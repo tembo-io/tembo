@@ -8,7 +8,8 @@ CoreDB is being built by a group of long-time Postgres users. We are building a 
 * Beautiful monitoring UI - it'd be nice to get information about the cluster without having to use the SQL console
 * Integrated extensions — developers shouldn't have to enable functionality via cryptic commands
 * Awesome migrations — migrations are a database concern, not an application concern. 
-* Schema source-of-truth — the database should broadcast to authorized users 
+* Schema source-of-truth — the database should broadcast to authorized users
+* CoreDB Kubernetes Operator
 
 
 ## Maybe also/eventually...
