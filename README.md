@@ -1,6 +1,9 @@
 # CoreDB
 
-CoreDB is an "On Steroids" distribution of Postgres, as well as a managed service to easily provision CoreDB to the cloud.
+CoreDB is an "On Steroids" distribution of Postgres under active development that you are free to use, 
+except to compete with the managed service that we are building concurrently with this open project.
+
+See http://coredb.io/coredb-community-license
 
 ## Features
 
