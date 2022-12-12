@@ -18,7 +18,7 @@ except to compete with the managed service that we are building concurrently wit
 ## Roadmap - Next
 
 * Awesome migrations — migrations are a database concern, not an application concern 
-* Schema source-of-truth — the database should broadcast to authorized users
+* Schema source-of-truth — the database should communicate it's schema clearly to authorized users
 
 ## Roadmap - Maybe
 
