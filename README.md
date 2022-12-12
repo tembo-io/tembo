@@ -24,5 +24,5 @@ except to compete with the managed service that we are building concurrently wit
 
 * Serverless - seperate the storage from the compute
 * HTAP - automatically store data in the best format (row-wise or columnar) for the queries that you run
-* Multi-master — we should be able to run multiple masters and they can sync in the background
+* Multi-master — we should be able to run multiple masters that sync in the background
 * App sidecars - standard directories like `/dbt` `/python` `/rust` that you could drop your data pipelines or apps into, and are then run "as close as possible" to the database
