@@ -53,7 +53,7 @@ pub extern "C" fn background_worker_main(_arg: pg_sys::Datum) {
 
     let listener = TcpListener::bind("0.0.0.0:8080").unwrap();
     listener
-        .set_nonblocking(true)
+        .set_nonblocking(false)
         .expect("Cannot set non-blocking");
 
     log!("Listening on port 8080");
