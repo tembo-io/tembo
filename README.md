@@ -1,5 +1,8 @@
 # CoreDB
 
+[![](https://shields.io/endpoint?url=https://ossrank.com/shield/2103)](https://ossrank.com/p/2103)
+
+
 CoreDB is an "On Steroids" distribution of Postgres under active development that you are free to use, 
 except to compete with the managed service that we are building concurrently with this open project
 (see http://coredb.io/coredb-community-license).
