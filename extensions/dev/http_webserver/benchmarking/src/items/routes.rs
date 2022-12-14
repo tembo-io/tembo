@@ -1,7 +1,6 @@
 use crate::items::{Items};
 use crate::error_handler::CustomError;
 use actix_web::{get, web, HttpResponse};
-// use serde_json::json;
 
 #[get("/read")]
 async fn find_all() -> Result<HttpResponse, CustomError> {
