@@ -1,7 +1,6 @@
 [package]
 name = "controller"
-version = "0.12.4"
-authors = ["clux <sszynrae@gmail.com>"]
+version = "0.0.1"
 edition = "2021"
 default-run = "controller"
 license = "Apache-2.0"
@@ -53,8 +52,3 @@ tower-test = "0.4.0"
 [dependencies.kube]
 features = ["runtime", "client", "derive"]
 version = "0.76.0"
-
-# testing new releases - ignore
-#git = "https://github.com/kube-rs/kube-rs.git"
-#rev = "8dcd5c0865ad0a40520519032119fbe4ea5f85f7"
-#path = "../kube/kube"

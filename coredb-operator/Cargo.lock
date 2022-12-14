@@ -460,7 +460,7 @@ dependencies = [
 
 [[package]]
 name = "controller"
-version = "0.12.4"
+version = "0.0.1"
 dependencies = [
  "actix-web",
  "assert-json-diff",
