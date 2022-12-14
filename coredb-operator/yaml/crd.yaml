@@ -1,0 +1,52 @@
+metadata:
+  name: coredbs.kube.rs
+spec:
+  conversion:
+    strategy: None
+  group: kube.rs
+  names:
+    kind: CoreDB
+    listKind: CoreDBList
+    plural: coredbs
+    shortNames:
+      - cdb
+    singular: coredb
+  scope: Namespaced
+  versions:
+    - name: v1
+      schema:
+        openAPIV3Schema:
+          description: Auto-generated derived type for CoreDBSpec via `CustomResource`
+          properties:
+            spec:
+              description: |-
+                Generate the Kubernetes wrapper struct `CoreDB` from our Spec and Status struct
+
+                This provides a hook for generating the CRD yaml (in crdgen.rs)
+              properties:
+                hide:
+                  type: boolean
+                replicas:
+                  format: int32
+                  type: integer
+              required:
+                - hide
+                - replicas
+              type: object
+            status:
+              description: The status object of `CoreDB`
+              nullable: true
+              properties:
+                hidden:
+                  type: boolean
+              required:
+                - hidden
+              type: object
+          required:
+            - spec
+          title: CoreDB
+          type: object
+      served: true
+      storage: true
+      subresources:
+        status: {}
