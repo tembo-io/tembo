@@ -62,3 +62,7 @@ curl http://0.0.0.0:8080/delete/:id
 ```bash
 curl http://0.0.0.0:8080/echo
 ```
+
+## Benchmarking
+
+See [readme](./benchmarking/README.md) in the benchmarking directory.
