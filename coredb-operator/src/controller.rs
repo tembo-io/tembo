@@ -1,5 +1,5 @@
 use crate::{telemetry, Error, Metrics, Result};
-use k8s_openapi::api::apps::v1::{Deployment, DeploymentSpec, StatefulSet, StatefulSetSpec};
+use k8s_openapi::api::apps::v1::{StatefulSet, StatefulSetSpec};
 use k8s_openapi::api::core::v1::{Container, ContainerPort, EnvVar, PodSpec, PodTemplateSpec};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::LabelSelector;
 use std::collections::BTreeMap;
@@ -108,9 +108,7 @@ impl CoreDB {
                 .await
                 .map_err(Error::KubeError)?;
         }
-        // if name == "illegal" {
-        //     return Err(Error::IllegalCoreDB); // error names show up in metrics
-        // }
+
         // always overwrite status object with what we saw
         let new_status = Patch::Apply(json!({
             "apiVersion": "kube.rs/v1",
@@ -137,7 +135,6 @@ impl CoreDB {
         let ns = self.namespace().unwrap();
         let name = self.name_any();
         let mut labels: BTreeMap<String, String> = BTreeMap::new();
-        let mut env: BTreeMap<String, String> = BTreeMap::new();
         let sts_api: Api<StatefulSet> = Api::namespaced(client, &ns);
         labels.insert("app".to_owned(), name.to_owned());
         let sts: StatefulSet = StatefulSet {
@@ -164,7 +161,7 @@ impl CoreDB {
                             name: name.to_owned(),
                             image: Some("docker.io/postgres:15".to_owned()),
                             ports: Some(vec![ContainerPort {
-                                container_port: 8080,
+                                container_port: 5432,
                                 ..ContainerPort::default()
                             }]),
                             ..Container::default()
@@ -215,7 +212,7 @@ impl CoreDB {
             })
             .await
             .map_err(Error::KubeError)?;
-        self.delete_sts(client, &self.name(), &self.namespace().unwrap())
+        self.delete_sts(client, &self.name_any(), &self.namespace().unwrap())
             .await
             .expect("error deleting statefulset");
         Ok(Action::await_change())
