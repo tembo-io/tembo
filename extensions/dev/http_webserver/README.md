@@ -27,6 +27,8 @@ echo "shared_preload_libraries = 'api.so'" >> ~/.pgx/data-14/postgresql.conf
 
 ### Running the server
 
+Use `--release` when benchmarking
+
 ```bash
 cargo pgx run pg14
 ```
@@ -40,7 +42,7 @@ Everything is backed by the `items` table.
 ### Create a title
 
 ```bash
-curl -X POST -H "Content-Type: application/json" -d '{"title": "My Title"}' http://0.0.0.0:8080/add
+curl -X POST -H "Content-Type: application/json" -d '{"title": "SomeTitle"}' http://0.0.0.0:8080/add
 ```
 
 ### List titles
