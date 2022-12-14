@@ -18,19 +18,12 @@ Update the .env file with the correct database connection information.
 cargo run --release
 ```
 
-# Run stand-alone python webserver
-
-```bash
-poetry install
-poetry run gunicorn app:app -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:8000
-```
-
 # Loadtest against the stand-alone webserver
 
 ```bash
 poetry run locust \
     -f ./locustfile.py \
-    --host=http://0.0.0.0:8000/read \
+    --host=http://0.0.0.0:8001/read \
     -u 100 -r 100 -t 120s --stop-timeout 1 --headless --csv=stand-alone-actix
 ```
 

@@ -40,12 +40,11 @@ def combine_plt(files: list[str]):
     return df
 
 
-
 if __name__ == "__main__":
     combine_plt(
         [
-            # "stand-alone-actix_stats.csv",
-            # "pgext-TcpListener_stats.csv",
+            "stand-alone-actix_stats.csv",
+            "pgext-TcpListener_stats.csv",
             "fastapi_stats.csv"
         ])
     
