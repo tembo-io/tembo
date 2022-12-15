@@ -4,7 +4,7 @@
 
 * A CoreDB cluster is deployed
 * I have user credentials to deploy to it
-* I have created a coredb project via `coredb init`
+* I have created a coredb project on my machine via `coredb init` command
 * I create files according to coredb docs
 
 ## When
