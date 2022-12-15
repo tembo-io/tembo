@@ -11,7 +11,6 @@ use prometheus_client::registry::Registry;
 #[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelValue)]
 pub enum Method {
     Get,
-    Post,
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelSet)]

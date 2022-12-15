@@ -9,9 +9,8 @@ mod webserver;
 #[allow(non_snake_case)]
 #[pg_guard]
 pub extern "C" fn _PG_init() {
-    log!("Initializing background worker");
-    BackgroundWorkerBuilder::new("Background Worker Example")
-        .set_function("background_worker_main")
+    BackgroundWorkerBuilder::new("Prometheus Exporter for Postgres")
+        .set_function("serve_metrics")
         .set_library("prometheus_exporter")
         .enable_spi_access()
         .set_start_time(BgWorkerStartTime::ConsistentState)
@@ -21,19 +20,15 @@ pub extern "C" fn _PG_init() {
 
 #[pg_guard]
 #[no_mangle]
-pub extern "C" fn background_worker_main(_arg: pg_sys::Datum) {
-    // these are the signals we want to receive.  If we don't attach the SIGTERM handler, then
-    // we'll never be able to exit via an external notification
+pub extern "C" fn serve_metrics(_arg: pg_sys::Datum) {
     BackgroundWorker::attach_signal_handlers(SignalWakeFlags::SIGHUP | SignalWakeFlags::SIGTERM);
 
-    // we want to be able to use SPI against the specified database (postgres), as the superuser which
-    // did the initdb. You can specify a specific user with Some("my_user")
     BackgroundWorker::connect_worker_to_spi(Some("prometheus_exporter"), None);
 
     webserver::serve().unwrap();
 
     log!(
-        "Goodbye from inside the {} BGWorker! ",
+        "Closing BGWorker: {}",
         BackgroundWorker::get_name()
     );
 }
