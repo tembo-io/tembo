@@ -186,7 +186,7 @@ impl CoreDB {
         let mut exists = false;
         // Create the statefulset defined above
         let lp = ListParams::default().labels("app=coredb");
-        for s in sts_api.list(&lp).await.map_err(Error::KubeError)? {
+        for _ in sts_api.list(&lp).await.map_err(Error::KubeError)? {
             exists = true
         }
         if !exists {
@@ -203,7 +203,7 @@ impl CoreDB {
         let mut exists = false;
         // Create the statefulset defined above
         let lp = ListParams::default().labels("app=coredb");
-        for s in sts.list(&lp).await.map_err(Error::KubeError)? {
+        for _ in sts.list(&lp).await.map_err(Error::KubeError)? {
             exists = true
         }
         if exists {
