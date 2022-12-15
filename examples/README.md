@@ -17,5 +17,5 @@
   * `db/schemas` directory is parsed for changes, and migrations are generated
     * potentially problematic migrations are flagged
     * the cli steps me through the migrations one-by-one
-  * `instances` directory is parsed for instances of postgres to spin up, within which dataplane clusters, and with what limitations
+  * `instances` directory is parsed for instances of postgres to spin up, within which dataplane clusters, and with what limitations (this assumes that we have magic multi-master functionality, which doesn't exist yet)
   * `apps` directory is parsed for apps to bundle into the postgres deployment (initially, only `actix` framework)
