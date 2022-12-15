@@ -127,7 +127,7 @@ impl CoreDB {
             .await
             .expect("error creating statefulset");
         // If no events were received, check back every minute
-        Ok(Action::requeue(Duration::from_secs(1 * 60)))
+        Ok(Action::requeue(Duration::from_secs(60)))
     }
 
     async fn create_sts(&self, ctx: Arc<Context>) -> Result<(), Error> {
