@@ -126,17 +126,18 @@ impl CoreDB {
         self.create_sts(ctx)
             .await
             .expect("error creating statefulset");
-        // If no events were received, check back every 5 minutes
-        Ok(Action::requeue(Duration::from_secs(5 * 60)))
+        // If no events were received, check back every minute
+        Ok(Action::requeue(Duration::from_secs(1 * 60)))
     }
 
-    async fn create_sts(&self, ctx: Arc<Context>) -> Result<Action> {
+    async fn create_sts(&self, ctx: Arc<Context>) -> Result<(), Error> {
         let client = ctx.client.clone();
         let ns = self.namespace().unwrap();
         let name = self.name_any();
         let mut labels: BTreeMap<String, String> = BTreeMap::new();
         let sts_api: Api<StatefulSet> = Api::namespaced(client, &ns);
-        labels.insert("app".to_owned(), name.to_owned());
+        labels.insert("app".to_owned(), "coredb".to_string());
+
         let sts: StatefulSet = StatefulSet {
             metadata: ObjectMeta {
                 name: Some(name.to_owned()),
@@ -178,22 +179,35 @@ impl CoreDB {
             ..StatefulSet::default()
         };
 
-        // Create the statefulset defined above
-        sts_api
-            .create(&PostParams::default(), &sts)
-            .await
-            .map_err(Error::KubeError)?;
-
-        // If no events were received, check back every 5 minutes
-        Ok(Action::requeue(Duration::from_secs(5 * 60)))
+        let mut exists = false;
+        // Create the statefulset if it does not exist
+        let lp = ListParams::default().labels("app=coredb");
+        for _ in sts_api.list(&lp).await.map_err(Error::KubeError)? {
+            exists = true
+        }
+        if !exists {
+            sts_api
+                .create(&PostParams::default(), &sts)
+                .await
+                .map_err(Error::KubeError)?;
+        }
+        Ok(())
     }
 
     async fn delete_sts(&self, client: Client, name: &str, namespace: &str) -> Result<(), Error> {
         let sts: Api<StatefulSet> = Api::namespaced(client, namespace);
-        sts
-            .delete(name, &DeleteParams::default())
-            .await
-            .map_err(Error::KubeError)?;
+        let mut exists = false;
+        // Delete the statefulset if it exists
+        let lp = ListParams::default().labels("app=coredb");
+        for _ in sts.list(&lp).await.map_err(Error::KubeError)? {
+            exists = true
+        }
+        if exists {
+            sts
+                .delete(name, &DeleteParams::default())
+                .await
+                .map_err(Error::KubeError)?;
+        }
         Ok(())
     }
 
