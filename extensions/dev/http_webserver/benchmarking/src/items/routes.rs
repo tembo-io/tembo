@@ -8,6 +8,11 @@ async fn find_all() -> Result<HttpResponse, CustomError> {
     Ok(HttpResponse::Ok().json(items))
 }
 
+#[get("/alive")]
+async fn alive() -> Result<HttpResponse, CustomError> {
+    Ok(HttpResponse::Ok().body("alive"))
+}
+
 
 pub fn init_routes(config: &mut web::ServiceConfig) {
     config.service(find_all);

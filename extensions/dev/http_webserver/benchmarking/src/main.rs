@@ -22,14 +22,14 @@ async fn main() -> std::io::Result<()> {
     let mut listenfd = ListenFd::from_env();
     let mut server = HttpServer::new(|| App::new().configure(items::init_routes));
 
-    server = match listenfd.take_tcp_listener(0)? {
-        Some(listener) => server.listen(listener)?,
-        None => {
-            let host = env::var("WEBSERVER_HOST").expect("Set WEBSERVER_HOST in .env");
-            let port = env::var("WEBSERVER_PORT").expect("Set WEBSERVER_PORT in .env");
-            server.bind(format!("{}:{}", host, port))?
-        }
-    };
-
+    // server = match listenfd.take_tcp_listener(0)? {
+    //     Some(listener) => server.listen(listener)?,
+    //     None => {
+    //         let host = env::var("WEBSERVER_HOST").expect("Set WEBSERVER_HOST in .env");
+    //         let port = env::var("WEBSERVER_PORT").expect("Set WEBSERVER_PORT in .env");
+    //         server.bind(format!("{}:{}", host, port))?
+    //     }
+    // };
+    server = server.bind("0.0.0.0:8081")?;
     server.run().await
 }
