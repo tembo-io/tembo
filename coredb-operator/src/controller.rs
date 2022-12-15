@@ -189,23 +189,6 @@ impl CoreDB {
         Ok(())
     }
 
-    // async fn delete_sts(&self, client: Client, name: &str, namespace: &str) -> Result<(), Error> {
-    //     let sts: Api<StatefulSet> = Api::namespaced(client, namespace);
-    //     let mut exists = false;
-    //     // Delete the statefulset if it exists
-    //     let lp = ListParams::default().labels("app=coredb");
-    //     for _ in sts.list(&lp).await.map_err(Error::KubeError)? {
-    //         exists = true
-    //     }
-    //     if exists {
-    //         sts
-    //             .delete(name, &DeleteParams::default())
-    //             .await
-    //             .map_err(Error::KubeError)?;
-    //     }
-    //     Ok(())
-    // }
-
     // Finalizer cleanup (the object was deleted, ensure nothing is orphaned)
     async fn cleanup(&self, ctx: Arc<Context>) -> Result<Action> {
         let client = ctx.client.clone();
@@ -221,9 +204,6 @@ impl CoreDB {
             })
             .await
             .map_err(Error::KubeError)?;
-        // self.delete_sts(client, &self.name_any(), &self.namespace().unwrap())
-        //     .await
-        //     .expect("error deleting statefulset");
         Ok(Action::await_change())
     }
 }
