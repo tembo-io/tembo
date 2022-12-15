@@ -7,4 +7,23 @@ edition = "2021"
 
 [dependencies]
 actix-web = "4.2.1"
+pgx = "0.6.1"
 prometheus-client = "0.19.0-alpha.2"
+
+
+[features]
+default = ["pg14"]
+pg14 = ["pgx/pg14", "pgx-tests/pg14" ]
+
+[dev-dependencies]
+pgx-tests = "~0.6.1"
+
+[profile.dev]
+panic = "unwind"
+lto = "thin"
+
+[profile.release]
+panic = "unwind"
+opt-level = 3
+lto = "fat"
+codegen-units = 1
