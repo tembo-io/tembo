@@ -51,4 +51,4 @@ tower-test = "0.4.0"
 
 [dependencies.kube]
 features = ["runtime", "client", "derive"]
-version = "0.76.0"
+version = "0.77.0"
