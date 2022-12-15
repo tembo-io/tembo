@@ -138,10 +138,6 @@ impl CoreDB {
         let sts_api: Api<StatefulSet> = Api::namespaced(client, &ns);
         labels.insert("app".to_owned(), "coredb".to_string());
 
-        // if sts_api.get(&name) {
-        //     return
-        // }
-
         let sts: StatefulSet = StatefulSet {
             metadata: ObjectMeta {
                 name: Some(name.to_owned()),
@@ -184,7 +180,7 @@ impl CoreDB {
         };
 
         let mut exists = false;
-        // Create the statefulset defined above
+        // Create the statefulset if it does not exist
         let lp = ListParams::default().labels("app=coredb");
         for _ in sts_api.list(&lp).await.map_err(Error::KubeError)? {
             exists = true
@@ -201,7 +197,7 @@ impl CoreDB {
     async fn delete_sts(&self, client: Client, name: &str, namespace: &str) -> Result<(), Error> {
         let sts: Api<StatefulSet> = Api::namespaced(client, namespace);
         let mut exists = false;
-        // Create the statefulset defined above
+        // Delete the statefulset if it exists
         let lp = ListParams::default().labels("app=coredb");
         for _ in sts.list(&lp).await.map_err(Error::KubeError)? {
             exists = true
