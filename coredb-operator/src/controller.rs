@@ -179,18 +179,11 @@ impl CoreDB {
             ..StatefulSet::default()
         };
 
-        let mut exists = false;
-        // Create the statefulset if it does not exist
-        let lp = ListParams::default().labels("app=coredb");
-        for _ in sts_api.list(&lp).await.map_err(Error::KubeError)? {
-            exists = true
-        }
-        if !exists {
-            sts_api
-                .create(&PostParams::default(), &sts)
-                .await
-                .map_err(Error::KubeError)?;
-        }
+        let ps = PatchParams::apply("cntrlr").force();
+        let _o = sts_api
+            .patch(&name, &ps, &Patch::Apply(&sts))
+            .await
+            .map_err(Error::KubeError)?;
         Ok(())
     }
 
