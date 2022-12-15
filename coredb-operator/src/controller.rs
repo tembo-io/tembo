@@ -3,7 +3,7 @@ use k8s_openapi::api::apps::v1::{StatefulSet, StatefulSetSpec};
 use k8s_openapi::api::core::v1::{Container, ContainerPort, EnvVar, PodSpec, PodTemplateSpec};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::LabelSelector;
 use std::collections::BTreeMap;
-use kube::api::{DeleteParams, ObjectMeta};
+use kube::api::{ObjectMeta};
 use chrono::{DateTime, Utc};
 use futures::{future::BoxFuture, FutureExt, StreamExt};
 use kube::{
@@ -136,6 +136,7 @@ impl CoreDB {
         let name = self.name_any();
         let mut labels: BTreeMap<String, String> = BTreeMap::new();
         let sts_api: Api<StatefulSet> = Api::namespaced(client, &ns);
+        let oref = self.controller_owner_ref(&()).unwrap();
         labels.insert("app".to_owned(), "coredb".to_string());
 
         let sts: StatefulSet = StatefulSet {
@@ -143,6 +144,7 @@ impl CoreDB {
                 name: Some(name.to_owned()),
                 namespace: Some(ns.to_owned()),
                 labels: Some(labels.clone()),
+                owner_references: Some(vec![oref]),
                 ..ObjectMeta::default()
             },
             spec: Some(StatefulSetSpec {
@@ -187,26 +189,8 @@ impl CoreDB {
         Ok(())
     }
 
-    async fn delete_sts(&self, client: Client, name: &str, namespace: &str) -> Result<(), Error> {
-        let sts: Api<StatefulSet> = Api::namespaced(client, namespace);
-        let mut exists = false;
-        // Delete the statefulset if it exists
-        let lp = ListParams::default().labels("app=coredb");
-        for _ in sts.list(&lp).await.map_err(Error::KubeError)? {
-            exists = true
-        }
-        if exists {
-            sts
-                .delete(name, &DeleteParams::default())
-                .await
-                .map_err(Error::KubeError)?;
-        }
-        Ok(())
-    }
-
     // Finalizer cleanup (the object was deleted, ensure nothing is orphaned)
     async fn cleanup(&self, ctx: Arc<Context>) -> Result<Action> {
-        let client = ctx.client.clone();
         let recorder = ctx.diagnostics.read().await.recorder(ctx.client.clone(), self);
         // CoreDB doesn't have dependencies in this example case, so we just publish an event
         recorder
@@ -219,9 +203,6 @@ impl CoreDB {
             })
             .await
             .map_err(Error::KubeError)?;
-        self.delete_sts(client, &self.name_any(), &self.namespace().unwrap())
-            .await
-            .expect("error deleting statefulset");
         Ok(Action::await_change())
     }
 }
