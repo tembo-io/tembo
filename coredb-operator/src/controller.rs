@@ -3,7 +3,7 @@ use k8s_openapi::api::apps::v1::{StatefulSet, StatefulSetSpec};
 use k8s_openapi::api::core::v1::{Container, ContainerPort, EnvVar, PodSpec, PodTemplateSpec};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::LabelSelector;
 use std::collections::BTreeMap;
-use kube::api::{DeleteParams, ObjectMeta, PostParams};
+use kube::api::{DeleteParams, ObjectMeta};
 use chrono::{DateTime, Utc};
 use futures::{future::BoxFuture, FutureExt, StreamExt};
 use kube::{
@@ -127,7 +127,7 @@ impl CoreDB {
             .await
             .expect("error creating statefulset");
         // If no events were received, check back every minute
-        Ok(Action::requeue(Duration::from_secs(1 * 60)))
+        Ok(Action::requeue(Duration::from_secs(60)))
     }
 
     async fn create_sts(&self, ctx: Arc<Context>) -> Result<(), Error> {
@@ -179,18 +179,11 @@ impl CoreDB {
             ..StatefulSet::default()
         };
 
-        let mut exists = false;
-        // Create the statefulset if it does not exist
-        let lp = ListParams::default().labels("app=coredb");
-        for _ in sts_api.list(&lp).await.map_err(Error::KubeError)? {
-            exists = true
-        }
-        if !exists {
-            sts_api
-                .create(&PostParams::default(), &sts)
-                .await
-                .map_err(Error::KubeError)?;
-        }
+        let ps = PatchParams::apply("cntrlr").force();
+        let _o = sts_api
+            .patch(&name, &ps, &Patch::Apply(&sts))
+            .await
+            .map_err(Error::KubeError)?;
         Ok(())
     }
 
