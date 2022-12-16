@@ -2,9 +2,9 @@ use pgx::bgworkers::*;
 use pgx::log;
 use pgx::prelude::*;
 
-pgx::pg_module_magic!();
-
 mod webserver;
+
+pgx::pg_module_magic!();
 
 #[allow(non_snake_case)]
 #[pg_guard]
@@ -31,4 +31,9 @@ pub extern "C" fn serve_metrics(_arg: pg_sys::Datum) {
         "Closing BGWorker: {}",
         BackgroundWorker::get_name()
     );
+}
+
+#[pg_extern]
+pub fn yolo() -> String{
+    "yolo".to_string()
 }
