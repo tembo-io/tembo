@@ -12,7 +12,7 @@ use pgx::bgworkers::*;
 use pgx::prelude::*;
 
 use prometheus_client::encoding::text::encode;
-use prometheus_client::encoding::{EncodeLabelSet};
+use prometheus_client::encoding::EncodeLabelSet;
 use prometheus_client::metrics::family::Family;
 use prometheus_client::metrics::gauge::Gauge;
 use prometheus_client::registry::Registry;
@@ -81,7 +81,7 @@ fn handle_pg_uptime() -> Option<i64> {
         log!("pg_uptime: {:?}", obj_clone);
     });
     let x = Some(*uptime.lock().unwrap());
-    
+
     x
 }
 
