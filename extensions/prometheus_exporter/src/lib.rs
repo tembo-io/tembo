@@ -2,9 +2,9 @@ use pgx::bgworkers::*;
 use pgx::log;
 use pgx::prelude::*;
 
-pgx::pg_module_magic!();
-
 mod webserver;
+
+pgx::pg_module_magic!();
 
 #[allow(non_snake_case)]
 #[pg_guard]
