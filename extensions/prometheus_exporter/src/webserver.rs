@@ -92,13 +92,6 @@ fn query() -> Option<i64> {
     let uptime = Arc::new(Mutex::new(i64::default()));
     let clone = Arc::clone(&uptime);
     println!("query called");
-    // BackgroundWorker::transaction(move || {
-    //     let ut: Option<i64> = Spi::get_one(UPTIME_QUERY);
-    //     match ut {
-    //         Some(t) => println!("t: {:?}", t),
-    //         None => println!("no value"),
-    //     }
-    // });
     BackgroundWorker::transaction(move || {
         Spi::execute(|client| {
             println!("query called (inside spi");
