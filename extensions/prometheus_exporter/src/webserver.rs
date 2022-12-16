@@ -16,7 +16,7 @@ use prometheus_client::metrics::family::Family;
 use prometheus_client::metrics::gauge::Gauge;
 use prometheus_client::registry::Registry;
 
-const UPTIME_QUERY: &str = "SELECT FLOOR(EXTRACT(EPOCH FROM now() - pg_postmaster_start_time))
+const UPTIME_QUERY: &str = "SELECT FLOOR(EXTRACT(EPOCH FROM now() - pg_postmaster_start_time))::bigint
 FROM pg_postmaster_start_time();";
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelValue)]
