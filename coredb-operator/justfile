@@ -6,6 +6,11 @@ SEMVER_VERSION := `grep version Cargo.toml | awk -F"\"" '{print $2}' | head -n 1
 default:
   @just --list --unsorted --color=always | rg -v "    default"
 
+# generate crd
+generate-crd:
+  cargo run --bin crdgen > yaml/crd.yaml
+
+
 # generate and install crd into the cluster
 install-crd:
   cargo run --bin crdgen > yaml/crd.yaml

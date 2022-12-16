@@ -4,4 +4,3 @@ metadata:
   name: sample-coredb
 spec:
   replicas: 1
-  hide: false

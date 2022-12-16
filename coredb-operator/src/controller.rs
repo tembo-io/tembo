@@ -1,13 +1,15 @@
 use crate::{telemetry, Error, Metrics, Result};
-use k8s_openapi::api::apps::v1::{StatefulSet, StatefulSetSpec};
-use k8s_openapi::api::core::v1::{Container, ContainerPort, EnvVar, PodSpec, PodTemplateSpec};
-use k8s_openapi::apimachinery::pkg::apis::meta::v1::LabelSelector;
-use std::collections::BTreeMap;
-use kube::api::{ObjectMeta};
 use chrono::{DateTime, Utc};
 use futures::{future::BoxFuture, FutureExt, StreamExt};
+use k8s_openapi::{
+    api::{
+        apps::v1::{StatefulSet, StatefulSetSpec},
+        core::v1::{Container, ContainerPort, EnvVar, PodSpec, PodTemplateSpec},
+    },
+    apimachinery::pkg::apis::meta::v1::LabelSelector,
+};
 use kube::{
-    api::{Api, ListParams, Patch, PatchParams, ResourceExt},
+    api::{Api, ListParams, ObjectMeta, Patch, PatchParams, ResourceExt},
     client::Client,
     runtime::{
         controller::{Action, Controller},
@@ -19,7 +21,7 @@ use kube::{
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 use tokio::{sync::RwLock, time::Duration};
 use tracing::*;
 
@@ -34,18 +36,11 @@ pub static COREDB_FINALIZER: &str = "coredbs.kube.rs";
 #[kube(status = "CoreDBStatus", shortname = "cdb")]
 pub struct CoreDBSpec {
     pub replicas: i32,
-    pub hide: bool,
 }
 /// The status object of `CoreDB`
 #[derive(Deserialize, Serialize, Clone, Default, Debug, JsonSchema)]
 pub struct CoreDBStatus {
-    pub hidden: bool,
-}
-
-impl CoreDB {
-    fn was_hidden(&self) -> bool {
-        self.status.as_ref().map(|s| s.hidden).unwrap_or(false)
-    }
+    pub running: bool,
 }
 
 // Context for our reconciler
@@ -89,32 +84,17 @@ impl CoreDB {
     // Reconcile (for non-finalizer related changes)
     async fn reconcile(&self, ctx: Arc<Context>) -> Result<Action> {
         let client = ctx.client.clone();
-        let recorder = ctx.diagnostics.read().await.recorder(client.clone(), self);
+        let _recorder = ctx.diagnostics.read().await.recorder(client.clone(), self);
         let ns = self.namespace().unwrap();
         let name = self.name_any();
         let coredbs: Api<CoreDB> = Api::namespaced(client, &ns);
-
-        let should_hide = self.spec.hide;
-        if !self.was_hidden() && should_hide {
-            // only send event the first time
-            recorder
-                .publish(Event {
-                    type_: EventType::Normal,
-                    reason: "HiddenCoreDB".into(),
-                    note: Some(format!("Hiding `{name}`")),
-                    action: "Reconciling".into(),
-                    secondary: None,
-                })
-                .await
-                .map_err(Error::KubeError)?;
-        }
 
         // always overwrite status object with what we saw
         let new_status = Patch::Apply(json!({
             "apiVersion": "kube.rs/v1",
             "kind": "CoreDB",
             "status": CoreDBStatus {
-                hidden: should_hide,
+                running: true,
             }
         }));
         let ps = PatchParams::apply("cntrlr").force();
@@ -123,9 +103,7 @@ impl CoreDB {
             .await
             .map_err(Error::KubeError)?;
         // create statefulset
-        self.create_sts(ctx)
-            .await
-            .expect("error creating statefulset");
+        self.create_sts(ctx).await.expect("error creating statefulset");
         // If no events were received, check back every minute
         Ok(Action::requeue(Duration::from_secs(60)))
     }
@@ -159,7 +137,7 @@ impl CoreDB {
                             env: Option::from(vec![EnvVar {
                                 name: "POSTGRES_PASSWORD".parse().unwrap(),
                                 value: Some("password".parse().unwrap()),
-                                value_from: None
+                                value_from: None,
                             }]),
                             name: name.to_owned(),
                             image: Some("docker.io/postgres:15".to_owned()),
