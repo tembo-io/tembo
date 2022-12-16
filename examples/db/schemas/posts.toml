@@ -1,0 +1,26 @@
+[table]
+schema = "main"
+name = "posts"
+
+[table.fields.id]
+type = "int"
+default = "autoincrement()"
+
+[table.fields.createdAt]
+type = "DateTime"
+default = "now()"
+
+[table.fields.updatedAt]
+type = "DateTime"
+
+[table.fields.title]
+type = "VARCHAR(200)"
+default = ""
+
+[table.fields.body]
+type = "VARCHAR"
+default = ""
+
+[table.fields.slug]
+type = "VARCHAR(255)"
+unique = true

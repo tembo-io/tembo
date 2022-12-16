@@ -1,0 +1,10 @@
+[instance]
+name = "read"
+cpu = "1"
+mem = "1024"
+read_only = true
+coredb_account_cluster = "aws-us-east"
+
+[tables]
+include = ["posts"]
+

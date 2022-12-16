@@ -1,0 +1,9 @@
+[instance]
+name = "primary"
+cpu = "2"
+mem = "4096"
+coredb_account_cluster = "google-us-west"
+
+[tables]
+include = ["posts"]
+
