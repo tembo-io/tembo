@@ -7,8 +7,10 @@ edition = "2021"
 
 [dependencies]
 actix-web = "4.2.1"
+futures = "0.3.25"
 pgx = "0.6.1"
 prometheus-client = "0.19.0-alpha.2"
+tokio = {version = "1.23.0", features = ["macros", "rt-multi-thread"] }
 
 [lib]
 crate-type = ["cdylib"]
