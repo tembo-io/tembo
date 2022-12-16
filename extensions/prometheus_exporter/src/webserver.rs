@@ -68,6 +68,8 @@ fn pg_uptime() -> Option<i64> {
     Spi::get_one(UPTIME_QUERY)
 }
 
+use pgx::log;
+
 fn handle_pg_uptime() -> Option<i64> {
     let uptime = Arc::new(Mutex::new(i64::default()));
     let clone = Arc::clone(&uptime);
@@ -76,9 +78,10 @@ fn handle_pg_uptime() -> Option<i64> {
     BackgroundWorker::transaction(move || {
         let mut obj_clone = clone.lock().unwrap();
         *obj_clone = pg_uptime().unwrap();
+        log!("pg_uptime: {:?}", obj_clone);
     });
     let x = Some(*uptime.lock().unwrap());
-    println!("uptime: {:?}", x.unwrap());
+    
     x
 }
 
