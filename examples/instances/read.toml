@@ -1,5 +1,5 @@
 [instance]
-name = "primary"
+name = "read"
 cpu = "1"
 mem = "1024"
 read_only = true
