@@ -17,7 +17,6 @@ pub extern "C" fn _PG_init() {
         .load();
 }
 
-
 #[pg_guard]
 #[no_mangle]
 pub extern "C" fn serve_metrics(_arg: pg_sys::Datum) {
@@ -27,8 +26,5 @@ pub extern "C" fn serve_metrics(_arg: pg_sys::Datum) {
 
     webserver::serve().unwrap();
 
-    log!(
-        "Closing BGWorker: {}",
-        BackgroundWorker::get_name()
-    );
+    log!("Closing BGWorker: {}", BackgroundWorker::get_name());
 }
