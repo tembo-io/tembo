@@ -1,13 +1,15 @@
 use crate::{telemetry, Error, Metrics, Result};
-use k8s_openapi::api::apps::v1::{StatefulSet, StatefulSetSpec};
-use k8s_openapi::api::core::v1::{Container, ContainerPort, EnvVar, PodSpec, PodTemplateSpec};
-use k8s_openapi::apimachinery::pkg::apis::meta::v1::LabelSelector;
-use std::collections::BTreeMap;
-use kube::api::{ObjectMeta};
 use chrono::{DateTime, Utc};
 use futures::{future::BoxFuture, FutureExt, StreamExt};
+use k8s_openapi::{
+    api::{
+        apps::v1::{StatefulSet, StatefulSetSpec},
+        core::v1::{Container, ContainerPort, EnvVar, PodSpec, PodTemplateSpec},
+    },
+    apimachinery::pkg::apis::meta::v1::LabelSelector,
+};
 use kube::{
-    api::{Api, ListParams, Patch, PatchParams, ResourceExt},
+    api::{Api, ListParams, ObjectMeta, Patch, PatchParams, ResourceExt},
     client::Client,
     runtime::{
         controller::{Action, Controller},
@@ -19,7 +21,7 @@ use kube::{
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 use tokio::{sync::RwLock, time::Duration};
 use tracing::*;
 
@@ -82,7 +84,7 @@ impl CoreDB {
     // Reconcile (for non-finalizer related changes)
     async fn reconcile(&self, ctx: Arc<Context>) -> Result<Action> {
         let client = ctx.client.clone();
-        let recorder = ctx.diagnostics.read().await.recorder(client.clone(), self);
+        let _recorder = ctx.diagnostics.read().await.recorder(client.clone(), self);
         let ns = self.namespace().unwrap();
         let name = self.name_any();
         let coredbs: Api<CoreDB> = Api::namespaced(client, &ns);
@@ -101,9 +103,7 @@ impl CoreDB {
             .await
             .map_err(Error::KubeError)?;
         // create statefulset
-        self.create_sts(ctx)
-            .await
-            .expect("error creating statefulset");
+        self.create_sts(ctx).await.expect("error creating statefulset");
         // If no events were received, check back every minute
         Ok(Action::requeue(Duration::from_secs(60)))
     }
@@ -137,7 +137,7 @@ impl CoreDB {
                             env: Option::from(vec![EnvVar {
                                 name: "POSTGRES_PASSWORD".parse().unwrap(),
                                 value: Some("password".parse().unwrap()),
-                                value_from: None
+                                value_from: None,
                             }]),
                             name: name.to_owned(),
                             image: Some("docker.io/postgres:15".to_owned()),
