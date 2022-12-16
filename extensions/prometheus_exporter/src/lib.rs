@@ -32,8 +32,3 @@ pub extern "C" fn serve_metrics(_arg: pg_sys::Datum) {
         BackgroundWorker::get_name()
     );
 }
-
-#[pg_extern]
-pub fn yolo() -> String{
-    "yolo".to_string()
-}
