@@ -7,3 +7,4 @@ coredb_account_cluster = "aws-us-east"
 
 [tables]
 include = ["posts"]
+

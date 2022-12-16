@@ -6,3 +6,4 @@ coredb_account_cluster = "google-us-west"
 
 [tables]
 include = ["posts"]
+
