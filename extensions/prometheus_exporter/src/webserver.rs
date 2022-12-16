@@ -9,6 +9,7 @@ use actix_web::{web, App, HttpResponse, HttpServer, Result};
 use tokio::task;
 
 use pgx::bgworkers::*;
+use pgx::log;
 use pgx::prelude::*;
 
 use prometheus_client::encoding::text::encode;
@@ -67,8 +68,6 @@ pub async fn update_metrics(metrics_clone: Arc<Mutex<Metrics>>) {
 fn pg_uptime() -> Option<i64> {
     Spi::get_one(UPTIME_QUERY)
 }
-
-use pgx::log;
 
 fn handle_pg_uptime() -> Option<i64> {
     let uptime = Arc::new(Mutex::new(i64::default()));
