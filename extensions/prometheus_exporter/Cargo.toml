@@ -13,16 +13,15 @@ pg12 = ["pgx/pg12", "pgx-tests/pg12" ]
 pg13 = ["pgx/pg13", "pgx-tests/pg13" ]
 pg14 = ["pgx/pg14", "pgx-tests/pg14" ]
 pg15 = ["pgx/pg15", "pgx-tests/pg15" ]
-pg_test = ["pgx-tests"]
-
+pg_test = []
 
 [dependencies]
-actix-web = "4.2.1"
 pgx = "0.6.1"
-pgx-tests = { version = "0.6.1", optional = true }
+actix-web = "4.2.1"
 prometheus-client = "0.19.0-alpha.2"
 signal-hook = "0.3.14"
 tokio = {version = "1.23.0", features = ["macros", "rt-multi-thread"] }
+
 
 [dev-dependencies]
 pgx-tests = "0.6.1"
