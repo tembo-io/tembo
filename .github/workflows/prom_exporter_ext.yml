@@ -1,5 +1,10 @@
 name: Prometheus Exporter for Postgres
 
+defaults:
+  run:
+    shell: bash
+    working-directory: ./extensions/prometheus_exporter/
+
 on:
   pull_request:
     branches: [ main ]
