@@ -44,8 +44,13 @@ async fn main() -> Result<()> {
     // Initialize tracing
     tracing::subscriber::set_global_default(collector).unwrap();
 
+    // Initialize the Kubernetes client
+    let client_future = kube::Client::try_default();
+    let client = match client_future.await {
+        Ok(wrapped_client) => wrapped_client,
+        Err(error) => panic!("Please configure your Kubernetes Context"),
+    };
     // Prepare shared state for the kubernetes controller and web server
-    let client = kube::Client::try_default().await.unwrap();
     let (controller, state) = controller::init(client).await;
 
     // Start web server
