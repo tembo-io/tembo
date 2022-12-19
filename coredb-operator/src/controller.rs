@@ -22,6 +22,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{collections::BTreeMap, sync::Arc};
+use k8s_openapi::api::core::v1::{PersistentVolumeClaim, PersistentVolumeClaimSpec, ResourceRequirements};
+use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 use tokio::{sync::RwLock, time::Duration};
 use tracing::*;
 
@@ -113,9 +115,11 @@ impl CoreDB {
         let ns = self.namespace().unwrap();
         let name = self.name_any();
         let mut labels: BTreeMap<String, String> = BTreeMap::new();
+        let mut pvc_requests: BTreeMap<String, Quantity, > = BTreeMap::new();
         let sts_api: Api<StatefulSet> = Api::namespaced(client, &ns);
         let oref = self.controller_owner_ref(&()).unwrap();
-        labels.insert("app".to_owned(), "coredb".to_string());
+        labels.insert("app".to_string(), "coredb".to_string());
+        pvc_requests.insert("storage".to_string(), Quantity("8Gi".to_string()));
 
         let sts: StatefulSet = StatefulSet {
             metadata: ObjectMeta {
@@ -154,6 +158,21 @@ impl CoreDB {
                         ..ObjectMeta::default()
                     }),
                 },
+                volume_claim_templates: Option::from(vec![PersistentVolumeClaim {
+                    metadata: ObjectMeta {
+                        name: Some("data".to_string()),
+                        ..ObjectMeta::default()
+                    },
+                    spec: Some(PersistentVolumeClaimSpec {
+                        access_modes: Some(vec!["ReadWriteOnce".to_owned()]),
+                        resources: Some(ResourceRequirements {
+                            limits: None,
+                            requests: Some(pvc_requests),
+                        }),
+                        ..PersistentVolumeClaimSpec::default()
+                    }),
+                    status: None,
+                }]),
                 ..StatefulSetSpec::default()
             }),
             ..StatefulSet::default()
