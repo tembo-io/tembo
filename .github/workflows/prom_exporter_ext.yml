@@ -1,0 +1,33 @@
+name: Prometheus Exporter for Postgres (pg14)
+
+defaults:
+  run:
+    shell: bash
+    working-directory: ./extensions/prometheus_exporter/
+
+on:
+  pull_request:
+    branches: [ main ]
+    paths: 
+    - '.github/workflows/postgres_extension.yml'
+    - 'extensions/**'
+
+jobs:
+  build_and_test:
+    name: Rust project
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: setup pgx
+        run: cargo install --locked cargo-pgx
+
+      - name: init
+        run: run: cargo pgx init --pg14 download
+
+      - name: test
+        run: cargo test --no-default-features --features pg14

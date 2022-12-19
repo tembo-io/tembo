@@ -117,3 +117,15 @@ pub async fn serve() -> std::io::Result<()> {
     .run()
     .await
 }
+
+#[cfg(any(test, feature = "pg_test"))]
+#[pg_schema]
+mod tests {
+    use crate::webserver;
+    use pgx::prelude::*;
+
+    #[pg_test]
+    fn test_pg_uptime() {
+        assert!(webserver::pg_uptime().is_some());
+    }
+}

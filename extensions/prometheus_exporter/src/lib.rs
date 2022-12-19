@@ -28,3 +28,15 @@ pub extern "C" fn serve_metrics(_arg: pg_sys::Datum) {
 
     log!("Closing BGWorker: {}", BackgroundWorker::get_name());
 }
+
+#[cfg(test)]
+pub mod pg_test {
+    pub fn setup(_options: Vec<&str>) {
+        // perform one-off initialization when the pg_test framework starts
+    }
+
+    pub fn postgresql_conf_options() -> Vec<&'static str> {
+        // return any postgresql.conf settings that are required for your tests
+        vec![]
+    }
+}
