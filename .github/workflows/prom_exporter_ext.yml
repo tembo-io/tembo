@@ -16,6 +16,7 @@ jobs:
   build_and_test:
     name: Rust project
     runs-on: ubuntu-20.04
+    container: postgres:14
     steps:
       - uses: actions/checkout@v2
 
@@ -27,7 +28,7 @@ jobs:
         run: cargo install --locked cargo-pgx
 
       - name: init
-        run: cargo pgx init --pg14 download
+        run: cargo pgx init --pg14 /usr/lib/postgresql/14/bin/pg_config
 
       - name: test
         run: cargo test --no-default-features --features pg14
