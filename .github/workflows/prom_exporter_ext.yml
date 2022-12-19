@@ -27,7 +27,7 @@ jobs:
         run: cargo install --locked cargo-pgx
 
       - name: init
-        run: cargo pgx init --pg14 download
+        run: run: cargo pgx init --pg14 download
 
       - name: test
         run: cargo test --no-default-features --features pg14
