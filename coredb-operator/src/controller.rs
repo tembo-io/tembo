@@ -254,3 +254,30 @@ pub async fn init(client: Client) -> (BoxFuture<'static, ()>, State) {
         .boxed();
     (controller, state)
 }
+
+// Tests rely on fixtures.rs
+#[cfg(test)]
+mod test {
+    use super::{reconcile, Context, CoreDB};
+    use std::sync::Arc;
+
+    #[tokio::test]
+    async fn new_coredbs_without_finalizers_gets_a_finalizer() {
+        let (testctx, fakeserver, _) = Context::test();
+        let coredb = CoreDB::test();
+        // verify that coredb gets a finalizer attached during reconcile
+        fakeserver.handle_finalizer_creation(&coredb);
+        let res = reconcile(Arc::new(coredb), testctx).await;
+        assert!(res.is_ok(), "initial creation succeds in adding finalizer");
+    }
+
+    #[tokio::test]
+    async fn test_coredb_sends_events_and_patches_coredb() {
+        let (testctx, fakeserver, _) = Context::test();
+        let coredb = CoreDB::test().finalized();
+        // verify that doc gets a finalizer attached during reconcile
+        fakeserver.handle_event_publish_and_coredb_patch(&coredb);
+        let res = reconcile(Arc::new(coredb), testctx).await;
+        assert!(res.is_ok(), "finalized coredb succeeds in its reconciler");
+    }
+}
