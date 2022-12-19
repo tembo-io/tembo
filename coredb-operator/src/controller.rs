@@ -4,9 +4,12 @@ use futures::{future::BoxFuture, FutureExt, StreamExt};
 use k8s_openapi::{
     api::{
         apps::v1::{StatefulSet, StatefulSetSpec},
-        core::v1::{Container, ContainerPort, EnvVar, PodSpec, PodTemplateSpec},
+        core::v1::{
+            Container, ContainerPort, EnvVar, PersistentVolumeClaim, PersistentVolumeClaimSpec, PodSpec,
+            PodTemplateSpec, ResourceRequirements,
+        },
     },
-    apimachinery::pkg::apis::meta::v1::LabelSelector,
+    apimachinery::pkg::{api::resource::Quantity, apis::meta::v1::LabelSelector},
 };
 use kube::{
     api::{Api, ListParams, ObjectMeta, Patch, PatchParams, ResourceExt},
@@ -22,8 +25,6 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::{collections::BTreeMap, sync::Arc};
-use k8s_openapi::api::core::v1::{PersistentVolumeClaim, PersistentVolumeClaimSpec, ResourceRequirements};
-use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 use tokio::{sync::RwLock, time::Duration};
 use tracing::*;
 
@@ -115,7 +116,7 @@ impl CoreDB {
         let ns = self.namespace().unwrap();
         let name = self.name_any();
         let mut labels: BTreeMap<String, String> = BTreeMap::new();
-        let mut pvc_requests: BTreeMap<String, Quantity, > = BTreeMap::new();
+        let mut pvc_requests: BTreeMap<String, Quantity> = BTreeMap::new();
         let sts_api: Api<StatefulSet> = Api::namespaced(client, &ns);
         let oref = self.controller_owner_ref(&()).unwrap();
         labels.insert("app".to_string(), "coredb".to_string());
