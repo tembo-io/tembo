@@ -1,4 +1,4 @@
-name: Prometheus Exporter for Postgres
+name: Prometheus Exporter for Postgres (pg14)
 
 defaults:
   run:
@@ -27,7 +27,7 @@ jobs:
         run: cargo install --locked cargo-pgx
 
       - name: init
-        run: cargo pgx init
+        run: cargo pgx init --pg14 download
 
       - name: test
-        run: cargo pgx test
+        run: cargo test --no-default-features --features pg14

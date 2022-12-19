@@ -125,7 +125,7 @@ mod tests {
     use pgx::prelude::*;
 
     #[pg_test]
-    fn test_this() {
+    fn test_pg_uptime() {
         assert!(webserver::pg_uptime().is_some());
     }
 }
