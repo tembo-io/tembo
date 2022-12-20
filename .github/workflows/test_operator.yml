@@ -22,7 +22,20 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: "coredb-operator"
       - name: Cargo test
         run: cargo test
+  lint:
+    name: Run linters
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Install nightly formatter
+        run: rustup component add rustfmt --toolchain nightly
       - name: Cargo format check
         run: cargo +nightly fmt --check
