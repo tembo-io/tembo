@@ -24,6 +24,9 @@ rules:
   - apiGroups: ["events.k8s.io"]
     resources: ["events"]
     verbs: ["create"]
+  - apiGroups: ["apps"]
+    resources: ["statefulsets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 
 ---
 # Binding the role to the account in default
@@ -83,7 +86,7 @@ spec:
       serviceAccountName: coredb-controller
       containers:
       - name: coredb-controller
-        image: localhost:5001/controller:bfc8655a54a24317913afa7b1ff567eb20c0445d
+        image: localhost:5001/controller:ac593af6da990c911652c6e35fb777f36498d6dc
         imagePullPolicy: Always
         resources:
           limits:
