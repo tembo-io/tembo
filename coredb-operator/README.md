@@ -16,7 +16,7 @@ As an example; install [`kind`](https://kind.sigs.k8s.io/docs/user/quick-start/#
 Apply the CRD from [cached file](yaml/crd.yaml), or pipe it from `crdgen` (best if changing it):
 
 ```sh
-cargo +nightly run --bin crdgen | kubectl apply -f -
+cargo run --bin crdgen | kubectl apply -f -
 ```
 
 ### Opentelemetry (optional)
@@ -27,13 +27,13 @@ Setup an opentelemetry collector in your cluster. [Tempo](https://github.com/gra
 ### Locally
 
 ```sh
-cargo +nightly run
+cargo run
 ```
 
 or, with optional telemetry (change as per requirements):
 
 ```sh
-OPENTELEMETRY_ENDPOINT_URL=https://0.0.0.0:55680 RUST_LOG=info,kube=trace,controller=debug cargo +nightly run --features=telemetry
+OPENTELEMETRY_ENDPOINT_URL=https://0.0.0.0:55680 RUST_LOG=info,kube=trace,controller=debug cargo run --features=telemetry
 ```
 
 ### In-cluster
