@@ -19,7 +19,7 @@ Apply the CRD from [cached file](yaml/crd.yaml), or pipe it from `crdgen` (best 
 cargo +nightly run --bin crdgen | kubectl apply -f -
 ```
 
-### Opentelemetry
+### Opentelemetry (optional)
 Setup an opentelemetry collector in your cluster. [Tempo](https://github.com/grafana/helm-charts/tree/main/charts/tempo) / [opentelemetry-operator](https://github.com/open-telemetry/opentelemetry-helm-charts/tree/main/charts/opentelemetry-operator) / [grafana agent](https://github.com/grafana/helm-charts/tree/main/charts/agent-operator) should all work out of the box. If your collector does not support grpc otlp you need to change the exporter in [`main.rs`](./src/main.rs).
 
 ## Running
@@ -52,11 +52,10 @@ Push the image to your local registry with:
 docker push localhost:5001/controller:<tag>
 ```
 
-Edit the [deployment](./yaml/deployment.yaml)'s image tag appropriately, and then:
+Edit the [deployment](./yaml/deployment.yaml)'s image tag appropriately, then run:
 
 ```sh
 kubectl apply -f yaml/deployment.yaml
-kubectl wait --for=condition=available deploy/coredb-controller --timeout=20s
 kubectl port-forward service/coredb-controller 8080:80
 ```
 
