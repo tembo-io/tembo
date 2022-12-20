@@ -15,7 +15,7 @@ use kube::{
 };
 use std::{collections::BTreeMap, sync::Arc};
 
-pub async fn create_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
+pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
     let client = ctx.client.clone();
     let ns = cdb.namespace().unwrap();
     let name = cdb.name_any();

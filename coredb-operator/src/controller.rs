@@ -2,7 +2,7 @@ use crate::{telemetry, Error, Metrics, Result};
 use chrono::{DateTime, Utc};
 use futures::{future::BoxFuture, FutureExt, StreamExt};
 
-use crate::statefulset::create_sts;
+use crate::statefulset::reconcile_sts;
 use kube::{
     api::{Api, ListParams, Patch, PatchParams, ResourceExt},
     client::Client,
@@ -97,8 +97,8 @@ impl CoreDB {
             .patch_status(&name, &ps, &new_status)
             .await
             .map_err(Error::KubeError)?;
-        // create statefulset
-        create_sts(self, ctx).await.expect("error creating statefulset");
+        // reconcile statefulset
+        reconcile_sts(self, ctx).await.expect("error reconciling statefulset");
         // If no events were received, check back every minute
         Ok(Action::requeue(Duration::from_secs(60)))
     }
