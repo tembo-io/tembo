@@ -89,8 +89,8 @@ impl ApiServerVerifier {
                 serde_json::from_slice(&req_body).expect("patch_status object is json");
             let status_json = json.get("status").expect("status object").clone();
             let status: CoreDBStatus = serde_json::from_value(status_json).expect("contains valid status");
-            assert_eq!(
-                status.running, true,
+            assert!(
+                status.running,
                 "CoreDB::test says the status isn't running, but it was expected to be running."
             );
 
