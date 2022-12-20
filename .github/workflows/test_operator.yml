@@ -34,19 +34,18 @@ jobs:
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - name: Install minimal nightly with clippy and rustfmt
+        uses: actions-rs/toolchain@v1
         with:
+          profile: minimal
           toolchain: nightly
-          components: clippy
-          override: true
+          components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
         with:
           prefix-key: "coredb-operator-lint"
           workspaces: |
             coredb-operator
-      # https://github.com/actions-rs/clippy-check/pull/158#issuecomment-952150576
-      - uses: reinismu/clippy-check@master
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          args: --all-features
-          working-directory: ./coredb-operator
+      - name: Cargo format
+        run: cargo +nightly fmt --check
+      - name: Clippy
+        run: cargo clippy
