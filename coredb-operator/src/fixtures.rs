@@ -16,6 +16,7 @@ impl CoreDB {
     pub fn test() -> Self {
         let mut d = CoreDB::new("testdb", CoreDBSpec::default());
         d.meta_mut().namespace = Some("testns".into());
+        d.meta_mut().uid = Some("752d59ef-2671-4890-9feb-0097459b18c8".into());
         d.spec.replicas = 1;
         d
     }
@@ -82,23 +83,16 @@ impl ApiServerVerifier {
         })
     }
 
-    pub fn handle_event_publish_and_coredb_patch(self, coredb_: &CoreDB) -> JoinHandle<()> {
+    pub fn handle_coredb_patch(self, coredb_: &CoreDB) -> JoinHandle<()> {
         let handle = self.0;
         let coredb = coredb_.clone();
         tokio::spawn(async move {
             pin_mut!(handle);
-            let (request, send) = handle.next_request().await.expect("service not called");
-            assert_eq!(request.method(), http::Method::POST);
-            assert_eq!(
-                request.uri().to_string(),
-                format!("/apis/events.k8s.io/v1/namespaces/testns/events?")
-            );
-            send.send_response(Response::builder().body(request.into_body()).unwrap());
-            // second expected request
+            // expecting to get a PATCH request to update CoreDB resource
             let (request, send) = handle
                 .next_request()
                 .await
-                .expect("service not called second time");
+                .expect("Kube API called to PATCH CoreDB");
             assert_eq!(request.method(), http::Method::PATCH);
             assert_eq!(
                 request.uri().to_string(),
@@ -120,6 +114,19 @@ impl ApiServerVerifier {
             let response = serde_json::to_vec(&coredb.with_status(status)).unwrap();
             // pass through coredb "patch accepted"
             send.send_response(Response::builder().body(Body::from(response)).unwrap());
+
+            // After the PATCH to CoreDB, we expect a PATCH to StatefulSet
+            let (request, send) = handle
+                .next_request()
+                .await
+                .expect("Kube API called to PATCH StatefulSet");
+            assert_eq!(request.method(), http::Method::PATCH);
+            assert_eq!(
+                request.uri().to_string(),
+                format!("/apis/apps/v1/namespaces/testns/statefulsets/testdb?&force=true&fieldManager=cntrlr")
+            );
+            send.send_response(Response::builder().body(request.into_body()).unwrap());
+
         })
     }
 }
