@@ -37,10 +37,6 @@ pub struct ApiServerVerifier(Handle<Request<Body>, Response<Body>>);
 
 /// Create a responder + verifier object that deals with the main reconcile scenarios
 ///
-/// 1. objects without finalizers will get a finalizer applied (and not call the apply loop)
-/// 2. finalized objects will run through the apply loop
-/// 3. finalized objects "with errors" (i.e. the "illegal" object) will short circuit the apply loop
-/// 4. objects with a deletion timestamp will run the cleanup loop (which will send an event)
 impl ApiServerVerifier {
     pub fn handle_finalizer_creation(self, coredb_: &CoreDB) -> JoinHandle<()> {
         let handle = self.0;
@@ -65,21 +61,6 @@ impl ApiServerVerifier {
 
             let response = serde_json::to_vec(&coredb.finalized()).unwrap(); // respond as the apiserver would have
             send.send_response(Response::builder().body(Body::from(response)).unwrap());
-        })
-    }
-
-    pub fn handle_event_publish(self) -> JoinHandle<()> {
-        let handle = self.0;
-        tokio::spawn(async move {
-            pin_mut!(handle);
-            let (request, send) = handle.next_request().await.expect("service not called");
-            assert_eq!(request.method(), http::Method::POST);
-            assert_eq!(
-                request.uri().to_string(),
-                format!("/apis/events.k8s.io/v1/namespaces/testns/events?")
-            );
-            // pass the event straight through
-            send.send_response(Response::builder().body(request.into_body()).unwrap());
         })
     }
 
