@@ -24,7 +24,9 @@ jobs:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
         with:
-          prefix-key: "coredb-operator"
+          prefix-key: "coredb-operator-test"
+          workspaces: |
+            coredb-operator
       - name: Cargo test
         run: cargo test
   lint:
@@ -37,7 +39,13 @@ jobs:
           toolchain: nightly
           components: clippy
           override: true
-      - uses: actions-rs/clippy-check@v1
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: "coredb-operator-lint"
+          workspaces: |
+            coredb-operator
+      - uses: reinismu/clippy-check@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           args: --all-features
+          working-directory: ./coredb-operator
