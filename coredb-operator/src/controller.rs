@@ -275,7 +275,6 @@ mod test {
     async fn test_coredb_sends_events_and_patches_coredb() {
         let (testctx, fakeserver, _) = Context::test();
         let coredb = CoreDB::test().finalized();
-        // verify that doc gets a finalizer attached during reconcile
         fakeserver.handle_event_publish_and_coredb_patch(&coredb);
         let res = reconcile(Arc::new(coredb), testctx).await;
         assert!(res.is_ok(), "finalized coredb succeeds in its reconciler");
