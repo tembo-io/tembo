@@ -34,3 +34,4 @@ pub use metrics::Metrics;
 
 #[cfg(test)] pub mod fixtures;
 mod statefulset;
+mod service;
