@@ -1,30 +1,22 @@
 ## CoreDB Operator
 
-A rust kubernetes reference controller for a [`CoreDB` resource](https://github.com/kube-rs/controller-rs/blob/master/yaml/crd.yaml) using [kube-rs](https://github.com/kube-rs/kube-rs/), with observability instrumentation.
+A rust kubernetes controller for a [`CoreDB` resource](https://github.com/CoreDB-io/coredb/blob/main/coredb-operator/yaml/crd.yaml) using [kube-rs](https://github.com/kube-rs/kube-rs/).
 
 The `Controller` object reconciles `CoreDB` instances when changes to it are detected, writes to its .status object, creates associated events, and uses finalizers for guaranteed delete handling.
 
 ## Requirements
-- A Kubernetes cluster / k3d instance
+- A Kubernetes cluster
 - The [CRD](yaml/crd.yaml)
 - Opentelemetry collector (**optional**)
 
 ### Cluster
-As an example; get `k3d` then:
-
-```sh
-k3d cluster create --registry-create --servers 1 --agents 1 main
-k3d kubeconfig get --all > ~/.kube/k3d
-export KUBECONFIG="$HOME/.kube/k3d"
-```
-
-A default `k3d` setup is fastest for local dev due to its local registry.
+As an example; install [`kind`](https://kind.sigs.k8s.io/docs/user/quick-start/#installation). Once installed, follow [these instructions](https://kind.sigs.k8s.io/docs/user/local-registry/) to create a kind cluster connected to a local image registry.
 
 ### CRD
 Apply the CRD from [cached file](yaml/crd.yaml), or pipe it from `crdgen` (best if changing it):
 
 ```sh
-cargo run --bin crdgen | kubectl apply -f -
+cargo +nightly run --bin crdgen | kubectl apply -f -
 ```
 
 ### Opentelemetry
@@ -35,17 +27,32 @@ Setup an opentelemetry collector in your cluster. [Tempo](https://github.com/gra
 ### Locally
 
 ```sh
-cargo run
+cargo +nightly run
 ```
 
 or, with optional telemetry (change as per requirements):
 
 ```sh
-OPENTELEMETRY_ENDPOINT_URL=https://0.0.0.0:55680 RUST_LOG=info,kube=trace,controller=debug cargo run --features=telemetry
+OPENTELEMETRY_ENDPOINT_URL=https://0.0.0.0:55680 RUST_LOG=info,kube=trace,controller=debug cargo +nightly run --features=telemetry
 ```
 
 ### In-cluster
-Use either your locally built image or the one from dockerhub (using opentemetry features by default). Edit the [deployment](./yaml/deployment.yaml)'s image tag appropriately, and then:
+Compile the controller with:
+```sh
+just compile
+```
+
+Build an image with:
+```sh
+just build
+```
+
+Push the image to your local registry with:
+```sh
+docker push localhost:5001/controller:<tag>
+```
+
+Edit the [deployment](./yaml/deployment.yaml)'s image tag appropriately, and then:
 
 ```sh
 kubectl apply -f yaml/deployment.yaml
