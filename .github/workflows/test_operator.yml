@@ -12,6 +12,11 @@ on:
     paths:
     - '.github/workflows/test_operator.yml'
     - 'coredb-operator/**'
+  # Always run tests on main or release branches
+  push:
+    branches:
+      - main
+      - release**
 
 jobs:
   test:
