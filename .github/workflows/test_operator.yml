@@ -44,7 +44,8 @@ jobs:
           prefix-key: "coredb-operator-lint"
           workspaces: |
             coredb-operator
-      - uses: reinismu/clippy-check@v1
+      # https://github.com/actions-rs/clippy-check/pull/158#issuecomment-952150576
+      - uses: reinismu/clippy-check@master
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           args: --all-features
