@@ -1,4 +1,3 @@
-
 // Include the #[ignore] macro on slow tests.
 // That way, 'cargo test' does not run them by default.
 // To run just these tests, use 'cargo test -- --ignored'
@@ -10,13 +9,13 @@
 #[ignore]
 async fn it_is() {
     // Initialize the Kubernetes client
-    let client = kube_client().await;
+    let _client = kube_client().await;
     assert!(true);
 }
 
 async fn kube_client() -> kube::Client {
-    use kube::{Client, Config, api::{Api, ListParams}};
     use k8s_openapi::api::core::v1::Namespace;
+    use kube::{api::Api, Client, Config};
 
     // Initialize the Kubernetes client
     let client_future = Client::try_default();
@@ -38,7 +37,13 @@ async fn kube_client() -> kube::Client {
     let namespaces: Api<Namespace> = Api::all(client.clone());
     let namespace = namespaces.get(&selected_namespace).await.unwrap();
     let labels = namespace.metadata.labels.unwrap();
-    assert!(labels.contains_key("safe-to-run-coredb-tests"), "expected to find label 'safe-to-run-core-db-tests'");
-    assert_eq!(labels["safe-to-run-coredb-tests"], "true", "expected to find label 'safe-to-run-core-db-tests' with value 'true'");
-    return client;
+    assert!(
+        labels.contains_key("safe-to-run-coredb-tests"),
+        "expected to find label 'safe-to-run-core-db-tests'"
+    );
+    assert_eq!(
+        labels["safe-to-run-coredb-tests"], "true",
+        "expected to find label 'safe-to-run-core-db-tests' with value 'true'"
+    );
+    client
 }
