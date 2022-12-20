@@ -4,9 +4,12 @@ use futures::{future::BoxFuture, FutureExt, StreamExt};
 use k8s_openapi::{
     api::{
         apps::v1::{StatefulSet, StatefulSetSpec},
-        core::v1::{Container, ContainerPort, EnvVar, PodSpec, PodTemplateSpec},
+        core::v1::{
+            Container, ContainerPort, EnvVar, PersistentVolumeClaim, PersistentVolumeClaimSpec, PodSpec,
+            PodTemplateSpec, ResourceRequirements,
+        },
     },
-    apimachinery::pkg::apis::meta::v1::LabelSelector,
+    apimachinery::pkg::{api::resource::Quantity, apis::meta::v1::LabelSelector},
 };
 use kube::{
     api::{Api, ListParams, ObjectMeta, Patch, PatchParams, ResourceExt},
@@ -113,9 +116,11 @@ impl CoreDB {
         let ns = self.namespace().unwrap();
         let name = self.name_any();
         let mut labels: BTreeMap<String, String> = BTreeMap::new();
+        let mut pvc_requests: BTreeMap<String, Quantity> = BTreeMap::new();
         let sts_api: Api<StatefulSet> = Api::namespaced(client, &ns);
         let oref = self.controller_owner_ref(&()).unwrap();
-        labels.insert("app".to_owned(), "coredb".to_string());
+        labels.insert("app".to_string(), "coredb".to_string());
+        pvc_requests.insert("storage".to_string(), Quantity("8Gi".to_string()));
 
         let sts: StatefulSet = StatefulSet {
             metadata: ObjectMeta {
@@ -154,6 +159,21 @@ impl CoreDB {
                         ..ObjectMeta::default()
                     }),
                 },
+                volume_claim_templates: Option::from(vec![PersistentVolumeClaim {
+                    metadata: ObjectMeta {
+                        name: Some("data".to_string()),
+                        ..ObjectMeta::default()
+                    },
+                    spec: Some(PersistentVolumeClaimSpec {
+                        access_modes: Some(vec!["ReadWriteOnce".to_owned()]),
+                        resources: Some(ResourceRequirements {
+                            limits: None,
+                            requests: Some(pvc_requests),
+                        }),
+                        ..PersistentVolumeClaimSpec::default()
+                    }),
+                    status: None,
+                }]),
                 ..StatefulSetSpec::default()
             }),
             ..StatefulSet::default()
