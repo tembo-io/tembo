@@ -98,7 +98,9 @@ impl CoreDB {
             .await
             .map_err(Error::KubeError)?;
         // reconcile statefulset
-        reconcile_sts(self, ctx).await.expect("error reconciling statefulset");
+        reconcile_sts(self, ctx)
+            .await
+            .expect("error reconciling statefulset");
         // If no events were received, check back every minute
         Ok(Action::requeue(Duration::from_secs(60)))
     }
