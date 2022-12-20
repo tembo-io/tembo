@@ -42,10 +42,12 @@ cargo test
 kubectl label namespace default safe-to-run-coredb-tests=true
 ```
 
+- Start or install the controller you want to test (see the following sections)
 - Run the integration tests
 ```
 cargo test -- --ignored
 ```
+- The integration tests assume you already have installed or are running the operator connected to the cluster.
 
 ### Cluster
 As an example; get `k3d` then:

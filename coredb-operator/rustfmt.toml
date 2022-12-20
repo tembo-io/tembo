@@ -9,3 +9,4 @@ ignore = [
 comment_width = 110
 max_width = 110
 inline_attribute_width = 80
+edition = "2021"

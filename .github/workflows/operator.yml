@@ -1,4 +1,4 @@
-name: CoreDB operator tests
+name: CoreDB operator workflow
 
 defaults:
   run:
@@ -10,7 +10,7 @@ on:
     branches:
       - main
     paths:
-    - '.github/workflows/test_operator.yml'
+    - '.github/workflows/operator.yml'
     - 'coredb-operator/**'
   # Always run tests on main or release branches
   push:
@@ -33,11 +33,10 @@ jobs:
           workspaces: |
             coredb-operator
       - name: Unit tests
-        # --offline: make sure we do not add network calls to unit tests
-        run: cargo test --offline
-      # If the unit tests pass, also run integration tests
-      - name: Integration tests
-        run: cargo test -- --ignored
+        run: cargo test
+      # WIP: If the unit tests pass, also run integration tests
+      # - name: Integration tests
+      #   run: cargo test -- --ignored
 
   lint:
     name: Run linters
