@@ -11,7 +11,6 @@ use tokio::task::JoinHandle;
 use tower_test::mock::{self, Handle};
 
 impl CoreDB {
-
     /// A normal test CoreDB
     pub fn test() -> Self {
         let mut d = CoreDB::new("testdb", CoreDBSpec::default());
@@ -48,7 +47,10 @@ impl ApiServerVerifier {
             assert_eq!(request.method(), http::Method::PATCH);
             assert_eq!(
                 request.uri().to_string(),
-                format!("/apis/kube.rs/v1/namespaces/testns/coredbs/{}?", coredb.name_any())
+                format!(
+                    "/apis/kube.rs/v1/namespaces/testns/coredbs/{}?",
+                    coredb.name_any()
+                )
             );
             let expected_patch = serde_json::json!([
                 { "op": "test", "path": "/metadata/finalizers", "value": null },
@@ -104,10 +106,11 @@ impl ApiServerVerifier {
             assert_eq!(request.method(), http::Method::PATCH);
             assert_eq!(
                 request.uri().to_string(),
-                format!("/apis/apps/v1/namespaces/testns/statefulsets/testdb?&force=true&fieldManager=cntrlr")
+                format!(
+                    "/apis/apps/v1/namespaces/testns/statefulsets/testdb?&force=true&fieldManager=cntrlr"
+                )
             );
             send.send_response(Response::builder().body(request.into_body()).unwrap());
-
         })
     }
 }
