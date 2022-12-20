@@ -25,6 +25,27 @@ rustup component add rustfmt --toolchain nightly
 cargo +nightly fmt
 ```
 
+### Testing
+
+
+#### Unit testing
+
+```
+cargo test
+```
+
+#### Integration testing
+
+- Connect to a cluster that is safe to run the tests against
+- Set your kubecontext to any namespace, and label it to indicate it is safe to run tests against this cluster (do not do against non-test clusters)
+```
+kubectl label namespace default safe-to-run-coredb-tests=true
+```
+
+- Run the integration tests
+```
+cargo test -- --ignored
+```
 
 ### Cluster
 As an example; get `k3d` then:
