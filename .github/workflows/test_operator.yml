@@ -32,8 +32,13 @@ jobs:
           prefix-key: "coredb-operator-test"
           workspaces: |
             coredb-operator
-      - name: Cargo test
-        run: cargo test
+      - name: Unit tests
+        # --offline: make sure we do not add network calls to unit tests
+        run: cargo test --offline
+      # If the unit tests pass, also run integration tests
+      - name: Integration tests
+        run: cargo test -- --ignored
+
   lint:
     name: Run linters
     runs-on: ubuntu-20.04
