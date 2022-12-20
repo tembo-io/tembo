@@ -9,6 +9,23 @@ The `Controller` object reconciles `CoreDB` instances when changes to it are det
 - The [CRD](yaml/crd.yaml)
 - Opentelemetry collector (**optional**)
 
+### Linting
+
+Run linting with `cargo fmt` and `clippy`
+
+Clippy:
+```
+rustup component add clippy
+cargo clippy
+```
+
+cargo fmt:
+```
+rustup component add rustfmt --toolchain nightly
+cargo +nightly fmt
+```
+
+
 ### Cluster
 As an example; get `k3d` then:
 
