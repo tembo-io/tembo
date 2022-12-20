@@ -31,6 +31,6 @@ jobs:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
-          toolchain: nightly
+          toolchain: stable
       - name: Cargo format check
         run: cargo +nightly fmt --check
