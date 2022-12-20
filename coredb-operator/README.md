@@ -1,11 +1,11 @@
 ## CoreDB Operator
 
-A rust kubernetes reference controller for a [`CoreDB` resource](https://github.com/kube-rs/controller-rs/blob/master/yaml/crd.yaml) using [kube-rs](https://github.com/kube-rs/kube-rs/), with observability instrumentation.
+A rust kubernetes controller for a [`CoreDB` resource](https://github.com/CoreDB-io/coredb/blob/main/coredb-operator/yaml/crd.yaml) using [kube-rs](https://github.com/kube-rs/kube-rs/).
 
 The `Controller` object reconciles `CoreDB` instances when changes to it are detected, writes to its .status object, creates associated events, and uses finalizers for guaranteed delete handling.
 
 ## Requirements
-- A Kubernetes cluster / k3d instance
+- A Kubernetes cluster
 - The [CRD](yaml/crd.yaml)
 - Opentelemetry collector (**optional**)
 
@@ -27,15 +27,7 @@ cargo +nightly fmt
 
 
 ### Cluster
-As an example; get `k3d` then:
-
-```sh
-k3d cluster create --registry-create --servers 1 --agents 1 main
-k3d kubeconfig get --all > ~/.kube/k3d
-export KUBECONFIG="$HOME/.kube/k3d"
-```
-
-A default `k3d` setup is fastest for local dev due to its local registry.
+As an example; install [`kind`](https://kind.sigs.k8s.io/docs/user/quick-start/#installation). Once installed, follow [these instructions](https://kind.sigs.k8s.io/docs/user/local-registry/) to create a kind cluster connected to a local image registry.
 
 ### CRD
 Apply the CRD from [cached file](yaml/crd.yaml), or pipe it from `crdgen` (best if changing it):
@@ -44,7 +36,7 @@ Apply the CRD from [cached file](yaml/crd.yaml), or pipe it from `crdgen` (best 
 cargo run --bin crdgen | kubectl apply -f -
 ```
 
-### Opentelemetry
+### Opentelemetry (optional)
 Setup an opentelemetry collector in your cluster. [Tempo](https://github.com/grafana/helm-charts/tree/main/charts/tempo) / [opentelemetry-operator](https://github.com/open-telemetry/opentelemetry-helm-charts/tree/main/charts/opentelemetry-operator) / [grafana agent](https://github.com/grafana/helm-charts/tree/main/charts/agent-operator) should all work out of the box. If your collector does not support grpc otlp you need to change the exporter in [`main.rs`](./src/main.rs).
 
 ## Running
@@ -62,11 +54,25 @@ OPENTELEMETRY_ENDPOINT_URL=https://0.0.0.0:55680 RUST_LOG=info,kube=trace,contro
 ```
 
 ### In-cluster
-Use either your locally built image or the one from dockerhub (using opentemetry features by default). Edit the [deployment](./yaml/deployment.yaml)'s image tag appropriately, and then:
+Compile the controller with:
+```sh
+just compile
+```
+
+Build an image with:
+```sh
+just build
+```
+
+Push the image to your local registry with:
+```sh
+docker push localhost:5001/controller:<tag>
+```
+
+Edit the [deployment](./yaml/deployment.yaml)'s image tag appropriately, then run:
 
 ```sh
 kubectl apply -f yaml/deployment.yaml
-kubectl wait --for=condition=available deploy/coredb-controller --timeout=20s
 kubectl port-forward service/coredb-controller 8080:80
 ```
 
