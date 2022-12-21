@@ -82,4 +82,4 @@ jobs:
           workspaces: |
             coredb-operator
       - name: Run functional / integration tests
-        run: cargo test -- --ignored
+        run: cargo test -- --ignored --nocapture

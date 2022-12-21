@@ -13,13 +13,11 @@
 mod test {
 
     use controller::CoreDB;
-    use futures::TryStreamExt;
     use k8s_openapi::api::core::v1::{Namespace, Pod};
     use kube::{
-        api::{ListParams, Patch, PatchParams},
+        api::{Patch, PatchParams},
         runtime::{
             wait::{await_condition, conditions},
-            watcher, WatchStreamExt,
         },
         Api, Client, Config,
     };
@@ -40,7 +38,7 @@ mod test {
         let replicas = 1;
 
         // Timeout settings while waiting for an event
-        let timeout_seconds = 20;
+        let timeout_seconds = 60;
 
         // Apply a basic configuration of CoreDB
         println!("Creating CoreDB resource {}", name);
@@ -57,7 +55,7 @@ mod test {
         });
         let params = PatchParams::apply("coredb-integration-test");
         let patch = Patch::Apply(&coredb_json);
-        let coredb_resource = coredbs.patch(name, &params, &patch).await;
+        let _coredb_resource = coredbs.patch(name, &params, &patch).await;
 
         // Wait for Pod to be created
 
