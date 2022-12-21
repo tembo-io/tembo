@@ -35,7 +35,7 @@ pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
             ..ObjectMeta::default()
         },
         spec: Some(StatefulSetSpec {
-            replicas: Some(cdb.spec.replicas),
+            replicas: Some(cdb.spec.replicas.clone()),
             selector: LabelSelector {
                 match_expressions: None,
                 match_labels: Some(labels.clone()),
@@ -49,7 +49,7 @@ pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
                             value_from: None,
                         }]),
                         name: name.to_owned(),
-                        image: Some("docker.io/postgres:15".to_owned()),
+                        image: Some(cdb.spec.image.clone()),
                         ports: Some(vec![ContainerPort {
                             container_port: 5432,
                             ..ContainerPort::default()
