@@ -49,6 +49,10 @@ cargo test -- --ignored
 ```
 - The integration tests assume you already have installed or are running the operator connected to the cluster.
 
+#### Other testing notes
+
+- Include the `--nocapture` flag to show print statements during test runs
+
 ### Cluster
 As an example; get `k3d` then:
 
