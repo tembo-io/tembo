@@ -2,7 +2,7 @@ use crate::{telemetry, Error, Metrics, Result};
 use chrono::{DateTime, Utc};
 use futures::{future::BoxFuture, FutureExt, StreamExt};
 
-use crate::{service::reconcile_svc, statefulset::reconcile_sts};
+use crate::{defaults, service::reconcile_svc, statefulset::reconcile_sts};
 use kube::{
     api::{Api, ListParams, Patch, PatchParams, ResourceExt},
     client::Client,
@@ -30,8 +30,14 @@ pub static COREDB_FINALIZER: &str = "coredbs.kube.rs";
 #[kube(kind = "CoreDB", group = "kube.rs", version = "v1", namespaced)]
 #[kube(status = "CoreDBStatus", shortname = "cdb")]
 pub struct CoreDBSpec {
+    #[serde(default = "defaults::default_replicas")]
     pub replicas: i32,
+    #[serde(default = "defaults::default_image")]
+    pub image: String,
+    #[serde(default = "defaults::default_port")]
+    pub port: i32,
 }
+
 /// The status object of `CoreDB`
 #[derive(Deserialize, Serialize, Clone, Default, Debug, JsonSchema)]
 pub struct CoreDBStatus {
