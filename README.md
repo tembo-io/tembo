@@ -2,8 +2,7 @@
 
 [![](https://shields.io/endpoint?url=https://ossrank.com/shield/2103)](https://ossrank.com/p/2103)
 
-
-CoreDB is an "On Steroids" distribution of Postgres under active development that you are free to use, 
+CoreDB is an "On Steroids" distribution of Postgres under active development that you are free to use,
 except to compete with the managed service that we are building concurrently with this open project
 (see http://coredb.io/coredb-community-license).
 
@@ -20,7 +19,7 @@ except to compete with the managed service that we are building concurrently wit
 
 ## Roadmap - Next
 
-* Awesome migrations — migrations are a database concern, not an application concern 
+* Awesome migrations — migrations are a database concern, not an application concern
 * Schema source-of-truth — the database should communicate it's schema clearly to authorized users
 
 ## Roadmap - Maybe
