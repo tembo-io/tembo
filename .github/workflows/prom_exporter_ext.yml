@@ -75,4 +75,10 @@ jobs:
           pg_version: ${{ matrix.pg_version }}
       - name: test
         run: |
+          set -xe
+          # Debugging information
+          ls -ltrah /home/runner/.pgx/
+          ls -ltrah /home/runner/.pgx/data-${{ matrix.pg_version }}/
+          whoami
+          set +e
           cargo pgx test pg${{ matrix.pg_version }}
