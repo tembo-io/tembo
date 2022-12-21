@@ -90,6 +90,7 @@ jobs:
           set -xe
           # Install the CRD
           cargo run --bin crdgen | kubectl apply -f -
+          kubectl get crds
           # Start the operator in the background
           cargo run &
           # Run the tests
