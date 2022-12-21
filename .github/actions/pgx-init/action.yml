@@ -1,0 +1,30 @@
+name: 'pgx initialization'
+description: 'cargo pgx init'
+inputs:
+  working-directory:
+    description: 'the directory in which there is a pgx extension project'
+    required: true
+outputs: {}
+runs:
+  using: "composite"
+  steps:
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: ${{ inputs.working-directory }}
+          workspaces: |
+            ${{ inputs.working-directory }}
+          # Additional directories to cache
+          cache-directories: |
+            /home/runner/.pgx
+      - name: setup pgx
+        run: cargo install --locked cargo-pgx
+      - name: pgx init
+        run: |
+          set -x
+          ls -ltrah /home/runner/.pgx
+          # pgx init can take a long time, and it re-compiles postgres even when there
+          # is a cached version. So, we can just check for the directory and
+          [ ! -d "/home/runner/.pgx/14.6" ] && cargo pgx init --pg14 download
