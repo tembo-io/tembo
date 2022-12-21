@@ -473,6 +473,7 @@ dependencies = [
  "opentelemetry",
  "opentelemetry-otlp",
  "prometheus",
+ "rand",
  "schemars",
  "serde",
  "serde_json",

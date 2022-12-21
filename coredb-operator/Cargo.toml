@@ -47,6 +47,7 @@ thiserror = "1.0.37"
 assert-json-diff = "2.0.2"
 http = "0.2.8"
 hyper = "0.14.23"
+rand = "0.8.5"
 tower-test = "0.4.0"
 
 [dependencies.kube]

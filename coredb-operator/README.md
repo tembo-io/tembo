@@ -25,6 +25,33 @@ rustup component add rustfmt --toolchain nightly
 cargo +nightly fmt
 ```
 
+### Testing
+
+
+#### Unit testing
+
+```
+cargo test
+```
+
+#### Integration testing
+
+- Connect to a cluster that is safe to run the tests against
+- Set your kubecontext to any namespace, and label it to indicate it is safe to run tests against this cluster (do not do against non-test clusters)
+```
+kubectl label namespace default safe-to-run-coredb-tests=true
+```
+
+- Start or install the controller you want to test (see the following sections)
+- Run the integration tests
+```
+cargo test -- --ignored
+```
+- The integration tests assume you already have installed or are running the operator connected to the cluster.
+
+#### Other testing notes
+
+- Include the `--nocapture` flag to show print statements during test runs
 
 ### Cluster
 As an example; install [`kind`](https://kind.sigs.k8s.io/docs/user/quick-start/#installation). Once installed, follow [these instructions](https://kind.sigs.k8s.io/docs/user/local-registry/) to create a kind cluster connected to a local image registry.
