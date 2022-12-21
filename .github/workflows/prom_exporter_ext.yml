@@ -7,10 +7,17 @@ defaults:
 
 on:
   pull_request:
-    branches: [ main ]
-    paths: 
+    branches:
+      - main
+    paths:
     - '.github/workflows/postgres_extension.yml'
     - 'extensions/**'
+  # Always run tests on main or release branches
+  push:
+    branches:
+      - main
+      - release**
+
 
 jobs:
   build_and_test:
