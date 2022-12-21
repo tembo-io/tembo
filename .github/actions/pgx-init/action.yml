@@ -30,7 +30,7 @@ runs:
         shell: bash
         run: |
           set -x
-          ls -ltrah /home/runner/.pgx
+          ls -ltrah /home/runner/.pgx || true
           # pgx init can take a long time, and it re-compiles postgres even when there
           # is a cached version. So, we can just check for the directory and
           if find /home/runner/.pgx | grep $(awk -F "=" '/pg$${{ inputs.pg_version }}/ {print $2}' /home/runner/.pgx/config.toml | tr -d '"'); then
@@ -38,3 +38,4 @@ runs:
           else
             cargo pgx init --pg${{ inputs.pg_version }} download
           fi
+          ls -ltrah /home/runner/.pgx
