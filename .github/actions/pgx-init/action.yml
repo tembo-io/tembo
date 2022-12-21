@@ -2,8 +2,12 @@ name: 'pgx initialization'
 description: 'cargo pgx init'
 inputs:
   working-directory:
-    description: 'the directory in which there is a pgx extension project'
+    description: 'The directory in which there is a pgx extension project'
     required: true
+  pg_version:
+    description: 'The version of postgres to use'
+    required: false
+    default: 14
 outputs: {}
 runs:
   using: "composite"
@@ -29,4 +33,8 @@ runs:
           ls -ltrah /home/runner/.pgx
           # pgx init can take a long time, and it re-compiles postgres even when there
           # is a cached version. So, we can just check for the directory and
-          [ ! -d "/home/runner/.pgx/14.6" ] && cargo pgx init --pg14 download
+          if find /home/runner/.pgx | grep $(awk -F "=" '/pg$${{ inputs.pg_version }}/ {print $2}' /home/runner/.pgx/config.toml | tr -d '"'); then
+            echo "Already found pgx is initialized. Skipping 'cargo pgx init' command."
+          else
+            cargo pgx init --pg${{ inputs.pg_version }} download
+          fi
