@@ -20,7 +20,7 @@ on:
 
 jobs:
   lint:
-    name: Run linters
+    name: Run Linters
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
@@ -48,7 +48,7 @@ jobs:
         run: cargo clippy
 
   test:
-    name: Rust project
+    name: Run tests
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
