@@ -24,7 +24,7 @@ runs:
           ls -ltrah /home/runner/.pgx || true
           # pgx init can take a long time, and it re-compiles postgres even when there
           # is a cached version. So, we can just check for the directory and
-          if find /home/runner/.pgx | grep $(awk -F "=" '/pg$${{ inputs.pg_version }}/ {print $2}' /home/runner/.pgx/config.toml | tr -d '"'); then
+          if find /home/runner/.pgx | grep $(awk -F "=" '/pg${{ inputs.pg_version }}/ {print $2}' /home/runner/.pgx/config.toml | tr -d '"'); then
             echo "Already found pgx is initialized. Skipping 'cargo pgx init' command."
           else
             cargo pgx init --pg${{ inputs.pg_version }} download
