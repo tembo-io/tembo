@@ -30,6 +30,14 @@ jobs:
           profile: minimal
           toolchain: nightly
           components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: "prom-extension-lint"
+          workspaces: |
+            extensions/prometheus_exporter
+          # Additional directories to cache
+          cache-directories: |
+            /home/runner/.pgx
       - uses: ./.github/actions/pgx-init
         with:
           working-directory: extensions/prometheus_exporter
@@ -47,6 +55,14 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: "prom-extension-test"
+          workspaces: |
+            extensions/prometheus_exporter
+          # Additional directories to cache
+          cache-directories: |
+            /home/runner/.pgx
       - uses: ./.github/actions/pgx-init
         with:
           working-directory: extensions/prometheus_exporter

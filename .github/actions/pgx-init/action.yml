@@ -12,19 +12,13 @@ outputs: {}
 runs:
   using: "composite"
   steps:
-      - uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: ${{ inputs.working-directory }}
-          workspaces: |
-            ${{ inputs.working-directory }}
-          # Additional directories to cache
-          cache-directories: |
-            /home/runner/.pgx
       - name: setup pgx
         shell: bash
         run: cargo install --locked cargo-pgx
+        working-directory: ${{ inputs.working-directory }}
       - name: pgx init
         shell: bash
+        working-directory: ${{ inputs.working-directory }}
         run: |
           set -x
           ls -ltrah /home/runner/.pgx || true
