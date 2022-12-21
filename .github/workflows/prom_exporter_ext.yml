@@ -80,5 +80,7 @@ jobs:
           ls -ltrah /home/runner/.pgx/
           ls -ltrah /home/runner/.pgx/data-${{ matrix.pg_version }}/
           whoami
+          cat /home/runner/.pgx/data-${{ matrix.pg_version }}/postgresql.conf
+          cat /home/runner/.pgx/data-${{ matrix.pg_version }}/postgresql.auto.conf
           set +e
           cargo pgx test pg${{ matrix.pg_version }}
