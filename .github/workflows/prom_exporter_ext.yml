@@ -49,6 +49,12 @@ jobs:
   test:
     name: Run tests
     runs-on: ubuntu-20.04
+    strategy:
+      # fail-fast means to cancel all jobs if one fails
+      fail-fast: false
+      matrix:
+        pg_version:
+          - 14
     steps:
       - uses: actions/checkout@v2
       - name: Install Rust stable toolchain
@@ -66,5 +72,7 @@ jobs:
       - uses: ./.github/actions/pgx-init
         with:
           working-directory: extensions/prometheus_exporter
+          pg_version: ${{ matrix.pg_version }}
       - name: test
-        run: cargo test --no-default-features --features pg14
+        run: |
+          cargo pgx test pg${{ matrix.pg_version }}
