@@ -32,5 +32,7 @@ pub mod telemetry;
 mod metrics;
 pub use metrics::Metrics;
 
+mod defaults;
 #[cfg(test)] pub mod fixtures;
+mod service;
 mod statefulset;
