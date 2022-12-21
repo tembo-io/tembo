@@ -14,12 +14,15 @@ mod test {
 
     use controller::CoreDB;
     use k8s_openapi::api::core::v1::{Namespace, Pod};
+    use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
     use kube::{
         api::{Patch, PatchParams},
         runtime::wait::{await_condition, conditions},
         Api, Client, Config,
     };
     use rand::Rng;
+
+    const API_VERSION: &str = "kube.rs/v1";
 
     #[tokio::test]
     #[ignore]
@@ -31,18 +34,17 @@ mod test {
         let mut rng = rand::thread_rng();
         let name = &format!("test-coredb-{}", rng.gen_range(0..100000));
         let namespace = "default";
-        let api_version = "kube.rs/v1";
         let kind = "CoreDB";
         let replicas = 1;
 
         // Timeout settings while waiting for an event
-        let timeout_seconds = 120;
+        let timeout_seconds = 30;
 
         // Apply a basic configuration of CoreDB
         println!("Creating CoreDB resource {}", name);
         let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), namespace);
         let coredb_json = serde_json::json!({
-            "apiVersion": api_version,
+            "apiVersion": API_VERSION,
             "kind": kind,
             "metadata": {
                 "name": name
@@ -98,6 +100,18 @@ mod test {
             labels["safe-to-run-coredb-tests"], "true",
             "expected to find label 'safe-to-run-coredb-tests' with value 'true'"
         );
+
+        // Check that the CRD is installed
+        let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
+        if let Err(_) = tokio::time::timeout(
+            std::time::Duration::from_secs(2),
+            await_condition(crds, "coredbs.kube.rs", conditions::is_crd_established()),
+        )
+        .await
+        {
+            panic!("\n\nERROR: Did not find the CRD to be installed.\n\n")
+        }
+
         return client;
     }
 }

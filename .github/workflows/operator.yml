@@ -86,7 +86,14 @@ jobs:
           workspaces: |
             coredb-operator
       - name: Run functional / integration tests
-        run: cargo test -- --ignored --nocapture
+        run: |
+          set -xe
+          # Install the CRD
+          cargo run --bin crdgen | kubectl apply -f -
+          # Start the operator in the background
+          cargo run &
+          # Run the tests
+          cargo test -- --ignored --nocapture
       - name: Debugging information
         if: always()
         run: |
