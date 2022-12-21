@@ -35,6 +35,13 @@ jobs:
           prefix-key: "prometheus-exporter-lint"
           workspaces: |
             extensions/prometheus_exporter
+          # Additional directories to cache
+          cache-directories: |
+            /home/runner/.pgx
+      - name: setup pgx
+        run: cargo install --locked cargo-pgx
+      - name: init
+        run: cargo pgx init --pg14 download
       - name: Cargo format
         run: cargo +nightly fmt --check
       - name: Clippy
