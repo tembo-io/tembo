@@ -87,3 +87,19 @@ jobs:
             coredb-operator
       - name: Run functional / integration tests
         run: cargo test -- --ignored --nocapture
+      - name: Debugging information
+        if: always()
+        run: |
+          set +e
+          set -x
+          echo "=========="
+          kubectl get pods --all-namespaces
+          echo "=========="
+          kubectl get -o yaml sts
+          echo "=========="
+          kubectl get -o yaml svc
+          echo "=========="
+          kubectl get -o yaml pods
+          echo "=========="
+          kubectl get -o yaml coredb
+          echo "=========="
