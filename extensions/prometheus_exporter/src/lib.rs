@@ -3,6 +3,7 @@ use pgx::log;
 use pgx::prelude::*;
 
 mod metrics;
+mod webserver;
 
 pgx::pg_module_magic!();
 
@@ -24,7 +25,7 @@ pub extern "C" fn background_worker(_arg: pg_sys::Datum) {
 
     BackgroundWorker::connect_worker_to_spi(Some("prometheus_exporter"), None);
 
-    metrics::serve().unwrap();
+    webserver::run().unwrap();
 
     log!("Closing BGWorker: {}", BackgroundWorker::get_name());
 }
