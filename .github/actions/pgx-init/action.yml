@@ -20,8 +20,10 @@ runs:
           cache-directories: |
             /home/runner/.pgx
       - name: setup pgx
+        shell: bash
         run: cargo install --locked cargo-pgx
       - name: pgx init
+        shell: bash
         run: |
           set -x
           ls -ltrah /home/runner/.pgx
