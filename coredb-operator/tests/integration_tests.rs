@@ -15,10 +15,14 @@ mod test {
     use controller::CoreDB;
     use futures::TryStreamExt;
     use k8s_openapi::api::core::v1::{Namespace, Pod};
-    use kube::api::{ListParams, Patch, PatchParams};
-    use kube::runtime::wait::{await_condition, conditions};
-    use kube::runtime::{watcher, WatchStreamExt};
-    use kube::{Api, Client, Config};
+    use kube::{
+        api::{ListParams, Patch, PatchParams},
+        runtime::{
+            wait::{await_condition, conditions},
+            watcher, WatchStreamExt,
+        },
+        Api, Client, Config,
+    };
     use rand::Rng;
 
     #[tokio::test]
