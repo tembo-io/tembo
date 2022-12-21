@@ -11,16 +11,15 @@ on:
       - main
     paths:
     - '.github/workflows/postgres_extension.yml'
-    - 'extensions/**'
+    - 'extensions/prometheus_exporter/**'
   # Always run tests on main or release branches
   push:
     branches:
       - main
       - release**
 
-
 jobs:
-  build_and_test:
+  test:
     name: Rust project
     runs-on: ubuntu-20.04
     steps:
@@ -29,6 +28,12 @@ jobs:
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: "prometheus-exporter-test"
+          workspaces: |
+            extensions/prometheus_exporter
 
       - name: setup pgx
         run: cargo install --locked cargo-pgx
