@@ -16,9 +16,7 @@ mod test {
     use k8s_openapi::api::core::v1::{Namespace, Pod};
     use kube::{
         api::{Patch, PatchParams},
-        runtime::{
-            wait::{await_condition, conditions},
-        },
+        runtime::wait::{await_condition, conditions},
         Api, Client, Config,
     };
     use rand::Rng;
