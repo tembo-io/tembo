@@ -73,6 +73,9 @@ jobs:
         uses: helm/kind-action@v1.5.0
         with:
           node_image: ${{ matrix.node_image }}
+      - name: Apply safety check label to namespace
+        run: |
+          kubectl label namespace default safe-to-run-core-db-tests=true
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
