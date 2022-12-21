@@ -19,25 +19,6 @@ on:
       - release**
 
 jobs:
-  test:
-    name: Run unit tests
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: "coredb-operator-test"
-          workspaces: |
-            coredb-operator
-      - name: Unit tests
-        run: cargo test
-      # WIP: If the unit tests pass, also run integration tests
-      # - name: Integration tests
-      #   run: cargo test -- --ignored
-
   lint:
     name: Run linters
     runs-on: ubuntu-20.04
@@ -58,3 +39,46 @@ jobs:
         run: cargo +nightly fmt --check
       - name: Clippy
         run: cargo clippy
+  test:
+    name: Run unit tests
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: "coredb-operator-test"
+          workspaces: |
+            coredb-operator
+      - name: Unit tests
+        run: cargo test
+
+  functional_test:
+    name: Run functional testing
+    runs-on: ubuntu-20.04
+    strategy:
+      # fail-fast means to cancel all jobs if one fails
+      fail-fast: false
+      matrix:
+        # Go here for a list of versions:
+        # https://github.com/kubernetes-sigs/kind/releases
+        k8s_version:
+          - 'v1.25.3'
+    steps:
+      - uses: actions/checkout@v2
+      - name: Create k8s Kind Cluster
+        uses: helm/kind-action@v1.4.0
+        with:
+          version: ${{ matrix.version }}
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: "coredb-operator-functional-test"
+          workspaces: |
+            coredb-operator
+      - name: Run functional / integration tests
+        run: cargo test -- --ignored
