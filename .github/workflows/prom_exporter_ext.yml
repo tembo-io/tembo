@@ -67,4 +67,8 @@ jobs:
         with:
           working-directory: extensions/prometheus_exporter
       - name: test
-        run: cargo test --no-default-features --features pg14
+        run: |
+          set -x
+          ls -ltrah
+          cargo build --features pg_test
+          cargo test --no-default-features --features pg14
