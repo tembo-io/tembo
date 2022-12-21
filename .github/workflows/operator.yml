@@ -75,7 +75,8 @@ jobs:
           node_image: ${{ matrix.node_image }}
       - name: Apply safety check label to namespace
         run: |
-          kubectl label namespace default safe-to-run-core-db-tests=true
+          kubectl label namespace default safe-to-run-coredb-tests=true
+          kubectl get -o yaml namespaces
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable

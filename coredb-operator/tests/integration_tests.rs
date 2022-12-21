@@ -92,11 +92,11 @@ mod test {
         let labels = namespace.metadata.labels.unwrap();
         assert!(
             labels.contains_key("safe-to-run-coredb-tests"),
-            "expected to find label 'safe-to-run-core-db-tests'"
+            "expected to find label 'safe-to-run-coredb-tests'"
         );
         assert_eq!(
             labels["safe-to-run-coredb-tests"], "true",
-            "expected to find label 'safe-to-run-core-db-tests' with value 'true'"
+            "expected to find label 'safe-to-run-coredb-tests' with value 'true'"
         );
         return client;
     }
