@@ -13,8 +13,10 @@
 mod test {
 
     use controller::CoreDB;
-    use k8s_openapi::api::core::v1::{Namespace, Pod};
-    use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
+    use k8s_openapi::{
+        api::core::v1::{Namespace, Pod},
+        apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
+    };
     use kube::{
         api::{Patch, PatchParams},
         runtime::wait::{await_condition, conditions},
