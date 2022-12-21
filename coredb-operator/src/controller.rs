@@ -2,7 +2,7 @@ use crate::{telemetry, Error, Metrics, Result};
 use chrono::{DateTime, Utc};
 use futures::{future::BoxFuture, FutureExt, StreamExt};
 
-use crate::statefulset::reconcile_sts;
+use crate::{service::reconcile_svc, statefulset::reconcile_sts};
 use kube::{
     api::{Api, ListParams, Patch, PatchParams, ResourceExt},
     client::Client,
@@ -97,8 +97,14 @@ impl CoreDB {
             .patch_status(&name, &ps, &new_status)
             .await
             .map_err(Error::KubeError)?;
+
+        // reconcile service
+        reconcile_svc(self, ctx.clone())
+            .await
+            .expect("error reconciling service");
+
         // reconcile statefulset
-        reconcile_sts(self, ctx)
+        reconcile_sts(self, ctx.clone())
             .await
             .expect("error reconciling statefulset");
         // If no events were received, check back every minute
