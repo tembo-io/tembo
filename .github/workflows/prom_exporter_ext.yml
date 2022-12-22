@@ -83,4 +83,5 @@ jobs:
           cat /home/runner/.pgx/data-${{ matrix.pg_version }}/postgresql.conf
           cat /home/runner/.pgx/data-${{ matrix.pg_version }}/postgresql.auto.conf
           set +e
+          export RUST_BACKTRACE=1
           cargo pgx test pg${{ matrix.pg_version }}
