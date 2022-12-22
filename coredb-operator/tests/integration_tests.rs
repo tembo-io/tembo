@@ -64,28 +64,26 @@ mod test {
         let pod_name = format!("{}-0", name);
         println!("Waiting for pod to be running: {}", pod_name);
         let pods: Api<Pod> = Api::namespaced(client.clone(), namespace);
-        if let Err(_) = tokio::time::timeout(
+        let _check_for_pod = tokio::time::timeout(
             std::time::Duration::from_secs(timeout_seconds),
             await_condition(pods, &pod_name, conditions::is_pod_running()),
         )
         .await
-        {
-            panic!(
-                "\n\nERROR: Did not find the pod {} to be running after waiting for {} seconds\n\n",
-                pod_name, timeout_seconds
-            )
-        }
+        .expect(&format!(
+            "Did not find the pod {} to be running after waiting {} seconds",
+            pod_name, timeout_seconds
+        ));
     }
 
     async fn kube_client() -> kube::Client {
-        // Initialize the Kubernetes client
-        let client_future = Client::try_default();
-        let client = match client_future.await {
-            Ok(wrapped_client) => wrapped_client,
-            Err(_error) => panic!("Please configure your Kubernetes Context"),
-        };
         // Get the name of the currently selected namespace
-        let selected_namespace = Config::infer().await.unwrap().default_namespace;
+        let kube_config = Config::infer()
+            .await
+            .expect("Please configure your Kubernetes context.");
+        let selected_namespace = &kube_config.default_namespace;
+
+        // Initialize the Kubernetes client
+        let client = Client::try_from(kube_config.clone()).expect("Failed to initialize Kubernetes client");
 
         // Next, check that the currently selected namespace is labeled
         // to allow the running of tests.
@@ -104,15 +102,18 @@ mod test {
         );
 
         // Check that the CRD is installed
-        let crds: Api<CustomResourceDefinition> = Api::all(client.clone());
-        if let Err(_) = tokio::time::timeout(
+        let custom_resource_definitions: Api<CustomResourceDefinition> = Api::all(client.clone());
+
+        let _check_for_crd = tokio::time::timeout(
             std::time::Duration::from_secs(2),
-            await_condition(crds, "coredbs.kube.rs", conditions::is_crd_established()),
+            await_condition(
+                custom_resource_definitions,
+                "coredbs.kube.rs",
+                conditions::is_crd_established(),
+            ),
         )
         .await
-        {
-            panic!("\n\nERROR: Did not find the CRD to be installed.\n\n")
-        }
+        .expect("Custom Resource Definition for CoreDB was not found.");
 
         return client;
     }
