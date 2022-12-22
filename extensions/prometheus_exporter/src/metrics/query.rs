@@ -32,7 +32,7 @@ mod tests {
     use pgx::prelude::*;
 
     #[pg_test]
-    fn test_handle_query() {
+    fn test_query_exec() {
         assert!(query::query_exec(query::UPTIME_QUERY).is_some());
     }
 }
