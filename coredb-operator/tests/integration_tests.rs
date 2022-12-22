@@ -40,7 +40,7 @@ mod test {
         let replicas = 1;
 
         // Timeout settings while waiting for an event
-        let timeout_seconds = 30;
+        let timeout_seconds = 60;
 
         // Apply a basic configuration of CoreDB
         println!("Creating CoreDB resource {}", name);
