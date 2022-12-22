@@ -76,14 +76,14 @@ mod test {
     }
 
     async fn kube_client() -> kube::Client {
-        // Initialize the Kubernetes client
-        let client_future = Client::try_default();
-        let client = match client_future.await {
-            Ok(wrapped_client) => wrapped_client,
-            Err(_error) => panic!("Please configure your Kubernetes Context"),
-        };
         // Get the name of the currently selected namespace
-        let selected_namespace = Config::infer().await.unwrap().default_namespace;
+        let kube_config = Config::infer()
+            .await
+            .expect("Please configure your Kubernetes context.");
+        let selected_namespace = &kube_config.default_namespace;
+
+        // Initialize the Kubernetes client
+        let client = Client::try_from(kube_config.clone()).expect("Failed to initialize Kubernetes client");
 
         // Next, check that the currently selected namespace is labeled
         // to allow the running of tests.
