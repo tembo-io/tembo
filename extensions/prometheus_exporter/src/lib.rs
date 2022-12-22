@@ -2,6 +2,7 @@ use pgx::bgworkers::*;
 use pgx::log;
 use pgx::prelude::*;
 
+mod metrics;
 mod webserver;
 
 pgx::pg_module_magic!();
@@ -10,7 +11,7 @@ pgx::pg_module_magic!();
 #[pg_guard]
 pub extern "C" fn _PG_init() {
     BackgroundWorkerBuilder::new("Prometheus Exporter for Postgres")
-        .set_function("serve_metrics")
+        .set_function("background_worker")
         .set_library("prometheus_exporter")
         .enable_spi_access()
         .set_start_time(BgWorkerStartTime::ConsistentState)
@@ -19,12 +20,12 @@ pub extern "C" fn _PG_init() {
 
 #[pg_guard]
 #[no_mangle]
-pub extern "C" fn serve_metrics(_arg: pg_sys::Datum) {
+pub extern "C" fn background_worker(_arg: pg_sys::Datum) {
     BackgroundWorker::attach_signal_handlers(SignalWakeFlags::SIGHUP | SignalWakeFlags::SIGTERM);
 
     BackgroundWorker::connect_worker_to_spi(Some("prometheus_exporter"), None);
 
-    webserver::serve().unwrap();
+    webserver::run().unwrap();
 
     log!("Closing BGWorker: {}", BackgroundWorker::get_name());
 }
