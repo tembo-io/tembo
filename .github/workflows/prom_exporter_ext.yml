@@ -11,30 +11,69 @@ on:
       - main
     paths:
     - '.github/workflows/postgres_extension.yml'
-    - 'extensions/**'
+    - 'extensions/prometheus_exporter/**'
   # Always run tests on main or release branches
   push:
     branches:
       - main
       - release**
 
-
 jobs:
-  build_and_test:
-    name: Rust project
+  lint:
+    name: Run linters
     runs-on: ubuntu-20.04
     steps:
       - uses: actions/checkout@v2
+      - name: Install Rust minimal nightly with clippy and rustfmt
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: "prom-extension-lint"
+          workspaces: |
+            extensions/prometheus_exporter
+          # Additional directories to cache
+          cache-directories: |
+            /home/runner/.pgx
+      - uses: ./.github/actions/pgx-init
+        with:
+          working-directory: extensions/prometheus_exporter
+      - name: Cargo format
+        run: cargo +nightly fmt --check
+      - name: Clippy
+        run: cargo clippy
 
-      - uses: actions-rs/toolchain@v1
+  test:
+    name: Run tests
+    runs-on: ubuntu-20.04
+    strategy:
+      # fail-fast means to cancel all jobs if one fails
+      fail-fast: false
+      matrix:
+        pg_version:
+          - 14
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Rust stable toolchain
+        uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-
-      - name: setup pgx
-        run: cargo install --locked cargo-pgx
-
-      - name: init
-        run: cargo pgx init --pg14 download
-
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: "prom-extension-test-${{ matrix.pg_version }}"
+          workspaces: |
+            extensions/prometheus_exporter
+          # Additional directories to cache
+          cache-directories: |
+            /home/runner/.pgx
+      - uses: ./.github/actions/pgx-init
+        with:
+          working-directory: extensions/prometheus_exporter
+          pg_version: ${{ matrix.pg_version }}
       - name: test
-        run: cargo test --no-default-features --features pg14
+        run: |
+          rm -rf ./target/pgx-test-data-${{ matrix.pg_version }} || true
+          cargo pgx test pg${{ matrix.pg_version }}
