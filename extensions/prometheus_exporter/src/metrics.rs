@@ -1,4 +1,3 @@
-// https://github.com/prometheus/client_rust/blob/master/examples/actix-web.rs
 use signal_hook::flag;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
