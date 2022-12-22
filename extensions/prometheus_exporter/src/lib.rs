@@ -30,14 +30,25 @@ pub extern "C" fn background_worker(_arg: pg_sys::Datum) {
     log!("Closing BGWorker: {}", BackgroundWorker::get_name());
 }
 
+// required by pgx for testing
 #[cfg(test)]
 pub mod pg_test {
+    use once_cell::sync::Lazy;
+    use pgx::bgworkers::*;
+
+    static SHARED_PREPLOAD_LIB: Lazy<String> =
+        Lazy::new(|| "shared_preload_libraries = 'prometheus_exporter.so'".to_string());
+
     pub fn setup(_options: Vec<&str>) {
-        // perform one-off initialization when the pg_test framework starts
+        BackgroundWorkerBuilder::new("Prometheus Exporter for Postgres")
+            .set_function("background_worker")
+            .set_library("prometheus_exporter")
+            .enable_spi_access()
+            .set_start_time(BgWorkerStartTime::ConsistentState)
+            .load();
     }
 
     pub fn postgresql_conf_options() -> Vec<&'static str> {
-        // return any postgresql.conf settings that are required for your tests
-        vec![]
+        vec![&*SHARED_PREPLOAD_LIB]
     }
 }
