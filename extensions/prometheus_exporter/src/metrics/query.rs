@@ -15,10 +15,14 @@ pub fn handle_query(query: &str) -> Option<i64> {
     // interacting with the SPI bust be done in a background worker
     BackgroundWorker::transaction(move || {
         let mut obj_clone = clone.lock().unwrap();
-        *obj_clone = Spi::get_one(query).unwrap();
+        *obj_clone = query_exec(&query).unwrap();
     });
     let x = Some(*uptime.lock().unwrap());
     x
+}
+
+fn query_exec(query: &str) -> Option<i64> {
+    Spi::get_one(&query)
 }
 
 #[cfg(any(test, feature = "pg_test"))]
@@ -29,6 +33,6 @@ mod tests {
 
     #[pg_test]
     fn test_handle_query() {
-        assert!(query::handle_query(query::UPTIME_QUERY).is_some());
+        assert!(query::query_exec(query::UPTIME_QUERY).is_some());
     }
 }
