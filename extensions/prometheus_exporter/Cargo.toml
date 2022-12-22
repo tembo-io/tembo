@@ -20,7 +20,7 @@ pgx = "0.6.1"
 actix-web = "4.2.1"
 prometheus-client = "0.19.0-alpha.2"
 signal-hook = "0.3.14"
-tokio = {version = "1.23.0", features = ["macros", "rt-multi-thread"] }
+tokio = {version = "1.23.0", features = ["macros"] }
 
 
 [dev-dependencies]
