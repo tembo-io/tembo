@@ -75,17 +75,5 @@ jobs:
           pg_version: ${{ matrix.pg_version }}
       - name: test
         run: |
-          set -xe
-          # Debugging information
-          ls -ltrah /home/runner/.pgx/
-          ls -ltrah /home/runner/.pgx/data-${{ matrix.pg_version }}/
-          whoami
-          cat /home/runner/.pgx/data-${{ matrix.pg_version }}/postgresql.conf
-          cat /home/runner/.pgx/data-${{ matrix.pg_version }}/postgresql.auto.conf
-          ls ./target/pgx-test-data-${{ matrix.pg_version }}
-          # ensure test data directory is deleted before starting tests
-          rm -rf ./target/pgx-test-data-${{ matrix.pg_version }}
-          ls ./target/
-          set +e
-          export RUST_BACKTRACE=1
+          rm -rf ./target/pgx-test-data-${{ matrix.pg_version }} || true
           cargo pgx test pg${{ matrix.pg_version }}
