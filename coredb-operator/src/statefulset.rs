@@ -14,6 +14,8 @@ use kube::{
     Resource,
 };
 use std::{collections::BTreeMap, sync::Arc};
+use k8s_openapi::api::core::v1::{PersistentVolumeClaimVolumeSource, Volume, VolumeMount};
+use serde::de::Unexpected::Option;
 
 pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
     let client = ctx.client.clone();
@@ -54,8 +56,21 @@ pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
                             container_port: 5432,
                             ..ContainerPort::default()
                         }]),
+                        volume_mounts: Option::from(vec![VolumeMount {
+                            name: "data".to_owned(),
+                            mount_path: "".to_owned(),
+                            ..VolumeMount::default()
+                        }]),
                         ..Container::default()
                     }],
+                    volumes: Option::from(vec![Volume {
+                        name: "data".to_owned(),
+                        persistent_volume_claim: Some(PersistentVolumeClaimVolumeSource{
+                            claim_name: "data".to_owned(),
+                            read_only: Some(false),
+                        }),
+                        ..Volume::default()
+                    }]),
                     ..PodSpec::default()
                 }),
                 metadata: Some(ObjectMeta {
