@@ -4,7 +4,7 @@ use k8s_openapi::{
         apps::v1::{StatefulSet, StatefulSetSpec},
         core::v1::{
             Container, ContainerPort, EnvVar, PersistentVolumeClaim, PersistentVolumeClaimSpec, PodSpec,
-            PodTemplateSpec, ResourceRequirements,
+            PodTemplateSpec, ResourceRequirements, VolumeMount,
         },
     },
     apimachinery::pkg::{api::resource::Quantity, apis::meta::v1::LabelSelector},
@@ -14,8 +14,6 @@ use kube::{
     Resource,
 };
 use std::{collections::BTreeMap, sync::Arc};
-use k8s_openapi::api::core::v1::{PersistentVolumeClaimVolumeSource, Volume, VolumeMount};
-use serde::de::Unexpected::Option;
 
 pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
     let client = ctx.client.clone();
@@ -45,7 +43,7 @@ pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
             template: PodTemplateSpec {
                 spec: Some(PodSpec {
                     containers: vec![Container {
-                        env: Option::from(vec![EnvVar {
+                        env: Some(vec![EnvVar {
                             name: "POSTGRES_PASSWORD".to_owned(),
                             value: Some("password".to_owned()),
                             value_from: None,
@@ -56,21 +54,13 @@ pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
                             container_port: 5432,
                             ..ContainerPort::default()
                         }]),
-                        volume_mounts: Option::from(vec![VolumeMount {
+                        volume_mounts: Some(vec![VolumeMount {
                             name: "data".to_owned(),
-                            mount_path: "".to_owned(),
+                            mount_path: "/var/lib/postgresql/data".to_owned(),
                             ..VolumeMount::default()
                         }]),
                         ..Container::default()
                     }],
-                    volumes: Option::from(vec![Volume {
-                        name: "data".to_owned(),
-                        persistent_volume_claim: Some(PersistentVolumeClaimVolumeSource{
-                            claim_name: "data".to_owned(),
-                            read_only: Some(false),
-                        }),
-                        ..Volume::default()
-                    }]),
                     ..PodSpec::default()
                 }),
                 metadata: Some(ObjectMeta {
@@ -78,7 +68,7 @@ pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
                     ..ObjectMeta::default()
                 }),
             },
-            volume_claim_templates: Option::from(vec![PersistentVolumeClaim {
+            volume_claim_templates: Some(vec![PersistentVolumeClaim {
                 metadata: ObjectMeta {
                     name: Some("data".to_string()),
                     ..ObjectMeta::default()
