@@ -1,17 +1,17 @@
-name: Prometheus Exporter for Postgres (pg14)
+name: Postgres Simple Message Queue (pg14)
 
 defaults:
   run:
     shell: bash
-    working-directory: ./extensions/prometheus_exporter/
+    working-directory: ./extensions/pg_smq/
 
 on:
   pull_request:
     branches:
       - main
     paths:
-    - '.github/workflows/postgres_extension.yml'
-    - 'extensions/prometheus_exporter/**'
+      - '.github/workflows/pg_smq_ext.yml'
+      - 'extensions/pg_smq/**'
   # Always run tests on main or release branches
   push:
     branches:
@@ -32,15 +32,15 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
         with:
-          prefix-key: "prom-extension-lint"
+          prefix-key: "pg-smq-extension-lint"
           workspaces: |
-            extensions/prometheus_exporter
+            extensions/pg_smq
           # Additional directories to cache
           cache-directories: |
             /home/runner/.pgx
       - uses: ./.github/actions/pgx-init
         with:
-          working-directory: extensions/prometheus_exporter
+          working-directory: extensions/pg_smq
       - name: Cargo format
         run: cargo +nightly fmt --all --check
       - name: Clippy
@@ -63,15 +63,15 @@ jobs:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
         with:
-          prefix-key: "prom-extension-test-${{ matrix.pg_version }}"
+          prefix-key: "pg-smq-extension-test-${{ matrix.pg_version }}"
           workspaces: |
-            extensions/prometheus_exporter
+            extensions/pg_smq
           # Additional directories to cache
           cache-directories: |
             /home/runner/.pgx
       - uses: ./.github/actions/pgx-init
         with:
-          working-directory: extensions/prometheus_exporter
+          working-directory: extensions/pg_smq
           pg_version: ${{ matrix.pg_version }}
       - name: test
         run: |
