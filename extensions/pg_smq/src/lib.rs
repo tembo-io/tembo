@@ -1,5 +1,5 @@
 use pgx::prelude::*;
-use pgx::{error, info, log, warning};
+use pgx::warning;
 
 pgx::pg_module_magic!();
 
@@ -52,7 +52,6 @@ fn psmq_enqueue(queue_name: &str, message: pgx::Json) -> Option<i64> {
 }
 
 // check message out of the queue
-// how to make pgx function accept optional params?
 #[pg_extern]
 fn psmq_read(queue_name: &str, vt: Option<i64>) -> pgx::Json {
     let _vt = vt.unwrap_or(VT_DEFAULT);
