@@ -10,7 +10,7 @@ on:
     branches:
       - main
     paths:
-    - '.github/workflows/postgres_extension.yml'
+    - '.github/workflows/prom_exporter_ext.yml'
     - 'extensions/prometheus_exporter/**'
   # Always run tests on main or release branches
   push:
@@ -49,6 +49,7 @@ jobs:
   test:
     name: Run tests
     runs-on: ubuntu-20.04
+    needs: lint
     strategy:
       # fail-fast means to cancel all jobs if one fails
       fail-fast: false
