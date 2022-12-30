@@ -4,7 +4,7 @@ use k8s_openapi::{
         apps::v1::{StatefulSet, StatefulSetSpec},
         core::v1::{
             Container, ContainerPort, EnvVar, PersistentVolumeClaim, PersistentVolumeClaimSpec, PodSpec,
-            PodTemplateSpec, ResourceRequirements,
+            PodTemplateSpec, ResourceRequirements, VolumeMount,
         },
     },
     apimachinery::pkg::{api::resource::Quantity, apis::meta::v1::LabelSelector},
@@ -43,7 +43,7 @@ pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
             template: PodTemplateSpec {
                 spec: Some(PodSpec {
                     containers: vec![Container {
-                        env: Option::from(vec![EnvVar {
+                        env: Some(vec![EnvVar {
                             name: "POSTGRES_PASSWORD".to_owned(),
                             value: Some("password".to_owned()),
                             value_from: None,
@@ -54,6 +54,11 @@ pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
                             container_port: 5432,
                             ..ContainerPort::default()
                         }]),
+                        volume_mounts: Some(vec![VolumeMount {
+                            name: "data".to_owned(),
+                            mount_path: "/var/lib/postgresql/data".to_owned(),
+                            ..VolumeMount::default()
+                        }]),
                         ..Container::default()
                     }],
                     ..PodSpec::default()
@@ -63,7 +68,7 @@ pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
                     ..ObjectMeta::default()
                 }),
             },
-            volume_claim_templates: Option::from(vec![PersistentVolumeClaim {
+            volume_claim_templates: Some(vec![PersistentVolumeClaim {
                 metadata: ObjectMeta {
                     name: Some("data".to_string()),
                     ..ObjectMeta::default()
