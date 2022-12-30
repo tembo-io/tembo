@@ -96,26 +96,25 @@ fn psmq_delete(queue_name: &str, msg_id: String) -> bool {
 }
 
 // reads and deletes at same time
-// #[pg_extern]
-// fn psmq_pop(queue_name: &str, vt: i64, qty: i32) -> bool {
-//     Spi::run(
-//         format!(
-//             "
-//             WITH cte AS
-//                 (
-//                     SELECT *
-//                     FROM '{queue_name}'
-//                     LIMIT {qty}
-//                     FOR UPDATE SKIP LOCKED
-//                 )
-//             UPDATE '{queue_name}'
-//             DELETE
-//             WHERE rank = (select rank from cte)
-//             RETURNING *;
-//             "
-//         ),
-//     )
-// };
+#[pg_extern]
+fn psmq_pop(queue_name: &str) -> pgx::Json {
+    Spi::get_one(&format!(
+        "
+            WITH cte AS
+                (
+                    SELECT *
+                    FROM '{queue_name}'
+                    LIMIT 1
+                    FOR UPDATE SKIP LOCKED
+                )
+            UPDATE '{queue_name}'
+            DELETE
+            WHERE rank = (select rank from cte)
+            RETURNING *;
+            "
+    ))
+    .unwrap()
+}
 
 #[cfg(any(test, feature = "pg_test"))]
 #[pg_schema]
