@@ -1,14 +1,27 @@
 use pgx::prelude::*;
+use pgx::{error, info, log, warning};
 
 pgx::pg_module_magic!();
 
 const VT_DEFAULT: i64 = 60;
 
-// TODOs:
-// 2. how to make fn param optional with defaults?
-// 3. alter queue attributes
-// 4. alter message vt
-// 5. background worker which updates VT on messages. can this be automatic?
+// read many messages at once, if they exist
+#[pg_extern]
+fn psmq_read_many(queue_name: &str, qty: i32) {
+    // TODO - LIMIT {qty}
+}
+
+// change attributes on existing queue
+#[pg_extern]
+fn psmq_alter_queue(queue_name: &str) {
+    // TODO
+}
+
+// changes VT on an existing message
+#[pg_extern]
+fn psmq_set_vt(queue_name: &str, msg_id: &str, vt: i64) {
+    // TODO
+}
 
 #[pg_extern]
 fn psmq_create(queue_name: &str) -> bool {
@@ -39,7 +52,6 @@ fn psmq_enqueue(queue_name: &str, message: pgx::Json) -> Option<i64> {
 }
 
 // check message out of the queue
-// TODO: impl a read_many
 // how to make pgx function accept optional params?
 #[pg_extern]
 fn psmq_read(queue_name: &str, vt: Option<i64>) -> pgx::Json {
@@ -63,20 +75,25 @@ fn psmq_read(queue_name: &str, vt: Option<i64>) -> pgx::Json {
     msg.unwrap()
 }
 
-// #[pg_extern]
-// fn psmq_delete(queue_name: &str, msg_id: String) -> bool {
-//     Spi::run(
-//         format!(
-//             "
-//             DELETE
-//             FROM '{queue}'
-//             WHERE msg_id = '{msg_id}';
-//             ",
-//             queue = queue_name,
-//             msg_id=msg_id
-//         ),
-//     )
-// };
+#[pg_extern]
+fn psmq_delete(queue_name: &str, msg_id: String) -> bool {
+    let del: Option<i32> = Spi::get_one(&format!(
+        "
+            DELETE
+            FROM '{queue}'
+            WHERE msg_id = '{msg_id}';
+            ",
+        queue = queue_name,
+        msg_id = msg_id
+    ));
+    match del {
+        Some(_) => true,
+        None => {
+            warning!("msg_id: {} not found in queue: {}", msg_id, queue_name);
+            false
+        }
+    }
+}
 
 // reads and deletes at same time
 // #[pg_extern]
