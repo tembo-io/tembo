@@ -21,7 +21,7 @@ on:
 jobs:
   lint:
     name: Run linters
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust minimal nightly with clippy and rustfmt
@@ -48,7 +48,7 @@ jobs:
 
   test:
     name: Run tests
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     needs: lint
     strategy:
       # fail-fast means to cancel all jobs if one fails
