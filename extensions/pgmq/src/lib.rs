@@ -1,6 +1,6 @@
+use pgx::SpiTupleTable;
 use pgx::prelude::*;
 use pgx::warning;
-use pgx::SpiTupleTable;
 
 pgx::pg_module_magic!();
 
@@ -95,25 +95,22 @@ fn pgmq_read(queue_name: &str) -> Option<pgx::Json> {
 
 #[pg_extern]
 fn pgmq_delete(queue_name: &str, msg_id: i64) -> bool {
+
     let mut num_deleted = 0;
 
     Spi::connect(|client| {
-        let tup_table: SpiTupleTable = client.select(
-            &format!(
-                "
+        let tup_table: SpiTupleTable = client.select(&format!(
+            "
                 DELETE
                 FROM {queue_name}
                 WHERE msg_id = '{msg_id}';
             "
-            ),
-            None,
-            None,
-        );
+        ), None, None);
         num_deleted = tup_table.len();
         Ok(Some(()))
     });
     if num_deleted == 1 {
-        1
+        true
     } else if num_deleted == 0 {
         warning!("no message found with msg_id: {}", msg_id);
         false
