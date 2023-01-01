@@ -3,79 +3,97 @@ use pgx::warning;
 
 pgx::pg_module_magic!();
 
-const VT_DEFAULT: i64 = 60;
+const VT_DEFAULT: i64 = 30;
+const DELAY_DEFAULT: i64 = 0;
 
 // read many messages at once, if they exist
 #[pg_extern]
-fn psmq_read_many(queue_name: &str, qty: i32) {
+fn pgmq_read_many(_queue_name: &str, _qty: i32) {
     // TODO - LIMIT {qty}
 }
 
 // change attributes on existing queue
 #[pg_extern]
-fn psmq_alter_queue(queue_name: &str) {
+fn pgmq_alter_queue(_queue_name: &str) {
     // TODO
 }
 
 // changes VT on an existing message
 #[pg_extern]
-fn psmq_set_vt(queue_name: &str, msg_id: &str, vt: i64) {
+fn pgmq_set_vt(_queue_name: &str, _msg_id: &str, _vt: i64) {
     // TODO
 }
 
 #[pg_extern]
-fn psmq_create(queue_name: &str) -> bool {
+fn pgmq_create(queue_name: &str) -> bool {
     Spi::run(&format!(
-        "CREATE TABLE {name} (
-            msg_id SERIAL,
-            vt BIGINT,
-            visible BOOL DEFAULT TRUE,
+        "
+        CREATE TABLE IF NOT EXISTS pgmq_config (
+            queue_name VARCHAR NOT NULL,
+            vt_default INT DEFAULT {VT_DEFAULT},
+            delay_default INT DEFAULT {DELAY_DEFAULT},
+            created TIMESTAMP DEFAULT current_timestamp
+        );
+
+        CREATE TABLE IF NOT EXISTS {name} (
+            msg_id BIGSERIAL,
+            vt TIMESTAMP,
             message JSON
-        );",
+        );
+
+        INSERT INTO pgmq_config (queue_name)
+        VALUES ('{name}');
+        ",
         name = queue_name
     ));
+    // TODO: create index on vt
     true
 }
 
 // puts messages onto the queue
 #[pg_extern]
-fn psmq_enqueue(queue_name: &str, message: pgx::Json) -> Option<i64> {
+fn pgmq_enqueue(queue_name: &str, message: pgx::Json) -> Option<i64> {
+    // TODO: impl delay on top of vt
     Spi::get_one(&format!(
-        "INSERT INTO {queue_name} (vt, visible, message)
-            VALUES ('{vt}', '{visible}', '{message}'::json)
+        "INSERT INTO {queue_name} (vt, message)
+            VALUES (now() at time zone 'utc', '{message}'::json)
             RETURNING msg_id;",
         queue_name = queue_name,
-        vt = 1,
-        visible = true,
         message = message.0,
     ))
 }
 
-// check message out of the queue
+// check message out of the queue using default timeout
 #[pg_extern]
-fn psmq_read(queue_name: &str, vt: Option<i64>) -> pgx::Json {
-    let _vt = vt.unwrap_or(VT_DEFAULT);
-
-    let msg = Spi::get_one(&format!(
+fn pgmq_read(queue_name: &str) -> Option<pgx::Json> {
+    let (msg_id, vt, message) = Spi::get_three::<i64, pgx::Timestamp, pgx::Json>(&format!(
         "
-        WITH cte AS
-            (
-                SELECT *
-                FROM '{queue_name}'
-                LIMIT 1
-                FOR UPDATE SKIP LOCKED
-            )
-        UPDATE '{queue_name}'
-        SET visible = false, vt = {_vt}
-        WHERE rank = (select rank from cte)
-        RETURNING *;
-        "
+    WITH cte AS
+        (
+            SELECT msg_id, vt, message
+            FROM {queue_name}
+            WHERE vt <= now() at time zone 'utc'
+            LIMIT 1
+            FOR UPDATE SKIP LOCKED
+        )
+    UPDATE {queue_name}
+    SET vt = (now() at time zone 'utc' + interval '{VT_DEFAULT} seconds')
+    WHERE msg_id = (select msg_id from cte)
+    RETURNING *;
+    "
     ));
-    msg.unwrap()
+    match msg_id {
+        Some(msg_id) => Some(pgx::Json(serde_json::json!({
+            "msg_id": msg_id,
+            "vt": vt,
+            "message": message
+        }))),
+        None => None,
+    }
 }
 
 #[pg_extern]
-fn psmq_delete(queue_name: &str, msg_id: String) -> bool {
+fn pgmq_delete(queue_name: &str, msg_id: String) -> bool {
     let del: Option<i32> = Spi::get_one(&format!(
         "
             DELETE
@@ -85,9 +103,9 @@ fn psmq_delete(queue_name: &str, msg_id: String) -> bool {
         queue = queue_name,
         msg_id = msg_id
     ));
-    match del {
-        Some(_) => true,
-        None => {
+    match del.unwrap() {
+        d if d >= 1 => true,
+        _ => {
             warning!("msg_id: {} not found in queue: {}", msg_id, queue_name);
             false
         }
@@ -96,19 +114,20 @@ fn psmq_delete(queue_name: &str, msg_id: String) -> bool {
 
 // reads and deletes at same time
 #[pg_extern]
-fn psmq_pop(queue_name: &str) -> pgx::Json {
+fn pgmq_pop(queue_name: &str) -> pgx::Json {
     Spi::get_one(&format!(
         "
             WITH cte AS
                 (
                     SELECT *
                     FROM '{queue_name}'
+                    WHERE vt <= now()
                     LIMIT 1
                     FOR UPDATE SKIP LOCKED
                 )
             UPDATE '{queue_name}'
             DELETE
-            WHERE rank = (select rank from cte)
+            WHERE msg_id = (select msg_id from cte)
             RETURNING *;
             "
     ))
@@ -123,14 +142,38 @@ mod tests {
     #[pg_test]
     fn test_create() {
         let qname = r#"test_queue"#;
-        crate::psmq_create(&qname);
+        crate::pgmq_create(&qname);
         let retval = Spi::get_one::<i32>(&format!("SELECT count(*) FROM {q}", q = &qname))
             .expect("SQL select failed");
         assert_eq!(retval, 0);
-        crate::psmq_enqueue(&qname, pgx::Json(serde_json::json!({"x":"y"})));
+        crate::pgmq_enqueue(&qname, pgx::Json(serde_json::json!({"x":"y"})));
         let retval = Spi::get_one::<i32>(&format!("SELECT count(*) FROM {q}", q = &qname))
             .expect("SQL select failed");
         assert_eq!(retval, 1);
+    }
+
+    // assert an invisible message is not readable
+    #[pg_test]
+    fn test_default_vt() {
+        let qname = r#"test_queue"#;
+        crate::pgmq_create(&qname);
+        let init_count = Spi::get_one::<i32>(&format!("SELECT count(*) FROM {q}", q = &qname))
+            .expect("SQL select failed");
+        // should not be any messages initially
+        assert_eq!(init_count, 0);
+
+        // put a message on the queue
+        crate::pgmq_enqueue(&qname, pgx::Json(serde_json::json!({"x":"y"})));
+        // read the message off queue
+        let msg = crate::pgmq_read(&qname);
+        assert!(msg.is_some());
+        // should be no messages left
+        let nomsgs = crate::pgmq_read(&qname);
+        assert!(nomsgs.is_none());
+        // but still one record on the table
+        let init_count = Spi::get_one::<i32>(&format!("SELECT count(*) FROM {q}", q = &qname))
+            .expect("SQL select failed");
+        assert_eq!(init_count, 1);
     }
 }
 
