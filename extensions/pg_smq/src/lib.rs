@@ -93,11 +93,11 @@ fn pgmq_read(queue_name: &str) -> Option<pgx::Json> {
 }
 
 #[pg_extern]
-fn pgmq_delete(queue_name: &str, msg_id: String) -> bool {
+fn pgmq_delete(queue_name: &str, msg_id: &str) -> bool {
     let del: Option<i32> = Spi::get_one(&format!(
         "
             DELETE
-            FROM '{queue}'
+            FROM {queue}
             WHERE msg_id = '{msg_id}';
             ",
         queue = queue_name,
@@ -114,24 +114,30 @@ fn pgmq_delete(queue_name: &str, msg_id: String) -> bool {
 
 // reads and deletes at same time
 #[pg_extern]
-fn pgmq_pop(queue_name: &str) -> pgx::Json {
-    Spi::get_one(&format!(
+fn pgmq_pop(queue_name: &str) -> Option<pgx::Json> {
+    let (msg_id, vt, message) = Spi::get_three::<i64, pgx::Timestamp, pgx::Json>(&format!(
         "
             WITH cte AS
                 (
-                    SELECT *
-                    FROM '{queue_name}'
-                    WHERE vt <= now()
+                    SELECT msg_id, vt, message
+                    FROM {queue_name}
+                    WHERE vt <= now() at time zone 'utc'
                     LIMIT 1
                     FOR UPDATE SKIP LOCKED
                 )
-            UPDATE '{queue_name}'
-            DELETE
+            DELETE from {queue_name}
             WHERE msg_id = (select msg_id from cte)
             RETURNING *;
-            "
-    ))
-    .unwrap()
+        "
+    ));
+    match msg_id {
+        Some(msg_id) => Some(pgx::Json(serde_json::json!({
+            "msg_id": msg_id,
+            "vt": vt,
+            "message": message
+        }))),
+        None => None,
+    }
 }
 
 #[cfg(any(test, feature = "pg_test"))]
