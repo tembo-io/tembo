@@ -1,6 +1,9 @@
 use crate::{telemetry, Error, Metrics, Result};
 use chrono::{DateTime, Utc};
-use futures::{future::BoxFuture, FutureExt, StreamExt};
+use futures::{
+    future::{BoxFuture, FutureExt},
+    stream::StreamExt,
+};
 
 use crate::{defaults, service::reconcile_svc, statefulset::reconcile_sts};
 use kube::{
