@@ -184,14 +184,14 @@ mod tests {
             id: 1,
             event_type: EventType::CREATE,
             before: None,
-            after: None,
+            after: serde_json::json!({}),
             org: "coredb".to_owned(),
         };
         assert_eq!(event.timestamp, "2020-10-01T00:00:00Z".to_owned());
         assert_eq!(event.id, 1);
         assert_eq!(event.event_type, EventType::CREATE);
         assert_eq!(event.before, None);
-        assert_eq!(event.after, None);
+        assert_eq!(event.after, serde_json::json!({}));
         assert_eq!(event.org, "coredb".to_owned());
     }
 }
