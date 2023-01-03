@@ -1,5 +1,5 @@
-comment = 'pg_smq:  Created by pgx'
+comment = 'pgmq:  Created by pgx'
 default_version = '@CARGO_VERSION@'
-module_pathname = '$libdir/pg_smq'
+module_pathname = '$libdir/pgmq'
 relocatable = false
 superuser = false

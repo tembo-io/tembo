@@ -1,5 +1,5 @@
 [package]
-name = "pg_smq"
+name = "pgmq"
 version = "0.0.0"
 edition = "2021"
 
