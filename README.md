@@ -1,6 +1,7 @@
 # CoreDB
 
 [![](https://shields.io/endpoint?url=https://ossrank.com/shield/2103)](https://ossrank.com/p/2103)
+[![Discord Chat](https://img.shields.io/discord/1060568981725003789?label=Discord)][Discord]
 
 CoreDB is an "On Steroids" distribution of Postgres under active development that you are free to use,
 except to compete with the managed service that we are building concurrently with this open project
@@ -28,3 +29,5 @@ except to compete with the managed service that we are building concurrently wit
 * HTAP - automatically store data in the best format (row-wise or columnar) for the queries that you run
 * Multi-master — we should be able to run multiple masters that sync in the background
 * App sidecars - standard directories like `/dbt` `/python` `/rust` that you could drop your data pipelines or apps into, and are then run "as close as possible" to the database
+
+[Discord]: https://discord.gg/HjuMB3JX
