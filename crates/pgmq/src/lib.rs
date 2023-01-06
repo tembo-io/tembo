@@ -11,6 +11,10 @@ use sqlx::postgres::PgRow;
 
 mod query;
 
+
+const VT_DEFAULT: u32 = 30;
+
+
 #[derive(Debug)]
 pub struct Message {
     pub msg_id: i64,
@@ -19,23 +23,27 @@ pub struct Message {
 }
 
 pub struct PGMQueue {
-    pub config: PGMQueueConfig,
+    pub url: String,
     pub connection: Option<Pool<Postgres>>,
 }
 
 impl PGMQueue {
+    pub fn new(url: String) -> PGMQueue {
+        PGMQueue { url: url, connection: None }
+    }
+
     pub async fn connect(&mut self) {
         let con = PgPoolOptions::new()
             .max_connections(5)
-            .connect(&self.config.url)
+            .connect(&self.url)
             .await
             .unwrap();
         self.connection = Some(con);
     }
 
-    pub async fn create(&self) -> Result<(), Error> {
-        let create = query::create(&self.config.queue_name);
-        let index: String = query::create_index(&self.config.queue_name);
+    pub async fn create(&self, queue_name: &str) -> Result<(), Error> {
+        let create = query::create(&queue_name);
+        let index: String = query::create_index(&queue_name);
         sqlx::query(&create)
             .execute(self.connection.as_ref().unwrap())
             .await?;
@@ -45,18 +53,23 @@ impl PGMQueue {
         Ok(())
     }
 
-    pub async fn enqueue(&self, message: &serde_json::Value) -> Result<i64, Error> {
+    pub async fn enqueue(&self, queue_name: &str, message: &serde_json::Value) -> Result<i64, Error> {
         // TODO: sends any struct that can be serialized to json
         // struct will need to derive serialize
-        let row: PgRow = sqlx::query(&query::enqueue(&self.config.queue_name, &message))
+        let row: PgRow = sqlx::query(&query::enqueue(&queue_name, &message))
             .fetch_one(self.connection.as_ref().unwrap())
             .await?;
 
         Ok(row.try_get("msg_id").unwrap())
     }
 
-    pub async fn read(&self) -> Option<Message> {
-        let query = &query::read(&self.config.queue_name, &self.config.vt);
+    pub async fn read(&self, queue_name: &str, vt: Option<&u32>) -> Option<Message> {
+        // map vt or default VT
+        let vt_ = match vt {
+            Some(t) => t,
+            None => &VT_DEFAULT
+        };
+        let query = &query::read(&queue_name, &vt_);
         let row = sqlx::query(query)
             .fetch_one(self.connection.as_ref().unwrap())
             .await;
@@ -71,8 +84,8 @@ impl PGMQueue {
         }
     }
 
-    pub async fn delete(&self, msg_id: &i64) -> Result<u64, Error> {
-        let query = &&query::delete(&self.config.queue_name, &msg_id);
+    pub async fn delete(&self, queue_name: &str, msg_id: &i64) -> Result<u64, Error> {
+        let query = &&query::delete(&queue_name, &msg_id);
         let row = sqlx::query(query)
             .execute(self.connection.as_ref().unwrap())
             .await?;
@@ -93,22 +106,22 @@ pub struct PGMQueueConfig {
     pub delay: u32,
 }
 
-impl PGMQueueConfig {
-    pub fn new() -> PGMQueueConfig {
-        PGMQueueConfig {
-            url: "postgres://postgres:postgres@0.0.0.0:5432".to_owned(),
-            queue_name: "default".to_owned(),
-            vt: 30,
-            delay: 0,
-        }
-    }
+// impl PGMQueueConfig {
+//     pub fn new() -> PGMQueueConfig {
+//         PGMQueueConfig {
+//             url: "postgres://postgres:postgres@0.0.0.0:5432".to_owned(),
+//             queue_name: "default".to_owned(),
+//             vt: 30,
+//             delay: 0,
+//         }
+//     }
 
-    pub async fn init(self) -> PGMQueue {
-        let mut q = PGMQueue {
-            config: self,
-            connection: None,
-        };
-        q.connect().await;
-        q
-    }
-}
+//     pub async fn init(self) -> PGMQueue {
+//         let mut q = PGMQueue {
+//             config: self,
+//             connection: None,
+//         };
+//         q.connect().await;
+//         q
+//     }
+// }

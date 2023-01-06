@@ -2,27 +2,22 @@ use pgmq::{Message, PGMQueue, PGMQueueConfig};
 
 #[tokio::main]
 async fn main() -> Result<(), sqlx::Error> {
-    let qconfig = PGMQueueConfig {
-        queue_name: "myqueue".to_owned(),
-        url: "postgres://postgres:postgres@0.0.0.0:5432".to_owned(),
-        vt: 30,
-        delay: 0,
-    };
 
-    let queue: PGMQueue = qconfig.init().await;
+    let queue: PGMQueue = PGMQueue::new("postgres://postgres:postgres@0.0.0.0:5432".to_owned());
 
-    queue.create().await?;
+    let myqueue = "myqueue".to_owned();
+    queue.create(&myqueue).await?;
 
     let msg = serde_json::json!({
         "foo": "bar"
     });
-    let msg_id = queue.enqueue(&msg).await;
+    let msg_id = queue.enqueue(&myqueue, &msg).await;
     println!("msg_id: {:?}", msg_id);
 
-    let read_msg: Message = queue.read().await.unwrap();
+    let read_msg: Message = queue.read(&myqueue, Some(&30_u32)).await.unwrap();
     print!("read_msg: {:?}", read_msg);
 
-    let deleted = queue.delete(&read_msg.msg_id).await;
+    let deleted = queue.delete(&myqueue, &read_msg.msg_id).await;
     println!("deleted: {:?}", deleted);
 
     Ok(())
