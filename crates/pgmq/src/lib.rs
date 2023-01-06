@@ -11,9 +11,7 @@ use sqlx::postgres::PgRow;
 
 mod query;
 
-
 const VT_DEFAULT: u32 = 30;
-
 
 #[derive(Debug)]
 pub struct Message {
@@ -29,7 +27,10 @@ pub struct PGMQueue {
 
 impl PGMQueue {
     pub fn new(url: String) -> PGMQueue {
-        PGMQueue { url: url, connection: None }
+        PGMQueue {
+            url: url,
+            connection: None,
+        }
     }
 
     pub async fn connect(&mut self) {
@@ -53,7 +54,11 @@ impl PGMQueue {
         Ok(())
     }
 
-    pub async fn enqueue(&self, queue_name: &str, message: &serde_json::Value) -> Result<i64, Error> {
+    pub async fn enqueue(
+        &self,
+        queue_name: &str,
+        message: &serde_json::Value,
+    ) -> Result<i64, Error> {
         // TODO: sends any struct that can be serialized to json
         // struct will need to derive serialize
         let row: PgRow = sqlx::query(&query::enqueue(&queue_name, &message))
@@ -67,7 +72,7 @@ impl PGMQueue {
         // map vt or default VT
         let vt_ = match vt {
             Some(t) => t,
-            None => &VT_DEFAULT
+            None => &VT_DEFAULT,
         };
         let query = &query::read(&queue_name, &vt_);
         let row = sqlx::query(query)
@@ -105,23 +110,3 @@ pub struct PGMQueueConfig {
     pub vt: u32,
     pub delay: u32,
 }
-
-// impl PGMQueueConfig {
-//     pub fn new() -> PGMQueueConfig {
-//         PGMQueueConfig {
-//             url: "postgres://postgres:postgres@0.0.0.0:5432".to_owned(),
-//             queue_name: "default".to_owned(),
-//             vt: 30,
-//             delay: 0,
-//         }
-//     }
-
-//     pub async fn init(self) -> PGMQueue {
-//         let mut q = PGMQueue {
-//             config: self,
-//             connection: None,
-//         };
-//         q.connect().await;
-//         q
-//     }
-// }
