@@ -2,9 +2,10 @@ use pgmq::{Message, PGMQueue};
 
 #[tokio::main]
 async fn main() -> Result<(), sqlx::Error> {
-    let queue: PGMQueue = PGMQueue::new("postgres://postgres:postgres@0.0.0.0:5432".to_owned());
+    let queue: PGMQueue =
+        PGMQueue::new("postgres://postgres:postgres@0.0.0.0:5432".to_owned()).await;
 
-    let myqueue = "myqueue".to_owned();
+    let myqueue = "myqueue1".to_owned();
     queue.create(&myqueue).await?;
 
     let msg = serde_json::json!({
