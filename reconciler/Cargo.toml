@@ -1,0 +1,23 @@
+[package]
+name = "reconciler"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+k8s-openapi = { version = "0.16.0", features = ["v1_25"] }
+tokio = {version = "1.23.0", features = ["full"]}
+futures = "0.3.25"
+serde = { version = "1.0.148", features = ["derive"] }
+serde_json = "1.0.89"
+schemars = "0.8.11"
+thiserror = "1.0.38"
+env_logger = "0.10.0"
+log = "0.4.17"
+tokio-postgres = "0.7.7"
+pgmq = "0.0.1-alpha"
+
+[dependencies.kube]
+features = ["runtime", "client", "derive"]
+version = "0.77.0"
