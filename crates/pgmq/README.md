@@ -12,7 +12,8 @@ docker run -d --name postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgre
 use pgmq::{Message, PGMQueue};
 
 
-let queue: PGMQueue = PGMQueue::new("postgres://postgres:postgres@0.0.0.0:5432".to_owned());
+let queue: PGMQueue = PGMQueue::new("postgres://postgres:postgres@0.0.0.0:5432".to_owned()).await;
+
 ```
 
 ## Create the queue
