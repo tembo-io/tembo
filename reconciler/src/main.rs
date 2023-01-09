@@ -1,6 +1,6 @@
 use kube::{Client, ResourceExt};
 use log::info;
-use pgmq::{PGMQueue, PGMQueueConfig};
+use pgmq::{PGMQueue};
 use reconciler::{create_or_update, delete, get_all};
 use std::env;
 use std::{thread, time};
@@ -9,22 +9,17 @@ use std::{thread, time};
 async fn run() -> Result<(), Box<dyn std::error::Error>> {
     // // Read connection info from environment variable
     let pg_conn_url = env::var("PG_CONN_URL").expect("PG_CONN_URL must be set");
+    let pg_queue_name = env::var("PG_QUEUE_NAME").expect("PG_QUEUE_NAME must be set");
 
     // Connect to postgres queue
-    let qconfig = PGMQueueConfig {
-        queue_name: "myqueue".to_owned(),
-        url: pg_conn_url,
-        vt: 30,
-        delay: 0,
-    };
-    let queue: PGMQueue = qconfig.init().await;
+    let queue: PGMQueue = PGMQueue::new(pg_conn_url).await;
 
     // Infer the runtime environment and try to create a Kubernetes Client
     let client = Client::try_default().await?;
 
     loop {
         // Read from queue (check for new message)
-        let read_msg = match queue.read().await {
+        let read_msg = match queue.read(&pg_queue_name, Some(&30_u32)).await {
             Some(message) => {
                 print!("read_msg: {:?}", message);
                 message
@@ -69,7 +64,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
 
         // Delete message from queue
         let deleted = queue
-            .delete(&read_msg.msg_id)
+            .delete(&pg_queue_name, &read_msg.msg_id)
             .await
             .expect("error deleting message from queue");
         // TODO(ianstanton) Improve logging everywhere
