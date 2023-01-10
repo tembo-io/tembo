@@ -41,8 +41,7 @@ fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
     let postgres_container = Container {
         env: postgres_env.clone(),
         security_context: Some(SecurityContext {
-            //run_as_user: Some(cdb.spec.uid.clone() as i64),
-            run_as_user: Some(999),
+            run_as_user: Some(cdb.spec.uid.clone() as i64),
             allow_privilege_escalation: Some(false),
             ..SecurityContext::default()
         }),
@@ -135,8 +134,11 @@ mod tests {
     use kube::Resource;
 
     #[test]
-    fn test_default_uid() {
-        let mut coredb: CoreDB = CoreDB::new("check-uid-default", CoreDBSpec::default());
+    fn test_user_specified_uid() {
+        let mut cdb_spec: CoreDBSpec = CoreDBSpec::default();
+        cdb_spec.uid = 1000;
+        let mut coredb: CoreDB = CoreDB::new("check-uid", cdb_spec);
+
         coredb.meta_mut().namespace = Some("default".into());
         coredb.meta_mut().uid = Some("752d59ef-2671-4890-9feb-0097459b18c8".into());
         let sts: StatefulSet = stateful_set_from_cdb(&coredb);
@@ -153,7 +155,7 @@ mod tests {
                 .expect("Did not have a security context")
                 .run_as_user
                 .unwrap(),
-            999
+            1000
         );
     }
 }
