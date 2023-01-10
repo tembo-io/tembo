@@ -50,7 +50,9 @@ jobs:
       - name: unit-tests
         run: cargo test
       - name: integration-tests
-        run: cargo test --test integration_test
+        run: make test.integration
+      - name: teardown
+        run: make test.cleanup
 
   publish:
     # only publish off tag events
