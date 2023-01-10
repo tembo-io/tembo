@@ -3,6 +3,7 @@ mod pg_cluster_crd;
 use kube::api::{DeleteParams, ListParams, Patch, PatchParams};
 use kube::{Api, Client};
 use pg_cluster_crd::PostgresCluster;
+use serde_json::Value;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -12,6 +13,62 @@ pub enum Error {
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
+
+pub async fn generate_spec(body: Value) -> Value {
+    let name: String = serde_json::from_value(body["resource_name"].clone()).unwrap();
+    let image: String = serde_json::from_value(body["postgres_image"].clone()).unwrap();
+    let cpu: String = serde_json::from_value(body["cpu"].clone()).unwrap();
+    let memory: String = serde_json::from_value(body["memory"].clone()).unwrap();
+    let storage: String = serde_json::from_value(body["storage"].clone()).unwrap();
+
+    let spec = serde_json::json!({
+        "apiVersion": "postgres-operator.crunchydata.com/v1beta1",
+        "kind": "PostgresCluster",
+        "metadata": {
+            "name": format!("{}", name),
+        },
+        "spec": {
+            "image": format!("{}", image),
+            "postgresVersion": 14,
+            "instances": [
+                {
+                    "name": "instance1",
+                    "dataVolumeClaimSpec": {
+                        "accessModes": ["ReadWriteOnce"],
+                        "resources": {"requests": {"storage": format!("{}", storage)}},
+                    },
+                    "resources": {
+                        "limits": {
+                            "cpu": format!("{}", cpu),
+                            "memory": format!("{}", memory),
+                        },
+                        "requests": {
+                            "cpu": format!("{}", cpu),
+                            "memory": format!("{}", memory),
+                        },
+                    },
+                },
+            ],
+            "backups": {
+                "pgbackrest": {
+                    "image": "registry.developers.crunchydata.com/crunchydata/crunchy-pgbackrest:ubi8-2.41-2",
+                    "repos": [
+                        {
+                            "name": "repo1",
+                            "volume": {
+                                "volumeClaimSpec": {
+                                    "accessModes": ["ReadWriteOnce"],
+                                    "resources": {"requests": {"storage": "1Gi"}},
+                                },
+                            },
+                        },
+                    ],
+                }
+            },
+        },
+    });
+    spec
+}
 
 pub async fn get_all(client: Client, namespace: String) -> Vec<PostgresCluster> {
     let pg_cluster_api: Api<PostgresCluster> = Api::namespaced(client, &namespace);

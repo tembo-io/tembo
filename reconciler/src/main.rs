@@ -1,7 +1,7 @@
 use kube::{Client, ResourceExt};
 use log::info;
-use pgmq::{PGMQueue};
-use reconciler::{create_or_update, delete, get_all};
+use pgmq::PGMQueue;
+use reconciler::{create_or_update, delete, generate_spec, get_all};
 use std::env;
 use std::{thread, time};
 
@@ -30,19 +30,23 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             }
         };
 
-        // Based on action in message, create, update, delete PostgresCluster
-        match serde_json::from_str(&read_msg.message["action"].to_string()).unwrap() {
-            Some("create") | Some("update") => {
-                let spec = read_msg.message["spec"].clone();
+        // Based on message_type in message, create, update, delete PostgresCluster
+        match serde_json::from_str(&read_msg.message["message_type"].to_string()).unwrap() {
+            Some("SnapShot") => {
+                info!("Doing nothing for now")
+            }
+            Some("Create") | Some("Update") => {
+                // generate PostgresCluster spec based on values in body
+                let spec = generate_spec(read_msg.message["body"].clone()).await;
 
                 // create or update PostgresCluster
                 create_or_update(client.clone(), "default".to_owned(), spec)
                     .await
                     .expect("error creating or updating PostgresCluster");
             }
-            Some("delete") => {
+            Some("Delete") => {
                 let name: String =
-                    serde_json::from_value(read_msg.message["spec"]["metadata"]["name"].clone())
+                    serde_json::from_value(read_msg.message["body"]["resource_name"].clone())
                         .unwrap();
 
                 // delete PostgresCluster
