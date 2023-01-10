@@ -41,7 +41,8 @@ fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
     let postgres_container = Container {
         env: postgres_env.clone(),
         security_context: Some(SecurityContext {
-            run_as_user: Some(cdb.spec.uid.clone() as i64),
+            //run_as_user: Some(cdb.spec.uid.clone() as i64),
+            run_as_user: Some(999),
             allow_privilege_escalation: Some(false),
             ..SecurityContext::default()
         }),
@@ -125,6 +126,36 @@ fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
         ..StatefulSet::default()
     };
     return sts;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{stateful_set_from_cdb, StatefulSet};
+    use crate::{CoreDB, CoreDBSpec};
+    use kube::Resource;
+
+    #[test]
+    fn test_default_uid() {
+        let mut coredb: CoreDB = CoreDB::new("check-uid-default", CoreDBSpec::default());
+        coredb.meta_mut().namespace = Some("default".into());
+        coredb.meta_mut().uid = Some("752d59ef-2671-4890-9feb-0097459b18c8".into());
+        let sts: StatefulSet = stateful_set_from_cdb(&coredb);
+
+        assert_eq!(
+            sts.spec
+                .expect("StatefulSet does not have a spec")
+                .template
+                .spec
+                .expect("Did not have a pod spec")
+                .containers[0]
+                .clone()
+                .security_context
+                .expect("Did not have a security context")
+                .run_as_user
+                .unwrap(),
+            999
+        );
+    }
 }
 
 pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
