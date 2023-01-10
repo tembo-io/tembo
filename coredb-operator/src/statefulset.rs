@@ -27,6 +27,61 @@ pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
     labels.insert("app".to_owned(), "coredb".to_owned());
     pvc_requests.insert("storage".to_string(), Quantity("8Gi".to_string()));
 
+    let postgres_env = Some(vec![EnvVar {
+        name: "POSTGRES_PASSWORD".to_owned(),
+        value: Some("password".to_owned()),
+        value_from: None,
+    }]);
+
+    let postgres_volume_mounts = Some(vec![VolumeMount {
+        name: "data".to_owned(),
+        mount_path: "/var/lib/postgresql/data".to_owned(),
+        ..VolumeMount::default()
+    }]);
+
+    // This container for running postgresql
+    let postgres_container = Container {
+        env: postgres_env.clone(),
+        security_context: Some(SecurityContext {
+            run_as_user: Some(999),
+            allow_privilege_escalation: Some(false),
+            ..SecurityContext::default()
+        }),
+        name: "postgres".to_string(),
+        image: Some(cdb.spec.image.clone()),
+        ports: Some(vec![ContainerPort {
+            container_port: 5432,
+            ..ContainerPort::default()
+        }]),
+        volume_mounts: postgres_volume_mounts.clone(),
+        ..Container::default()
+    };
+
+    // This container for initializing postgres data directory
+    let postgres_init_container = Container {
+        env: postgres_env.clone(),
+        name: "pg-directory-init".to_string(),
+        image: Some(cdb.spec.image.clone()),
+        volume_mounts: postgres_volume_mounts.clone(),
+        // When we have our own PG container,
+        // this will be refactored: this is assuming the
+        // content of the docker entrypoint script
+        // https://github.com/docker-library/postgres/blob/master/docker-entrypoint.sh
+        args: Some(vec![
+            "/bin/bash".to_string(),
+            "-c".to_string(),
+            "\
+    set -e
+    source /usr/local/bin/docker-entrypoint.sh
+    set -x
+    docker_setup_env
+    docker_create_db_directories
+                        "
+            .to_string(),
+        ]),
+        ..Container::default()
+    };
+
     let sts: StatefulSet = StatefulSet {
         metadata: ObjectMeta {
             name: Some(name.to_owned()),
@@ -43,30 +98,8 @@ pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
             },
             template: PodTemplateSpec {
                 spec: Some(PodSpec {
-                    containers: vec![Container {
-                        env: Some(vec![EnvVar {
-                            name: "POSTGRES_PASSWORD".to_owned(),
-                            value: Some("password".to_owned()),
-                            value_from: None,
-                        }]),
-                        security_context: Some(SecurityContext {
-                            run_as_user: Some(999),
-                            allow_privilege_escalation: Some(false),
-                            ..SecurityContext::default()
-                        }),
-                        name: name.to_owned(),
-                        image: Some(cdb.spec.image.clone()),
-                        ports: Some(vec![ContainerPort {
-                            container_port: 5432,
-                            ..ContainerPort::default()
-                        }]),
-                        volume_mounts: Some(vec![VolumeMount {
-                            name: "data".to_owned(),
-                            mount_path: "/var/lib/postgresql/data".to_owned(),
-                            ..VolumeMount::default()
-                        }]),
-                        ..Container::default()
-                    }],
+                    containers: vec![postgres_container],
+                    init_containers: Option::from(vec![postgres_init_container]),
                     ..PodSpec::default()
                 }),
                 metadata: Some(ObjectMeta {
