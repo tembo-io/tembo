@@ -4,7 +4,7 @@ use k8s_openapi::{
         apps::v1::{StatefulSet, StatefulSetSpec},
         core::v1::{
             Container, ContainerPort, EnvVar, PersistentVolumeClaim, PersistentVolumeClaimSpec, PodSpec,
-            PodTemplateSpec, ResourceRequirements, VolumeMount,
+            PodTemplateSpec, ResourceRequirements, SecurityContext, VolumeMount,
         },
     },
     apimachinery::pkg::{api::resource::Quantity, apis::meta::v1::LabelSelector},
@@ -13,18 +13,72 @@ use kube::{
     api::{Api, ObjectMeta, Patch, PatchParams, ResourceExt},
     Resource,
 };
+
 use std::{collections::BTreeMap, sync::Arc};
 
-pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
-    let client = ctx.client.clone();
+fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
     let ns = cdb.namespace().unwrap();
     let name = cdb.name_any();
     let mut labels: BTreeMap<String, String> = BTreeMap::new();
     let mut pvc_requests: BTreeMap<String, Quantity> = BTreeMap::new();
-    let sts_api: Api<StatefulSet> = Api::namespaced(client, &ns);
     let oref = cdb.controller_owner_ref(&()).unwrap();
     labels.insert("app".to_owned(), "coredb".to_owned());
     pvc_requests.insert("storage".to_string(), Quantity("8Gi".to_string()));
+
+    let postgres_env = Some(vec![EnvVar {
+        name: "POSTGRES_PASSWORD".to_owned(),
+        value: Some("password".to_owned()),
+        value_from: None,
+    }]);
+
+    let postgres_volume_mounts = Some(vec![VolumeMount {
+        name: "data".to_owned(),
+        mount_path: "/var/lib/postgresql/data".to_owned(),
+        ..VolumeMount::default()
+    }]);
+
+    // This container for running postgresql
+    let postgres_container = Container {
+        env: postgres_env.clone(),
+        security_context: Some(SecurityContext {
+            run_as_user: Some(cdb.spec.uid.clone() as i64),
+            allow_privilege_escalation: Some(false),
+            ..SecurityContext::default()
+        }),
+        name: "postgres".to_string(),
+        image: Some(cdb.spec.image.clone()),
+        ports: Some(vec![ContainerPort {
+            container_port: 5432,
+            ..ContainerPort::default()
+        }]),
+        volume_mounts: postgres_volume_mounts.clone(),
+        ..Container::default()
+    };
+
+    // This container for initializing postgres data directory
+    let postgres_init_container = Container {
+        env: postgres_env.clone(),
+        name: "pg-directory-init".to_string(),
+        image: Some(cdb.spec.image.clone()),
+        volume_mounts: postgres_volume_mounts.clone(),
+        // When we have our own PG container,
+        // this will be refactored: this is assuming the
+        // content of the docker entrypoint script
+        // https://github.com/docker-library/postgres/blob/master/docker-entrypoint.sh
+        args: Some(vec![
+            "/bin/bash".to_string(),
+            "-c".to_string(),
+            "\
+    set -e
+    source /usr/local/bin/docker-entrypoint.sh
+    set -x
+    docker_setup_env
+    docker_create_db_directories
+                        "
+            .to_string(),
+        ]),
+        ..Container::default()
+    };
 
     let sts: StatefulSet = StatefulSet {
         metadata: ObjectMeta {
@@ -42,25 +96,8 @@ pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
             },
             template: PodTemplateSpec {
                 spec: Some(PodSpec {
-                    containers: vec![Container {
-                        env: Some(vec![EnvVar {
-                            name: "POSTGRES_PASSWORD".to_owned(),
-                            value: Some("password".to_owned()),
-                            value_from: None,
-                        }]),
-                        name: name.to_owned(),
-                        image: Some(cdb.spec.image.clone()),
-                        ports: Some(vec![ContainerPort {
-                            container_port: 5432,
-                            ..ContainerPort::default()
-                        }]),
-                        volume_mounts: Some(vec![VolumeMount {
-                            name: "data".to_owned(),
-                            mount_path: "/var/lib/postgresql/data".to_owned(),
-                            ..VolumeMount::default()
-                        }]),
-                        ..Container::default()
-                    }],
+                    containers: vec![postgres_container],
+                    init_containers: Option::from(vec![postgres_init_container]),
                     ..PodSpec::default()
                 }),
                 metadata: Some(ObjectMeta {
@@ -87,10 +124,52 @@ pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
         }),
         ..StatefulSet::default()
     };
+    return sts;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{stateful_set_from_cdb, StatefulSet};
+    use crate::{CoreDB, CoreDBSpec};
+    use kube::Resource;
+
+    #[test]
+    fn test_user_specified_uid() {
+        let mut cdb_spec: CoreDBSpec = CoreDBSpec::default();
+        cdb_spec.uid = 1000;
+        let mut coredb: CoreDB = CoreDB::new("check-uid", cdb_spec);
+
+        coredb.meta_mut().namespace = Some("default".into());
+        coredb.meta_mut().uid = Some("752d59ef-2671-4890-9feb-0097459b18c8".into());
+        let sts: StatefulSet = stateful_set_from_cdb(&coredb);
+
+        assert_eq!(
+            sts.spec
+                .expect("StatefulSet does not have a spec")
+                .template
+                .spec
+                .expect("Did not have a pod spec")
+                .containers[0]
+                .clone()
+                .security_context
+                .expect("Did not have a security context")
+                .run_as_user
+                .unwrap(),
+            1000
+        );
+    }
+}
+
+pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
+    let client = ctx.client.clone();
+
+    let sts: StatefulSet = stateful_set_from_cdb(cdb);
+
+    let sts_api: Api<StatefulSet> = Api::namespaced(client, &sts.clone().metadata.namespace.unwrap());
 
     let ps = PatchParams::apply("cntrlr").force();
     let _o = sts_api
-        .patch(&name, &ps, &Patch::Apply(&sts))
+        .patch(&sts.clone().metadata.name.unwrap(), &ps, &Patch::Apply(&sts))
         .await
         .map_err(Error::KubeError)?;
     Ok(())
