@@ -48,7 +48,7 @@ jobs:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
       - name: unit-tests
-        run: cargo test
+        run: cargo test --lib
       - name: integration-tests
         run: make test.integration
       - name: teardown
