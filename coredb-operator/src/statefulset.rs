@@ -4,7 +4,7 @@ use k8s_openapi::{
         apps::v1::{StatefulSet, StatefulSetSpec},
         core::v1::{
             Container, ContainerPort, EnvVar, PersistentVolumeClaim, PersistentVolumeClaimSpec, PodSpec,
-            PodTemplateSpec, ResourceRequirements, VolumeMount,
+            PodTemplateSpec, ResourceRequirements, SecurityContext, VolumeMount,
         },
     },
     apimachinery::pkg::{api::resource::Quantity, apis::meta::v1::LabelSelector},
@@ -13,6 +13,7 @@ use kube::{
     api::{Api, ObjectMeta, Patch, PatchParams, ResourceExt},
     Resource,
 };
+
 use std::{collections::BTreeMap, sync::Arc};
 
 pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
@@ -48,6 +49,11 @@ pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
                             value: Some("password".to_owned()),
                             value_from: None,
                         }]),
+                        security_context: Some(SecurityContext {
+                            run_as_user: Some(999),
+                            allow_privilege_escalation: Some(false),
+                            ..SecurityContext::default()
+                        }),
                         name: name.to_owned(),
                         image: Some(cdb.spec.image.clone()),
                         ports: Some(vec![ContainerPort {

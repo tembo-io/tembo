@@ -19,12 +19,27 @@ mod test {
     };
     use kube::{
         api::{Patch, PatchParams},
-        runtime::wait::{await_condition, conditions},
+        runtime::wait::{await_condition, conditions, Condition},
         Api, Client, Config,
     };
     use rand::Rng;
 
     const API_VERSION: &str = "kube.rs/v1";
+
+    fn is_pod_ready() -> impl Condition<Pod> + 'static {
+        move |obj: Option<&Pod>| {
+            if let Some(pod) = &obj {
+                if let Some(status) = &pod.status {
+                    if let Some(conds) = &status.conditions {
+                        if let Some(pcond) = conds.iter().find(|c| c.type_ == "ContainersReady") {
+                            return pcond.status == "True";
+                        }
+                    }
+                }
+            }
+            false
+        }
+    }
 
     #[tokio::test]
     #[ignore]
@@ -40,7 +55,8 @@ mod test {
         let replicas = 1;
 
         // Timeout settings while waiting for an event
-        let timeout_seconds = 60;
+        let timeout_seconds_start_pod = 60;
+        let timeout_seconds_pod_ready = 10;
 
         // Apply a basic configuration of CoreDB
         println!("Creating CoreDB resource {}", name);
@@ -62,16 +78,26 @@ mod test {
         // Wait for Pod to be created
 
         let pod_name = format!("{}-0", name);
-        println!("Waiting for pod to be running: {}", pod_name);
         let pods: Api<Pod> = Api::namespaced(client.clone(), namespace);
+        println!("Waiting for pod to be running: {}", pod_name);
         let _check_for_pod = tokio::time::timeout(
-            std::time::Duration::from_secs(timeout_seconds),
-            await_condition(pods, &pod_name, conditions::is_pod_running()),
+            std::time::Duration::from_secs(timeout_seconds_start_pod),
+            await_condition(pods.clone(), &pod_name, conditions::is_pod_running()),
         )
         .await
         .expect(&format!(
             "Did not find the pod {} to be running after waiting {} seconds",
-            pod_name, timeout_seconds
+            pod_name, timeout_seconds_start_pod
+        ));
+        println!("Waiting for pod to be ready: {}", pod_name);
+        let _check_for_pod_ready = tokio::time::timeout(
+            std::time::Duration::from_secs(timeout_seconds_pod_ready),
+            await_condition(pods.clone(), &pod_name, is_pod_ready()),
+        )
+        .await
+        .expect(&format!(
+            "Did not find the pod {} to be ready after waiting {} seconds",
+            pod_name, timeout_seconds_pod_ready
         ));
     }
 
