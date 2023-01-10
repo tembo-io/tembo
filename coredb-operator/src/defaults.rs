@@ -2,6 +2,10 @@ pub fn default_replicas() -> i32 {
     1
 }
 
+pub fn default_uid() -> i32 {
+    999
+}
+
 pub fn default_port() -> i32 {
     5432
 }

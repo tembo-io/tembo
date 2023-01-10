@@ -16,13 +16,11 @@ use kube::{
 
 use std::{collections::BTreeMap, sync::Arc};
 
-pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
-    let client = ctx.client.clone();
+fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
     let ns = cdb.namespace().unwrap();
     let name = cdb.name_any();
     let mut labels: BTreeMap<String, String> = BTreeMap::new();
     let mut pvc_requests: BTreeMap<String, Quantity> = BTreeMap::new();
-    let sts_api: Api<StatefulSet> = Api::namespaced(client, &ns);
     let oref = cdb.controller_owner_ref(&()).unwrap();
     labels.insert("app".to_owned(), "coredb".to_owned());
     pvc_requests.insert("storage".to_string(), Quantity("8Gi".to_string()));
@@ -43,7 +41,7 @@ pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
     let postgres_container = Container {
         env: postgres_env.clone(),
         security_context: Some(SecurityContext {
-            run_as_user: Some(999),
+            run_as_user: Some(cdb.spec.uid.clone() as i64),
             allow_privilege_escalation: Some(false),
             ..SecurityContext::default()
         }),
@@ -126,10 +124,19 @@ pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
         }),
         ..StatefulSet::default()
     };
+    return sts;
+}
+
+pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
+    let client = ctx.client.clone();
+
+    let sts: StatefulSet = stateful_set_from_cdb(cdb);
+
+    let sts_api: Api<StatefulSet> = Api::namespaced(client, &sts.clone().metadata.namespace.unwrap());
 
     let ps = PatchParams::apply("cntrlr").force();
     let _o = sts_api
-        .patch(&name, &ps, &Patch::Apply(&sts))
+        .patch(&sts.clone().metadata.name.unwrap(), &ps, &Patch::Apply(&sts))
         .await
         .map_err(Error::KubeError)?;
     Ok(())
