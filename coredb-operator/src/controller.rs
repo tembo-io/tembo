@@ -39,6 +39,8 @@ pub struct CoreDBSpec {
     pub image: String,
     #[serde(default = "defaults::default_port")]
     pub port: i32,
+    #[serde(default = "defaults::default_uid")]
+    pub uid: i32,
 }
 
 /// The status object of `CoreDB`
