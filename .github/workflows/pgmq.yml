@@ -3,8 +3,20 @@ name: pgmq CI workflow
 defaults:
   run:
     shell: bash
+    working-directory: ./crates/pgmq/
 
-on: [push, pull_request]
+on:
+  pull_request:
+    branches:
+     - main
+    paths:
+      - '.github/workflows/pgmq.yml'
+      - 'crates/pgmq/**'
+  push:
+    branches:
+      - main
+      - release**
+
 
 jobs:
   lint:

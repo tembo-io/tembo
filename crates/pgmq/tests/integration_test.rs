@@ -46,7 +46,7 @@ async fn test_lifecycle() {
     let msg1 = queue.read(&test_queue, Some(&vt)).await.unwrap();
     assert_eq!(msg1.msg_id, 1);
     // no messages returned, and the one record on the table is invisible
-    let no_messages= queue.read(&test_queue, Some(&vt)).await;
+    let no_messages = queue.read(&test_queue, Some(&vt)).await;
     assert!(no_messages.is_none());
     // still one invisible record on the table
     let results = sqlx::query(&row_ct_query)
@@ -68,11 +68,10 @@ async fn test_lifecycle() {
     let msg3 = queue.read(&test_queue, Some(&vt)).await;
     assert!(msg3.is_none());
     let results = sqlx::query(&row_ct_query)
-    .fetch_one(&queue.connection)
-    .await
-    .unwrap()
-    .get::<i64, usize>(0);
+        .fetch_one(&queue.connection)
+        .await
+        .unwrap()
+        .get::<i64, usize>(0);
     // table empty
     assert_eq!(results, 0);
-
 }
