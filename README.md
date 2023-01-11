@@ -47,7 +47,7 @@ currently have to rely on custom libraries/tooling/process to solve this problem
 
 ## Roadmap - MVP
 
-* Gitops — changes to the cluster, database, and schemas are captured in source control
+* CLI Ops — changes to the cluster, database, and schemas are documented in code, and stored in source control
 * Beautiful monitoring UI — get information about the cluster, without having to use the SQL console
 * Integrated extensions — developers don't have to enable functionality via SQL commands
 * Kubernetes Operator
