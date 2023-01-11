@@ -127,6 +127,21 @@ fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
     return sts;
 }
 
+pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
+    let client = ctx.client.clone();
+
+    let sts: StatefulSet = stateful_set_from_cdb(cdb);
+
+    let sts_api: Api<StatefulSet> = Api::namespaced(client, &sts.clone().metadata.namespace.unwrap());
+
+    let ps = PatchParams::apply("cntrlr").force();
+    let _o = sts_api
+        .patch(&sts.clone().metadata.name.unwrap(), &ps, &Patch::Apply(&sts))
+        .await
+        .map_err(Error::KubeError)?;
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::{stateful_set_from_cdb, StatefulSet};
@@ -158,19 +173,4 @@ mod tests {
             1000
         );
     }
-}
-
-pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
-    let client = ctx.client.clone();
-
-    let sts: StatefulSet = stateful_set_from_cdb(cdb);
-
-    let sts_api: Api<StatefulSet> = Api::namespaced(client, &sts.clone().metadata.namespace.unwrap());
-
-    let ps = PatchParams::apply("cntrlr").force();
-    let _o = sts_api
-        .patch(&sts.clone().metadata.name.unwrap(), &ps, &Patch::Apply(&sts))
-        .await
-        .map_err(Error::KubeError)?;
-    Ok(())
 }
