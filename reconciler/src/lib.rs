@@ -1,7 +1,9 @@
 mod pg_cluster_crd;
 
+use k8s_openapi::api::core::v1::Namespace;
 use kube::api::{DeleteParams, ListParams, Patch, PatchParams};
 use kube::{Api, Client};
+use log::info;
 use pg_cluster_crd::PostgresCluster;
 use serde_json::Value;
 use thiserror::Error;
@@ -87,7 +89,7 @@ pub async fn create_or_update(
     let pg_cluster_api: Api<PostgresCluster> = Api::namespaced(client, &namespace);
     let params = PatchParams::apply("reconciler").force();
     let name: String = serde_json::from_value(deployment["metadata"]["name"].clone()).unwrap();
-    println!("\nCreating or updating PostgresCluster: {}", name);
+    info!("\nCreating or updating PostgresCluster: {}", name);
     let _o = pg_cluster_api
         .patch(&name, &params, &Patch::Apply(&deployment))
         .await
@@ -98,8 +100,37 @@ pub async fn create_or_update(
 pub async fn delete(client: Client, namespace: String, name: String) -> Result<(), Error> {
     let pg_cluster_api: Api<PostgresCluster> = Api::namespaced(client, &namespace);
     let params = DeleteParams::default();
-    println!("\nDeleting PostgresCluster: {}", name);
+    info!("\nDeleting PostgresCluster: {}", name);
     let _o = pg_cluster_api
+        .delete(&name, &params)
+        .await
+        .map_err(Error::KubeError);
+    Ok(())
+}
+
+pub async fn create_namespace(client: Client, name: String) -> Result<(), Error> {
+    let ns_api: Api<Namespace> = Api::all(client);
+    let params = PatchParams::apply("reconciler").force();
+    let ns = serde_json::json!({
+        "apiVersion": "v1",
+        "kind": "Namespace",
+        "metadata": {
+            "name": format!("{}", name),
+        }
+    });
+    info!("\nCreating namespace {} if it does not exist", name);
+    let _o = ns_api
+        .patch(&name, &params, &Patch::Apply(&ns))
+        .await
+        .map_err(Error::KubeError)?;
+    Ok(())
+}
+
+pub async fn delete_namespace(client: Client, name: String) -> Result<(), Error> {
+    let ns_api: Api<Namespace> = Api::all(client);
+    let params = DeleteParams::default();
+    info!("\nDeleting namespace: {}", name);
+    let _o = ns_api
         .delete(&name, &params)
         .await
         .map_err(Error::KubeError);

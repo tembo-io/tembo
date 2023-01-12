@@ -1,7 +1,9 @@
 use kube::{Client, ResourceExt};
 use log::info;
 use pgmq::PGMQueue;
-use reconciler::{create_or_update, delete, generate_spec, get_all};
+use reconciler::{
+    create_namespace, create_or_update, delete, delete_namespace, generate_spec, get_all,
+};
 use std::env;
 use std::{thread, time};
 
@@ -21,7 +23,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         // Read from queue (check for new message)
         let read_msg = match queue.read(&pg_queue_name, Some(&30_u32)).await {
             Some(message) => {
-                print!("read_msg: {:?}", message);
+                info!("read_msg: {:?}", message);
                 message
             }
             None => {
@@ -36,11 +38,19 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 info!("Doing nothing for now")
             }
             Some("Create") | Some("Update") => {
+                // create namespace if it does not exist
+                let namespace: String =
+                    serde_json::from_value(read_msg.message["body"]["resource_name"].clone())
+                        .unwrap();
+                create_namespace(client.clone(), namespace.clone())
+                    .await
+                    .expect("error creating namespace");
+
                 // generate PostgresCluster spec based on values in body
                 let spec = generate_spec(read_msg.message["body"].clone()).await;
 
                 // create or update PostgresCluster
-                create_or_update(client.clone(), "default".to_owned(), spec)
+                create_or_update(client.clone(), namespace.clone(), spec)
                     .await
                     .expect("error creating or updating PostgresCluster");
             }
@@ -50,11 +60,16 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                         .unwrap();
 
                 // delete PostgresCluster
-                delete(client.clone(), "default".to_owned(), name)
+                delete(client.clone(), name.clone(), name.clone())
                     .await
                     .expect("error deleting PostgresCluster");
+
+                // delete namespace
+                delete_namespace(client.clone(), name.clone())
+                    .await
+                    .expect("error deleting namespace");
             }
-            None | _ => println!("action was not in expected format"),
+            None | _ => info!("action was not in expected format"),
         }
 
         // TODO(ianstanton) This is here as an example for now. We want to use
@@ -62,7 +77,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         // Get all existing PostgresClusters
         let vec = get_all(client.clone(), "default".to_owned());
         for pg in vec.await.iter() {
-            println!("found PostgresCluster {}", pg.name_any());
+            info!("found PostgresCluster {}", pg.name_any());
         }
         thread::sleep(time::Duration::from_secs(1));
 
@@ -72,7 +87,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             .await
             .expect("error deleting message from queue");
         // TODO(ianstanton) Improve logging everywhere
-        println!("deleted: {:?}", deleted);
+        info!("deleted: {:?}", deleted);
     }
 }
 
