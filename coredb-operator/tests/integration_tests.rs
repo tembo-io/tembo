@@ -106,17 +106,29 @@ mod test {
             .psql("\\dt".to_string(), "postgres".to_string(), client.clone())
             .await
             .unwrap();
-        println!("{}", result);
-        // psql_result = coredb_resource.psql(
-        //     "\
-        //     CREATE TABLE customers (
-        //        id serial PRIMARY KEY,
-        //        name VARCHAR(50) NOT NULL,
-        //        email VARCHAR(50) NOT NULL UNIQUE,
-        //        created_at TIMESTAMP DEFAULT NOW()
-        //     );
-        // ",
-        // )
+        assert!(result.contains("Did not find any relations."));
+        let mut result = coredb_resource
+            .psql(
+                "
+                CREATE TABLE customers (
+                   id serial PRIMARY KEY,
+                   name VARCHAR(50) NOT NULL,
+                   email VARCHAR(50) NOT NULL UNIQUE,
+                   created_at TIMESTAMP DEFAULT NOW()
+                );
+                "
+                .to_string(),
+                "postgres".to_string(),
+                client.clone(),
+            )
+            .await
+            .unwrap();
+        assert!(result.contains("CREATE TABLE"));
+        let mut result = coredb_resource
+            .psql("\\dt".to_string(), "postgres".to_string(), client.clone())
+            .await
+            .unwrap();
+        assert!(result.contains("customers"));
     }
 
     async fn kube_client() -> kube::Client {

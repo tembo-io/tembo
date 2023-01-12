@@ -185,8 +185,12 @@ impl CoreDB {
         let mut attached_process = pods.exec(&pod_name, psql_command, &attach_params).await.unwrap();
         // attached_process.join();
         let mut stdout_reader = attached_process.stdout().unwrap();
-        let mut result = String::new();
-        stdout_reader.read_to_string(&mut result).await;
+        let mut result_stdout = String::new();
+        stdout_reader.read_to_string(&mut result_stdout).await;
+        let mut stderr_reader = attached_process.stderr().unwrap();
+        let mut result_stderr = String::new();
+        stderr_reader.read_to_string(&mut result_stderr).await;
+        let result = result_stdout + &result_stderr;
         return Ok(result);
     }
 }
