@@ -57,7 +57,7 @@ mod test {
 
         // Timeout settings while waiting for an event
         let timeout_seconds_start_pod = 60;
-        let timeout_seconds_pod_ready = 10;
+        let timeout_seconds_pod_ready = 30;
 
         // Apply a basic configuration of CoreDB
         println!("Creating CoreDB resource {}", name);
