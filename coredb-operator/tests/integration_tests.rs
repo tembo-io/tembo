@@ -24,7 +24,6 @@ mod test {
     };
     use rand::Rng;
     use std::str;
-    use tokio::io::AsyncReadExt;
 
     const API_VERSION: &str = "kube.rs/v1";
 
@@ -102,12 +101,12 @@ mod test {
             pod_name, timeout_seconds_pod_ready
         ));
         println!("Found pod ready: {}", pod_name);
-        let mut result = coredb_resource
+        let result = coredb_resource
             .psql("\\dt".to_string(), "postgres".to_string(), client.clone())
             .await
             .unwrap();
         assert!(result.contains("Did not find any relations."));
-        let mut result = coredb_resource
+        let result = coredb_resource
             .psql(
                 "
                 CREATE TABLE customers (
@@ -124,7 +123,7 @@ mod test {
             .await
             .unwrap();
         assert!(result.contains("CREATE TABLE"));
-        let mut result = coredb_resource
+        let result = coredb_resource
             .psql("\\dt".to_string(), "postgres".to_string(), client.clone())
             .await
             .unwrap();
