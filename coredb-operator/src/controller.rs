@@ -12,10 +12,10 @@ use crate::{
     service::reconcile_svc,
     statefulset::{reconcile_sts, stateful_set_from_cdb},
 };
-use kube::core::subresource::AttachParams;
 use kube::{
     api::{Api, AttachedProcess, ListParams, Patch, PatchParams, ResourceExt},
     client::Client,
+    core::subresource::AttachParams,
     runtime::{
         controller::{Action, Controller},
         events::{Event, EventType, Recorder, Reporter},
