@@ -38,49 +38,6 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
         ..VolumeMount::default()
     }]);
 
-    // This container for running postgresql
-    let postgres_container = Container {
-        env: postgres_env.clone(),
-        security_context: Some(SecurityContext {
-            run_as_user: Some(cdb.spec.uid.clone() as i64),
-            allow_privilege_escalation: Some(false),
-            ..SecurityContext::default()
-        }),
-        name: "postgres".to_string(),
-        image: Some(cdb.spec.image.clone()),
-        ports: Some(vec![ContainerPort {
-            container_port: 5432,
-            ..ContainerPort::default()
-        }]),
-        volume_mounts: postgres_volume_mounts.clone(),
-        ..Container::default()
-    };
-
-    // This container for initializing postgres data directory
-    let postgres_init_container = Container {
-        env: postgres_env.clone(),
-        name: "pg-directory-init".to_string(),
-        image: Some(cdb.spec.image.clone()),
-        volume_mounts: postgres_volume_mounts.clone(),
-        // When we have our own PG container,
-        // this will be refactored: this is assuming the
-        // content of the docker entrypoint script
-        // https://github.com/docker-library/postgres/blob/master/docker-entrypoint.sh
-        args: Some(vec![
-            "/bin/bash".to_string(),
-            "-c".to_string(),
-            "\
-    set -e
-    source /usr/local/bin/docker-entrypoint.sh
-    set -x
-    docker_setup_env
-    docker_create_db_directories
-                        "
-            .to_string(),
-        ]),
-        ..Container::default()
-    };
-
     let sts: StatefulSet = StatefulSet {
         metadata: ObjectMeta {
             name: Some(name.to_owned()),
@@ -97,8 +54,48 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
             },
             template: PodTemplateSpec {
                 spec: Some(PodSpec {
-                    containers: vec![postgres_container],
-                    init_containers: Option::from(vec![postgres_init_container]),
+                    containers: vec![
+                        // This container for running postgresql
+                        Container {
+                            env: postgres_env.clone(),
+                            security_context: Some(SecurityContext {
+                                run_as_user: Some(cdb.spec.uid.clone() as i64),
+                                allow_privilege_escalation: Some(false),
+                                ..SecurityContext::default()
+                            }),
+                            name: "postgres".to_string(),
+                            image: Some(cdb.spec.image.clone()),
+                            ports: Some(vec![ContainerPort {
+                                container_port: 5432,
+                                ..ContainerPort::default()
+                            }]),
+                            volume_mounts: postgres_volume_mounts.clone(),
+                            ..Container::default()
+                        },
+                    ],
+                    init_containers: Option::from(vec![Container {
+                        env: postgres_env.clone(),
+                        name: "pg-directory-init".to_string(),
+                        image: Some(cdb.spec.image.clone()),
+                        volume_mounts: postgres_volume_mounts.clone(),
+                        // When we have our own PG container,
+                        // this will be refactored: this is assuming the
+                        // content of the docker entrypoint script
+                        // https://github.com/docker-library/postgres/blob/master/docker-entrypoint.sh
+                        args: Some(vec![
+                            "/bin/bash".to_string(),
+                            "-c".to_string(),
+                            "\
+                            set -e
+                            source /usr/local/bin/docker-entrypoint.sh
+                            set -x
+                            docker_setup_env
+                            docker_create_db_directories
+                        "
+                            .to_string(),
+                        ]),
+                        ..Container::default()
+                    }]),
                     ..PodSpec::default()
                 }),
                 metadata: Some(ObjectMeta {
