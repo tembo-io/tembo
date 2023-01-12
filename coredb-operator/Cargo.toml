@@ -27,7 +27,7 @@ telemetry = ["tonic", "opentelemetry-otlp"]
 [dependencies]
 actix-web = "4.2.1"
 futures = "0.3.25"
-tokio = { version = "1.22.0", features = ["macros", "rt-multi-thread", "io-util"] }
+tokio = { version = "1.22.0", features = ["macros", "rt-multi-thread"] }
 k8s-openapi = { version = "0.16.0", features = ["v1_24"], default-features = false }
 schemars = { version = "0.8.11", features = ["chrono"] }
 serde = { version = "1.0.148", features = ["derive"] }
