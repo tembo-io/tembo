@@ -3,8 +3,8 @@ use k8s_openapi::{
     api::{
         apps::v1::{StatefulSet, StatefulSetSpec},
         core::v1::{
-            Container, ContainerPort, EnvVar, PersistentVolumeClaim, PersistentVolumeClaimSpec, PodSpec,
-            PodTemplateSpec, ResourceRequirements, SecurityContext, VolumeMount,
+            Container, ContainerPort, EnvVar, ExecAction, PersistentVolumeClaim, PersistentVolumeClaimSpec,
+            PodSpec, PodTemplateSpec, Probe, ResourceRequirements, SecurityContext, VolumeMount,
         },
     },
     apimachinery::pkg::{api::resource::Quantity, apis::meta::v1::LabelSelector},
@@ -70,6 +70,13 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
                                 ..ContainerPort::default()
                             }]),
                             volume_mounts: postgres_volume_mounts.clone(),
+                            readiness_probe: Some(Probe {
+                                exec: Some(ExecAction {
+                                    command: Some(vec![String::from("pg_isready")]),
+                                }),
+                                initial_delay_seconds: Some(3),
+                                ..Probe::default()
+                            }),
                             ..Container::default()
                         },
                     ],
