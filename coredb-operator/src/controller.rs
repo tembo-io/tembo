@@ -4,7 +4,6 @@ use futures::{
     future::{BoxFuture, FutureExt},
     stream::StreamExt,
 };
-use std::io::Read;
 use tokio::io::AsyncReadExt;
 
 use crate::{
@@ -13,7 +12,7 @@ use crate::{
     statefulset::{reconcile_sts, stateful_set_from_cdb},
 };
 use kube::{
-    api::{Api, AttachedProcess, ListParams, Patch, PatchParams, ResourceExt},
+    api::{Api, ListParams, Patch, PatchParams, ResourceExt},
     client::Client,
     core::subresource::AttachParams,
     runtime::{
@@ -186,12 +185,11 @@ impl CoreDB {
         // attached_process.join();
         let mut stdout_reader = attached_process.stdout().unwrap();
         let mut result_stdout = String::new();
-        stdout_reader.read_to_string(&mut result_stdout).await;
+        stdout_reader.read_to_string(&mut result_stdout).await.unwrap();
         let mut stderr_reader = attached_process.stderr().unwrap();
         let mut result_stderr = String::new();
-        stderr_reader.read_to_string(&mut result_stderr).await;
-        let result = result_stdout + &result_stderr;
-        return Ok(result);
+        stderr_reader.read_to_string(&mut result_stderr).await.unwrap();
+        return Ok(result_stdout + &result_stderr);
     }
 }
 
