@@ -105,6 +105,7 @@ mod test {
             .psql("\\dt".to_string(), "postgres".to_string(), client.clone())
             .await
             .unwrap();
+        println!("{}", result);
         assert!(result.contains("Did not find any relations."));
         let result = coredb_resource
             .psql(
@@ -122,11 +123,13 @@ mod test {
             )
             .await
             .unwrap();
+        println!("{}", result);
         assert!(result.contains("CREATE TABLE"));
         let result = coredb_resource
             .psql("\\dt".to_string(), "postgres".to_string(), client.clone())
             .await
             .unwrap();
+        println!("{}", result);
         assert!(result.contains("customers"));
     }
 
