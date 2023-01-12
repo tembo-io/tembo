@@ -36,3 +36,4 @@ mod defaults;
 #[cfg(test)] pub mod fixtures;
 mod service;
 mod statefulset;
+mod psql;

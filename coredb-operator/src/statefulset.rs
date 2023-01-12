@@ -16,13 +16,14 @@ use kube::{
 
 use std::{collections::BTreeMap, sync::Arc};
 
-fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
+pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
     let ns = cdb.namespace().unwrap();
     let name = cdb.name_any();
     let mut labels: BTreeMap<String, String> = BTreeMap::new();
     let mut pvc_requests: BTreeMap<String, Quantity> = BTreeMap::new();
     let oref = cdb.controller_owner_ref(&()).unwrap();
     labels.insert("app".to_owned(), "coredb".to_owned());
+    labels.insert("statefulset".to_owned(), name.to_owned());
     pvc_requests.insert("storage".to_string(), Quantity("8Gi".to_string()));
 
     let postgres_env = Some(vec![EnvVar {

@@ -23,6 +23,8 @@ mod test {
         Api, Client, Config,
     };
     use rand::Rng;
+    use std::str;
+    use tokio::io::AsyncReadExt;
 
     const API_VERSION: &str = "kube.rs/v1";
 
@@ -73,7 +75,7 @@ mod test {
         });
         let params = PatchParams::apply("coredb-integration-test");
         let patch = Patch::Apply(&coredb_json);
-        let _coredb_resource = coredbs.patch(name, &params, &patch).await;
+        let coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
 
         // Wait for Pod to be created
 
@@ -99,6 +101,22 @@ mod test {
             "Did not find the pod {} to be ready after waiting {} seconds",
             pod_name, timeout_seconds_pod_ready
         ));
+        println!("Found pod ready: {}", pod_name);
+        let mut result = coredb_resource
+            .psql("\\dt".to_string(), "postgres".to_string(), client.clone())
+            .await
+            .unwrap();
+        println!("{}", result);
+        // psql_result = coredb_resource.psql(
+        //     "\
+        //     CREATE TABLE customers (
+        //        id serial PRIMARY KEY,
+        //        name VARCHAR(50) NOT NULL,
+        //        email VARCHAR(50) NOT NULL UNIQUE,
+        //        created_at TIMESTAMP DEFAULT NOW()
+        //     );
+        // ",
+        // )
     }
 
     async fn kube_client() -> kube::Client {

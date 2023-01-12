@@ -4,10 +4,17 @@ use futures::{
     future::{BoxFuture, FutureExt},
     stream::StreamExt,
 };
+use std::io::Read;
+use tokio::io::AsyncReadExt;
 
-use crate::{defaults, service::reconcile_svc, statefulset::reconcile_sts};
+use crate::{
+    defaults,
+    service::reconcile_svc,
+    statefulset::{reconcile_sts, stateful_set_from_cdb},
+};
+use kube::core::subresource::AttachParams;
 use kube::{
-    api::{Api, ListParams, Patch, PatchParams, ResourceExt},
+    api::{Api, AttachedProcess, ListParams, Patch, PatchParams, ResourceExt},
     client::Client,
     runtime::{
         controller::{Action, Controller},
@@ -16,6 +23,8 @@ use kube::{
     },
     CustomResource, Resource,
 };
+
+use k8s_openapi::api::core::v1::Pod;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -139,6 +148,47 @@ impl CoreDB {
             .map_err(Error::KubeError)?;
         Ok(Action::await_change())
     }
+
+    async fn primary_pod(&self, client: Client) -> Result<Pod> {
+        let sts = stateful_set_from_cdb(self);
+        let sts_name = sts.metadata.name.unwrap();
+        let sts_namespace = sts.metadata.namespace.unwrap();
+        let label_selector = format!("statefulset={}", sts_name);
+        let list_params = ListParams::default().labels(&label_selector);
+        let pods: Api<Pod> = Api::namespaced(client, &sts_namespace);
+        let pods = pods.list(&list_params);
+        // For the time being, we assume that the first pod is the primary
+        let primary = pods.await.unwrap().items[0].clone();
+        return Ok(primary);
+    }
+
+    pub async fn psql(&self, command: String, database: String, client: Client) -> Result<String> {
+        let psql_command = vec!["psql", &database, "-c", &command];
+        let attach_params = AttachParams {
+            container: None,
+            tty: false,
+            stdin: true,
+            stdout: true,
+            stderr: true,
+            max_stdin_buf_size: Some(1024),
+            max_stdout_buf_size: Some(1024),
+            max_stderr_buf_size: Some(1024),
+        };
+        let pod_name = self
+            .primary_pod(client.clone())
+            .await
+            .unwrap()
+            .metadata
+            .name
+            .unwrap();
+        let pods: Api<Pod> = Api::namespaced(client.clone(), &self.metadata.namespace.clone().unwrap());
+        let mut attached_process = pods.exec(&pod_name, psql_command, &attach_params).await.unwrap();
+        // attached_process.join();
+        let mut stdout_reader = attached_process.stdout().unwrap();
+        let mut result = String::new();
+        stdout_reader.read_to_string(&mut result).await;
+        return Ok(result);
+    }
 }
 
 /// Diagnostics to be exposed by the web server
@@ -224,7 +274,7 @@ mod test {
         // verify that coredb gets a finalizer attached during reconcile
         fakeserver.handle_finalizer_creation(&coredb);
         let res = reconcile(Arc::new(coredb), testctx).await;
-        assert!(res.is_ok(), "initial creation succeds in adding finalizer");
+        assert!(res.is_ok(), "initial creation succeeds in adding finalizer");
     }
 
     #[tokio::test]
