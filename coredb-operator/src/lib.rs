@@ -1,3 +1,20 @@
+/// Expose all controller components used by main
+pub mod controller;
+pub use crate::controller::*;
+
+/// Log and trace integrations
+pub mod telemetry;
+
+/// Metrics
+mod metrics;
+pub use metrics::Metrics;
+
+mod defaults;
+#[cfg(test)]
+pub mod fixtures;
+mod psql;
+mod service;
+mod statefulset;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -20,19 +37,3 @@ impl Error {
         format!("{self:?}").to_lowercase()
     }
 }
-
-/// Expose all controller components used by main
-pub mod controller;
-pub use crate::controller::*;
-
-/// Log and trace integrations
-pub mod telemetry;
-
-/// Metrics
-mod metrics;
-pub use metrics::Metrics;
-
-mod defaults;
-#[cfg(test)] pub mod fixtures;
-mod service;
-mod statefulset;

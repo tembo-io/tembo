@@ -4,17 +4,16 @@ use futures::{
     future::{BoxFuture, FutureExt},
     stream::StreamExt,
 };
-use tokio::io::AsyncReadExt;
 
 use crate::{
     defaults,
+    psql::{PsqlCommand, PsqlOutput},
     service::reconcile_svc,
     statefulset::{reconcile_sts, stateful_set_from_cdb},
 };
 use kube::{
     api::{Api, ListParams, Patch, PatchParams, ResourceExt},
     client::Client,
-    core::subresource::AttachParams,
     runtime::{
         controller::{Action, Controller},
         events::{Event, EventType, Recorder, Reporter},
@@ -24,7 +23,6 @@ use kube::{
 };
 
 use k8s_openapi::api::core::v1::Pod;
-use k8s_openapi::apimachinery::pkg::apis::meta::v1::Status;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -93,23 +91,6 @@ fn error_policy(cdb: Arc<CoreDB>, error: &Error, ctx: Arc<Context>) -> Action {
     warn!("reconcile failed: {:?}", error);
     ctx.metrics.reconcile_failure(&cdb, error);
     Action::requeue(Duration::from_secs(5 * 60))
-}
-
-pub struct PsqlCommand {
-    pub stdout: String,
-    pub stderr: String,
-    // k8s_openapi::apimachinery::pkg::apis::meta::v1::Status
-    pub status: Status,
-}
-
-impl PsqlCommand {
-    pub fn new(stdout: String, stderr: String, status: Status) -> Self {
-        Self {
-            stdout,
-            stderr,
-            status,
-        }
-    }
 }
 
 impl CoreDB {
@@ -184,19 +165,7 @@ impl CoreDB {
         command: String,
         database: String,
         client: Client,
-    ) -> Result<PsqlCommand, kube::Error> {
-        let psql_command = vec!["psql", &database, "-c", &command];
-        let attach_params = AttachParams {
-            container: None,
-            tty: false,
-            stdin: true,
-            stdout: true,
-            stderr: true,
-            max_stdin_buf_size: Some(1024),
-            max_stdout_buf_size: Some(1024),
-            max_stderr_buf_size: Some(1024),
-        };
-
+    ) -> Result<PsqlOutput, kube::Error> {
         let pod_name = self
             .primary_pod(client.clone())
             .await
@@ -204,29 +173,16 @@ impl CoreDB {
             .metadata
             .name
             .unwrap();
-        let pods: Api<Pod> = Api::namespaced(client.clone(), &self.metadata.namespace.clone().unwrap());
 
-        let mut attached_process = pods.exec(&pod_name, psql_command, &attach_params).await?;
-
-        // https://docs.rs/tokio/latest/tokio/io/trait.AsyncReadExt.html#method.read_to_string
-        // Since waiting for EOF to be reached, a join is not needed and the attached_process will
-        // be completed before returning the value
-
-        // STDOUT
-        let mut stdout_reader = attached_process.stdout().unwrap();
-        let mut result_stdout = String::new();
-        stdout_reader.read_to_string(&mut result_stdout).await.unwrap();
-
-        // STDERR
-        let mut stderr_reader = attached_process.stderr().unwrap();
-        let mut result_stderr = String::new();
-        stderr_reader.read_to_string(&mut result_stderr).await.unwrap();
-
-        // Status
-        // https://docs.rs/k8s-openapi/latest/k8s_openapi/apimachinery/pkg/apis/meta/v1/struct.Status.html
-        let status = attached_process.take_status().unwrap().await.unwrap();
-
-        return Ok(PsqlCommand::new(result_stdout, result_stderr, status));
+        return PsqlCommand::new(
+            pod_name,
+            self.metadata.namespace.clone().unwrap(),
+            command,
+            database,
+            client,
+        )
+        .execute()
+        .await;
     }
 }
 
