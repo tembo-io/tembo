@@ -56,10 +56,44 @@ CREATE PUBLICATION alltables FOR ALL TABLES;
 
 Now, we just need to configure CoreDB as a subscriber of the publication we just created.
 
-### Create a Kubernetes Secret with the replication user's credentials
-
-TODO: create access information to the RDS instance
-
 ### Create a CoreDB
 
-TODO: configure CoreDB as a read replica to AWS RDS
+- Apply a CoreDB into your Kubernetes cluster
+```
+apiVersion: kube.rs/v1
+kind: CoreDB
+metadata:
+  name: coredb-rds-replica
+  spec:
+    replicas: 1
+```
+
+### Create a Kubernetes Secret
+
+- Create a secret that CoreDB can use to connect to AWS RDS
+  - Substitue `****` for the password you created for the user coredb_replication in your AWS RDS primary.
+  - Substitue "your-rds-host.example.com" with a domain name that resolves to the primary AWS RDS endpoint
+  - Substitue "your-db-name" with the name of the database in the AWS RDS primary where the replication user was created
+
+```
+kubectl create secret generic coredb-replication-connection-info \
+--from-literal=user="coredb_replication" \
+--from-literal=password="****" \
+--from-literal=host="your-rds-host.example.com" \
+--from-literal=dbname="your-db-name" \
+--from-literal=sslmode="require" \
+```
+
+### Create a CoreDBSubscription
+
+- In the below example, we create the subscription from your AWS RDS primary into the CoreDB database named 'postgres', but you can create the subscription into any database inside your CoreDB.
+```
+apiVersion: kube.rs/v1
+kind: CoreDBSubscription
+metadata:
+  name: coredb-rds-replication-subscription
+  spec:
+    connectionInfo: coredb-replication-connection-info
+    coredbRef: coredb-rds-replica
+    dbname: postgres
+```
