@@ -195,7 +195,7 @@ pub async fn get_pg_conn(client: Client, name: String) -> Result<String, Error> 
     let user = serde_json::to_string(data.get("user").unwrap()).unwrap();
     let password = serde_json::to_string(data.get("password").unwrap()).unwrap();
     let host = format!("{}.coredb-development.com", name);
-    let connection_string = format!("postgresl://{}:{}@{}:5432", user, password, host);
+    let connection_string = format!("postgresql://{}:{}@{}:5432", user, password, host);
 
     Ok(connection_string)
 }
