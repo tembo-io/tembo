@@ -23,6 +23,7 @@ mod test {
         Api, Client, Config,
     };
     use rand::Rng;
+    use std::str;
 
     const API_VERSION: &str = "kube.rs/v1";
 
@@ -56,7 +57,7 @@ mod test {
 
         // Timeout settings while waiting for an event
         let timeout_seconds_start_pod = 60;
-        let timeout_seconds_pod_ready = 10;
+        let timeout_seconds_pod_ready = 30;
 
         // Apply a basic configuration of CoreDB
         println!("Creating CoreDB resource {}", name);
@@ -73,7 +74,7 @@ mod test {
         });
         let params = PatchParams::apply("coredb-integration-test");
         let patch = Patch::Apply(&coredb_json);
-        let _coredb_resource = coredbs.patch(name, &params, &patch).await;
+        let coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
 
         // Wait for Pod to be created
 
@@ -99,6 +100,41 @@ mod test {
             "Did not find the pod {} to be ready after waiting {} seconds",
             pod_name, timeout_seconds_pod_ready
         ));
+        println!("Found pod ready: {}", pod_name);
+        let result = coredb_resource
+            .psql("\\dt".to_string(), "postgres".to_string(), client.clone())
+            .await
+            .unwrap();
+        println!("{}", result.stderr.clone().unwrap());
+        assert!(result
+            .stderr
+            .clone()
+            .unwrap()
+            .contains("Did not find any relations."));
+        let result = coredb_resource
+            .psql(
+                "
+                CREATE TABLE customers (
+                   id serial PRIMARY KEY,
+                   name VARCHAR(50) NOT NULL,
+                   email VARCHAR(50) NOT NULL UNIQUE,
+                   created_at TIMESTAMP DEFAULT NOW()
+                );
+                "
+                .to_string(),
+                "postgres".to_string(),
+                client.clone(),
+            )
+            .await
+            .unwrap();
+        println!("{}", result.stdout.clone().unwrap());
+        assert!(result.stdout.clone().unwrap().contains("CREATE TABLE"));
+        let result = coredb_resource
+            .psql("\\dt".to_string(), "postgres".to_string(), client.clone())
+            .await
+            .unwrap();
+        println!("{}", result.stdout.clone().unwrap());
+        assert!(result.stdout.clone().unwrap().contains("customers"));
     }
 
     async fn kube_client() -> kube::Client {

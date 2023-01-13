@@ -5,7 +5,12 @@ use futures::{
     stream::StreamExt,
 };
 
-use crate::{defaults, service::reconcile_svc, statefulset::reconcile_sts};
+use crate::{
+    defaults,
+    psql::{PsqlCommand, PsqlOutput},
+    service::reconcile_svc,
+    statefulset::{reconcile_sts, stateful_set_from_cdb},
+};
 use kube::{
     api::{Api, ListParams, Patch, PatchParams, ResourceExt},
     client::Client,
@@ -16,6 +21,8 @@ use kube::{
     },
     CustomResource, Resource,
 };
+
+use k8s_openapi::api::core::v1::Pod;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -139,6 +146,44 @@ impl CoreDB {
             .map_err(Error::KubeError)?;
         Ok(Action::await_change())
     }
+
+    async fn primary_pod(&self, client: Client) -> Result<Pod> {
+        let sts = stateful_set_from_cdb(self);
+        let sts_name = sts.metadata.name.unwrap();
+        let sts_namespace = sts.metadata.namespace.unwrap();
+        let label_selector = format!("statefulset={}", sts_name);
+        let list_params = ListParams::default().labels(&label_selector);
+        let pods: Api<Pod> = Api::namespaced(client, &sts_namespace);
+        let pods = pods.list(&list_params);
+        // For the time being, we assume that the first pod is the primary
+        let primary = pods.await.unwrap().items[0].clone();
+        return Ok(primary);
+    }
+
+    pub async fn psql(
+        &self,
+        command: String,
+        database: String,
+        client: Client,
+    ) -> Result<PsqlOutput, kube::Error> {
+        let pod_name = self
+            .primary_pod(client.clone())
+            .await
+            .unwrap()
+            .metadata
+            .name
+            .unwrap();
+
+        return PsqlCommand::new(
+            pod_name,
+            self.metadata.namespace.clone().unwrap(),
+            command,
+            database,
+            client,
+        )
+        .execute()
+        .await;
+    }
 }
 
 /// Diagnostics to be exposed by the web server
@@ -224,7 +269,7 @@ mod test {
         // verify that coredb gets a finalizer attached during reconcile
         fakeserver.handle_finalizer_creation(&coredb);
         let res = reconcile(Arc::new(coredb), testctx).await;
-        assert!(res.is_ok(), "initial creation succeds in adding finalizer");
+        assert!(res.is_ok(), "initial creation succeeds in adding finalizer");
     }
 
     #[tokio::test]

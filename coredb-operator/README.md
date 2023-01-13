@@ -74,7 +74,17 @@ Setup an opentelemetry collector in your cluster. [Tempo](https://github.com/gra
 cargo run
 ```
 
-or, with optional telemetry (change as per requirements):
+- Or, you can run with auto-reloading your local changes.
+- First, install cargo-watch
+```
+cargo install cargo-watch
+```
+- Then, run with auto-reload
+```
+cargo watch -x 'run'
+```
+
+- Or, with optional telemetry (change as per requirements):
 
 ```sh
 OPENTELEMETRY_ENDPOINT_URL=https://0.0.0.0:55680 RUST_LOG=info,kube=trace,controller=debug cargo run --features=telemetry
