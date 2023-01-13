@@ -2,12 +2,13 @@ mod ingress_route_tcp_crd;
 mod pg_cluster_crd;
 
 use ingress_route_tcp_crd::IngressRouteTCP;
-use k8s_openapi::api::core::v1::Namespace;
+use k8s_openapi::api::core::v1::{Namespace, Secret};
 use kube::api::{DeleteParams, ListParams, Patch, PatchParams};
 use kube::{Api, Client};
 use log::info;
 use pg_cluster_crd::PostgresCluster;
 use serde_json::Value;
+use std::fmt::Debug;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -173,4 +174,22 @@ pub async fn delete_namespace(client: Client, name: String) -> Result<(), Error>
         .await
         .map_err(Error::KubeError);
     Ok(())
+}
+
+pub async fn get_pg_conn(client: Client, name: String) -> Result<String, Error> {
+    // read secret <name>-pguser-name
+    let secret_name = format!("{}-pguser-{}", name, name);
+    let secret_api: Api<Secret> = Api::namespaced(client, &name.clone());
+    let secret = secret_api
+        .get(secret_name.as_str())
+        .await
+        .expect("error getting Secret");
+
+    let data = secret.data.unwrap();
+    let user = serde_json::to_string(data.get("user").unwrap()).unwrap();
+    let password = serde_json::to_string(data.get("password").unwrap()).unwrap();
+    let host = format!("{}.coredb-development.com", name);
+    let connection_string = format!("postgresl://{}:{}@{}:5432", user, password, host);
+
+    Ok(connection_string)
 }
