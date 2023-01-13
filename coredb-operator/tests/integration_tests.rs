@@ -12,7 +12,7 @@
 #[cfg(test)]
 mod test {
 
-    use controller::CoreDB;
+    use controller::{CoreDB, PsqlCommand};
     use k8s_openapi::{
         api::core::v1::{Namespace, Pod},
         apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
@@ -105,8 +105,8 @@ mod test {
             .psql("\\dt".to_string(), "postgres".to_string(), client.clone())
             .await
             .unwrap();
-        println!("{}", result);
-        assert!(result.contains("Did not find any relations."));
+        println!("{}", result.stderr);
+        assert!(result.stderr.contains("Did not find any relations."));
         let result = coredb_resource
             .psql(
                 "
@@ -123,14 +123,14 @@ mod test {
             )
             .await
             .unwrap();
-        println!("{}", result);
-        assert!(result.contains("CREATE TABLE"));
+        println!("{}", result.stdout);
+        assert!(result.stdout.contains("CREATE TABLE"));
         let result = coredb_resource
             .psql("\\dt".to_string(), "postgres".to_string(), client.clone())
             .await
             .unwrap();
-        println!("{}", result);
-        assert!(result.contains("customers"));
+        println!("{}", result.stdout);
+        assert!(result.stdout.contains("customers"));
     }
 
     async fn kube_client() -> kube::Client {
