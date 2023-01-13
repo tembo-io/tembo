@@ -3,8 +3,8 @@ use k8s_openapi::{
     api::{
         apps::v1::{StatefulSet, StatefulSetSpec},
         core::v1::{
-            Container, ContainerPort, EnvVar, PersistentVolumeClaim, PersistentVolumeClaimSpec, PodSpec,
-            PodTemplateSpec, ResourceRequirements, SecurityContext, VolumeMount,
+            Container, ContainerPort, EnvVar, ExecAction, PersistentVolumeClaim, PersistentVolumeClaimSpec,
+            PodSpec, PodTemplateSpec, Probe, ResourceRequirements, SecurityContext, VolumeMount,
         },
     },
     apimachinery::pkg::{api::resource::Quantity, apis::meta::v1::LabelSelector},
@@ -16,13 +16,14 @@ use kube::{
 
 use std::{collections::BTreeMap, sync::Arc};
 
-fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
+pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
     let ns = cdb.namespace().unwrap();
     let name = cdb.name_any();
     let mut labels: BTreeMap<String, String> = BTreeMap::new();
     let mut pvc_requests: BTreeMap<String, Quantity> = BTreeMap::new();
     let oref = cdb.controller_owner_ref(&()).unwrap();
     labels.insert("app".to_owned(), "coredb".to_owned());
+    labels.insert("statefulset".to_owned(), name.to_owned());
     pvc_requests.insert("storage".to_string(), Quantity("8Gi".to_string()));
 
     let postgres_env = Some(vec![EnvVar {
@@ -36,49 +37,6 @@ fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
         mount_path: "/var/lib/postgresql/data".to_owned(),
         ..VolumeMount::default()
     }]);
-
-    // This container for running postgresql
-    let postgres_container = Container {
-        env: postgres_env.clone(),
-        security_context: Some(SecurityContext {
-            run_as_user: Some(cdb.spec.uid.clone() as i64),
-            allow_privilege_escalation: Some(false),
-            ..SecurityContext::default()
-        }),
-        name: "postgres".to_string(),
-        image: Some(cdb.spec.image.clone()),
-        ports: Some(vec![ContainerPort {
-            container_port: 5432,
-            ..ContainerPort::default()
-        }]),
-        volume_mounts: postgres_volume_mounts.clone(),
-        ..Container::default()
-    };
-
-    // This container for initializing postgres data directory
-    let postgres_init_container = Container {
-        env: postgres_env.clone(),
-        name: "pg-directory-init".to_string(),
-        image: Some(cdb.spec.image.clone()),
-        volume_mounts: postgres_volume_mounts.clone(),
-        // When we have our own PG container,
-        // this will be refactored: this is assuming the
-        // content of the docker entrypoint script
-        // https://github.com/docker-library/postgres/blob/master/docker-entrypoint.sh
-        args: Some(vec![
-            "/bin/bash".to_string(),
-            "-c".to_string(),
-            "\
-    set -e
-    source /usr/local/bin/docker-entrypoint.sh
-    set -x
-    docker_setup_env
-    docker_create_db_directories
-                        "
-            .to_string(),
-        ]),
-        ..Container::default()
-    };
 
     let sts: StatefulSet = StatefulSet {
         metadata: ObjectMeta {
@@ -96,8 +54,55 @@ fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
             },
             template: PodTemplateSpec {
                 spec: Some(PodSpec {
-                    containers: vec![postgres_container],
-                    init_containers: Option::from(vec![postgres_init_container]),
+                    containers: vec![
+                        // This container for running postgresql
+                        Container {
+                            env: postgres_env.clone(),
+                            security_context: Some(SecurityContext {
+                                run_as_user: Some(cdb.spec.uid.clone() as i64),
+                                allow_privilege_escalation: Some(false),
+                                ..SecurityContext::default()
+                            }),
+                            name: "postgres".to_string(),
+                            image: Some(cdb.spec.image.clone()),
+                            ports: Some(vec![ContainerPort {
+                                container_port: 5432,
+                                ..ContainerPort::default()
+                            }]),
+                            volume_mounts: postgres_volume_mounts.clone(),
+                            readiness_probe: Some(Probe {
+                                exec: Some(ExecAction {
+                                    command: Some(vec![String::from("pg_isready")]),
+                                }),
+                                initial_delay_seconds: Some(3),
+                                ..Probe::default()
+                            }),
+                            ..Container::default()
+                        },
+                    ],
+                    init_containers: Option::from(vec![Container {
+                        env: postgres_env.clone(),
+                        name: "pg-directory-init".to_string(),
+                        image: Some(cdb.spec.image.clone()),
+                        volume_mounts: postgres_volume_mounts.clone(),
+                        // When we have our own PG container,
+                        // this will be refactored: this is assuming the
+                        // content of the docker entrypoint script
+                        // https://github.com/docker-library/postgres/blob/master/docker-entrypoint.sh
+                        args: Some(vec![
+                            "/bin/bash".to_string(),
+                            "-c".to_string(),
+                            "\
+                            set -e
+                            source /usr/local/bin/docker-entrypoint.sh
+                            set -x
+                            docker_setup_env
+                            docker_create_db_directories
+                        "
+                            .to_string(),
+                        ]),
+                        ..Container::default()
+                    }]),
                     ..PodSpec::default()
                 }),
                 metadata: Some(ObjectMeta {
@@ -125,6 +130,21 @@ fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
         ..StatefulSet::default()
     };
     return sts;
+}
+
+pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
+    let client = ctx.client.clone();
+
+    let sts: StatefulSet = stateful_set_from_cdb(cdb);
+
+    let sts_api: Api<StatefulSet> = Api::namespaced(client, &sts.clone().metadata.namespace.unwrap());
+
+    let ps = PatchParams::apply("cntrlr").force();
+    let _o = sts_api
+        .patch(&sts.clone().metadata.name.unwrap(), &ps, &Patch::Apply(&sts))
+        .await
+        .map_err(Error::KubeError)?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -158,19 +178,4 @@ mod tests {
             1000
         );
     }
-}
-
-pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
-    let client = ctx.client.clone();
-
-    let sts: StatefulSet = stateful_set_from_cdb(cdb);
-
-    let sts_api: Api<StatefulSet> = Api::namespaced(client, &sts.clone().metadata.namespace.unwrap());
-
-    let ps = PatchParams::apply("cntrlr").force();
-    let _o = sts_api
-        .patch(&sts.clone().metadata.name.unwrap(), &ps, &Patch::Apply(&sts))
-        .await
-        .map_err(Error::KubeError)?;
-    Ok(())
 }
