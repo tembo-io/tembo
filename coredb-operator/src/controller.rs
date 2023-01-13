@@ -182,7 +182,6 @@ impl CoreDB {
             .unwrap();
         let pods: Api<Pod> = Api::namespaced(client.clone(), &self.metadata.namespace.clone().unwrap());
         let mut attached_process = pods.exec(&pod_name, psql_command, &attach_params).await.unwrap();
-        // attached_process.join();
         let mut stdout_reader = attached_process.stdout().unwrap();
         let mut result_stdout = String::new();
         stdout_reader.read_to_string(&mut result_stdout).await.unwrap();
