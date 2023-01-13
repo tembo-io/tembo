@@ -1,5 +1,7 @@
+mod ingress_route_tcp_crd;
 mod pg_cluster_crd;
 
+use ingress_route_tcp_crd::IngressRouteTCP;
 use k8s_openapi::api::core::v1::Namespace;
 use kube::api::{DeleteParams, ListParams, Patch, PatchParams};
 use kube::{Api, Client};
@@ -70,6 +72,42 @@ pub async fn generate_spec(body: Value) -> Value {
         },
     });
     spec
+}
+
+pub async fn create_ing_route_tcp(client: Client, name: String) -> Result<(), Error> {
+    let ing_api: Api<IngressRouteTCP> = Api::namespaced(client, &name);
+    let params = PatchParams::apply("reconciler").force();
+    let ing = serde_json::json!({
+        "apiVersion": "traefik.containo.us/v1alpha1",
+        "kind": "IngressRouteTCP",
+        "metadata": {
+            "name": format!("{}", name),
+            "namespace": format!("{}", name),
+        },
+        "spec": {
+            "entryPoints": ["postgresql"],
+            "routes": [
+                {
+                    "match": format!("HostSNI(`{}.coredb.io`) || HostSNI(`{}.coredb-development.com`)", name, name),
+                    "services": [
+                        {
+                            "name": format!("{}-primary", name),
+                            "port": "5432",
+                        },
+                    ],
+                },
+            ],
+            "tls": {
+                "passthrough": true,
+            },
+        },
+    });
+    info!("\nCreating or updating IngressRouteTCP: {}", name);
+    let _o = ing_api
+        .patch(&name, &params, &Patch::Apply(&ing))
+        .await
+        .map_err(Error::KubeError)?;
+    Ok(())
 }
 
 pub async fn get_all(client: Client, namespace: String) -> Vec<PostgresCluster> {
