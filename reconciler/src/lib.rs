@@ -4,6 +4,7 @@ mod pg_cluster_crd;
 use ingress_route_tcp_crd::IngressRouteTCP;
 use k8s_openapi::api::core::v1::{Namespace, Secret};
 use kube::api::{DeleteParams, ListParams, Patch, PatchParams};
+use kube::runtime::wait::{await_condition, Condition};
 use kube::{Api, Client};
 use log::info;
 use pg_cluster_crd::PostgresCluster;
@@ -180,6 +181,11 @@ pub async fn get_pg_conn(client: Client, name: String) -> Result<String, Error> 
     // read secret <name>-pguser-name
     let secret_name = format!("{}-pguser-{}", name, name);
     let secret_api: Api<Secret> = Api::namespaced(client, &name.clone());
+
+    // wait for secret to exist
+    let establish = await_condition(secret_api.clone(), &secret_name, wait_for_secret());
+    let _ = tokio::time::timeout(std::time::Duration::from_secs(90), establish).await;
+
     let secret = secret_api
         .get(secret_name.as_str())
         .await
@@ -192,4 +198,17 @@ pub async fn get_pg_conn(client: Client, name: String) -> Result<String, Error> 
     let connection_string = format!("postgresl://{}:{}@{}:5432", user, password, host);
 
     Ok(connection_string)
+}
+
+// TODO(ianstanton) This is a hack for now. We need to find a more 'official' way of checking for
+//  existing resources in the cluster.
+pub fn wait_for_secret() -> impl Condition<Secret> {
+    |obj: Option<&Secret>| {
+        if let Some(secret) = &obj {
+            if let Some(t) = &secret.type_ {
+                return t == "Opaque";
+            }
+        }
+        false
+    }
 }

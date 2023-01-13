@@ -70,10 +70,10 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                     .await
                     .expect("error getting secret");
 
-                let data_plane_id: String = serde_json::from_value(read_msg.message["data_plane_id"].clone())
-                    .unwrap();
-                let event_id: String = serde_json::from_value(read_msg.message["event_id"].clone())
-                    .unwrap();
+                let data_plane_id: String =
+                    serde_json::from_value(read_msg.message["data_plane_id"].clone()).unwrap();
+                let event_id: String =
+                    serde_json::from_value(read_msg.message["event_id"].clone()).unwrap();
 
                 // enqueue connection string
                 let msg = serde_json::json!({
