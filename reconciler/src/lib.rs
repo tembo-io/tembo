@@ -94,7 +94,7 @@ pub async fn create_ing_route_tcp(client: Client, name: String) -> Result<(), Er
                     "services": [
                         {
                             "name": format!("{}-primary", name),
-                            "port": "5432",
+                            "port": 5432,
                         },
                     ],
                 },
