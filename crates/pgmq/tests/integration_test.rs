@@ -206,7 +206,8 @@ async fn test_serde() {
     assert_eq!(msg_read.message["num"].as_u64().unwrap(), msg.num);
 
     // DEFAULT json => json
-    // not using turbofish
+    // no turbofish .read<T>()
+    // no Message<T> annotation on assignment
     let msg = serde_json::json!( {
         "foo": "bar".to_owned(),
         "num": rng.gen_range(0..100000),
