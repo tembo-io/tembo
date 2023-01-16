@@ -206,14 +206,14 @@ async fn test_serde() {
     assert_eq!(msg_read.message["num"].as_u64().unwrap(), msg.num);
 
     // DEFAULT json => json
-    // not using turbofish needed
+    // not using turbofish
     let msg = serde_json::json!( {
         "foo": "bar".to_owned(),
         "num": rng.gen_range(0..100000),
     });
     let msg5 = queue.enqueue(&test_queue, &msg).await.unwrap();
     assert_eq!(msg5, 5);
-    let msg_read: crate::pgmq::Message<Value> = queue
+    let msg_read: crate::pgmq::Message = queue
         .read(&test_queue, Some(&30_u32)) // no turbofish on this line
         .await
         .unwrap();
