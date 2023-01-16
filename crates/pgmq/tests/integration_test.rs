@@ -204,4 +204,24 @@ async fn test_serde() {
     queue.delete(&test_queue, &msg_read.msg_id).await.unwrap();
     assert_eq!(msg_read.message["foo"].to_owned(), msg.foo);
     assert_eq!(msg_read.message["num"].as_u64().unwrap(), msg.num);
+
+    // DEFAULT json => json
+    // no turbofish .read<T>()
+    // no Message<T> annotation on assignment
+    let msg = serde_json::json!( {
+        "foo": "bar".to_owned(),
+        "num": rng.gen_range(0..100000),
+    });
+    let msg5 = queue.enqueue(&test_queue, &msg).await.unwrap();
+    assert_eq!(msg5, 5);
+    let msg_read: crate::pgmq::Message = queue
+        .read(&test_queue, Some(&30_u32)) // no turbofish on this line
+        .await
+        .unwrap();
+    queue.delete(&test_queue, &msg_read.msg_id).await.unwrap();
+    assert_eq!(msg_read.message["foo"].to_owned(), msg["foo"].to_owned());
+    assert_eq!(
+        msg_read.message["num"].as_u64().unwrap(),
+        msg["num"].as_u64().unwrap()
+    );
 }
