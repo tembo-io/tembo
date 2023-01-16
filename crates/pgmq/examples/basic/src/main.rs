@@ -28,7 +28,6 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     println!("deleted: {:?}", deleted);
 
     // SEND A STRUCT
-
     #[derive(Serialize, Debug, Deserialize)]
     struct MyMessage {
         foo: String,
