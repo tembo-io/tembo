@@ -194,11 +194,11 @@ pub async fn get_pg_conn(client: Client, name: String) -> Result<String, Error> 
         .expect("error getting Secret");
 
     let data = secret.data.unwrap();
-    let b64user = serde_json::to_string(data.get("user").unwrap()).unwrap();
-    let b64password = serde_json::to_string(data.get("password").unwrap()).unwrap();
+    let byte_user = serde_json::to_string(data.get("user").unwrap()).unwrap();
+    let byte_pw = serde_json::to_string(data.get("password").unwrap()).unwrap();
 
-    let user = b64_decode(b64user.as_str());
-    let password = b64_decode(b64password.as_str());
+    let user = b64_decode(&byte_user);
+    let password = b64_decode(&byte_pw);
 
     let host = format!("{}.coredb-development.com", name);
     let connection_string = format!("postgresql://{}:{}@{}:5432", user, password, host);
