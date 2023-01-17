@@ -1,6 +1,10 @@
-FROM rust:1.66.0
+FROM rust:1.66.1 as builder
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src
-RUN cargo build --release
-RUN mv target/release/reconciler ./
-RUN cargo clean
+RUN cargo build && \
+    cargo clean -p reconciler
+RUN cargo install --path .
+
+# second stage.
+FROM debian
+COPY --from=builder /usr/local/cargo/bin/* /usr/local/bin/
