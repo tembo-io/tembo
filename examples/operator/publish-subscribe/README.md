@@ -40,12 +40,12 @@ kind: CoreDBPublication
 metadata:
   name: coredb-customers
   spec:
-    coredbRef: coredb-rds-replica
+    coredbRef: coredb-sample-publisher
     dbname: postgres
 	tables:
       - customers
 ```
-- Or, you can use the CoreDB CLI `coredb create publication --publisher coredb-rds-replica --database postgres --tables customers coredb-customers`
+- Or, you can use the CoreDB CLI `coredb create publication --publisher coredb-sample-publisher --database postgres --tables customers coredb-customers`
 - List publications with `coredb get publications`
 
 ## Subscribers
