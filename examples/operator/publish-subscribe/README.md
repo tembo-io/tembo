@@ -14,7 +14,7 @@ metadata:
   spec:
     replicas: 1
 ```
-- Or, you can use the coredb CLI `coredb create coredb-sample-publisher`
+- Or, you can use the coredb CLI `coredb create db coredb-sample-publisher`
 
 - Then, connect and add some data.
 ```
@@ -29,7 +29,7 @@ INSERT INTO customers (name, email)
 VALUES ('John Doe', 'john.doe@example.com');
 ```
 - In the above example, we create a table "customers" and add one row, in the database named 'postgres'.
-- You can connect into the database with `kubectl exec -it pod_name -- /bin/bash`, or you can connect with the coredb CLI `coredb connect coredb-sample-publisher`
+- You can connect into the database with `kubectl exec -it pod_name -- /bin/bash`, or you can connect with the coredb CLI `coredb psql coredb-sample-publisher --database postgres`
 
 ### Create a CoreDBPublication
 
