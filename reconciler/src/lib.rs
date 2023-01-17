@@ -8,7 +8,7 @@ use kube::runtime::wait::{await_condition, Condition};
 use kube::{Api, Client};
 use log::info;
 use pg_cluster_crd::PostgresCluster;
-use serde_json::Value;
+use serde_json::{from_str, to_string, Value};
 use std::fmt::Debug;
 use thiserror::Error;
 
@@ -194,11 +194,18 @@ pub async fn get_pg_conn(client: Client, name: String) -> Result<String, Error> 
         .expect("error getting Secret");
 
     let data = secret.data.unwrap();
-    let byte_user = serde_json::to_string(data.get("user").unwrap()).unwrap();
-    let byte_pw = serde_json::to_string(data.get("password").unwrap()).unwrap();
 
-    let user = b64_decode(&byte_user);
-    let password = b64_decode(&byte_pw);
+    // TODO(ianstanton) There has to be a better way to do this
+    let user_data = data.get("user").unwrap();
+    let byte_user = to_string(user_data).unwrap();
+    let string_user: String = from_str(&byte_user).unwrap();
+
+    let pw_data = data.get("password").unwrap();
+    let byte_pw = to_string(pw_data).unwrap();
+    let string_pw: String = from_str(&byte_pw).unwrap();
+
+    let user = b64_decode(&string_user);
+    let password = b64_decode(&string_pw);
 
     let host = format!("{}.coredb-development.com", name);
     let connection_string = format!("postgresql://{}:{}@{}:5432", user, password, host);
