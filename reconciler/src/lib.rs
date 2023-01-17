@@ -12,6 +12,8 @@ use serde_json::Value;
 use std::fmt::Debug;
 use thiserror::Error;
 
+use base64::{engine::general_purpose, Engine as _};
+
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("Kube Error: {0}")]
@@ -192,12 +194,21 @@ pub async fn get_pg_conn(client: Client, name: String) -> Result<String, Error> 
         .expect("error getting Secret");
 
     let data = secret.data.unwrap();
-    let user = serde_json::to_string(data.get("user").unwrap()).unwrap();
-    let password = serde_json::to_string(data.get("password").unwrap()).unwrap();
+    let byte_user = serde_json::to_string(data.get("user").unwrap()).unwrap();
+    let byte_pw = serde_json::to_string(data.get("password").unwrap()).unwrap();
+
+    let user = b64_decode(&byte_user);
+    let password = b64_decode(&byte_pw);
+
     let host = format!("{}.coredb-development.com", name);
     let connection_string = format!("postgresql://{}:{}@{}:5432", user, password, host);
 
     Ok(connection_string)
+}
+
+fn b64_decode(b64_encoded: &str) -> String {
+    let bytes = general_purpose::STANDARD.decode(b64_encoded).unwrap();
+    std::str::from_utf8(&bytes).unwrap().to_owned()
 }
 
 // TODO(ianstanton) This is a hack for now. We need to find a more 'official' way of checking for
@@ -211,4 +222,22 @@ pub fn wait_for_secret() -> impl Condition<Secret> {
         }
         false
     }
+}
+
+#[test]
+fn test_b64_decode_string() {
+    let encoded = "SGVsbG8sIFdvcmxkIQ==";
+    let decoded = b64_decode(encoded);
+    assert_eq!(decoded, "Hello, World!");
+
+    let encoded = "ZnJpZGF5";
+    let decoded = b64_decode(encoded);
+    assert_eq!(decoded, "friday");
+}
+
+#[test]
+fn test_b64_decode_empty_string() {
+    let encoded = "";
+    let decoded = b64_decode(encoded);
+    assert_eq!(decoded, "");
 }
