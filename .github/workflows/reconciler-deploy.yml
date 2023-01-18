@@ -1,0 +1,46 @@
+name: reconciler-deploy workflow
+
+defaults:
+  run:
+    shell: bash
+    working-directory: ./reconciler/
+
+on:
+  workflow_run:
+    workflows: [ reconciler-lint workflow ]
+    types:
+      - completed
+    branches:
+      - main
+      - release**
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  docker-build-push:
+    name: Build and push image
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+      - id: commit
+        uses: pr-mpt/actions-commit-hash@v2
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: ${{ secrets.ROLEARN }}
+          aws-region: ${{ secrets.REGION }}
+          role-session-name: MySessionName
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v1
+      - name: Build, tag, and push docker image to Amazon ECR
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          REPOSITORY: reconciler
+          IMAGE_TAG: ${{ steps.commit.outputs.short }}
+        run: |
+          docker build -t $REGISTRY/$REPOSITORY:$IMAGE_TAG .
+          docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
