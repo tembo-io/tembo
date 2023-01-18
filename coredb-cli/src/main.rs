@@ -11,13 +11,10 @@ struct Cli {
 #[derive(Subcommand)]
 enum SubCommands {
     Get {
-        #[arg(short, long)]
         resource_type: String,
     },
     Create {
-        #[arg(short, long)]
         resource_type: String,
-        #[arg(short, long)]
         name: String,
     },
 }
