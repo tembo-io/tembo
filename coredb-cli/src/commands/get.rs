@@ -1,4 +1,4 @@
-use super::SubCommand;
+use super::{ResourceType, SubCommand};
 use clap::Args;
 use std::process::Command;
 
@@ -8,15 +8,10 @@ pub struct GetCommand {
     resource_type: ResourceType,
 }
 
-#[derive(clap::ValueEnum, Clone)]
-enum ResourceType {
-    Dbs,
-}
-
 impl SubCommand for GetCommand {
     fn execute(&self) {
         match self.resource_type {
-            ResourceType::Dbs => {
+            ResourceType::Db | ResourceType::Dbs => {
                 let output = Command::new("kubectl")
                     .arg("get")
                     .arg("coredbs")
