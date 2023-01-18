@@ -5,28 +5,40 @@ use clap::{Args, Parser, Subcommand};
 #[command(propagate_version = true)]
 struct Cli {
     #[command(subcommand)]
-    command: Commands,
+    command: SubCommands,
 }
 
 #[derive(Subcommand)]
-enum Commands {
-    /// Adds files to myapp
-    Get(Get),
-}
-
-#[derive(Args)]
-struct Get {
-    name: String,
+enum SubCommands {
+    Get {
+        #[arg(short, long)]
+        resource_type: String,
+    },
+    Create {
+        #[arg(short, long)]
+        resource_type: String,
+        #[arg(short, long)]
+        name: String,
+    },
 }
 
 fn main() {
     let cli = Cli::parse();
 
-    // You can check for the existence of subcommands, and if found use their
-    // matches just as you would the top level cmd
-    match &cli.command {
-        Commands::Get(name) => {
-            println!("'coredb get {:?}' was called", &name.name)
+    match cli.command {
+        SubCommands::Get { resource_type} => {
+            if resource_type == "dbs" {
+                println!("Getting all dbs");
+            } else if resource_type == "extensions" {
+                println!("Getting all extensions");
+            }
+        }
+        SubCommands::Create { resource_type, name} => {
+            if resource_type == "db" {
+                println!("db with name: {}", name);
+            } else if resource_type == "extension" {
+                println!("Creating a new extension with name: {}", name);
+            }
         }
     }
 }
