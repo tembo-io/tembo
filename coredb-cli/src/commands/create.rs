@@ -1,19 +1,10 @@
-use clap::Args;
 use super::SubCommand;
+use clap::Args;
 
 #[derive(Args)]
 pub struct CreateCommand {
     resource_type: String,
     name: String,
-}
-
-impl CreateCommand {
-    fn new(resource_type: &str, name: &str) -> Self {
-        CreateCommand {
-            resource_type: resource_type.to_owned(),
-            name: name.to_owned(),
-        }
-    }
 }
 
 impl SubCommand for CreateCommand {
