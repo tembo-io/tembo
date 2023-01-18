@@ -1,4 +1,5 @@
 use clap::{Args, Parser, Subcommand};
+use std::process::Command;
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
@@ -25,7 +26,13 @@ fn main() {
     match cli.command {
         SubCommands::Get { resource_type} => {
             if resource_type == "dbs" {
-                println!("Getting all dbs");
+                let output = Command::new("kubectl")
+                    .arg("get")
+                    .arg("coredbs")
+                    .arg("--all-namespaces")
+                    .output()
+                    .expect("Failed to execute 'kubectl' command.");
+                println!("{}", String::from_utf8_lossy(&output.stdout));
             } else if resource_type == "extensions" {
                 println!("Getting all extensions");
             }
