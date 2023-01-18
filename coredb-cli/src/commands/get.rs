@@ -4,19 +4,27 @@ use std::process::Command;
 
 #[derive(Args)]
 pub struct GetCommand {
-    resource_type: String,
+    #[arg(value_enum)]
+    resource_type: ResourceType,
+}
+
+#[derive(clap::ValueEnum, Clone)]
+enum ResourceType {
+    Dbs,
 }
 
 impl SubCommand for GetCommand {
     fn execute(&self) {
-        if self.resource_type == "dbs" {
-            let output = Command::new("kubectl")
-                .arg("get")
-                .arg("coredbs")
-                .arg("--all-namespaces")
-                .output()
-                .expect("Failed to execute 'kubectl' command.");
-            println!("{}", String::from_utf8_lossy(&output.stdout));
+        match self.resource_type {
+            ResourceType::Dbs => {
+                let output = Command::new("kubectl")
+                    .arg("get")
+                    .arg("coredbs")
+                    .arg("--all-namespaces")
+                    .output()
+                    .expect("Failed to execute 'kubectl' command.");
+                println!("{}", String::from_utf8_lossy(&output.stdout));
+            }
         }
     }
 }
