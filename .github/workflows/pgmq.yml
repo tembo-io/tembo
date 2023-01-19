@@ -47,12 +47,8 @@ jobs:
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
-      - name: unit-tests
-        run: cargo test --lib
-      - name: doc-tests
-        run: cargo test --doc
-      - name: integration-tests
-        run: make test.integration
+      - name: run all tests
+        run: make test
       - name: teardown
         run: make test.cleanup
 

@@ -45,9 +45,11 @@ async fn main() {
     // READ A MESSAGE as `serde_json::Value`
     let vt: u32 = 30;
     let read_msg1: Message<Value> = queue.read::<Value>(&myqueue, Some(&vt)).await.expect("no messages in the queue!");
+    assert_eq!(read_msg1.msg_id, msg_id1);
 
     // READ A MESSAGE as a struct
     let read_msg2: Message<MyMessage> = queue.read::<MyMessage>(&myqueue, Some(&vt)).await.expect("no messages in the queue!");
+    assert_eq!(read_msg2.msg_id, msg_id2);
 
     // DELETE THE MESSAGE WE SENT
     let deleted = queue.delete(&myqueue, &read_msg1.msg_id).await.expect("Failed to delete message");
