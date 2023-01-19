@@ -2,7 +2,7 @@
 //!
 //! A lightweight messaging queue for Rust, using Postgres as the backend.
 //! Inspired by the [RSMQ project](https://github.com/smrchy/rsmq).
-//! 
+//!
 //! # Examples
 //!
 //! First, start any Postgres instance. It is the only external dependency.
