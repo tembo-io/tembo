@@ -49,6 +49,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: unit-tests
         run: cargo test --lib
+      - name: doc-tests
+        run: cargo test --doc
       - name: integration-tests
         run: make test.integration
       - name: teardown
