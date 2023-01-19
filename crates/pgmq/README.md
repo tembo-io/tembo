@@ -22,7 +22,7 @@ use serde_json::Value;
 #[tokio::main]
 async fn main() {
     // CREATE A QUEUE
-    let queue: PGMQueue = PGMQueue::new("postgres://postgres:postgres@0.0.0.0:5432".to_owned()).await.expect("Failed to connect to Postgres");
+    let queue: PGMQueue = PGMQueue::new("postgres://postgres:postgres@0.0.0.0:5432".to_owned()).await;
     let myqueue = "myqueue".to_owned();
     queue.create(&myqueue).await.expect("Failed to create queue");
 
@@ -50,10 +50,10 @@ async fn main() {
     let read_msg2: Message<MyMessage> = queue.read::<MyMessage>(&myqueue, Some(&vt)).await.expect("no messages in the queue!");
 
     // DELETE THE MESSAGE WE SENT
-    let deleted = queue.delete(&read_msg1.msg_id).await.expect("Failed to delete message");
-    let deleted = queue.delete(&read_msg2.msg_id).await.expect("Failed to delete message");
+    let deleted = queue.delete(&myqueue, &read_msg1.msg_id).await.expect("Failed to delete message");
+    let deleted = queue.delete(&myqueue, &read_msg2.msg_id).await.expect("Failed to delete message");
 }
-
+```
 ## Sending messages
 
 `queue.enqueue()` can be passed any type that implements `serde::Serialize`. This means you can prepare your messages as JSON or as a struct.
