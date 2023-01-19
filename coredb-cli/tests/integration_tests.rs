@@ -9,8 +9,7 @@ fn help() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
 
     cmd.arg("--help");
-    cmd.assert()
-        .stdout(predicate::str::contains("Usage: "));
+    cmd.assert().stdout(predicate::str::contains("Usage: "));
 
     Ok(())
 }
