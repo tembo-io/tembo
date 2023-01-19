@@ -1,6 +1,5 @@
-# pgmq
+# Postgres Message Queue
 
-## Postgres Message Queue
 A lightweight messaging queue for Rust, using Postgres as the backend.
 Inspired by the [RSMQ project](https://github.com/smrchy/rsmq).
 ## Examples
@@ -43,6 +42,7 @@ let msg = MyMessage {
 };
 let msg_id: i64  = queue.enqueue(&myqueue, &msg).await.expect("Failed to enqueue message");
 ```
+
 ## Reading messages
 Reading a message will make it invisible for the duration of the visibility timeout (vt).
 No messages are returned when the queue is empty or all messages are invisible.
