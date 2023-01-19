@@ -16,7 +16,7 @@ chrono = { version = "0.4.23", features = [ "serde" ] }
 serde = "1.0.152"
 serde_json = { version = "1.0.91", features = [ "raw_value" ] }
 sqlx = { version = "0.6", features = [ "runtime-tokio-native-tls" , "postgres", "chrono" ] }
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1", features = ["macros"] }
 
 [dev-dependencies]
 rand = "0.8.5"
