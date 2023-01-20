@@ -32,7 +32,7 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
         with:
-          prefix-key: "coredb-operator-lint"
+          prefix-key: "coredb-cli-lint"
           workspaces: |
             coredb-cli
       - name: Cargo format
@@ -51,6 +51,6 @@ jobs:
         with:
           prefix-key: "coredb-cli-test"
           workspaces: |
-            coredb-operator
+            coredb-cli
       - name: Run tests
         run: cargo test
