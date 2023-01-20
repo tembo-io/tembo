@@ -85,6 +85,11 @@ jobs:
           prefix-key: "coredb-operator-functional-test"
           workspaces: |
             coredb-operator
+      - name: Check CRD is updated in the yaml directory
+        run: |
+          set -xe
+          cargo run --bin crdgen > yaml/crd.yaml
+          git diff --exit-code yaml/crd.yaml
       - name: Run functional / integration tests
         run: |
           set -xe
