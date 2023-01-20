@@ -168,13 +168,33 @@ impl PGMQueue {
     }
 
     pub async fn delete(&self, queue_name: &str, msg_id: &i64) -> Result<u64, Error> {
-        let query = &&query::delete(queue_name, msg_id);
+        let query = &query::delete(queue_name, msg_id);
         let row = sqlx::query(query).execute(&self.connection).await?;
         let num_deleted = row.rows_affected();
         Ok(num_deleted)
     }
 
-    // pub async fn pop(self) -> Message{
-    //     // TODO: returns a struct
-    // }
+    pub async fn pop<T: for<'de> Deserialize<'de>>(self, queue_name: &str) -> Option<Message<T>> {
+        let query = &query::pop(queue_name);
+        fetch_one::<T>(&query, &self.connection).await
+    }
+}
+
+async fn fetch_one<T: for<'de> Deserialize<'de>>(
+    query: &str,
+    connection: &Pool<Postgres>,
+) -> Option<Message<T>> {
+    let row: Result<PgRow, Error> = sqlx::query(query).fetch_one(connection).await;
+    match row {
+        Ok(row) => {
+            let b = row.get("message");
+            let a = serde_json::from_value::<T>(b).unwrap();
+            Some(Message {
+                msg_id: row.get("msg_id"),
+                vt: row.get("vt"),
+                message: a,
+            })
+        }
+        Err(_) => None,
+    }
 }
