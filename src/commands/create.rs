@@ -67,6 +67,7 @@ impl SubCommand for CreateCommand {
 
                     if !status.success() {
                         eprintln!("kubectl apply failed with status {:?}", status);
+                        eprintln!("\n\nHint: Is CoreDB installed in the cluster?\n\nTry running 'coredb install'");
                     }
                 }
             }
