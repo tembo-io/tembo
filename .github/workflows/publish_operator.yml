@@ -1,6 +1,5 @@
-# TODO: replace with push to CoreDB Quay, and versioned pushes.
-# This is to enable demo 'coredb install' on the CLI.
-#
+name: CoreDB Operator image build and upload
+
 on:
   push:
     branches:
@@ -10,6 +9,9 @@ on:
     - 'coredb-operator/**'
 
 jobs:
+  # TODO: replace with push to CoreDB Quay, and versioned pushes.
+  # This is to enable demo 'coredb install' on the CLI.
+  #
   push_to_registry:
     name: Push Docker image to Docker Hub
     runs-on: ubuntu-latest
