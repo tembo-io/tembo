@@ -1,6 +1,6 @@
 use super::{ResourceType, SubCommand};
 use clap::Args;
-use serde_json::{json};
+use serde_json::json;
 use serde_yaml;
 use std::io::Write;
 use std::process::{Command, Stdio};
@@ -36,9 +36,11 @@ impl SubCommand for CreateCommand {
     fn execute(&self) {
         match self.resource_type {
             ResourceType::Db | ResourceType::Dbs => {
-
                 if self.dry_run {
-                    println!("{}", generate_yaml(self.resource_type.clone(), self.name.clone()));
+                    println!(
+                        "{}",
+                        generate_yaml(self.resource_type.clone(), self.name.clone())
+                    );
                 } else {
                     println!("Creating a new db with name: {}", self.name);
 
@@ -54,7 +56,8 @@ impl SubCommand for CreateCommand {
                     if let Some(ref mut stdin) = kubectl.stdin {
                         stdin
                             .write_all(
-                                generate_yaml(self.resource_type.clone(), self.name.clone()).as_bytes(),
+                                generate_yaml(self.resource_type.clone(), self.name.clone())
+                                    .as_bytes(),
                             )
                             .expect("Failed to write to kubectl stdin");
                     }
