@@ -27,7 +27,9 @@ rules:
   - apiGroups: ["apps"]
     resources: ["statefulsets"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 ---
 # Binding the role to the account in default
 kind: ClusterRoleBinding
@@ -86,7 +88,7 @@ spec:
       serviceAccountName: coredb-controller
       containers:
       - name: coredb-controller
-        image: localhost:5001/controller:ac593af6da990c911652c6e35fb777f36498d6dc
+        image: sjmiller609/coredb-operator:latest
         imagePullPolicy: Always
         resources:
           limits:
