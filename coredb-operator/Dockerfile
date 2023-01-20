@@ -1,3 +1,5 @@
+# This does not build on M1
+
 FROM --platform=linux/amd64 clux/muslrust:stable AS builder
 
 WORKDIR /build
