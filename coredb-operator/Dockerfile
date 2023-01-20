@@ -2,7 +2,7 @@ FROM clux/muslrust:stable AS builder
 
 COPY . .
 
-RUN cargo build --release
+RUN cargo build --release --target=x86_64-unknown-linux-musl
 
 FROM alpine:latest
 
