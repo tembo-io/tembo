@@ -1,4 +1,4 @@
-name: CoreDB Operator image build and upload
+name: CoreDB operator image build and upload
 
 on:
   push:
