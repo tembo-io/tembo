@@ -1,10 +1,10 @@
-FROM clux/muslrust:stable AS builder
+FROM --platform=linux/amd64 clux/muslrust:stable AS builder
 
 COPY . .
 
 RUN cargo build --release --target=x86_64-unknown-linux-musl
 
-FROM alpine:latest
+FROM --platform=linux/amd64 alpine:latest
 
 RUN adduser -D nonroot
 
