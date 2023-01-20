@@ -28,4 +28,4 @@ jobs:
         with:
           context: ./coredb-operator
           push: true
-          tags: latest
+          tags: sjmiller609/coredb-operator:latest
