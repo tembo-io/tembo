@@ -14,7 +14,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: control-cdb
 rules:
-  - apiGroups: ["kube.rs"]
+  - apiGroups: ["coredb.io"]
     resources: ["coredbs", "coredbs/status"]
     verbs:
     - get

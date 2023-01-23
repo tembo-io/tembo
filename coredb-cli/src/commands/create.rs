@@ -17,7 +17,7 @@ fn generate_yaml(resource_type: ResourceType, name: String) -> String {
     match resource_type {
         ResourceType::Db | ResourceType::Dbs => {
             let json_value = json!({
-                "apiVersion": "kube.rs/v1",
+                "apiVersion": "coredb.io/v1",
                 "kind": "CoreDB",
                 "metadata": {
                     "name": name,

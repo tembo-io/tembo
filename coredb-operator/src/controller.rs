@@ -30,14 +30,14 @@ use std::sync::Arc;
 use tokio::{sync::RwLock, time::Duration};
 use tracing::*;
 
-pub static COREDB_FINALIZER: &str = "coredbs.kube.rs";
+pub static COREDB_FINALIZER: &str = "coredbs.coredb.io";
 
 /// Generate the Kubernetes wrapper struct `CoreDB` from our Spec and Status struct
 ///
 /// This provides a hook for generating the CRD yaml (in crdgen.rs)
 #[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
 #[cfg_attr(test, derive(Default))]
-#[kube(kind = "CoreDB", group = "kube.rs", version = "v1", namespaced)]
+#[kube(kind = "CoreDB", group = "coredb.io", version = "v1", namespaced)]
 #[kube(status = "CoreDBStatus", shortname = "cdb")]
 pub struct CoreDBSpec {
     #[serde(default = "defaults::default_replicas")]
@@ -104,7 +104,7 @@ impl CoreDB {
 
         // always overwrite status object with what we saw
         let new_status = Patch::Apply(json!({
-            "apiVersion": "kube.rs/v1",
+            "apiVersion": "coredb.io/v1",
             "kind": "CoreDB",
             "status": CoreDBStatus {
                 running: true,
