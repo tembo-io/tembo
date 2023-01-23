@@ -48,7 +48,7 @@ impl ApiServerVerifier {
             assert_eq!(
                 request.uri().to_string(),
                 format!(
-                    "/apis/kube.rs/v1/namespaces/testns/coredbs/{}?",
+                    "/apis/coredb.io/v1alpha1/namespaces/testns/coredbs/{}?",
                     coredb.name_any()
                 )
             );
@@ -80,7 +80,7 @@ impl ApiServerVerifier {
             assert_eq!(
                 request.uri().to_string(),
                 format!(
-                    "/apis/kube.rs/v1/namespaces/testns/coredbs/{}/status?&force=true&fieldManager=cntrlr",
+                    "/apis/coredb.io/v1alpha1/namespaces/testns/coredbs/{}/status?&force=true&fieldManager=cntrlr",
                     coredb.name_any()
                 )
             );
