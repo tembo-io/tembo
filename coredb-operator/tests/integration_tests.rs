@@ -25,7 +25,7 @@ mod test {
     use rand::Rng;
     use std::str;
 
-    const API_VERSION: &str = "coredb.io/v1";
+    const API_VERSION: &str = "coredb.io/v1alpha1";
 
     fn is_pod_ready() -> impl Condition<Pod> + 'static {
         move |obj: Option<&Pod>| {

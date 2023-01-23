@@ -37,7 +37,7 @@ pub static COREDB_FINALIZER: &str = "coredbs.coredb.io";
 /// This provides a hook for generating the CRD yaml (in crdgen.rs)
 #[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
 #[cfg_attr(test, derive(Default))]
-#[kube(kind = "CoreDB", group = "coredb.io", version = "v1", namespaced)]
+#[kube(kind = "CoreDB", group = "coredb.io", version = "v1alpha1", namespaced)]
 #[kube(status = "CoreDBStatus", shortname = "cdb")]
 pub struct CoreDBSpec {
     #[serde(default = "defaults::default_replicas")]
@@ -104,7 +104,7 @@ impl CoreDB {
 
         // always overwrite status object with what we saw
         let new_status = Patch::Apply(json!({
-            "apiVersion": "coredb.io/v1",
+            "apiVersion": "coredb.io/v1alpha1",
             "kind": "CoreDB",
             "status": CoreDBStatus {
                 running: true,

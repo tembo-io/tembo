@@ -1,4 +1,4 @@
-apiVersion: coredb.io/v1
+apiVersion: coredb.io/v1alpha1
 kind: CoreDB
 metadata:
   name: sample-coredb
