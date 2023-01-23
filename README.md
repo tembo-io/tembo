@@ -2,7 +2,6 @@
 
 [![](https://shields.io/endpoint?url=https://ossrank.com/shield/2103)](https://ossrank.com/p/2103)
 [![Discord Chat](https://img.shields.io/discord/1060568981725003789?label=Discord)][Discord]
-[![Docker Repository on Quay](https://quay.io/repository/coredb/coredb-operator/status "Docker Repository on Quay")](https://quay.io/repository/coredb/coredb-operator)
 
 CoreDB aims to dramatically simplify the developer experience of deploying, managing, and scaling
 Postgres through a novel “database-as-code” approach.
