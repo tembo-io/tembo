@@ -13,7 +13,7 @@ on:
 jobs:
   push_to_registry:
     name: Build and push image
-    runs-on: ubuntu-20.04-4core
+    runs-on: ubuntu-20.04
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
