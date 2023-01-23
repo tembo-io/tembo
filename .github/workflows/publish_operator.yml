@@ -12,8 +12,8 @@ on:
 
 jobs:
   push_to_registry:
-    name: Push Docker image to Docker Hub
-    runs-on: ubuntu-20.04-8core
+    name: Build and push image
+    runs-on: ubuntu-20.04-4core
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
