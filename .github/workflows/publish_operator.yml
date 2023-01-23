@@ -3,7 +3,6 @@ name: CoreDB operator image build and upload
 on:
   push:
     branches:
-      - operator-quay
       - main
     paths:
     - 'coredb-operator/**'
