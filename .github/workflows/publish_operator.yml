@@ -3,9 +3,8 @@ name: CoreDB operator image build and upload
 on:
   push:
     branches:
-      - main
-      # Just to test in the PR this workflow will work
       - operator-quay
+      - main
     paths:
     - 'coredb-operator/**'
     - '.github/workflows/publish_operator.yml'
@@ -26,6 +25,9 @@ jobs:
           echo "CAL_VER=$(date '+%Y.%m.%d')" >> $GITHUB_OUTPUT
       - name: Build image
         run: |
+          set -xe
+          # Pull before build so that some layers may be cached
+          docker pull quay.io/coredb/coredb-operator:latest
           docker build -t coredb-operator ./coredb-operator
           docker tag coredb-operator coredb-operator:latest
           docker tag coredb-operator coredb-operator:${{ steps.versions.outputs.CAL_VER }}
