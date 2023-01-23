@@ -1,4 +1,4 @@
-# This does not build on M1
+# This does not build on ARM laptops, even with the --platform flag.
 
 FROM --platform=linux/amd64 clux/muslrust:stable AS builder
 
