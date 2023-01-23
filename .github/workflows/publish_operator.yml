@@ -27,6 +27,9 @@ jobs:
       - name: Build image
         run: |
           docker build -t coredb-operator ./coredb-operator
+          docker tag coredb-operator coredb-operator:latest
+          docker tag coredb-operator coredb-operator:${{ steps.versions.outputs.CAL_VER }}
+          docker tag coredb-operator coredb-operator:${{ steps.versions.outputs.SHORT_SHA }}
       - name: Push To quay.io
         uses: redhat-actions/push-to-registry@v2
         with:
