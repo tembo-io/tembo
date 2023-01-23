@@ -26,7 +26,7 @@ jobs:
           echo "CAL_VER=$(date '+%Y.%m.%d')" >> $GITHUB_OUTPUT
       - name: Build image
         run: |
-          docker build -t quay.io/coredb/coredb-operator:latest ./coredb-operator
+          docker build -t coredb-operator ./coredb-operator
       - name: Push To quay.io
         uses: redhat-actions/push-to-registry@v2
         with:
