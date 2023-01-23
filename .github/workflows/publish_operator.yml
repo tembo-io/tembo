@@ -8,6 +8,7 @@ on:
       - operator-quay
     paths:
     - 'coredb-operator/**'
+    - '.github/workflows/publish_operator.yml'
 
 jobs:
   push_to_registry:
