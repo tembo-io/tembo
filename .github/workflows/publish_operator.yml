@@ -16,14 +16,21 @@ jobs:
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v2
+      - name: Set version strings
+        id: versions
+        run: |
+          echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          # If we publish multiple versions on the same day,
+          # we overwrite the previous versions.
+          echo "CAL_VER=$(date '+%Y.%m.%d')" >> $GITHUB_OUTPUT
+      - name: Build image
+        run: |
+          docker build -t quay.io/coredb/coredb-operator:latest ./coredb-operator
+      - name: Push To quay.io
+        uses: redhat-actions/push-to-registry@v2
         with:
+          registry: quay.io/coredb
+          image: coredb-operator
+          tags: latest ${{ steps.versions.outputs.CAL_VER }} ${{ steps.versions.outputs.SHORT_SHA }}
           username: ${{ secrets.QUAY_USER }}
           password: ${{ secrets.QUAY_PASSWORD }}
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v3
-        with:
-          context: ./coredb-operator
-          push: true
-          tags: quay.io/coredb/coredb-operator:latest
