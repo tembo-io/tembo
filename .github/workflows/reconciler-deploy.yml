@@ -19,28 +19,31 @@ permissions:
   contents: read
 
 jobs:
-  docker-build-push:
+  push_to_registry:
     name: Build and push image
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
     steps:
-      - name: Checkout
+      - name: Check out the repo
         uses: actions/checkout@v3
-      - id: commit
-        uses: pr-mpt/actions-commit-hash@v2
-      - name: Configure AWS credentials
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          role-to-assume: ${{ secrets.ROLEARN }}
-          aws-region: ${{ secrets.REGION }}
-          role-session-name: MySessionName
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v1
-      - name: Build, tag, and push docker image to Amazon ECR
-        env:
-          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          REPOSITORY: reconciler
-          IMAGE_TAG: ${{ steps.commit.outputs.short }}
+      - name: Set version strings
+        id: versions
         run: |
-          docker build -t $REGISTRY/$REPOSITORY:$IMAGE_TAG .
-          docker push $REGISTRY/$REPOSITORY:$IMAGE_TAG
+          echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          # If we publish multiple versions on the same day,
+          # we overwrite the previous versions.
+          echo "CAL_VER=$(date '+%Y.%m.%d')" >> $GITHUB_OUTPUT
+      - name: Build image
+        run: |
+          set -xe
+          docker build -t reconciler ./reconciler
+          docker tag reconciler reconciler:latest
+          docker tag reconciler reconciler:${{ steps.versions.outputs.CAL_VER }}
+          docker tag reconciler reconciler:${{ steps.versions.outputs.SHORT_SHA }}
+      - name: Push To quay.io
+        uses: redhat-actions/push-to-registry@v2
+        with:
+          registry: quay.io/coredb
+          image: reconciler
+          tags: latest ${{ steps.versions.outputs.CAL_VER }} ${{ steps.versions.outputs.SHORT_SHA }}
+          username: ${{ secrets.QUAY_USER }}
+          password: ${{ secrets.QUAY_PASSWORD }}
