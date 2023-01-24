@@ -2,10 +2,10 @@ name: 'Build and push to Quay'
 description: 'Builds a container image and pushes it to our Quay organization'
 inputs:
   image_name:
-    decription: 'The name of the image, not including the registry or the tag, for example "postgres"'
+    description: 'The name of the image, not including the registry or the tag, for example "postgres"'
     required: true
   registry:
-    decription: 'The name of the image, not including the registry or the tag, for example "postgres"'
+    description: 'The name of the image, not including the registry or the tag, for example "postgres"'
     required: false
     default: "quay.io/coredb"
   docker_directory:
@@ -29,7 +29,7 @@ inputs:
   tags:
     description: "Whitespace-separated tags, not including the registry, for example 'v1' or 'v1 release-1.0'. There are also some default tags provided, please see the other options of this action."
     required: false
-    default: false
+    default: ""
 outputs: {}
 runs:
   using: "composite"
@@ -64,7 +64,7 @@ runs:
       run: |
         set -xe
         # Build the image
-        docker build -t ${{ inputs.image_name }} ./{{ inputs.docker_directory }}
+        docker build -t ${{ inputs.image_name }} ${{ inputs.docker_directory }}
         # Tag with each tag in the comma-separate list
         IFS=' ' read -ra TAG_ARRAY <<< "${{ steps.tags.outputs.TAGS }}"
         for tag in "${TAG_ARRAY[@]}"; do
@@ -75,6 +75,6 @@ runs:
       with:
         registry: ${{ inputs.registry }}
         image: ${{ inputs.image_name }}
-        tags: ${{ steps.tags.outputs.TAGS}}
+        tags: ${{ steps.tags.outputs.TAGS }}
         username: ${{ inputs.quay_user }}
         password: ${{ inputs.quay_password }}
