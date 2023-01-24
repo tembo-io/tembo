@@ -13,3 +13,5 @@ pub fn default_port() -> i32 {
 pub fn default_image() -> String {
     "docker.io/postgres:15".to_owned()
 }
+
+pub fn default_extensions() -> Vec<String> {vec![]}

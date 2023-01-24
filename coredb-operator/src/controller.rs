@@ -48,6 +48,7 @@ pub struct CoreDBSpec {
     pub port: i32,
     #[serde(default = "defaults::default_uid")]
     pub uid: i32,
+    #[serde(default = "defaults::default_extensions")]
     pub enabledExtensions: Vec<String>
 }
 

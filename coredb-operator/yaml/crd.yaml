@@ -26,6 +26,7 @@ spec:
               This provides a hook for generating the CRD yaml (in crdgen.rs)
             properties:
               enabledExtensions:
+                default: []
                 items:
                   type: string
                 type: array
@@ -44,8 +45,6 @@ spec:
                 default: 999
                 format: int32
                 type: integer
-            required:
-            - enabledExtensions
             type: object
           status:
             description: The status object of `CoreDB`
