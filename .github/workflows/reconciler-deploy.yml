@@ -35,7 +35,7 @@ jobs:
       - name: Build image
         run: |
           set -xe
-          docker build -t reconciler ./reconciler
+          docker build -t reconciler .
           docker tag reconciler reconciler:latest
           docker tag reconciler reconciler:${{ steps.versions.outputs.CAL_VER }}
           docker tag reconciler reconciler:${{ steps.versions.outputs.SHORT_SHA }}
