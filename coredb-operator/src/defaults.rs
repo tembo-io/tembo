@@ -11,5 +11,5 @@ pub fn default_port() -> i32 {
 }
 
 pub fn default_image() -> String {
-    "docker.io/postgres:15".to_owned()
+    "quay.io/coredb/postgres:2023.01.24".to_owned()
 }
