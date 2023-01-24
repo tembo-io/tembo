@@ -8,6 +8,8 @@ use reconciler::{
 use std::env;
 use std::{thread, time};
 
+use reconciler::types::EventBody;
+
 #[tokio::main]
 async fn run() -> Result<(), Box<dyn std::error::Error>> {
     // // Read connection info from environment variable
@@ -45,10 +47,12 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 info!("Doing nothing for now")
             }
             Some("Create") | Some("Update") => {
+                let crud_event_body =
+                    serde_json::from_value::<EventBody>(read_msg.message["body"].clone())
+                        .expect("error parsing body");
                 // create namespace if it does not exist
-                let namespace: String =
-                    serde_json::from_value(read_msg.message["body"]["resource_name"].clone())
-                        .unwrap();
+                let namespace: String = crud_event_body.resource_name.clone();
+
                 create_namespace(client.clone(), namespace.clone())
                     .await
                     .expect("error creating namespace");
@@ -59,7 +63,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                     .expect("error creating IngressRouteTCP");
 
                 // generate PostgresCluster spec based on values in body
-                let spec = generate_spec(read_msg.message["body"].clone()).await;
+                let spec = generate_spec(&crud_event_body).await;
 
                 // create or update PostgresCluster
                 create_or_update(client.clone(), namespace.clone(), spec)
