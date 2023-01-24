@@ -24,7 +24,6 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub async fn generate_spec(body: Value) -> Value {
     let name: String = serde_json::from_value(body["resource_name"].clone()).unwrap();
-    let image: String = serde_json::from_value(body["postgres_image"].clone()).unwrap();
     let cpu: String = serde_json::from_value(body["cpu"].clone()).unwrap();
     let memory: String = serde_json::from_value(body["memory"].clone()).unwrap();
     let storage: String = serde_json::from_value(body["storage"].clone()).unwrap();
@@ -36,7 +35,7 @@ pub async fn generate_spec(body: Value) -> Value {
             "name": format!("{}", name),
         },
         "spec": {
-            "image": format!("{}", image),
+            "image": "registry.developers.crunchydata.com/crunchydata/crunchy-postgres:ubi8-14.6-2".to_owned(),
             "postgresVersion": 14,
             "instances": [
                 {
