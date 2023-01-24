@@ -51,7 +51,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                     serde_json::from_value::<EventBody>(read_msg.message["body"].clone())
                         .expect("error parsing body");
                 // create namespace if it does not exist
-                let namespace: String = crud_event_body.resource_name;
+                let namespace: String = crud_event_body.resource_name.clone();
 
                 create_namespace(client.clone(), namespace.clone())
                     .await
@@ -63,7 +63,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                     .expect("error creating IngressRouteTCP");
 
                 // generate PostgresCluster spec based on values in body
-                let spec = generate_spec(read_msg.message["body"].clone()).await;
+                let spec = generate_spec(&crud_event_body).await;
 
                 // create or update PostgresCluster
                 create_or_update(client.clone(), namespace.clone(), spec)

@@ -2,6 +2,7 @@ mod ingress_route_tcp_crd;
 mod pg_cluster_crd;
 pub mod types;
 
+use base64::{engine::general_purpose, Engine as _};
 use ingress_route_tcp_crd::IngressRouteTCP;
 use k8s_openapi::api::core::v1::{Namespace, Secret};
 use kube::api::{DeleteParams, ListParams, Patch, PatchParams};
@@ -13,8 +14,6 @@ use serde_json::{from_str, to_string, Value};
 use std::fmt::Debug;
 use thiserror::Error;
 
-use base64::{engine::general_purpose, Engine as _};
-
 #[derive(Error, Debug)]
 pub enum Error {
     #[error("Kube Error: {0}")]
@@ -23,17 +22,12 @@ pub enum Error {
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
-pub async fn generate_spec(body: Value) -> Value {
-    let name: String = serde_json::from_value(body["resource_name"].clone()).unwrap();
-    let cpu: String = serde_json::from_value(body["cpu"].clone()).unwrap();
-    let memory: String = serde_json::from_value(body["memory"].clone()).unwrap();
-    let storage: String = serde_json::from_value(body["storage"].clone()).unwrap();
-
+pub async fn generate_spec(event_body: &types::EventBody) -> Value {
     let spec = serde_json::json!({
         "apiVersion": "postgres-operator.crunchydata.com/v1beta1",
         "kind": "PostgresCluster",
         "metadata": {
-            "name": format!("{}", name),
+            "name": format!("{}", event_body.resource_name),
         },
         "spec": {
             "image": "registry.developers.crunchydata.com/crunchydata/crunchy-postgres:ubi8-14.6-2".to_owned(),
@@ -43,16 +37,16 @@ pub async fn generate_spec(body: Value) -> Value {
                     "name": "instance1",
                     "dataVolumeClaimSpec": {
                         "accessModes": ["ReadWriteOnce"],
-                        "resources": {"requests": {"storage": format!("{}", storage)}},
+                        "resources": {"requests": {"storage": format!("{}", event_body.storage)}},
                     },
                     "resources": {
                         "limits": {
-                            "cpu": format!("{}", cpu),
-                            "memory": format!("{}", memory),
+                            "cpu": format!("{}", event_body.cpu),
+                            "memory": format!("{}", event_body.memory),
                         },
                         "requests": {
-                            "cpu": format!("{}", cpu),
-                            "memory": format!("{}", memory),
+                            "cpu": format!("{}", event_body.cpu),
+                            "memory": format!("{}", event_body.memory),
                         },
                     },
                 },
