@@ -8,6 +8,7 @@ on:
     paths:
     - 'postgres/**'
     - '.github/workflows/publish_postgres.yml'
+    - '.github/actions/build-and-push-to-quay/**'
 
 jobs:
   push_to_registry:
