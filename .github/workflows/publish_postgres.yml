@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - cor-167
     paths:
     - 'postgres/**'
     - '.github/workflows/publish_postgres.yml'
