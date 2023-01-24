@@ -1,5 +1,6 @@
 mod ingress_route_tcp_crd;
 mod pg_cluster_crd;
+pub mod types;
 
 use ingress_route_tcp_crd::IngressRouteTCP;
 use k8s_openapi::api::core::v1::{Namespace, Secret};
