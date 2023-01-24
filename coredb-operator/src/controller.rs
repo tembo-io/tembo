@@ -48,6 +48,7 @@ pub struct CoreDBSpec {
     pub port: i32,
     #[serde(default = "defaults::default_uid")]
     pub uid: i32,
+    pub enabledExtensions: Vec<String>
 }
 
 /// The status object of `CoreDB`

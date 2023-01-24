@@ -25,11 +25,27 @@ spec:
 
               This provides a hook for generating the CRD yaml (in crdgen.rs)
             properties:
+              enabledExtensions:
+                items:
+                  type: string
+                type: array
+              image:
+                default: docker.io/postgres:15
+                type: string
+              port:
+                default: 5432
+                format: int32
+                type: integer
               replicas:
+                default: 1
+                format: int32
+                type: integer
+              uid:
+                default: 999
                 format: int32
                 type: integer
             required:
-            - replicas
+            - enabledExtensions
             type: object
           status:
             description: The status object of `CoreDB`
