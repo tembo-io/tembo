@@ -1,6 +1,6 @@
 [package]
 name = "pgmq"
-version = "0.0.3"
+version = "0.1.0"
 edition = "2021"
 authors = ["CoreDB.io"]
 description = "A message queue for Rust applications. The only external dependency is a Postgres database."
@@ -9,7 +9,7 @@ homepage = "https://www.coredb.io"
 keywords = ["messaging", "queues", "postgres"]
 license = "MIT"
 readme = "README.md"
-repo = "https://github.com/CoreDB-io/coredb/tree/main/crates/pgmq"
+repository = "https://github.com/CoreDB-io/coredb/tree/main/crates/pgmq"
 
 [dependencies]
 chrono = { version = "0.4.23", features = [ "serde" ] }

@@ -10,67 +10,72 @@
 //! ```bash
 //! docker run -d --name postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres
 //! ```
-//! ## Create a queue
+//!
+//! Example of sending, receiving, and deleting messages from the queue. Typically applications sending messages
+//! will not be the same application reading the message.
 //!
 //! ```rust
 //! use pgmq::{Message, PGMQueue};
-//! let queue: PGMQueue = PGMQueue::new("postgres://postgres:postgres@0.0.0.0:5432".to_owned()).await.expect("Failed to connect to Postgres");
+//! use serde::{Serialize, Deserialize};
+//! use serde_json::Value;
 //!
-//! let myqueue = "myqueue".to_owned();
-//! queue.create(&myqueue).await.expect("Failed to create queue");
+//! #[tokio::main]
+//! async fn main() {
+//!     // CREATE A QUEUE
+//!     let queue: PGMQueue = PGMQueue::new("postgres://postgres:postgres@0.0.0.0:5432".to_owned()).await;
+//!     let myqueue = "myqueue".to_owned();
+//!     queue.create(&myqueue).await.expect("Failed to create queue");
+//!
+//!     // SEND A `serde_json::Value` MESSAGE
+//!     let msg1 = serde_json::json!({
+//!         "foo": "bar"
+//!     });
+//!     let msg_id1: i64 = queue.enqueue(&myqueue, &msg1).await.expect("Failed to enqueue message");
+//!
+//!     // SEND A STRUCT
+//!     #[derive(Serialize, Debug, Deserialize)]
+//!     struct MyMessage {
+//!         foo: String,
+//!     }
+//!     let msg2 = MyMessage {
+//!         foo: "bar".to_owned(),
+//!     };
+//!     let msg_id2: i64  = queue.enqueue(&myqueue, &msg2).await.expect("Failed to enqueue message");
+//!     
+//!     // READ A MESSAGE as `serde_json::Value`
+//!     let vt: u32 = 30;
+//!     let read_msg1: Message<Value> = queue.read::<Value>(&myqueue, Some(&vt)).await.expect("no messages in the queue!");
+//!     assert_eq!(read_msg1.msg_id, msg_id1);
+//!
+//!     // READ A MESSAGE as a struct
+//!     let read_msg2: Message<MyMessage> = queue.read::<MyMessage>(&myqueue, Some(&vt)).await.expect("no messages in the queue!");
+//!     assert_eq!(read_msg2.msg_id, msg_id2);
+//!
+//!     // DELETE THE MESSAGE WE SENT
+//!     let deleted = queue.delete(&myqueue, &read_msg1.msg_id).await.expect("Failed to delete message");
+//!     let deleted = queue.delete(&myqueue, &read_msg2.msg_id).await.expect("Failed to delete message");
+//! }
 //! ```
-//!
 //! ## Sending messages
 //!
 //! `queue.enqueue()` can be passed any type that implements `serde::Serialize`. This means you can prepare your messages as JSON or as a struct.
 //!
-//! #### as serde_json::Value
-//! ```rust
-//! let msg = serde_json::json!({
-//!     "foo": "bar"
-//! });
-//! let msg_id = queue.enqueue(&myqueue, &msg).await.expect("Failed to enqueue message");
-//! ```
-//! #### as a struct
-//! ```rust
-//! use serde::{Serialize, Deserialize};
-//! #[derive(Serialize, Debug, Deserialize)]
-//! struct MyMessage {
-//!     foo: String,
-//! }
-//! let msg = MyMessage {
-//!     foo: "bar".to_owned(),
-//! };
-//! let msg_id: i64  = queue.enqueue(&myqueue, &msg).await.expect("Failed to enqueue message");
-//! ```
-//!
 //! ## Reading messages
-//! Reading a message will make it invisible for the duration of the visibility timeout (vt).
+//! Reading a message will make it invisible (unavailable for consumption) for the duration of the visibility timeout (vt).
 //! No messages are returned when the queue is empty or all messages are invisible.
-//! Messages can be parsed as JSON or as into a struct. `queue.read()` returns an `Option<Message<T>>`
+//!
+//! Messages can be parsed as JSON or into a struct. `queue.read()` returns an `Option<Message<T>>`
 //! where `T` is the type of the message on the queue. It can be parsed as JSON or as a struct.
 //! Note that when parsing into a `struct`, the application will panic if the message cannot be
 //! parsed as the type specified. For example, if the message expected is
 //! `MyMessage{foo: "bar"}` but` {"hello": "world"}` is received, the application will panic.
-//! #### as serde_json::Value
-//! ```rust
-//! use serde_json::Value;
-//! let vt: u32 = 30;
-//! let read_msg: Message<Value> = queue.read::<Value>(&myqueue, Some(&vt)).await.expect("no messages in the queue!");
-//! ```
+//!
 //! #### as a Struct
 //! Reading a message will make it invisible for the duration of the visibility timeout (vt).
 //! No messages are returned when the queue is empty or all messages are invisible.
-//! ```rust
-//! use serde_json::Value;
-//! let vt: u32 = 30;
-//! let read_msg: Message<MyMessage> = queue.read::<MyMessage>(&myqueue, Some(&vt)).await.expect("no messages in the queue!");
-//! ```
+//!
 //! ## Delete a message
 //! Remove the message from the queue when you are done with it.
-//! ```rust
-//! let deleted = queue.delete(&read_msg.msg_id).await;
-//! ```
 
 #![doc(html_root_url = "https://docs.rs/pgmq/")]
 
@@ -109,6 +114,7 @@ impl PGMQueue {
         }
     }
 
+    /// Connect to the database
     async fn connect(url: &str) -> Pool<Postgres> {
         PgPoolOptions::new()
             .acquire_timeout(std::time::Duration::from_secs(10))
@@ -118,6 +124,7 @@ impl PGMQueue {
             .expect("connection failed")
     }
 
+    /// Create a queue
     pub async fn create(&self, queue_name: &str) -> Result<(), Error> {
         let create = query::create(queue_name);
         let index: String = query::create_index(queue_name);
@@ -126,6 +133,7 @@ impl PGMQueue {
         Ok(())
     }
 
+    /// Send a message to the queue
     pub async fn enqueue<T: Serialize>(&self, queue_name: &str, message: &T) -> Result<i64, Error> {
         let msg = &serde_json::json!(&message);
         let row: PgRow = sqlx::query(&query::enqueue(queue_name, msg))
@@ -135,6 +143,8 @@ impl PGMQueue {
         Ok(row.try_get("msg_id").unwrap())
     }
 
+    /// Reads a single message from the queue. If the queue is empty or all messages are invisible, `None` is returned.
+    /// If a message is returned, it is made invisible for the duration of the visibility timeout (vt) in seconds.
     pub async fn read<T: for<'de> Deserialize<'de>>(
         &self,
         queue_name: &str,
@@ -162,14 +172,39 @@ impl PGMQueue {
         }
     }
 
+    /// Delete a message from the queue
     pub async fn delete(&self, queue_name: &str, msg_id: &i64) -> Result<u64, Error> {
-        let query = &&query::delete(queue_name, msg_id);
+        let query = &query::delete(queue_name, msg_id);
         let row = sqlx::query(query).execute(&self.connection).await?;
         let num_deleted = row.rows_affected();
         Ok(num_deleted)
     }
 
-    // pub async fn pop(self) -> Message{
-    //     // TODO: returns a struct
-    // }
+    /// Reads a single message from the queue. The message is deleted from the queue immediately.
+    /// If no messages are available, `None` is returned.
+    pub async fn pop<T: for<'de> Deserialize<'de>>(&self, queue_name: &str) -> Option<Message<T>> {
+        let query = &query::pop(queue_name);
+        fetch_one::<T>(query, &self.connection).await
+    }
+}
+
+// Executes a query and returns a single row
+// If the query returns no rows, None is returned
+async fn fetch_one<T: for<'de> Deserialize<'de>>(
+    query: &str,
+    connection: &Pool<Postgres>,
+) -> Option<Message<T>> {
+    let row: Result<PgRow, Error> = sqlx::query(query).fetch_one(connection).await;
+    match row {
+        Ok(row) => {
+            let raw_msg = row.get("message");
+            let parsed_msg = serde_json::from_value::<T>(raw_msg).expect("unable to parse message");
+            Some(Message {
+                msg_id: row.get("msg_id"),
+                vt: row.get("vt"),
+                message: parsed_msg,
+            })
+        }
+        Err(_) => None,
+    }
 }

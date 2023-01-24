@@ -15,6 +15,7 @@ struct Cli {
 enum SubCommands {
     Get(commands::get::GetCommand),
     Create(commands::create::CreateCommand),
+    Install(commands::install::InstallCommand),
 }
 
 impl SubCommand for SubCommands {
@@ -22,6 +23,7 @@ impl SubCommand for SubCommands {
         match self {
             SubCommands::Get(cmd) => cmd.execute(),
             SubCommands::Create(cmd) => cmd.execute(),
+            SubCommands::Install(cmd) => cmd.execute(),
         }
     }
 }
