@@ -49,7 +49,7 @@ pub struct CoreDBSpec {
     #[serde(default = "defaults::default_uid")]
     pub uid: i32,
     #[serde(default = "defaults::default_extensions")]
-    pub enabledExtensions: Vec<String>
+    pub enabledExtensions: Vec<String>,
 }
 
 /// The status object of `CoreDB`
