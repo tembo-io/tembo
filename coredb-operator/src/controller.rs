@@ -22,6 +22,7 @@ use kube::{
     CustomResource, Resource,
 };
 
+use crate::secret::reconcile_secret;
 use k8s_openapi::api::core::v1::Pod;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -115,6 +116,11 @@ impl CoreDB {
             .patch_status(&name, &ps, &new_status)
             .await
             .map_err(Error::KubeError)?;
+
+        // reconcile secret
+        reconcile_secret(self, ctx.clone())
+            .await
+            .expect("error reconciling secret");
 
         // reconcile statefulset
         reconcile_sts(self, ctx.clone())
