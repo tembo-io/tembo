@@ -98,6 +98,17 @@ impl ApiServerVerifier {
             // pass through coredb "patch accepted"
             send.send_response(Response::builder().body(Body::from(response)).unwrap());
 
+            // After the PATCH to CoreDB, we expect a PATCH to Secret
+            let (request, send) = handle
+                .next_request()
+                .await
+                .expect("Kube API called to PATCH Secret");
+            assert_eq!(request.method(), http::Method::PATCH);
+            assert_eq!(
+                request.uri().to_string(),
+                format!("/api/v1/namespaces/testns/secrets/testdb?&force=true&fieldManager=cntrlr")
+            );
+            send.send_response(Response::builder().body(request.into_body()).unwrap());
             // After the PATCH to CoreDB, we expect a PATCH to StatefulSet
             let (request, send) = handle
                 .next_request()
