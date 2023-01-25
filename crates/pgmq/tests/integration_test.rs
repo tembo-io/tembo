@@ -300,7 +300,19 @@ async fn test_database_error_modes() {
 
     // connect to a postgres instance that doesnt exist should error
     let queue = pgmq::PGMQueue::new("postgres://DNE:5432".to_owned()).await;
-    assert!(queue.is_err());
+    // we expect a database error
+    match queue {
+        Err(e) => {
+            if let pgmq::errors::PgmqError::DatabaseError { .. } = e {
+                // got the db error. good.
+            } else {
+                // got some other error. bad.
+                panic!("expected a db error, got {:?}", e);
+            }
+        }
+        // didnt get an error. bad.
+        _ => panic!("expected a db error, got {:?}", read_msg),
+    }
 }
 
 /// test parsing operations that should produce errors
@@ -313,5 +325,18 @@ async fn test_parsing_error_modes() {
 
     // we sent MyMessage, so trying to parse into YoloMessage should error
     let read_msg = queue.read::<YoloMessage>(&test_queue, Some(&10_u32)).await;
-    assert!(read_msg.is_err());
+
+    // we expect a parse error
+    match read_msg {
+        Err(e) => {
+            if let pgmq::errors::PgmqError::ParsingError { .. } = e {
+                // got the parsing error. good.
+            } else {
+                // got some other error. bad.
+                panic!("expected a parse error, got {:?}", e);
+            }
+        }
+        // didnt get an error. bad.
+        _ => panic!("expected a parse error, got {:?}", read_msg),
+    }
 }
