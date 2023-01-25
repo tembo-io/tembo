@@ -1,0 +1,131 @@
+name: Reconciler test workflow
+
+defaults:
+  run:
+    shell: bash
+    working-directory: ./reconciler/
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+    - '.github/workflows/reconciler-test.yml'
+    - 'reconciler/**'
+  # Always run tests on main or release branches
+  push:
+    branches:
+      - main
+      - release**
+
+jobs:
+  lint:
+    name: Run linters
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install minimal nightly with clippy and rustfmt
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: "reconciler-lint"
+          workspaces: |
+            reconciler
+      - name: Cargo format
+        run: cargo +nightly fmt --all --check
+      - name: Clippy
+        run: cargo clippy
+  test:
+    name: Run unit tests
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: "reconciler-test"
+          workspaces: |
+            reconciler
+      - name: Unit tests
+        run: cargo test
+
+  functional_test:
+    name: Run functional testing
+    runs-on: ubuntu-20.04
+    strategy:
+      # fail-fast means to cancel all jobs if one fails
+      fail-fast: false
+      matrix:
+        # Go here for a list of versions:
+        # https://github.com/kubernetes-sigs/kind/releases
+        node_image:
+          - 'kindest/node:v1.25.3'
+    steps:
+      - uses: actions/checkout@v2
+      - name: Create k8s Kind Cluster
+        uses: helm/kind-action@v1.5.0
+        with:
+          node_image: ${{ matrix.node_image }}
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: "reconciler-functional-test"
+          workspaces: |
+            reconciler
+      - name: Run functional / integration tests
+        run: |
+          set -xe
+
+          # Install Helm
+          curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
+          # Install Traefik
+          helm repo add traefik https://traefik.github.io/charts
+          helm repo update
+          kubectl create namespace traefik-v2
+          helm install --namespace=traefik-v2 --values ./tests/traefik-values.yaml traefik traefik/traefik
+
+          # Install the CoreDB operator
+          cargo install --version 2023.1.23 coredb-cli
+          coredb-cli install
+          kubectl get crds
+
+          # Start local postgres for the Nile queues
+          docker run -d --name pgmq -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres
+
+          # Set ENVs for reconciler
+          export PG_CONN_URL=postgres://postgres:postgres@localhost:5432/postgres
+          export CONTROL_PLANE_EVENTS_QUEUE=myqueue_control_plane
+          export DATA_PLANE_EVENTS_QUEUE=myqueue_data_plane
+
+          # Start the reconciler in the background
+          cargo build
+          cargo run &
+
+          # Run the tests
+          cargo test -- --ignored --nocapture
+      - name: Debugging information
+        if: always()
+        run: |
+          set +e
+          set -x
+          echo "=========="
+          kubectl get pods --all-namespaces
+          echo "=========="
+          kubectl get -o yaml sts --all-namespaces
+          echo "=========="
+          kubectl get -o yaml svc --all-namespaces
+          echo "=========="
+          kubectl get -o yaml pods --all-namespaces
+          echo "=========="
+          kubectl get -o yaml coredb --all-namespaces
+          echo "=========="
+          kubectl logs -n default $(kubectl get pods -n default | grep coredb-controller | cut -d' ' -f1)

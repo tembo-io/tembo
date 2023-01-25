@@ -1447,6 +1447,7 @@ dependencies = [
  "kube",
  "log",
  "pgmq",
+ "rand",
  "schemars",
  "serde",
  "serde_json",

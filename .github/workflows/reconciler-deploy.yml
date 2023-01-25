@@ -7,7 +7,7 @@ defaults:
 
 on:
   workflow_run:
-    workflows: [ reconciler-lint workflow ]
+    workflows: [ reconciler-test workflow ]
     types:
       - completed
     branches:
