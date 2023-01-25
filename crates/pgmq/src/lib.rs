@@ -165,21 +165,8 @@ impl PGMQueue {
             None => &VT_DEFAULT,
         };
         let query = &query::read(queue_name, vt_);
-        let row: Result<PgRow, Error> = sqlx::query(query).fetch_one(&self.connection).await;
-
-        match row {
-            Ok(row) => {
-                let b = row.get("message");
-                let a = serde_json::from_value::<T>(b);
-                Ok(Some(Message {
-                    msg_id: row.get("msg_id"),
-                    vt: row.get("vt"),
-                    message: a.unwrap(),
-                }))
-            }
-            Err(sqlx::Error::RowNotFound) => Ok(None),
-            Err(e) => Err(e)?,
-        }
+        let message = fetch_one_message::<T>(query, &self.connection).await?;
+        Ok(message)
     }
 
     /// Delete a message from the queue
@@ -197,28 +184,33 @@ impl PGMQueue {
         queue_name: &str,
     ) -> Result<Option<Message<T>>, errors::PgmqError> {
         let query = &query::pop(queue_name);
-        let message = fetch_one::<T>(query, &self.connection).await;
+        let message = fetch_one_message::<T>(query, &self.connection).await?;
         Ok(message)
     }
 }
 
 // Executes a query and returns a single row
 // If the query returns no rows, None is returned
-async fn fetch_one<T: for<'de> Deserialize<'de>>(
+async fn fetch_one_message<T: for<'de> Deserialize<'de>>(
     query: &str,
     connection: &Pool<Postgres>,
-) -> Option<Message<T>> {
+) -> Result<Option<Message<T>>, errors::PgmqError> {
     let row: Result<PgRow, Error> = sqlx::query(query).fetch_one(connection).await;
     match row {
         Ok(row) => {
+            // happy path - successfully read a message
             let raw_msg = row.get("message");
-            let parsed_msg = serde_json::from_value::<T>(raw_msg).expect("unable to parse message");
-            Some(Message {
-                msg_id: row.get("msg_id"),
-                vt: row.get("vt"),
-                message: parsed_msg,
-            })
+            let parsed_msg = serde_json::from_value::<T>(raw_msg);
+            match parsed_msg {
+                Ok(parsed_msg) => Ok(Some(Message {
+                    msg_id: row.get("msg_id"),
+                    vt: row.get("vt"),
+                    message: parsed_msg,
+                })),
+                Err(e) => Err(errors::PgmqError::ParsingError(e)),
+            }
         }
-        Err(_) => None,
+        Err(sqlx::error::Error::RowNotFound) => Ok(None),
+        Err(e) => Err(e)?,
     }
 }

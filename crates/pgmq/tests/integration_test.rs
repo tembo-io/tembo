@@ -39,6 +39,11 @@ impl Default for MyMessage {
     }
 }
 
+#[derive(Serialize, Debug, Deserialize)]
+struct YoloMessage {
+    yolo: String,
+}
+
 async fn rowcount(qname: &str, connection: &Pool<Postgres>) -> i64 {
     let row_ct_query = format!("SELECT count(*) as ct FROM pgmq_{}", qname);
     sqlx::query(&row_ct_query)
@@ -278,9 +283,9 @@ async fn test_pop() {
     assert_eq!(num_rows, 0);
 }
 
-/// test operations that should produce errors
+/// test db operations that should produce errors
 #[tokio::test]
-async fn test_error_modes() {
+async fn test_database_error_modes() {
     let pgpass = env::var("POSTGRES_PASSWORD").unwrap_or_else(|_| "password".to_owned());
     let queue = pgmq::PGMQueue::new(format!("postgres://postgres:{}@0.0.0.0:5432", pgpass))
         .await
@@ -296,4 +301,17 @@ async fn test_error_modes() {
     // connect to a postgres instance that doesnt exist should error
     let queue = pgmq::PGMQueue::new("postgres://DNE:5432".to_owned()).await;
     assert!(queue.is_err());
+}
+
+/// test parsing operations that should produce errors
+#[tokio::test]
+async fn test_parsing_error_modes() {
+    let test_queue = "test_parsing_queue".to_owned();
+    let queue = init_queue(&test_queue).await;
+    let msg = MyMessage::default();
+    let _ = queue.enqueue(&test_queue, &msg).await.unwrap();
+
+    // we sent MyMessage, so trying to parse into YoloMessage should error
+    let read_msg = queue.read::<YoloMessage>(&test_queue, Some(&10_u32)).await;
+    assert!(read_msg.is_err());
 }
