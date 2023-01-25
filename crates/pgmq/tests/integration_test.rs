@@ -286,7 +286,7 @@ async fn test_pop() {
 /// test db operations that should produce errors
 #[tokio::test]
 async fn test_database_error_modes() {
-    let pgpass = env::var("POSTGRES_PASSWORD").unwrap_or_else(|_| "password".to_owned());
+    let pgpass = env::var("POSTGRES_PASSWORD").unwrap_or_else(|_| "postgres".to_owned());
     let queue = pgmq::PGMQueue::new(format!("postgres://postgres:{}@0.0.0.0:5432", pgpass))
         .await
         .expect("failed to connect to postgres");
