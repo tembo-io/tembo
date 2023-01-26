@@ -82,12 +82,15 @@ mod test {
         let secret_name = format!("{}-connection", name);
         println!("Waiting for secret to be created: {}", secret_name);
         let establish = await_condition(secret_api.clone(), &secret_name, wait_for_secret());
-        let _ = tokio::time::timeout(std::time::Duration::from_secs(timeout_seconds_secret_present), establish)
-            .await
-            .expect(&format!(
-                "Did not find the secret {} to be ready after waiting {} seconds",
-                secret_name, timeout_seconds_secret_present
-            ));
+        let _ = tokio::time::timeout(
+            std::time::Duration::from_secs(timeout_seconds_secret_present),
+            establish,
+        )
+        .await
+        .expect(&format!(
+            "Did not find the secret {} present after waiting {} seconds",
+            secret_name, timeout_seconds_secret_present
+        ));
         println!("Found secret: {}", secret_name);
 
         // Wait for Pod to be created
