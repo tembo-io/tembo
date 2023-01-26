@@ -13,12 +13,11 @@ pub async fn reconcile_secret(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Err
     let ns = cdb.namespace().unwrap();
     let name = format!("{}-connection", cdb.name_any());
     let mut labels: BTreeMap<String, String> = BTreeMap::new();
-    let mut data: BTreeMap<String, ByteString> = BTreeMap::new();
     let secret_api: Api<Secret> = Api::namespaced(client, &ns);
     let oref = cdb.controller_owner_ref(&()).unwrap();
     labels.insert("app".to_owned(), "coredb".to_owned());
 
-    //  check for existing secret
+    // check for existing secret
     let lp = ListParams::default().labels("app=coredb");
     let secrets = secret_api.list(&lp).await.expect("could not get Secrets");
 
@@ -31,6 +30,32 @@ pub async fn reconcile_secret(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Err
             }
         }
     }
+
+    // generate secret data
+    let data = secret_data(&cdb, &name, &ns);
+
+    let secret: Secret = Secret {
+        metadata: ObjectMeta {
+            name: Some(name.to_owned()),
+            namespace: Some(ns.to_owned()),
+            labels: Some(labels.clone()),
+            owner_references: Some(vec![oref]),
+            ..ObjectMeta::default()
+        },
+        data: Some(data),
+        ..Secret::default()
+    };
+
+    let ps = PatchParams::apply("cntrlr").force();
+    let _o = secret_api
+        .patch(&name, &ps, &Patch::Apply(&secret))
+        .await
+        .map_err(Error::KubeError)?;
+    Ok(())
+}
+
+fn secret_data(cdb: &CoreDB, name: &str, ns: &str) -> BTreeMap<String, ByteString> {
+    let mut data = BTreeMap::new();
 
     // encode and insert user into secret data
     let user = "postgres".to_owned();
@@ -57,25 +82,7 @@ pub async fn reconcile_secret(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Err
     let b64_uri = b64_encode(&uri);
     data.insert("uri".to_owned(), b64_uri);
 
-
-    let secret: Secret = Secret {
-        metadata: ObjectMeta {
-            name: Some(name.to_owned()),
-            namespace: Some(ns.to_owned()),
-            labels: Some(labels.clone()),
-            owner_references: Some(vec![oref]),
-            ..ObjectMeta::default()
-        },
-        data: Some(data),
-        ..Secret::default()
-    };
-
-    let ps = PatchParams::apply("cntrlr").force();
-    let _o = secret_api
-        .patch(&name, &ps, &Patch::Apply(&secret))
-        .await
-        .map_err(Error::KubeError)?;
-    Ok(())
+    data
 }
 
 fn b64_encode(string: &str) -> ByteString {
