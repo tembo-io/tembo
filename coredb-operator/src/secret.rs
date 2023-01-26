@@ -19,13 +19,29 @@ pub async fn reconcile_secret(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Err
 
     // encode and insert user into secret data
     let user = "postgres".to_owned();
-    let b64_user = b64_encode(user);
+    let b64_user = b64_encode(&user);
     data.insert("user".to_owned(), b64_user);
 
     // encode and insert password into secret data
     let password = generate_password();
-    let b64_password = b64_encode(password);
+    let b64_password = b64_encode(&password);
     data.insert("password".to_owned(), b64_password);
+
+    // encode and insert port into secret data
+    let port = cdb.spec.port.to_string();
+    let b64_port = b64_encode(&port);
+    data.insert("port".to_owned(), b64_port);
+
+    // encode and insert host into secret data
+    let host = format!("{}.{}.svc.cluster.local", cdb.name_any(), cdb.name_any());
+    let b64_host = b64_encode(&host);
+    data.insert("host".to_owned(), b64_host);
+
+    // encode and insert uri into secret data
+    let uri = format!("postgresql://{}:{}@{}:{}", &user, &password, &host, &port);
+    let b64_uri = b64_encode(&uri);
+    data.insert("uri".to_owned(), b64_uri);
+
 
     let secret: Secret = Secret {
         metadata: ObjectMeta {
@@ -47,7 +63,7 @@ pub async fn reconcile_secret(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Err
     Ok(())
 }
 
-fn b64_encode(string: String) -> ByteString {
+fn b64_encode(string: &String) -> ByteString {
     let bytes_vec = string.as_bytes().to_vec();
     let byte_string = ByteString(bytes_vec);
     byte_string
