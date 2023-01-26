@@ -4,7 +4,8 @@ use assert_json_diff::assert_json_include;
 use futures::pin_mut;
 use http::{Request, Response};
 use hyper::{body::to_bytes, Body};
-use kube::{Client, Resource, ResourceExt};
+use k8s_openapi::api::core::v1::Secret;
+use kube::{core::ObjectList, Client, Resource, ResourceExt};
 use prometheus::Registry;
 use std::sync::Arc;
 use tokio::task::JoinHandle;
@@ -98,7 +99,37 @@ impl ApiServerVerifier {
             // pass through coredb "patch accepted"
             send.send_response(Response::builder().body(Body::from(response)).unwrap());
 
-            // After the PATCH to CoreDB, we expect a PATCH to StatefulSet
+            // After the PATCH to CoreDB, we expect a GET on Secrets
+            let (request, send) = handle
+                .next_request()
+                .await
+                .expect("Kube API called to GET Secret");
+            assert_eq!(request.method(), http::Method::GET);
+            assert_eq!(
+                request.uri().to_string(),
+                format!("/api/v1/namespaces/testns/secrets?&labelSelector=app%3Dcoredb")
+            );
+            // We need to send an empty ObjectList<Secret> back as our response
+            let obj: ObjectList<Secret> = ObjectList {
+                metadata: Default::default(),
+                items: vec![],
+            };
+            let response = serde_json::to_vec(&obj).unwrap();
+            send.send_response(Response::builder().body(Body::from(response)).unwrap());
+            // After the GET on Secrets, we expect a PATCH to Secret
+            let (request, send) = handle
+                .next_request()
+                .await
+                .expect("Kube API called to PATCH Secret");
+            assert_eq!(request.method(), http::Method::PATCH);
+            assert_eq!(
+                request.uri().to_string(),
+                format!(
+                    "/api/v1/namespaces/testns/secrets/testdb-connection?&force=true&fieldManager=cntrlr"
+                )
+            );
+            send.send_response(Response::builder().body(request.into_body()).unwrap());
+            // After the PATCH to Secret, we expect a PATCH to StatefulSet
             let (request, send) = handle
                 .next_request()
                 .await
@@ -111,7 +142,7 @@ impl ApiServerVerifier {
                 )
             );
             send.send_response(Response::builder().body(request.into_body()).unwrap());
-            // After the PATCH to CoreDB, we expect a PATCH to Service
+            // After the PATCH to StatefulSet, we expect a PATCH to Service
             let (request, send) = handle
                 .next_request()
                 .await
