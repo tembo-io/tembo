@@ -1,5 +1,5 @@
 [package]
-name = "controller"
+name = "coredb-operator"
 version = "0.0.1"
 edition = "2021"
 default-run = "controller"
