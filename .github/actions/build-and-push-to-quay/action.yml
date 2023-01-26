@@ -22,6 +22,10 @@ inputs:
     description: 'Should we tag with calender versioning?'
     required: false
     default: false
+  calver_suffix:
+    description: 'Optional suffix to the calendar version'
+    required: false
+    default: ""
   publish_latest:
     description: "Should we tag with 'latest'?"
     required: false
@@ -45,8 +49,10 @@ runs:
 
         # Calendar version
         if [ "${{ inputs.publish_calver }}" == "true" ]; then
-          CAL_VER=$(date '+%Y.%m.%d')
-          TAGS="$TAGS ${CAL_VER}"
+          # A date without leading zeros, for example:
+          # 2023.1.26
+          CAL_VER=$(date '+%Y.%-m.%-d')
+          TAGS="$TAGS ${CAL_VER}${{ inputs.calver_suffix }}"
         fi
 
         # latest
