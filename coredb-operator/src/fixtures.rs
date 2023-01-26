@@ -98,7 +98,18 @@ impl ApiServerVerifier {
             // pass through coredb "patch accepted"
             send.send_response(Response::builder().body(Body::from(response)).unwrap());
 
-            // After the PATCH to CoreDB, we expect a PATCH to Secret
+            // After the PATCH to CoreDB, we expect a GET on Secrets
+            let (request, send) = handle
+                .next_request()
+                .await
+                .expect("Kube API called to GET Secret");
+            assert_eq!(request.method(), http::Method::GET);
+            assert_eq!(
+                request.uri().to_string(),
+                format!("/api/v1/namespaces/testns/secrets?&labelSelector=app%3Dcoredb")
+            );
+            send.send_response(Response::builder().body(request.into_body()).unwrap());
+            // After the GET on Secrets, we expect a PATCH to Secret
             let (request, send) = handle
                 .next_request()
                 .await
@@ -109,7 +120,7 @@ impl ApiServerVerifier {
                 format!("/api/v1/namespaces/testns/secrets/testdb?&force=true&fieldManager=cntrlr")
             );
             send.send_response(Response::builder().body(request.into_body()).unwrap());
-            // After the PATCH to CoreDB, we expect a PATCH to StatefulSet
+            // After the PATCH to Secret, we expect a PATCH to StatefulSet
             let (request, send) = handle
                 .next_request()
                 .await
@@ -122,7 +133,7 @@ impl ApiServerVerifier {
                 )
             );
             send.send_response(Response::builder().body(request.into_body()).unwrap());
-            // After the PATCH to CoreDB, we expect a PATCH to Service
+            // After the PATCH to StatefulSet, we expect a PATCH to Service
             let (request, send) = handle
                 .next_request()
                 .await
