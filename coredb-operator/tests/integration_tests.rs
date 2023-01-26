@@ -14,7 +14,7 @@ mod test {
 
     use controller::CoreDB;
     use k8s_openapi::{
-        api::core::v1::{Namespace, Pod},
+        api::core::v1::{Namespace, Pod, Secret},
         apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
     };
     use kube::{
@@ -58,6 +58,7 @@ mod test {
         // Timeout settings while waiting for an event
         let timeout_seconds_start_pod = 60;
         let timeout_seconds_pod_ready = 30;
+        let timeout_seconds_secret_present = 30;
 
         // Apply a basic configuration of CoreDB
         println!("Creating CoreDB resource {}", name);
@@ -75,6 +76,19 @@ mod test {
         let params = PatchParams::apply("coredb-integration-test");
         let patch = Patch::Apply(&coredb_json);
         let coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        // Wait for secret to be created
+        let secret_api: Api<Secret> = Api::namespaced(client.clone(), namespace);
+        let secret_name = format!("{}-connection", name);
+        println!("Waiting for secret to be created: {}", secret_name);
+        let establish = await_condition(secret_api.clone(), &secret_name, wait_for_secret());
+        let _ = tokio::time::timeout(std::time::Duration::from_secs(timeout_seconds_secret_present), establish)
+            .await
+            .expect(&format!(
+                "Did not find the secret {} to be ready after waiting {} seconds",
+                secret_name, timeout_seconds_secret_present
+            ));
+        println!("Found secret: {}", secret_name);
 
         // Wait for Pod to be created
 
@@ -135,6 +149,8 @@ mod test {
             .unwrap();
         println!("{}", result.stdout.clone().unwrap());
         assert!(result.stdout.clone().unwrap().contains("customers"));
+
+        // TODO(ianstanton) Tear down resources when finished.
     }
 
     async fn kube_client() -> kube::Client {
@@ -178,5 +194,16 @@ mod test {
         .expect("Custom Resource Definition for CoreDB was not found.");
 
         return client;
+    }
+
+    fn wait_for_secret() -> impl Condition<Secret> {
+        |obj: Option<&Secret>| {
+            if let Some(secret) = &obj {
+                if let Some(t) = &secret.type_ {
+                    return t == "Opaque";
+                }
+            }
+            false
+        }
     }
 }

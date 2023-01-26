@@ -93,7 +93,7 @@ fn b64_encode(string: &str) -> ByteString {
 
 fn generate_password() -> String {
     let pg = PasswordGenerator {
-        length: 8,
+        length: 16,
         numbers: true,
         lowercase_letters: true,
         uppercase_letters: true,
