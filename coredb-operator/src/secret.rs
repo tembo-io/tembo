@@ -19,7 +19,7 @@ pub async fn reconcile_secret(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Err
     labels.insert("app".to_owned(), "coredb".to_owned());
 
     //  check for existing secret
-    let lp = ListParams::default();
+    let lp = ListParams::default().labels("app=coredb");
     let secrets = secret_api.list(&lp).await.expect("could not get Secrets");
 
     // if the secret has already been created, return (avoids overwriting password value)
@@ -78,7 +78,7 @@ pub async fn reconcile_secret(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Err
     Ok(())
 }
 
-fn b64_encode(string: &String) -> ByteString {
+fn b64_encode(string: &str) -> ByteString {
     let bytes_vec = string.as_bytes().to_vec();
     let byte_string = ByteString(bytes_vec);
     byte_string
@@ -95,6 +95,5 @@ fn generate_password() -> String {
         exclude_similar_characters: false,
         strict: true,
     };
-    let password = pg.generate_one().unwrap();
-    password
+    pg.generate_one().unwrap()
 }
