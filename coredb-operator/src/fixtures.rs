@@ -4,11 +4,10 @@ use assert_json_diff::assert_json_include;
 use futures::pin_mut;
 use http::{Request, Response};
 use hyper::{body::to_bytes, Body};
-use kube::{Client, Resource, ResourceExt};
+use k8s_openapi::api::core::v1::Secret;
+use kube::{core::ObjectList, Client, Resource, ResourceExt};
 use prometheus::Registry;
 use std::sync::Arc;
-use k8s_openapi::api::core::v1::Secret;
-use kube::core::ObjectList;
 use tokio::task::JoinHandle;
 use tower_test::mock::{self, Handle};
 
@@ -111,7 +110,10 @@ impl ApiServerVerifier {
                 format!("/api/v1/namespaces/testns/secrets?&labelSelector=app%3Dcoredb")
             );
             // We need to send an empty ObjectList<Secret> back as our response
-            let obj: ObjectList<Secret>= ObjectList{ metadata: Default::default(), items: vec![] };
+            let obj: ObjectList<Secret> = ObjectList {
+                metadata: Default::default(),
+                items: vec![],
+            };
             let response = serde_json::to_vec(&obj).unwrap();
             send.send_response(Response::builder().body(Body::from(response)).unwrap());
             // After the GET on Secrets, we expect a PATCH to Secret
@@ -122,7 +124,9 @@ impl ApiServerVerifier {
             assert_eq!(request.method(), http::Method::PATCH);
             assert_eq!(
                 request.uri().to_string(),
-                format!("/api/v1/namespaces/testns/secrets/testdb-connection?&force=true&fieldManager=cntrlr")
+                format!(
+                    "/api/v1/namespaces/testns/secrets/testdb-connection?&force=true&fieldManager=cntrlr"
+                )
             );
             send.send_response(Response::builder().body(request.into_body()).unwrap());
             // After the PATCH to Secret, we expect a PATCH to StatefulSet
