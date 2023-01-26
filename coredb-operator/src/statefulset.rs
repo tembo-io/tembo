@@ -3,8 +3,9 @@ use k8s_openapi::{
     api::{
         apps::v1::{StatefulSet, StatefulSetSpec},
         core::v1::{
-            Container, ContainerPort, EnvVar, ExecAction, PersistentVolumeClaim, PersistentVolumeClaimSpec,
-            PodSpec, PodTemplateSpec, Probe, ResourceRequirements, SecurityContext, VolumeMount,
+            Container, ContainerPort, EnvVar, EnvVarSource, ExecAction, PersistentVolumeClaim,
+            PersistentVolumeClaimSpec, PodSpec, PodTemplateSpec, Probe, ResourceRequirements,
+            SecretKeySelector, SecurityContext, VolumeMount,
         },
     },
     apimachinery::pkg::{api::resource::Quantity, apis::meta::v1::LabelSelector},
@@ -28,8 +29,15 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
 
     let postgres_env = Some(vec![EnvVar {
         name: "POSTGRES_PASSWORD".to_owned(),
-        value: Some("password".to_owned()),
-        value_from: None,
+        value: None,
+        value_from: Some(EnvVarSource {
+            secret_key_ref: Some(SecretKeySelector {
+                key: "password".to_string(),
+                name: Some(name.clone()),
+                optional: None,
+            }),
+            ..EnvVarSource::default()
+        }),
     }]);
 
     let postgres_volume_mounts = Some(vec![VolumeMount {
