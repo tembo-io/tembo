@@ -33,7 +33,7 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
         value_from: Some(EnvVarSource {
             secret_key_ref: Some(SecretKeySelector {
                 key: "password".to_string(),
-                name: Some(name.clone()),
+                name: Some(format!("{}-connection", &name)),
                 optional: None,
             }),
             ..EnvVarSource::default()

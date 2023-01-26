@@ -1,21 +1,36 @@
 use crate::{Context, CoreDB, Error};
 use k8s_openapi::{api::core::v1::Secret, apimachinery::pkg::apis::meta::v1::ObjectMeta, ByteString};
 use kube::{
-    api::{Patch, PatchParams},
+    api::{ListParams, Patch, PatchParams},
     Api, Resource, ResourceExt,
 };
 use passwords::PasswordGenerator;
 use std::{collections::BTreeMap, sync::Arc};
+use tracing::debug;
 
 pub async fn reconcile_secret(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
     let client = ctx.client.clone();
     let ns = cdb.namespace().unwrap();
-    let name = cdb.name_any();
+    let name = format!("{}-connection", cdb.name_any());
     let mut labels: BTreeMap<String, String> = BTreeMap::new();
     let mut data: BTreeMap<String, ByteString> = BTreeMap::new();
     let secret_api: Api<Secret> = Api::namespaced(client, &ns);
     let oref = cdb.controller_owner_ref(&()).unwrap();
     labels.insert("app".to_owned(), "coredb".to_owned());
+
+    //  check for existing secret
+    let lp = ListParams::default();
+    let secrets = secret_api.list(&lp).await.expect("could not get Secrets");
+
+    // if the secret has already been created, return (avoids overwriting password value)
+    if !secrets.items.is_empty() {
+        for s in &secrets.items {
+            if s.name_any() == name {
+                debug!("skipping secret creation: secret {} exists", &name);
+                return Ok(());
+            }
+        }
+    }
 
     // encode and insert user into secret data
     let user = "postgres".to_owned();
@@ -33,7 +48,7 @@ pub async fn reconcile_secret(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Err
     data.insert("port".to_owned(), b64_port);
 
     // encode and insert host into secret data
-    let host = format!("{}.{}.svc.cluster.local", cdb.name_any(), cdb.name_any());
+    let host = format!("{}.{}.svc.cluster.local", &name, &ns);
     let b64_host = b64_encode(&host);
     data.insert("host".to_owned(), b64_host);
 
@@ -75,7 +90,7 @@ fn generate_password() -> String {
         numbers: true,
         lowercase_letters: true,
         uppercase_letters: true,
-        symbols: true,
+        symbols: false,
         spaces: false,
         exclude_similar_characters: false,
         strict: true,
