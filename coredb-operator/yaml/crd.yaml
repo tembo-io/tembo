@@ -31,7 +31,7 @@ spec:
                   type: string
                 type: array
               image:
-                default: docker.io/postgres:15
+                default: quay.io/coredb/postgres:2023.01.24
                 type: string
               port:
                 default: 5432
