@@ -12,6 +12,7 @@ pub use metrics::Metrics;
 mod defaults;
 #[cfg(test)] pub mod fixtures;
 mod psql;
+mod secret;
 mod service;
 mod statefulset;
 use thiserror::Error;
