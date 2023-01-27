@@ -16,6 +16,8 @@ on:
   push:
     branches:
       - release/**
+      # TODO: remove before merge
+      - cor-175/**
 
 jobs:
   version:
@@ -23,11 +25,13 @@ jobs:
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
-    	- name: Parse version from branch name
-    	  id: parse_version
-    	  uses: ./.github/actions/parse-version-from-branch-name
-    	  with:
-    	    branch_prefix: 'release/'
+      - name: Parse version from branch name
+        id: parse_version
+        uses: ./.github/actions/parse-version-from-branch-name
+        with:
+          # TODO: remove before merge
+          branch_prefix: 'cor-175/'
+          # branch_prefix: 'release/'
       - name: Set version output
         run: echo "::set-output name=version::${{ steps.parse_version.outputs.version }}"
 
