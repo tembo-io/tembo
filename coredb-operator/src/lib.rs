@@ -16,7 +16,6 @@ mod psql;
 mod secret;
 mod service;
 mod statefulset;
-
 use thiserror::Error;
 
 #[derive(Error, Debug)]
