@@ -22,7 +22,7 @@ use kube::{
     CustomResource, Resource,
 };
 
-use crate::{controller_util::create_extensions, secret::reconcile_secret};
+use crate::{extensions::create_extensions, secret::reconcile_secret};
 use k8s_openapi::api::core::v1::Pod;
 use kube::runtime::wait::{await_condition, conditions, Condition};
 use schemars::JsonSchema;
@@ -41,6 +41,7 @@ pub static COREDB_FINALIZER: &str = "coredbs.coredb.io";
 #[cfg_attr(test, derive(Default))]
 #[kube(kind = "CoreDB", group = "coredb.io", version = "v1alpha1", namespaced)]
 #[kube(status = "CoreDBStatus", shortname = "cdb")]
+#[allow(non_snake_case)]
 pub struct CoreDBSpec {
     #[serde(default = "defaults::default_replicas")]
     pub replicas: i32,

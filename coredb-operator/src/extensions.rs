@@ -1,5 +1,5 @@
 use crate::{Context, CoreDB, Error};
-use std::sync::{atomic::compiler_fence, Arc};
+use std::sync::Arc;
 use tracing::info;
 
 pub async fn create_extensions(cdb: &CoreDB, ctx: &Arc<Context>) -> Result<(), Error> {
