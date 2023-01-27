@@ -9,6 +9,7 @@ on:
   pull_request:
     branches:
       - main
+      - release/**
     paths:
     - '.github/workflows/operator.yml'
     - 'coredb-operator/**'
