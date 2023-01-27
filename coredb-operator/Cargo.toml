@@ -4,6 +4,12 @@ version = "0.0.1"
 edition = "2021"
 default-run = "controller"
 license = "CoreDB"
+authors = ["CoreDB.io"]
+description = "The CLI for CoreDB"
+homepage = "https://www.coredb.io"
+readme = "README.md"
+repository = "https://github.com/CoreDB-io/coredb"
+
 
 [[bin]]
 doc = false
