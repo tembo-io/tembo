@@ -3,7 +3,7 @@ name = "coredb-operator"
 version = "0.0.1"
 edition = "2021"
 default-run = "controller"
-license = "Apache-2.0"
+license = "CoreDB"
 publish = false
 
 [[bin]]
