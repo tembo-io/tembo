@@ -103,12 +103,12 @@ jobs:
           echo "The list of known versions:"
           echo $PUBLISHED_VERSIONS
 
-          # Yank the release candidate if there already is one published
-          RC_VERSION=${VERSION}-rc
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          RC_VERSION=${VERSION}-rc-${SHORT_SHA}
           echo "Generating release candidate '${RC_VERSION}'"
           if echo ${PUBLISHED_VERSIONS} | grep ${RC_VERSION}; then
-            echo "The release candidate '${RC_VERSION}' is already published, yanking..."
-            cargo yank --version ${RC_VERSION} --token ${{ secrets.CARGO_REGISTRY_TOKEN }} ${NAME}
+            echo "The version '${RC_VERSION}' of '${NAME}' is already published. Skipping."
+            exit 0
           fi
 
           # Publish the release candidate
