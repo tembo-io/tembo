@@ -45,6 +45,7 @@ mod test {
            "storage": "1Gi",
            "resource_name": name,
            "resource_type": "CoreDB",
+           "enabled_extensions": ["postgis"],
         },
         "data_plane_id": "org_02s3owPQskuGXHE8vYsGSY",
         "event_id": "coredb-poc1.org_02s3owPQskuGXHE8vYsGSY.CoreDB.inst_02s4UKVbRy34SAYVSwZq2H",
@@ -93,7 +94,7 @@ mod test {
             std::time::Duration::from_secs(2),
             await_condition(
                 custom_resource_definitions,
-                "coredbs.kube.rs",
+                "coredbs.coredb.io",
                 conditions::is_crd_established(),
             ),
         )

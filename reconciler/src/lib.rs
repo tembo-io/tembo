@@ -26,13 +26,14 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 
 pub async fn generate_spec(event_body: &types::EventBody) -> Value {
     let spec = serde_json::json!({
-        "apiVersion": "kube.rs/v1",
+        "apiVersion": "coredb.io/v1alpha1",
         "kind": "CoreDB",
         "metadata": {
             "name": format!("{}", event_body.resource_name),
         },
         "spec": {
             "replicas": 1,
+            "enabledExtensions": event_body.extensions
         },
     });
     spec

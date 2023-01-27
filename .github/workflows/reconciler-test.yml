@@ -94,7 +94,7 @@ jobs:
           helm install --namespace=traefik-v2 --values ./tests/traefik-values.yaml traefik traefik/traefik
 
           # Install the CoreDB operator
-          cargo install --version 2023.1.23 coredb-cli
+          cargo install --version 2023.1.27 coredb-cli
           coredb-cli install
           kubectl get crds
 
