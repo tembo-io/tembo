@@ -24,6 +24,7 @@ use kube::{
 
 use crate::{controller_util::create_extensions, secret::reconcile_secret};
 use k8s_openapi::api::core::v1::Pod;
+use kube::runtime::wait::{await_condition, conditions, Condition};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -103,7 +104,10 @@ impl CoreDB {
         let _recorder = ctx.diagnostics.read().await.recorder(client.clone(), self);
         let ns = self.namespace().unwrap();
         let name = self.name_any();
-        let coredbs: Api<CoreDB> = Api::namespaced(client, &ns);
+        let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &ns);
+        let pods: Api<Pod> = Api::namespaced(client, &ns);
+        let timeout_seconds_start_pod = 30;
+        let timeout_seconds_pod_ready = 30;
 
         // always overwrite status object with what we saw
         let new_status = Patch::Apply(json!({
@@ -134,7 +138,32 @@ impl CoreDB {
             .await
             .expect("error reconciling service");
 
-        // create extensions
+        // Wait for Pod to be running and ready before creating extensions
+        let pod_name = format!("{}-0", name);
+        debug!("Waiting for pod to be running: {}", pod_name);
+        let _check_for_pod = tokio::time::timeout(
+            std::time::Duration::from_secs(timeout_seconds_start_pod),
+            await_condition(pods.clone(), &pod_name, conditions::is_pod_running()),
+        )
+        .await
+        .expect(&format!(
+            "Did not find the pod {} to be running after waiting {} seconds",
+            pod_name, timeout_seconds_start_pod
+        ));
+
+        debug!("Waiting for pod to be ready: {}", pod_name);
+        let _check_for_pod_ready = tokio::time::timeout(
+            std::time::Duration::from_secs(timeout_seconds_pod_ready),
+            await_condition(pods.clone(), &pod_name, is_pod_ready()),
+        )
+        .await
+        .expect(&format!(
+            "Did not find the pod {} to be ready after waiting {} seconds",
+            pod_name, timeout_seconds_pod_ready
+        ));
+        debug!("Found pod ready: {}", pod_name);
+
+        // Create extensions
         create_extensions(self, &ctx)
             .await
             .expect("error creating extensions");
@@ -196,6 +225,21 @@ impl CoreDB {
         )
         .execute()
         .await;
+    }
+}
+
+pub fn is_pod_ready() -> impl Condition<Pod> + 'static {
+    move |obj: Option<&Pod>| {
+        if let Some(pod) = &obj {
+            if let Some(status) = &pod.status {
+                if let Some(conds) = &status.conditions {
+                    if let Some(pcond) = conds.iter().find(|c| c.type_ == "ContainersReady") {
+                        return pcond.status == "True";
+                    }
+                }
+            }
+        }
+        false
     }
 }
 

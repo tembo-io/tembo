@@ -6,8 +6,7 @@ pub async fn create_extensions(cdb: &CoreDB, ctx: &Arc<Context>) -> Result<(), E
     let client = &ctx.client;
     let extensions = &cdb.spec.enabledExtensions;
 
-    // iterate through list of extensions and run CREATE EXTENSION <extension-name>
-    // TODO(ianstanton) we need to check if the extensions are enabled before creating them
+    // iterate through list of extensions and run CREATE EXTENSION <extension-name> for each
     for ext in extensions {
         info!("Creating extension: {}", ext);
         let result = cdb
