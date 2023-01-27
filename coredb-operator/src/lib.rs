@@ -9,12 +9,14 @@ pub mod telemetry;
 mod metrics;
 pub use metrics::Metrics;
 
+mod controller_util;
 mod defaults;
 #[cfg(test)] pub mod fixtures;
 mod psql;
 mod secret;
 mod service;
 mod statefulset;
+
 use thiserror::Error;
 
 #[derive(Error, Debug)]

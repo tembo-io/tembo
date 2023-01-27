@@ -22,7 +22,7 @@ use kube::{
     CustomResource, Resource,
 };
 
-use crate::secret::reconcile_secret;
+use crate::{controller_util::create_extensions, secret::reconcile_secret};
 use k8s_openapi::api::core::v1::Pod;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -133,6 +133,11 @@ impl CoreDB {
         reconcile_svc(self, ctx.clone())
             .await
             .expect("error reconciling service");
+
+        // create extensions
+        create_extensions(self, &ctx)
+            .await
+            .expect("error creating extensions");
 
         // If no events were received, check back every minute
         Ok(Action::requeue(Duration::from_secs(60)))
