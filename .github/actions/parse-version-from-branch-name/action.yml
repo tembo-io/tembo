@@ -16,6 +16,7 @@ runs:
   using: "composite"
   steps:
     - name: Get current branch name
+      shell: bash
       run: echo "::set-output name=branch::$(git rev-parse --abbrev-ref HEAD)"
     - name: Validate and parse semantic version
       shell: bash
