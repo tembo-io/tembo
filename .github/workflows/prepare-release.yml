@@ -85,7 +85,7 @@ jobs:
          wget https://github.com/freshautomations/stoml/releases/download/v0.7.1/stoml_linux_amd64
          mv stoml_linux_amd64 stoml
          chmod +x stoml
-         mv stoml /usr/local/sbin/
+         sudo mv stoml /usr/local/bin/
       - name: Publish release candidate
         working-directory: ${{ inputs.path }}
         run: |
