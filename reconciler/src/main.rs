@@ -1,6 +1,6 @@
 use kube::{Client, ResourceExt};
 use log::info;
-use pgmq::PGMQueue;
+use pgmq::{Message, PGMQueue};
 use reconciler::{
     create_ing_route_tcp, create_namespace, create_or_update, delete, delete_namespace,
     generate_spec, get_all, get_pg_conn,
@@ -20,7 +20,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         env::var("DATA_PLANE_EVENTS_QUEUE").expect("DATA_PLANE_EVENTS_QUEUE must be set");
 
     // Connect to pgmq
-    let queue: PGMQueue = PGMQueue::new(pg_conn_url).await;
+    let queue: PGMQueue = PGMQueue::new(pg_conn_url).await?;
 
     // Create queues if they do not exist
     queue.create(&control_plane_events_queue).await?;
@@ -31,7 +31,10 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     loop {
         // Read from queue (check for new message)
-        let read_msg = match queue.read(&control_plane_events_queue, Some(&30_u32)).await {
+        let read_msg: Message = match queue
+            .read(&control_plane_events_queue, Some(&30_u32))
+            .await?
+        {
             Some(message) => {
                 info!("read_msg: {:?}", message);
                 message

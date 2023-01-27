@@ -1287,13 +1287,15 @@ checksum = "478c572c3d73181ff3c2539045f6eb99e5491218eae919370993b890cdbdd98e"
 
 [[package]]
 name = "pgmq"
-version = "0.0.1-alpha.1"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3cc718d441c6b7668c3be39ff94c2105c42bb7ac38ec4ea1b9c25d4e692bdc24"
+checksum = "a3730d972ddedcecaf33e18154b10269e76bde042e26ae0b12977bb992d249b1"
 dependencies = [
  "chrono",
+ "serde",
  "serde_json",
  "sqlx",
+ "thiserror",
  "tokio",
 ]
 
