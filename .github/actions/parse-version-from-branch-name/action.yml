@@ -1,0 +1,31 @@
+name: 'Parse version from branch'
+description: 'Given a branch like release/X.Y.Z, then parse and validate the version'
+inputs:
+  branch_prefix:
+    description: 'The prefix of the branch to remove before parsing the version'
+    required: false
+    default: "release/"
+  semantic_version_regex:
+    description: 'The regex string for validating the version'
+    required: false
+    default: "^((([0-9]+)\.([0-9]+)\.([0-9]+)(?:-([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)(?:\+([0-9a-zA-Z-]+(?:\.[0-9a-zA-Z-]+)*))?)$"
+outputs:
+  version:
+    description: 'The parsed semantic version from the branch name'
+runs:
+  using: "composite"
+  steps:
+    - name: Get current branch name
+      run: echo "::set-output name=branch::$(git rev-parse --abbrev-ref HEAD)"
+    - name: Validate and parse semantic version
+      shell: bash
+      run: |
+        branch=$(echo "${{ steps.get_branch.outputs.branch }}")
+        version=${branch#${{ inputs.branch_prefix }}}
+        if [[ $version =~ ${{ inputs.semantic_version_regex }} ]]; then
+          echo "Valid semantic version: $version"
+          echo "::set-output name=version::$version"
+        else
+          echo "Invalid semantic version: $version"
+          exit 1
+        fi

@@ -1,24 +1,42 @@
 name: CoreDB prerelease workflow
 
-# On push to main branch, we prepare a prerelease.
-# If there is already a prerelease, then we replace
-# that with a new prerelease.
+# On push to release/VERSION branch:
+# - For each crate, if the version is already published, error the workflow
+# - Publish images with tag VERSION-rc
+# - Publish crates with -rc suffix appended, (using the version in their Cargo.toml, not the release version)
+# - If there is a GitHub pre-release for this version, delete it
+# - Create prerelease on GitHub
+# - Prerelease should include the auto release notes and the version of each component
 #
-# When the team is ready to release, we promote the
-# prerelease to a release. Then the release.yml workflow
-# will run to publish the release.
+# On manually performed release promotion:
+# - Retag images
+# - Publish each crate with the version in Cargo.toml
 
 on:
   push:
     branches:
-      - main
+      - release/**
 
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v3
+    	- name: Parse version from branch name
+    	  id: parse_version
+    	  uses: ./.github/actions/parse-version-from-branch-name
+    	  with:
+    	    branch_prefix: 'release/'
+      - name: Set version output
+        run: echo "::set-output name=version::${{ steps.parse_version.outputs.version }}"
+
   build_and_push_images:
     name: Build and push images
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
+    needs:
+      - version
     strategy:
-      # fail-fast means to cancel all jobs if one fails
       fail-fast: false
       matrix:
         include:
@@ -34,8 +52,7 @@ jobs:
         with:
           image_name: ${{ matrix.name }}
           docker_directory: ${{ matrix.path }}
-          tags: main
-          publish_calver: true
-          calver_suffix: "-prerelease"
+          # Tagged as version with '-rc' suffix to indicate release candidate
+          tags: ${{ steps.parse_version.outputs.version }}-rc
           quay_user: ${{ secrets.QUAY_USER }}
           quay_password: ${{ secrets.QUAY_PASSWORD }}
