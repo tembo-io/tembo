@@ -94,7 +94,7 @@ jobs:
           PUBLISHED_VERSIONS=$(curl https://crates.io/api/v1/crates/${NAME} 2> /dev/null | jq -r '.versions[] | .num')
 
           # If this version is already published, skip the rest of the script and do nothing.
-          if echo ${PUBLISHED_VERSIONS} | grep ${VERSION}; then
+          if echo ${PUBLISHED_VERSIONS} | grep -v 'rc' | grep ${VERSION}; then
             echo "The version '${VERSION}' of '${NAME}' is already published. Skipping."
             exit 0
           fi
