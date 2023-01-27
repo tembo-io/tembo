@@ -11,6 +11,7 @@ on:
       - main
     paths:
       - '.github/workflows/pg_smq_ext.yml'
+      - '.github/actions/pgx-init/**'
       - 'extensions/pgmq/**'
   # Always run tests on main or release branches
   push:
