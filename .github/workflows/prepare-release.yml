@@ -74,53 +74,8 @@ jobs:
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
+      - name: Build and upload image
+        uses: ./.github/actions/publish-crate-prerelease
         with:
-          toolchain: stable
-      - name: Install TOML parser
-        run: |
-         set -xe
-         wget https://github.com/freshautomations/stoml/releases/download/v0.7.1/stoml_linux_amd64
-         mv stoml_linux_amd64 stoml
-         chmod +x stoml
-         sudo mv stoml /usr/local/bin/
-      - name: Publish release candidate
-        working-directory: ${{ matrix.path }}
-        run: |
-          set -e
-          # Get crate information
-          NAME=$(stoml Cargo.toml package.name)
-          VERSION=$(stoml Cargo.toml package.version)
-          PUBLISHED_VERSIONS=$(curl https://crates.io/api/v1/crates/${NAME} 2> /dev/null | jq -r '.versions[] | .num')
-
-          # If this version is already published, skip the rest of the script and do nothing.
-          if echo ${PUBLISHED_VERSIONS} | grep -v 'rc' | grep ${VERSION}; then
-            echo "The version '${VERSION}' of '${NAME}' is already published. Skipping."
-            exit 0
-          fi
-
-          echo "Did not detect the version ${VERSION} to be already published."
-          echo "The list of known versions:"
-          echo $PUBLISHED_VERSIONS
-
-          SHORT_SHA=$(git rev-parse --short HEAD)
-          RC_VERSION=${VERSION}-rc-${SHORT_SHA}
-          echo "Generating release candidate '${RC_VERSION}'"
-          if echo ${PUBLISHED_VERSIONS} | grep ${RC_VERSION}; then
-            echo "The version '${RC_VERSION}' of '${NAME}' is already published. Skipping."
-            exit 0
-          fi
-
-          # Publish the release candidate
-          #
-          # Check we are using GNU sed
-          sed --version | grep 'sed (GNU sed)'
-          # Replace version with release candidate version
-          sed -i "0,/${VERSION}/s//${RC_VERSION}/" Cargo.toml
-          CONFIRM_VERSION=$(stoml Cargo.toml package.version)
-          if [ "${CONFIRM_VERSION}" == "${RC_VERSION}" ]; then
-            cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }} --allow-dirty
-          else
-            echo "Error: did not overwrite version to release candidate version of crate"
-            exit 1
-          fi
+          working-directory: ${{ matrix.path }}
+          cargo_registry_token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
