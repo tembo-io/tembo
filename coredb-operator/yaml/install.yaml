@@ -24,7 +24,7 @@ rules:
     resources: ["statefulsets"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: [""]
-    resources: ["services", "secrets"]
+    resources: ["services", "secrets", "pods"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 ---
 # Binding the role to the account in default
