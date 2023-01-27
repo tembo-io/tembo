@@ -1,7 +1,7 @@
 use crate::{Context, CoreDB, Error};
+use regex::Regex;
 use std::sync::Arc;
 use tracing::debug;
-use regex::Regex;
 
 pub async fn create_extensions(cdb: &CoreDB, ctx: &Arc<Context>) -> Result<(), Error> {
     let client = &ctx.client;
