@@ -6,6 +6,7 @@ authors = ["CoreDB.io"]
 description = "The CLI for CoreDB"
 homepage = "https://www.coredb.io"
 readme = "README.md"
+license = "Apache-2.0"
 repository = "https://github.com/CoreDB-io/coredb"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
