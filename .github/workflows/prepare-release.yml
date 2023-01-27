@@ -119,7 +119,7 @@ jobs:
           sed -i "0,/${VERSION}/s//${RC_VERSION}/" Cargo.toml
           CONFIRM_VERSION=$(stoml Cargo.toml package.version)
           if [ "${CONFIRM_VERSION}" == "${RC_VERSION}" ]; then
-            cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+            cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }} --allow-dirty
           else
             echo "Error: did not overwrite version to release candidate version of crate"
             exit 1
