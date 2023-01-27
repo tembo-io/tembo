@@ -6,7 +6,7 @@
 CoreDB aims to dramatically simplify the developer experience of deploying, managing, and scaling
 Postgres through a novel “database-as-code” approach.
 
-CoreDB is an "On Steroids" distribution of Postgres under active development that you are free to use,
+CoreDB is an "For Everything" distribution of Postgres under active development that you are free to use,
 except to compete with the managed service that we are building concurrently with this open project
 (see http://coredb.io/coredb-community-license).
 
