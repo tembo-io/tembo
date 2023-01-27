@@ -8,13 +8,17 @@ inputs:
     description: 'The version of postgres to use'
     required: false
     default: 14
+  pgx_version:
+    description: 'The version of pgx to use'
+    required: false
+    default: "0.6.1"
 outputs: {}
 runs:
   using: "composite"
   steps:
       - name: setup pgx
         shell: bash
-        run: cargo install --locked cargo-pgx
+        run: cargo install --version ${{ inputs.pgx_version }} cargo-pgx
         working-directory: ${{ inputs.working-directory }}
       - name: pgx init
         shell: bash
