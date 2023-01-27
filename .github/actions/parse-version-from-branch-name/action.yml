@@ -12,6 +12,7 @@ inputs:
 outputs:
   version:
     description: 'The parsed semantic version from the branch name'
+    value: ${{ steps.validate.outputs.version }}
 runs:
   using: "composite"
   steps:
@@ -22,14 +23,17 @@ runs:
         BRANCH=$(git rev-parse --abbrev-ref HEAD)
         echo "branch=${BRANCH}" >> $GITHUB_OUTPUT
     - name: Validate and parse semantic version
-      shell: bash
+      shell: python
+      id: validate
       run: |
-        branch=$(echo "${{ steps.get_branch.outputs.branch }}")
-        version=${branch#${{ inputs.branch_prefix }}}
-        if [[ $version =~ ${{ inputs.semantic_version_regex }} ]]; then
-          echo "Valid semantic version: $version"
-          echo "::set-output name=version::$version"
-        else
-          echo "Invalid semantic version: $version"
-          exit 1
-        fi
+        import os
+        import re
+        regex = '${{ inputs.semantic_version_regex }}'
+        branch = "${{ steps.get_branch.outputs.branch }}"
+        version = branch.replace("${{ inputs.branch_prefix }}", "").strip()
+        if re.match(regex, version):
+            print(f"Valid semantic version: {version}")
+            os.environ["GITHUB_OUTPUT"] = f"version={version}"
+        else:
+            print(f"Invalid semantic version: {version}")
+            exit(1)
