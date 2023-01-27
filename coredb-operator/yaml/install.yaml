@@ -27,8 +27,11 @@ rules:
     resources: ["services", "secrets"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+  - apiGroups: [""]
     resources: ["pods"]
-    verbs: ["get", "list", "watch", "exec"]
+    verbs: ["get", "list"]
 ---
 # Binding the role to the account in default
 kind: ClusterRoleBinding
