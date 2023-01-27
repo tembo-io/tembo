@@ -25,6 +25,11 @@ spec:
 
               This provides a hook for generating the CRD yaml (in crdgen.rs)
             properties:
+              enabledExtensions:
+                default: []
+                items:
+                  type: string
+                type: array
               image:
                 default: quay.io/coredb/postgres:2023.01.24
                 type: string

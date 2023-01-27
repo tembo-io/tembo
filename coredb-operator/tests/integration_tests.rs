@@ -12,7 +12,7 @@
 #[cfg(test)]
 mod test {
 
-    use controller::CoreDB;
+    use controller::{is_pod_ready, CoreDB};
     use k8s_openapi::{
         api::core::v1::{Namespace, Pod, Secret},
         apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
@@ -23,24 +23,9 @@ mod test {
         Api, Client, Config,
     };
     use rand::Rng;
-    use std::str;
+    use std::{str, thread, time::Duration};
 
     const API_VERSION: &str = "coredb.io/v1alpha1";
-
-    fn is_pod_ready() -> impl Condition<Pod> + 'static {
-        move |obj: Option<&Pod>| {
-            if let Some(pod) = &obj {
-                if let Some(status) = &pod.status {
-                    if let Some(conds) = &status.conditions {
-                        if let Some(pcond) = conds.iter().find(|c| c.type_ == "ContainersReady") {
-                            return pcond.status == "True";
-                        }
-                    }
-                }
-            }
-            false
-        }
-    }
 
     #[tokio::test]
     #[ignore]
@@ -70,7 +55,8 @@ mod test {
                 "name": name
             },
             "spec": {
-                "replicas": replicas
+                "replicas": replicas,
+                "enabledExtensions": ["postgis"]
             }
         });
         let params = PatchParams::apply("coredb-integration-test");
@@ -94,7 +80,6 @@ mod test {
         println!("Found secret: {}", secret_name);
 
         // Wait for Pod to be created
-
         let pod_name = format!("{}-0", name);
         let pods: Api<Pod> = Api::namespaced(client.clone(), namespace);
         println!("Waiting for pod to be running: {}", pod_name);
@@ -118,6 +103,8 @@ mod test {
             pod_name, timeout_seconds_pod_ready
         ));
         println!("Found pod ready: {}", pod_name);
+
+        // Assert no tables found
         let result = coredb_resource
             .psql("\\dt".to_string(), "postgres".to_string(), client.clone())
             .await
@@ -128,6 +115,8 @@ mod test {
             .clone()
             .unwrap()
             .contains("Did not find any relations."));
+
+        // Create table 'customers'
         let result = coredb_resource
             .psql(
                 "
@@ -146,12 +135,30 @@ mod test {
             .unwrap();
         println!("{}", result.stdout.clone().unwrap());
         assert!(result.stdout.clone().unwrap().contains("CREATE TABLE"));
+
+        // Assert table 'customers' exists
         let result = coredb_resource
             .psql("\\dt".to_string(), "postgres".to_string(), client.clone())
             .await
             .unwrap();
         println!("{}", result.stdout.clone().unwrap());
         assert!(result.stdout.clone().unwrap().contains("customers"));
+
+        // TODO(ianstanton) we need to properly wait for 'postgis' extension to be created
+        thread::sleep(Duration::from_millis(500));
+
+        // Assert extension 'postgis' was created
+        let result = coredb_resource
+            .psql(
+                "select extname from pg_catalog.pg_extension;".to_string(),
+                "postgres".to_string(),
+                client.clone(),
+            )
+            .await
+            .unwrap();
+
+        println!("{}", result.stdout.clone().unwrap());
+        assert!(result.stdout.clone().unwrap().contains("postgis"));
 
         // TODO(ianstanton) Tear down resources when finished.
     }
