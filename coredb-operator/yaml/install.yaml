@@ -24,14 +24,8 @@ rules:
     resources: ["statefulsets"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: [""]
-    resources: ["services", "secrets"]
+    resources: ["services", "secrets", "pods", "pods/exec"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  - apiGroups: [""]
-    resources: ["pods/exec"]
-    verbs: ["create"]
-  - apiGroups: [""]
-    resources: ["pods"]
-    verbs: ["get", "list"]
 ---
 # Binding the role to the account in default
 kind: ClusterRoleBinding
