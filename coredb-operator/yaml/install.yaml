@@ -24,11 +24,7 @@ rules:
     resources: ["statefulsets"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: [""]
-<<<<<<< HEAD
     resources: ["services", "secrets", "pods", "pods/exec"]
-=======
-    resources: ["services", "secrets"]
->>>>>>> 7bc0155 (Update install.yaml)
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 ---
 # Binding the role to the account in default
