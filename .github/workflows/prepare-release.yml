@@ -1,9 +1,9 @@
 name: CoreDB prerelease workflow
 
 # On push to release/VERSION branch:
-# - For each crate, if the version is already published, error the workflow
 # - Publish images with tag VERSION-rc
-# - Publish crates with -rc suffix appended, (using the version in their Cargo.toml, not the release version)
+# - For each crate, if the version is already published, skip
+#   - Publish crates with -rc suffix appended, yanking if already exists
 # - If there is a GitHub pre-release for this version, delete it
 # - Create prerelease on GitHub
 # - Prerelease should include the auto release notes and the version of each component
@@ -22,6 +22,8 @@ on:
 jobs:
   version:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.parse_version.outputs.version }}
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
@@ -32,8 +34,6 @@ jobs:
           # TODO: remove before merge
           branch_prefix: 'cor-175/'
           # branch_prefix: 'release/'
-      - name: Set version output
-        run: echo "::set-output name=version::${{ steps.parse_version.outputs.version }}"
 
   build_and_push_images:
     name: Build and push images
@@ -60,3 +60,69 @@ jobs:
           tags: ${{ steps.parse_version.outputs.version }}-rc
           quay_user: ${{ secrets.QUAY_USER }}
           quay_password: ${{ secrets.QUAY_PASSWORD }}
+
+  publish_crates:
+    name: cargo publish pre-releases
+    runs-on: ubuntu-latest
+    needs:
+      - version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - path: ./coredb-cli
+          - path: ./coredb-operator
+          - path: ./crates/pgmq
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v3
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Install TOML parser
+        run: |
+         set -xe
+         wget https://github.com/freshautomations/stoml/releases/download/v0.7.1/stoml_linux_amd64
+         mv stoml_linux_amd64 stoml
+         chmod +x stoml
+         mv stoml /usr/local/sbin/
+      - name: Publish release candidate
+        working-directory: ${{ inputs.path }}
+        run: |
+          set -e
+          # Get crate information
+          NAME=$(stoml Cargo.toml package.name)
+          VERSION=$(stoml Cargo.toml package.version)
+          PUBLISHED_VERSIONS=$(curl https://crates.io/api/v1/crates/${NAME} 2> /dev/null | jq -r '.versions[] | .num')
+
+          # If this version is already published, skip the rest of the script and do nothing.
+          if echo ${PUBLISHED_VERSIONS} | grep ${VERSION}; then
+            echo "The version '${VERSION}' of '${NAME}' is already published. Skipping."
+            exit 0
+          fi
+
+          echo "Did not detect the version ${VERSION} to be already published."
+          echo "The list of known versions:"
+          echo $PUBLISHED_VERSIONS
+
+          # Yank the release candidate if there already is one published
+          RC_VERSION=${VERSION}-rc
+          echo "Generating release candidate '${RC_VERSION}'"
+          if echo ${PUBLISHED_VERSIONS} | grep ${RC_VERSION}; then
+            echo "The release candidate '${RC_VERSION}' is already published, yanking..."
+            cargo yank --version ${RC_VERSION} --token ${{ secrets.CARGO_REGISTRY_TOKEN }} ${NAME}
+          fi
+
+          # Publish the release candidate
+          #
+          # Check we are using GNU sed
+          sed --version | grep 'sed (GNU sed)'
+          # Replace version with release candidate version
+          sed -i "0,/${VERSION}/s//${RC_VERSION}/" Cargo.toml
+          CONFIRM_VERSION=$(stoml Cargo.toml package.version)
+          if [ "${CONFIRM_VERSION}" == "${RC_VERSION}" ]; then
+            cargo publish --token ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          else
+            echo "Error: did not overwrite version to release candidate version of crate"
+            exit 1
+          fi
