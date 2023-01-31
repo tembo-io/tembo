@@ -143,36 +143,33 @@ pub async fn delete_namespace(client: Client, name: String) -> Result<(), Error>
 // remove after COR-166
 #[allow(unused_variables)]
 pub async fn get_pg_conn(client: Client, name: String) -> Result<String, Error> {
-    // read secret <name>-pguser-name
-    let secret_name = format!("{}-pguser-{}", name, name);
+    // read secret <name>-connection
+    let secret_name = format!("{}-connection", name);
 
-    // Temporarily comment out secrets loading until COR-166 is ready
-    // let secret_api: Api<Secret> = Api::namespaced(client, &name.clone());
+    let secret_api: Api<Secret> = Api::namespaced(client, &name.clone());
 
-    // // wait for secret to exist
-    // let establish = await_condition(secret_api.clone(), &secret_name, wait_for_secret());
-    // let _ = tokio::time::timeout(std::time::Duration::from_secs(90), establish).await;
+    // wait for secret to exist
+    let establish = await_condition(secret_api.clone(), &secret_name, wait_for_secret());
+    let _ = tokio::time::timeout(std::time::Duration::from_secs(90), establish).await;
 
-    // let secret = secret_api
-    //     .get(secret_name.as_str())
-    //     .await
-    //     .expect("error getting Secret");
+    let secret = secret_api
+        .get(secret_name.as_str())
+        .await
+        .expect("error getting Secret");
 
-    // let data = secret.data.unwrap();
+    let data = secret.data.unwrap();
 
-    // // TODO(ianstanton) There has to be a better way to do this
-    // let user_data = data.get("user").unwrap();
-    // let byte_user = to_string(user_data).unwrap();
-    // let string_user: String = from_str(&byte_user).unwrap();
+    // TODO(ianstanton) There has to be a better way to do this
+    let user_data = data.get("user").unwrap();
+    let byte_user = to_string(user_data).unwrap();
+    let string_user: String = from_str(&byte_user).unwrap();
 
-    // let pw_data = data.get("password").unwrap();
-    // let byte_pw = to_string(pw_data).unwrap();
-    // let string_pw: String = from_str(&byte_pw).unwrap();
+    let pw_data = data.get("password").unwrap();
+    let byte_pw = to_string(pw_data).unwrap();
+    let string_pw: String = from_str(&byte_pw).unwrap();
 
-    // let user = b64_decode(&string_user);
-    // let password = b64_decode(&string_pw);
-    let password = "password";
-    let user = "postgres";
+    let user = b64_decode(&string_user);
+    let password = b64_decode(&string_pw);
 
     let host = format!("{}.coredb-development.com", name);
     let connection_string = format!("postgresql://{}:{}@{}:5432", user, password, host);
