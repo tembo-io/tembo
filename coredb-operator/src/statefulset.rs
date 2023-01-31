@@ -104,6 +104,9 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
                             set -e
                             source /usr/local/bin/docker-entrypoint.sh
                             set -x
+                            # ext4 will create this directory
+                            # on AWS block storage.
+                            rmdir $PGDATA/lost+found || true
                             docker_setup_env
                             docker_create_db_directories
                         "
