@@ -3,7 +3,7 @@ name: CoreDB operator image build and upload
 on:
   push:
     branches:
-      - main
+      - 'release/2023.1.27'
     paths:
     - 'coredb-operator/**'
     - '.github/workflows/publish_operator.yml'
