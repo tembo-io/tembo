@@ -128,9 +128,8 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
                             docker_setup_env
                             docker_create_db_directories
 
+                            # https://www.postgresql.org/docs/current/ssl-tcp.html
                             cd /certs
-                            # generate a self-signed certificate using the openssl CLI
-                            # https://www.postgresql.org/docs/9.1/ssl-tcp.html
                             openssl req -new -x509 -days 365 -nodes -text -out server.crt \
                               -keyout server.key -subj '/CN=selfsigned.coredb.io'
                             chmod og-rwx server.key
