@@ -15,6 +15,7 @@ use kube::{
     Resource,
 };
 
+use k8s_openapi::api::core::v1::{EmptyDirVolumeSource, Volume};
 use std::{collections::BTreeMap, sync::Arc};
 
 pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
@@ -40,11 +41,18 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
         }),
     }]);
 
-    let postgres_volume_mounts = Some(vec![VolumeMount {
-        name: "data".to_owned(),
-        mount_path: "/var/lib/postgresql/data".to_owned(),
-        ..VolumeMount::default()
-    }]);
+    let postgres_volume_mounts = Some(vec![
+        VolumeMount {
+            name: "data".to_owned(),
+            mount_path: "/var/lib/postgresql/data".to_owned(),
+            ..VolumeMount::default()
+        },
+        VolumeMount {
+            name: "certs".to_owned(),
+            mount_path: "/certs".to_owned(),
+            ..VolumeMount::default()
+        },
+    ]);
 
     let sts: StatefulSet = StatefulSet {
         metadata: ObjectMeta {
@@ -65,6 +73,14 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
                     containers: vec![
                         // This container for running postgresql
                         Container {
+                            args: Some(vec![
+                                "-c".to_string(),
+                                "ssl=on".to_string(),
+                                "-c".to_string(),
+                                "ssl_cert_file=/certs/server.crt".to_string(),
+                                "-c".to_string(),
+                                "ssl_key_file=/certs/server.key".to_string(),
+                            ]),
                             env: postgres_env.clone(),
                             security_context: Some(SecurityContext {
                                 run_as_user: Some(cdb.spec.uid.clone() as i64),
@@ -104,15 +120,31 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
                             set -e
                             source /usr/local/bin/docker-entrypoint.sh
                             set -x
+
                             # ext4 will create this directory
                             # on AWS block storage.
                             rmdir $PGDATA/lost+found || true
+
                             docker_setup_env
                             docker_create_db_directories
+
+                            # https://www.postgresql.org/docs/current/ssl-tcp.html
+                            cd /certs
+                            openssl req -new -x509 -days 365 -nodes -text -out server.crt \
+                              -keyout server.key -subj '/CN=selfsigned.coredb.io'
+                            chmod og-rwx server.key
+                            chown -R postgres:postgres /certs
                         "
                             .to_string(),
                         ]),
                         ..Container::default()
+                    }]),
+                    volumes: Some(vec![Volume {
+                        name: "certs".to_owned(),
+                        empty_dir: Some(EmptyDirVolumeSource {
+                            ..EmptyDirVolumeSource::default()
+                        }),
+                        ..Volume::default()
                     }]),
                     ..PodSpec::default()
                 }),
