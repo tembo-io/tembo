@@ -18,6 +18,7 @@ serde_json = { version = "1.0.91", features = [ "raw_value" ] }
 sqlx = { version = "0.6", features = [ "runtime-tokio-native-tls" , "postgres", "chrono" ] }
 thiserror = "1.0.38"
 tokio = { version = "1", features = ["macros"] }
+log = "0.4.17"
 
 [dev-dependencies]
 cargo-readme = "3.2.0"

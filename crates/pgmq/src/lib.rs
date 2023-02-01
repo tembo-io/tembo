@@ -85,10 +85,11 @@
 
 use serde::{Deserialize, Serialize};
 use sqlx::error::Error;
-use sqlx::postgres::{PgPoolOptions, PgRow};
+use sqlx::postgres::{PgConnectOptions, PgPoolOptions, PgRow};
 use sqlx::types::chrono::Utc;
-use sqlx::FromRow;
+use sqlx::{ConnectOptions, FromRow};
 use sqlx::{Pool, Postgres, Row};
+use log::LevelFilter;
 
 pub mod errors;
 mod query;
@@ -121,10 +122,11 @@ impl PGMQueue {
 
     /// Connect to the database
     async fn connect(url: &str) -> Result<Pool<Postgres>, errors::PgmqError> {
+        let options = conn_options();
         let pgp = PgPoolOptions::new()
             .acquire_timeout(std::time::Duration::from_secs(10))
             .max_connections(5)
-            .connect(url)
+            .connect_with(options)
             .await?;
         Ok(pgp)
     }
@@ -213,4 +215,18 @@ async fn fetch_one_message<T: for<'de> Deserialize<'de>>(
         Err(sqlx::error::Error::RowNotFound) => Ok(None),
         Err(e) => Err(e)?,
     }
+}
+
+// Configure connection options
+pub fn conn_options(url: &str) -> PgConnectOptions {
+    // parse url
+    let mut pool_connection_options = PgConnectOptions::new();
+    pool_connection_options.host("");
+    pool_connection_options.port(5);
+    pool_connection_options.user("");
+    pool_connection_options.password("");
+    pool_connection_options.database("");
+
+    pool_connection_options.log_statements(LevelFilter::Debug);
+    pool_connection_options
 }
