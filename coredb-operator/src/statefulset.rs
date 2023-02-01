@@ -120,6 +120,7 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
                             set -e
                             source /usr/local/bin/docker-entrypoint.sh
                             set -x
+
                             # ext4 will create this directory
                             # on AWS block storage.
                             rmdir $PGDATA/lost+found || true
@@ -153,7 +154,6 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
                     ..ObjectMeta::default()
                 }),
             },
-
             volume_claim_templates: Some(vec![PersistentVolumeClaim {
                 metadata: ObjectMeta {
                     name: Some("data".to_string()),
