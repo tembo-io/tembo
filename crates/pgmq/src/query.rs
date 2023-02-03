@@ -115,7 +115,7 @@ mod tests {
     #[test]
     fn test_read() {
         let qname = "myqueue";
-        let vt: u32 = 20;
+        let vt: i32 = 20;
 
         let query = read(&qname, &vt);
 
