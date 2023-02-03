@@ -5,7 +5,6 @@ pub fn create(name: &str) -> String {
         "
         CREATE TABLE IF NOT EXISTS {TABLE_PREFIX}_{name} (
             msg_id BIGSERIAL,
-            read_ct INT DEFAULT 0,
             vt TIMESTAMP WITH TIME ZONE,
             message JSON
         );
@@ -57,7 +56,6 @@ pub fn read(name: &str, vt: &i32) -> String {
     UPDATE {TABLE_PREFIX}_{name}
     SET
         vt = (now() at time zone 'utc' + interval '{vt} seconds'),
-        read_ct = read_ct + 1
     WHERE msg_id = (select msg_id from cte)
     RETURNING *;
     "
@@ -86,7 +84,6 @@ pub fn pop(name: &str) -> String {
                 FOR UPDATE SKIP LOCKED
             )
         DELETE from {TABLE_PREFIX}_{name}
-        SET read_ct = read_ct + 1
         WHERE msg_id = (select msg_id from cte)
         RETURNING *;
         "
