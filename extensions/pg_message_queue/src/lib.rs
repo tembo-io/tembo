@@ -4,32 +4,11 @@ use pgx::warning;
 
 pgx::pg_module_magic!();
 
-use pgmq::query::{create, delete, enqueue_str, read};
-
-const VT_DEFAULT: i64 = 30;
-const DELAY_DEFAULT: i64 = 0;
-
-// read many messages at once, if they exist
-#[pg_extern]
-fn pgmq_read_many(_queue_name: &str, _qty: i32) {
-    !todo!()
-}
-
-// change attributes on existing queue
-#[pg_extern]
-fn pgmq_alter_queue(_queue_name: &str) {
-    !todo!()
-}
-
-// changes VT on an existing message
-#[pg_extern]
-fn pgmq_set_vt(_queue_name: &str, _msg_id: &str, _vt: i64) {
-    !todo!()
-}
+use pgmq::query::{create, delete, enqueue_str, pop, read};
 
 #[pg_extern]
 fn pgmq_create(queue_name: &str) -> Result<(), pgx::spi::Error> {
-    Spi::run(&create(&queue_name))
+    Spi::run(&create(queue_name))
 }
 
 // puts messages onto the queue
@@ -42,25 +21,34 @@ fn pgmq_enqueue(queue_name: &str, message: pgx::Json) -> Result<Option<i64>, spi
 // check message out of the queue using default timeout
 #[pg_extern]
 fn pgmq_read(queue_name: &str, vt: i32) -> Result<Option<pgx::Json>, spi::Error> {
-    let (msg_id, vt, message) =
-        Spi::get_three::<i64, pgx::TimestampWithTimeZone, pgx::Json>(&read(queue_name, &vt))?;
+    Spi::connect(|mut client| {
+        let tup_table: SpiTupleTable = client.update(&read(queue_name, &vt), None, None)?.first();
+        let row = tup_table.get_heap_tuple()?;
+        match row {
+            Some(row) => {
+                let msg_id = row["msg_id"].value::<i64>()?.expect("no msg_id");
+                let vt = row["vt"]
+                    .value::<pgx::TimestampWithTimeZone>()?
+                    .expect("no vt");
+                let message = row["message"].value::<pgx::Json>()?.expect("no message");
 
-    match msg_id {
-        Some(msg_id) => Ok(Some(pgx::Json(serde_json::json!({
-            "msg_id": msg_id,
-            "vt": vt.unwrap(),
-            "message": message.unwrap()
-        })))),
-        None => Ok(None),
-    }
+                Ok(Some(pgx::Json(serde_json::json!({
+                    "msg_id": msg_id,
+                    "vt": vt,
+                    "message": message
+                }))))
+            }
+            None => Ok(None),
+        }
+    })
 }
 
 #[pg_extern(volatile)]
 fn pgmq_delete(queue_name: &str, msg_id: i64) -> Result<Option<bool>, spi::Error> {
     let mut num_deleted = 0;
 
-    Spi::connect(|client| {
-        let tup_table = client.select(&delete(queue_name, &msg_id), None, None);
+    Spi::connect(|mut client| {
+        let tup_table = client.update(&delete(queue_name, &msg_id), None, None);
         match tup_table {
             Ok(tup_table) => num_deleted = tup_table.len(),
             Err(e) => {
@@ -81,32 +69,19 @@ fn pgmq_delete(queue_name: &str, msg_id: i64) -> Result<Option<bool>, spi::Error
 }
 
 // reads and deletes at same time
-// #[pg_extern]
-// fn pgmq_pop(queue_name: &str) -> Option<pgx::Json> {
-//     let (msg_id, vt, message) = Spi::get_three::<i64, pgx::Timestamp, pgx::Json>(&format!(
-//         "
-//             WITH cte AS
-//                 (
-//                     SELECT msg_id, vt, message
-//                     FROM {queue_name}
-//                     WHERE vt <= now() at time zone 'utc'
-//                     LIMIT 1
-//                     FOR UPDATE SKIP LOCKED
-//                 )
-//             DELETE from {queue_name}
-//             WHERE msg_id = (select msg_id from cte)
-//             RETURNING *;
-//         "
-//     ));
-//     match msg_id {
-//         Some(msg_id) => Some(pgx::Json(serde_json::json!({
-//             "msg_id": msg_id,
-//             "vt": vt,
-//             "message": message
-//         }))),
-//         None => None,
-//     }
-// }
+#[pg_extern]
+fn pgmq_pop(queue_name: &str) -> Result<Option<pgx::Json>, spi::Error> {
+    let (msg_id, vt, message) =
+        Spi::get_three::<i64, pgx::TimestampWithTimeZone, pgx::Json>(&pop(queue_name))?;
+    match msg_id {
+        Some(msg_id) => Ok(Some(pgx::Json(serde_json::json!({
+            "msg_id": msg_id,
+            "vt": vt,
+            "message": message
+        })))),
+        None => Ok(None),
+    }
+}
 
 #[cfg(any(test, feature = "pg_test"))]
 #[pg_schema]
