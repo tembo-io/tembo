@@ -4,11 +4,11 @@ use pgx::warning;
 
 pgx::pg_module_magic!();
 
-use pgmq::query::{create, delete, enqueue_str, pop, read};
+use pgmq::query::{delete, enqueue_str, pop, read, init_queue};
 
 #[pg_extern]
 fn pgmq_create(queue_name: &str) -> Result<(), pgx::spi::Error> {
-    Spi::run(&create(queue_name))
+    Spi::run(&init_queue(queue_name))
 }
 
 // puts messages onto the queue
