@@ -86,6 +86,7 @@ pub fn pop(name: &str) -> String {
                 FOR UPDATE SKIP LOCKED
             )
         DELETE from {TABLE_PREFIX}_{name}
+        SET read_ct = read_ct + 1
         WHERE msg_id = (select msg_id from cte)
         RETURNING *;
         "
