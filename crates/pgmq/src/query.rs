@@ -42,7 +42,6 @@ pub fn enqueue_str(name: &str, message: &str) -> String {
     )
 }
 
-
 pub fn read(name: &str, vt: &i32) -> String {
     format!(
         "
