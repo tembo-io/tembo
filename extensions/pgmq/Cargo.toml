@@ -16,7 +16,7 @@ pg15 = ["pgx/pg15", "pgx-tests/pg15" ]
 pg_test = []
 
 [dependencies]
-pgx = "0.7.0"
+pgx = "0.7.1"
 serde = "1.0.152"
 pgmq = { path = "../../crates/pgmq", version = "0.2.0" }
 serde_json = "1.0.91"
