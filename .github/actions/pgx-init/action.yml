@@ -11,7 +11,7 @@ inputs:
   pgx_version:
     description: 'The version of pgx to use'
     required: false
-    default: "0.6.1"
+    default: "0.7.1"
 outputs: {}
 runs:
   using: "composite"
