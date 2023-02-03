@@ -4,16 +4,23 @@ use pgx::warning;
 
 pgx::pg_module_magic!();
 
-use pgmq::query::{delete, enqueue_str, pop, read, init_queue};
+use pgmq::query::{delete, enqueue_str, init_queue, pop, read};
 
 #[pg_extern]
-fn pgmq_create(queue_name: &str) -> Result<(), pgx::spi::Error> {
-    Spi::run(&init_queue(queue_name))
+fn pgmq_create(queue_name: &str) -> Result<(), spi::Error> {
+    let setup = init_queue(queue_name);
+    let _: Result<_, spi::Error> = Spi::connect(|mut c| {
+        for q in setup {
+            c.update(&q, None, None)?;
+        }
+        Ok(())
+    });
+    Ok(())
 }
 
 // puts messages onto the queue
 #[pg_extern]
-fn pgmq_enqueue(queue_name: &str, message: pgx::Json) -> Result<Option<i64>, spi::Error> {
+fn pgmq_send(queue_name: &str, message: pgx::Json) -> Result<Option<i64>, spi::Error> {
     let m = serde_json::to_string(&message.0).unwrap();
     Spi::get_one(&enqueue_str(queue_name, &m))
 }
@@ -83,12 +90,17 @@ fn pgmq_pop(queue_name: &str) -> Result<Option<pgx::Json>, spi::Error> {
     }
 }
 
+#[pg_extern]
+fn pgmq_list_queues() -> Result<Vec<String>, spi::Error> {
+    Ok(vec!["Cat".to_owned()])
+}
+
 #[cfg(any(test, feature = "pg_test"))]
 #[pg_schema]
 mod tests {
     use crate::*;
     use pgmq::query::TABLE_PREFIX;
-    use pgx::prelude::*;
+    // use pgx::prelude::*;
     #[pg_test]
     fn test_create() {
         let qname = r#"test_queue"#;
@@ -96,7 +108,7 @@ mod tests {
         let retval = Spi::get_one::<i64>(&format!("SELECT count(*) FROM {TABLE_PREFIX}_{qname}"))
             .expect("SQL select failed");
         assert_eq!(retval.unwrap(), 0);
-        let _ = pgmq_enqueue(&qname, pgx::Json(serde_json::json!({"x":"y"}))).unwrap();
+        let _ = pgmq_send(&qname, pgx::Json(serde_json::json!({"x":"y"}))).unwrap();
         let retval = Spi::get_one::<i64>(&format!("SELECT count(*) FROM {TABLE_PREFIX}_{qname}"))
             .expect("SQL select failed");
         assert_eq!(retval.unwrap(), 1);
@@ -114,7 +126,7 @@ mod tests {
         assert_eq!(init_count.unwrap(), 0);
 
         // put a message on the queue
-        let _ = pgmq_enqueue(&qname, pgx::Json(serde_json::json!({"x":"y"})));
+        let _ = pgmq_send(&qname, pgx::Json(serde_json::json!({"x":"y"})));
         // read the message off queue
         let msg = pgmq_read(&qname, 10_i32).unwrap();
         assert!(msg.is_some());
