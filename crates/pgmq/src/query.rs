@@ -54,8 +54,7 @@ pub fn read(name: &str, vt: &i32) -> String {
             FOR UPDATE SKIP LOCKED
         )
     UPDATE {TABLE_PREFIX}_{name}
-    SET
-        vt = (now() at time zone 'utc' + interval '{vt} seconds'),
+    SET vt = (now() at time zone 'utc' + interval '{vt} seconds')
     WHERE msg_id = (select msg_id from cte)
     RETURNING *;
     "
