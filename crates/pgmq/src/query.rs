@@ -1,4 +1,4 @@
-const TABLE_PREFIX: &str = r#"pgmq"#;
+pub const TABLE_PREFIX: &str = r#"pgmq"#;
 
 pub fn create(name: &str) -> String {
     format!(
@@ -7,7 +7,7 @@ pub fn create(name: &str) -> String {
             msg_id BIGSERIAL,
             read_ct INT DEFAULT 0,
             vt TIMESTAMP WITH TIME ZONE,
-            message JSON,
+            message JSON
         );
         "
     )

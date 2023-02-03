@@ -86,45 +86,46 @@ fn pgmq_pop(queue_name: &str) -> Result<Option<pgx::Json>, spi::Error> {
 #[cfg(any(test, feature = "pg_test"))]
 #[pg_schema]
 mod tests {
+    use crate::*;
+    use pgmq::query::TABLE_PREFIX;
     use pgx::prelude::*;
-
     #[pg_test]
     fn test_create() {
         let qname = r#"test_queue"#;
-        crate::pgmq_create(&qname);
-        let retval = Spi::get_one::<i32>(&format!("SELECT count(*) FROM {q}", q = &qname))
+        let _ = pgmq_create(&qname).unwrap();
+        let retval = Spi::get_one::<i64>(&format!("SELECT count(*) FROM {TABLE_PREFIX}_{qname}"))
             .expect("SQL select failed");
-        assert!(retval.is_none());
         assert_eq!(retval.unwrap(), 0);
-        crate::pgmq_enqueue(&qname, pgx::Json(serde_json::json!({"x":"y"})));
-        let retval = Spi::get_one::<i32>(&format!("SELECT count(*) FROM {q}", q = &qname))
+        let _ = pgmq_enqueue(&qname, pgx::Json(serde_json::json!({"x":"y"}))).unwrap();
+        let retval = Spi::get_one::<i64>(&format!("SELECT count(*) FROM {TABLE_PREFIX}_{qname}"))
             .expect("SQL select failed");
-        assert!(retval.is_none());
-        assert_eq!(retval.unwrap(), 0);
+        assert_eq!(retval.unwrap(), 1);
     }
 
     // assert an invisible message is not readable
     #[pg_test]
-    fn test_default_vt() {
+    fn test_default() {
         let qname = r#"test_queue"#;
-        crate::pgmq_create(&qname);
-        let init_count = Spi::get_one::<i32>(&format!("SELECT count(*) FROM {q}", q = &qname))
-            .expect("SQL select failed");
+        let _ = pgmq_create(&qname);
+        let init_count =
+            Spi::get_one::<i64>(&format!("SELECT count(*) FROM {TABLE_PREFIX}_{qname}"))
+                .expect("SQL select failed");
         // should not be any messages initially
-        assert!(init_count.is_none());
+        assert_eq!(init_count.unwrap(), 0);
 
         // put a message on the queue
-        crate::pgmq_enqueue(&qname, pgx::Json(serde_json::json!({"x":"y"})));
+        let _ = pgmq_enqueue(&qname, pgx::Json(serde_json::json!({"x":"y"})));
         // read the message off queue
-        let msg = crate::pgmq_read(&qname, 10_i32).unwrap();
-        // assert!(msg.);
+        let msg = pgmq_read(&qname, 10_i32).unwrap();
+        assert!(msg.is_some());
         // should be no messages left
-        let nomsgs = crate::pgmq_read(&qname, 10_i32);
-        // assert!(nomsgs.is_none());
+        let nomsgs = pgmq_read(&qname, 10_i32).unwrap();
+        assert!(nomsgs.is_none());
         // but still one record on the table
-        let init_count = Spi::get_one::<i32>(&format!("SELECT count(*) FROM {q}", q = &qname))
-            .expect("SQL select failed");
-        // assert_eq!(init_count, 1);
+        let init_count =
+            Spi::get_one::<i64>(&format!("SELECT count(*) FROM {TABLE_PREFIX}_{qname}"))
+                .expect("SQL select failed");
+        assert_eq!(init_count.unwrap(), 1);
     }
 }
 

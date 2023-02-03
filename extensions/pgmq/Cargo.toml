@@ -22,7 +22,7 @@ pgmq = { path = "../../crates/pgmq", version = "0.2.0" }
 serde_json = "1.0.91"
 
 [dev-dependencies]
-pgx-tests = "0.7.0"
+pgx-tests = "0.7.1"
 
 [profile.dev]
 panic = "unwind"
