@@ -1,14 +1,11 @@
 [package]
-name = "coredb-operator"
+name = "controller"
 version = "0.0.1"
 edition = "2021"
 default-run = "controller"
-authors = ["CoreDB.io"]
-description = "The CLI for CoreDB"
-homepage = "https://www.coredb.io"
-readme = "README.md"
 license = "Apache-2.0"
 repository = "https://github.com/CoreDB-io/coredb"
+publish = false
 
 [[bin]]
 doc = false
