@@ -71,7 +71,7 @@ jobs:
           # Tag with version in Cargo.toml
           # if that file is present
           # and if the branch is 'main' or starts with 'release/'
-          tag_cargo_version_if_present: ${{ steps.tags.outputs.tag_caro }}
+          tag_cargo_version_if_present: ${{ steps.tags.outputs.tag_cargo }}
           # Tag with 'latest'
           # if the branch is 'main'
           publish_latest: ${{ steps.tags.outputs.tag_latest }}
