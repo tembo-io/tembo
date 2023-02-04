@@ -20,7 +20,7 @@ jobs:
         id: find_directories
         run: |
           # Get directories with a Dockerfile
-					directories=`find . -name Dockerfile -not -path "*/target/*" -exec dirname {} \;`
+          directories=`find . -name Dockerfile -not -path "*/target/*" -exec dirname {} \;`
           # Format into JSON for the next job
           matrix_include=$(echo "${directories}" | jq -R 'split(" +") | map(select(. != "")) | add' | jq -s '{"include": .}' | jq -cM)
           echo "matrix=${matrix_include}" >> $GITHUB_OUTPUTS
