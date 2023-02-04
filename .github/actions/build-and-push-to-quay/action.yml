@@ -22,8 +22,16 @@ inputs:
     description: 'Should we tag with calender versioning?'
     required: false
     default: false
+  calver_suffix:
+    description: 'Optional suffix to the calendar version'
+    required: false
+    default: ""
   publish_latest:
     description: "Should we tag with 'latest'?"
+    required: false
+    default: false
+  tag_cargo_version_if_present:
+    description: "Should we tag with the version found in Cargo.toml, if found?"
     required: false
     default: false
   tags:
@@ -34,19 +42,37 @@ outputs: {}
 runs:
   using: "composite"
   steps:
+    - name: Install TOML parser
+      shell: bash
+      run: |
+       set -xe
+       wget https://github.com/freshautomations/stoml/releases/download/v0.7.1/stoml_linux_amd64
+       mv stoml_linux_amd64 stoml
+       chmod +x stoml
+       sudo mv stoml /usr/local/bin/
     - name: Create whitespace-separated tags list
       shell: bash
       id: tags
       run: |
-        set -xe
+        set -e
 
         # input tags
         TAGS='${{ inputs.tags }}'
 
+        cd ${{ inputs.docker_directory }}
+
+        if [ "${{ inputs.tag_cargo_version_if_present }}" == "true" ] && [ test -f "Cargo.toml" ]; then
+            echo "Cargo file detected, adding to tags"
+            VERSION=$(stoml Cargo.toml package.version)
+            TAGS="$TAGS $VERSION"
+        fi
+
         # Calendar version
         if [ "${{ inputs.publish_calver }}" == "true" ]; then
-          CAL_VER=$(date '+%Y.%m.%d')
-          TAGS="$TAGS ${CAL_VER}"
+          # A date without leading zeros, for example:
+          # 2023.1.26
+          CAL_VER=$(date '+%Y.%-m.%-d')
+          TAGS="$TAGS ${CAL_VER}${{ inputs.calver_suffix }}"
         fi
 
         # latest

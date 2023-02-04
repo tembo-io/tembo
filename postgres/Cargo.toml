@@ -1,0 +1,4 @@
+# Using Cargo.toml file for consistent means of versioning
+# not actually a cargo project for the time being
+[package]
+version = "15.1-coredb.1"
