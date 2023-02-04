@@ -78,9 +78,18 @@ pub fn delete_queue_index(name: &str) -> String {
 pub fn delete_queue_metadata(name: &str) -> String {
     format!(
         "
-        DELETE
-        FROM {TABLE_PREFIX}_meta
-        WHERE queue_name = '{name}';
+        DO $$
+        BEGIN
+           IF EXISTS (
+                SELECT 1
+                FROM information_schema.tables
+                WHERE table_name = '{TABLE_PREFIX}_meta')
+            THEN
+              DELETE
+              FROM {TABLE_PREFIX}_meta
+              WHERE queue_name = '{name}';
+           END IF;
+        END $$;
         "
     )
 }
