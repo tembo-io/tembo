@@ -20,13 +20,23 @@ jobs:
         id: find_directories
         run: |
           set -xe
-          # Get directories with a Dockerfile
-          directories=`find . -name Dockerfile -not -path "*/target/*" -exec dirname {} \;`
+          # Get directories with a Dockerfile that have not changed
+          # relative to the branch we are pulling into
+          directories=$(
+          find . -name Dockerfile -not -path "*/target/*" -exec dirname {} \; | while read dir; do
+            # This will check if the directory has changed relative to the branch we are PRing
+            # into, and if it's not a PR, in the case of main or release/**, then it will
+            # build all docker directories
+            if git diff --quiet HEAD ${{ github.base_ref || 'not-a-ref' }} -- "$dir"; then
+              echo ""
+            else
+              echo "$dir"
+            fi
+          done)
           # Format into JSON for the next job
           matrix_include=$(echo "${directories}" | awk 'NF{print $NF};' | while read dir; do dir_without_dot=${dir#./}; echo "{\"path\": \"$dir\", \"name\": \"$dir_without_dot\"}"; done | jq -scM '{"include": .}')
           echo "${matrix_include}"
           echo "include=${matrix_include}" >> $GITHUB_OUTPUT
-
   build_and_push_images:
     name: Build and push images
     runs-on: ubuntu-20.04
