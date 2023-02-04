@@ -6,12 +6,13 @@ defaults:
     working-directory: ./coredb-operator/
 
 on:
-  pull_request:
-    branches:
-      - main
-    paths:
-    - '.github/workflows/operator.yml'
-    - 'coredb-operator/**'
+  # TODO: undisable this before merge. disabling to save GHA minutes
+  # pull_request:
+  #   branches:
+  #     - main
+  #   paths:
+  #   - '.github/workflows/operator.yml'
+  #   - 'coredb-operator/**'
   # Always run tests on main or release branches
   push:
     branches:

@@ -23,7 +23,7 @@ jobs:
           directories=`find . -name Dockerfile -not -path "*/target/*" -exec dirname {} \;`
           # Format into JSON for the next job
           matrix_include=$(echo "${directories}" | jq -R 'split(" +") | map(select(. != "")) | add' | jq -s '{"include": .}' | jq -cM)
-          echo "matrix=${matrix_include}" >> $GITHUB_OUTPUTS
+          echo "directories=${matrix_include}" >> $GITHUB_OUTPUTS
 
   build_and_push_images:
     name: Build and push images
@@ -32,7 +32,7 @@ jobs:
       - find_directories
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(find_directories.find_directories.outputs.directories) }}
+      matrix: ${{ fromJson(needs.find_directories.outputs.directories) }}
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
