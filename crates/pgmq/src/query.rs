@@ -6,7 +6,7 @@ pub fn init_queue(name: &str) -> Vec<String> {
         create_queue(name),
         create_index(name),
         create_archive(name),
-        insert_meta(name)
+        insert_meta(name),
     ]
 }
 
