@@ -1,0 +1,51 @@
+# name: GitHub release workflow
+#
+# on:
+#   push:
+#     branches:
+#       - release/**
+#       # TODO: remove before merge
+#       - cor-175/**
+#
+# # Should not run concurrently on the same branch.
+# concurrency:
+#   group: ${{ github.workflow }}-${{ github.ref }}
+#   cancel-in-progress: false
+#
+# jobs:
+#   version:
+#     runs-on: ubuntu-20.04
+#     outputs:
+#       next_version: ${{ steps.release_version.outputs.next_version }}
+#     steps:
+#       - name: Check out the repo
+#         uses: actions/checkout@v3
+#       # Branch should be named like release/major.minor
+#       - name: Determine the version
+#         id: release_version
+#         uses: ./.github/actions/release-version
+#         with:
+#           # TODO: remove before merge
+#           branch_prefix: 'cor-175/'
+#           # branch_prefix: 'release/'
+#
+#   publish_crates:
+#     name: cargo publish pre-releases
+#     runs-on: ubuntu-latest
+#     needs:
+#       - version
+#     strategy:
+#       fail-fast: false
+#       matrix:
+#         include:
+#           - path: ./coredb-cli
+#           - path: ./coredb-operator
+#           - path: ./crates/pgmq
+#     steps:
+#       - name: Check out the repo
+#         uses: actions/checkout@v3
+#       - name: Build and upload crates
+#         uses: ./.github/actions/publish-crate-prerelease
+#         with:
+#           working-directory: ${{ matrix.path }}
+#           cargo-registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}

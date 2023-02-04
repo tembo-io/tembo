@@ -1,0 +1,142 @@
+name: 'Release version'
+description: 'Determine the next version and next prerelease for the currently checked out release branch. For example a branch like release/0.1, if there is already 0.1.0 and 0.1.1-rc.0 published should return the next version as 0.1.1 and the next prerelease as 0.1.1-rc.1'
+inputs:
+  branch_prefix:
+    description: 'The prefix of the branch to remove before parsing the version'
+    required: false
+    default: "release/"
+  github_user:
+    description: "Github organization or user name under which to find releases"
+    required: false
+    default: "coredb-io"
+  github_repo:
+    description: "Github repository under which to find releases"
+    required: true
+  prerelease_string:
+    description: "Style of prerelease string, for example 'rc' if you want prereleases like this 1.0.0-rc.1"
+    default: "rc"
+    required: false
+outputs:
+  next_version:
+    description: 'The next semantic version'
+    value: ${{ steps.validate.outputs.next_version }}
+  next_prerelease:
+    description: 'The next semantic version, as a prerelease'
+    value: ${{ steps.validate.outputs.next_prerelease }}
+runs:
+  using: "composite"
+  steps:
+    - name: Install python3 requirements
+      shell: bash
+      run: |
+        pip install requests semver
+    - name: Get current branch name
+      shell: bash
+      id: get_branch
+      run: |
+        BRANCH=$(git rev-parse --abbrev-ref HEAD)
+        echo "branch=${BRANCH}" >> $GITHUB_OUTPUT
+    - name: Validate and parse semantic version
+      shell: python
+      id: validate
+      run: |
+        import os
+        import requests
+        import semver
+
+        user = '${{ inputs.github_user }}'
+        repo = '${{ inputs.github_repo }}'
+        branch_prefix = "${{ inputs.branch_prefix }}"
+        prerelease_string = '${{ inputs.prerelease_string }}'
+        branch = "${{ steps.get_branch.outputs.branch }}"
+
+        major_minor = branch.replace(branch_prefix, "").strip()
+
+        next_version = f"{major_minor}.0"
+        this_version = None
+        try:
+            this_version = semver.VersionInfo.parse(next_version)
+        except ValueError:
+            print(f"ERROR: {major_minor} is not a valid semantic string when appended by a patch version, for example {next_version}.")
+            print(f"The branch should be named as {branch_prefix}X.Y where X and Y are major and minor versions.")
+            exit(1)
+
+        versions = []
+        prereleases = []
+        page = 0
+        # for up to 10000 pages of releases
+        for i in range(0, 10000):
+            response = requests.get(f"https://api.github.com/repos/{user}/{repo}/releases?per_page=100&page={page}")
+            releases = response.json()
+            # exit if we are on the last page
+            if not releases:
+                break
+            # for each release
+            for release in releases:
+                version = release['tag_name']
+                print(version)
+                try:
+                    semantic_version = semver.VersionInfo.parse(version)
+                # if it's not a valid semantic version, ignore
+                except ValueError:
+                    print(f"Warning: '{version}' is not a valid semantic string. Skipping.")
+                    continue
+                # if we found a version of the same minor and major version
+                if semantic_version.major == this_version.major and semantic_version.minor == this_version.major:
+                    # if it's a prerelease
+                    if semantic_version.prerelease:
+                        print("detected prerelease of same major.minor version")
+                        prereleases.append(version)
+                    else:
+                        print("detected releases of same major.minor version")
+                        versions.append(version)
+            page += 1
+
+        versions.sort()
+        prereleases.sort()
+
+        print("Found these matching versions:")
+        print(versions)
+
+        # Determine the next patch version to publish
+        for version in versions:
+            semantic_version = semver.VersionInfo.parse(version)
+            if this_version.patch == semantic_version.patch:
+                patch = this_version.patch + 1
+                next_version = f"{major_minor}.{patch}"
+                this_version = semver.VersionInfo.parse(next_version)
+
+        print(f"Determined next version is {next_version}")
+
+        # Collect only prereleases of this major.minor.patch
+        prereleases_matching_patch = []
+        for version in prereleases:
+            semantic_version = semver.VersionInfo.parse(version)
+            if this_version.patch == semantic_version.patch:
+                preleases_matching_patch.append(version)
+
+        prereleases_matching_patch.sort()
+
+        print("Found matching prereleases:")
+        print(prereleases_matching_patch)
+
+        next_prerelease_number = 0
+        next_prerelease = f"{next_version}-{prerelease_string}.{next_prerelease_number}"
+        this_prerelease = semver.VersionInfo.parse(next_prerelease)
+        for version in prereleases_matching_patch:
+            semantic_version = semver.VersionInfo.parse(version)
+            if this_prerelease.prerelease == semantic_version.prerelease:
+                next_prerelease_number += 1
+                next_prerelease = f"{next_version}-{prerelease_string}.{next_prerelease_number}"
+                this_prerelease = semver.VersionInfo.parse(next_prerelease)
+
+        print(f"Determined next prerelease version is {next_prerelease}")
+
+        with open(os.environ['GITHUB_OUTPUT'], 'a') as github_output:
+          print(f'next_version={next_version}', file=github_output)
+          print(f'next_prerelease={next_prerelease}', file=github_output)
+
+      # Double check for mistakes in this script
+      assert(major_minor in branch, "Expected to find the major.minor version in our branch name")
+      assert(major_minor in next_version, "Expected the branch's major.minor version to be present in the next version")
+      assert(major_minor in next_prelease, "Expected the branch's major.minor version to be present in the next prerelease")

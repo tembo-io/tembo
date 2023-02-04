@@ -1,0 +1,34 @@
+# name: Cargo release workflow
+#
+# on:
+#   push:
+#     branches:
+#       - main
+#       - release/**
+#       # TODO: remove before merge
+#       - cor-175/**
+#
+# # Should not run concurrently on the same branch.
+# concurrency:
+#   group: ${{ github.workflow }}-${{ github.ref }}
+#   cancel-in-progress: false
+#
+# jobs:
+#   publish_crates:
+#     name: cargo publish
+#     runs-on: ubuntu-20.04
+#     strategy:
+#       fail-fast: false
+#       matrix:
+#         include:
+#           - path: ./coredb-cli
+#           - path: ./coredb-operator
+#           - path: ./crates/pgmq
+#     steps:
+#       - name: Check out the repo
+#         uses: actions/checkout@v3
+#       - name: Build and upload crates
+#         uses: ./.github/actions/publish-crate
+#         with:
+#           working-directory: ${{ matrix.path }}
+#           cargo-registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
