@@ -16,14 +16,11 @@ jobs:
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
-        with:
-          # 0 indicates all history for all branches and tags
-          # Required in order to determine if a build is needed.
-          fetch-depth: 0
       - name: Find directories with Dockerfiles
         id: find_directories
         run: |
           set -xe
+          git fetch origin ${{ github.base_ref }} || true
           # Get directories with a Dockerfile that have not changed
           # relative to the branch we are pulling into
           directories=$(
@@ -31,7 +28,7 @@ jobs:
             # This will check if the directory has changed relative to the branch we are PRing
             # into, and if it's not a PR, in the case of main or release/**, then it will
             # build all docker directories
-            if git diff --quiet HEAD ${{ github.base_ref || 'not-a-ref' }} -- "$dir"; then
+            if git diff --quiet HEAD origin/${{ github.base_ref || 'not-a-ref' }} -- "$dir"; then
               echo ""
             else
               echo "$dir"
