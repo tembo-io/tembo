@@ -39,30 +39,13 @@ pub fn create_archive(name: &str) -> String {
     )
 }
 
-pub fn delete_queue(name: &str) -> String {
-    format!(
-        "
-        DROP TABLE IF EXISTS {TABLE_PREFIX}_{name};
-        "
-    )
-}
-
 pub fn create_meta() -> String {
     format!(
         "
         CREATE TABLE IF NOT EXISTS {TABLE_PREFIX}_meta (
-            queue_name VARCHAR UNIQUE
+            queue_name VARCHAR UNIQUE,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT (now() at time zone 'utc')
         );
-        "
-    )
-}
-
-pub fn drop_queue(name: &str) -> String {
-    format!(
-        "
-        DELETE 
-        FROM {TABLE_PREFIX}_meta
-        WHERE queue_name = '{name}';
         "
     )
 }
@@ -74,15 +57,6 @@ pub fn insert_meta(name: &str) -> String {
         VALUES ('{name}')
         ON CONFLICT
         DO NOTHING;
-        "
-    )
-}
-
-pub fn list_queues() -> String {
-    format!(
-        "
-        SELECT queue_name
-        FROM {TABLE_PREFIX}_meta;
         "
     )
 }

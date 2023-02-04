@@ -9,13 +9,16 @@ use pgmq::query::{delete, enqueue_str, init_queue, pop, read};
 #[pg_extern]
 fn pgmq_create(queue_name: &str) -> Result<(), spi::Error> {
     let setup = init_queue(queue_name);
-    let _: Result<_, spi::Error> = Spi::connect(|mut c| {
+    let ran: Result<_, spi::Error> = Spi::connect(|mut c| {
         for q in setup {
-            c.update(&q, None, None)?;
+            let _ = c.update(&q, None, None)?;
         }
         Ok(())
     });
-    Ok(())
+    match ran {
+        Ok(_) => Ok(()),
+        Err(ran) => Err(ran),
+    }
 }
 
 // puts messages onto the queue
@@ -91,8 +94,28 @@ fn pgmq_pop(queue_name: &str) -> Result<Option<pgx::Json>, spi::Error> {
 }
 
 #[pg_extern]
-fn pgmq_list_queues() -> Result<Vec<String>, spi::Error> {
-    Ok(vec!["Cat".to_owned()])
+fn pgmq_list_queues() -> Result<Vec<pgx::Json>, spi::Error> {
+    let query = "SELECT * FROM pgmq_meta";
+    let result: Result<Vec<pgx::Json>, spi::Error> = Spi::connect(|client| {
+        let mut queues = Vec::new();
+        let tup_table = client.select(query, None, None)?;
+
+        for row in tup_table {
+            let queue_name = row["queue_name"]
+                .value::<String>()?
+                .expect("queue name empty");
+            let created = row["created_at"]
+                .value::<pgx::TimestampWithTimeZone>()?
+                .expect("created at was null");
+            queues.push(pgx::Json(serde_json::json!({
+                "queue_name": queue_name,
+                "created_at": created
+
+            })));
+        }
+        Ok(queues)
+    });
+    result
 }
 
 #[cfg(any(test, feature = "pg_test"))]
