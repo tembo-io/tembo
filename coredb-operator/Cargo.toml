@@ -4,7 +4,6 @@ version = "0.0.1"
 edition = "2021"
 default-run = "controller"
 license = "Apache-2.0"
-repository = "https://github.com/CoreDB-io/coredb"
 publish = false
 
 [[bin]]
