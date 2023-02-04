@@ -19,10 +19,12 @@ jobs:
       - name: Find directories with Dockerfiles
         id: find_directories
         run: |
+          set -xe
           # Get directories with a Dockerfile
           directories=`find . -name Dockerfile -not -path "*/target/*" -exec dirname {} \;`
           # Format into JSON for the next job
           matrix_include=$(echo "${directories}" | awk 'NF{print $NF};' | while read dir; do dir_without_dot=${dir#./}; echo "{\"path\": \"$dir\", \"name\": \"$dir_without_dot\"}"; done | jq -scM '{"include": .}')
+          echo "${matrix_include}"
           echo "include=${matrix_include}" >> $GITHUB_OUTPUT
 
   build_and_push_images:
