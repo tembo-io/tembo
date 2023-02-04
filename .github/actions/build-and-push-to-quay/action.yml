@@ -67,15 +67,6 @@ runs:
             TAGS="$TAGS $VERSION"
         fi
 
-        # # Fail if any of these tags are already published
-        # IFS=' ' read -ra TAG_ARRAY <<< "${TAGS}"
-        # for tag in "${TAG_ARRAY[@]}"; do
-        #   if docker manifest inspect ${{ inputs.registry }}/${{ inputs.image_name }}:$tag > /dev/null; then
-        #     echo "Error: found this is already published to Quay ${{ inputs.registry }}/${{ inputs.image_name }}:$tag"
-        #     exit 1
-        #   fi
-        # done
-
         # Calendar version
         if [ "${{ inputs.publish_calver }}" == "true" ]; then
           # A date without leading zeros, for example:
