@@ -12,7 +12,7 @@ jobs:
     name: Find directories with Dockerfiles
     runs-on: ubuntu-20.04
     outputs:
-      directories: ${{ steps.find_directories.outputs.directories }}
+      include: ${{ steps.find_directories.outputs.include }}
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
