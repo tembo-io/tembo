@@ -22,7 +22,7 @@ jobs:
           # Get directories with a Dockerfile
           directories=`find . -name Dockerfile -not -path "*/target/*" -exec dirname {} \;`
           # Format into JSON for the next job
-          matrix_include=$(echo "${directories}" | jq -R 'split(" +") | map(select(. != "")) | add' | jq -s '{"include": .}' | jq -cM)
+          matrix_include=$(echo "${directories}" | jq -R 'split(" +") | map(select(. != "")) | add' | jq -s '{"directory": .}' | jq -cM)
           echo "directories=${matrix_include}" >> $GITHUB_OUTPUT
 
   build_and_push_images:
@@ -53,8 +53,8 @@ jobs:
       - name: Build and upload image
         uses: ./.github/actions/build-and-push-to-quay
         with:
-          image_name: ${{ matrix.name }}
-          docker_directory: ${{ matrix.path }}
+          image_name: ${{ matrix.directory }}
+          docker_directory: ${{ matrix.directory }}
           # Tag with version in Cargo.toml
           # if that file is present
           # and if the branch is 'main' or starts with 'release/'
