@@ -11,11 +11,8 @@ async fn init_queue(qname: &str) -> pgmq::PGMQueue {
         .await
         .expect("failed to connect to postgres");
 
-    // drop the test table at beginning of test
-    sqlx::query(format!("DROP TABLE IF EXISTS pgmq_{}", qname).as_str())
-        .execute(&queue.connection)
-        .await
-        .unwrap();
+    // make sure queue doesn't exist before the test
+    let _ = queue.destroy(qname).await.unwrap();
 
     // CREATE QUEUE
     let q_success = queue.create(qname).await;
@@ -278,6 +275,20 @@ async fn test_pop() {
     assert_eq!(msg, 1);
     let popped_msg = queue.pop::<MyMessage>(&test_queue).await.unwrap().unwrap();
     assert_eq!(popped_msg.msg_id, 1);
+    let num_rows = rowcount(&test_queue, &queue.connection).await;
+    // popped record is deleted on read
+    assert_eq!(num_rows, 0);
+}
+
+#[tokio::test]
+async fn test_archive() {
+    let test_queue = "test_archive_queue".to_owned();
+    let queue = init_queue(&test_queue).await;
+    let msg = MyMessage::default();
+    let msg = queue.send(&test_queue, &msg).await.unwrap();
+    assert_eq!(msg, 1);
+    let num_moved = queue.archive(&test_queue, &msg).await.unwrap();
+    assert_eq!(num_moved, 1);
     let num_rows = rowcount(&test_queue, &queue.connection).await;
     // popped record is deleted on read
     assert_eq!(num_rows, 0);
