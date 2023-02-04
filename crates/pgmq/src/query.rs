@@ -70,7 +70,7 @@ pub fn drop_queue(name: &str) -> String {
 pub fn delete_queue_index(name: &str) -> String {
     format!(
         "
-        DROP INDEX IF EXISTS vt_idx_{name};
+        DROP INDEX IF EXISTS {TABLE_PREFIX}_{name}.vt_idx_{name};
         "
     )
 }
@@ -169,11 +169,11 @@ pub fn archive(name: &str, msg_id: &i64) -> String {
         "
         WITH archived AS (
             DELETE FROM {TABLE_PREFIX}_{name}
-            WHERE msg_id = {msg_id};
-            RETURNING *
+            WHERE msg_id = {msg_id}
+            RETURNING msg_id, vt, read_ct, enqueued_at, message
         )
-        INSERT INTO {TABLE_PREFIX}_{name}_archive
-        SELECT *
+        INSERT INTO {TABLE_PREFIX}_{name}_archive (msg_id, vt, read_ct, enqueued_at, message)
+        SELECT msg_id, vt, read_ct, enqueued_at, message 
         FROM archived;
         "
     )

@@ -1,4 +1,4 @@
-use pgmq::{self, Message};
+use pgmq::{self, query::TABLE_PREFIX, Message};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -10,10 +10,8 @@ async fn init_queue(qname: &str) -> pgmq::PGMQueue {
     let queue = pgmq::PGMQueue::new(format!("postgres://postgres:{}@0.0.0.0:5432", pgpass))
         .await
         .expect("failed to connect to postgres");
-
     // make sure queue doesn't exist before the test
     let _ = queue.destroy(qname).await.unwrap();
-
     // CREATE QUEUE
     let q_success = queue.create(qname).await;
     println!("q_success: {:?}", q_success);
@@ -42,7 +40,7 @@ struct YoloMessage {
 }
 
 async fn rowcount(qname: &str, connection: &Pool<Postgres>) -> i64 {
-    let row_ct_query = format!("SELECT count(*) as ct FROM pgmq_{}", qname);
+    let row_ct_query = format!("SELECT count(*) as ct FROM {TABLE_PREFIX}_{qname}");
     sqlx::query(&row_ct_query)
         .fetch_one(connection)
         .await
@@ -289,9 +287,12 @@ async fn test_archive() {
     assert_eq!(msg, 1);
     let num_moved = queue.archive(&test_queue, &msg).await.unwrap();
     assert_eq!(num_moved, 1);
-    let num_rows = rowcount(&test_queue, &queue.connection).await;
-    // popped record is deleted on read
-    assert_eq!(num_rows, 0);
+    let num_rows_queue = rowcount(&test_queue, &queue.connection).await;
+    // archived record is no longer on the queue
+    assert_eq!(num_rows_queue, 0);
+    let num_rows_archive = rowcount(&format!("{test_queue}_archive"), &queue.connection).await;
+    // archived record is now on the archive table
+    assert_eq!(num_rows_archive, 1);
 }
 
 /// test db operations that should produce errors
