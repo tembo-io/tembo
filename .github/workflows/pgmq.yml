@@ -53,8 +53,7 @@ jobs:
         run: make test.cleanup
 
   # publish:
-  #   # only publish off tag events
-  #   if: startsWith(github.ref, 'refs/tags/')
+  #   if: startsWith(github.ref, 'refs/heads/release/pgmq/')
   #   name: Publish Crate
   #   runs-on: ubuntu-22.04
   #   needs: [lint, tests]
