@@ -39,3 +39,4 @@ jobs:
           working-directory: ${{ matrix.path }}
           dry-run: true
           fail-if-version-published: true
+          cargo-registry-token: ${{ secrets.CARGO_REGISTRY_TOKEN }}
