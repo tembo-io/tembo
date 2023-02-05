@@ -5,7 +5,7 @@ on:
   push:
     branches:
       - 'main'
-      - 'release/**'
+      - 'release/[0-9]+.[0-9]+'
 
 jobs:
   find_directories:
