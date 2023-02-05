@@ -39,13 +39,14 @@ runs:
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       run: |
-        set -e
+        set -xe
 
         # Get crate information
         NAME=$(stoml Cargo.toml package.name)
         VERSION=$(stoml Cargo.toml package.version)
         VERSIONS_INFO=$(curl https://crates.io/api/v1/crates/${NAME} 2> /dev/null)
         PUBLISHED_VERSIONS=$(echo ${VERSIONS_INFO} | jq -r '.versions[] | .num')
+        echo ${VERSIONS_INFO}
 
         # If this version is already published...
         if echo ${VERSIONS_INFO} | jq -r '.versions[] | .num | . == "${VERSION}"' | grep true; then
