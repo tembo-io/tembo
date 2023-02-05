@@ -44,10 +44,11 @@ runs:
         # Get crate information
         NAME=$(stoml Cargo.toml package.name)
         VERSION=$(stoml Cargo.toml package.version)
-        PUBLISHED_VERSIONS=$(curl https://crates.io/api/v1/crates/${NAME} 2> /dev/null | jq -r '.versions[] | .num')
+        VERSIONS_INFO=$(curl https://crates.io/api/v1/crates/${NAME} 2> /dev/null)
+        PUBLISHED_VERSIONS=$(echo ${VERSIONS_INFO} | jq -r '.versions[] | .num')
 
         # If this version is already published...
-        if echo ${PUBLISHED_VERSIONS} | grep ^${VERSION}$; then
+        if echo ${VERSIONS_INFO} | jq -r '.versions[] | .num | . == "${VERSION}"' | grep true; then
           echo "The version '${VERSION}' of '${NAME}' is already published."
           if [ "${{ inputs.fail-if-version-published }}" == "true" ]; then
             exit 1
