@@ -1,0 +1,39 @@
+name: 'Find changed directories'
+description: 'Finds directories containing a specific filename in the root of that directory, filtering out directories that are unchanged relative to a given branch name'
+inputs:
+  contains_the_file:
+    description: 'Look for directories with this file in the root of that directory. For example, Dockerfile or Cargo.toml'
+    required: true
+  changed_relative_to_branch:
+    description: 'The branch on the origin to compare with to determine if this directory has changed. For example "main".'
+    required: true
+outputs:
+  build_matrix:
+    description: "Input this output to your matrix build in a following job, like this 'fromJson(needs.find_directories.outputs.build_matrix)'"
+    value: ${{ steps.find_directories.outputs.build_matrix }}
+runs:
+  using: "composite"
+  steps:
+    - name: Find directories with Dockerfiles
+      shell: bash
+      id: find_directories
+      run: |
+        set -xe
+        git fetch origin ${{ inputs.changed_relative_to_branch }} || true
+        # Get directories with a Dockerfile that have not changed
+        # relative to the branch we are pulling into
+        directories=$(
+        find . -name ${{ inputs.contains_the_file }} -not -path "*/target/*" -exec dirname {} \; | while read dir; do
+          # This will check if the directory has changed relative to the branch we are PRing
+          # into, and if it's not a PR, in the case of main or release/**, then it will
+          # build all docker directories
+          if git diff --quiet HEAD origin/${{ inputs.changed_relative_to_branch }} -- "$dir"; then
+            echo ""
+          else
+            echo "$dir"
+          fi
+        done)
+        # Format directories into a build matrix
+        matrix_include=$(echo "${directories}" | awk 'NF{print $NF};' | while read dir; do dir_without_dot=${dir#./}; echo "{\"path\": \"$dir\", \"name\": \"$dir_without_dot\"}"; done | jq -scM '{"include": .}')
+        echo "${matrix_include}"
+        echo "build_matrix=${matrix_include}" >> $GITHUB_OUTPUT
