@@ -36,5 +36,6 @@ jobs:
       - name: Check this version is not already published
         uses: ./.github/actions/publish-crate
         with:
+          working-directory: ${{ matrix.path }}
           dry-run: true
           fail-if-version-published: true
