@@ -9,7 +9,7 @@ inputs:
     required: true
 outputs:
   build_matrix:
-    description: "Input this output to your matrix build in a following job, like this '${{ fromJson(needs.find_directories.outputs.build_matrix) }}'"
+    description: "Input this output to your matrix build in a following job, like this 'fromJson(needs.find_directories.outputs.build_matrix)'"
     value: ${{ steps.find_directories.outputs.build_matrix }}
 runs:
   using: "composite"
