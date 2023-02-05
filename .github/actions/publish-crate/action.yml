@@ -39,7 +39,7 @@ runs:
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       run: |
-        set -xe
+        set -e
 
         # Get crate information
         NAME=$(stoml Cargo.toml package.name)
@@ -49,7 +49,7 @@ runs:
         echo ${VERSIONS_INFO}
 
         # If this version is already published...
-        if echo ${VERSIONS_INFO} | jq -r '.versions[] | .num | . == "${VERSION}"' | grep true; then
+        if echo ${VERSIONS_INFO} | jq -r ".versions[] | .num | . == \"${VERSION}\"" | grep true; then
           echo "The version '${VERSION}' of '${NAME}' is already published."
           if [ "${{ inputs.fail-if-version-published }}" == "true" ]; then
             exit 1
