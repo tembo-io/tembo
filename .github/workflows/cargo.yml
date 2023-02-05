@@ -62,7 +62,7 @@ jobs:
             echo "dry_run=true" >> $GITHUB_OUTPUT
             echo "fail_if_version_published=true" >> $GITHUB_OUTPUT
           fi
-      - name: Check this version is not already published
+      - name: Publish or validate
         uses: ./.github/actions/publish-crate
         with:
           working-directory: ${{ matrix.path }}
