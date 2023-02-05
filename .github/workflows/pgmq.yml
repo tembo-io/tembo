@@ -51,20 +51,3 @@ jobs:
         run: make test
       - name: teardown
         run: make test.cleanup
-
-  # publish:
-  #   if: startsWith(github.ref, 'refs/heads/release/pgmq/')
-  #   name: Publish Crate
-  #   runs-on: ubuntu-22.04
-  #   needs: [lint, tests]
-  #   steps:
-  #     - uses: actions/checkout@v2
-  #     - name: Install Rust stable toolchain
-  #       uses: actions-rs/toolchain@v1
-  #       with:
-  #         toolchain: stable
-  #     - uses: Swatinem/rust-cache@v2
-  #     - name: publish
-  #       env:
-  #         CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-  #       run: cargo publish
