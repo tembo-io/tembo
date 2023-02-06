@@ -39,7 +39,7 @@ runs:
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       run: |
-        set -e
+        set -xe
 
         # If package.publish is false, skip the rest
         SHOULD_PUBLISH=$(stoml Cargo.toml package.publish)
