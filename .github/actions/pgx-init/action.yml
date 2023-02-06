@@ -1,5 +1,5 @@
 name: 'pgx initialization'
-description: 'cargo pgx init'
+description: 'Initialize PGX if it is a dependency, otherwise do nothing.'
 inputs:
   working-directory:
     description: 'The directory in which there is a pgx extension project'
@@ -12,12 +12,33 @@ outputs: {}
 runs:
   using: "composite"
   steps:
+      - name: Install TOML parser
+        shell: bash
+        run: |
+         set -xe
+         wget https://github.com/freshautomations/stoml/releases/download/v0.7.1/stoml_linux_amd64 &> /dev/null
+         mv stoml_linux_amd64 stoml
+         chmod +x stoml
+         sudo mv stoml /usr/local/bin/
+      - name: setup pgx
+        shell: bash
+        id: pgx_install
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          pgx_version=$(stoml Cargo.toml dependencies.pgx)
+          if [ -z "${pgx_version}" ]; then
+            echo "pgx is not a dependency: skipping"
+            echo "skip=true" >> $GITHUT_OUTPUT
+          else
+            cargo install --version ${pgx_version} cargo-pgx
+            echo "skip=false" >> $GITHUT_OUTPUT
+          fi
       - name: pgx init
         shell: bash
+        if: steps.pgx_install.outputs.skip == "false"
         working-directory: ${{ inputs.working-directory }}
         run: |
           set -x
-          cargo build
           # pgx init can take a long time, and it re-compiles postgres even when there
           # is a cached version. So, we can just check for the directory and
           if find /home/runner/.pgx | grep $(awk -F "=" '/pg${{ inputs.pg_version }}/ {print $2}' /home/runner/.pgx/config.toml | tr -d '"'); then
