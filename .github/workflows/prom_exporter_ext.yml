@@ -69,6 +69,6 @@ jobs:
       - name: test
         run: |
           ls ./target
-          rm -rf ./target/pgx-test-data || true
+          rm -rf ./target/pgx-test-data-* || true
           pg_version=$(stoml Cargo.toml features.default)
           cargo pgx test ${pg_version}
