@@ -1,7 +1,14 @@
 [package]
-name = "actix-postgres"
-version = "0.1.0"
+name = "benchmark-target-http-postgres"
+version = "0.0.1-alpha"
 edition = "2018"
+publish = false
+authors = ["CoreDB.io"]
+description = "Benchmarking running a webserver as a postgres extension"
+homepage = "https://www.coredb.io"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/CoreDB-io/coredb"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [dependencies]

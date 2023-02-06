@@ -41,6 +41,13 @@ runs:
       run: |
         set -e
 
+        # If package.publish is false, skip the rest
+        SHOULD_PUBLISH=$(stoml Cargo.toml package.publish)
+        if [[ "${SHOULD_PUBLISH}" == "false" ]]; then
+            echo "Found package.publish is false. Skipping."
+            exit 0
+        fi
+
         # Get crate information
         NAME=$(stoml Cargo.toml package.name)
         VERSION=$(stoml Cargo.toml package.version)
