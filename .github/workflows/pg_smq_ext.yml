@@ -50,7 +50,6 @@ jobs:
   test:
     name: Run tests
     runs-on: ubuntu-22.04
-    needs: lint
     steps:
       - uses: actions/checkout@v2
       - name: Install Rust stable toolchain

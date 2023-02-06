@@ -49,7 +49,6 @@ jobs:
   test:
     name: Run tests
     runs-on: ubuntu-20.04
-    needs: lint
     steps:
       - uses: actions/checkout@v2
       - name: Install Rust stable toolchain
