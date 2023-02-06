@@ -122,7 +122,7 @@ impl PGMQueue {
 
     /// Connect to the database
     async fn connect(url: &str) -> Result<Pool<Postgres>, errors::PgmqError> {
-        let options = conn_options();
+        let options = conn_options(url);
         let pgp = PgPoolOptions::new()
             .acquire_timeout(std::time::Duration::from_secs(10))
             .max_connections(5)
@@ -220,13 +220,12 @@ async fn fetch_one_message<T: for<'de> Deserialize<'de>>(
 // Configure connection options
 pub fn conn_options(url: &str) -> PgConnectOptions {
     // parse url
-    let mut pool_connection_options = PgConnectOptions::new();
-    pool_connection_options.host("");
-    pool_connection_options.port(5);
-    pool_connection_options.user("");
-    pool_connection_options.password("");
-    pool_connection_options.database("");
 
-    pool_connection_options.log_statements(LevelFilter::Debug);
-    pool_connection_options
+    let mut options = PgConnectOptions::new()
+        .host("secret-host")
+        .port(2525)
+        .username("secret-user")
+        .password("secret-password");
+    options.log_statements(LevelFilter::Debug);
+    options
 }
