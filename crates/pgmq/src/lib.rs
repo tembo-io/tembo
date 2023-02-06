@@ -123,11 +123,11 @@ impl PGMQueue {
 
     /// Connect to the database
     async fn connect(url: &str) -> Result<Pool<Postgres>, errors::PgmqError> {
-        let options = conn_options(url);
+        let options = conn_options(url)?;
         let pgp = PgPoolOptions::new()
             .acquire_timeout(std::time::Duration::from_secs(10))
             .max_connections(5)
-            .connect_with(options.unwrap())
+            .connect_with(options)
             .await?;
         Ok(pgp)
     }
@@ -210,7 +210,7 @@ async fn fetch_one_message<T: for<'de> Deserialize<'de>>(
                     vt: row.get("vt"),
                     message: parsed_msg,
                 })),
-                Err(e) => Err(errors::PgmqError::ParsingError(e)),
+                Err(e) => Err(errors::PgmqError::JsonParsingError(e)),
             }
         }
         Err(sqlx::error::Error::RowNotFound) => Ok(None),
@@ -221,12 +221,12 @@ async fn fetch_one_message<T: for<'de> Deserialize<'de>>(
 // Configure connection options
 pub fn conn_options(url: &str) -> Result<PgConnectOptions, ParseError> {
     // Parse url
-    let parsed = Url::parse(url).unwrap();
+    let parsed = Url::parse(url)?;
     let mut options = PgConnectOptions::new()
-        .host(parsed.host_str().unwrap())
-        .port(parsed.port().unwrap())
+        .host(parsed.host_str().ok_or(ParseError::EmptyHost)?)
+        .port(parsed.port().ok_or(ParseError::InvalidPort)?)
         .username(parsed.username())
-        .password(parsed.password().unwrap());
+        .password(parsed.password().ok_or(ParseError::IdnaError)?);
     options.log_statements(LevelFilter::Debug);
     Ok(options)
 }
