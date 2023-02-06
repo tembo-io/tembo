@@ -38,8 +38,8 @@ runs:
           pg_version=$(stoml Cargo.toml features.default)
           # pgx init can take a long time, and it re-compiles postgres even when there
           # is a cached version. So, we can just check for the directory and
-          if find /home/runner/.pgx | grep $(awk -F "=" '/pg${pg_version}/ {print $2}' /home/runner/.pgx/config.toml | tr -d '"'); then
+          if find /home/runner/.pgx | grep $(awk -F "=" '/${pg_version}/ {print $2}' /home/runner/.pgx/config.toml | tr -d '"'); then
             echo "Already found pgx is initialized. Skipping 'cargo pgx init' command."
           else
-            cargo pgx init --pg${pg_version} download || true
+            cargo pgx init --${pg_version} download || true
           fi
