@@ -45,7 +45,8 @@ runs:
         NAME=$(stoml Cargo.toml package.name)
         VERSION=$(stoml Cargo.toml package.version)
         VERSIONS_INFO=$(curl https://crates.io/api/v1/crates/${NAME} 2> /dev/null)
-        PUBLISHED_VERSIONS=$(echo ${VERSIONS_INFO} | jq -r '.versions[] | .num')
+        # "|| true" handles the case where this crate hasn't yet been published
+        PUBLISHED_VERSIONS=$(echo ${VERSIONS_INFO} | jq -r '.versions[] | .num' || true)
         echo ${VERSIONS_INFO}
 
         # If this version is already published...
