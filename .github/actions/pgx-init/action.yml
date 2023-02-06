@@ -28,10 +28,10 @@ runs:
           pgx_version=$(stoml Cargo.toml dependencies.pgx)
           if [ -z "${pgx_version}" ]; then
             echo "pgx is not a dependency: skipping"
-            echo "skip=true" >> $GITHUT_OUTPUT
+            echo "skip=true" >> $GITHUB_OUTPUT
           else
             cargo install --version ${pgx_version} cargo-pgx
-            echo "skip=false" >> $GITHUT_OUTPUT
+            echo "skip=false" >> $GITHUB_OUTPUT
           fi
       - name: pgx init
         shell: bash
