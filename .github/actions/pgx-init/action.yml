@@ -35,7 +35,7 @@ runs:
           fi
       - name: pgx init
         shell: bash
-        if: steps.pgx_install.outputs.skip == "false"
+        if: steps.pgx_install.outputs.skip == 'false'
         working-directory: ${{ inputs.working-directory }}
         run: |
           set -x
