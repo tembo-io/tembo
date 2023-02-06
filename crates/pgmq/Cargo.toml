@@ -19,6 +19,7 @@ sqlx = { version = "0.6", features = [ "runtime-tokio-native-tls" , "postgres", 
 thiserror = "1.0.38"
 tokio = { version = "1", features = ["macros"] }
 log = "0.4.17"
+url = "2.3.1"
 
 [dev-dependencies]
 cargo-readme = "3.2.0"

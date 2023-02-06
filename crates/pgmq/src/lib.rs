@@ -83,13 +83,14 @@
 
 #![doc(html_root_url = "https://docs.rs/pgmq/")]
 
+use log::LevelFilter;
 use serde::{Deserialize, Serialize};
 use sqlx::error::Error;
 use sqlx::postgres::{PgConnectOptions, PgPoolOptions, PgRow};
 use sqlx::types::chrono::Utc;
 use sqlx::{ConnectOptions, FromRow};
 use sqlx::{Pool, Postgres, Row};
-use log::LevelFilter;
+use url::{ParseError, Url};
 
 pub mod errors;
 mod query;
@@ -126,7 +127,7 @@ impl PGMQueue {
         let pgp = PgPoolOptions::new()
             .acquire_timeout(std::time::Duration::from_secs(10))
             .max_connections(5)
-            .connect_with(options)
+            .connect_with(options.unwrap())
             .await?;
         Ok(pgp)
     }
@@ -218,14 +219,14 @@ async fn fetch_one_message<T: for<'de> Deserialize<'de>>(
 }
 
 // Configure connection options
-pub fn conn_options(url: &str) -> PgConnectOptions {
-    // parse url
-
+pub fn conn_options(url: &str) -> Result<PgConnectOptions, ParseError> {
+    // Parse url
+    let parsed = Url::parse(url).unwrap();
     let mut options = PgConnectOptions::new()
-        .host("secret-host")
-        .port(2525)
-        .username("secret-user")
-        .password("secret-password");
+        .host(parsed.host_str().unwrap())
+        .port(parsed.port().unwrap())
+        .username(parsed.username())
+        .password(parsed.password().unwrap());
     options.log_statements(LevelFilter::Debug);
-    options
+    Ok(options)
 }
