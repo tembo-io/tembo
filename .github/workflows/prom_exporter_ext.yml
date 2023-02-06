@@ -3,7 +3,7 @@ name: Prometheus Exporter for Postgres (pg14)
 defaults:
   run:
     shell: bash
-    working-directory: ./extensions/prometheus_exporter/
+    working-directory: ./extensions/pgx_prometheus_exporter/
 
 on:
   pull_request:
@@ -11,7 +11,7 @@ on:
       - main
     paths:
     - '.github/workflows/prom_exporter_ext.yml'
-    - 'extensions/prometheus_exporter/**'
+    - 'extensions/pgx_prometheus_exporter/**'
   # Always run tests on main or release branches
   push:
     branches:
@@ -34,14 +34,13 @@ jobs:
         with:
           prefix-key: "prom-extension-lint"
           workspaces: |
-            extensions/prometheus_exporter
+            extensions/pgx_prometheus_exporter
           # Additional directories to cache
           cache-directories: |
             /home/runner/.pgx
       - uses: ./.github/actions/pgx-init
         with:
-          working-directory: extensions/prometheus_exporter
-          pgx_version: "0.6.1"
+          working-directory: extensions/pgx_prometheus_exporter
       - name: Cargo format
         run: cargo +nightly fmt --all --check
       - name: Clippy
@@ -50,13 +49,6 @@ jobs:
   test:
     name: Run tests
     runs-on: ubuntu-20.04
-    needs: lint
-    strategy:
-      # fail-fast means to cancel all jobs if one fails
-      fail-fast: false
-      matrix:
-        pg_version:
-          - 14
     steps:
       - uses: actions/checkout@v2
       - name: Install Rust stable toolchain
@@ -65,18 +57,18 @@ jobs:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
         with:
-          prefix-key: "prom-extension-test-${{ matrix.pg_version }}"
+          prefix-key: "prom-extension-test"
           workspaces: |
-            extensions/prometheus_exporter
+            extensions/pgx_prometheus_exporter
           # Additional directories to cache
           cache-directories: |
             /home/runner/.pgx
       - uses: ./.github/actions/pgx-init
         with:
-          working-directory: extensions/prometheus_exporter
-          pg_version: ${{ matrix.pg_version }}
-          pgx_version: "0.6.1"
+          working-directory: extensions/pgx_prometheus_exporter
       - name: test
         run: |
-          rm -rf ./target/pgx-test-data-${{ matrix.pg_version }} || true
-          cargo pgx test pg${{ matrix.pg_version }}
+          ls ./target
+          rm -rf ./target/pgx-test-data-* || true
+          pg_version=$(stoml Cargo.toml features.default)
+          cargo pgx test ${pg_version}

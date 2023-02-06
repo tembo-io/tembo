@@ -34,6 +34,6 @@ runs:
           fi
         done)
         # Format directories into a build matrix
-        matrix_include=$(echo "${directories}" | awk 'NF{print $NF};' | while read dir; do dir_without_dot=${dir#./}; echo "{\"path\": \"$dir\", \"name\": \"$dir_without_dot\"}"; done | jq -scM '{"include": .}')
+        matrix_include=$(echo "${directories}" | awk 'NF{print $NF};' | while read dir; do dir_without_dot=$(basename ${dir}); echo "{\"path\": \"$dir\", \"name\": \"$dir_without_dot\"}"; done | jq -scM '{"include": .}')
         echo "${matrix_include}"
         echo "build_matrix=${matrix_include}" >> $GITHUB_OUTPUT

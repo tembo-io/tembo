@@ -1,5 +1,0 @@
-comment = 'prometheus_exporter:  Created by pgx'
-default_version = '@CARGO_VERSION@'
-module_pathname = '$libdir/prometheus_exporter'
-relocatable = false
-superuser = false

@@ -3,7 +3,7 @@ name: Postgres Simple Message Queue (pg14)
 defaults:
   run:
     shell: bash
-    working-directory: ./extensions/pgmq/
+    working-directory: ./extensions/pgx_pgmq/
 
 on:
   pull_request:
@@ -12,7 +12,7 @@ on:
     paths:
       - '.github/workflows/pg_smq_ext.yml'
       - '.github/actions/pgx-init/**'
-      - 'extensions/pgmq/**'
+      - 'extensions/pgx_pgmq/**'
   # Always run tests on main or release branches
   push:
     branches:
@@ -35,14 +35,13 @@ jobs:
         with:
           prefix-key: "pg-smq-extension-lint"
           workspaces: |
-            extensions/pgmq
+            extensions/pgx_pgmq
           # Additional directories to cache
           cache-directories: |
             /home/runner/.pgx
       - uses: ./.github/actions/pgx-init
         with:
-          working-directory: extensions/pgmq
-          pgx_version: "0.7.1"
+          working-directory: extensions/pgx_pgmq
       - name: Cargo format
         run: cargo +nightly fmt --all --check
       - name: Clippy
@@ -51,13 +50,6 @@ jobs:
   test:
     name: Run tests
     runs-on: ubuntu-22.04
-    needs: lint
-    strategy:
-      # fail-fast means to cancel all jobs if one fails
-      fail-fast: false
-      matrix:
-        pg_version:
-          - 14
     steps:
       - uses: actions/checkout@v2
       - name: Install Rust stable toolchain
@@ -66,18 +58,17 @@ jobs:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
         with:
-          prefix-key: "pg-smq-extension-test-${{ matrix.pg_version }}"
+          prefix-key: "pg-smq-extension-test"
           workspaces: |
-            extensions/pgmq
+            extensions/pgx_pgmq
           # Additional directories to cache
           cache-directories: |
             /home/runner/.pgx
       - uses: ./.github/actions/pgx-init
         with:
-          working-directory: extensions/pgmq
-          pg_version: ${{ matrix.pg_version }}
-          pgx_version: "0.7.1"
+          working-directory: extensions/pgx_pgmq
       - name: test
         run: |
-          rm -rf ./target/pgx-test-data-${{ matrix.pg_version }} || true
-          cargo pgx test pg${{ matrix.pg_version }}
+          rm -rf ./target/pgx-test-data-* || true
+          pg_version=$(stoml Cargo.toml features.default)
+          cargo pgx test ${pg_version}
