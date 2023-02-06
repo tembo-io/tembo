@@ -8,6 +8,7 @@ homepage = "https://www.coredb.io"
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/CoreDB-io/coredb"
+publish = false
 
 [lib]
 name = "api"
