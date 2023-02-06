@@ -69,6 +69,7 @@ jobs:
           working-directory: extensions/pgx_prometheus_exporter
       - name: test
         run: |
+          ls ./target
           rm -rf ./target/pgx-test-data || true
           pg_version=$(stoml Cargo.toml features.default)
           cargo pgx test ${pg_version}
