@@ -42,7 +42,7 @@ jobs:
       - name: Determine which tags to publish
         id: tags
         run: |
-          BRANCH=$(git rev-parse --abbrev-ref HEAD)
+          BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
           if [ "${BRANCH_NAME}" == "main" ]; then
             echo "tag_latest=true" >> $GITHUB_OUTPUT
             echo "tag_cargo=true" >> $GITHUB_OUTPUT
