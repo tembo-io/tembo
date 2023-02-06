@@ -51,12 +51,6 @@ jobs:
     name: Run tests
     runs-on: ubuntu-22.04
     needs: lint
-    strategy:
-      # fail-fast means to cancel all jobs if one fails
-      fail-fast: false
-      matrix:
-        pg_version:
-          - 14
     steps:
       - uses: actions/checkout@v2
       - name: Install Rust stable toolchain
@@ -65,7 +59,7 @@ jobs:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
         with:
-          prefix-key: "pg-smq-extension-test-${{ matrix.pg_version }}"
+          prefix-key: "pg-smq-extension-test"
           workspaces: |
             extensions/pgmq
           # Additional directories to cache
@@ -74,8 +68,8 @@ jobs:
       - uses: ./.github/actions/pgx-init
         with:
           working-directory: extensions/pgmq
-          pg_version: ${{ matrix.pg_version }}
       - name: test
         run: |
-          rm -rf ./target/pgx-test-data-${{ matrix.pg_version }} || true
-          cargo pgx test pg${{ matrix.pg_version }}
+          rm -rf ./target/pgx-test-data || true
+          pg_version=$(stoml Cargo.toml features.default)
+          cargo pgx test pg${pg_version}

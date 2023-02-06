@@ -73,7 +73,6 @@ jobs:
       - uses: ./.github/actions/pgx-init
         with:
           working-directory: ${{ matrix.path }}
-          pg_version: 14
       - name: Publish or validate
         uses: ./.github/actions/publish-crate
         with:
