@@ -1,7 +1,13 @@
 [package]
-name = "prometheus_exporter"
-version = "0.0.1"
+name = "pgx-prometheus-exporter"
+version = "0.0.1-alpha"
 edition = "2021"
+authors = ["CoreDB.io"]
+description = "Rust extension for exporting prometheus metrics"
+homepage = "https://www.coredb.io"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/CoreDB-io/coredb"
 
 [lib]
 crate-type = ["cdylib"]

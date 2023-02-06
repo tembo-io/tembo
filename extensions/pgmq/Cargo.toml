@@ -1,7 +1,14 @@
 [package]
-name = "pgmq"
-version = "0.0.1"
+name = "pgx-pgmq"
+version = "0.0.1-alpha"
 edition = "2021"
+authors = ["CoreDB.io"]
+description = "Postgres extension for PGMQ"
+homepage = "https://www.coredb.io"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/CoreDB-io/coredb"
+
 
 [lib]
 crate-type = ["cdylib"]
