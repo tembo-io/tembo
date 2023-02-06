@@ -3,7 +3,7 @@ name: Postgres Simple Message Queue (pg14)
 defaults:
   run:
     shell: bash
-    working-directory: ./extensions/pgmq/
+    working-directory: ./extensions/pgx_pgmq/
 
 on:
   pull_request:
@@ -12,7 +12,7 @@ on:
     paths:
       - '.github/workflows/pg_smq_ext.yml'
       - '.github/actions/pgx-init/**'
-      - 'extensions/pgmq/**'
+      - 'extensions/pgx_pgmq/**'
   # Always run tests on main or release branches
   push:
     branches:
@@ -35,13 +35,13 @@ jobs:
         with:
           prefix-key: "pg-smq-extension-lint"
           workspaces: |
-            extensions/pgmq
+            extensions/pgx_pgmq
           # Additional directories to cache
           cache-directories: |
             /home/runner/.pgx
       - uses: ./.github/actions/pgx-init
         with:
-          working-directory: extensions/pgmq
+          working-directory: extensions/pgx_pgmq
       - name: Cargo format
         run: cargo +nightly fmt --all --check
       - name: Clippy
@@ -61,13 +61,13 @@ jobs:
         with:
           prefix-key: "pg-smq-extension-test"
           workspaces: |
-            extensions/pgmq
+            extensions/pgx_pgmq
           # Additional directories to cache
           cache-directories: |
             /home/runner/.pgx
       - uses: ./.github/actions/pgx-init
         with:
-          working-directory: extensions/pgmq
+          working-directory: extensions/pgx_pgmq
       - name: test
         run: |
           rm -rf ./target/pgx-test-data || true

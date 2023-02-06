@@ -3,7 +3,7 @@ name: Prometheus Exporter for Postgres (pg14)
 defaults:
   run:
     shell: bash
-    working-directory: ./extensions/prometheus_exporter/
+    working-directory: ./extensions/pgx_prometheus_exporter/
 
 on:
   pull_request:
@@ -11,7 +11,7 @@ on:
       - main
     paths:
     - '.github/workflows/prom_exporter_ext.yml'
-    - 'extensions/prometheus_exporter/**'
+    - 'extensions/pgx_prometheus_exporter/**'
   # Always run tests on main or release branches
   push:
     branches:
@@ -34,13 +34,13 @@ jobs:
         with:
           prefix-key: "prom-extension-lint"
           workspaces: |
-            extensions/prometheus_exporter
+            extensions/pgx_prometheus_exporter
           # Additional directories to cache
           cache-directories: |
             /home/runner/.pgx
       - uses: ./.github/actions/pgx-init
         with:
-          working-directory: extensions/prometheus_exporter
+          working-directory: extensions/pgx_prometheus_exporter
       - name: Cargo format
         run: cargo +nightly fmt --all --check
       - name: Clippy
@@ -60,13 +60,13 @@ jobs:
         with:
           prefix-key: "prom-extension-test"
           workspaces: |
-            extensions/prometheus_exporter
+            extensions/pgx_prometheus_exporter
           # Additional directories to cache
           cache-directories: |
             /home/runner/.pgx
       - uses: ./.github/actions/pgx-init
         with:
-          working-directory: extensions/prometheus_exporter
+          working-directory: extensions/pgx_prometheus_exporter
       - name: test
         run: |
           rm -rf ./target/pgx-test-data || true
