@@ -1,5 +1,5 @@
 [package]
-name = "pgx-prometheus-exporter"
+name = "pgx_prometheus_exporter"
 version = "0.0.1-alpha"
 edition = "2021"
 authors = ["CoreDB.io"]

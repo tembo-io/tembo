@@ -1,0 +1,5 @@
+comment = 'pgx_http_webserver:  Created by pgx'
+default_version = '@CARGO_VERSION@'
+module_pathname = '$libdir/pgx_http_webserver'
+relocatable = false
+superuser = false

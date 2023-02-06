@@ -1,5 +1,5 @@
 [package]
-name = "pgx-sample-server"
+name = "pgx_http_webserver"
 version = "0.0.1-alpha"
 edition = "2021"
 authors = ["CoreDB.io"]
