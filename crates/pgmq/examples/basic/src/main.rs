@@ -18,7 +18,7 @@ async fn main() {
         "foo": "bar"
     });
     let _msg_id1: i64 = queue
-        .enqueue(&myqueue, &msg1)
+        .send(&myqueue, &msg1)
         .await
         .expect("Failed to enqueue message");
 
@@ -31,12 +31,12 @@ async fn main() {
         foo: "bar".to_owned(),
     };
     let _msg_id2: i64 = queue
-        .enqueue(&myqueue, &msg2)
+        .send(&myqueue, &msg2)
         .await
         .expect("Failed to enqueue message");
 
     // READ A MESSAGE as `serde_json::Value`
-    let vt: u32 = 30;
+    let vt: i32 = 30;
     let read_msg1: Message<Value> = queue
         .read::<Value>(&myqueue, Some(&vt))
         .await

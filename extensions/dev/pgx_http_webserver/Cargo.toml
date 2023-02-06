@@ -1,7 +1,14 @@
 [package]
-name = "api"
-version = "0.0.0"
+name = "pgx_http_webserver"
+version = "0.0.1-alpha"
 edition = "2021"
+authors = ["CoreDB.io"]
+description = "Testing running a webserver as a postgres extension"
+homepage = "https://www.coredb.io"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/CoreDB-io/coredb"
+publish = false
 
 [lib]
 name = "api"

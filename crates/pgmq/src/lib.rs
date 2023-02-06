@@ -3,7 +3,7 @@
 //! A lightweight messaging queue for Rust, using Postgres as the backend.
 //! Inspired by the [RSMQ project](https://github.com/smrchy/rsmq).
 //!
-//! # Examples
+//! ## Examples
 //!
 //! First, start any Postgres instance. It is the only external dependency.
 //!
@@ -30,7 +30,7 @@
 //!     let msg1 = serde_json::json!({
 //!         "foo": "bar"
 //!     });
-//!     let msg_id1: i64 = queue.enqueue(&myqueue, &msg1).await.expect("Failed to enqueue message");
+//!     let msg_id1: i64 = queue.send(&myqueue, &msg1).await.expect("Failed to enqueue message");
 //!
 //!     // SEND A STRUCT
 //!     #[derive(Serialize, Debug, Deserialize)]
@@ -40,10 +40,10 @@
 //!     let msg2 = MyMessage {
 //!         foo: "bar".to_owned(),
 //!     };
-//!     let msg_id2: i64  = queue.enqueue(&myqueue, &msg2).await.expect("Failed to enqueue message");
+//!     let msg_id2: i64  = queue.send(&myqueue, &msg2).await.expect("Failed to enqueue message");
 //!     
 //!     // READ A MESSAGE as `serde_json::Value`
-//!     let vt: u32 = 30;
+//!     let vt: i32 = 30;
 //!     let read_msg1: Message<Value> = queue.read::<Value>(&myqueue, Some(&vt)).await.unwrap().expect("no messages in the queue!");
 //!     assert_eq!(read_msg1.msg_id, msg_id1);
 //!
@@ -62,9 +62,10 @@
 //! ```
 //! ## Sending messages
 //!
-//! `queue.enqueue()` can be passed any type that implements `serde::Serialize`. This means you can prepare your messages as JSON or as a struct.
+//! `queue.send()` can be passed any type that implements `serde::Serialize`. This means you can prepare your messages as JSON or as a struct.
 //!
 //! ## Reading messages
+//!
 //! Reading a message will make it invisible (unavailable for consumption) for the duration of the visibility timeout (vt).
 //! No messages are returned when the queue is empty or all messages are invisible.
 //!
@@ -74,12 +75,9 @@
 //! parsed as the type specified. For example, if the message expected is
 //! `MyMessage{foo: "bar"}` but` {"hello": "world"}` is received, the application will panic.
 //!
-//! #### as a Struct
-//! Reading a message will make it invisible for the duration of the visibility timeout (vt).
-//! No messages are returned when the queue is empty or all messages are invisible.
+//! ## Archive or Delete a message
 //!
-//! ## Delete a message
-//! Remove the message from the queue when you are done with it.
+//! Remove the message from the queue when you are done with it. You can either completely `.delete()`, or `.archive()` the message. Archived messages are deleted from the queue and inserted to the queue's archive table. Deleted messages are just deleted.
 
 #![doc(html_root_url = "https://docs.rs/pgmq/")]
 
@@ -93,10 +91,10 @@ use sqlx::{Pool, Postgres, Row};
 use url::{ParseError, Url};
 
 pub mod errors;
-mod query;
+pub mod query;
 use chrono::serde::ts_seconds::deserialize as from_ts;
 
-const VT_DEFAULT: u32 = 30;
+const VT_DEFAULT: i32 = 30;
 
 #[derive(Debug, Deserialize, FromRow)]
 pub struct Message<T = serde_json::Value> {
@@ -134,15 +132,28 @@ impl PGMQueue {
 
     /// Create a queue
     pub async fn create(&self, queue_name: &str) -> Result<(), errors::PgmqError> {
-        let create = query::create(queue_name);
-        let index: String = query::create_index(queue_name);
-        sqlx::query(&create).execute(&self.connection).await?;
-        sqlx::query(&index).execute(&self.connection).await?;
+        let mut tx = self.connection.begin().await?;
+        let setup = query::init_queue(queue_name);
+        for q in setup {
+            sqlx::query(&q).execute(&mut tx).await?;
+        }
+        tx.commit().await?;
+        Ok(())
+    }
+
+    /// destroy a queue
+    pub async fn destroy(&self, queue_name: &str) -> Result<(), errors::PgmqError> {
+        let mut tx = self.connection.begin().await?;
+        let setup = query::destory_queue(queue_name);
+        for q in setup {
+            sqlx::query(&q).execute(&mut tx).await?;
+        }
+        tx.commit().await?;
         Ok(())
     }
 
     /// Send a message to the queue
-    pub async fn enqueue<T: Serialize>(
+    pub async fn send<T: Serialize>(
         &self,
         queue_name: &str,
         message: &T,
@@ -160,7 +171,7 @@ impl PGMQueue {
     pub async fn read<T: for<'de> Deserialize<'de>>(
         &self,
         queue_name: &str,
-        vt: Option<&u32>,
+        vt: Option<&i32>,
     ) -> Result<Option<Message<T>>, errors::PgmqError> {
         // map vt or default VT
         let vt_ = match vt {
@@ -176,6 +187,14 @@ impl PGMQueue {
     pub async fn delete(&self, queue_name: &str, msg_id: &i64) -> Result<u64, Error> {
         let query = &query::delete(queue_name, msg_id);
         let row = sqlx::query(query).execute(&self.connection).await?;
+        let num_deleted = row.rows_affected();
+        Ok(num_deleted)
+    }
+
+    /// move message from queue table to archive table
+    pub async fn archive(&self, queue_name: &str, msg_id: &i64) -> Result<u64, Error> {
+        let query = query::archive(queue_name, msg_id);
+        let row = sqlx::query(&query).execute(&self.connection).await?;
         let num_deleted = row.rows_affected();
         Ok(num_deleted)
     }
@@ -198,6 +217,7 @@ async fn fetch_one_message<T: for<'de> Deserialize<'de>>(
     query: &str,
     connection: &Pool<Postgres>,
 ) -> Result<Option<Message<T>>, errors::PgmqError> {
+    // explore: .fetch_optional()
     let row: Result<PgRow, Error> = sqlx::query(query).fetch_one(connection).await;
     match row {
         Ok(row) => {

@@ -1,4 +1,4 @@
-use pgmq::{self, Message};
+use pgmq::{self, query::TABLE_PREFIX, Message};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -10,13 +10,8 @@ async fn init_queue(qname: &str) -> pgmq::PGMQueue {
     let queue = pgmq::PGMQueue::new(format!("postgres://postgres:{}@0.0.0.0:5432", pgpass))
         .await
         .expect("failed to connect to postgres");
-
-    // drop the test table at beginning of test
-    sqlx::query(format!("DROP TABLE IF EXISTS pgmq_{}", qname).as_str())
-        .execute(&queue.connection)
-        .await
-        .unwrap();
-
+    // make sure queue doesn't exist before the test
+    let _ = queue.destroy(qname).await.unwrap();
     // CREATE QUEUE
     let q_success = queue.create(qname).await;
     println!("q_success: {:?}", q_success);
@@ -45,12 +40,26 @@ struct YoloMessage {
 }
 
 async fn rowcount(qname: &str, connection: &Pool<Postgres>) -> i64 {
-    let row_ct_query = format!("SELECT count(*) as ct FROM pgmq_{}", qname);
+    let row_ct_query = format!("SELECT count(*) as ct FROM {TABLE_PREFIX}_{qname}");
     sqlx::query(&row_ct_query)
         .fetch_one(connection)
         .await
         .unwrap()
         .get::<i64, usize>(0)
+}
+
+// we need to check whether table exists
+// simple solution: our existing rowcount() helper will fail
+// wrap it in a Result<> so we can use it
+async fn fallible_rowcount(
+    qname: &str,
+    connection: &Pool<Postgres>,
+) -> Result<i64, pgmq::errors::PgmqError> {
+    let row_ct_query = format!("SELECT count(*) as ct FROM {TABLE_PREFIX}_{qname}");
+    Ok(sqlx::query(&row_ct_query)
+        .fetch_one(connection)
+        .await?
+        .get::<i64, usize>(0))
 }
 
 #[tokio::test]
@@ -70,7 +79,7 @@ async fn test_lifecycle() {
     let msg = serde_json::json!({
         "foo": "bar"
     });
-    let msg_id = queue.enqueue(&test_queue, &msg).await.unwrap();
+    let msg_id = queue.send(&test_queue, &msg).await.unwrap();
     assert_eq!(msg_id, 1);
     let num_rows = rowcount(&test_queue, &queue.connection).await;
 
@@ -124,14 +133,14 @@ async fn test_fifo() {
     let msg = serde_json::json!({
         "foo": "bar1"
     });
-    let msg_id1 = queue.enqueue(&test_queue, &msg).await.unwrap();
+    let msg_id1 = queue.send(&test_queue, &msg).await.unwrap();
     assert_eq!(msg_id1, 1);
-    let msg_id2 = queue.enqueue(&test_queue, &msg).await.unwrap();
+    let msg_id2 = queue.send(&test_queue, &msg).await.unwrap();
     assert_eq!(msg_id2, 2);
-    let msg_id3 = queue.enqueue(&test_queue, &msg).await.unwrap();
+    let msg_id3 = queue.send(&test_queue, &msg).await.unwrap();
     assert_eq!(msg_id3, 3);
 
-    let vt: u32 = 1;
+    let vt: i32 = 1;
     // READ FIRST TWO MESSAGES
     let read1 = queue
         .read::<Value>(&test_queue, Some(&vt))
@@ -183,11 +192,11 @@ async fn test_serde() {
         foo: "bar".to_owned(),
         num: rng.gen_range(0..100000),
     };
-    let msg1 = queue.enqueue(&test_queue, &msg).await.unwrap();
+    let msg1 = queue.send(&test_queue, &msg).await.unwrap();
     assert_eq!(msg1, 1);
 
     let msg_read = queue
-        .read::<MyMessage>(&test_queue, Some(&30_u32))
+        .read::<MyMessage>(&test_queue, Some(&30_i32))
         .await
         .unwrap()
         .unwrap();
@@ -200,11 +209,11 @@ async fn test_serde() {
         "foo": "bar",
         "num": rng.gen_range(0..100000)
     });
-    let msg2 = queue.enqueue(&test_queue, &msg).await.unwrap();
+    let msg2 = queue.send(&test_queue, &msg).await.unwrap();
     assert_eq!(msg2, 2);
 
     let msg_read = queue
-        .read::<Value>(&test_queue, Some(&30_u32))
+        .read::<Value>(&test_queue, Some(&30_i32))
         .await
         .unwrap()
         .unwrap();
@@ -219,11 +228,11 @@ async fn test_serde() {
         "num": rng.gen_range(0..100000)
     });
 
-    let msg3 = queue.enqueue(&test_queue, &msg).await.unwrap();
+    let msg3 = queue.send(&test_queue, &msg).await.unwrap();
     assert_eq!(msg3, 3);
 
     let msg_read = queue
-        .read::<MyMessage>(&test_queue, Some(&30_u32))
+        .read::<MyMessage>(&test_queue, Some(&30_i32))
         .await
         .unwrap()
         .unwrap();
@@ -236,10 +245,10 @@ async fn test_serde() {
         foo: "bar".to_owned(),
         num: rng.gen_range(0..100000),
     };
-    let msg4 = queue.enqueue(&test_queue, &msg).await.unwrap();
+    let msg4 = queue.send(&test_queue, &msg).await.unwrap();
     assert_eq!(msg4, 4);
     let msg_read = queue
-        .read::<Value>(&test_queue, Some(&30_u32))
+        .read::<Value>(&test_queue, Some(&30_i32))
         .await
         .unwrap()
         .unwrap();
@@ -254,10 +263,10 @@ async fn test_serde() {
         "foo": "bar".to_owned(),
         "num": rng.gen_range(0..100000),
     });
-    let msg5 = queue.enqueue(&test_queue, &msg).await.unwrap();
+    let msg5 = queue.send(&test_queue, &msg).await.unwrap();
     assert_eq!(msg5, 5);
     let msg_read: crate::pgmq::Message = queue
-        .read(&test_queue, Some(&30_u32)) // no turbofish on this line
+        .read(&test_queue, Some(&30_i32)) // no turbofish on this line
         .await
         .unwrap()
         .unwrap();
@@ -274,13 +283,30 @@ async fn test_pop() {
     let test_queue = "test_pop_queue".to_owned();
     let queue = init_queue(&test_queue).await;
     let msg = MyMessage::default();
-    let msg = queue.enqueue(&test_queue, &msg).await.unwrap();
+    let msg = queue.send(&test_queue, &msg).await.unwrap();
     assert_eq!(msg, 1);
     let popped_msg = queue.pop::<MyMessage>(&test_queue).await.unwrap().unwrap();
     assert_eq!(popped_msg.msg_id, 1);
     let num_rows = rowcount(&test_queue, &queue.connection).await;
     // popped record is deleted on read
     assert_eq!(num_rows, 0);
+}
+
+#[tokio::test]
+async fn test_archive() {
+    let test_queue = "test_archive_queue".to_owned();
+    let queue = init_queue(&test_queue).await;
+    let msg = MyMessage::default();
+    let msg = queue.send(&test_queue, &msg).await.unwrap();
+    assert_eq!(msg, 1);
+    let num_moved = queue.archive(&test_queue, &msg).await.unwrap();
+    assert_eq!(num_moved, 1);
+    let num_rows_queue = rowcount(&test_queue, &queue.connection).await;
+    // archived record is no longer on the queue
+    assert_eq!(num_rows_queue, 0);
+    let num_rows_archive = rowcount(&format!("{test_queue}_archive"), &queue.connection).await;
+    // archived record is now on the archive table
+    assert_eq!(num_rows_archive, 1);
 }
 
 /// test db operations that should produce errors
@@ -291,11 +317,11 @@ async fn test_database_error_modes() {
         .await
         .expect("failed to connect to postgres");
     // let's not create the queues and make sure we get an error
-    let msg_id = queue.enqueue("doesNotExist", &"foo").await;
+    let msg_id = queue.send("doesNotExist", &"foo").await;
     assert!(msg_id.is_err());
 
     // read from a queue that does not exist should error
-    let read_msg = queue.read::<Message>("doesNotExist", Some(&10_u32)).await;
+    let read_msg = queue.read::<Message>("doesNotExist", Some(&10_i32)).await;
     assert!(read_msg.is_err());
 
     // connect to a postgres instance that doesnt exist should error
@@ -321,10 +347,10 @@ async fn test_parsing_error_modes() {
     let test_queue = "test_parsing_queue".to_owned();
     let queue = init_queue(&test_queue).await;
     let msg = MyMessage::default();
-    let _ = queue.enqueue(&test_queue, &msg).await.unwrap();
+    let _ = queue.send(&test_queue, &msg).await.unwrap();
 
     // we sent MyMessage, so trying to parse into YoloMessage should error
-    let read_msg = queue.read::<YoloMessage>(&test_queue, Some(&10_u32)).await;
+    let read_msg = queue.read::<YoloMessage>(&test_queue, Some(&10_i32)).await;
 
     // we expect a parse error
     match read_msg {
@@ -339,4 +365,48 @@ async fn test_parsing_error_modes() {
         // didnt get an error. bad.
         _ => panic!("expected a parse error, got {:?}", read_msg),
     }
+}
+
+/// destroy queue should clean up appropriately
+#[tokio::test]
+async fn test_destroy() {
+    let test_queue = "test_destroy_queue".to_owned();
+    let queue = init_queue(&test_queue).await;
+    let msg = MyMessage::default();
+    // send two messages
+    let msg1 = queue.send(&test_queue, &msg).await.unwrap();
+    let msg2 = queue.send(&test_queue, &msg).await.unwrap();
+
+    // archive one, so there's messages in queue and in archive
+    let _ = queue.archive(&test_queue, &msg1).await.unwrap();
+    // read one to make sure messages are on the queue
+    let read: Message = queue
+        .read(&test_queue, Some(&30_i32))
+        .await
+        .unwrap()
+        .unwrap();
+    assert_eq!(read.msg_id, msg2);
+
+    // must not panic
+    let _ = queue.destroy(&test_queue).await.unwrap();
+
+    // the queue and the queue archive should no longer exist
+    let queue_table = fallible_rowcount(&test_queue, &queue.connection).await;
+    assert!(queue_table.is_err());
+    let archive_table =
+        fallible_rowcount(&format!("{test_queue}_archive"), &queue.connection).await;
+    assert!(archive_table.is_err());
+
+    // queue must not be present on pgmq_meta
+    let pgmq_meta_query = format!(
+        "SELECT count(*) as ct
+        FROM {TABLE_PREFIX}_meta
+        WHERE queue_name = '{test_queue}'",
+    );
+    let rowcount = sqlx::query(&pgmq_meta_query)
+        .fetch_one(&queue.connection)
+        .await
+        .unwrap()
+        .get::<i64, usize>(0);
+    assert_eq!(rowcount, 0);
 }

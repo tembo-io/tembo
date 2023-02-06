@@ -30,7 +30,7 @@ async fn main() {
     let msg1 = serde_json::json!({
         "foo": "bar"
     });
-    let msg_id1: i64 = queue.enqueue(&myqueue, &msg1).await.expect("Failed to enqueue message");
+    let msg_id1: i64 = queue.send(&myqueue, &msg1).await.expect("Failed to enqueue message");
 
     // SEND A STRUCT
     #[derive(Serialize, Debug, Deserialize)]
@@ -40,10 +40,10 @@ async fn main() {
     let msg2 = MyMessage {
         foo: "bar".to_owned(),
     };
-    let msg_id2: i64  = queue.enqueue(&myqueue, &msg2).await.expect("Failed to enqueue message");
+    let msg_id2: i64  = queue.send(&myqueue, &msg2).await.expect("Failed to enqueue message");
 
     // READ A MESSAGE as `serde_json::Value`
-    let vt: u32 = 30;
+    let vt: i32 = 30;
     let read_msg1: Message<Value> = queue.read::<Value>(&myqueue, Some(&vt)).await.unwrap().expect("no messages in the queue!");
     assert_eq!(read_msg1.msg_id, msg_id1);
 
@@ -62,9 +62,10 @@ async fn main() {
 ```
 ## Sending messages
 
-`queue.enqueue()` can be passed any type that implements `serde::Serialize`. This means you can prepare your messages as JSON or as a struct.
+`queue.send()` can be passed any type that implements `serde::Serialize`. This means you can prepare your messages as JSON or as a struct.
 
 ## Reading messages
+
 Reading a message will make it invisible (unavailable for consumption) for the duration of the visibility timeout (vt).
 No messages are returned when the queue is empty or all messages are invisible.
 
@@ -74,11 +75,8 @@ Note that when parsing into a `struct`, the operation will return an error if
 parsed as the type specified. For example, if the message expected is
 `MyMessage{foo: "bar"}` but` {"hello": "world"}` is received, the application will panic.
 
-#### as a Struct
-Reading a message will make it invisible for the duration of the visibility timeout (vt).
-No messages are returned when the queue is empty or all messages are invisible.
+## Archive or Delete a message
 
-## Delete a message
-Remove the message from the queue when you are done with it.
+Remove the message from the queue when you are done with it. You can either completely `.delete()`, or `.archive()` the message. Archived messages are deleted from the queue and inserted to the queue's archive table. Deleted messages are just deleted.
 
 License: MIT
