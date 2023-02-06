@@ -52,7 +52,7 @@ jobs:
         id: cargo_flags
         run: |
           set -x
-          BRANCH=$(git rev-parse --abbrev-ref HEAD)
+          BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
           if [ "${BRANCH_NAME}" == "main" ]; then
             echo "dry_run=false" >> $GITHUB_OUTPUT
             echo "fail_if_version_published=false" >> $GITHUB_OUTPUT
