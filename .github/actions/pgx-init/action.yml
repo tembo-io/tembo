@@ -8,29 +8,20 @@ inputs:
     description: 'The version of postgres to use'
     required: false
     default: 14
-  pgx_version:
-    description: 'The version of pgx to use'
-    required: false
-    default: "0.7.1"
 outputs: {}
 runs:
   using: "composite"
   steps:
-      - name: setup pgx
-        shell: bash
-        run: cargo install --version ${{ inputs.pgx_version }} cargo-pgx
-        working-directory: ${{ inputs.working-directory }}
       - name: pgx init
         shell: bash
         working-directory: ${{ inputs.working-directory }}
         run: |
           set -x
-          ls -ltrah /home/runner/.pgx || true
+          cargo build
           # pgx init can take a long time, and it re-compiles postgres even when there
           # is a cached version. So, we can just check for the directory and
           if find /home/runner/.pgx | grep $(awk -F "=" '/pg${{ inputs.pg_version }}/ {print $2}' /home/runner/.pgx/config.toml | tr -d '"'); then
             echo "Already found pgx is initialized. Skipping 'cargo pgx init' command."
           else
-            cargo pgx init --pg${{ inputs.pg_version }} download
+            cargo pgx init --pg${{ inputs.pg_version }} download || true
           fi
-          ls -ltrah /home/runner/.pgx

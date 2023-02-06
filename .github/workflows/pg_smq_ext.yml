@@ -42,7 +42,6 @@ jobs:
       - uses: ./.github/actions/pgx-init
         with:
           working-directory: extensions/pgmq
-          pgx_version: "0.7.1"
       - name: Cargo format
         run: cargo +nightly fmt --all --check
       - name: Clippy
@@ -76,7 +75,6 @@ jobs:
         with:
           working-directory: extensions/pgmq
           pg_version: ${{ matrix.pg_version }}
-          pgx_version: "0.7.1"
       - name: test
         run: |
           rm -rf ./target/pgx-test-data-${{ matrix.pg_version }} || true

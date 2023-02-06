@@ -41,7 +41,6 @@ jobs:
       - uses: ./.github/actions/pgx-init
         with:
           working-directory: extensions/prometheus_exporter
-          pgx_version: "0.6.1"
       - name: Cargo format
         run: cargo +nightly fmt --all --check
       - name: Clippy
@@ -75,7 +74,6 @@ jobs:
         with:
           working-directory: extensions/prometheus_exporter
           pg_version: ${{ matrix.pg_version }}
-          pgx_version: "0.6.1"
       - name: test
         run: |
           rm -rf ./target/pgx-test-data-${{ matrix.pg_version }} || true
