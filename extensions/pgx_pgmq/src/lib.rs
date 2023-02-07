@@ -46,8 +46,31 @@ fn pgmq_read(
     >,
     spi::Error,
 > {
-    Spi::connect(|mut client| {
-        let mut results = Vec::new();
+    let results = readit(queue_name, vt)?;
+    Ok(TableIterator::new(results.into_iter()))
+}
+
+fn readit(
+    queue_name: &str,
+    vt: i32,
+) -> Result<
+    Vec<(
+        i64,
+        i32,
+        TimestampWithTimeZone,
+        TimestampWithTimeZone,
+        pgx::Json,
+    )>,
+    spi::Error,
+> {
+    let mut results: Vec<(
+        i64,
+        i32,
+        TimestampWithTimeZone,
+        TimestampWithTimeZone,
+        pgx::Json,
+    )> = Vec::new();
+    let _: Result<(), spi::Error> = Spi::connect(|mut client| {
         let mut tup_table: SpiTupleTable = client.update(&read(queue_name, &vt), None, None)?;
         while let Some(row) = tup_table.next() {
             let msg_id = row["msg_id"].value::<i64>()?.expect("no msg_id");
@@ -59,9 +82,9 @@ fn pgmq_read(
             let message = row["message"].value::<pgx::Json>()?.expect("no message");
             results.push((msg_id, read_ct, vt, enqueued_at, message));
         }
-
-        Ok(TableIterator::new(results.into_iter()))
-    })
+        Ok(())
+    });
+    Ok(results)
 }
 
 #[pg_extern(volatile)]
@@ -106,8 +129,30 @@ fn pgmq_pop(
     >,
     spi::Error,
 > {
-    Spi::connect(|mut client| {
-        let mut results = Vec::new();
+    let results = popit(queue_name)?;
+    Ok(TableIterator::new(results.into_iter()))
+}
+
+fn popit(
+    queue_name: &str,
+) -> Result<
+    Vec<(
+        i64,
+        i32,
+        TimestampWithTimeZone,
+        TimestampWithTimeZone,
+        pgx::Json,
+    )>,
+    spi::Error,
+> {
+    let mut results: Vec<(
+        i64,
+        i32,
+        TimestampWithTimeZone,
+        TimestampWithTimeZone,
+        pgx::Json,
+    )> = Vec::new();
+    let _: Result<(), spi::Error> = Spi::connect(|mut client| {
         let mut tup_table: SpiTupleTable = client.update(&pop(queue_name), None, None)?;
         while let Some(row) = tup_table.next() {
             let msg_id = row["msg_id"].value::<i64>()?.expect("no msg_id");
@@ -119,9 +164,9 @@ fn pgmq_pop(
             let message = row["message"].value::<pgx::Json>()?.expect("no message");
             results.push((msg_id, read_ct, vt, enqueued_at, message));
         }
-
-        Ok(TableIterator::new(results.into_iter()))
-    })
+        Ok(())
+    });
+    Ok(results)
 }
 
 #[pg_extern]
@@ -173,7 +218,7 @@ mod tests {
     // assert an invisible message is not readable
     #[pg_test]
     fn test_default() {
-        let qname = r#"test_queue"#;
+        let qname = r#"test_default"#;
         let _ = pgmq_create(&qname);
         let init_count =
             Spi::get_one::<i64>(&format!("SELECT count(*) FROM {TABLE_PREFIX}_{qname}"))
@@ -183,12 +228,14 @@ mod tests {
 
         // put a message on the queue
         let _ = pgmq_send(&qname, pgx::Json(serde_json::json!({"x":"y"})));
-        // read the message off queue
-        let msg = pgmq_read(&qname, 10_i32).unwrap();
-        assert!(msg.is_some());
+
+        let msg = pgmq_read(&qname, 10_i32);
+
         // should be no messages left
-        let nomsgs = pgmq_read(&qname, 10_i32).unwrap();
-        assert!(nomsgs.is_none());
+        let nomsgs = pgmq_read(&qname, 10_i32);
+        assert!(nomsgs.is_ok());
+        log!("nomsgs: {:?}", nomsgs.unwrap());
+        assert_eq!(nomsgs.into_iter().len(), 0);
         // but still one record on the table
         let init_count =
             Spi::get_one::<i64>(&format!("SELECT count(*) FROM {TABLE_PREFIX}_{qname}"))
