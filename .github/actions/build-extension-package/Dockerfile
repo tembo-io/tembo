@@ -16,6 +16,8 @@ RUN apt-fast install apt-fast curl unzip gpg wget -y
 RUN curl https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor | tee /etc/apt/trusted.gpg.d/apt.postgresql.org.gpg > /dev/null
 RUN echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list
 
+ARG PGVERSION=15
+
 RUN apt-get update && apt-fast install -y postgresql-${PGVERSION} postgresql-server-dev-${PGVERSION} pkg-config libssl-dev build-essential libclang-dev clang
 
 USER postgres
@@ -24,7 +26,6 @@ USER postgres
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 ENV PATH="/var/lib/postgresql/.cargo/bin:${PATH}"
 
-ARG PGVERSION=15
 ARG PGX_VERSION=0.7.1
 
 # Install tcdi/pgx
