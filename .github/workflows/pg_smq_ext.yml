@@ -20,61 +20,35 @@ on:
       - 'release/[0-9]+.[0-9]+'
 
 jobs:
-  # lint:
-  #   name: Run linters
-  #   runs-on: ubuntu-22.04
-  #   steps:
-  #     - uses: actions/checkout@v3
-  #     - name: Install Rust minimal nightly with clippy and rustfmt
-  #       uses: actions-rs/toolchain@v1
-  #       with:
-  #         profile: minimal
-  #         toolchain: nightly
-  #         components: rustfmt, clippy
-  #     - uses: Swatinem/rust-cache@v2
-  #       with:
-  #         prefix-key: "pg-smq-extension-lint"
-  #         workspaces: |
-  #           extensions/pgx_pgmq
-  #         # Additional directories to cache
-  #         cache-directories: |
-  #           /home/runner/.pgx
-  #     - uses: ./.github/actions/pgx-init
-  #       with:
-  #         working-directory: extensions/pgx_pgmq
-  #     - name: Cargo format
-  #       run: cargo +nightly fmt --all --check
-  #     - name: Clippy
-  #       run: cargo clippy
+  lint:
+    name: Run linters
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust minimal nightly with clippy and rustfmt
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: "pg-smq-extension-lint"
+          workspaces: |
+            extensions/pgx_pgmq
+          # Additional directories to cache
+          cache-directories: |
+            /home/runner/.pgx
+      - uses: ./.github/actions/pgx-init
+        with:
+          working-directory: extensions/pgx_pgmq
+      - name: Cargo format
+        run: cargo +nightly fmt --all --check
+      - name: Clippy
+        run: cargo clippy
 
-  # test:
-  #   name: Run tests
-  #   runs-on: ubuntu-22.04
-  #   steps:
-  #     - uses: actions/checkout@v2
-  #     - name: Install Rust stable toolchain
-  #       uses: actions-rs/toolchain@v1
-  #       with:
-  #         toolchain: stable
-  #     - uses: Swatinem/rust-cache@v2
-  #       with:
-  #         prefix-key: "pg-smq-extension-test"
-  #         workspaces: |
-  #           extensions/pgx_pgmq
-  #         # Additional directories to cache
-  #         cache-directories: |
-  #           /home/runner/.pgx
-  #     - uses: ./.github/actions/pgx-init
-  #       with:
-  #         working-directory: extensions/pgx_pgmq
-  #     - name: test
-  #       run: |
-  #         rm -rf ./target/pgx-test-data-* || true
-  #         pg_version=$(stoml Cargo.toml features.default)
-  #         cargo pgx test ${pg_version}
-
-  build:
-    name: Build the extension
+  test:
+    name: Run tests
     runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v2
@@ -82,7 +56,19 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-      - uses: ./.github/actions/build-extension-package
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: "pg-smq-extension-test"
+          workspaces: |
+            extensions/pgx_pgmq
+          # Additional directories to cache
+          cache-directories: |
+            /home/runner/.pgx
+      - uses: ./.github/actions/pgx-init
         with:
           working-directory: extensions/pgx_pgmq
-          name: pgmq
+      - name: test
+        run: |
+          rm -rf ./target/pgx-test-data-* || true
+          pg_version=$(stoml Cargo.toml features.default)
+          cargo pgx test ${pg_version}
