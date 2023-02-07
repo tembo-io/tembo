@@ -3,4 +3,6 @@
 /target
 *.iml
 **/*.rs.bk
-Cargo.lock
+Dockerfile
+.dockerignore
+docker/**
