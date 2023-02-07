@@ -21,7 +21,6 @@ fn pgmq_create(queue_name: &str) -> Result<(), spi::Error> {
     }
 }
 
-// puts messages onto the queue
 #[pg_extern]
 fn pgmq_send(queue_name: &str, message: pgx::Json) -> Result<Option<i64>, spi::Error> {
     let m = serde_json::to_string(&message.0).unwrap();
@@ -29,27 +28,39 @@ fn pgmq_send(queue_name: &str, message: pgx::Json) -> Result<Option<i64>, spi::E
 }
 
 // check message out of the queue using default timeout
-#[pg_extern]
-fn pgmq_read(queue_name: &str, vt: i32) -> Result<Option<pgx::Json>, spi::Error> {
-    Spi::connect(|mut client| {
-        let tup_table: SpiTupleTable = client.update(&read(queue_name, &vt), None, None)?.first();
-        let row = tup_table.get_heap_tuple()?;
-        match row {
-            Some(row) => {
-                let msg_id = row["msg_id"].value::<i64>()?.expect("no msg_id");
-                let vt = row["vt"]
-                    .value::<pgx::TimestampWithTimeZone>()?
-                    .expect("no vt");
-                let message = row["message"].value::<pgx::Json>()?.expect("no message");
 
-                Ok(Some(pgx::Json(serde_json::json!({
-                    "msg_id": msg_id,
-                    "vt": vt,
-                    "message": message
-                }))))
-            }
-            None => Ok(None),
+#[pg_extern]
+fn pgmq_read(
+    queue_name: &str,
+    vt: i32,
+) -> Result<
+    TableIterator<
+        'static,
+        (
+            name!(msg_id, i64),
+            name!(read_ct, i32),
+            name!(vt, TimestampWithTimeZone),
+            name!(enqueued_at, TimestampWithTimeZone),
+            name!(message, pgx::Json),
+        ),
+    >,
+    spi::Error,
+> {
+    Spi::connect(|mut client| {
+        let mut results = Vec::new();
+        let mut tup_table: SpiTupleTable = client.update(&read(queue_name, &vt), None, None)?;
+        while let Some(row) = tup_table.next() {
+            let msg_id = row["msg_id"].value::<i64>()?.expect("no msg_id");
+            let read_ct = row["read_ct"].value::<i32>()?.expect("no read_ct");
+            let vt = row["vt"].value::<TimestampWithTimeZone>()?.expect("no vt");
+            let enqueued_at = row["enqueued_at"]
+                .value::<TimestampWithTimeZone>()?
+                .expect("no enqueue time");
+            let message = row["message"].value::<pgx::Json>()?.expect("no message");
+            results.push((msg_id, read_ct, vt, enqueued_at, message));
         }
+
+        Ok(TableIterator::new(results.into_iter()))
     })
 }
 
@@ -80,42 +91,64 @@ fn pgmq_delete(queue_name: &str, msg_id: i64) -> Result<Option<bool>, spi::Error
 
 // reads and deletes at same time
 #[pg_extern]
-fn pgmq_pop(queue_name: &str) -> Result<Option<pgx::Json>, spi::Error> {
-    let (msg_id, vt, message) =
-        Spi::get_three::<i64, pgx::TimestampWithTimeZone, pgx::Json>(&pop(queue_name))?;
-    match msg_id {
-        Some(msg_id) => Ok(Some(pgx::Json(serde_json::json!({
-            "msg_id": msg_id,
-            "vt": vt,
-            "message": message
-        })))),
-        None => Ok(None),
-    }
+fn pgmq_pop(
+    queue_name: &str,
+) -> Result<
+    TableIterator<
+        'static,
+        (
+            name!(msg_id, i64),
+            name!(read_ct, i32),
+            name!(vt, TimestampWithTimeZone),
+            name!(enqueued_at, TimestampWithTimeZone),
+            name!(message, pgx::Json),
+        ),
+    >,
+    spi::Error,
+> {
+    Spi::connect(|mut client| {
+        let mut results = Vec::new();
+        let mut tup_table: SpiTupleTable = client.update(&pop(queue_name), None, None)?;
+        while let Some(row) = tup_table.next() {
+            let msg_id = row["msg_id"].value::<i64>()?.expect("no msg_id");
+            let read_ct = row["read_ct"].value::<i32>()?.expect("no read_ct");
+            let vt = row["vt"].value::<TimestampWithTimeZone>()?.expect("no vt");
+            let enqueued_at = row["enqueued_at"]
+                .value::<TimestampWithTimeZone>()?
+                .expect("no enqueue time");
+            let message = row["message"].value::<pgx::Json>()?.expect("no message");
+            results.push((msg_id, read_ct, vt, enqueued_at, message));
+        }
+
+        Ok(TableIterator::new(results.into_iter()))
+    })
 }
 
 #[pg_extern]
-fn pgmq_list_queues() -> Result<Vec<pgx::Json>, spi::Error> {
+fn pgmq_list_queues() -> Result<
+    TableIterator<
+        'static,
+        (
+            name!(queue_name, String),
+            name!(created_at, TimestampWithTimeZone),
+        ),
+    >,
+    spi::Error,
+> {
     let query = "SELECT * FROM pgmq_meta";
-    let result: Result<Vec<pgx::Json>, spi::Error> = Spi::connect(|client| {
-        let mut queues = Vec::new();
-        let tup_table = client.select(query, None, None)?;
-
-        for row in tup_table {
-            let queue_name = row["queue_name"]
-                .value::<String>()?
-                .expect("queue name empty");
-            let created = row["created_at"]
-                .value::<pgx::TimestampWithTimeZone>()?
-                .expect("created at was null");
-            queues.push(pgx::Json(serde_json::json!({
-                "queue_name": queue_name,
-                "created_at": created
-
-            })));
+    Spi::connect(|client| {
+        let mut results = Vec::new();
+        let mut tup_table: SpiTupleTable = client.select(query, None, None)?;
+        while let Some(row) = tup_table.next() {
+            let queue_name = row["queue_name"].value::<String>()?.expect("no queue_name");
+            let created_at = row["created_at"]
+                .value::<TimestampWithTimeZone>()?
+                .expect("no created_at");
+            results.push((queue_name, created_at));
         }
-        Ok(queues)
-    });
-    result
+
+        Ok(TableIterator::new(results.into_iter()))
+    })
 }
 
 #[cfg(any(test, feature = "pg_test"))]
