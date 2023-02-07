@@ -50,4 +50,4 @@ cat ${TARGET}/DEBIAN/control
 PACKAGE=postgresql-${NAME}-${PGVERSION}_${PACKAGE_VERSION}-ubuntu${UBUNTU_VERSION}-${ARCH}.deb
 
 # Build the debian package
-dpkg-deb --build ${TARGET} $OUTPUT_DIR/${PACKAGE}
+dpkg-deb -Zgzip --build ${TARGET} $OUTPUT_DIR/${PACKAGE}
