@@ -5,6 +5,7 @@
 
 PACKAGE_VERSION=${PACKAGE_VERSION:-0.0.0}
 OUTPUT_DIR=${OUTPUT_DIR:-"."}
+NAME=${PACKAGE_NAME:-"coredb-extension"}
 
 if [[ $(uname -a) == *"aarch64"* ]]; then
     ARCH="arm64"
@@ -25,23 +26,28 @@ else
     exit 1
 fi
 
-TARGET="target/release/pgx_pgmq-pg${PGVERSION}"
+TARGET="target/release/${NAME}-pg${PGVERSION}"
 UBUNTU_VERSION=$(lsb_release -a | grep Release | awk '{ print $2 }')
 
 ls -R ${TARGET}
 
 mkdir -p ${TARGET}/DEBIAN
-cp control ${TARGET}/DEBIAN/control
 
-# Save version and arch.
-sed -i "s/PGVERSION/${PGVERSION}/g" ${TARGET}/DEBIAN/control
-sed -i "s/PACKAGE_VERSION/${PACKAGE_VERSION}/g" ${TARGET}/DEBIAN/control
-sed -i "s/ARCH/${ARCH}/g" ${TARGET}/DEBIAN/control
+echo <<EOF > ${TARGET}/DEBIAN/control
+Package: postgresql-${NAME}-$PGVERSION}
+Version: ${PACKAGE_VERSION}
+Section: database
+Priority: optional
+Architecture: ${ARCH}
+Depends: postgresql-${PGVERSION}, postgresql-server-dev-${PGVERSION}
+Maintainer: CoreDB <admin+${NAME}@coredb.io>
+Homepage: https://coredb.io
+Description: The extension is written in Rust using tcdi/pgx
+EOF
 
-# Show me what we got.
 cat ${TARGET}/DEBIAN/control
 
-PACKAGE=postgresql-pgmq-${PGVERSION}_${PACKAGE_VERSION}-ubuntu${UBUNTU_VERSION}-${ARCH}.deb
+PACKAGE=postgresql-${NAME}-${PGVERSION}_${PACKAGE_VERSION}-ubuntu${UBUNTU_VERSION}-${ARCH}.deb
 
 # Build the debian package
 dpkg-deb --build ${TARGET} $OUTPUT_DIR/${PACKAGE}

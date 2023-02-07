@@ -85,3 +85,4 @@ jobs:
       - uses: ./.github/actions/build-extension-package
         with:
           working-directory: extensions/pgx_pgmq
+          name: pgmq

@@ -12,6 +12,9 @@ inputs:
     description: 'The version of Ubuntu to build for'
     default: "22.04"
     required: false
+  name:
+    description: 'Short name for this extension'
+    required: true
 outputs: {}
 runs:
   using: "composite"
@@ -68,6 +71,7 @@ runs:
           docker build . --build-arg UBUNTU_VERSION=${{ inputs.ubuntu_version }} \
                          --build-arg PGX_VERSION=${{ steps.pgx_version.outputs.pgx_version }} \
                          --build-arg PACKAGE_VERSION=${{ steps.pgx_version.outputs.extension_version }} \
+                         --build-arg PACKAGE_NAME=${{ inputs.name }} \
                          --build-arg PGVERSION=${{ inputs.pg_version }} \
                          -t ${random_tag}
           docker run -v $(pwd):/output ${random_tag}
