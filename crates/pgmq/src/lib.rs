@@ -95,6 +95,7 @@ pub mod query;
 use chrono::serde::ts_seconds::deserialize as from_ts;
 
 const VT_DEFAULT: i32 = 30;
+const READ_LIMIT_DEFAULT: i32 = 1;
 
 #[derive(Debug, Deserialize, FromRow)]
 pub struct Message<T = serde_json::Value> {
@@ -152,6 +153,8 @@ impl PGMQueue {
         Ok(())
     }
 
+    // send_batch fn takes vec! types that implement serialize (vec T)
+
     /// Send a message to the queue
     pub async fn send<T: Serialize>(
         &self,
@@ -166,6 +169,9 @@ impl PGMQueue {
         Ok(msg_id)
     }
 
+    // could create read_batch(queue_name, vt, num_messages)
+    // return type would change to result<option<vec!<message>>>
+
     /// Reads a single message from the queue. If the queue is empty or all messages are invisible, `None` is returned.
     /// If a message is returned, it is made invisible for the duration of the visibility timeout (vt) in seconds.
     pub async fn read<T: for<'de> Deserialize<'de>>(
@@ -178,10 +184,32 @@ impl PGMQueue {
             Some(t) => t,
             None => &VT_DEFAULT,
         };
-        let query = &query::read(queue_name, vt_);
+        let limit = &READ_LIMIT_DEFAULT;
+        let query = &query::read(queue_name, vt_, limit);
         let message = fetch_one_message::<T>(query, &self.connection).await?;
         Ok(message)
     }
+
+    /// Reads a given number of messages (num_msgs) from the queue. If the queue is empty or all messages are invisible, `None` is returned.
+    /// If a message is returned, it is made invisible for the duration of the visibility timeout (vt) in seconds.
+    pub async fn read_batch<T: for<'de> Deserialize<'de>>(
+        &self,
+        queue_name: &str,
+        vt: Option<&i32>,
+        num_msgs: &i32,
+    ) -> Result<Option<Vec<Message<T>>>, errors::PgmqError> {
+        // map vt or default VT
+        let vt_ = match vt {
+            Some(t) => t,
+            None => &VT_DEFAULT,
+        };
+        let query = &query::read(queue_name, vt_, num_msgs);
+        let messages = fetch_messages::<T>(query, &self.connection).await?;
+        Ok(messages)
+    }
+
+    // batch_delete, vec of msg_id
+    //
 
     /// Delete a message from the queue
     pub async fn delete(&self, queue_name: &str, msg_id: &i64) -> Result<u64, Error> {
@@ -236,6 +264,37 @@ async fn fetch_one_message<T: for<'de> Deserialize<'de>>(
         Err(sqlx::error::Error::RowNotFound) => Ok(None),
         Err(e) => Err(e)?,
     }
+}
+
+// Executes a query and returns multiple rows
+// If the query returns no rows, None is returned
+async fn fetch_messages<T: for<'de> Deserialize<'de>>(
+    query: &str,
+    connection: &Pool<Postgres>,
+) -> Result<Option<Vec<Message<T>>>, errors::PgmqError> {
+    let mut messages: Vec<Message<T>> = Vec::new();
+    let rows: Result<Vec<PgRow>, Error> = sqlx::query(query).fetch_all(connection).await;
+    if let Err(sqlx::error::Error::RowNotFound) = rows {
+        return Ok(None)
+    } else if let Err(e) = rows {
+        return Err(e)?
+    } else if let Ok(rows) = rows {
+        // happy path - successfully read a message
+        for row in rows.iter() {
+            let raw_msg = row.get("message");
+            let parsed_msg = serde_json::from_value::<T>(raw_msg);
+            if let Err(e) = parsed_msg {
+                return Err(errors::PgmqError::JsonParsingError(e))
+            } else if let Ok(parsed_msg) = parsed_msg {
+                messages.push(Message {
+                    msg_id: row.get("msg_id"),
+                    vt: row.get("vt"),
+                    message: parsed_msg,
+                })
+            }
+        }
+    }
+    Ok(Some(messages))
 }
 
 // Configure connection options

@@ -180,6 +180,38 @@ async fn test_fifo() {
 }
 
 #[tokio::test]
+async fn test_read_batch() {
+    let test_queue = "test_read_batch".to_owned();
+
+    let queue = init_queue(&test_queue).await;
+
+    // PUBLISH THREE MESSAGES
+    let msg = serde_json::json!({
+        "foo": "bar1"
+    });
+    let msg_id1 = queue.send(&test_queue, &msg).await.unwrap();
+    assert_eq!(msg_id1, 1);
+    let msg_id2 = queue.send(&test_queue, &msg).await.unwrap();
+    assert_eq!(msg_id2, 2);
+    let msg_id3 = queue.send(&test_queue, &msg).await.unwrap();
+    assert_eq!(msg_id3, 3);
+
+    let vt: i32 = 1;
+    let num_msgs = 2;
+
+    let batch = queue
+        .read_batch::<Value>(&test_queue, Some(&vt), &num_msgs)
+        .await
+        .unwrap()
+        .unwrap();
+
+    for (i, message) in batch.iter().enumerate() {
+        let index = i + 1;
+        assert_eq!(message.msg_id.to_string(), index.to_string());
+    }
+}
+
+#[tokio::test]
 async fn test_serde() {
     // series of tests serializing to queue and deserializing from queue
     let mut rng = rand::thread_rng();
@@ -356,6 +388,9 @@ async fn test_database_error_modes() {
         _ => panic!("expected a db error, got {:?}", read_msg),
     }
 }
+
+// tests for batch feature
+// ...
 
 /// test parsing operations that should produce errors
 #[tokio::test]

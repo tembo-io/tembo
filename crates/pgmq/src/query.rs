@@ -121,6 +121,9 @@ pub fn create_index(name: &str) -> String {
     )
 }
 
+// need to use query for inserting multiple rows
+// iterate through vec and generate string, add string to sql statement
+
 pub fn enqueue(name: &str, message: &serde_json::Value) -> String {
     // TOOO: vt should be now() + delay
     format!(
@@ -142,7 +145,12 @@ pub fn enqueue_str(name: &str, message: &str) -> String {
     )
 }
 
-pub fn read(name: &str, vt: &i32) -> String {
+// keep 1 read fn
+// instead of LIMIT 1, add limit parameter
+// read fn would pass 1
+// read_batch would pass n
+
+pub fn read(name: &str, vt: &i32, limit: &i32) -> String {
     format!(
         "
     WITH cte AS
@@ -151,7 +159,7 @@ pub fn read(name: &str, vt: &i32) -> String {
             FROM {TABLE_PREFIX}_{name}
             WHERE vt <= now() at time zone 'utc'
             ORDER BY msg_id ASC
-            LIMIT 1
+            LIMIT {limit}
             FOR UPDATE SKIP LOCKED
         )
     UPDATE {TABLE_PREFIX}_{name}
@@ -163,6 +171,11 @@ pub fn read(name: &str, vt: &i32) -> String {
     "
     )
 }
+
+// batch_delete fn
+// iterate through vec of msg_id
+// construct list of msg_id
+// WHERE msg_id in (msg_id1, msg_id2)
 
 pub fn delete(name: &str, msg_id: &i64) -> String {
     format!(
@@ -231,8 +244,9 @@ mod tests {
     fn test_read() {
         let qname = "myqueue";
         let vt: i32 = 20;
+        let limit: i32 = 1;
 
-        let query = read(&qname, &vt);
+        let query = read(&qname, &vt, &limit);
 
         assert!(query.contains(&qname));
         assert!(query.contains(&vt.to_string()));
