@@ -27,47 +27,62 @@ cargo pgx run pg14
 
 ```sql
 CREATE EXTENSION pgmq;
+
 ```
 
 ### Creating a queue
 
 ```sql
 SELECT pgmq_create('my_queue');
+
+ pgmq_create 
+-------------
+ 
 ```
 
 ### Enqueueing a message
 
 ```sql
-pgmq=# SELECT pgmq_enqueue('my_queue', '{"foo": "bar"}');
- pgmq_enqueue 
+pgmq=# SELECT * from pgmq_send('my_queue', '{"foo": "bar"}');
+ pgmq_send
 --------------
             1
 ```
 
 ## Read a message
-Reads a single message from the queue. 
+Reads a single message from the queue. Make it invisible for 30 seconds. 
 ```sql
-pgmq=# SELECT pgmq_read('my_queue');
-                               pgmq_read                                
-------------------------------------------------------------------------
- {"message":{"foo":"bar"},"msg_id":1,"vt":"2023-01-01T13:54:15.646554"}
+pgmq=# SELECT * from pgmq_read('my_queue', 30);
+
+ msg_id | read_ct |              vt               |          enqueued_at          |    message    
+--------+---------+-------------------------------+-------------------------------+---------------
+      1 |       2 | 2023-02-07 04:56:00.650342-06 | 2023-02-07 04:54:51.530818-06 | {"foo":"bar"}
 ```
 
-If the queue is empty, or if all messages are currently invisible, it will immediately return None.
+If the queue is empty, or if all messages are currently invisible, no rows will be returned.
+
 ```sql
-pgmq=# SELECT pgmq_read('my_queue');
- pgmq_read 
------------
+pgx_pgmq=# SELECT * from pgmq_read('my_queue', 30);
+ msg_id | read_ct | vt | enqueued_at | message 
+--------+---------+----+-------------+---------
+
 ```
 
 ### Pop a message
 Read a message and immediately delete it from the queue. Returns `None` if the queue is empty.
 ```sql
-pgmq=# SELECT pgmq_pop('my_queue');
-                                pgmq_pop                                
-------------------------------------------------------------------------
- {"message":{"foo":"bar"},"msg_id":1,"vt":"2023-01-01T13:55:15.967657"}
+pgmq=# SELECT * from pgmq_pop('my_queue');
+
+ msg_id | read_ct |              vt               |          enqueued_at          |    message    
+--------+---------+-------------------------------+-------------------------------+---------------
+      1 |       2 | 2023-02-07 04:56:00.650342-06 | 2023-02-07 04:54:51.530818-06 | {"foo":"bar"}
 ```
+
+### Archive a message
+
+Archiving a message removes it from the queue, and inserts it to the archive table.
+TODO:
+
 
 ### Delete a message
 Delete a message with id `1` from queue named `my_queue`.
