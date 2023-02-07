@@ -1287,9 +1287,9 @@ checksum = "478c572c3d73181ff3c2539045f6eb99e5491218eae919370993b890cdbdd98e"
 
 [[package]]
 name = "pgmq"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a3730d972ddedcecaf33e18154b10269e76bde042e26ae0b12977bb992d249b1"
+checksum = "b41d1d4b71d23cf7c9f3a2fad8d0eb7d026e4ee2ad6ebae072616b67a1b5cc33"
 dependencies = [
  "chrono",
  "serde",

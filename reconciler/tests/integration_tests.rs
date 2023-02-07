@@ -52,7 +52,7 @@ mod test {
         "message_type": "Create"
         });
 
-        let msg_id = queue.enqueue(&myqueue, &msg).await;
+        let msg_id = queue.send(&myqueue, &msg).await;
         println!("msg_id: {:?}", msg_id);
 
         let client = kube_client().await;

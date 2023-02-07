@@ -1,5 +1,5 @@
 use kube::{Client, ResourceExt};
-use log::info;
+use log::{info, warn};
 use pgmq::{Message, PGMQueue};
 use reconciler::{
     create_ing_route_tcp, create_namespace, create_or_update, delete, delete_namespace,
@@ -8,7 +8,7 @@ use reconciler::{
 use std::env;
 use std::{thread, time};
 
-use reconciler::types::EventBody;
+use reconciler::types;
 
 #[tokio::main]
 async fn run() -> Result<(), Box<dyn std::error::Error>> {
@@ -32,7 +32,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     loop {
         // Read from queue (check for new message)
         let read_msg: Message = match queue
-            .read(&control_plane_events_queue, Some(&30_u32))
+            .read(&control_plane_events_queue, Some(&30_i32))
             .await?
         {
             Some(message) => {
@@ -44,6 +44,11 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 continue;
             }
         };
+        let data_plane_id: String =
+            serde_json::from_value(read_msg.message["data_plane_id"].clone()).unwrap();
+        let event_id: String =
+            serde_json::from_value(read_msg.message["event_id"].clone()).unwrap();
+
         // Based on message_type in message, create, update, delete PostgresCluster
         match serde_json::from_str(&read_msg.message["message_type"].to_string()).unwrap() {
             Some("SnapShot") => {
@@ -51,7 +56,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             }
             Some("Create") | Some("Update") => {
                 let crud_event_body =
-                    serde_json::from_value::<EventBody>(read_msg.message["body"].clone())
+                    serde_json::from_value::<types::EventBody>(read_msg.message["body"].clone())
                         .expect("error parsing body");
                 // create namespace if it does not exist
                 let namespace: String = crud_event_body.resource_name.clone();
@@ -77,21 +82,17 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                     .await
                     .expect("error getting secret");
 
-                let data_plane_id: String =
-                    serde_json::from_value(read_msg.message["data_plane_id"].clone()).unwrap();
-                let event_id: String =
-                    serde_json::from_value(read_msg.message["event_id"].clone()).unwrap();
-
-                // enqueue connection string
-                let msg = serde_json::json!({
-                    "data_plane_id": format!("{}", data_plane_id),
-                    "event_id": format!("{}", event_id),
-                    "event_meta": {
-                        "connection": format!("{}", connection_string),
-                    }
-                });
-                let msg_id = queue.enqueue(&data_plane_events_queue, &msg).await;
-                println!("msg_id: {:?}", msg_id);
+                // report state
+                let msg = types::StateToControlPlane {
+                    data_plane_id,
+                    event_id,
+                    state: types::State {
+                        connection: Some(connection_string),
+                        status: types::Status::Up,
+                    },
+                };
+                let msg_id = queue.send(&data_plane_events_queue, &msg).await?;
+                info!("msg_id: {:?}", msg_id);
             }
             Some("Delete") => {
                 let name: String =
@@ -107,8 +108,20 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 delete_namespace(client.clone(), name.clone())
                     .await
                     .expect("error deleting namespace");
+
+                // report state
+                let msg = types::StateToControlPlane {
+                    data_plane_id,
+                    event_id,
+                    state: types::State {
+                        connection: None,
+                        status: types::Status::Deleted,
+                    },
+                };
+                let msg_id = queue.send(&data_plane_events_queue, &msg).await?;
+                info!("msg_id: {:?}", msg_id);
             }
-            None | _ => info!("action was not in expected format"),
+            None | _ => warn!("action was not in expected format"),
         }
 
         // TODO(ianstanton) This is here as an example for now. We want to use
@@ -120,13 +133,13 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         }
         thread::sleep(time::Duration::from_secs(1));
 
-        // Delete message from queue
-        let deleted = queue
-            .delete(&control_plane_events_queue, &read_msg.msg_id)
+        // archive message from queue
+        let archived = queue
+            .archive(&control_plane_events_queue, &read_msg.msg_id)
             .await
-            .expect("error deleting message from queue");
+            .expect("error archiving message from queue");
         // TODO(ianstanton) Improve logging everywhere
-        info!("deleted: {:?}", deleted);
+        info!("archived: {:?}", archived);
     }
 }
 
