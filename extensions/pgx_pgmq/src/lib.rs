@@ -87,7 +87,7 @@ fn readit(
     Ok(results)
 }
 
-#[pg_extern(volatile)]
+#[pg_extern]
 fn pgmq_delete(queue_name: &str, msg_id: i64) -> Result<Option<bool>, spi::Error> {
     let mut num_deleted = 0;
 
@@ -153,8 +153,8 @@ fn popit(
         pgx::Json,
     )> = Vec::new();
     let _: Result<(), spi::Error> = Spi::connect(|mut client| {
-        let mut tup_table: SpiTupleTable = client.update(&pop(queue_name), None, None)?;
-        while let Some(row) = tup_table.next() {
+        let tup_table: SpiTupleTable = client.update(&pop(queue_name), None, None)?;
+        for row in tup_table {
             let msg_id = row["msg_id"].value::<i64>()?.expect("no msg_id");
             let read_ct = row["read_ct"].value::<i32>()?.expect("no read_ct");
             let vt = row["vt"].value::<TimestampWithTimeZone>()?.expect("no vt");
@@ -180,20 +180,25 @@ fn pgmq_list_queues() -> Result<
     >,
     spi::Error,
 > {
+    let results = listit()?;
+    Ok(TableIterator::new(results.into_iter()))
+}
+
+fn listit() -> Result<Vec<(String, TimestampWithTimeZone)>, spi::Error> {
+    let mut results: Vec<(String, TimestampWithTimeZone)> = Vec::new();
     let query = "SELECT * FROM pgmq_meta";
-    Spi::connect(|client| {
-        let mut results = Vec::new();
-        let mut tup_table: SpiTupleTable = client.select(query, None, None)?;
-        while let Some(row) = tup_table.next() {
+    let _: Result<(), spi::Error> = Spi::connect(|client| {
+        let tup_table: SpiTupleTable = client.select(query, None, None)?;
+        for row in tup_table {
             let queue_name = row["queue_name"].value::<String>()?.expect("no queue_name");
             let created_at = row["created_at"]
                 .value::<TimestampWithTimeZone>()?
                 .expect("no created_at");
             results.push((queue_name, created_at));
         }
-
-        Ok(TableIterator::new(results.into_iter()))
-    })
+        Ok(())
+    });
+    Ok(results)
 }
 
 #[cfg(any(test, feature = "pg_test"))]
@@ -229,18 +234,71 @@ mod tests {
         // put a message on the queue
         let _ = pgmq_send(&qname, pgx::Json(serde_json::json!({"x":"y"})));
 
-        let msg = pgmq_read(&qname, 10_i32);
-
-        // should be no messages left
-        let nomsgs = pgmq_read(&qname, 10_i32);
-        assert!(nomsgs.is_ok());
-        log!("nomsgs: {:?}", nomsgs.unwrap());
-        assert_eq!(nomsgs.into_iter().len(), 0);
+        // read the message with the pg_extern, sets message invisible
+        let _ = pgmq_read(&qname, 10_i32);
         // but still one record on the table
         let init_count =
             Spi::get_one::<i64>(&format!("SELECT count(*) FROM {TABLE_PREFIX}_{qname}"))
                 .expect("SQL select failed");
         assert_eq!(init_count.unwrap(), 1);
+
+        // pop the message, must not panic
+        let popped = pgmq_pop(&qname);
+        assert!(popped.is_ok());
+    }
+
+    // validate all internal functions
+    // e.g. readit, popit, listit
+    #[pg_test]
+    fn test_internal() {
+        let qname = r#"test_internal"#;
+        let _ = pgmq_create(&qname).unwrap();
+
+        let queues = listit().unwrap();
+        assert_eq!(queues.len(), 1);
+
+        // put two message on the queue
+        let msg_id1 = pgmq_send(&qname, pgx::Json(serde_json::json!({"x":1})))
+            .unwrap()
+            .unwrap();
+        let msg_id2 = pgmq_send(&qname, pgx::Json(serde_json::json!({"x":2})))
+            .unwrap()
+            .unwrap();
+        assert_eq!(msg_id1, 1);
+        assert_eq!(msg_id2, 2);
+
+        // read first message
+        let msg1 = readit(&qname, 1_i32).unwrap();
+        // pop the second message
+        let msg2 = popit(&qname).unwrap();
+        assert_eq!(msg1.len(), 1);
+        assert_eq!(msg2.len(), 1);
+        assert_eq!(msg1[0].0, msg_id1);
+        assert_eq!(msg2[0].0, msg_id2);
+
+        // read again, should be no messages
+        let nothing = readit(&qname, 2_i32).unwrap();
+        assert_eq!(nothing.len(), 0);
+
+        // but still one record on the table
+        let init_count =
+            Spi::get_one::<i64>(&format!("SELECT count(*) FROM {TABLE_PREFIX}_{qname}"))
+                .expect("SQL select failed");
+        assert_eq!(init_count.unwrap(), 1);
+
+        //  delete the messages
+        let delete1 = pgmq_delete(&qname, msg_id1).unwrap().unwrap();
+        assert!(delete1);
+
+        //  delete when message is gone returns False
+        let delete1 = pgmq_delete(&qname, msg_id1).unwrap().unwrap();
+        assert!(!delete1);
+
+        // no records after delete
+        let init_count =
+            Spi::get_one::<i64>(&format!("SELECT count(*) FROM {TABLE_PREFIX}_{qname}"))
+                .expect("SQL select failed");
+        assert_eq!(init_count.unwrap(), 0);
     }
 }
 
