@@ -5,12 +5,13 @@ set -xe
 # This script is for running the action .github/actions/build-extension-package locally
 
 GIT_ROOT=$(git rev-parse --show-toplevel)
+THIS_DIR=${GIT_ROOT}/extensions/pgx_pgmq
 
 # Cleanup files created by this script
 function cleanup {
-	rm Dockerfile
-	rm -rf docker
-  rm .dockerignore
+  rm ${THIS_DIR}/Dockerfile
+  rm -rf ${THIS_DIR}/docker
+  rm ${THIS_DIR}/.dockerignore
 }
 trap cleanup EXIT
 

@@ -40,7 +40,6 @@ Version: ${PACKAGE_VERSION}
 Section: database
 Priority: optional
 Architecture: ${ARCH}
-Depends: postgresql-${PGVERSION}, postgresql-server-dev-${PGVERSION}
 Maintainer: CoreDB <admin+${NAME}@coredb.io>
 Homepage: https://coredb.io
 Description: The extension is written in Rust using tcdi/pgx
