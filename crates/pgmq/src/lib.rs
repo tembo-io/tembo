@@ -275,16 +275,16 @@ async fn fetch_messages<T: for<'de> Deserialize<'de>>(
     let mut messages: Vec<Message<T>> = Vec::new();
     let rows: Result<Vec<PgRow>, Error> = sqlx::query(query).fetch_all(connection).await;
     if let Err(sqlx::error::Error::RowNotFound) = rows {
-        return Ok(None)
+        return Ok(None);
     } else if let Err(e) = rows {
-        return Err(e)?
+        return Err(e)?;
     } else if let Ok(rows) = rows {
         // happy path - successfully read a message
         for row in rows.iter() {
             let raw_msg = row.get("message");
             let parsed_msg = serde_json::from_value::<T>(raw_msg);
             if let Err(e) = parsed_msg {
-                return Err(errors::PgmqError::JsonParsingError(e))
+                return Err(errors::PgmqError::JsonParsingError(e));
             } else if let Ok(parsed_msg) = parsed_msg {
                 messages.push(Message {
                     msg_id: row.get("msg_id"),
