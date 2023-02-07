@@ -1,5 +1,9 @@
 #!/bin/bash
 
+set -xe
+
+# This script is for running the action .github/actions/build-extension-package locally
+
 GIT_ROOT=$(git rev-parse --show-toplevel)
 
 # Cleanup files created by this script
@@ -18,7 +22,8 @@ random_tag=extension-build-$(echo $RANDOM)
 docker build . --build-arg UBUNTU_VERSION="22.04" \
                --build-arg PGX_VERSION=0.7.1 \
                --build-arg PACKAGE_VERSION=0.0.1 \
-               --build-arg PACKAGE_NAME=pgmq \
+               --build-arg NAME=pgmq \
+               --build-arg PACKAGE_NAME=pgx_pgmq \
                --build-arg PGVERSION=15 \
                -t ${random_tag}
 docker run -v $(pwd):/output ${random_tag}

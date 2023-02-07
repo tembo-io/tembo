@@ -6,3 +6,4 @@
 Dockerfile
 .dockerignore
 docker/**
+*.deb

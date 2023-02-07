@@ -5,7 +5,8 @@
 
 PACKAGE_VERSION=${PACKAGE_VERSION:-0.0.0}
 OUTPUT_DIR=${OUTPUT_DIR:-"."}
-NAME=${PACKAGE_NAME:-"coredb-extension"}
+NAME=${NAME:-"coredb-extension"}
+PACKAGE_NAME=${PACKAGE_NAME:-"coredb-extension"}
 
 if [[ $(uname -a) == *"aarch64"* ]]; then
     ARCH="arm64"
@@ -26,15 +27,15 @@ else
     exit 1
 fi
 
-TARGET="target/release/${NAME}-pg${PGVERSION}"
+TARGET="target/release/${PACKAGE_NAME}-pg${PGVERSION}"
 UBUNTU_VERSION=$(lsb_release -a | grep Release | awk '{ print $2 }')
 
 ls -R ${TARGET}
 
 mkdir -p ${TARGET}/DEBIAN
 
-echo <<EOF > ${TARGET}/DEBIAN/control
-Package: postgresql-${NAME}-$PGVERSION}
+cat <<EOF > ${TARGET}/DEBIAN/control
+Package: postgresql-${NAME}-${PGVERSION}
 Version: ${PACKAGE_VERSION}
 Section: database
 Priority: optional

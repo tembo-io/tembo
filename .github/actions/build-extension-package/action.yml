@@ -44,6 +44,12 @@ runs:
             exit 1
           fi
           echo "package_version=${package_version}" >> $GITHUB_OUTPUT
+          package_name=$(stoml Cargo.toml package.name)
+          if [ -z "${package_name}" ]; then
+            echo "Did not find the package name in Cargo.toml"
+            exit 1
+          fi
+          echo "package_name=${package_name}" >> $GITHUB_OUTPUT
       - name: Prepare the build directory
         shell: bash
         working-directory: ${{ inputs.working-directory }}
@@ -71,7 +77,8 @@ runs:
           docker build . --build-arg UBUNTU_VERSION=${{ inputs.ubuntu_version }} \
                          --build-arg PGX_VERSION=${{ steps.pgx_version.outputs.pgx_version }} \
                          --build-arg PACKAGE_VERSION=${{ steps.pgx_version.outputs.extension_version }} \
-                         --build-arg PACKAGE_NAME=${{ inputs.name }} \
+                         --build-arg PACKAGE_NAME=${{ steps.pgx_version.outputs.package_name }} \
+                         --build-arg NAME=${{ inputs.name }} \
                          --build-arg PGVERSION=${{ inputs.pg_version }} \
                          -t ${random_tag}
           docker run -v $(pwd):/output ${random_tag}
