@@ -1,33 +1,125 @@
 # Postgres Message Queue
 
-A lightweight message queue extension for Postgres.
 
-## Usage
+A lightweight message queue extension for Postgres. Provides similar experience to [AWS SQS](https://aws.amazon.com/sqs/) and [Redis Simple Message Queue](https://github.com/smrchy/rsmq), but on Postgres.
 
-### Installation
+- [Postgres Message Queue](#postgres-message-queue)
+  - [Installation](#installation)
+  - [Python Examples](#python-examples)
+    - [Connect to postgres](#connect-to-postgres)
+    - [Create and list queues](#create-and-list-queues)
+    - [Send a message to the queue](#send-a-message-to-the-queue)
+    - [Read a message from the queue](#read-a-message-from-the-queue)
+    - [Delete a message from the queue](#delete-a-message-from-the-queue)
+  - [SQL Examples](#sql-examples)
+    - [Creating a queue](#creating-a-queue)
+    - [Send a message](#send-a-message)
+    - [Read a message](#read-a-message)
+    - [Pop a message](#pop-a-message)
+    - [Archive a message](#archive-a-message)
+    - [Delete a message](#delete-a-message)
+  - [Development](#development)
 
-Setup `pgx`.
-```bash
-cargo install --locked cargo-pgx
-cargo pgx init
+## Installation
+
+TODO
+`docker run ...`
+
+
+## Python Examples
+
+### Connect to postgres
+
+```python
+import json
+import pprint
+
+from sqlalchemy import create_engine, text
+
+engine = create_engine("postgresql://postgres:postrgres@localhost:28814/pgx_pgmq")
 ```
 
-Then, clone this repo and change into this directory.
+### Create and list queues
 
+```python
+with engine.connect() as con:
+    # create a queue
+    created = con.execute(text( "select * from pgmq_create('myqueue');"))
+    # list queues
+    list_queues = con.execute(text( "select * from pgmq_list_queues()"))
+    column_names = list_queues.keys()
+    rows = list_queues.fetchall()
+    print("### Queues ###")
+    for row in rows:
+        pprint.pprint(dict(zip(column_names, row)))
 ```
-git clone git@github.com:CoreDB-io/coredb.git
-cd coredb/extensions/pgmq/
+```
+'### Queues ###'
+{'created_at': datetime.datetime(2023, 2, 7, 2, 5, 39, 946356, tzinfo=datetime.timezone(datetime.timedelta(days=-1, seconds=64800))),
+ 'queue_name': 'myqueue'}
+ ```
+
+
+### Send a message to the queue
+
+```python
+with engine.connect() as con:
+    # send a message
+    msg = json.dumps({"yolo": 42})
+    msg_id = con.execute(text(f"select * from pgmq_send('x', '{msg}') as msg_id;"))
+    column_names = msg_id.keys()
+    rows = msg_id.fetchall()
+    print("### Message ID ###")
+    for row in rows:
+        pprint.pprint(dict(zip(column_names, row)))
+```
+```
+'### Message ID ###'
+{'msg_id': 1}
 ```
 
-Run the dev environment
-```bash
-cargo pgx run pg14
+### Read a message from the queue
+
+```python
+with engine.connect() as con:
+    # read a message, make it unavailable to be read again for 5 seconds
+    read = con.execute(text("select * from pgmq_read('x', 5);"))
+    column_names = read.keys()
+    rows = read.fetchall()
+    print("### Read Message ###")
+    for row in rows:
+        pprint.pprint(dict(zip(column_names, row)))
+```
+```
+'### Read Message ###'
+{'enqueued_at': datetime.datetime(2023, 2, 7, 2, 51, 50, 468837, tzinfo=datetime.timezone(datetime.timedelta(days=-1, seconds=64800))),
+ 'message': {'myqueue': 42},
+ 'msg_id': 1,
+ 'read_ct': 1,
+ 'vt': datetime.datetime(2023, 2, 7, 16, 9, 4, 826669, tzinfo=datetime.timezone(datetime.timedelta(days=-1, seconds=64800)))}
+ ```
+
+### Delete a message from the queue
+
+```python
+with engine.connect() as con:
+    # delete a message
+    deleted = con.execute(text("select pgmq_delete('x', 1);"))
+    column_names = deleted.keys()
+    rows = deleted.fetchall()
+    print("### Message Deleted ###")
+    for row in rows:
+        pprint.pprint(dict(zip(column_names, row)))
+```
+```
+'### Message Deleted ###'
+{'pgmq_delete': True}
 ```
 
+## SQL Examples
 
 ```sql
 CREATE EXTENSION pgmq;
-
 ```
 
 ### Creating a queue
@@ -40,7 +132,7 @@ SELECT pgmq_create('my_queue');
  
 ```
 
-### Enqueueing a message
+### Send a message
 
 ```sql
 pgmq=# SELECT * from pgmq_send('my_queue', '{"foo": "bar"}');
@@ -49,7 +141,7 @@ pgmq=# SELECT * from pgmq_send('my_queue', '{"foo": "bar"}');
             1
 ```
 
-## Read a message
+### Read a message
 Reads a single message from the queue. Make it invisible for 30 seconds. 
 ```sql
 pgmq=# SELECT * from pgmq_read('my_queue', 30);
@@ -93,3 +185,27 @@ pgmq=# select pgmq_delete('my_queue', 1);
  t
  ```
 
+
+
+
+## Development
+
+Setup `pgx`.
+
+```bash
+cargo install --locked cargo-pgx
+cargo pgx init
+```
+
+Then, clone this repo and change into this directory.
+
+```bash
+git clone git@github.com:CoreDB-io/coredb.git
+cd coredb/extensions/pgmq/
+```
+
+Run the dev environment
+
+```bash
+cargo pgx run pg14
+```
