@@ -2,6 +2,8 @@ ARG UBUNTU_VERSION=22.04
 FROM ubuntu:${UBUNTU_VERSION}
 
 ARG PGVERSION=15
+ARG PGX_VERSION=0.7.1
+ARG PACKAGE_VERSION=0.0.0
 
 ARG DEBIAN_FRONTEND=noninteractive
 ENV TZ=Etc/UTC
@@ -27,7 +29,7 @@ RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 ENV PATH="/var/lib/postgresql/.cargo/bin:${PATH}"
 
 # Install tcdi/pgx
-RUN cargo install cargo-pgx --version 0.7.1
+RUN cargo install cargo-pgx --version $PGX_VERSION
 RUN cargo pgx init --pg${PGVERSION} /usr/bin/pg_config
 
 COPY --chown=postgres:postgres . /app

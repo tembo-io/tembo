@@ -1,0 +1,88 @@
+name: 'Build package from a PGX extension'
+description: 'Build with PGX inside a container, then output an installable package.'
+inputs:
+  working-directory:
+    description: 'The directory in which there is a pgx extension project'
+    required: true
+  pg_version:
+    description: 'The version of Postgres to build for'
+    default: "15"
+    required: false
+  ubuntu_version:
+    description: 'The version of Ubuntu to build for'
+    default: "22.04"
+    required: false
+outputs: {}
+runs:
+  using: "composite"
+  steps:
+      - name: Install TOML parser
+        shell: bash
+        run: |
+         set -xe
+         wget https://github.com/freshautomations/stoml/releases/download/v0.7.1/stoml_linux_amd64 &> /dev/null
+         mv stoml_linux_amd64 stoml
+         chmod +x stoml
+         sudo mv stoml /usr/local/bin/
+      - name: Get PGX version
+        shell: bash
+        id: pgx_version
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          pgx_version=$(stoml Cargo.toml dependencies.pgx)
+          if [ -z "${pgx_version}" ]; then
+            echo "'pgx' is not a dependency in Cargo.toml"
+            exit 1
+          fi
+          echo "pgx_version=${pgx_version}" >> $GITHUB_OUTPUT
+          package_version=$(stoml Cargo.toml package.version)
+          if [ -z "${package_version}" ]; then
+            echo "Did not find the package version in Cargo.toml"
+            exit 1
+          fi
+          echo "package_version=${package_version}" >> $GITHUB_OUTPUT
+      - name: Prepare the build directory
+        shell: bash
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          if [[ -f Dockerfile ]]; then
+            echo "ERROR: a Dockerfile is already in the extension's directory"
+            exit 1
+          fi
+          if [[ -d docker/ ]]; then
+            echo "ERROR: a directory called 'docker' is already in the extension's directory"
+            exit 1
+          fi
+          # Copy the Dockerfile and runtime script(s)
+          # to the build directory.
+          cp ${{ github.action_path }}/Dockerfile .
+          cp -R ${{ github.action_path }}/docker .
+          echo "target/**" >> .dockerignore
+      - name: Build the extension
+        shell: bash
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          set -xe
+          echo "Building extension in Docker"
+          random_tag=extension-build-$(echo $RANDOM)
+          docker build . --build-arg UBUNTU_VERSION=${{ inputs.ubuntu_version }} \
+                         --build-arg PGX_VERSION=${{ steps.pgx_version.outputs.pgx_version }} \
+                         --build-arg PACKAGE_VERSION=${{ steps.pgx_version.outputs.extension_version }} \
+                         --build-arg PGVERSION=${{ inputs.pg_version }} \
+                         -t ${random_tag}
+          docker run -v $(pwd):/output ${random_tag}
+      - name: Clean up
+        shell: bash
+        if: always()
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          set -xe
+          rm Dockerfile
+          rm -rf docker
+      - name: Show information
+        shell: bash
+        if: always()
+        working-directory: ${{ inputs.working-directory }}
+        run: |
+          set -xe
+          ls -ltrah
