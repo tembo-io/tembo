@@ -90,7 +90,6 @@ with engine.connect() as con:
     for row in rows:
         pprint.pprint(dict(zip(column_names, row)))
 ```
-
 ```
 '### Read Message ###'
 {'enqueued_at': datetime.datetime(2023, 2, 7, 2, 51, 50, 468837, tzinfo=datetime.timezone(datetime.timedelta(days=-1, seconds=64800))),
