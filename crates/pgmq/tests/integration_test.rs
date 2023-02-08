@@ -209,6 +209,13 @@ async fn test_read_batch() {
         let index = i + 1;
         assert_eq!(message.msg_id.to_string(), index.to_string());
     }
+
+    let msg = queue.read::<Value>(&test_queue, Some(&vt)).await.unwrap();
+    // assert no messages read because they are invisible
+    assert!(msg.is_none());
+    let num_rows = rowcount(&test_queue, &queue.connection).await;
+    // assert there are still 3 (invisible) entries on the table
+    assert_eq!(num_rows, 3);
 }
 
 #[tokio::test]
