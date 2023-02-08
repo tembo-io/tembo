@@ -174,8 +174,10 @@ impl PGMQueue {
         queue_name: &str,
         message: &T,
     ) -> Result<i64, errors::PgmqError> {
-        let msg = &serde_json::json!(&message);
-        let row: PgRow = sqlx::query(&query::enqueue(queue_name, msg))
+        let mut msgs: Vec<serde_json::Value> = Vec::new();
+        let msg = serde_json::json!(&message);
+        msgs.push(msg);
+        let row: PgRow = sqlx::query(&query::enqueue(queue_name, &msgs))
             .fetch_one(&self.connection)
             .await?;
         let msg_id: i64 = row.get("msg_id");
@@ -186,16 +188,16 @@ impl PGMQueue {
     pub async fn send_batch<T: Serialize>(
         &self,
         queue_name: &str,
-        messages: Vec<&T>,
+        messages: &Vec<T>,
     ) -> Result<Vec<i64>, errors::PgmqError> {
-        let mut msgs: Vec<&serde_json::Value> = Vec::new();
+        let mut msgs: Vec<serde_json::Value> = Vec::new();
         let mut msg_ids: Vec<i64> = Vec::new();
         // for each message in
-        for msg in messages {
-            let binding = &serde_json::json!(&msg);
+        for msg in messages.iter() {
+            let binding = serde_json::json!(&msg);
             msgs.push(binding)
         }
-        let rows: PgRow = sqlx::query(&query::enqueue(queue_name, msgs))
+        let rows: PgRow = sqlx::query(&query::enqueue(queue_name, &msgs))
             .fetch_one(&self.connection)
             .await?;
         msg_ids.push(rows.get("msg_id"));

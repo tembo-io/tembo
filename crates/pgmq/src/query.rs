@@ -1,5 +1,3 @@
-use std::fmt::format;
-
 pub const TABLE_PREFIX: &str = r#"pgmq"#;
 
 pub fn init_queue(name: &str) -> Vec<String> {
@@ -126,7 +124,7 @@ pub fn create_index(name: &str) -> String {
 // need to use query for inserting multiple rows
 // iterate through vec and generate string, add string to sql statement
 
-pub fn enqueue(name: &str, messages: Vec<&serde_json::Value>) -> String {
+pub fn enqueue(name: &str, messages: &Vec<serde_json::Value>) -> String {
     // TOOO: vt should be now() + delay
     // receive vec of messages
     // use this vec to construct comma separated string
