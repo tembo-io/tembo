@@ -18,17 +18,15 @@ export default function LeftNavigation(props: Props) {
         <h1>CoreDB</h1>
       </section>
       <section>
-        <h4 className={styles.leftNavTitle}>Organizations</h4>
+        <h4 className={styles.leftNavTitle}>Databases</h4>
         <div className={styles.orgList}>
-          {/* TO DO: map all orgs to links here */}
-          {/* TO DO: highlight selected org */}
 
         </div>
         <button
           className="btn small secondary"
           onClick={() => alert('choose a new org')}
         >
-          + Organization
+          + Database
         </button>
 
       </section>
