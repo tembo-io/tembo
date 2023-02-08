@@ -60,7 +60,6 @@
 //!     }
 //!
 //!     // READ MULTIPLE MESSAGES as a struct
-//!     let num_msgs = 2;
 //!     let batch: Vec<Message<MyMessage>> = queue.read_batch::<MyMessage>(&myqueue, Some(&vt), &num_msgs).await.unwrap().expect("no messages in the queue!");
 //!     for (i, message) in batch.iter().enumerate() {
 //!         let index = i + 1;
@@ -202,7 +201,7 @@ impl PGMQueue {
     }
 
     /// Reads a given number of messages (num_msgs) from the queue. If the queue is empty or all messages are invisible, `None` is returned.
-    /// If a message is returned, it is made invisible for the duration of the visibility timeout (vt) in seconds.
+    /// If messages are returned, they are made invisible for the duration of the visibility timeout (vt) in seconds.
     pub async fn read_batch<T: for<'de> Deserialize<'de>>(
         &self,
         queue_name: &str,
