@@ -121,18 +121,9 @@ pub fn create_index(name: &str) -> String {
     )
 }
 
-// need to use query for inserting multiple rows
-// iterate through vec and generate string, add string to sql statement
-
 pub fn enqueue(name: &str, messages: &Vec<serde_json::Value>) -> String {
     // TOOO: vt should be now() + delay
-    // receive vec of messages
-    // use this vec to construct comma separated string
-    //   (vt, message1),
-    //   (vt, message2),
-    //   (vt, message3),
-    // pass constructed message to VALUES
-
+    // construct string of comma separated messages
     let mut values: String = "".to_owned();
     for message in messages.iter() {
         let full_msg = format!("(now() at time zone 'utc', '{}'::json),", message);
