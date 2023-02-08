@@ -197,7 +197,7 @@ async fn test_read_batch() {
     assert_eq!(msg_id3, 3);
 
     let vt: i32 = 1;
-    let num_msgs = 2;
+    let num_msgs = 3;
 
     let batch = queue
         .read_batch::<Value>(&test_queue, Some(&vt), &num_msgs)

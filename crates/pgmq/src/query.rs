@@ -166,7 +166,7 @@ pub fn read(name: &str, vt: &i32, limit: &i32) -> String {
     SET 
         vt = (now() at time zone 'utc' + interval '{vt} seconds'),
         read_ct = read_ct + 1
-    WHERE msg_id = (select msg_id from cte)
+    WHERE msg_id in (select msg_id from cte)
     RETURNING *;
     "
     )
