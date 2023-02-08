@@ -33,6 +33,7 @@ fn pgmq_send(queue_name: &str, message: pgx::Json) -> Result<Option<i64>, spi::E
 fn pgmq_read(
     queue_name: &str,
     vt: i32,
+    limit: i32,
 ) -> Result<
     TableIterator<
         'static,
@@ -46,13 +47,14 @@ fn pgmq_read(
     >,
     spi::Error,
 > {
-    let results = readit(queue_name, vt)?;
+    let results = readit(queue_name, vt, limit)?;
     Ok(TableIterator::new(results.into_iter()))
 }
 
 fn readit(
     queue_name: &str,
     vt: i32,
+    limit: i32,
 ) -> Result<
     Vec<(
         i64,
@@ -71,7 +73,7 @@ fn readit(
         pgx::Json,
     )> = Vec::new();
     let _: Result<(), spi::Error> = Spi::connect(|mut client| {
-        let mut tup_table: SpiTupleTable = client.update(&read(queue_name, &vt), None, None)?;
+        let mut tup_table: SpiTupleTable = client.update(&read(queue_name, &vt, &limit), None, None)?;
         while let Some(row) = tup_table.next() {
             let msg_id = row["msg_id"].value::<i64>()?.expect("no msg_id");
             let read_ct = row["read_ct"].value::<i32>()?.expect("no read_ct");
