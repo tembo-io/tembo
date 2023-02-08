@@ -73,7 +73,8 @@ fn readit(
         pgx::Json,
     )> = Vec::new();
     let _: Result<(), spi::Error> = Spi::connect(|mut client| {
-        let mut tup_table: SpiTupleTable = client.update(&read(queue_name, &vt, &limit), None, None)?;
+        let mut tup_table: SpiTupleTable =
+            client.update(&read(queue_name, &vt, &limit), None, None)?;
         while let Some(row) = tup_table.next() {
             let msg_id = row["msg_id"].value::<i64>()?.expect("no msg_id");
             let read_ct = row["read_ct"].value::<i32>()?.expect("no read_ct");
