@@ -33,14 +33,10 @@ function WithGlobalLoader({
 
 function MyApp({ Component, pageProps }: AppProps) {
   console.log('component', Component, 'page props', pageProps);
-  const { publicRuntimeConfig } = getConfig();
-  const { NILE_WORKSPACE } = publicRuntimeConfig;
-
+\
   return (
       <WithGlobalLoader>
         <Head>
-          <title>{NILE_WORKSPACE}</title>
-          <meta name="description" content={`Welcome to ${NILE_WORKSPACE}`} />
           <link rel="icon" href="favicon.ico" />
         </Head>
           <WorkspaceChecker>
