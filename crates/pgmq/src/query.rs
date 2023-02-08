@@ -121,9 +121,6 @@ pub fn create_index(name: &str) -> String {
     )
 }
 
-// need to use query for inserting multiple rows
-// iterate through vec and generate string, add string to sql statement
-
 pub fn enqueue(name: &str, message: &serde_json::Value) -> String {
     // TOOO: vt should be now() + delay
     format!(
@@ -166,11 +163,6 @@ pub fn read(name: &str, vt: &i32, limit: &i32) -> String {
     "
     )
 }
-
-// delete_batch fn
-// iterate through vec of msg_id
-// construct list of msg_id
-// WHERE msg_id in (msg_id1, msg_id2)
 
 pub fn delete(name: &str, msg_id: &i64) -> String {
     format!(

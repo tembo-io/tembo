@@ -169,8 +169,6 @@ impl PGMQueue {
         Ok(())
     }
 
-    // send_batch fn takes vec! types that implement serialize (vec T)
-
     /// Send a message to the queue
     pub async fn send<T: Serialize>(
         &self,
@@ -220,9 +218,6 @@ impl PGMQueue {
         let messages = fetch_messages::<T>(query, &self.connection).await?;
         Ok(messages)
     }
-
-    // batch_delete, vec of msg_id
-    //
 
     /// Delete a message from the queue
     pub async fn delete(&self, queue_name: &str, msg_id: &i64) -> Result<u64, Error> {
@@ -292,7 +287,7 @@ async fn fetch_messages<T: for<'de> Deserialize<'de>>(
     } else if let Err(e) = rows {
         return Err(e)?;
     } else if let Ok(rows) = rows {
-        // happy path - successfully read a message
+        // happy path - successfully read messages
         for row in rows.iter() {
             let raw_msg = row.get("message");
             let parsed_msg = serde_json::from_value::<T>(raw_msg);

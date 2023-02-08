@@ -211,9 +211,6 @@ async fn test_read_batch() {
     }
 }
 
-// async fn test_send_batch() {}
-// async fn test_delete_batch() {
-
 #[tokio::test]
 async fn test_serde() {
     // series of tests serializing to queue and deserializing from queue
