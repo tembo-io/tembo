@@ -118,7 +118,7 @@ pub struct Message<T = serde_json::Value> {
     #[serde(deserialize_with = "from_ts")]
     pub vt: chrono::DateTime<Utc>,
     pub enqueued_at: chrono::DateTime<Utc>,
-    pub read_ct: i64,
+    pub read_ct: i32,
     pub message: T,
 }
 
