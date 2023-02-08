@@ -1,3 +1,5 @@
+use std::fmt::format;
+
 pub const TABLE_PREFIX: &str = r#"pgmq"#;
 
 pub fn init_queue(name: &str) -> Vec<String> {
@@ -121,12 +123,30 @@ pub fn create_index(name: &str) -> String {
     )
 }
 
-pub fn enqueue(name: &str, message: &serde_json::Value) -> String {
+// need to use query for inserting multiple rows
+// iterate through vec and generate string, add string to sql statement
+
+pub fn enqueue(name: &str, messages: Vec<&serde_json::Value>) -> String {
     // TOOO: vt should be now() + delay
+    // receive vec of messages
+    // use this vec to construct comma separated string
+    //   (vt, message1),
+    //   (vt, message2),
+    //   (vt, message3),
+    // pass constructed message to VALUES
+
+    let mut values: String = "".to_owned();
+    for message in messages {
+        let msg: String = serde_json::from_value(message.clone()).unwrap();
+        let full_msg = format!("(now() at time zone 'utc', '{}'::json),", msg);
+        values.push_str(&full_msg)
+    }
+    // drop trailing comma from constructed string
+    values.pop();
     format!(
         "
         INSERT INTO {TABLE_PREFIX}_{name} (vt, message)
-        VALUES (now() at time zone 'utc', '{message}'::json)
+        VALUES {values}
         RETURNING msg_id;
         "
     )

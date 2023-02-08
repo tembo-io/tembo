@@ -219,6 +219,34 @@ async fn test_read_batch() {
 }
 
 #[tokio::test]
+async fn test_send_batch() {
+    let test_queue = "test_send_batch".to_owned();
+
+    let queue = init_queue(&test_queue).await;
+
+    // PUBLISH THREE MESSAGES
+    let msgs = vec!(serde_json::json!({"foo": "bar1"}), serde_json::json!({"foo": "bar2"}), serde_json::json!({"foo": "bar3"}));
+    let msg_id = queue.send_batch(&test_queue, &msgs).await.unwrap();
+    assert_eq!(msg_id1, 1);
+
+    let vt: i32 = 1;
+    let num_msgs = 3;
+
+    let batch = queue
+        .read_batch::<Value>(&test_queue, Some(&vt), &num_msgs)
+        .await
+        .unwrap()
+        .unwrap();
+
+    for (i, message) in batch.iter().enumerate() {
+        let index = i + 1;
+        assert_eq!(message.msg_id.to_string(), index.to_string());
+    }
+}
+
+// async fn test_delete_batch() {
+
+#[tokio::test]
 async fn test_serde() {
     // series of tests serializing to queue and deserializing from queue
     let mut rng = rand::thread_rng();

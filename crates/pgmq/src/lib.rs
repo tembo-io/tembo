@@ -182,6 +182,26 @@ impl PGMQueue {
         Ok(msg_id)
     }
 
+    /// Send multiple messages to the queue
+    pub async fn send_batch<T: Serialize>(
+        &self,
+        queue_name: &str,
+        messages: Vec<&T>,
+    ) -> Result<Vec<i64>, errors::PgmqError> {
+        let mut msgs: Vec<&serde_json::Value> = Vec::new();
+        let mut msg_ids: Vec<i64> = Vec::new();
+        // for each message in
+        for msg in messages {
+            let binding = &serde_json::json!(&msg);
+            msgs.push(binding)
+        }
+        let rows: PgRow = sqlx::query(&query::enqueue(queue_name, msgs))
+            .fetch_one(&self.connection)
+            .await?;
+        msg_ids.push(rows.get("msg_id"));
+        Ok(msg_ids)
+    }
+
     /// Reads a single message from the queue. If the queue is empty or all messages are invisible, `None` is returned.
     /// If a message is returned, it is made invisible for the duration of the visibility timeout (vt) in seconds.
     pub async fn read<T: for<'de> Deserialize<'de>>(
