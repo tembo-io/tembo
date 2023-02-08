@@ -1,0 +1,79 @@
+{{- if or (not .Values.controlPlaneEventsQueue) (not .Values.dataPlaneEventsQueue) -}}
+{{ fail "Both controlPlaneEventsQueue and dataPlaneEventsQueue must be set in the helm values" }}
+{{- end }}
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "reconciler.fullname" . }}
+  labels:
+    {{- include "reconciler.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "reconciler.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "reconciler.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "reconciler.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      strategy:
+        rollingUpdate:
+          maxSurge: 25%
+          maxUnavailable: 25%
+        type: RollingUpdate
+      containers:
+        - name: {{ .Chart.Name }}
+          command:
+          - ./usr/local/bin/reconciler
+          env:
+          - name: PG_CONN_URL
+            valueFrom:
+              secretKeyRef:
+                name: {{ include "reconciler.fullname" . }}
+                key: connection
+          - name: CONTROL_PLANE_EVENTS_QUEUE
+            value: {{ .Values.controlPlaneEventsQueue }}
+          - name: DATA_PLANE_EVENTS_QUEUE
+            value: {{ .Values.dataPlaneEventsQueue }}
+          - name: RUST_LOG
+            value: {{ .Values.logLevel }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          # TODO: add probes
+          # livenessProbe:
+          #   httpGet:
+          #     path: /
+          #     port: http
+          # readinessProbe:
+          #   httpGet:
+          #     path: /
+          #     port: http
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

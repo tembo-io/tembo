@@ -1,0 +1,44 @@
+controlPlaneEventsQueue: ~
+dataPlaneEventsQueue: ~
+logLevel: debug
+
+secret:
+  # If you create the secret,
+  # then specify the queueConnectionString
+  create: true
+  # You can use an existing secret instead,
+  # in this case set secret.create to false.
+  useExistingSecret: ~
+  queueConnectionString: ~
+
+image:
+  repository: quay.io/coredb/reconciler
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+# We should reconfigure the defaults
+# once we have more information about this
+# workload in practice.
+resources:
+  limits:
+    cpu: 1000m
+    memory: 128Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+serviceAccount:
+  annotations: {}
+  # Defaults to match name of deployment,
+  # when this is set to empty string.
+  name: ""
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+podAnnotations: {}
+podSecurityContext: {}
+securityContext: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
