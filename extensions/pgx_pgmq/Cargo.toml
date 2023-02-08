@@ -1,6 +1,6 @@
 [package]
 name = "pgx_pgmq"
-version = "0.0.2"
+version = "0.0.3-alpha.1"
 edition = "2021"
 authors = ["CoreDB.io"]
 description = "Postgres extension for PGMQ"
