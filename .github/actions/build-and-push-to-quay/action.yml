@@ -85,6 +85,16 @@ runs:
         TAGS="$TAGS ${SHORT_SHA}"
 
         echo "TAGS=$TAGS" >> $GITHUB_OUTPUT
+    - name: Run pre-build hooks
+      shell: bash
+      run: |
+        cd ${{ inputs.docker_directory }}
+        if [[ -f pre-build-hook.sh ]]; then
+          echo "detected pre-build hook, running"
+          /bin/bash pre-build-hook.sh
+        else
+          echo "no pre build hook detected"
+        fi
     - name: Build image and tag
       shell: bash
       run: |
