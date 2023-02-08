@@ -51,6 +51,22 @@
 //!     let read_msg2: Message<MyMessage> = queue.read::<MyMessage>(&myqueue, Some(&vt)).await.unwrap().expect("no messages in the queue!");
 //!     assert_eq!(read_msg2.msg_id, msg_id2);
 //!
+//!     // READ MULTIPLE MESSAGES as `serde_json::Value`
+//!     let num_msgs = 2;
+//!     let batch: Vec<Message<Value>> = queue.read_batch::<Value>(&myqueue, Some(&vt), &num_msgs).await.unwrap().expect("no messages in the queue!");
+//!     for (i, message) in batch.iter().enumerate() {
+//!         let index = i + 1;
+//!         assert_eq!(message.msg_id.to_string(), index.to_string());
+//!     }
+//!
+//!     // READ MULTIPLE MESSAGES as a struct
+//!     let num_msgs = 2;
+//!     let batch: Vec<Message<MyMessage>> = queue.read_batch::<MyMessage>(&myqueue, Some(&vt), &num_msgs).await.unwrap().expect("no messages in the queue!");
+//!     for (i, message) in batch.iter().enumerate() {
+//!         let index = i + 1;
+//!         assert_eq!(message.msg_id.to_string(), index.to_string());
+//!     }
+//!
 //!     // DELETE THE MESSAGE WE SENT
 //!     let deleted = queue.delete(&myqueue, &read_msg1.msg_id).await.expect("Failed to delete message");
 //!     let deleted = queue.delete(&myqueue, &read_msg2.msg_id).await.expect("Failed to delete message");
