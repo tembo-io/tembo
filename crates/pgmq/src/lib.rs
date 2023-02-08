@@ -169,9 +169,6 @@ impl PGMQueue {
         Ok(msg_id)
     }
 
-    // could create read_batch(queue_name, vt, num_messages)
-    // return type would change to result<option<vec!<message>>>
-
     /// Reads a single message from the queue. If the queue is empty or all messages are invisible, `None` is returned.
     /// If a message is returned, it is made invisible for the duration of the visibility timeout (vt) in seconds.
     pub async fn read<T: for<'de> Deserialize<'de>>(

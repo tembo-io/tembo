@@ -145,11 +145,6 @@ pub fn enqueue_str(name: &str, message: &str) -> String {
     )
 }
 
-// keep 1 read fn
-// instead of LIMIT 1, add limit parameter
-// read fn would pass 1
-// read_batch would pass n
-
 pub fn read(name: &str, vt: &i32, limit: &i32) -> String {
     format!(
         "
@@ -172,7 +167,7 @@ pub fn read(name: &str, vt: &i32, limit: &i32) -> String {
     )
 }
 
-// batch_delete fn
+// delete_batch fn
 // iterate through vec of msg_id
 // construct list of msg_id
 // WHERE msg_id in (msg_id1, msg_id2)

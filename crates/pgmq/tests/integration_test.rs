@@ -211,6 +211,9 @@ async fn test_read_batch() {
     }
 }
 
+// async fn test_send_batch() {}
+// async fn test_delete_batch() {
+
 #[tokio::test]
 async fn test_serde() {
     // series of tests serializing to queue and deserializing from queue
@@ -388,9 +391,6 @@ async fn test_database_error_modes() {
         _ => panic!("expected a db error, got {:?}", read_msg),
     }
 }
-
-// tests for batch feature
-// ...
 
 /// test parsing operations that should produce errors
 #[tokio::test]
