@@ -1,0 +1,45 @@
+version: "3.5"
+services:
+  postgres_dagger:
+    restart: always
+    image: postgres:15.1
+    ports:
+      - 5432:5432
+    environment:
+      POSTGRES_PASSWORD: postgres
+  
+  metrics_exporter:
+    restart: always
+    image: quay.io/prometheuscommunity/postgres-exporter
+    ports:
+      - 9187:9187
+    environment:
+      DATA_SOURCE_NAME: postgresql://postgres:postgres@arbitrary_postgres:5432/postgres?sslmode=disable
+
+  prometheus:
+    restart: always
+    image: prom/prometheus:v2.42.0
+    volumes:
+      - ./prometheus/:/etc/prometheus/
+      # - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/config/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
+      - "--web.console.templates=/usr/share/prometheus/consoles"
+      - "--storage.tsdb.retention=1d" # This is retention.time in future versions of prometheus
+      - "--web.external-url="
+      - "--web.enable-admin-api"
+      - "--web.enable-lifecycle"
+      - "--query.max-concurrency=400"
+    ports:
+      - 9090:9090
+
+  arbitrary_postgres:
+    restart: always
+    image: postgres
+    ports:
+      - 5434:5432
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
