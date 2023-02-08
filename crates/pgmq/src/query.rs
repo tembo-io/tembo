@@ -134,9 +134,8 @@ pub fn enqueue(name: &str, messages: &Vec<serde_json::Value>) -> String {
     // pass constructed message to VALUES
 
     let mut values: String = "".to_owned();
-    for message in messages {
-        let msg: String = serde_json::from_value(message.clone()).unwrap();
-        let full_msg = format!("(now() at time zone 'utc', '{}'::json),", msg);
+    for message in messages.iter() {
+        let full_msg = format!("(now() at time zone 'utc', '{}'::json),", message);
         values.push_str(&full_msg)
     }
     // drop trailing comma from constructed string
@@ -237,10 +236,12 @@ mod tests {
 
     #[test]
     fn test_enqueue() {
+        let mut msgs: Vec<serde_json::Value> = Vec::new();
         let msg = serde_json::json!({
             "foo": "bar"
         });
-        let query = enqueue("yolo", &msg);
+        msgs.push(msg);
+        let query = enqueue("yolo", &msgs);
         assert!(query.contains("pgmq_yolo"));
         assert!(query.contains("{\"foo\":\"bar\"}"));
     }

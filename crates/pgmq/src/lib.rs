@@ -197,10 +197,12 @@ impl PGMQueue {
             let binding = serde_json::json!(&msg);
             msgs.push(binding)
         }
-        let rows: PgRow = sqlx::query(&query::enqueue(queue_name, &msgs))
-            .fetch_one(&self.connection)
+        let rows: Vec<PgRow> = sqlx::query(&query::enqueue(queue_name, &msgs))
+            .fetch_all(&self.connection)
             .await?;
-        msg_ids.push(rows.get("msg_id"));
+        for row in rows.iter() {
+            msg_ids.push(row.get("msg_id"));
+        }
         Ok(msg_ids)
     }
 

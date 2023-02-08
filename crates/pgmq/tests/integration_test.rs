@@ -225,9 +225,13 @@ async fn test_send_batch() {
     let queue = init_queue(&test_queue).await;
 
     // PUBLISH THREE MESSAGES
-    let msgs = vec!(serde_json::json!({"foo": "bar1"}), serde_json::json!({"foo": "bar2"}), serde_json::json!({"foo": "bar3"}));
+    let msgs = vec![
+        serde_json::json!({"foo": "bar1"}),
+        serde_json::json!({"foo": "bar2"}),
+        serde_json::json!({"foo": "bar3"}),
+    ];
     let msg_id = queue.send_batch(&test_queue, &msgs).await.unwrap();
-    assert_eq!(msg_id1, 1);
+    assert_eq!(msg_id[0], 1);
 
     let vt: i32 = 1;
     let num_msgs = 3;
