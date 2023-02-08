@@ -33,6 +33,7 @@ fn pgmq_send(queue_name: &str, message: pgx::Json) -> Result<Option<i64>, spi::E
 fn pgmq_read(
     queue_name: &str,
     vt: i32,
+    limit: i32,
 ) -> Result<
     TableIterator<
         'static,
@@ -46,13 +47,14 @@ fn pgmq_read(
     >,
     spi::Error,
 > {
-    let results = readit(queue_name, vt)?;
+    let results = readit(queue_name, vt, limit)?;
     Ok(TableIterator::new(results.into_iter()))
 }
 
 fn readit(
     queue_name: &str,
     vt: i32,
+    limit: i32,
 ) -> Result<
     Vec<(
         i64,
@@ -71,7 +73,8 @@ fn readit(
         pgx::Json,
     )> = Vec::new();
     let _: Result<(), spi::Error> = Spi::connect(|mut client| {
-        let mut tup_table: SpiTupleTable = client.update(&read(queue_name, &vt), None, None)?;
+        let mut tup_table: SpiTupleTable =
+            client.update(&read(queue_name, &vt, &limit), None, None)?;
         while let Some(row) = tup_table.next() {
             let msg_id = row["msg_id"].value::<i64>()?.expect("no msg_id");
             let read_ct = row["read_ct"].value::<i32>()?.expect("no read_ct");
@@ -235,7 +238,7 @@ mod tests {
         let _ = pgmq_send(&qname, pgx::Json(serde_json::json!({"x":"y"})));
 
         // read the message with the pg_extern, sets message invisible
-        let _ = pgmq_read(&qname, 10_i32);
+        let _ = pgmq_read(&qname, 10_i32, 1_i32);
         // but still one record on the table
         let init_count =
             Spi::get_one::<i64>(&format!("SELECT count(*) FROM {TABLE_PREFIX}_{qname}"))
@@ -268,7 +271,7 @@ mod tests {
         assert_eq!(msg_id2, 2);
 
         // read first message
-        let msg1 = readit(&qname, 1_i32).unwrap();
+        let msg1 = readit(&qname, 1_i32, 1_i32).unwrap();
         // pop the second message
         let msg2 = popit(&qname).unwrap();
         assert_eq!(msg1.len(), 1);
@@ -277,7 +280,7 @@ mod tests {
         assert_eq!(msg2[0].0, msg_id2);
 
         // read again, should be no messages
-        let nothing = readit(&qname, 2_i32).unwrap();
+        let nothing = readit(&qname, 2_i32, 1_i32).unwrap();
         assert_eq!(nothing.len(), 0);
 
         // but still one record on the table

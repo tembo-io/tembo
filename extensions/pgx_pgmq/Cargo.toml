@@ -1,6 +1,6 @@
 [package]
 name = "pgx_pgmq"
-version = "0.0.3-alpha.1"
+version = "0.0.4"
 edition = "2021"
 authors = ["CoreDB.io"]
 description = "Postgres extension for PGMQ"
@@ -25,7 +25,7 @@ pg_test = []
 [dependencies]
 pgx = "0.7.1"
 serde = "1.0.152"
-pgmq = "0.4.0"
+pgmq = "0.5.1"
 serde_json = "1.0.91"
 
 [dev-dependencies]
