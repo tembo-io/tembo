@@ -127,9 +127,9 @@ CREATE EXTENSION pgmq;
 ```sql
 SELECT pgmq_create('my_queue');
 
- pgmq_create 
+ pgmq_create
 -------------
- 
+
 ```
 
 ### Send a message
@@ -142,11 +142,11 @@ pgmq=# SELECT * from pgmq_send('my_queue', '{"foo": "bar"}');
 ```
 
 ### Read a message
-Reads a single message from the queue. Make it invisible for 30 seconds. 
+Reads a single message from the queue. Make it invisible for 30 seconds.
 ```sql
 pgmq=# SELECT * from pgmq_read('my_queue', 30);
 
- msg_id | read_ct |              vt               |          enqueued_at          |    message    
+ msg_id | read_ct |              vt               |          enqueued_at          |    message
 --------+---------+-------------------------------+-------------------------------+---------------
       1 |       2 | 2023-02-07 04:56:00.650342-06 | 2023-02-07 04:54:51.530818-06 | {"foo":"bar"}
 ```
@@ -155,7 +155,7 @@ If the queue is empty, or if all messages are currently invisible, no rows will 
 
 ```sql
 pgx_pgmq=# SELECT * from pgmq_read('my_queue', 30);
- msg_id | read_ct | vt | enqueued_at | message 
+ msg_id | read_ct | vt | enqueued_at | message
 --------+---------+----+-------------+---------
 
 ```
@@ -165,7 +165,7 @@ Read a message and immediately delete it from the queue. Returns `None` if the q
 ```sql
 pgmq=# SELECT * from pgmq_pop('my_queue');
 
- msg_id | read_ct |              vt               |          enqueued_at          |    message    
+ msg_id | read_ct |              vt               |          enqueued_at          |    message
 --------+---------+-------------------------------+-------------------------------+---------------
       1 |       2 | 2023-02-07 04:56:00.650342-06 | 2023-02-07 04:54:51.530818-06 | {"foo":"bar"}
 ```
@@ -180,7 +180,7 @@ TODO:
 Delete a message with id `1` from queue named `my_queue`.
 ```sql
 pgmq=# select pgmq_delete('my_queue', 1);
- pgmq_delete 
+ pgmq_delete
 -------------
  t
  ```
@@ -208,4 +208,12 @@ Run the dev environment
 
 ```bash
 cargo pgx run pg14
+```
+
+## Packaging
+
+Run this script to package into a `.deb` file, which can be installed on Ubuntu.
+
+```
+/bin/bash build-extension.sh
 ```
