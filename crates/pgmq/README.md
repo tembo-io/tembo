@@ -43,13 +43,13 @@ cd basic
 
 - Add PGMQ to the project
 
-```rust
+```bash
 cargo add pgmq
 ```
 
 - Add other dependencies to the project
 
-```rust
+```bash
 cargo add tokio serde serde_json
 ```
 
@@ -103,7 +103,7 @@ async fn main() -> Result<(), PgmqError> {
     // Use a visibility timeout of 30 seconds.
     //
     // Messages that are not deleted within the
-    // visilibity timeout will return to the queue.
+    // visibility timeout will return to the queue.
     let visibility_timeout_seconds: i32 = 30;
 
     // Read the JSON message
@@ -204,7 +204,7 @@ async fn main() -> Result<(), PgmqError> {
 
 - This example is present in the examples/basic directory
 
-```rust
+```bash
 cargo run
 ```
 
