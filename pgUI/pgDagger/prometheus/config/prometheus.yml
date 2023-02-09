@@ -38,3 +38,9 @@ scrape_configs:
 #       static_configs:
 #         - targets:
 #             - "alertmanager:9093"
+
+remote_write:
+  - url: "http://promscale:9201/write"
+remote_read:
+  - url: "http://promscale:9201/read"
+    read_recent: true
