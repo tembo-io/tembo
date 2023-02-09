@@ -230,10 +230,24 @@ async fn test_send_batch() {
         serde_json::json!({"foo": "bar2"}),
         serde_json::json!({"foo": "bar3"}),
     ];
-    let msg_ids = queue.send_batch(&test_queue, &msgs).await.unwrap();
+    let msg_ids = queue.send_batch(&test_queue, &msgs).await.expect("Failed to enqueue messages");
     for (i, id) in msg_ids.iter().enumerate() {
-        let index = i + 1;
-        assert_eq!(id.to_string(), index.to_string());
+        assert_eq!(id.to_string(), msg_ids[i].to_string());
+    }
+
+    // Send 3 messages in struct form to queue as batch
+    #[derive(Serialize, Debug, Deserialize)]
+    struct MyMessage {
+        foo: String,
+    }
+    let msgs2 = vec![
+        MyMessage {foo: "bar1".to_owned()},
+        MyMessage {foo: "bar2".to_owned()},
+        MyMessage {foo: "bar3".to_owned()},
+    ];
+    let msg_ids2  = queue.send_batch(&test_queue, &msgs2).await.expect("Failed to enqueue messages");
+    for (i, id) in msg_ids2.iter().enumerate() {
+        assert_eq!(id.to_string(), msg_ids2[i].to_string());
     }
 
     // Read 3 messages from queue as batch
