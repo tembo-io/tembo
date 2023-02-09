@@ -1,9 +1,19 @@
-# Postgres Message Queue
+# Postgres Message Queue (PGMQ)
 
-A lightweight messaging queue for Rust, using Postgres as the backend.
-Inspired by the [RSMQ project](https://github.com/smrchy/rsmq).
+A lightweight distributed message queue for Rust. Like [AWS SQS](https://aws.amazon.com/sqs/) and [RSMQ](https://github.com/smrchy/rsmq) but on Postgres.
 
-# Examples
+Not building in Rust? Try the [CoreDB pgmq extension](https://github.com/CoreDB-io/coredb/tree/main/extensions/pgx_pgmq).
+
+## Features
+
+- Lightweight - Rust and Postgres only
+- Guaranteed delivery of messages to exactly one consumer within a visibility timeout
+- API parity with [AWS SQS](https://aws.amazon.com/sqs/) and [RSMQ](https://github.com/smrchy/rsmq)
+- Messages stay in the queue until deleted
+- Messages can be archived, instead of deleted, for long-term retention and replayability
+- Completely asynchronous API
+
+## Examples
 
 First, start any Postgres instance. It is the only external dependency.
 
@@ -51,13 +61,44 @@ async fn main() {
     let read_msg2: Message<MyMessage> = queue.read::<MyMessage>(&myqueue, Some(&vt)).await.unwrap().expect("no messages in the queue!");
     assert_eq!(read_msg2.msg_id, msg_id2);
 
+    // READ MULTIPLE MESSAGES as `serde_json::Value`
+    let num_msgs = 2;
+    let batch: Vec<Message<Value>> = queue.read_batch::<Value>(&myqueue, Some(&vt), &num_msgs).await.unwrap().expect("no messages in the queue!");
+    for (i, message) in batch.iter().enumerate() {
+        let index = i + 1;
+        assert_eq!(message.msg_id.to_string(), index.to_string());
+    }
+
+    // READ MULTIPLE MESSAGES as a struct
+    let batch: Vec<Message<MyMessage>> = queue.read_batch::<MyMessage>(&myqueue, Some(&vt), &num_msgs).await.unwrap().expect("no messages in the queue!");
+    for (i, message) in batch.iter().enumerate() {
+        let index = i + 1;
+        assert_eq!(message.msg_id.to_string(), index.to_string());
+    }
+
     // DELETE THE MESSAGE WE SENT
     let deleted = queue.delete(&myqueue, &read_msg1.msg_id).await.expect("Failed to delete message");
     let deleted = queue.delete(&myqueue, &read_msg2.msg_id).await.expect("Failed to delete message");
 
-    // No messages present aftwe we've deleted all of them
+    // No messages present after we've deleted all of them
     let no_msg: Option<Message<Value>> = queue.read::<Value>(&myqueue, Some(&vt)).await.unwrap();
     assert!(no_msg.is_none());
+
+    // SEND MULTIPLE MESSAGES as `serde_json::Value`
+    let msgs1 = vec![
+        serde_json::json!({"foo": "bar1"}),
+        serde_json::json!({"foo": "bar2"}),
+        serde_json::json!({"foo": "bar3"}),
+    ];
+    let msg_ids1 = queue.send_batch(&myqueue, &msgs1).await.expect("Failed to enqueue messages");
+
+    // SEND MULTIPLE MESSAGES as a struct
+    let msgs2 = vec![
+        MyMessage {foo: "bar1".to_owned()},
+        MyMessage {foo: "bar2".to_owned()},
+        MyMessage {foo: "bar3".to_owned()},
+    ];
+    let msg_ids2 = queue.send_batch(&myqueue, &msgs2).await.expect("Failed to enqueue messages");
 }
 ```
 ## Sending messages

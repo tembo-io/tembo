@@ -1,8 +1,18 @@
-//! # Postgres Message Queue
+//! # Postgres Message Queue (PGMQ)
 //!
-//! A lightweight messaging queue for Rust, using Postgres as the backend.
-//! Inspired by the [RSMQ project](https://github.com/smrchy/rsmq).
+//! A lightweight distributed message queue for Rust. Like [AWS SQS](https://aws.amazon.com/sqs/) and [RSMQ](https://github.com/smrchy/rsmq) but on Postgres.
+//! 
+//! Not building in Rust? Try the [CoreDB pgmq extension](https://github.com/CoreDB-io/coredb/tree/main/extensions/pgx_pgmq).
 //!
+//! ## Features
+//! 
+//! - Lightweight - Rust and Postgres only
+//! - Guaranteed delivery of messages to exactly one consumer within a visibility timeout
+//! - API parity with [AWS SQS](https://aws.amazon.com/sqs/) and [RSMQ](https://github.com/smrchy/rsmq)
+//! - Messages stay in the queue until deleted
+//! - Messages can be archived, instead of deleted, for long-term retention and replayability
+//! - Completely asynchronous API
+//! 
 //! ## Examples
 //!
 //! First, start any Postgres instance. It is the only external dependency.

@@ -1,7 +1,16 @@
-# Postgres Message Queue
+# Postgres Message Queue (PGMQ)
+
+A lightweight distributed message queue. Like [AWS SQS](https://aws.amazon.com/sqs/) and [RSMQ](https://github.com/smrchy/rsmq) but on Postgres.
 
 
-A lightweight message queue extension for Postgres. Provides similar experience to [AWS SQS](https://aws.amazon.com/sqs/) and [Redis Simple Message Queue](https://github.com/smrchy/rsmq), but on Postgres.
+## Features
+
+- Lightweight - Rust and Postgres only
+- Guaranteed delivery of messages to exactly one consumer within a visibility timeout
+- API parity with [AWS SQS](https://aws.amazon.com/sqs/) and [RSMQ](https://github.com/smrchy/rsmq)
+- Messages stay in the queue until deleted
+- Messages can be archived, instead of deleted, for long-term retention and replayability
+- Completely asynchronous API
 
 - [Postgres Message Queue](#postgres-message-queue)
   - [Installation](#installation)
@@ -19,12 +28,16 @@ A lightweight message queue extension for Postgres. Provides similar experience 
     - [Archive a message](#archive-a-message)
     - [Delete a message](#delete-a-message)
   - [Development](#development)
+  - [Packaging](#packaging)
 
-## Installation
+## Start CoreDB Postgres
 
-TODO
-`docker run ...`
+CoreDB Postgres images come with the `pgmq` extension pre-installed.
 
+
+```bash
+docker run -d --name postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 quay.io/coredb/postgres:1f064f52626f
+```
 
 ## Python Examples
 
@@ -36,7 +49,7 @@ import pprint
 
 from sqlalchemy import create_engine, text
 
-engine = create_engine("postgresql://postgres:postrgres@localhost:28814/pgx_pgmq")
+engine = create_engine("postgresql://postgres:postrgres@0.0.0.0:5432/postgres")
 ```
 
 ### Create and list queues
@@ -53,10 +66,14 @@ with engine.connect() as con:
     for row in rows:
         pprint.pprint(dict(zip(column_names, row)))
 ```
-```
+
+```python
 '### Queues ###'
-{'created_at': datetime.datetime(2023, 2, 7, 2, 5, 39, 946356, tzinfo=datetime.timezone(datetime.timedelta(days=-1, seconds=64800))),
- 'queue_name': 'myqueue'}
+{
+  'created_at': datetime.datetime(2023, 2, 7, 2, 5, 39, 946356,
+  tzinfo=datetime.timezone(datetime.timedelta(days=-1, seconds=64800))),
+ 'queue_name': 'myqueue'
+}
  ```
 
 
@@ -73,7 +90,8 @@ with engine.connect() as con:
     for row in rows:
         pprint.pprint(dict(zip(column_names, row)))
 ```
-```
+
+```python
 '### Message ID ###'
 {'msg_id': 1}
 ```
@@ -90,13 +108,16 @@ with engine.connect() as con:
     for row in rows:
         pprint.pprint(dict(zip(column_names, row)))
 ```
-```
+
+```python
 '### Read Message ###'
-{'enqueued_at': datetime.datetime(2023, 2, 7, 2, 51, 50, 468837, tzinfo=datetime.timezone(datetime.timedelta(days=-1, seconds=64800))),
- 'message': {'myqueue': 42},
+{
+  'enqueued_at': datetime.datetime(2023, 2, 7, 2, 51, 50, 468837, tzinfo=datetime.timezone(datetime.timedelta(days=-1, seconds=64800))),
+  'message': {'myqueue': 42},
  'msg_id': 1,
  'read_ct': 1,
- 'vt': datetime.datetime(2023, 2, 7, 16, 9, 4, 826669, tzinfo=datetime.timezone(datetime.timedelta(days=-1, seconds=64800)))}
+ 'vt': datetime.datetime(2023, 2, 7, 16, 9, 4, 826669, tzinfo=datetime.timezone(datetime.timedelta(days=-1, seconds=64800)))
+}
  ```
 
 ### Delete a message from the queue
@@ -118,6 +139,10 @@ with engine.connect() as con:
 
 ## SQL Examples
 
+```bash
+psql postgres://postgres:postgres@0.0.0.0:5432/postgres
+```
+
 ```sql
 CREATE EXTENSION pgmq;
 ```
@@ -132,36 +157,52 @@ SELECT pgmq_create('my_queue');
 
 ```
 
-### Send a message
+### Send two message
 
 ```sql
-pgmq=# SELECT * from pgmq_send('my_queue', '{"foo": "bar"}');
- pgmq_send
---------------
-            1
+pgmq=# 
+SELECT * from pgmq_send('my_queue', '{"foo": "bar"}');
+SELECT * from pgmq_send('my_queue', '{"foo": "bar"}');
 ```
 
-### Read a message
-Reads a single message from the queue. Make it invisible for 30 seconds.
+```
+ pgmq_send 
+-----------
+         1
+(1 row)
+
+ pgmq_send 
+-----------
+         2
+(1 row)
+```
+
+### Read messages
+
+Read two message from the queue. Make them invisible for 30 seconds.
+
 ```sql
-pgmq=# SELECT * from pgmq_read('my_queue', 30);
+pgmq=# SELECT * from pgmq_read('my_queue', 30, 1);
 
  msg_id | read_ct |              vt               |          enqueued_at          |    message
 --------+---------+-------------------------------+-------------------------------+---------------
-      1 |       2 | 2023-02-07 04:56:00.650342-06 | 2023-02-07 04:54:51.530818-06 | {"foo":"bar"}
+      1 |       1 | 2023-02-07 04:56:00.650342-06 | 2023-02-07 04:54:51.530818-06 | {"foo":"bar"}
+      2 |       1 | 2023-02-07 04:56:00.650342-06 | 2023-02-07 04:54:51.530818-06 | {"foo":"bar"}
 ```
 
 If the queue is empty, or if all messages are currently invisible, no rows will be returned.
 
 ```sql
-pgx_pgmq=# SELECT * from pgmq_read('my_queue', 30);
+pgx_pgmq=# SELECT * from pgmq_read('my_queue', 30, 1);
  msg_id | read_ct | vt | enqueued_at | message
 --------+---------+----+-------------+---------
 
 ```
 
 ### Pop a message
+
 Read a message and immediately delete it from the queue. Returns `None` if the queue is empty.
+
 ```sql
 pgmq=# SELECT * from pgmq_pop('my_queue');
 
