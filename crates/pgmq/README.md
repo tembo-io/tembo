@@ -43,13 +43,13 @@ cd basic
 
 - Add PGMQ to the project
 
-```
+```rust
 cargo add pgmq
 ```
 
 - Add other dependencies to the project
 
-```
+```rust
 cargo add tokio serde serde_json
 ```
 
@@ -204,7 +204,7 @@ async fn main() -> Result<(), PgmqError> {
 
 - This example is present in the examples/basic directory
 
-```
+```rust
 cargo run
 ```
 
@@ -226,5 +226,7 @@ parsed as the type specified. For example, if the message expected is
 ## Archive or Delete a message
 
 Remove the message from the queue when you are done with it. You can either completely `.delete()`, or `.archive()` the message. Archived messages are deleted from the queue and inserted to the queue's archive table. Deleted messages are just deleted.
+
+License: MIT
 
 License: MIT
