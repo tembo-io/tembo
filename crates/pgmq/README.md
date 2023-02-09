@@ -210,7 +210,8 @@ cargo run
 
 ## Sending messages
 
-`queue.send()` can be passed any type that implements `serde::Serialize`. This means you can prepare your messages as JSON or as a struct.
+You can send one message at a time with `queue.send()` or several with `queue.send_batch()`.
+These methods can be passed any type that implements `serde::Serialize`. This means you can prepare your messages as JSON or as a struct.
 
 ## Reading messages
 
@@ -221,10 +222,20 @@ Messages can be parsed as serde_json::Value or into a struct. `queue.read()` ret
 where `T` is the type of the message on the queue. It returns an error when there is an issue parsing the message or if PGMQ is unable to reach postgres.
 Note that when parsing into a `struct`, the operation will return an error if
 parsed as the type specified. For example, if the message expected is
-`MyMessage{foo: "bar"}` but` {"hello": "world"}` is received, the application will panic.
+`MyMessage{foo: "bar"}` but `{"hello": "world"}` is received, the application will panic.
+
+Read a single message with `queue.read()` or as many as you want with `queue.read_batch()`.
 
 ## Archive or Delete a message
 
 Remove the message from the queue when you are done with it. You can either completely `.delete()`, or `.archive()` the message. Archived messages are deleted from the queue and inserted to the queue's archive table. Deleted messages are just deleted.
+
+Read messages from the queue archive with SQL:
+
+```sql
+SELECT *
+FROM pgmq_{your_queue_name}_archive;
+```
+
 
 License: MIT
