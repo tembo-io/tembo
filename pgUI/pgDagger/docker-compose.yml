@@ -2,12 +2,15 @@ version: "3.5"
 services:
   postgres_dagger:
     restart: always
-    image: postgres:15.1
+    image: timescale/timescaledb-ha:pg14-latest
     ports:
-      - 5432:5432
+      - 5433:5433/tcp
     environment:
       POSTGRES_PASSWORD: postgres
-  
+      POSTGRES_USER: postgres
+      TSTUNE_PROFILE: promscale
+    command: -p 5433
+
   metrics_exporter:
     restart: always
     image: quay.io/prometheuscommunity/postgres-exporter
@@ -19,6 +22,8 @@ services:
   prometheus:
     restart: always
     image: prom/prometheus:v2.42.0
+    depends_on:
+      - promscale
     volumes:
       - ./prometheus/:/etc/prometheus/
       # - prometheus_data:/prometheus
@@ -35,11 +40,30 @@ services:
     ports:
       - 9090:9090
 
+  promscale:
+    image: timescale/promscale:0.17
+    ports:
+      - 9201:9201/tcp
+      - 9202:9202/tcp
+    restart: on-failure
+    depends_on:
+      - postgres_dagger
+    # volumes:
+    #   - ${PWD}/promscale_prometheus.yml:/prometheus.yml
+    #   - ${PWD}/rules.yml:/rules.yml
+    #   - ${PWD}/alerts.yml:/alerts.yml
+    environment:
+      PROMSCALE_DB_URI: postgres://postgres:postgres@postgres_dagger:5433/postgres?sslmode=allow
+      # PROMSCALE_TRACING_OTLP_SERVER_ADDRESS: ":9202"
+      # PROMSCALE_TELEMETRY_TRACE_OTEL_ENDPOINT: "otel-collector:4317"
+      # PROMSCALE_TELEMETRY_TRACE_SAMPLING_RATIO: "0.1"
+      # PROMSCALE_METRICS_RULES_CONFIG_FILE: /prometheus.yml
+
   arbitrary_postgres:
     restart: always
     image: postgres
     ports:
-      - 5434:5432
+      - 5432:5432
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
