@@ -230,7 +230,10 @@ async fn test_send_batch() {
         serde_json::json!({"foo": "bar2"}),
         serde_json::json!({"foo": "bar3"}),
     ];
-    let msg_ids = queue.send_batch(&test_queue, &msgs).await.expect("Failed to enqueue messages");
+    let msg_ids = queue
+        .send_batch(&test_queue, &msgs)
+        .await
+        .expect("Failed to enqueue messages");
     for (i, id) in msg_ids.iter().enumerate() {
         assert_eq!(id.to_string(), msg_ids[i].to_string());
     }
@@ -241,11 +244,20 @@ async fn test_send_batch() {
         foo: String,
     }
     let msgs2 = vec![
-        MyMessage {foo: "bar1".to_owned()},
-        MyMessage {foo: "bar2".to_owned()},
-        MyMessage {foo: "bar3".to_owned()},
+        MyMessage {
+            foo: "bar1".to_owned(),
+        },
+        MyMessage {
+            foo: "bar2".to_owned(),
+        },
+        MyMessage {
+            foo: "bar3".to_owned(),
+        },
     ];
-    let msg_ids2  = queue.send_batch(&test_queue, &msgs2).await.expect("Failed to enqueue messages");
+    let msg_ids2 = queue
+        .send_batch(&test_queue, &msgs2)
+        .await
+        .expect("Failed to enqueue messages");
     for (i, id) in msg_ids2.iter().enumerate() {
         assert_eq!(id.to_string(), msg_ids2[i].to_string());
     }
