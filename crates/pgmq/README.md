@@ -1,65 +1,174 @@
-# Postgres Message Queue
+# Postgres Message Queue (PGMQ)
 
-A lightweight messaging queue for Rust, using Postgres as the backend.
-Inspired by the [RSMQ project](https://github.com/smrchy/rsmq).
+**A Rust crate for message queues in Postgres.**
 
-# Examples
 
-First, start any Postgres instance. It is the only external dependency.
+Creating a queue:
+```
+let queue: PGMQueue = PGMQueue::new("postgres://postgres:postgres@0.0.0.0:5432".to_owned()).await.expect("Failed to connect to postgres");
+let my_queue = "my_queue".to_owned();
+queue.create(&my_queue).await.expect("Failed to create queue");
+```
+
+Enqueuing a message:
+```
+let my_message = serde_json::json!({
+    "foo": "bar"
+});
+let message_id: i64 = queue.send(&my_queue, &my_message).await.expect("Failed to enqueue message");
+```
+
+Reading a message:
+```
+let visibility_timeout_seconds: i32 = 30;
+let retrieved_message: Message<Value> = queue.read::<Value>(&my_queue, Some(&visibility_timeout_seconds)).await.unwrap().expect("No messages in the queue");
+```
+
+Messages are either deleted within the visibility timeout, or they return to the queue.
+
+Deleting a message:
+
+```
+let deleted = queue.delete(&my_queue, &retrieved_message.msg_id).await.expect("Failed to delete message");
+```
+
+## Quick start
+
+- First, you will need Postgres. We use a container in this example.
 
 ```bash
 docker run -d --name postgres -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres
 ```
 
-Example of sending, receiving, and deleting messages from the queue. Typically applications sending messages
-will not be the same application reading the message.
+- If you don't have Docker installed, it can be found [here](https://docs.docker.com/get-docker/).
+
+- Make sure you have the Rust toolchain installed:
+
+```bash
+cargo --version
+```
+
+- This example was written with version 1.67.0, but the latest stable should work. You can go [here](https://www.rust-lang.org/tools/install) to install Rust if you don't have it already, then run `rustup install stable` to install the latest, stable toolchain.
+
+- Next, let's create a Rust project for the demo.
+
+```bash
+# Create a new Rust project
+cargo new pgmq_demo
+
+# Change directory into the new project
+cd pgmq_demo
+```
+
+- Add PGMQ to the project
+
+```
+cargo add pgmq
+```
+
+- Add other dependencies to the project
+
+```
+cargo add tokio serde serde_json
+```
+
+- Replace the contents of `src/main.rs` with this:
 
 ```rust
 use pgmq::{Message, PGMQueue};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 #[tokio::main]
 async fn main() {
-    // CREATE A QUEUE
-    let queue: PGMQueue = PGMQueue::new("postgres://postgres:postgres@0.0.0.0:5432".to_owned()).await.expect("failed to connect to postgres");
-    let myqueue = "myqueue".to_owned();
-    queue.create(&myqueue).await.expect("Failed to create queue");
 
-    // SEND A `serde_json::Value` MESSAGE
-    let msg1 = serde_json::json!({
+    // Initialize a connection to Postgres
+    println!("Connecting to Postgres");
+    let queue: PGMQueue = PGMQueue::new("postgres://postgres:postgres@0.0.0.0:5432".to_owned())
+        .await
+        .expect("failed to connect to postgres");
+
+    // Create a queue
+    println!("Creating a queue 'my_queue'");
+    let my_queue = "my_queue".to_owned();
+    queue.create(&my_queue)
+        .await
+        .expect("Failed to create queue");
+
+    // Send a message as JSON
+    let json_message = serde_json::json!({
         "foo": "bar"
     });
-    let msg_id1: i64 = queue.send(&myqueue, &msg1).await.expect("Failed to enqueue message");
+    println!("Enqueueing a JSON message: {json_message}");
+    let json_message_id: i64 = queue
+        .send(&my_queue, &json_message)
+        .await
+        .expect("Failed to enqueue message");
 
-    // SEND A STRUCT
+    // Messages can also be sent from structs
     #[derive(Serialize, Debug, Deserialize)]
     struct MyMessage {
         foo: String,
     }
-    let msg2 = MyMessage {
+    let struct_message = MyMessage {
         foo: "bar".to_owned(),
     };
-    let msg_id2: i64  = queue.send(&myqueue, &msg2).await.expect("Failed to enqueue message");
+    println!("Enqueueing a struct message: {:?}", struct_message);
+    let struct_message_id: i64 = queue
+        .send(&my_queue, &struct_message)
+        .await
+        .expect("Failed to enqueue message");
 
-    // READ A MESSAGE as `serde_json::Value`
-    let vt: i32 = 30;
-    let read_msg1: Message<Value> = queue.read::<Value>(&myqueue, Some(&vt)).await.unwrap().expect("no messages in the queue!");
-    assert_eq!(read_msg1.msg_id, msg_id1);
+    // Use a visibility timeout of 30 seconds.
+    //
+    // Messages that are not deleted within the
+    // visilibity timeout will return to the queue.
+    let visibility_timeout_seconds: i32 = 30;
 
-    // READ A MESSAGE as a struct
-    let read_msg2: Message<MyMessage> = queue.read::<MyMessage>(&myqueue, Some(&vt)).await.unwrap().expect("no messages in the queue!");
-    assert_eq!(read_msg2.msg_id, msg_id2);
+    // Read the JSON message
+    let received_json_message: Message<Value> = queue
+        .read::<Value>(&my_queue, Some(&visibility_timeout_seconds))
+        .await
+        .unwrap()
+        .expect("No messages in the queue");
+    println!("Received a message: {:?}", received_json_message);
 
-    // DELETE THE MESSAGE WE SENT
-    let deleted = queue.delete(&myqueue, &read_msg1.msg_id).await.expect("Failed to delete message");
-    let deleted = queue.delete(&myqueue, &read_msg2.msg_id).await.expect("Failed to delete message");
+    // Compare message IDs
+    assert_eq!(received_json_message.msg_id, json_message_id);
 
-    // No messages present aftwe we've deleted all of them
-    let no_msg: Option<Message<Value>> = queue.read::<Value>(&myqueue, Some(&vt)).await.unwrap();
-    assert!(no_msg.is_none());
+    // Read the struct message
+    let received_struct_message: Message<MyMessage> = queue
+        .read::<MyMessage>(&my_queue, Some(&visibility_timeout_seconds))
+        .await
+        .unwrap()
+        .expect("No messages in the queue");
+    println!("Received a message: {:?}", received_struct_message);
+
+    assert_eq!(received_struct_message.msg_id, struct_message_id);
+
+    // Delete the messages to remove them from the queue
+    let _ = queue.delete(&my_queue, &received_json_message.msg_id)
+        .await
+        .expect("Failed to delete message");
+    let _ = queue.delete(&my_queue, &received_struct_message.msg_id)
+        .await
+        .expect("Failed to delete message");
+    println!("Deleted the messages from the queue");
+
+    // No messages are remaining
+    let no_message: Option<Message<Value>> = queue.read::<Value>(&my_queue, Some(&visibility_timeout_seconds))
+        .await
+        .unwrap();
+    assert!(no_message.is_none());
 }
 ```
+
+- Run the program
+
+```
+cargo run
+```
+
 ## Sending messages
 
 `queue.send()` can be passed any type that implements `serde::Serialize`. This means you can prepare your messages as JSON or as a struct.
@@ -80,3 +189,7 @@ parsed as the type specified. For example, if the message expected is
 Remove the message from the queue when you are done with it. You can either completely `.delete()`, or `.archive()` the message. Archived messages are deleted from the queue and inserted to the queue's archive table. Deleted messages are just deleted.
 
 License: MIT
+
+## Inspired by
+
+Inspired by the [RSMQ project](https://github.com/smrchy/rsmq).
