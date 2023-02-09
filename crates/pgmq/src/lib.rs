@@ -41,7 +41,7 @@
 //!         foo: "bar".to_owned(),
 //!     };
 //!     let msg_id2: i64  = queue.send(&myqueue, &msg2).await.expect("Failed to enqueue message");
-//!     
+//!
 //!     // READ A MESSAGE as `serde_json::Value`
 //!     let vt: i32 = 30;
 //!     let read_msg1: Message<Value> = queue.read::<Value>(&myqueue, Some(&vt)).await.unwrap().expect("no messages in the queue!");
@@ -69,6 +69,22 @@
 //!     // DELETE THE MESSAGE WE SENT
 //!     let deleted = queue.delete(&myqueue, &read_msg1.msg_id).await.expect("Failed to delete message");
 //!     let deleted = queue.delete(&myqueue, &read_msg2.msg_id).await.expect("Failed to delete message");
+//!
+//!     // SEND MULTIPLE MESSAGES as `serde_json::Value`
+//!     let msgs1 = vec![
+//!         serde_json::json!({"foo": "bar1"}),
+//!         serde_json::json!({"foo": "bar2"}),
+//!         serde_json::json!({"foo": "bar3"}),
+//!     ];
+//!     let msg_ids1 = queue.send_batch(&myqueue, &msgs).await.expect("Failed to enqueue messages");
+//!
+//!     // SEND MULTIPLE MESSAGES as a struct
+//!     let msgs2 = vec![
+//!         MyMessage {foo: "bar1".to_owned()},
+//!         MyMessage {foo: "bar2".to_owned()},
+//!         MyMessage {foo: "bar3".to_owned()},
+//!     ];
+//!     let msg_ids2 = queue.send_batch(&myqueue, &msgs).await.expect("Failed to enqueue messages");
 //!
 //!     // No messages present aftwe we've deleted all of them
 //!     let no_msg: Option<Message<Value>> = queue.read::<Value>(&myqueue, Some(&vt)).await.unwrap();
