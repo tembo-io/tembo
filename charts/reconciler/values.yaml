@@ -3,13 +3,10 @@ dataPlaneEventsQueue: ~
 logLevel: debug
 
 secret:
-  # If you create the secret,
-  # then specify the queueConnectionString
-  create: true
-  # You can use an existing secret instead,
-  # in this case set secret.create to false.
+  # You must set the connection string for the postgres queue
+  postgresConnectionString: ~
+  # Or you can use an existing secret instead
   useExistingSecret: ~
-  queueConnectionString: ~
 
 image:
   repository: quay.io/coredb/reconciler
