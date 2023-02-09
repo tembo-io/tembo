@@ -267,6 +267,14 @@ impl PGMQueue {
         Ok(num_deleted)
     }
 
+    /// Delete multiple messages from the queue
+    pub async fn delete_batch(&self, queue_name: &str, msg_ids: &Vec<i64>) -> Result<u64, Error> {
+        let query = &query::delete_batch(queue_name, msg_ids);
+        let row = sqlx::query(query).execute(&self.connection).await?;
+        let num_deleted = row.rows_affected();
+        Ok(num_deleted)
+    }
+
     /// move message from queue table to archive table
     pub async fn archive(&self, queue_name: &str, msg_id: &i64) -> Result<u64, Error> {
         let query = query::archive(queue_name, msg_id);

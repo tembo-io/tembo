@@ -181,11 +181,6 @@ pub fn delete(name: &str, msg_id: &i64) -> String {
     )
 }
 
-// batch_delete fn
-// iterate through vec of msg_id
-// construct list of msg_id
-// WHERE msg_id in (msg_id1, msg_id2)
-
 pub fn delete_batch(name: &str, msg_ids: &Vec<i64>) -> String {
     // construct string of comma separated msg_id
     let mut msg_id_list: String = "".to_owned();
@@ -198,7 +193,7 @@ pub fn delete_batch(name: &str, msg_ids: &Vec<i64>) -> String {
     format!(
         "
         DELETE FROM {TABLE_PREFIX}_{name}
-        WHERE msg_id in {msg_id_list};
+        WHERE msg_id in ({msg_id_list});
         "
     )
 }
