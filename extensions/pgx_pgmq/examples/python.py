@@ -7,10 +7,10 @@ from sqlalchemy import create_engine, text
 engine = create_engine("postgresql://postgres:postgres@0.0.0.0:5432/postgres")
 
 # create extension
-# with engine.connect() as con:
-#     # create extension
-#     created = con.execute(text( "create extension pgx_pgmq;"))
-#     con.commit()
+with engine.connect() as con:
+    # create extension
+    created = con.execute(text( "create extension if not exists pgx_pgmq;"))
+    con.commit()
 
 QUEUE_NAME = 'myqueue'
 VT = 10
