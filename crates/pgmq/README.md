@@ -190,15 +190,11 @@ async fn main() -> Result<(), PgmqError> {
     println!("Received a batch of messages: {:?}", batch);
     for (_, message) in batch.iter().enumerate() {
         assert!(struct_message_batch_ids.contains(&message.msg_id));
-        let _ = queue.delete(&my_queue, &message.msg_id)
-            .await
-            .expect("Failed to delete message");
-        println!("Deleted message {}", message.msg_id);
     }
 
-    // DELETE MULTIPLE MESSAGES
+    // Delete a batch of messages
     let deleted = queue
-        .delete_batch(&myqueue, &struct_message_batch_ids)
+        .delete_batch(&my_queue, &struct_message_batch_ids)
         .await
         .expect("Failed to delete messages from queue");
     assert_eq!(deleted.to_string(), struct_message_batch_ids.len().to_string());
