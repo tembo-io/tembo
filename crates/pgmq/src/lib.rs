@@ -210,7 +210,6 @@ impl PGMQueue {
     ) -> Result<Vec<i64>, errors::PgmqError> {
         let mut msgs: Vec<serde_json::Value> = Vec::new();
         let mut msg_ids: Vec<i64> = Vec::new();
-        // for each message in
         for msg in messages.iter() {
             let binding = serde_json::json!(&msg);
             msgs.push(binding)
