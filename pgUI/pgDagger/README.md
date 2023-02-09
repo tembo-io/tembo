@@ -1,4 +1,4 @@
-# WIP: pgdagger
+# WIP: pgCommodore
 
 A metrics collector-aggregator for Postgres
 
@@ -22,7 +22,7 @@ Query Postgres:
 
 ```sql
 select time, value, jsonb(labels) as labels
-from prom_metric.pg_stat_activity_count psac 
+from prom_metric.pg_stat_activity_count psac
 limit 1
 ```
 
