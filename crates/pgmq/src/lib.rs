@@ -70,6 +70,10 @@
 //!     let deleted = queue.delete(&myqueue, &read_msg1.msg_id).await.expect("Failed to delete message");
 //!     let deleted = queue.delete(&myqueue, &read_msg2.msg_id).await.expect("Failed to delete message");
 //!
+//!     // No messages present after we've deleted all of them
+//!     let no_msg: Option<Message<Value>> = queue.read::<Value>(&myqueue, Some(&vt)).await.unwrap();
+//!     assert!(no_msg.is_none());
+//!
 //!     // SEND MULTIPLE MESSAGES as `serde_json::Value`
 //!     let msgs1 = vec![
 //!         serde_json::json!({"foo": "bar1"}),
@@ -85,10 +89,6 @@
 //!         MyMessage {foo: "bar3".to_owned()},
 //!     ];
 //!     let msg_ids2 = queue.send_batch(&myqueue, &msgs2).await.expect("Failed to enqueue messages");
-//!
-//!     // No messages present aftwe we've deleted all of them
-//!     let no_msg: Option<Message<Value>> = queue.read::<Value>(&myqueue, Some(&vt)).await.unwrap();
-//!     assert!(no_msg.is_none());
 //! }
 //! ```
 //! ## Sending messages
