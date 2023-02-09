@@ -89,6 +89,13 @@
 //!         MyMessage {foo: "bar3".to_owned()},
 //!     ];
 //!     let msg_ids2 = queue.send_batch(&myqueue, &msgs2).await.expect("Failed to enqueue messages");
+//!
+//!     // DELETE MULTIPLE MESSAGES
+//!     let deleted = queue
+//!         .delete_batch(&myqueue, &msg_ids1)
+//!         .await
+//!         .expect("Failed to delete messages from queue");
+//!     assert_eq!(deleted.to_string(), msg_ids1.len().to_string())
 //! }
 //! ```
 //! ## Sending messages
