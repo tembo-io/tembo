@@ -328,14 +328,14 @@ async fn test_delete_batch() {
         .read::<Value>(&test_queue, Some(&vt))
         .await
         .expect("Failed to read message");
-    assert_eq!(first.unwrap().msg_id, 1);
+    assert_eq!(first.unwrap().msg_id, msg_id1);
 
     // Assert last message is still present and readable
     let last = queue
         .read::<Value>(&test_queue, Some(&vt))
         .await
         .expect("Failed to read message");
-    assert_eq!(last.unwrap().msg_id, 5);
+    assert_eq!(last.unwrap().msg_id, msg_id2);
 
     // Delete first and last message as batch
     let del_first_last = queue
