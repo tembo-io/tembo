@@ -228,5 +228,3 @@ parsed as the type specified. For example, if the message expected is
 Remove the message from the queue when you are done with it. You can either completely `.delete()`, or `.archive()` the message. Archived messages are deleted from the queue and inserted to the queue's archive table. Deleted messages are just deleted.
 
 License: MIT
-
-License: MIT

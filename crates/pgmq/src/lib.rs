@@ -226,8 +226,6 @@
 //! ## Archive or Delete a message
 //! 
 //! Remove the message from the queue when you are done with it. You can either completely `.delete()`, or `.archive()` the message. Archived messages are deleted from the queue and inserted to the queue's archive table. Deleted messages are just deleted.
-//! 
-//! License: MIT
 
 #![doc(html_root_url = "https://docs.rs/pgmq/")]
 
