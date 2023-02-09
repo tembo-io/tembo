@@ -35,10 +35,10 @@ cargo --version
 
 ```bash
 # Create a new Rust project
-cargo new pgmq_demo
+cargo new basic
 
 # Change directory into the new project
-cd pgmq_demo
+cd basic
 ```
 
 - Add PGMQ to the project
@@ -145,6 +145,8 @@ async fn main() {
 ```
 
 - Run the program
+
+- This example is present in the examples/basic directory
 
 ```
 cargo run
