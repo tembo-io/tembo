@@ -324,11 +324,17 @@ async fn test_delete_batch() {
     assert_eq!(del.to_string(), msg_ids.len().to_string());
 
     // Assert first message is still present and readable
-    let first = queue.read::<Value>(&test_queue, Some(&vt)).await.expect("Failed to read message");
+    let first = queue
+        .read::<Value>(&test_queue, Some(&vt))
+        .await
+        .expect("Failed to read message");
     assert_eq!(first.unwrap().msg_id, 1);
 
     // Assert last message is still present and readable
-    let last = queue.read::<Value>(&test_queue, Some(&vt)).await.expect("Failed to read message");
+    let last = queue
+        .read::<Value>(&test_queue, Some(&vt))
+        .await
+        .expect("Failed to read message");
     assert_eq!(last.unwrap().msg_id, 5);
 
     // Delete first and last message as batch
@@ -338,7 +344,10 @@ async fn test_delete_batch() {
         .expect("Failed to delete messages from queue");
 
     // Assert the number of messages deleted is equal to the number of messages we passed to delete_batch()
-    assert_eq!(del_first_last.to_string(), msg_id_first_last.len().to_string());
+    assert_eq!(
+        del_first_last.to_string(),
+        msg_id_first_last.len().to_string()
+    );
 
     // Assert there are no messages to read from queue
     let msg = queue.read::<Value>(&test_queue, Some(&vt)).await.unwrap();
