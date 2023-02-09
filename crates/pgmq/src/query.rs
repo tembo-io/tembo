@@ -281,4 +281,20 @@ mod tests {
         assert!(query.contains(&qname));
         assert!(query.contains(&msg_id.to_string()));
     }
+
+    #[test]
+    fn test_delete_batch() {
+        let mut msg_ids: Vec<i64> = Vec::new();
+        let qname = "myqueue";
+        msg_ids.push(42);
+        msg_ids.push(43);
+        msg_ids.push(44);
+
+        let query = delete_batch(&qname, &msg_ids);
+
+        assert!(query.contains(&qname));
+        for id in msg_ids.iter() {
+            assert!(query.contains(&id.to_string()));
+        }
+    }
 }
