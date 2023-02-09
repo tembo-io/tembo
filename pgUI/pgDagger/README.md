@@ -1,4 +1,4 @@
-# WIP: pgCommodore
+# WIP: pgdagger
 
 A metrics collector-aggregator for Postgres
 
