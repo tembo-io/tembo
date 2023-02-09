@@ -5,23 +5,43 @@
 
 Creating a queue:
 ```
-let queue: PGMQueue = PGMQueue::new("postgres://postgres:postgres@0.0.0.0:5432".to_owned()).await.expect("Failed to connect to postgres");
 let my_queue = "my_queue".to_owned();
-queue.create(&my_queue).await.expect("Failed to create queue");
+queue.create(&my_queue)
+    .await
+    .expect("Failed to create queue");
 ```
 
 Enqueuing a message:
 ```
-let my_message = serde_json::json!({
+// Enqueuing a JSON message
+let json_message = serde_json::json!({
     "foo": "bar"
 });
-let message_id: i64 = queue.send(&my_queue, &my_message).await.expect("Failed to enqueue message");
+let json_message_id: i64 = queue
+    .send(&my_queue, &json_message)
+    .await
+    .expect("Failed to enqueue message");
+
+
+// Enqueuing a struct message
+let struct_message = MyStruct {
+    foo: "bar".to_owned(),
+};
+let struct_message_id: i64 = queue
+    .send(&my_queue, &struct_message)
+    .await
+    .expect("Failed to enqueue message");
+
 ```
 
 Reading a message:
 ```
 let visibility_timeout_seconds: i32 = 30;
-let retrieved_message: Message<Value> = queue.read::<Value>(&my_queue, Some(&visibility_timeout_seconds)).await.unwrap().expect("No messages in the queue");
+let received_message: Message<Value> = queue
+    .read::<Value>(&my_queue, Some(&visibility_timeout_seconds))
+    .await
+    .unwrap()
+    .expect("No messages in the queue");
 ```
 
 Messages are either deleted within the visibility timeout, or they return to the queue.
@@ -29,7 +49,9 @@ Messages are either deleted within the visibility timeout, or they return to the
 Deleting a message:
 
 ```
-let deleted = queue.delete(&my_queue, &retrieved_message.msg_id).await.expect("Failed to delete message");
+let _ = queue.delete(&my_queue, &received_message.msg_id)
+    .await
+    .expect("Failed to delete message");
 ```
 
 ## Quick start
