@@ -76,7 +76,7 @@
 //!         serde_json::json!({"foo": "bar2"}),
 //!         serde_json::json!({"foo": "bar3"}),
 //!     ];
-//!     let msg_ids1 = queue.send_batch(&myqueue, &msgs).await.expect("Failed to enqueue messages");
+//!     let msg_ids1 = queue.send_batch(&myqueue, &msgs1).await.expect("Failed to enqueue messages");
 //!
 //!     // SEND MULTIPLE MESSAGES as a struct
 //!     let msgs2 = vec![
@@ -84,7 +84,7 @@
 //!         MyMessage {foo: "bar2".to_owned()},
 //!         MyMessage {foo: "bar3".to_owned()},
 //!     ];
-//!     let msg_ids2 = queue.send_batch(&myqueue, &msgs).await.expect("Failed to enqueue messages");
+//!     let msg_ids2 = queue.send_batch(&myqueue, &msgs2).await.expect("Failed to enqueue messages");
 //!
 //!     // No messages present aftwe we've deleted all of them
 //!     let no_msg: Option<Message<Value>> = queue.read::<Value>(&myqueue, Some(&vt)).await.unwrap();
