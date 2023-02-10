@@ -12,7 +12,7 @@ async fn main() -> Result<(), PgmqError> {
 
     // Create a queue
     println!("Creating a queue 'my_queue'");
-    let my_queue = "my_queue".to_owned();
+    let my_queue = "my_basic_queue".to_owned();
     queue
         .create(&my_queue)
         .await
@@ -45,7 +45,7 @@ async fn main() -> Result<(), PgmqError> {
     // Use a visibility timeout of 30 seconds.
     //
     // Messages that are not deleted within the
-    // visilibity timeout will return to the queue.
+    // visibility timeout will return to the queue.
     let visibility_timeout_seconds: i32 = 30;
 
     // Read the JSON message

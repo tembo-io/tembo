@@ -1,8 +1,20 @@
 //! # Postgres Message Queue (PGMQ)
 //!
-//! A lightweight distributed message queue for Rust. Like [AWS SQS](https://aws.amazon.com/sqs/) and [RSMQ](https://github.com/smrchy/rsmq) but on Postgres.
-//!
-//! Not building in Rust? Try the [CoreDB pgmq extension](https://github.com/CoreDB-io/coredb/tree/main/extensions/pgx_pgmq).
+//! [![Latest Version](https://img.shields.io/crates/v/pgmq.svg)](https://crates.io/crates/pgmq)
+//! [![ci](https://github.com/CoreDB-io/control-plane/actions/workflows/pgmq.yml/badge.svg?branch=main)
+//! 
+//! PGMQ is a lightweight, distributed message queue.
+//! It's like [AWS SQS](https://aws.amazon.com/sqs/) and [RSMQ](https://github.com/smrchy/rsmq) but native to Postgres.
+//! 
+//! Message queues allow you to decouple and connect microservices. 
+//! Send, store, and receive messages between components scalably, without dropping messages or 
+//! needing other services to be available.
+//! 
+//! PGMQ was created by CoreDB. Our goal is to make the full Postgres ecosystem accessible to everyone.
+//! We're building a radically simplified Postgres platform designed to be developer-first and easily extensible.
+//! PGMQ is a part of that project.
+//! 
+//! Not building in Rust? Try the [CoreDB pgmq Postgres extension](https://github.com/CoreDB-io/coredb/tree/main/extensions/pgx_pgmq).
 //!
 //! ## Features
 //!
@@ -14,7 +26,7 @@
 //! - Completely asynchronous API
 //!
 //! ## Quick start
-//!
+//! 
 //! - First, you will need Postgres. We use a container in this example.
 //!
 //! ```bash
@@ -29,31 +41,18 @@
 //! cargo --version
 //! ```
 //!
-//! - This example was written with version 1.67.0, but the latest stable should work. You can go [here](https://www.rust-lang.org/tools/install) to install Rust if you don't have it already, then run `rustup install stable` to install the latest, stable toolchain.
+//! This example was written with version 1.67.0, but the latest stable should work. You can go [here](https://www.rust-lang.org/tools/install) to install Rust if you don't have it already, then run `rustup install stable` to install the latest, stable toolchain.
 //!
-//! - Next, let's create a Rust project for the demo.
-//!
+//! Change directory to the example project:
 //! ```bash
-//! # Create a new Rust project
-//! cargo new basic
+//! cd examples/basic
+//!```
 //!
-//! # Change directory into the new project
-//! cd basic
-//! ```
-//!
-//! - Add PGMQ to the project
-//!
+//! Run the project!
+//! 
 //! ```bash
-//! cargo add pgmq
+//! cargo run
 //! ```
-//!
-//! - Add other dependencies to the project
-//!
-//! ```bash
-//! cargo add tokio serde serde_json
-//! ```
-//!
-//! - Replace the contents of `src/main.rs` with this:
 //!
 //! ```rust
 //! use pgmq::{errors::PgmqError, Message, PGMQueue};
