@@ -1,7 +1,6 @@
 //! # Postgres Message Queue (PGMQ)
 //!
 //! [![Latest Version](https://img.shields.io/crates/v/pgmq.svg)](https://crates.io/crates/pgmq)
-//! [![ci](https://github.com/CoreDB-io/control-plane/actions/workflows/pgmq.yml/badge.svg?branch=main)
 //!
 //! PGMQ is a lightweight, distributed message queue.
 //! It's like [AWS SQS](https://aws.amazon.com/sqs/) and [RSMQ](https://github.com/smrchy/rsmq) but native to Postgres.
@@ -87,7 +86,7 @@
 //!     };
 //!     // Send the message
 //!     let message_id: i64 = queue
-//!         .send(&my_queue, &struct_message)
+//!         .send(&my_queue, &message)
 //!         .await
 //!         .expect("Failed to enqueue message");
 //!
@@ -97,20 +96,21 @@
 //!     let visibility_timeout_seconds: i32 = 30;
 //!
 //!     // Read a message
-//!     let received_struct_message: Message<MyMessage> = queue
+//!     let received_message: Message<MyMessage> = queue
 //!         .read::<MyMessage>(&my_queue, Some(&visibility_timeout_seconds))
 //!         .await
 //!         .unwrap()
 //!         .expect("No messages in the queue");
-//!     println!("Received a message: {:?}", received_struct_message);
+//!     println!("Received a message: {:?}", received_message);
 //!
-//!     assert_eq!(received_struct_message.msg_id, struct_message_id);
+//!     assert_eq!(received_message.msg_id, message_id);
 //!
 //!     // archive the messages
-//!     let _ = queue.archive(&my_queue, &received_json_message.msg_id)
+//!     let _ = queue.archive(&my_queue, &received_message.msg_id)
 //!         .await
 //!         .expect("Failed to archive message");
 //!     println!("archived the messages from the queue");
+//!     Ok(())
 //!
 //! }
 //! ```
@@ -163,16 +163,26 @@ use chrono::serde::ts_seconds::deserialize as from_ts;
 const VT_DEFAULT: i32 = 30;
 const READ_LIMIT_DEFAULT: i32 = 1;
 
+/// Message struct received from the queue
+///
+/// It is an "envelope" for the message that is stored in the queue.
+/// It contains both the message body but also metadata about the message.
 #[derive(Debug, Deserialize, FromRow)]
 pub struct Message<T = serde_json::Value> {
+    /// unique identifier for the message
     pub msg_id: i64,
     #[serde(deserialize_with = "from_ts")]
+    /// "visibility time". The UTC timestamp at which the message will be available for reading again.
     pub vt: chrono::DateTime<Utc>,
+    /// UTC timestamp that the message was sent to the queue
     pub enqueued_at: chrono::DateTime<Utc>,
+    /// The number of times the message has been read. Increments on read.
     pub read_ct: i32,
+    /// The message body.
     pub message: T,
 }
 
+/// Main controller for interacting with a queue.
 #[derive(Debug)]
 pub struct PGMQueue {
     pub url: String,

@@ -1,3 +1,5 @@
+//! Query constructors
+
 pub const TABLE_PREFIX: &str = r#"pgmq"#;
 
 pub fn init_queue(name: &str) -> Vec<String> {
