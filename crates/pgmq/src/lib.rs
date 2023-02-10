@@ -344,11 +344,11 @@ impl PGMQueue {
     ///     let queue: PGMQueue = PGMQueue::new("postgres://postgres:postgres@0.0.0.0:5432".to_owned())
     ///         .await
     ///         .expect("Failed to connect to postgres");
-    ///     let my_queue = "my_queue".to_owned();
+    ///     let my_queue = "my_queue_destroy".to_owned();
     ///     queue.create(&my_queue)
     ///         .await
     ///         .expect("Failed to create queue");
-    ///     queue.destroy("my_queue").await.expect("Failed to destroy queue!");
+    ///     queue.destroy("my_queue_destroy").await.expect("Failed to destroy queue!");
     ///     Ok(())
     /// }
     pub async fn destroy(&self, queue_name: &str) -> Result<(), errors::PgmqError> {
@@ -646,7 +646,50 @@ impl PGMQueue {
         Ok(messages)
     }
 
-    /// Delete a message from the queue
+    /// Delete a message from the queue.
+    /// This is a permanent delete and cannot be undone. If you want to retain a log of the message,
+    /// use the [archive](#method.archive) method.
+    ///
+    /// Deletes happen by message id, so you must have the message id to delete the message.
+    ///
+    /// Example:
+    ///
+    /// ```rust
+    /// use pgmq::{errors::PgmqError, PGMQueue};
+    /// use serde::Serialize;
+    /// use serde_json::Value;
+    ///
+    /// #[derive(Debug, Serialize)]
+    /// struct MyMessage {
+    ///    foo: String,
+    /// }
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), PgmqError> {
+    ///
+    ///     println!("Connecting to Postgres");
+    ///     let queue: PGMQueue = PGMQueue::new("postgres://postgres:postgres@0.0.0.0:5432".to_owned())
+    ///         .await
+    ///         .expect("Failed to connect to postgres");
+    ///     let my_queue = "my_queue".to_owned();
+    ///     queue.create(&my_queue)
+    ///         .await
+    ///         .expect("Failed to create queue");
+    ///
+    ///     let struct_message = MyMessage {
+    ///         foo: "bar".to_owned(),
+    ///     };
+    ///
+    ///     let message_id: i64 = queue
+    ///        .send(&my_queue, &struct_message)
+    ///        .await
+    ///        .expect("Failed to enqueue message");
+    ///     println!("Struct Message id: {message_id}");
+    ///
+    ///     queue.delete(&my_queue, &message_id).await.expect("failed to delete message");
+    ///
+    ///     Ok(())
+    /// }
     pub async fn delete(&self, queue_name: &str, msg_id: &i64) -> Result<u64, Error> {
         let query = &query::delete(queue_name, msg_id);
         let row = sqlx::query(query).execute(&self.connection).await?;
@@ -654,7 +697,48 @@ impl PGMQueue {
         Ok(num_deleted)
     }
 
-    /// Delete multiple messages from the queue
+    /// Delete multiple messages from the queue.
+    /// This is a permanent delete and cannot be undone. If you want to retain a log of the message,
+    /// use the [archive](#method.archive) method.
+    ///
+    /// Deletes happen by message id, so you must have the message id to delete the message.
+    ///
+    /// Example:
+    ///
+    /// ```rust
+    /// use pgmq::{errors::PgmqError, PGMQueue};
+    /// use serde::Serialize;
+    /// use serde_json::Value;
+    ///
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), PgmqError> {
+    ///
+    ///     println!("Connecting to Postgres");
+    ///     let queue: PGMQueue = PGMQueue::new("postgres://postgres:postgres@0.0.0.0:5432".to_owned())
+    ///         .await
+    ///         .expect("Failed to connect to postgres");
+    ///     let my_queue = "my_queue".to_owned();
+    ///     queue.create(&my_queue)
+    ///         .await
+    ///         .expect("Failed to create queue");
+    ///
+    ///     let msgs = vec![  
+    ///         serde_json::json!({"foo": "bar1"}),
+    ///         serde_json::json!({"foo": "bar2"}),
+    ///         serde_json::json!({"foo": "bar3"}),
+    ///     ];
+    ///     let msg_ids = queue
+    ///        .send_batch(&my_queue, &msgs)
+    ///        .await
+    ///        .expect("Failed to enqueue messages");
+    ///     let del = queue
+    ///         .delete_batch(&my_queue, &msg_ids)
+    ///         .await
+    ///         .expect("Failed to delete messages from queue");
+    ///
+    ///     Ok(())
+    /// }
     pub async fn delete_batch(&self, queue_name: &str, msg_ids: &[i64]) -> Result<u64, Error> {
         let query = &query::delete_batch(queue_name, msg_ids);
         let row = sqlx::query(query).execute(&self.connection).await?;
@@ -662,7 +746,42 @@ impl PGMQueue {
         Ok(num_deleted)
     }
 
-    /// move message from queue table to archive table
+    /// Moves a message, by message id, from the queue table to archive table
+    /// View messages on the archive table with sql:
+    /// ```sql
+    /// SELECT * FROM pgmq_<queue_name>_archive;
+    /// ```
+    ///
+    /// Example:
+    ///
+    /// ```rust
+    /// use pgmq::{errors::PgmqError, PGMQueue};
+    /// use serde::Serialize;
+    /// use serde_json::Value;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), PgmqError> {
+    ///
+    ///     println!("Connecting to Postgres");
+    ///     let queue: PGMQueue = PGMQueue::new("postgres://postgres:postgres@0.0.0.0:5432".to_owned())
+    ///         .await
+    ///         .expect("Failed to connect to postgres");
+    ///     let my_queue = "my_queue".to_owned();
+    ///     queue.create(&my_queue)
+    ///         .await
+    ///         .expect("Failed to create queue");
+    ///
+    ///     let message = serde_json::json!({"foo": "bar1"});
+    ///
+    ///     let message_id: i64 = queue
+    ///        .send(&my_queue, &message)
+    ///        .await
+    ///        .expect("Failed to enqueue message");
+    ///
+    ///     queue.archive(&my_queue, &message_id).await.expect("failed to archive message");
+    ///
+    ///     Ok(())
+    /// }
     pub async fn archive(&self, queue_name: &str, msg_id: &i64) -> Result<u64, Error> {
         let query = query::archive(queue_name, msg_id);
         let row = sqlx::query(&query).execute(&self.connection).await?;
@@ -670,8 +789,48 @@ impl PGMQueue {
         Ok(num_deleted)
     }
 
-    /// Reads a single message from the queue. The message is deleted from the queue immediately.
-    /// If no messages are available, `None` is returned.
+    /// Reads single message from the queue and delete it at the same time.
+    /// Similar to [read](#method.read) and [read_batch](#method.read_batch),
+    /// if no messages are available, [`Option::None`] is returned. Unlike these methods,
+    /// the visibility timeout does not apply. This is because the message is immediately deleted.
+    ///
+    /// Example:
+    ///
+    /// ```rust
+    /// use pgmq::{Message, errors::PgmqError, PGMQueue};
+    /// use serde::{Deserialize, Serialize};
+    /// use serde_json::Value;
+    ///
+    /// #[derive(Debug, Deserialize, Serialize)]
+    /// struct MyMessage {
+    ///    foo: String,
+    /// }
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), PgmqError> {
+    ///
+    ///     println!("Connecting to Postgres");
+    ///     let queue: PGMQueue = PGMQueue::new("postgres://postgres:postgres@0.0.0.0:5432".to_owned())
+    ///         .await
+    ///         .expect("Failed to connect to postgres");
+    ///     let my_queue = "my_queue".to_owned();
+    ///     queue.create(&my_queue)
+    ///         .await
+    ///         .expect("Failed to create queue");
+    ///     let send_message = MyMessage {foo: "bar1".to_owned()};
+    ///
+    ///     let struct_message_batch_ids = queue.send(&my_queue, &send_message)
+    ///        .await
+    ///        .expect("Failed to send message");
+    ///
+    ///     let popped_message: Message<MyMessage> = queue.pop::<MyMessage>(&my_queue)
+    ///         .await
+    ///         .unwrap()
+    ///         .expect("no messages in the queue!");
+    ///     println!("Received popped message : {popped_message:?}");
+    ///
+    ///     Ok(())
+    /// }
     pub async fn pop<T: for<'de> Deserialize<'de>>(
         &self,
         queue_name: &str,
@@ -684,6 +843,7 @@ impl PGMQueue {
 
 // Executes a query and returns a single row
 // If the query returns no rows, None is returned
+// This function is intended for internal use.
 async fn fetch_one_message<T: for<'de> Deserialize<'de>>(
     query: &str,
     connection: &Pool<Postgres>,
@@ -713,6 +873,7 @@ async fn fetch_one_message<T: for<'de> Deserialize<'de>>(
 
 // Executes a query and returns multiple rows
 // If the query returns no rows, None is returned
+// This function is intended for internal use.
 async fn fetch_messages<T: for<'de> Deserialize<'de>>(
     query: &str,
     connection: &Pool<Postgres>,
