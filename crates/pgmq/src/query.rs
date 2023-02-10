@@ -185,7 +185,7 @@ pub fn delete_batch(name: &str, msg_ids: &[i64]) -> String {
     // construct string of comma separated msg_id
     let mut msg_id_list: String = "".to_owned();
     for msg_id in msg_ids.iter() {
-        let id_str = format!("{msg_id}");
+        let id_str = format!("{msg_id},");
         msg_id_list.push_str(&id_str)
     }
     // drop trailing comma from constructed string
