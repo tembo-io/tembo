@@ -1,7 +1,6 @@
 # Postgres Message Queue (PGMQ)
 
 [![Latest Version](https://img.shields.io/crates/v/pgmq.svg)](https://crates.io/crates/pgmq)
-[![ci](https://github.com/CoreDB-io/control-plane/actions/workflows/pgmq.yml/badge.svg?branch=main)
 
 PGMQ is a lightweight, distributed message queue.
 It's like [AWS SQS](https://aws.amazon.com/sqs/) and [RSMQ](https://github.com/smrchy/rsmq) but native to Postgres.
@@ -54,7 +53,7 @@ cd examples/basic
 cargo run
 ```
 
-## Example at a glance
+## Minimal example at a glance
 
 ```rust
 use pgmq::{errors::PgmqError, Message, PGMQueue};
@@ -87,7 +86,7 @@ async fn main() -> Result<(), PgmqError> {
     };
     // Send the message
     let message_id: i64 = queue
-        .send(&my_queue, &struct_message)
+        .send(&my_queue, &message)
         .await
         .expect("Failed to enqueue message");
 
@@ -97,20 +96,21 @@ async fn main() -> Result<(), PgmqError> {
     let visibility_timeout_seconds: i32 = 30;
 
     // Read a message
-    let received_struct_message: Message<MyMessage> = queue
+    let received_message: Message<MyMessage> = queue
         .read::<MyMessage>(&my_queue, Some(&visibility_timeout_seconds))
         .await
         .unwrap()
         .expect("No messages in the queue");
-    println!("Received a message: {:?}", received_struct_message);
+    println!("Received a message: {:?}", received_message);
 
-    assert_eq!(received_struct_message.msg_id, struct_message_id);
+    assert_eq!(received_message.msg_id, message_id);
 
     // archive the messages
-    let _ = queue.archive(&my_queue, &received_json_message.msg_id)
+    let _ = queue.archive(&my_queue, &received_message.msg_id)
         .await
         .expect("Failed to archive message");
     println!("archived the messages from the queue");
+    Ok(())
 
 }
 ```

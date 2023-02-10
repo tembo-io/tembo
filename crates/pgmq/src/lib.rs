@@ -53,7 +53,7 @@
 //! cargo run
 //! ```
 //!
-//! ## Example at a glance
+//! ## Minimal example at a glance
 //!
 //! ```rust
 //! use pgmq::{errors::PgmqError, Message, PGMQueue};
