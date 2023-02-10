@@ -295,7 +295,26 @@ impl PGMQueue {
         Ok(pgp)
     }
 
-    /// Create a queue
+    /// Create a queue. This sets up the queue's tables, indexes, and metadata.
+    /// It is idempotent, but does not check if the queue already exists.
+    /// Amounts to `IF NOT EXISTS` statements in Postgres.
+    ///
+    /// Example:
+    ///
+    /// ```rust
+    /// use pgmq::{errors::PgmqError, PGMQueue};
+    /// use serde::{Deserialize, Serialize};
+    /// use serde_json::Value;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), PgmqError> {
+    ///
+    ///     println!("Connecting to Postgres");
+    ///     let queue: PGMQueue = PGMQueue::new("postgres://postgres:postgres@0.0.0.0:5432".to_owned())
+    ///         .await
+    ///         .expect("Failed to connect to postgres");
+    ///     Ok(())
+    /// }
     pub async fn create(&self, queue_name: &str) -> Result<(), errors::PgmqError> {
         let mut tx = self.connection.begin().await?;
         let setup = query::init_queue(queue_name);
@@ -306,7 +325,27 @@ impl PGMQueue {
         Ok(())
     }
 
-    /// destroy a queue
+    /// Destroy a queue. This deletes the queue's tables, indexes, and metadata.
+    /// Does not delete any data related to adjacent queues.
+    ///
+    /// Example:
+    ///
+    /// ```rust
+    /// use pgmq::{errors::PgmqError, PGMQueue};
+    /// use serde::{Deserialize, Serialize};
+    /// use serde_json::Value;
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), PgmqError> {
+    ///
+    ///     println!("Connecting to Postgres");
+    ///     let queue: PGMQueue = PGMQueue::new("postgres://postgres:postgres@0.0.0.0:5432".to_owned())
+    ///         .await
+    ///         .expect("Failed to connect to postgres");
+    ///
+    ///     queue.destroy("my_queue").await.expect("Failed to destroy queue!");
+    ///     Ok(())
+    /// }
     pub async fn destroy(&self, queue_name: &str) -> Result<(), errors::PgmqError> {
         let mut tx = self.connection.begin().await?;
         let setup = query::destory_queue(queue_name);
@@ -317,7 +356,53 @@ impl PGMQueue {
         Ok(())
     }
 
-    /// Send a message to the queue
+    /// Send a single message to a queue.
+    /// Messages can be any implementor of the `serde::Serialize` trait.
+    /// The message id, unique to the queue, is returned. Typically,
+    /// the message sender does not consume the message id but may use it for
+    /// logging and tracing purposes.
+    ///
+    /// Example:
+    ///
+    /// ```rust
+    /// use pgmq::{errors::PgmqError, PGMQueue};
+    /// use serde::{Deserialize, Serialize};
+    /// use serde_json::Value;
+    ///
+    /// #[derive(Debug, Deserialize, Serialize)]
+    /// struct MyMessage {
+    ///    foo: String,
+    /// }
+    ///
+    /// #[tokio::main]
+    /// async fn main() -> Result<(), PgmqError> {
+    ///
+    ///     println!("Connecting to Postgres");
+    ///     let queue: PGMQueue = PGMQueue::new("postgres://postgres:postgres@0.0.0.0:5432".to_owned())
+    ///         .await
+    ///         .expect("Failed to connect to postgres");
+    ///     
+    ///
+    ///     let struct_message = MyMessage {
+    ///         foo: "bar".to_owned(),
+    ///     };
+    ///
+    ///     let struct_message_id: i64 = queue
+    ///        .send(&my_queue, &struct_message)
+    ///        .await
+    ///        .expect("Failed to enqueue message");
+    ///     println!("Struct Message id: {}", struct_message_id);
+    ///
+    ///     let json_message = serde_json::json!({
+    ///         "foo": "bar"
+    ///     });
+    ///     let json_message_id: i64 = queue
+    ///         .send(&my_queue, &json_message)
+    ///         .await
+    ///         .expect("Failed to enqueue message");
+    ///     println!("Json Message id: {}", json_message_id);
+    ///     Ok(())
+    /// }
     pub async fn send<T: Serialize>(
         &self,
         queue_name: &str,
@@ -337,7 +422,7 @@ impl PGMQueue {
     pub async fn send_batch<T: Serialize>(
         &self,
         queue_name: &str,
-        messages: &Vec<T>,
+        messages: &[T],
     ) -> Result<Vec<i64>, errors::PgmqError> {
         let mut msgs: Vec<serde_json::Value> = Vec::new();
         let mut msg_ids: Vec<i64> = Vec::new();
@@ -399,7 +484,7 @@ impl PGMQueue {
     }
 
     /// Delete multiple messages from the queue
-    pub async fn delete_batch(&self, queue_name: &str, msg_ids: &Vec<i64>) -> Result<u64, Error> {
+    pub async fn delete_batch(&self, queue_name: &str, msg_ids: &[i64]) -> Result<u64, Error> {
         let query = &query::delete_batch(queue_name, msg_ids);
         let row = sqlx::query(query).execute(&self.connection).await?;
         let num_deleted = row.rows_affected();

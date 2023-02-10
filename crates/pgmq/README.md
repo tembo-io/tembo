@@ -47,14 +47,6 @@ cd basic
 cargo add pgmq
 ```
 
-- Add other dependencies to the project
-
-```bash
-cargo add tokio serde serde_json
-```
-
-- Replace the contents of `src/main.rs` with this:
-
 ```rust
 use pgmq::{errors::PgmqError, Message, PGMQueue};
 use serde::{Deserialize, Serialize};
