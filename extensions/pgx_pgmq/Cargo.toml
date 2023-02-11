@@ -25,7 +25,7 @@ pg_test = []
 [dependencies]
 pgx = "0.7.1"
 serde = "1.0.152"
-pgmq = "0.7.0"
+pgmq_crate = { package = "pgmq", version = "0.7.0" }
 serde_json = "1.0.91"
 
 [dev-dependencies]
