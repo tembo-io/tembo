@@ -103,7 +103,7 @@ pgmq=# SELECT * from pgmq_read('my_queue', 30, 2);
 If the queue is empty, or if all messages are currently invisible, no rows will be returned.
 
 ```sql
-pgx_pgmq=# SELECT * from pgmq_read('my_queue', 30, 1);
+pgmq=# SELECT * from pgmq_read('my_queue', 30, 1);
  msg_id | read_ct | vt | enqueued_at | message
 --------+---------+----+-------------+---------
 ```
