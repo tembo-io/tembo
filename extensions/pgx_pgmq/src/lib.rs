@@ -4,7 +4,7 @@ use pgx::warning;
 
 pgx::pg_module_magic!();
 
-use pgmq::query::{delete, enqueue_str, init_queue, pop, read};
+use pgmq_crate::query::{delete, enqueue_str, init_queue, pop, read};
 
 #[pg_extern]
 fn pgmq_create(queue_name: &str) -> Result<(), spi::Error> {
@@ -208,7 +208,7 @@ fn listit() -> Result<Vec<(String, TimestampWithTimeZone)>, spi::Error> {
 #[pg_schema]
 mod tests {
     use crate::*;
-    use pgmq::query::TABLE_PREFIX;
+    use pgmq_crate::query::TABLE_PREFIX;
     // use pgx::prelude::*;
     #[pg_test]
     fn test_create() {

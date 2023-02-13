@@ -1151,9 +1151,20 @@ dependencies = [
 
 [[package]]
 name = "pgmq"
-version = "0.5.1"
+version = "0.0.4"
+dependencies = [
+ "pgmq 0.7.2",
+ "pgx",
+ "pgx-tests",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "pgmq"
+version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "004bb81cb9259aa4ace7e22968159f54bc1a3c54b2225e532840d25322c89a4d"
+checksum = "e717f52a46868d3a34e3f9d9984319978fcc73b63febd71d87b336a335c2d416"
 dependencies = [
  "chrono",
  "log",
@@ -1284,17 +1295,6 @@ dependencies = [
  "sysinfo",
  "thiserror",
  "time 0.3.17",
-]
-
-[[package]]
-name = "pgx_pgmq"
-version = "0.0.4"
-dependencies = [
- "pgmq",
- "pgx",
- "pgx-tests",
- "serde",
- "serde_json",
 ]
 
 [[package]]

@@ -9,7 +9,7 @@ engine = create_engine("postgresql://postgres:postgres@0.0.0.0:5432/postgres")
 # create extension
 with engine.connect() as con:
     # create extension
-    created = con.execute(text( "create extension if not exists pgx_pgmq;"))
+    created = con.execute(text( "create extension if not exists pgmq;"))
     con.commit()
 
 QUEUE_NAME = 'myqueue'
