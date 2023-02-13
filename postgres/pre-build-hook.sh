@@ -6,10 +6,10 @@ set -xe
 GIT_ROOT=$(git rev-parse --show-toplevel)
 cd ${GIT_ROOT}/postgres
 
-cd ${GIT_ROOT}/extensions/pgx_pgmq
+cd ${GIT_ROOT}/extensions/pgmq
 /bin/bash build-extension.sh
 
 cd ${GIT_ROOT}/postgres
 mkdir extensions || true
 
-cp ${GIT_ROOT}/extensions/pgx_pgmq/*.deb ./extensions/
+cp ${GIT_ROOT}/extensions/pgmq/*.deb ./extensions/
