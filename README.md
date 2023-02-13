@@ -3,8 +3,8 @@
 [![](https://shields.io/endpoint?url=https://ossrank.com/shield/2103)](https://ossrank.com/p/2103)
 [![Discord Chat](https://img.shields.io/discord/1060568981725003789?label=Discord)][Discord]
 
-CoreDB aims to dramatically imporve the developer experience of deploying, managing, and scaling
-Postgres. The key idea behind CoreDB is to build a modern, rich Postgres platform with great user experience,
+CoreDB aims to dramatically improve the developer experience of deploying, managing, and scaling
+Postgres. We are building a modern, rich Postgres platform with great dev experience,
 observability, and extendability.
 
 CoreDB is an "For Everything" distribution of Postgres under active development that you are free to use,
