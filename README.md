@@ -31,6 +31,4 @@ We just got started, but here's what we're working on:
 * A managed service Postgres, which you can get early access to by signing up for 
   [our mailing list](https://coredb.io)
 
-our mailing list.
-
 [Discord]: https://discord.gg/HjuMB3JX
