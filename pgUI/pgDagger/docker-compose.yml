@@ -12,6 +12,15 @@ services:
     depends_on:
       - timescaledb
 
+  pgrestinit:
+    build:
+      context: ./scripts
+      dockerfile: Dockerfile.init
+    environment:
+      POSTGRES_CONNECTION: postgresql://postgres:postgres@timescaledb:5432/postgres
+    depends_on:
+      - timescaledb
+
   timescaledb:
     image: timescale/timescaledb-ha:pg14-latest
     restart: on-failure
