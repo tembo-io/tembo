@@ -146,10 +146,6 @@ impl CoreDB {
             debug!("Did not find primary pod");
             return Ok(Action::requeue(Duration::from_secs(1)));
         }
-        if !is_pod_ready().matches_object(Some(&primary_pod.unwrap())) {
-            debug!("Did not find primary pod is ready");
-            return Ok(Action::requeue(Duration::from_secs(1)));
-        }
 
         create_postgres_exporter_role(self, ctx.clone())
             .await
@@ -157,6 +153,11 @@ impl CoreDB {
                 "Error creating postgres_exporter on CoreDB {}",
                 self.metadata.name.clone().unwrap()
             ));
+
+        if !is_pod_ready().matches_object(Some(&primary_pod.unwrap())) {
+            debug!("Did not find primary pod");
+            return Ok(Action::requeue(Duration::from_secs(1)));
+        }
 
         create_extensions(self, ctx.clone()).await.expect(&format!(
             "Error creating extensions on CoreDB {}",
