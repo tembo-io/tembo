@@ -32,7 +32,11 @@ scrape_configs:
         labels:
           group: 'postgres'
 
-# alerting:
+  - job_name: promscale
+    static_configs:
+      - targets: ['promscale:9201']
+
+# alerting:docker 
 #   alertmanagers:
 #     - scheme: http
 #       static_configs:
@@ -41,6 +45,11 @@ scrape_configs:
 
 remote_write:
   - url: "http://promscale:9201/write"
+    remote_timeout: 100s
+    queue_config:
+      max_samples_per_send: 10000
+
+
 remote_read:
   - url: "http://promscale:9201/read"
     read_recent: true
