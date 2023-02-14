@@ -2,6 +2,7 @@ apiVersion: coredb.io/v1alpha1
 kind: CoreDB
 metadata:
   name: sample-coredb
+  namespace: sample2
 spec:
   replicas: 1
   enabledExtensions:
