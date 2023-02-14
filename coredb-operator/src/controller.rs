@@ -167,13 +167,11 @@ impl CoreDB {
         ));
         debug!("Found pod ready: {}", pod_name);
 
-        // Create extensions
         create_postgres_exporter_role(self, &ctx).await.expect(&format!(
             "Error creating postgres_exporter on CoreDB {}",
             self.metadata.name.clone().unwrap()
         ));
 
-        // Create extensions
         create_extensions(self, &ctx).await.expect(&format!(
             "Error creating extensions on CoreDB {}",
             self.metadata.name.clone().unwrap()
