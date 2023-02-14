@@ -1,7 +1,6 @@
 version: "3.5"
 services:
   rest:
-    container_name: pg_postgrest
     image: postgrest/postgrest:v10.0.0
     restart: unless-stopped
     ports:
@@ -28,14 +27,14 @@ services:
 
   metrics_exporter:
     restart: always
-    image: quay.io/prometheuscommunity/postgres-exporter
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.11.1
     ports:
       - 9187:9187
     environment:
       DATA_SOURCE_NAME: postgresql://postgres:postgres@arbitrary_postgres:5433/postgres?sslmode=disable
 
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v2.42.0
     restart: on-failure
     depends_on:
      - promscale
@@ -45,7 +44,7 @@ services:
       - ${PWD}/prometheus/config/prometheus.yml:/etc/prometheus/prometheus.yml
 
   promscale:
-    image: timescale/promscale:latest
+    image: timescale/promscale:0.17.0
     restart: on-failure
     ports:
       - 9201:9201/tcp
@@ -57,7 +56,7 @@ services:
 
   arbitrary_postgres:
     restart: always
-    image: postgres
+    image: postgres:15.2
     ports:
       - 5433:5433
     environment:
