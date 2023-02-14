@@ -247,21 +247,22 @@ mod test {
             std::time::Duration::from_secs(timeout_seconds_coredb_deleted),
             await_condition(coredbs.clone(), &name, conditions::is_deleted("")),
         )
-            .await
-            .expect(&format!(
-                "CoreDB {} was not deleted after waiting {} seconds",
-                name, timeout_seconds_coredb_deleted
-            ));
+        .await
+        .expect(&format!(
+            "CoreDB {} was not deleted after waiting {} seconds",
+            name, timeout_seconds_coredb_deleted
+        ));
 
         // Assert namespace has been deleted
-        let _assert_ns_deleted = tokio::time::timeout(Duration::from_secs(timeout_seconds_ns_deleted), async move {
-            loop {
-                let get_ns = ns_api.get_opt(&namespace).await.unwrap();
-                if get_ns == None {
-                    break;
+        let _assert_ns_deleted =
+            tokio::time::timeout(Duration::from_secs(timeout_seconds_ns_deleted), async move {
+                loop {
+                    let get_ns = ns_api.get_opt(&namespace).await.unwrap();
+                    if get_ns == None {
+                        break;
+                    }
                 }
-            }
-        })
+            })
             .await
             .expect(&format!(
                 "Namespace {} was not deleted after waiting {} seconds",
