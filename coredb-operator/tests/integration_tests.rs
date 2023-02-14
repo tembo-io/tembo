@@ -182,7 +182,7 @@ mod test {
                 "name": format!("{}", namespace),
             }
         });
-        let _ = ns_api
+        ns_api
             .patch(&namespace, &params, &Patch::Apply(&ns))
             .await
             .unwrap();
@@ -190,6 +190,8 @@ mod test {
         // Timeout settings while waiting for an event
         let timeout_seconds_start_pod = 60;
         let timeout_seconds_pod_ready = 30;
+        let timeout_seconds_ns_deleted = 30;
+        let timeout_seconds_coredb_deleted = 30;
 
         // Create coredb
         println!("Creating CoreDB resource {}", name);
@@ -207,7 +209,7 @@ mod test {
         });
         let params = PatchParams::apply("coredb-integration-test");
         let patch = Patch::Apply(&coredb_json);
-        let coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+        coredbs.patch(name, &params, &patch).await.unwrap();
 
         // Assert coredb is running
         let pod_name = format!("{}-0", name);
@@ -235,11 +237,36 @@ mod test {
         println!("Found pod ready: {}", pod_name);
 
         // Delete namespace
-        let _ = ns_api.delete(&namespace, &Default::default()).await.unwrap();
+        ns_api.delete(&namespace, &Default::default()).await.unwrap();
 
         // Assert coredb has been deleted
+        // TODO(ianstanton) This doesn't assert the object is gone for good. Tried implementing something
+        //  similar to the loop used in namespace delete assertion, but received a comparison error.
+        println!("Waiting for CoreDB to be deleted: {}", &name);
+        let _assert_coredb_deleted = tokio::time::timeout(
+            std::time::Duration::from_secs(timeout_seconds_coredb_deleted),
+            await_condition(coredbs.clone(), &name, conditions::is_deleted("")),
+        )
+            .await
+            .expect(&format!(
+                "CoreDB {} was not deleted after waiting {} seconds",
+                name, timeout_seconds_coredb_deleted
+            ));
 
         // Assert namespace has been deleted
+        let _assert_ns_deleted = tokio::time::timeout(Duration::from_secs(timeout_seconds_ns_deleted), async move {
+            loop {
+                let get_ns = ns_api.get_opt(&namespace).await.unwrap();
+                if get_ns == None {
+                    break;
+                }
+            }
+        })
+            .await
+            .expect(&format!(
+                "Namespace {} was not deleted after waiting {} seconds",
+                namespace, timeout_seconds_ns_deleted
+            ));
     }
 
     async fn kube_client() -> kube::Client {
