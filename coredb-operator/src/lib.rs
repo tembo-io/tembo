@@ -11,8 +11,7 @@ pub use metrics::Metrics;
 
 mod defaults;
 mod extensions;
-#[cfg(test)]
-pub mod fixtures;
+#[cfg(test)] pub mod fixtures;
 mod psql;
 mod secret;
 mod service;

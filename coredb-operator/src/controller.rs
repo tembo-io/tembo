@@ -185,7 +185,7 @@ impl CoreDB {
             .map_err(Error::KubeError);
         let phase = ns_status.unwrap().status.unwrap().phase;
         if phase == Some("Terminating".to_string()) {
-            return Ok(Action::await_change())
+            return Ok(Action::await_change());
         }
         let recorder = ctx.diagnostics.read().await.recorder(ctx.client.clone(), self);
         // CoreDB doesn't have dependencies in this example case, so we just publish an event
