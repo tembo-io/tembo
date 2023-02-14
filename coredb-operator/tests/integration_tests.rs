@@ -254,6 +254,7 @@ mod test {
         ));
 
         // Assert namespace has been deleted
+        println!("Waiting for namespace to be deleted: {}", &namespace);
         let _assert_ns_deleted =
             tokio::time::timeout(Duration::from_secs(timeout_seconds_ns_deleted), async move {
                 loop {
