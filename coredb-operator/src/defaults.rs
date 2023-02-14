@@ -11,7 +11,7 @@ pub fn default_port() -> i32 {
 }
 
 pub fn default_image() -> String {
-    "quay.io/coredb/postgres:2023.01.24".to_owned()
+    "quay.io/coredb/postgres:c03124e".to_owned()
 }
 
 pub fn default_extensions() -> Vec<String> {

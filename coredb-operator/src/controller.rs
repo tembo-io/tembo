@@ -22,7 +22,10 @@ use kube::{
     CustomResource, Resource,
 };
 
-use crate::{extensions::create_extensions, secret::reconcile_secret};
+use crate::{
+    extensions::create_extensions, postgres_exporter_role::create_postgres_exporter_role,
+    secret::reconcile_secret,
+};
 use k8s_openapi::api::core::v1::Pod;
 use kube::runtime::wait::{await_condition, conditions, Condition};
 use schemars::JsonSchema;
@@ -165,9 +168,16 @@ impl CoreDB {
         debug!("Found pod ready: {}", pod_name);
 
         // Create extensions
-        create_extensions(self, &ctx)
-            .await
-            .expect("error creating extensions");
+        create_postgres_exporter_role(self, &ctx).await.expect(&format!(
+            "Error creating postgres_exporter on CoreDB {}",
+            self.metadata.name.clone().unwrap()
+        ));
+
+        // Create extensions
+        create_extensions(self, &ctx).await.expect(&format!(
+            "Error creating extensions on CoreDB {}",
+            self.metadata.name.clone().unwrap()
+        ));
 
         // If no events were received, check back every minute
         Ok(Action::requeue(Duration::from_secs(60)))

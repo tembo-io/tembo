@@ -145,7 +145,7 @@ mod test {
         assert!(result.stdout.clone().unwrap().contains("customers"));
 
         // TODO(ianstanton) we need to properly wait for 'postgis' extension to be created
-        thread::sleep(Duration::from_millis(500));
+        thread::sleep(Duration::from_millis(5000));
 
         // Assert extension 'postgis' was created
         let result = coredb_resource
@@ -160,7 +160,20 @@ mod test {
         println!("{}", result.stdout.clone().unwrap());
         assert!(result.stdout.clone().unwrap().contains("postgis"));
 
-        // TODO(ianstanton) Tear down resources when finished.
+        // Assert role 'postgres_exporter' was created
+        let result = coredb_resource
+            .psql(
+                "SELECT rolname FROM pg_roles;".to_string(),
+                "postgres".to_string(),
+                client.clone(),
+            )
+            .await
+            .unwrap();
+
+        println!("{}", result.stdout.clone().unwrap());
+        assert!(result.stdout.clone().unwrap().contains("postgres_exporter"));
+
+        // TODO(ianstanton) Tear down resources when finished, if tests pass.
     }
 
     async fn kube_client() -> kube::Client {
