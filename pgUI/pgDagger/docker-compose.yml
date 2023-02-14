@@ -1,69 +1,68 @@
 version: "3.5"
 services:
-  postgres_dagger:
-    restart: always
-    image: timescale/timescaledb-ha:pg14-latest
+  rest:
+    image: postgrest/postgrest:v10.0.0
+    restart: unless-stopped
     ports:
-      - 5433:5433/tcp
+      - 3001:3000
+    environment:
+      PGRST_DB_URI: postgres://postgres:postgres@timescaledb:5432/postgres
+      PGRST_DB_SCHEMA: prom_data
+      PGRST_DB_ANON_ROLE: postgres
+    depends_on:
+      - timescaledb
+
+  timescaledb:
+    image: timescale/timescaledb-ha:pg14-latest
+    restart: on-failure
+    ports:
+      - 5432:5432/tcp
+    volumes:
+      - timescaledb-data:/var/lib/postgresql/data
     environment:
       POSTGRES_PASSWORD: postgres
       POSTGRES_USER: postgres
-      TSTUNE_PROFILE: promscale
-    command: -p 5433
+      POSTGRES_DB: postgres
+      POSTGRES_HOST_AUTH_METHOD: trust
 
   metrics_exporter:
     restart: always
-    image: quay.io/prometheuscommunity/postgres-exporter
+    image: quay.io/prometheuscommunity/postgres-exporter:v0.11.1
     ports:
       - 9187:9187
     environment:
-      DATA_SOURCE_NAME: postgresql://postgres:postgres@arbitrary_postgres:5432/postgres?sslmode=disable
+      DATA_SOURCE_NAME: postgresql://postgres:postgres@arbitrary_postgres:5433/postgres?sslmode=disable
 
   prometheus:
-    restart: always
     image: prom/prometheus:v2.42.0
+    restart: on-failure
     depends_on:
-      - promscale
-    volumes:
-      - ./prometheus/:/etc/prometheus/
-      # - prometheus_data:/prometheus
-    command:
-      - "--config.file=/etc/prometheus/config/prometheus.yml"
-      - "--storage.tsdb.path=/prometheus"
-      - "--web.console.libraries=/usr/share/prometheus/console_libraries"
-      - "--web.console.templates=/usr/share/prometheus/consoles"
-      - "--storage.tsdb.retention=1d" # This is retention.time in future versions of prometheus
-      - "--web.external-url="
-      - "--web.enable-admin-api"
-      - "--web.enable-lifecycle"
-      - "--query.max-concurrency=400"
+     - promscale
     ports:
-      - 9090:9090
+      - 9090:9090/tcp
+    volumes:
+      - ${PWD}/prometheus/config/prometheus.yml:/etc/prometheus/prometheus.yml
 
   promscale:
-    image: timescale/promscale:0.17
+    image: timescale/promscale:0.17.0
+    restart: on-failure
     ports:
       - 9201:9201/tcp
       - 9202:9202/tcp
-    restart: on-failure
     depends_on:
-      - postgres_dagger
-    # volumes:
-    #   - ${PWD}/promscale_prometheus.yml:/prometheus.yml
-    #   - ${PWD}/rules.yml:/rules.yml
-    #   - ${PWD}/alerts.yml:/alerts.yml
+      - timescaledb
     environment:
-      PROMSCALE_DB_URI: postgres://postgres:postgres@postgres_dagger:5433/postgres?sslmode=allow
-      # PROMSCALE_TRACING_OTLP_SERVER_ADDRESS: ":9202"
-      # PROMSCALE_TELEMETRY_TRACE_OTEL_ENDPOINT: "otel-collector:4317"
-      # PROMSCALE_TELEMETRY_TRACE_SAMPLING_RATIO: "0.1"
-      # PROMSCALE_METRICS_RULES_CONFIG_FILE: /prometheus.yml
+      PROMSCALE_DB_URI: postgres://postgres:postgres@timescaledb:5432/postgres?sslmode=allow
 
   arbitrary_postgres:
     restart: always
-    image: postgres
+    image: postgres:15.2
     ports:
-      - 5432:5432
+      - 5433:5433
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
+    command: -p 5433
+
+volumes:
+  timescaledb-data:
