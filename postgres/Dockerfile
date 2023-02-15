@@ -47,7 +47,9 @@ RUN apt-get update && apt-get install -y \
 RUN set -eux; \
   cp -v /usr/share/postgresql/${PG_MAJOR}/postgresql.conf.sample /usr/share/postgresql/${PG_MAJOR}/postgresql.conf.sample.orig; \
   sed -ri "s!^#?(listen_addresses)\s*=\s*\S+.*!\1 = '*'!" /usr/share/postgresql/${PG_MAJOR}/postgresql.conf.sample; \
-  grep -F "listen_addresses = '*'" /usr/share/postgresql/${PG_MAJOR}/postgresql.conf.sample
+  grep -F "listen_addresses = '*'" /usr/share/postgresql/${PG_MAJOR}/postgresql.conf.sample \
+# enable extensions that need access to background workers
+  echo "shared_preload_libraries = 'shared_preload_libraries=pg_stat_statements,pg_cron,pgaudit,pg_partman_bgw'" >> /usr/share/postgresql/${PG_MAJOR}/postgresql.conf.sample 
 
 COPY extensions/ /extensions
 
@@ -61,4 +63,4 @@ COPY docker-entrypoint.sh /usr/local/bin/
 ENTRYPOINT ["docker-entrypoint.sh"]
 
 USER postgres
-CMD ["postgres", "-c", "shared_preload_libraries=pg_stat_statements,pg_cron,pgaudit,pg_partman_bgw"]
+CMD ["postgres"]
