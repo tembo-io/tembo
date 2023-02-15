@@ -109,6 +109,12 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
                         name: "pg-directory-init".to_string(),
                         image: Some(cdb.spec.image.clone()),
                         volume_mounts: postgres_volume_mounts.clone(),
+                        security_context: Some(SecurityContext {
+                            // Run the init container as root
+                            run_as_user: Some(0),
+                            allow_privilege_escalation: Some(false),
+                            ..SecurityContext::default()
+                        }),
                         // When we have our own PG container,
                         // this will be refactored: this is assuming the
                         // content of the docker entrypoint script
