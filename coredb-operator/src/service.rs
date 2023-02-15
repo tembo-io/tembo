@@ -1,14 +1,13 @@
 use crate::{Context, CoreDB, Error};
 use k8s_openapi::{
     api::core::v1::{Service, ServicePort, ServiceSpec},
-    apimachinery::pkg::apis::meta::v1::ObjectMeta,
+    apimachinery::pkg::{apis::meta::v1::ObjectMeta, util::intstr::IntOrString},
 };
 use kube::{
     api::{Patch, PatchParams},
     Api, Resource, ResourceExt,
 };
 use std::{collections::BTreeMap, sync::Arc};
-use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 
 pub async fn reconcile_svc(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
     let client = ctx.client.clone();
@@ -45,6 +44,13 @@ pub async fn reconcile_svc(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
         .map_err(Error::KubeError)?;
 
     let name = cdb.name_any() + "-metrics";
+
+    if !(cdb.spec.postgresExporterEnabled) {
+        // check if service exists and delete it
+        let _o = svc_api.delete(&name, &Default::default()).await;
+        return Ok(());
+    }
+
     let metrics_svc: Service = Service {
         metadata: ObjectMeta {
             name: Some(name.to_owned()),
