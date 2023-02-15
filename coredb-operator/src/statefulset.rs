@@ -91,10 +91,10 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
         },
     ];
 
-    if cdb.spec.postgres_exporter_role_enabled {
+    if cdb.spec.postgresExporterEnabled {
         containers.push(Container {
             name: "postgres-exporter".to_string(),
-            image: Some(cdb.spec.postgres_exporter_image.clone()),
+            image: Some(cdb.spec.postgresExporterImage.clone()),
             args: Some(vec!["--auto-discover-databases".to_string()]),
             env: Some(vec![EnvVar {
                 name: "DATA_SOURCE_NAME".to_string(),
