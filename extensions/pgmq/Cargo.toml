@@ -25,10 +25,11 @@ pg_test = []
 [dependencies]
 pgx = "0.7.1"
 serde = "1.0.152"
-pgmq_crate = { package = "pgmq", version = "0.7.0" }
+pgmq_crate = { path = "../../crates/pgmq", package = "pgmq", version = "0.7.4-alpha.1" }
 serde_json = "1.0.91"
 
 [dev-dependencies]
+once_cell = "1.17.1"
 pgx-tests = "0.7.1"
 
 [profile.dev]

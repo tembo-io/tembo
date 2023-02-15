@@ -4,17 +4,37 @@ use pgx::warning;
 
 pgx::pg_module_magic!();
 
-use pgmq_crate::query::{delete, enqueue_str, init_queue, pop, read};
+pub mod partition;
+use pgmq_crate::query::{delete, enqueue_str, pop, read};
+
+
+extension_sql_file!("partman.sql", name = "schema");
+
 
 #[pg_extern]
+fn pgmq_init() -> Result<(), spi::Error> {
+    let partman_setup = partition::init_partman();
+    let ran: Result<_, spi::Error> = Spi::connect(|mut c| {
+        for q in partman_setup {
+            let _ = c.update(&q, None, None)?;
+        }
+        Ok(())
+    });
+    match ran {
+        Ok(_) => Ok(()),
+        Err(ran) => Err(ran),
+    }
+}
+#[pg_extern]
 fn pgmq_create(queue_name: &str) -> Result<(), spi::Error> {
-    let setup = init_queue(queue_name);
+    let setup = partition::init_partitioned_queue(queue_name);
     let ran: Result<_, spi::Error> = Spi::connect(|mut c| {
         for q in setup {
             let _ = c.update(&q, None, None)?;
         }
         Ok(())
     });
+
     match ran {
         Ok(_) => Ok(()),
         Err(ran) => Err(ran),
@@ -307,13 +327,15 @@ mod tests {
 
 #[cfg(test)]
 pub mod pg_test {
-    // pg_test module with both the setup and postgresql_conf_options functions are required
+    use crate::{pgmq_init};
+        // pg_test module with both the setup and postgresql_conf_options functions are required
+
     pub fn setup(_options: Vec<&str>) {
-        // perform one-off initialization when the pg_test framework starts
+        // let _ = pgmq_init();
     }
 
     pub fn postgresql_conf_options() -> Vec<&'static str> {
         // return any postgresql.conf settings that are required for your tests
-        vec![]
+        vec!["shared_preload_libraries = 'pg_partman_bgw'"]
     }
 }

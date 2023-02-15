@@ -25,6 +25,7 @@ A lightweight distributed message queue. Like [AWS SQS](https://aws.amazon.com/s
     - [Archive a message](#archive-a-message)
     - [Delete a message](#delete-a-message)
 - [Development](#development)
+    - [Setup dependencies](#setup-dependencies)
 - [Packaging](#packaging)
 
 ## Start CoreDB Postgres
@@ -154,6 +155,22 @@ Then, clone this repo and change into this directory.
 git clone git@github.com:CoreDB-io/coredb.git
 cd coredb/extensions/pgmq/
 ```
+
+### Setup dependencies
+
+Install:
+- [pg_partman](https://github.com/pgpartman/pg_partman)
+
+```
+#  ~/.pgx/data-14/postgresql.conf
+shared_preload_libraries = 'pg_partman_bgw'
+```
+
+cp /opt/homebrew/share/postgresql@14/extension/pg_partman* ~/.pgx/14.6/pgx-install/share/postgresql/extension/
+cp /opt/homebrew/lib/postgresql@14/pg_partman_bgw.so ~/.pgx/14.6/pgx-install/lib/postgresql/
+~/.pgx/data-14/postgresql.conf
+```
+- [pg_jobmon](https://github.com/omniti-labs/pg_jobmon)
 
 Run the dev environment
 
