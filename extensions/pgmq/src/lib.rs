@@ -7,24 +7,6 @@ pgx::pg_module_magic!();
 pub mod partition;
 use pgmq_crate::query::{delete, enqueue_str, pop, read};
 
-
-extension_sql_file!("partman.sql", name = "schema");
-
-
-#[pg_extern]
-fn pgmq_init() -> Result<(), spi::Error> {
-    let partman_setup = partition::init_partman();
-    let ran: Result<_, spi::Error> = Spi::connect(|mut c| {
-        for q in partman_setup {
-            let _ = c.update(&q, None, None)?;
-        }
-        Ok(())
-    });
-    match ran {
-        Ok(_) => Ok(()),
-        Err(ran) => Err(ran),
-    }
-}
 #[pg_extern]
 fn pgmq_create(queue_name: &str) -> Result<(), spi::Error> {
     let setup = partition::init_partitioned_queue(queue_name);
@@ -46,8 +28,6 @@ fn pgmq_send(queue_name: &str, message: pgx::Json) -> Result<Option<i64>, spi::E
     let m = serde_json::to_string(&message.0).unwrap();
     Spi::get_one(&enqueue_str(queue_name, &m))
 }
-
-// check message out of the queue using default timeout
 
 #[pg_extern]
 fn pgmq_read(
@@ -229,7 +209,6 @@ fn listit() -> Result<Vec<(String, TimestampWithTimeZone)>, spi::Error> {
 mod tests {
     use crate::*;
     use pgmq_crate::query::TABLE_PREFIX;
-    // use pgx::prelude::*;
     #[pg_test]
     fn test_create() {
         let qname = r#"test_queue"#;
@@ -327,8 +306,7 @@ mod tests {
 
 #[cfg(test)]
 pub mod pg_test {
-    use crate::{pgmq_init};
-        // pg_test module with both the setup and postgresql_conf_options functions are required
+    // pg_test module with both the setup and postgresql_conf_options functions are required
 
     pub fn setup(_options: Vec<&str>) {
         // let _ = pgmq_init();

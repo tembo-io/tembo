@@ -2,10 +2,12 @@ use pgmq_crate::query::{
     create_archive, create_index, create_meta, insert_meta, SCHEMA, TABLE_PREFIX,
 };
 
+// for now, put pg_partman in the public schema
+//
+const PARTMAN_SCHEMA: &str = "public";
+
 pub fn init_partitioned_queue(name: &str) -> Vec<String> {
     vec![
-        // create_partman_schema(),
-        // create_partman_extension(),
         create_meta(),
         create_partitioned_queue(name),
         create_partitioned_index(name),
@@ -14,24 +16,6 @@ pub fn init_partitioned_queue(name: &str) -> Vec<String> {
         create_partman(name),
         insert_meta(name),
     ]
-}
-
-pub fn init_partman() -> Vec<String> {
-    vec![
-        create_partman_schema(),
-        create_partman_extension(),
-    ]
-}
-pub fn create_partman_schema() -> String {
-    format!(
-        "
-        CREATE SCHEMA IF NOT EXISTS partman;
-        "
-    )
-}
-
-pub fn create_partman_extension() -> String {
-    format!("CREATE EXTENSION IF NOT EXISTS pg_partman cascade SCHEMA partman;")
 }
 
 pub fn create_partitioned_queue(queue: &str) -> String {
@@ -60,7 +44,7 @@ pub fn create_partman(queue: &str) -> String {
     // TODO: 1000 is a placeholder. should be configurable and optimized default
     format!(
         "
-        SELECT partman.create_parent('{SCHEMA}.{TABLE_PREFIX}_{queue}', 'msg_id', 'native', '1000');
+        SELECT {PARTMAN_SCHEMA}.create_parent('{SCHEMA}.{TABLE_PREFIX}_{queue}', 'msg_id', 'native', '1000');
         "
     )
 }
