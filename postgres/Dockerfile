@@ -56,7 +56,9 @@ RUN for extension in $(ls /extensions); do dpkg -i /extensions/${extension}; don
 
 RUN git clone https://github.com/pgpartman/pg_partman.git &&\
     cd pg_partman && \
-    make install
+    make install && \
+    cd ../ && \
+    rm -rf pg_partman
 
 COPY docker-entrypoint.sh /usr/local/bin/
 ENTRYPOINT ["docker-entrypoint.sh"]
