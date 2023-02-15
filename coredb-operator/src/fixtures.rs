@@ -162,11 +162,12 @@ impl ApiServerVerifier {
             send.send_response(Response::builder().body(request.into_body()).unwrap());
 
             // After the PATCH to Service, we expect a GET to Pods
+            // looking up by StatefulSet name
             let (request, send) = handle.next_request().await.expect("Kube API called to GET Pods");
             assert_eq!(request.method(), http::Method::GET);
             assert_eq!(
                 request.uri().to_string(),
-                format!("/api/v1/namespaces/testns/pods?&fieldSelector=metadata.name%3Dtestdb-0")
+                format!("/api/v1/namespaces/testns/pods?&labelSelector=statefulset%3Dtestdb")
             );
 
             // We need to send an ObjectList<Pod> back as our response
