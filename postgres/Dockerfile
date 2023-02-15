@@ -33,6 +33,9 @@ RUN mkdir /docker-entrypoint-initdb.d
 
 # Install postgres and some extensions
 RUN apt-get update && apt-get install -y \
+        build-essential \
+        git \
+        postgresql-server-dev-15 \
         postgresql-15 \
         postgresql-15-postgis-3 \
         postgresql-15-cron \
@@ -46,8 +49,7 @@ RUN set -eux; \
   sed -ri "s!^#?(listen_addresses)\s*=\s*\S+.*!\1 = '*'!" /usr/share/postgresql/${PG_MAJOR}/postgresql.conf.sample; \
   grep -F "listen_addresses = '*'" /usr/share/postgresql/${PG_MAJOR}/postgresql.conf.sample
 
-COPY extensions/ /extensions
-
+# COPY extensions/ /extensions
 RUN for extension in $(ls /extensions); do dpkg -i /extensions/${extension}; done
 
 RUN git clone https://github.com/pgpartman/pg_partman.git &&\
