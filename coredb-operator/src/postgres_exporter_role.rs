@@ -2,8 +2,11 @@ use crate::{Context, CoreDB, Error};
 use std::sync::Arc;
 use tracing::debug;
 
-pub async fn create_postgres_exporter_role(cdb: &CoreDB, ctx: &Arc<Context>) -> Result<(), Error> {
-    let client = &ctx.client;
+pub async fn create_postgres_exporter_role(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
+    let client = ctx.client.clone();
+    if !(cdb.spec.postgres_exporter_role_enabled) {
+        return Ok(());
+    }
     debug!(
         "Creating postgres_exporter role for database {} in namespace {}",
         cdb.metadata.name.clone().unwrap(),

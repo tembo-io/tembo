@@ -48,6 +48,8 @@ pub static COREDB_FINALIZER: &str = "coredbs.coredb.io";
 pub struct CoreDBSpec {
     #[serde(default = "defaults::default_replicas")]
     pub replicas: i32,
+    #[serde(default = "defaults::default_postgres_exporter_role_enabled")]
+    pub postgres_exporter_role_enabled: bool,
     #[serde(default = "defaults::default_image")]
     pub image: String,
     #[serde(default = "defaults::default_port")]
@@ -167,12 +169,14 @@ impl CoreDB {
         ));
         debug!("Found pod ready: {}", pod_name);
 
-        create_postgres_exporter_role(self, &ctx).await.expect(&format!(
-            "Error creating postgres_exporter on CoreDB {}",
-            self.metadata.name.clone().unwrap()
-        ));
+        create_postgres_exporter_role(self, ctx.clone())
+            .await
+            .expect(&format!(
+                "Error creating postgres_exporter on CoreDB {}",
+                self.metadata.name.clone().unwrap()
+            ));
 
-        create_extensions(self, &ctx).await.expect(&format!(
+        create_extensions(self, ctx.clone()).await.expect(&format!(
             "Error creating extensions on CoreDB {}",
             self.metadata.name.clone().unwrap()
         ));
@@ -207,7 +211,8 @@ impl CoreDB {
         let pods: Api<Pod> = Api::namespaced(client, &sts_namespace);
         let pods = pods.list(&list_params);
         // For the time being, we assume that the first pod is the primary
-        let primary = pods.await.unwrap().items[0].clone();
+        let primary = pods.await;
+        let primary = primary.unwrap().items[0].clone();
         return Ok(primary);
     }
 

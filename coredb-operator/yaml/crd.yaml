@@ -31,12 +31,15 @@ spec:
                   type: string
                 type: array
               image:
-                default: quay.io/coredb/postgres:2023.01.24
+                default: quay.io/coredb/postgres:c03124e
                 type: string
               port:
                 default: 5432
                 format: int32
                 type: integer
+              postgres_exporter_role_enabled:
+                default: true
+                type: boolean
               replicas:
                 default: 1
                 format: int32

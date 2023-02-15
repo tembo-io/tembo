@@ -2,6 +2,10 @@ pub fn default_replicas() -> i32 {
     1
 }
 
+pub fn default_postgres_exporter_role_enabled() -> bool {
+    true
+}
+
 pub fn default_uid() -> i32 {
     999
 }
