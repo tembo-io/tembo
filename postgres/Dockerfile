@@ -50,8 +50,12 @@ COPY extensions/ /extensions
 
 RUN for extension in $(ls /extensions); do dpkg -i /extensions/${extension}; done
 
+RUN git clone https://github.com/pgpartman/pg_partman.git &&\
+    cd pg_partman && \
+    make install
+
 COPY docker-entrypoint.sh /usr/local/bin/
 ENTRYPOINT ["docker-entrypoint.sh"]
 
 USER postgres
-CMD ["postgres"]
+CMD ["postgres", "-c", "shared_preload_libraries=pg_stat_statements,pg_cron,pgaudit,pg_partman_bgw"]
