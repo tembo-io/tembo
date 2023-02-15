@@ -48,7 +48,7 @@ pub static COREDB_FINALIZER: &str = "coredbs.coredb.io";
 pub struct CoreDBSpec {
     #[serde(default = "defaults::default_replicas")]
     pub replicas: i32,
-    #[serde(default = "defaults::default_postgres_exporter_role_enabled")]
+    #[serde(default = "defaults::default_postgres_exporter_enabled")]
     pub postgresExporterEnabled: bool,
     #[serde(default = "defaults::default_image")]
     pub image: String,

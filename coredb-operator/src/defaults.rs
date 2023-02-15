@@ -2,7 +2,7 @@ pub fn default_replicas() -> i32 {
     1
 }
 
-pub fn default_postgres_exporter_role_enabled() -> bool {
+pub fn default_postgres_exporter_enabled() -> bool {
     true
 }
 
