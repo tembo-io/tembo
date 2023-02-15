@@ -3,8 +3,8 @@ use regex::Regex;
 use std::sync::Arc;
 use tracing::debug;
 
-pub async fn create_extensions(cdb: &CoreDB, ctx: &Arc<Context>) -> Result<(), Error> {
-    let client = &ctx.client;
+pub async fn create_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
+    let client = ctx.client.clone();
     let extensions = &cdb.spec.enabledExtensions;
     let re = Regex::new(r"[a-zA-Z][0-9a-zA-Z_-]*$").unwrap();
 
