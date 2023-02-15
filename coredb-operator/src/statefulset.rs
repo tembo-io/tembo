@@ -15,7 +15,10 @@ use kube::{
     Resource,
 };
 
-use k8s_openapi::api::core::v1::{EmptyDirVolumeSource, Volume};
+use k8s_openapi::{
+    api::core::v1::{EmptyDirVolumeSource, HTTPGetAction, Volume},
+    apimachinery::pkg::util::intstr::IntOrString,
+};
 use std::{collections::BTreeMap, sync::Arc};
 
 pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
@@ -53,6 +56,74 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
             ..VolumeMount::default()
         },
     ]);
+    let mut containers = vec![
+        // This container for running postgresql
+        Container {
+            args: Some(vec![
+                "-c".to_string(),
+                "ssl=on".to_string(),
+                "-c".to_string(),
+                "ssl_cert_file=/certs/server.crt".to_string(),
+                "-c".to_string(),
+                "ssl_key_file=/certs/server.key".to_string(),
+            ]),
+            env: postgres_env.clone(),
+            security_context: Some(SecurityContext {
+                run_as_user: Some(cdb.spec.uid.clone() as i64),
+                allow_privilege_escalation: Some(false),
+                ..SecurityContext::default()
+            }),
+            name: "postgres".to_string(),
+            image: Some(cdb.spec.image.clone()),
+            ports: Some(vec![ContainerPort {
+                container_port: 5432,
+                ..ContainerPort::default()
+            }]),
+            volume_mounts: postgres_volume_mounts.clone(),
+            readiness_probe: Some(Probe {
+                exec: Some(ExecAction {
+                    command: Some(vec![String::from("pg_isready")]),
+                }),
+                initial_delay_seconds: Some(3),
+                ..Probe::default()
+            }),
+            ..Container::default()
+        },
+    ];
+
+    if cdb.spec.postgresExporterEnabled {
+        containers.push(Container {
+            name: "postgres-exporter".to_string(),
+            image: Some(cdb.spec.postgresExporterImage.clone()),
+            args: Some(vec!["--auto-discover-databases".to_string()]),
+            env: Some(vec![EnvVar {
+                name: "DATA_SOURCE_NAME".to_string(),
+                value: Some("postgresql://postgres_exporter@localhost:5432/postgres".to_string()),
+                ..EnvVar::default()
+            }]),
+            security_context: Some(SecurityContext {
+                run_as_user: Some(65534),
+                allow_privilege_escalation: Some(false),
+                ..SecurityContext::default()
+            }),
+            ports: Some(vec![ContainerPort {
+                container_port: 9187,
+                name: Some("metrics".to_string()),
+                protocol: Some("TCP".to_string()),
+                ..ContainerPort::default()
+            }]),
+            readiness_probe: Some(Probe {
+                http_get: Some(HTTPGetAction {
+                    path: Some("/metrics".to_string()),
+                    port: IntOrString::String("metrics".to_string()),
+                    ..HTTPGetAction::default()
+                }),
+                initial_delay_seconds: Some(3),
+                ..Probe::default()
+            }),
+            ..Container::default()
+        });
+    }
 
     let sts: StatefulSet = StatefulSet {
         metadata: ObjectMeta {
@@ -70,40 +141,7 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
             },
             template: PodTemplateSpec {
                 spec: Some(PodSpec {
-                    containers: vec![
-                        // This container for running postgresql
-                        Container {
-                            args: Some(vec![
-                                "-c".to_string(),
-                                "ssl=on".to_string(),
-                                "-c".to_string(),
-                                "ssl_cert_file=/certs/server.crt".to_string(),
-                                "-c".to_string(),
-                                "ssl_key_file=/certs/server.key".to_string(),
-                            ]),
-                            env: postgres_env.clone(),
-                            security_context: Some(SecurityContext {
-                                run_as_user: Some(cdb.spec.uid.clone() as i64),
-                                allow_privilege_escalation: Some(false),
-                                ..SecurityContext::default()
-                            }),
-                            name: "postgres".to_string(),
-                            image: Some(cdb.spec.image.clone()),
-                            ports: Some(vec![ContainerPort {
-                                container_port: 5432,
-                                ..ContainerPort::default()
-                            }]),
-                            volume_mounts: postgres_volume_mounts.clone(),
-                            readiness_probe: Some(Probe {
-                                exec: Some(ExecAction {
-                                    command: Some(vec![String::from("pg_isready")]),
-                                }),
-                                initial_delay_seconds: Some(3),
-                                ..Probe::default()
-                            }),
-                            ..Container::default()
-                        },
-                    ],
+                    containers,
                     init_containers: Option::from(vec![Container {
                         env: postgres_env.clone(),
                         name: "pg-directory-init".to_string(),

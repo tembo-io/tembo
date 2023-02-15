@@ -45,7 +45,7 @@ impl PsqlCommand {
 
     pub async fn execute(&self) -> Result<PsqlOutput, kube::Error> {
         let attach_params = AttachParams {
-            container: None,
+            container: Some("postgres".to_string()),
             tty: false,
             stdin: true,
             stdout: true,

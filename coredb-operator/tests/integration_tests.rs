@@ -14,18 +14,71 @@ mod test {
 
     use controller::{is_pod_ready, CoreDB};
     use k8s_openapi::{
-        api::core::v1::{Namespace, Pod, Secret},
+        api::core::v1::{Container, Namespace, Pod, PodSpec, Secret},
         apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
+        apimachinery::pkg::apis::meta::v1::ObjectMeta,
     };
     use kube::{
-        api::{Patch, PatchParams},
+        api::{AttachParams, Patch, PatchParams, PostParams},
         runtime::wait::{await_condition, conditions, Condition},
         Api, Client, Config,
     };
     use rand::Rng;
     use std::{str, thread, time::Duration};
+    use tokio::io::AsyncReadExt;
 
     const API_VERSION: &str = "coredb.io/v1alpha1";
+
+    async fn create_test_buddy(pods_api: Api<Pod>, name: String) -> String {
+        // Launch a pod we can connect to if we want to
+        // run commands inside the cluster.
+        let test_pod_name = format!("test-buddy-{}", name);
+        let pod = Pod {
+            metadata: ObjectMeta {
+                name: Some(test_pod_name.clone()),
+                ..ObjectMeta::default()
+            },
+            spec: Some(PodSpec {
+                containers: vec![Container {
+                    command: Some(vec!["sleep".to_string()]),
+                    args: Some(vec!["360".to_string()]),
+                    name: "test-connection".to_string(),
+                    image: Some("curlimages/curl:latest".to_string()),
+                    ..Container::default()
+                }],
+                restart_policy: Some("Never".to_string()),
+                ..PodSpec::default()
+            }),
+            ..Pod::default()
+        };
+
+        let _pod = pods_api.create(&PostParams::default(), &pod).await.unwrap();
+
+        return test_pod_name;
+    }
+
+    async fn run_command_in_container(pods_api: Api<Pod>, pod_name: String, command: Vec<String>) -> String {
+        let attach_params = AttachParams {
+            container: None,
+            tty: false,
+            stdin: true,
+            stdout: true,
+            stderr: true,
+            max_stdin_buf_size: Some(1024),
+            max_stdout_buf_size: Some(1024),
+            max_stderr_buf_size: Some(1024),
+        };
+
+        let mut attached_process = pods_api
+            .exec(pod_name.as_str(), &command, &attach_params)
+            .await
+            .unwrap();
+        let mut stdout_reader = attached_process.stdout().unwrap();
+        let mut result_stdout = String::new();
+        stdout_reader.read_to_string(&mut result_stdout).await.unwrap();
+
+        return result_stdout;
+    }
 
     #[tokio::test]
     #[ignore]
@@ -44,6 +97,10 @@ mod test {
         let timeout_seconds_start_pod = 60;
         let timeout_seconds_pod_ready = 30;
         let timeout_seconds_secret_present = 30;
+
+        // Create a pod we can use to run commands in the cluster
+        let pods: Api<Pod> = Api::namespaced(client.clone(), namespace);
+        let test_pod_name = create_test_buddy(pods.clone(), name.to_string()).await;
 
         // Apply a basic configuration of CoreDB
         println!("Creating CoreDB resource {}", name);
@@ -81,7 +138,7 @@ mod test {
 
         // Wait for Pod to be created
         let pod_name = format!("{}-0", name);
-        let pods: Api<Pod> = Api::namespaced(client.clone(), namespace);
+
         println!("Waiting for pod to be running: {}", pod_name);
         let _check_for_pod = tokio::time::timeout(
             std::time::Duration::from_secs(timeout_seconds_start_pod),
@@ -173,7 +230,14 @@ mod test {
         println!("{}", result.stdout.clone().unwrap());
         assert!(result.stdout.clone().unwrap().contains("postgres_exporter"));
 
-        // TODO(ianstanton) Tear down resources when finished, if tests pass.
+        // Assert we can curl the metrics from the service
+        let metrics_service_name = format!("{}-metrics", name);
+        let command = vec![
+            String::from("curl"),
+            format!("http://{metrics_service_name}/metrics"),
+        ];
+        let result_stdout = run_command_in_container(pods.clone(), test_pod_name, command).await;
+        assert!(result_stdout.contains("pg_up 1"));
     }
 
     #[tokio::test]
