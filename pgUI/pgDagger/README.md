@@ -12,16 +12,19 @@ docker compose up
 
 ## Query via REST
 
+Postgres data types are documented [here](https://postgrest.org/en/stable/how-tos/working-with-postgresql-data-types.html#timestamps)
+
 ```bash
-curl http://localhost:3001/pg_locks_count
+curl http://localhost:3001/prom_pg_stat_database_sessions_killed?time=gte.2023-02-14+21:40:15
 ```
 
 ```json
 [
- {"time":"2023-02-14T17:55:09.634+00:00","value":1,"series_id":743},
- {"time":"2023-02-14T17:55:09.634+00:00","value":0,"series_id":745},
- {"time":"2023-02-14T17:55:09.634+00:00","value":0,"series_id":746},
- {"time":"2023-02-14T17:55:09.634+00:00","value":0,"series_id":748}
+ {"time":"2023-02-14T21:40:55.18+00:00","value":15,"labels":{"job": "metrics_exporter", "group": "postgres", "server": "arbitrary_postgres:5433", "monitor": "pgDagger-prometheus", "__name__": "pg_stat_bgwriter_checkpoints_timed_total", "instance": "metrics_exporter:9187"}}, 
+ {"time":"2023-02-14T21:41:05.18+00:00","value":15,"labels":{"job": "metrics_exporter", "group": "postgres", "server": "arbitrary_postgres:5433", "monitor": "pgDagger-prometheus", "__name__": "pg_stat_bgwriter_checkpoints_timed_total", "instance": "metrics_exporter:9187"}}, 
+ {"time":"2023-02-14T21:41:15.18+00:00","value":15,"labels":{"job": "metrics_exporter", "group": "postgres", "server": "arbitrary_postgres:5433", "monitor": "pgDagger-prometheus", "__name__": "pg_stat_bgwriter_checkpoints_timed_total", "instance": "metrics_exporter:9187"}}, 
+ {"time":"2023-02-14T21:41:20.18+00:00","value":15,"labels":{"job": "metrics_exporter", "group": "postgres", "server": "arbitrary_postgres:5433", "monitor": "pgDagger-prometheus", "__name__": "pg_stat_bgwriter_checkpoints_timed_total", "instance": "metrics_exporter:9187"}}, 
+
 ]
 ```
 
