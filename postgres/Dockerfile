@@ -49,7 +49,8 @@ RUN set -eux; \
   sed -ri "s!^#?(listen_addresses)\s*=\s*\S+.*!\1 = '*'!" /usr/share/postgresql/${PG_MAJOR}/postgresql.conf.sample; \
   grep -F "listen_addresses = '*'" /usr/share/postgresql/${PG_MAJOR}/postgresql.conf.sample
 
-# COPY extensions/ /extensions
+COPY extensions/ /extensions
+
 RUN for extension in $(ls /extensions); do dpkg -i /extensions/${extension}; done
 
 RUN git clone https://github.com/pgpartman/pg_partman.git &&\
