@@ -128,4 +128,4 @@ jobs:
           echo "=========="
           kubectl get -o yaml coredb --all-namespaces
           echo "=========="
-          kubectl logs -n coredb-operator $(kubectl get pods -n default | grep coredb-controller | cut -d' ' -f1)
+          kubectl logs -n coredb-operator $(kubectl get pods -n coredb-operator | grep coredb-controller | cut -d' ' -f1)
