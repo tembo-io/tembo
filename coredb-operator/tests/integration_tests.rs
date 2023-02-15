@@ -176,6 +176,114 @@ mod test {
         // TODO(ianstanton) Tear down resources when finished, if tests pass.
     }
 
+    #[tokio::test]
+    #[ignore]
+    async fn functional_test_delete_namespace() {
+        // Initialize the Kubernetes client
+        let client = kube_client().await;
+        let mut rng = rand::thread_rng();
+        let name = &format!("test-coredb-{}", rng.gen_range(0..100000));
+        let namespace = name;
+
+        // Create namespace
+        let ns_api: Api<Namespace> = Api::all(client.clone());
+        let params = PatchParams::apply("coredb-integration-test").force();
+        let ns = serde_json::json!({
+            "apiVersion": "v1",
+            "kind": "Namespace",
+            "metadata": {
+                "name": format!("{}", namespace),
+            }
+        });
+        ns_api
+            .patch(&namespace, &params, &Patch::Apply(&ns))
+            .await
+            .unwrap();
+
+        // Timeout settings while waiting for an event
+        let timeout_seconds_start_pod = 60;
+        let timeout_seconds_pod_ready = 30;
+        let timeout_seconds_ns_deleted = 30;
+        let timeout_seconds_coredb_deleted = 30;
+
+        // Create coredb
+        println!("Creating CoreDB resource {}", name);
+        let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), namespace);
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": "CoreDB",
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "replicas": 1,
+                "enabledExtensions": ["postgis"]
+            }
+        });
+        let params = PatchParams::apply("coredb-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        coredbs.patch(name, &params, &patch).await.unwrap();
+
+        // Assert coredb is running
+        let pod_name = format!("{}-0", name);
+        let pods: Api<Pod> = Api::namespaced(client.clone(), namespace);
+        println!("Waiting for pod to be running: {}", pod_name);
+        let _check_for_pod = tokio::time::timeout(
+            std::time::Duration::from_secs(timeout_seconds_start_pod),
+            await_condition(pods.clone(), &pod_name, conditions::is_pod_running()),
+        )
+        .await
+        .expect(&format!(
+            "Did not find the pod {} to be running after waiting {} seconds",
+            pod_name, timeout_seconds_start_pod
+        ));
+        println!("Waiting for pod to be ready: {}", pod_name);
+        let _check_for_pod_ready = tokio::time::timeout(
+            std::time::Duration::from_secs(timeout_seconds_pod_ready),
+            await_condition(pods.clone(), &pod_name, is_pod_ready()),
+        )
+        .await
+        .expect(&format!(
+            "Did not find the pod {} to be ready after waiting {} seconds",
+            pod_name, timeout_seconds_pod_ready
+        ));
+        println!("Found pod ready: {}", pod_name);
+
+        // Delete namespace
+        ns_api.delete(&namespace, &Default::default()).await.unwrap();
+
+        // Assert coredb has been deleted
+        // TODO(ianstanton) This doesn't assert the object is gone for good. Tried implementing something
+        //  similar to the loop used in namespace delete assertion, but received a comparison error.
+        println!("Waiting for CoreDB to be deleted: {}", &name);
+        let _assert_coredb_deleted = tokio::time::timeout(
+            std::time::Duration::from_secs(timeout_seconds_coredb_deleted),
+            await_condition(coredbs.clone(), &name, conditions::is_deleted("")),
+        )
+        .await
+        .expect(&format!(
+            "CoreDB {} was not deleted after waiting {} seconds",
+            name, timeout_seconds_coredb_deleted
+        ));
+
+        // Assert namespace has been deleted
+        println!("Waiting for namespace to be deleted: {}", &namespace);
+        let _assert_ns_deleted =
+            tokio::time::timeout(Duration::from_secs(timeout_seconds_ns_deleted), async move {
+                loop {
+                    let get_ns = ns_api.get_opt(&namespace).await.unwrap();
+                    if get_ns == None {
+                        break;
+                    }
+                }
+            })
+            .await
+            .expect(&format!(
+                "Namespace {} was not deleted after waiting {} seconds",
+                namespace, timeout_seconds_ns_deleted
+            ));
+    }
+
     async fn kube_client() -> kube::Client {
         // Get the name of the currently selected namespace
         let kube_config = Config::infer()
