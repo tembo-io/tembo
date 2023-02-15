@@ -10,14 +10,14 @@ impl SubCommand for InstallCommand {
         let output = Command::new("kubectl")
             .arg("apply")
             .arg("-f")
-            .arg("https://raw.githubusercontent.com/CoreDB-io/coredb/main/coredb-operator/yaml/crd.yaml")
+            .arg("https://raw.githubusercontent.com/CoreDB-io/coredb/release/2023.2.15/coredb-operator/yaml/crd.yaml")
             .output()
             .expect("Failed to execute 'kubectl' command.");
         println!("{}", String::from_utf8_lossy(&output.stdout));
         let output = Command::new("kubectl")
             .arg("apply")
             .arg("-f")
-            .arg("https://raw.githubusercontent.com/CoreDB-io/coredb/main/coredb-operator/yaml/install.yaml")
+            .arg("https://raw.githubusercontent.com/CoreDB-io/coredb/release/2023.2.15/coredb-operator/yaml/install.yaml")
             .output()
             .expect("Failed to execute 'kubectl' command.");
         println!("{}", String::from_utf8_lossy(&output.stdout));
