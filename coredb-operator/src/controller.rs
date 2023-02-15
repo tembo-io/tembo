@@ -23,7 +23,7 @@ use kube::{
 };
 
 use crate::{extensions::create_extensions, secret::reconcile_secret};
-use k8s_openapi::api::core::v1::Pod;
+use k8s_openapi::api::core::v1::{Namespace, Pod};
 use kube::runtime::wait::{await_condition, conditions, Condition};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -175,6 +175,18 @@ impl CoreDB {
 
     // Finalizer cleanup (the object was deleted, ensure nothing is orphaned)
     async fn cleanup(&self, ctx: Arc<Context>) -> Result<Action> {
+        // If namespace is terminating, do not publish delete event. Attempting to publish an event
+        // in a terminating namespace will leave us in a bad state in which the namespace will hang
+        // in terminating state.
+        let ns_api: Api<Namespace> = Api::all(ctx.client.clone());
+        let ns_status = ns_api
+            .get_status(self.metadata.namespace.as_ref().unwrap())
+            .await
+            .map_err(Error::KubeError);
+        let phase = ns_status.unwrap().status.unwrap().phase;
+        if phase == Some("Terminating".to_string()) {
+            return Ok(Action::await_change());
+        }
         let recorder = ctx.diagnostics.read().await.recorder(ctx.client.clone(), self);
         // CoreDB doesn't have dependencies in this example case, so we just publish an event
         recorder
