@@ -20,7 +20,7 @@ jobs:
         with:
           repository: coredb-io/coredb
           path: ./coredb
-          ref: release/2023.1.27
+          ref: release/2023.2.15
       - name: Build and upload operator image
         uses: ./coredb/.github/actions/build-and-push-to-quay
         with:

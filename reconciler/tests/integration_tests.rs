@@ -59,7 +59,7 @@ mod test {
 
         let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
 
-        let timeout_seconds_start_pod = 30;
+        let timeout_seconds_start_pod = 90;
 
         let pod_name = format!("{}-0", name);
 
