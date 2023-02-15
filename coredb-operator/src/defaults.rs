@@ -15,7 +15,7 @@ pub fn default_port() -> i32 {
 }
 
 pub fn default_image() -> String {
-    "quay.io/coredb/postgres:c03124e".to_owned()
+    "quay.io/coredb/postgres:a703af3".to_owned()
 }
 
 pub fn default_postgres_exporter_image() -> String {

@@ -94,7 +94,7 @@ dependencies = [
 
 [[package]]
 name = "coredb-cli"
-version = "0.2.0-alpha"
+version = "2023.2.15"
 dependencies = [
  "assert_cmd",
  "clap",
