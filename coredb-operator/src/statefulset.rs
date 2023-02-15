@@ -108,14 +108,14 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
             }),
             ports: Some(vec![ContainerPort {
                 container_port: 9187,
-                name: Some("http".to_string()),
+                name: Some("metrics".to_string()),
                 protocol: Some("TCP".to_string()),
                 ..ContainerPort::default()
             }]),
             readiness_probe: Some(Probe {
                 http_get: Some(HTTPGetAction {
                     path: Some("/metrics".to_string()),
-                    port: IntOrString::String("http".to_string()),
+                    port: IntOrString::String("metrics".to_string()),
                     ..HTTPGetAction::default()
                 }),
                 initial_delay_seconds: Some(3),
