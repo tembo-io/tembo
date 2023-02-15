@@ -4,8 +4,8 @@ use assert_json_diff::assert_json_include;
 use futures::pin_mut;
 use http::{Request, Response};
 use hyper::{body::to_bytes, Body};
-use k8s_openapi::api::core::v1::Secret;
-use kube::{core::ObjectList, Client, Resource, ResourceExt};
+use k8s_openapi::api::core::v1::{Pod, Secret};
+use kube::{api::ObjectMeta, core::ObjectList, Client, Resource, ResourceExt};
 use prometheus::Registry;
 use std::sync::Arc;
 use tokio::task::JoinHandle;
@@ -18,6 +18,9 @@ impl CoreDB {
         d.meta_mut().namespace = Some("testns".into());
         d.meta_mut().uid = Some("752d59ef-2671-4890-9feb-0097459b18c8".into());
         d.spec.replicas = 1;
+        // Need to figure out how to mock websocket
+        // in order to unit test a feature using kube exec
+        d.spec.postgresExporterEnabled = false;
         d
     }
 
@@ -109,6 +112,7 @@ impl ApiServerVerifier {
                 request.uri().to_string(),
                 format!("/api/v1/namespaces/testns/secrets?&labelSelector=app%3Dcoredb")
             );
+
             // We need to send an empty ObjectList<Secret> back as our response
             let obj: ObjectList<Secret> = ObjectList {
                 metadata: Default::default(),
@@ -116,6 +120,7 @@ impl ApiServerVerifier {
             };
             let response = serde_json::to_vec(&obj).unwrap();
             send.send_response(Response::builder().body(Body::from(response)).unwrap());
+
             // After the GET on Secrets, we expect a PATCH to Secret
             let (request, send) = handle
                 .next_request()
@@ -129,6 +134,7 @@ impl ApiServerVerifier {
                 )
             );
             send.send_response(Response::builder().body(request.into_body()).unwrap());
+
             // After the PATCH to Secret, we expect a PATCH to StatefulSet
             let (request, send) = handle
                 .next_request()
@@ -142,6 +148,7 @@ impl ApiServerVerifier {
                 )
             );
             send.send_response(Response::builder().body(request.into_body()).unwrap());
+
             // After the PATCH to StatefulSet, we expect a PATCH to Service
             let (request, send) = handle
                 .next_request()
@@ -153,6 +160,30 @@ impl ApiServerVerifier {
                 format!("/api/v1/namespaces/testns/services/testdb?&force=true&fieldManager=cntrlr")
             );
             send.send_response(Response::builder().body(request.into_body()).unwrap());
+
+            // After the PATCH to Service, we expect a GET to Pods
+            let (request, send) = handle.next_request().await.expect("Kube API called to GET Pods");
+            assert_eq!(request.method(), http::Method::GET);
+            assert_eq!(
+                request.uri().to_string(),
+                format!("/api/v1/namespaces/testns/pods?&labelSelector=statefulset%3Dtestdb")
+            );
+
+            // We need to send an ObjectList<Pod> back as our response
+            let pod: Pod = Pod {
+                metadata: ObjectMeta {
+                    name: Some("testdb-0".to_string()),
+                    namespace: Some("testns".to_string()),
+                    ..ObjectMeta::default()
+                },
+                ..Pod::default()
+            };
+            let obj: ObjectList<Pod> = ObjectList {
+                metadata: Default::default(),
+                items: vec![pod],
+            };
+            let response = serde_json::to_vec(&obj).unwrap();
+            send.send_response(Response::builder().body(Body::from(response)).unwrap());
         })
     }
 }

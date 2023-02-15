@@ -22,9 +22,12 @@ use kube::{
     CustomResource, Resource,
 };
 
-use crate::{extensions::create_extensions, secret::reconcile_secret};
+use crate::{
+    extensions::create_extensions, postgres_exporter_role::create_postgres_exporter_role,
+    secret::reconcile_secret,
+};
 use k8s_openapi::api::core::v1::{Namespace, Pod};
-use kube::runtime::wait::{await_condition, conditions, Condition};
+use kube::runtime::wait::Condition;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -45,8 +48,12 @@ pub static COREDB_FINALIZER: &str = "coredbs.coredb.io";
 pub struct CoreDBSpec {
     #[serde(default = "defaults::default_replicas")]
     pub replicas: i32,
+    #[serde(default = "defaults::default_postgres_exporter_enabled")]
+    pub postgresExporterEnabled: bool,
     #[serde(default = "defaults::default_image")]
     pub image: String,
+    #[serde(default = "defaults::default_postgres_exporter_image")]
+    pub postgresExporterImage: String,
     #[serde(default = "defaults::default_port")]
     pub port: i32,
     #[serde(default = "defaults::default_uid")]
@@ -106,9 +113,6 @@ impl CoreDB {
         let ns = self.namespace().unwrap();
         let name = self.name_any();
         let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &ns);
-        let pods: Api<Pod> = Api::namespaced(client, &ns);
-        let timeout_seconds_start_pod = 30;
-        let timeout_seconds_pod_ready = 30;
 
         // always overwrite status object with what we saw
         let new_status = Patch::Apply(json!({
@@ -139,35 +143,34 @@ impl CoreDB {
             .await
             .expect("error reconciling service");
 
-        // Wait for Pod to be running and ready before creating extensions
-        let pod_name = format!("{}-0", name);
-        debug!("Waiting for pod to be running: {}", pod_name);
-        let _check_for_pod = tokio::time::timeout(
-            std::time::Duration::from_secs(timeout_seconds_start_pod),
-            await_condition(pods.clone(), &pod_name, conditions::is_pod_running()),
-        )
-        .await
-        .expect(&format!(
-            "Did not find the pod {} to be running after waiting {} seconds",
-            pod_name, timeout_seconds_start_pod
-        ));
+        let primary_pod = self.primary_pod(ctx.client.clone()).await;
+        if primary_pod.is_err() {
+            debug!("Did not find primary pod");
+            return Ok(Action::requeue(Duration::from_secs(1)));
+        }
+        let primary_pod = primary_pod.unwrap();
 
-        debug!("Waiting for pod to be ready: {}", pod_name);
-        let _check_for_pod_ready = tokio::time::timeout(
-            std::time::Duration::from_secs(timeout_seconds_pod_ready),
-            await_condition(pods.clone(), &pod_name, is_pod_ready()),
-        )
-        .await
-        .expect(&format!(
-            "Did not find the pod {} to be ready after waiting {} seconds",
-            pod_name, timeout_seconds_pod_ready
-        ));
-        debug!("Found pod ready: {}", pod_name);
+        if !is_postgres_ready().matches_object(Some(&primary_pod)) {
+            debug!("Postgres is not ready");
+            return Ok(Action::requeue(Duration::from_secs(1)));
+        }
 
-        // Create extensions
-        create_extensions(self, &ctx)
+        create_postgres_exporter_role(self, ctx.clone())
             .await
-            .expect("error creating extensions");
+            .expect(&format!(
+                "Error creating postgres_exporter on CoreDB {}",
+                self.metadata.name.clone().unwrap()
+            ));
+
+        if !is_pod_ready().matches_object(Some(&primary_pod)) {
+            debug!("Did not find primary pod");
+            return Ok(Action::requeue(Duration::from_secs(1)));
+        }
+
+        create_extensions(self, ctx.clone()).await.expect(&format!(
+            "Error creating extensions on CoreDB {}",
+            self.metadata.name.clone().unwrap()
+        ));
 
         // If no events were received, check back every minute
         Ok(Action::requeue(Duration::from_secs(60)))
@@ -202,7 +205,7 @@ impl CoreDB {
         Ok(Action::await_change())
     }
 
-    async fn primary_pod(&self, client: Client) -> Result<Pod> {
+    async fn primary_pod(&self, client: Client) -> Result<Pod, Error> {
         let sts = stateful_set_from_cdb(self);
         let sts_name = sts.metadata.name.unwrap();
         let sts_namespace = sts.metadata.namespace.unwrap();
@@ -210,8 +213,18 @@ impl CoreDB {
         let list_params = ListParams::default().labels(&label_selector);
         let pods: Api<Pod> = Api::namespaced(client, &sts_namespace);
         let pods = pods.list(&list_params);
-        // For the time being, we assume that the first pod is the primary
-        let primary = pods.await.unwrap().items[0].clone();
+        // Return an error if the query fails
+        let pod_list = pods.await.map_err(Error::KubeError)?;
+        // Return an error if the list is empty
+        if pod_list.items.is_empty() {
+            return Err(Error::KubeError(kube::Error::Api(kube::error::ErrorResponse {
+                status: "404".to_string(),
+                message: "No pods found".to_string(),
+                reason: "Not Found".to_string(),
+                code: 404,
+            })));
+        }
+        let primary = pod_list.items[0].clone();
         return Ok(primary);
     }
 
@@ -253,6 +266,23 @@ pub fn is_pod_ready() -> impl Condition<Pod> + 'static {
             }
         }
         false
+    }
+}
+
+pub fn is_postgres_ready() -> impl Condition<Pod> + 'static {
+    move |obj: Option<&Pod>| {
+        if let Some(pod) = &obj {
+            if let Some(status) = &pod.status {
+                if let Some(container_statuses) = &status.container_statuses {
+                    for container in container_statuses {
+                        if container.name == "postgres" {
+                            return container.ready;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
     }
 }
 
