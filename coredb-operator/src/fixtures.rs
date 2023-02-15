@@ -20,7 +20,7 @@ impl CoreDB {
         d.spec.replicas = 1;
         // Need to figure out how to mock websocket
         // in order to unit test a feature using kube exec
-        d.spec.postgres_exporter_role_enabled = false;
+        d.spec.postgresExporterEnabled = false;
         d
     }
 

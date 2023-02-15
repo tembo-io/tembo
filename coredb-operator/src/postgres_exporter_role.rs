@@ -4,7 +4,7 @@ use tracing::debug;
 
 pub async fn create_postgres_exporter_role(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
     let client = ctx.client.clone();
-    if !(cdb.spec.postgres_exporter_role_enabled) {
+    if !(cdb.spec.postgresExporterEnabled) {
         return Ok(());
     }
     debug!(

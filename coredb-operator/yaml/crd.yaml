@@ -37,7 +37,7 @@ spec:
                 default: 5432
                 format: int32
                 type: integer
-              postgres_exporter_role_enabled:
+              postgresExporterEnabled:
                 default: true
                 type: boolean
               replicas:
