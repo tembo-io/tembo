@@ -7,8 +7,18 @@ services:
       - 3001:3000
     environment:
       PGRST_DB_URI: postgres://postgres:postgres@timescaledb:5432/postgres
-      PGRST_DB_SCHEMA: prom_data
+      PGRST_DB_SCHEMA: public
       PGRST_DB_ANON_ROLE: postgres
+    depends_on:
+      - timescaledb
+
+  pgrestinit:
+    build:
+      context: ./scripts
+      dockerfile: Dockerfile.init
+    environment:
+      PGRST_DB_SCHEMA: public
+      POSTGRES_CONNECTION: postgresql://postgres:postgres@timescaledb:5432/postgres
     depends_on:
       - timescaledb
 
