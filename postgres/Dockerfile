@@ -33,23 +33,22 @@ RUN mkdir /docker-entrypoint-initdb.d
 
 # Install postgres and some extensions
 RUN apt-get update && apt-get install -y \
+        # build deps for pg_partman
         build-essential \
         git \
         postgresql-server-dev-15 \
+        # pg_stat_statement's package
+        postgresql-contrib \ 
+        # postgresql server
         postgresql-15 \
+        # extensions
         postgresql-15-postgis-3 \
         postgresql-15-cron \
         postgresql-15-repack \
         postgresql-15-pgaudit \
         && rm -rf /var/lib/apt/lists/*
 	
-# Set listen on all addresses to the default
-RUN set -eux; \
-  cp -v /usr/share/postgresql/${PG_MAJOR}/postgresql.conf.sample /usr/share/postgresql/${PG_MAJOR}/postgresql.conf.sample.orig; \
-  sed -ri "s!^#?(listen_addresses)\s*=\s*\S+.*!\1 = '*'!" /usr/share/postgresql/${PG_MAJOR}/postgresql.conf.sample; \
-  grep -F "listen_addresses = '*'" /usr/share/postgresql/${PG_MAJOR}/postgresql.conf.sample \
-# enable extensions that need access to background workers
-  echo "shared_preload_libraries = 'shared_preload_libraries=pg_stat_statements,pg_cron,pgaudit,pg_partman_bgw'" >> /usr/share/postgresql/${PG_MAJOR}/postgresql.conf.sample 
+COPY ./postgresql.conf /usr/share/postgresql/${PG_MAJOR}/postgresql.conf.sample
 
 COPY extensions/ /extensions
 
