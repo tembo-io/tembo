@@ -52,6 +52,8 @@ pub struct CoreDBSpec {
     pub postgresExporterEnabled: bool,
     #[serde(default = "defaults::default_image")]
     pub image: String,
+    #[serde(default = "defaults::default_postgres_exporter_image")]
+    pub postgresExporterImage: String,
     #[serde(default = "defaults::default_port")]
     pub port: i32,
     #[serde(default = "defaults::default_uid")]
@@ -146,8 +148,10 @@ impl CoreDB {
             debug!("Did not find primary pod");
             return Ok(Action::requeue(Duration::from_secs(1)));
         }
-        if !is_pod_ready().matches_object(Some(&primary_pod.unwrap())) {
-            debug!("Did not find primary pod is ready");
+        let primary_pod = primary_pod.unwrap();
+
+        if !is_postgres_ready().matches_object(Some(&primary_pod)) {
+            debug!("Postgres is not ready");
             return Ok(Action::requeue(Duration::from_secs(1)));
         }
 
@@ -157,6 +161,11 @@ impl CoreDB {
                 "Error creating postgres_exporter on CoreDB {}",
                 self.metadata.name.clone().unwrap()
             ));
+
+        if !is_pod_ready().matches_object(Some(&primary_pod)) {
+            debug!("Did not find primary pod");
+            return Ok(Action::requeue(Duration::from_secs(1)));
+        }
 
         create_extensions(self, ctx.clone()).await.expect(&format!(
             "Error creating extensions on CoreDB {}",
@@ -257,6 +266,23 @@ pub fn is_pod_ready() -> impl Condition<Pod> + 'static {
             }
         }
         false
+    }
+}
+
+pub fn is_postgres_ready() -> impl Condition<Pod> + 'static {
+    move |obj: Option<&Pod>| {
+        if let Some(pod) = &obj {
+            if let Some(status) = &pod.status {
+                if let Some(container_statuses) = &status.container_statuses {
+                    for container in container_statuses {
+                        if container.name == "postgres" {
+                            return container.ready;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
     }
 }
 
