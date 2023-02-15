@@ -52,6 +52,8 @@ pub struct CoreDBSpec {
     pub postgresExporterEnabled: bool,
     #[serde(default = "defaults::default_image")]
     pub image: String,
+    #[serde(default = "defaults::default_postgres_exporter_image")]
+    pub postgres_exporter_image: String,
     #[serde(default = "defaults::default_port")]
     pub port: i32,
     #[serde(default = "defaults::default_uid")]
@@ -258,6 +260,23 @@ pub fn is_pod_ready() -> impl Condition<Pod> + 'static {
             }
         }
         false
+    }
+}
+
+pub fn is_postgres_ready() -> impl Condition<Pod> + 'static {
+    move |obj: Option<&Pod>| {
+        if let Some(pod) = &obj {
+            if let Some(status) = &pod.status {
+                if let Some(container_statuses) = &status.container_statuses {
+                    for container in container_statuses {
+                        if container.name == "postgres" {
+                            return container.ready;
+                        }
+                    }
+                }
+            }
+        }
+        return false;
     }
 }
 

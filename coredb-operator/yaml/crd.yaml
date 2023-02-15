@@ -40,6 +40,9 @@ spec:
               postgresExporterEnabled:
                 default: true
                 type: boolean
+              postgres_exporter_image:
+                default: quay.io/prometheuscommunity/postgres-exporter:v0.11.1
+                type: string
               replicas:
                 default: 1
                 format: int32

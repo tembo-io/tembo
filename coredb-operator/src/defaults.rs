@@ -18,6 +18,10 @@ pub fn default_image() -> String {
     "quay.io/coredb/postgres:c03124e".to_owned()
 }
 
+pub fn default_postgres_exporter_image() -> String {
+    "quay.io/prometheuscommunity/postgres-exporter:v0.11.1".to_owned()
+}
+
 pub fn default_extensions() -> Vec<String> {
     vec![]
 }
