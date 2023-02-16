@@ -1,5 +1,8 @@
 #!/bin/bash
-#
+
+# directory of this script
+SCRIPT_DIR=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
+
 set -xe
 
 # Create new cluster
@@ -10,6 +13,8 @@ kind create cluster
 kubectl label namespace default safe-to-run-coredb-tests=true
 
 # Install CoreDB CRDs
+cd $SCRIPT_DIR
+cd ..
 cargo run --bin crdgen | kubectl apply -f -
 
 # Install prometheus operator
@@ -17,6 +22,6 @@ helm repo add prometheus-community https://prometheus-community.github.io/helm-c
 helm repo update
 helm upgrade monitoring \
   --install \
-  --values=kube-prometheus-stack-values.yaml \
+  --values=$SCRIPT_DIR/kube-prometheus-stack-values.yaml \
   prometheus-community/kube-prometheus-stack \
   &
