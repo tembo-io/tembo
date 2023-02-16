@@ -240,8 +240,9 @@ mod test {
             String::from("curl"),
             format!("http://{metrics_service_name}/metrics"),
         ];
-        let result_stdout = run_command_in_container(pods.clone(), test_pod_name, command).await;
+        let result_stdout = run_command_in_container(pods.clone(), test_pod_name.clone(), command).await;
         assert!(result_stdout.contains("pg_up 1"));
+        println!("Found metrics when curling the metrics service");
     }
 
     #[tokio::test]
