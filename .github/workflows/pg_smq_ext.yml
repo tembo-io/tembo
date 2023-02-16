@@ -69,6 +69,7 @@ jobs:
           working-directory: extensions/pgmq
       - name: test
         run: |
+          apt-get update && apt-get instsall -y postgresql-server-dev-15
           git clone https://github.com/pgpartman/pg_partman.git && \
           cd pg_partman && \
           make install
