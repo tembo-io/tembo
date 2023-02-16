@@ -64,6 +64,18 @@ services:
     environment:
       PROMSCALE_DB_URI: postgres://postgres:postgres@timescaledb:5432/postgres?sslmode=allow
 
+  grafana:
+    image: grafana/grafana:9.3.6
+    restart: always
+    ports:
+      - 3000:3000
+    volumes:
+      - ${PWD}/grafana/datasources:/etc/grafana/provisioning/datasources
+      - ${PWD}/grafana/dashboards.yaml:/etc/grafana/provisioning/dashboards/dashboards.yaml
+      - ${PWD}/grafana/dashboards:/etc/grafana/extra-dashboards
+    depends_on:
+      - prometheus
+
   arbitrary_postgres:
     restart: always
     image: postgres:15.2

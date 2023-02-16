@@ -1,0 +1,9 @@
+datasources:
+  - name: Prometheus
+    type: prometheus
+    isDefault: false
+    url: http://prometheus:9090
+  - name: Promscale-PromQL
+    type: prometheus
+    isDefault: true
+    url: http://promscale:9201
