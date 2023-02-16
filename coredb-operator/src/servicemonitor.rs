@@ -1,8 +1,10 @@
 use crate::{
-    servicemonitor_crd::{ServiceMonitor, ServiceMonitorSelector, ServiceMonitorSpec, ServiceMonitorEndpoints},
+    servicemonitor_crd::{
+        ServiceMonitor, ServiceMonitorEndpoints, ServiceMonitorSelector, ServiceMonitorSpec,
+    },
     Context, CoreDB, Error,
 };
-use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta};
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use kube::{
     api::{Patch, PatchParams},
     Api, Resource, ResourceExt,
@@ -17,21 +19,22 @@ pub async fn reconcile_servicemonitor(cdb: &CoreDB, ctx: Arc<Context>) -> Result
     let oref = cdb.controller_owner_ref(&()).unwrap();
 
     let mut labels: BTreeMap<String, String> = BTreeMap::new();
-    labels.insert("app".to_owned(), "coredb".to_owned());
-    labels.insert("component".to_owned(), "metrics".to_owned());
+    labels.insert("app".to_owned(), "coredb".to_string());
     labels.insert("coredb.io/name".to_owned(), cdb.name_any());
+    labels.insert("component".to_owned(), "metrics".to_owned());
 
     let servicemonitor: ServiceMonitor = ServiceMonitor {
         metadata: ObjectMeta {
             name: Some(name.to_owned()),
             namespace: Some(ns.to_owned()),
+            labels: Some(labels.clone()),
             owner_references: Some(vec![oref.clone()]),
             ..ObjectMeta::default()
         },
         spec: ServiceMonitorSpec {
             endpoints: vec![ServiceMonitorEndpoints {
                 path: Some("/metrics".to_owned()),
-                target_port: Some("9167".to_string()),
+                port: Some("metrics".to_string()),
                 authorization: None,
                 basic_auth: None,
                 bearer_token_file: None,
@@ -45,12 +48,12 @@ pub async fn reconcile_servicemonitor(cdb: &CoreDB, ctx: Arc<Context>) -> Result
                 metric_relabelings: None,
                 oauth2: None,
                 params: None,
-                port: None,
                 proxy_url: None,
                 relabelings: None,
                 scheme: None,
                 scrape_timeout: None,
                 tls_config: None,
+                target_port: None,
             }],
             selector: ServiceMonitorSelector {
                 match_labels: Some(labels.clone()),

@@ -1,4 +1,5 @@
 #!/bin/bash
+#
 set -xe
 
 # Create new cluster
@@ -16,9 +17,6 @@ helm repo add prometheus-community https://prometheus-community.github.io/helm-c
 helm repo update
 helm upgrade monitoring \
   --install \
-  --set kubeStateMetrics.enabled=false \
-  --set nodeExporter.enabled=false \
-  --set grafana.enabled=false \
-  --set alertmanager.enabled=false \
+  --values=kube-prometheus-stack-values.yaml \
   prometheus-community/kube-prometheus-stack \
   &

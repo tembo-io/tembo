@@ -1,0 +1,23 @@
+kubeStateMetrics:
+  enabled: false
+nodeExporter:
+  enabled: false
+grafana:
+  enabled: false
+alertmanager:
+  enabled: false
+prometheus:
+  prometheusSpec:
+    serviceMonitorNamespaceSelector: {}
+    serviceMonitorSelector:
+      matchLabels:
+        app: coredb
+    podMonitorSelector:
+      matchLabels:
+        app: coredb
+    probeSelector:
+      matchLabels:
+        app: coredb
+    ruleSelector:
+      matchLabels:
+        app: coredb

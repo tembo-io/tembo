@@ -30,8 +30,8 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
     pvc_requests.insert("storage".to_string(), Quantity("8Gi".to_string()));
 
     let mut labels: BTreeMap<String, String> = BTreeMap::new();
-    labels.insert("app".to_owned(), "coredb".to_owned());
-    labels.insert("coredb.io/name".to_owned(), name.to_string());
+    labels.insert("app".to_owned(), "coredb".to_string());
+    labels.insert("coredb.io/name".to_owned(), cdb.name_any());
     labels.insert("statefulset".to_owned(), name.to_owned());
 
     let postgres_env = Some(vec![EnvVar {
