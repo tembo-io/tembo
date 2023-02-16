@@ -14,7 +14,6 @@ mod test {
 
     use controller::{defaults, is_pod_ready, CoreDB};
     use defaults::default_resources;
-    use futures::TryFutureExt;
     use k8s_openapi::{
         api::core::v1::{Container, Namespace, Pod, PodSpec, ResourceRequirements, Secret},
         apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
