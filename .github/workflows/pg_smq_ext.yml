@@ -69,6 +69,9 @@ jobs:
           working-directory: extensions/pgmq
       - name: test
         run: |
+          git clone https://github.com/pgpartman/pg_partman.git && \
+          cd pg_partman && \
+          make install
           rm -rf ./target/pgx-test-data-* || true
           pg_version=$(stoml Cargo.toml features.default)
           cargo pgx test ${pg_version}
