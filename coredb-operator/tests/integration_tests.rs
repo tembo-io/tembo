@@ -298,7 +298,7 @@ mod test {
         let pods: Api<Pod> = Api::namespaced(client.clone(), namespace);
         println!("Waiting for pod to be running: {}", pod_name);
         let _check_for_pod = tokio::time::timeout(
-            std::time::Duration::from_secs(timeout_seconds_start_pod),
+            Duration::from_secs(timeout_seconds_start_pod),
             await_condition(pods.clone(), &pod_name, conditions::is_pod_running()),
         )
         .await
@@ -308,7 +308,7 @@ mod test {
         ));
         println!("Waiting for pod to be ready: {}", pod_name);
         let _check_for_pod_ready = tokio::time::timeout(
-            std::time::Duration::from_secs(timeout_seconds_pod_ready),
+            Duration::from_secs(timeout_seconds_pod_ready),
             await_condition(pods.clone(), &pod_name, is_pod_ready()),
         )
         .await
