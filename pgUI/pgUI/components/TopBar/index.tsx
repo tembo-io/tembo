@@ -18,8 +18,7 @@ export default function TopBar({ shortName }: Props): JSX.Element {
           height="20"
           viewBox="0 0 20 20"
           fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
+          xmlns="http://www.w3.org/2000/svg">
           <rect
             x="0.399902"
             y="0.279297"
@@ -55,8 +54,7 @@ export default function TopBar({ shortName }: Props): JSX.Element {
           height="19"
           viewBox="0 0 20 19"
           fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
+          xmlns="http://www.w3.org/2000/svg">
           <rect
             x="0.399902"
             y="0.302246"
