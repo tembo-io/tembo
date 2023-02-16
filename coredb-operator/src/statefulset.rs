@@ -75,7 +75,7 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
             }),
             name: "postgres".to_string(),
             image: Some(cdb.spec.image.clone()),
-            resources: Some(cdb.spec.resources.clone()),
+            // resources: Some(cdb.spec.resources.clone()),
             ports: Some(vec![ContainerPort {
                 container_port: 5432,
                 ..ContainerPort::default()
