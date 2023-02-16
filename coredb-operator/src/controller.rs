@@ -9,6 +9,7 @@ use crate::{
     defaults,
     psql::{PsqlCommand, PsqlOutput},
     service::reconcile_svc,
+    servicemonitor::reconcile_servicemonitor,
     statefulset::{reconcile_sts, stateful_set_from_cdb},
 };
 use kube::{
@@ -142,6 +143,11 @@ impl CoreDB {
         reconcile_svc(self, ctx.clone())
             .await
             .expect("error reconciling service");
+
+        // reconcile servicemonitor
+        reconcile_servicemonitor(self, ctx.clone())
+            .await
+            .expect("error reconciling servicemonitor");
 
         let primary_pod = self.primary_pod(ctx.client.clone()).await;
         if primary_pod.is_err() {

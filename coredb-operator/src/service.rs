@@ -13,10 +13,13 @@ pub async fn reconcile_svc(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
     let client = ctx.client.clone();
     let ns = cdb.namespace().unwrap();
     let name = cdb.name_any();
-    let mut labels: BTreeMap<String, String> = BTreeMap::new();
     let svc_api: Api<Service> = Api::namespaced(client, &ns);
     let oref = cdb.controller_owner_ref(&()).unwrap();
+
+    let mut labels: BTreeMap<String, String> = BTreeMap::new();
     labels.insert("app".to_owned(), "coredb".to_owned());
+    labels.insert("component".to_owned(), "postgres".to_owned());
+    labels.insert("coredb.io/name".to_owned(), cdb.name_any());
 
     let svc: Service = Service {
         metadata: ObjectMeta {
@@ -50,6 +53,11 @@ pub async fn reconcile_svc(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
         let _o = svc_api.delete(&name, &Default::default()).await;
         return Ok(());
     }
+
+    let mut labels: BTreeMap<String, String> = BTreeMap::new();
+    labels.insert("app".to_owned(), "coredb".to_owned());
+    labels.insert("component".to_owned(), "metrics".to_owned());
+    labels.insert("coredb.io/name".to_owned(), cdb.name_any());
 
     let metrics_svc: Service = Service {
         metadata: ObjectMeta {
