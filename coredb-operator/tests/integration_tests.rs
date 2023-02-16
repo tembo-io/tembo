@@ -248,6 +248,7 @@ mod test {
             format!("http://{prometheus_service_name}:9090/api/v1/targets"),
         ];
         let result_stdout = run_command_in_container(pods.clone(), test_pod_name.clone(), command).await;
+        println!("{}", result_stdout);
         assert!(result_stdout.contains(&name.clone()));
         println!("Found CoreDB as a target of Prometheus");
     }

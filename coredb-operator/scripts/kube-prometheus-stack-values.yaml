@@ -8,6 +8,7 @@ alertmanager:
   enabled: false
 prometheus:
   prometheusSpec:
+    scrapeInterval: 1s
     serviceMonitorNamespaceSelector: {}
     serviceMonitorSelector:
       matchLabels:
