@@ -30,7 +30,7 @@ pub fn create_queue(name: &str) -> String {
             enqueued_at TIMESTAMP WITH TIME ZONE DEFAULT (now() at time zone 'utc'),
             vt TIMESTAMP WITH TIME ZONE,
             message JSON
-        )
+        );
         "
     )
 }
