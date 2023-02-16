@@ -23,5 +23,4 @@ helm repo update
 helm upgrade monitoring \
   --install \
   --values=$SCRIPT_DIR/kube-prometheus-stack-values.yaml \
-  prometheus-community/kube-prometheus-stack \
-  &
+  prometheus-community/kube-prometheus-stack

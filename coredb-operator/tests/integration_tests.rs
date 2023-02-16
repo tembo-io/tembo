@@ -113,7 +113,8 @@ mod test {
             },
             "spec": {
                 "replicas": replicas,
-                "enabledExtensions": ["postgis"]
+                "enabledExtensions": ["postgis"],
+                "serviceMonitorEnabled": true
             }
         });
         let params = PatchParams::apply("coredb-integration-test");
@@ -236,8 +237,19 @@ mod test {
             String::from("curl"),
             format!("http://{metrics_service_name}/metrics"),
         ];
-        let result_stdout = run_command_in_container(pods.clone(), test_pod_name, command).await;
+        let result_stdout = run_command_in_container(pods.clone(), test_pod_name.clone(), command).await;
         assert!(result_stdout.contains("pg_up 1"));
+        println!("Found metrics when curling the metrics service");
+
+        // Check that prometheus has a CoreDB target
+        let prometheus_service_name = "monitoring-kube-prometheus-prometheus".to_string();
+        let command = vec![
+            String::from("curl"),
+            format!("http://{prometheus_service_name}:9090/api/v1/targets"),
+        ];
+        let result_stdout = run_command_in_container(pods.clone(), test_pod_name.clone(), command).await;
+        assert!(result_stdout.contains(&name.clone()));
+        println!("Found CoreDB as a target of Prometheus");
     }
 
     #[tokio::test]
