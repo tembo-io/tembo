@@ -26,7 +26,7 @@ use crate::{
     extensions::create_extensions, postgres_exporter_role::create_postgres_exporter_role,
     secret::reconcile_secret,
 };
-use k8s_openapi::api::core::v1::{Namespace, Pod};
+use k8s_openapi::api::core::v1::{Namespace, Pod, ResourceRequirements};
 use kube::runtime::wait::Condition;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -48,6 +48,8 @@ pub static COREDB_FINALIZER: &str = "coredbs.coredb.io";
 pub struct CoreDBSpec {
     #[serde(default = "defaults::default_replicas")]
     pub replicas: i32,
+    #[serde(default = "defaults::default_resources")]
+    pub resources: ResourceRequirements,
     #[serde(default = "defaults::default_postgres_exporter_enabled")]
     pub postgresExporterEnabled: bool,
     #[serde(default = "defaults::default_image")]
