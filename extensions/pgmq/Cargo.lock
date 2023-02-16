@@ -1153,7 +1153,6 @@ dependencies = [
 name = "pgmq"
 version = "0.1.0"
 dependencies = [
- "once_cell",
  "pgmq 0.7.3",
  "pgx",
  "pgx-tests",
