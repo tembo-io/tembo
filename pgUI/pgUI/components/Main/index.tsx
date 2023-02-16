@@ -1,18 +1,18 @@
-import { CircularProgress, Stack } from '@mui/joy'
+import { CircularProgress, Stack } from '@mui/joy';
 
-import TopBar from '../TopBar'
-import LeftNavigation from '../LeftNav'
+import TopBar from '../TopBar';
+import LeftNavigation from '../LeftNav';
 
-import styles from './Main.module.scss'
+import styles from './Main.module.scss';
 
 export default function Main(
   props: React.PropsWithChildren & {
-    hasRightSidebar?: boolean
-    allowCreation?: boolean
-    entity?: string
+    hasRightSidebar?: boolean;
+    allowCreation?: boolean;
+    entity?: string;
   }
 ) {
-  const { children, allowCreation, entity } = props
+  const { children, allowCreation, entity } = props;
 
   return (
     <Stack
@@ -26,5 +26,5 @@ export default function Main(
         {children}
       </div>
     </Stack>
-  )
+  );
 }

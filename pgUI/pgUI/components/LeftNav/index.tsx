@@ -1,15 +1,15 @@
-import { useRouter } from 'next/router'
-import Link from 'next/link'
+import { useRouter } from 'next/router';
+import Link from 'next/link';
 
-import styles from './LeftNav.module.scss'
+import styles from './LeftNav.module.scss';
 
 type Props = {
-  allowCreation?: boolean
-  entity?: string
-}
+  allowCreation?: boolean;
+  entity?: string;
+};
 export default function LeftNavigation(props: Props) {
-  const router = useRouter()
-  const { allowCreation = false, entity } = props
+  const router = useRouter();
+  const { allowCreation = false, entity } = props;
 
   return (
     <div className={styles.LeftNavigation}>
@@ -37,5 +37,5 @@ export default function LeftNavigation(props: Props) {
         </Link>
       </section>
     </div>
-  )
+  );
 }

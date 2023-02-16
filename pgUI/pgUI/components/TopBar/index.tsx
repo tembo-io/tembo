@@ -1,11 +1,11 @@
-import { Avatar } from '@mui/joy'
-import cx from 'classnames'
+import { Avatar } from '@mui/joy';
+import cx from 'classnames';
 
-import SearchBar from './SearchBar'
-import styles from './TopBar.module.scss'
+import SearchBar from './SearchBar';
+import styles from './TopBar.module.scss';
 
 interface Props {
-  shortName: string
+  shortName: string;
 }
 
 export default function TopBar({ shortName }: Props): JSX.Element {
@@ -100,5 +100,5 @@ export default function TopBar({ shortName }: Props): JSX.Element {
         </div>
       </div>
     </div>
-  )
+  );
 }

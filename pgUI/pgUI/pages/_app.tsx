@@ -1,37 +1,37 @@
-import type { AppProps } from 'next/app'
-import getConfig from 'next/config'
-import React from 'react'
-import Head from 'next/head'
-import { useRouter } from 'next/router'
+import type { AppProps } from 'next/app';
+import getConfig from 'next/config';
+import React from 'react';
+import Head from 'next/head';
+import { useRouter } from 'next/router';
 
-import '../styles/globals.scss'
+import '../styles/globals.scss';
 
 function WorkspaceChecker(props: React.PropsWithChildren) {
-  const { children } = props
+  const { children } = props;
 
   /** end delete */
-  return <>{children}</>
+  return <>{children}</>;
 }
 
 function WithGlobalLoader({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }): JSX.Element {
-  const router = useRouter()
-  const [ready, setReady] = React.useState(false)
+  const router = useRouter();
+  const [ready, setReady] = React.useState(false);
 
   React.useEffect(() => {
-    setReady(true)
-  }, [])
+    setReady(true);
+  }, []);
 
-  if (ready && router.isReady) return <>{children}</>
+  if (ready && router.isReady) return <>{children}</>;
 
-  return <></>
+  return <></>;
 }
 
 function MyApp({ Component, pageProps }: AppProps) {
-  console.log('component', Component, 'page props', pageProps)
+  console.log('component', Component, 'page props', pageProps);
 
   return (
     <WithGlobalLoader>
@@ -42,7 +42,7 @@ function MyApp({ Component, pageProps }: AppProps) {
         <Component {...pageProps} />
       </WorkspaceChecker>
     </WithGlobalLoader>
-  )
+  );
 }
 
-export default MyApp
+export default MyApp;
