@@ -12,9 +12,11 @@
 #[cfg(test)]
 mod test {
 
-    use controller::{is_pod_ready, CoreDB};
+    use controller::{defaults, is_pod_ready, CoreDB};
+    use defaults::default_resources;
+    use futures::TryFutureExt;
     use k8s_openapi::{
-        api::core::v1::{Container, Namespace, Pod, PodSpec, Secret},
+        api::core::v1::{Container, Namespace, Pod, PodSpec, ResourceRequirements, Secret},
         apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
         apimachinery::pkg::apis::meta::v1::ObjectMeta,
     };
@@ -125,15 +127,12 @@ mod test {
         let secret_name = format!("{}-connection", name);
         println!("Waiting for secret to be created: {}", secret_name);
         let establish = await_condition(secret_api.clone(), &secret_name, wait_for_secret());
-        let _ = tokio::time::timeout(
-            std::time::Duration::from_secs(timeout_seconds_secret_present),
-            establish,
-        )
-        .await
-        .expect(&format!(
-            "Did not find the secret {} present after waiting {} seconds",
-            secret_name, timeout_seconds_secret_present
-        ));
+        let _ = tokio::time::timeout(Duration::from_secs(timeout_seconds_secret_present), establish)
+            .await
+            .expect(&format!(
+                "Did not find the secret {} present after waiting {} seconds",
+                secret_name, timeout_seconds_secret_present
+            ));
         println!("Found secret: {}", secret_name);
 
         // Wait for Pod to be created
@@ -141,7 +140,7 @@ mod test {
 
         println!("Waiting for pod to be running: {}", pod_name);
         let _check_for_pod = tokio::time::timeout(
-            std::time::Duration::from_secs(timeout_seconds_start_pod),
+            Duration::from_secs(timeout_seconds_start_pod),
             await_condition(pods.clone(), &pod_name, conditions::is_pod_running()),
         )
         .await
@@ -151,7 +150,7 @@ mod test {
         ));
         println!("Waiting for pod to be ready: {}", pod_name);
         let _check_for_pod_ready = tokio::time::timeout(
-            std::time::Duration::from_secs(timeout_seconds_pod_ready),
+            Duration::from_secs(timeout_seconds_pod_ready),
             await_condition(pods.clone(), &pod_name, is_pod_ready()),
         )
         .await
@@ -160,6 +159,12 @@ mod test {
             pod_name, timeout_seconds_pod_ready
         ));
         println!("Found pod ready: {}", pod_name);
+
+        // Assert default resource values are applied to postgres container
+        let default_resources: ResourceRequirements = default_resources();
+        let pg_pod = pods.get(&pod_name).await.unwrap();
+        let resources = pg_pod.spec.unwrap().containers[0].clone().resources;
+        assert_eq!(default_resources, resources.unwrap());
 
         // Assert no tables found
         let result = coredb_resource
@@ -293,7 +298,7 @@ mod test {
         let pods: Api<Pod> = Api::namespaced(client.clone(), namespace);
         println!("Waiting for pod to be running: {}", pod_name);
         let _check_for_pod = tokio::time::timeout(
-            std::time::Duration::from_secs(timeout_seconds_start_pod),
+            Duration::from_secs(timeout_seconds_start_pod),
             await_condition(pods.clone(), &pod_name, conditions::is_pod_running()),
         )
         .await
@@ -303,7 +308,7 @@ mod test {
         ));
         println!("Waiting for pod to be ready: {}", pod_name);
         let _check_for_pod_ready = tokio::time::timeout(
-            std::time::Duration::from_secs(timeout_seconds_pod_ready),
+            Duration::from_secs(timeout_seconds_pod_ready),
             await_condition(pods.clone(), &pod_name, is_pod_ready()),
         )
         .await
@@ -321,7 +326,7 @@ mod test {
         //  similar to the loop used in namespace delete assertion, but received a comparison error.
         println!("Waiting for CoreDB to be deleted: {}", &name);
         let _assert_coredb_deleted = tokio::time::timeout(
-            std::time::Duration::from_secs(timeout_seconds_coredb_deleted),
+            Duration::from_secs(timeout_seconds_coredb_deleted),
             await_condition(coredbs.clone(), &name, conditions::is_deleted("")),
         )
         .await
@@ -348,7 +353,7 @@ mod test {
             ));
     }
 
-    async fn kube_client() -> kube::Client {
+    async fn kube_client() -> Client {
         // Get the name of the currently selected namespace
         let kube_config = Config::infer()
             .await
@@ -378,7 +383,7 @@ mod test {
         let custom_resource_definitions: Api<CustomResourceDefinition> = Api::all(client.clone());
 
         let _check_for_crd = tokio::time::timeout(
-            std::time::Duration::from_secs(2),
+            Duration::from_secs(2),
             await_condition(
                 custom_resource_definitions,
                 "coredbs.coredb.io",
