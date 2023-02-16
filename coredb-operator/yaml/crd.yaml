@@ -47,6 +47,9 @@ spec:
                 default: 1
                 format: int32
                 type: integer
+              serviceMonitorEnabled:
+                default: false
+                type: boolean
               uid:
                 default: 999
                 format: int32
