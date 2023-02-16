@@ -1,19 +1,17 @@
-use pgmq_crate::query::{
-    create_archive, create_index, create_meta, insert_meta, SCHEMA, TABLE_PREFIX,
-};
+use pgmq_crate::query::{create_archive, create_index, create_meta, insert_meta, TABLE_PREFIX};
 
 // for now, put pg_partman in the public schema
-//
 const PARTMAN_SCHEMA: &str = "public";
+const SCHEMA: &str = "public";
 
-pub fn init_partitioned_queue(name: &str) -> Vec<String> {
+pub fn init_partitioned_queue(name: &str, partition_size: i64) -> Vec<String> {
     vec![
         create_meta(),
         create_partitioned_queue(name),
         create_partitioned_index(name),
         create_index(name),
         create_archive(name),
-        create_partman(name),
+        create_partman(name, partition_size),
         insert_meta(name),
     ]
 }
@@ -40,11 +38,10 @@ pub fn create_partitioned_index(queue: &str) -> String {
     )
 }
 
-pub fn create_partman(queue: &str) -> String {
-    // TODO: 1000 is a placeholder. should be configurable and optimized default
+pub fn create_partman(queue: &str, partition_size: i64) -> String {
     format!(
         "
-        SELECT {PARTMAN_SCHEMA}.create_parent('{SCHEMA}.{TABLE_PREFIX}_{queue}', 'msg_id', 'native', '1000');
+        SELECT {PARTMAN_SCHEMA}.create_parent('{SCHEMA}.{TABLE_PREFIX}_{queue}', 'msg_id', 'native', '{partition_size}');
         "
     )
 }
