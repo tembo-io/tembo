@@ -19,8 +19,7 @@ export default function Main(
       direction="row"
       sx={{
         width: '100%',
-      }}
-    >
+      }}>
       <LeftNavigation allowCreation={allowCreation} entity={entity} />
       <div className={styles.DashboardContainer}>
         {<TopBar shortName={'jon'} />}

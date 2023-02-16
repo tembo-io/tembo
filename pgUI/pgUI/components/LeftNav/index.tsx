@@ -3,7 +3,6 @@ import Link from 'next/link';
 
 import styles from './LeftNav.module.scss';
 
-
 type Props = {
   allowCreation?: boolean;
   entity?: string;
@@ -19,16 +18,12 @@ export default function LeftNavigation(props: Props) {
       </section>
       <section>
         <h4 className={styles.leftNavTitle}>Databases</h4>
-        <div className={styles.orgList}>
-
-        </div>
+        <div className={styles.orgList}></div>
         <button
           className="btn small secondary"
-          onClick={() => alert('choose a new org')}
-        >
+          onClick={() => alert('choose a new org')}>
           + Database
         </button>
-
       </section>
       <section className={styles.helpSection}>
         <Link className="type-small" href="/">

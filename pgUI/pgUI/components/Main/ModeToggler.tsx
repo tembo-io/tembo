@@ -9,8 +9,7 @@ export default function ModeToggle() {
     <Button
       variant="plain"
       color="neutral"
-      onClick={() => setMode(mode === 'dark' ? 'light' : 'dark')}
-    >
+      onClick={() => setMode(mode === 'dark' ? 'light' : 'dark')}>
       {/* {mode === 'dark' ? <LightModeIcon /> : <DarkModeIcon />} */}
     </Button>
   );

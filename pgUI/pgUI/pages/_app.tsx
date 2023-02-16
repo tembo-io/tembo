@@ -30,20 +30,18 @@ function WithGlobalLoader({
   return <></>;
 }
 
-
 function MyApp({ Component, pageProps }: AppProps) {
   console.log('component', Component, 'page props', pageProps);
-\
-  return (
-      <WithGlobalLoader>
-        <Head>
-          <link rel="icon" href="favicon.ico" />
-        </Head>
-          <WorkspaceChecker>
-            <Component {...pageProps} />
-          </WorkspaceChecker>
-      </WithGlobalLoader>
 
+  return (
+    <WithGlobalLoader>
+      <Head>
+        <link rel="icon" href="favicon.ico" />
+      </Head>
+      <WorkspaceChecker>
+        <Component {...pageProps} />
+      </WorkspaceChecker>
+    </WithGlobalLoader>
   );
 }
 
