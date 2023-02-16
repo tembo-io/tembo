@@ -72,7 +72,7 @@ jobs:
           sudo apt-get update && sudo apt-get install -y postgresql-server-dev-14
           git clone https://github.com/pgpartman/pg_partman.git && \
           cd pg_partman && \
-          sudo make install && cd ../ && \
+          sudo make install && cd ../
           rm -rf ./target/pgx-test-data-* || true
           pg_version=$(stoml Cargo.toml features.default)
           cargo pgx test ${pg_version}
