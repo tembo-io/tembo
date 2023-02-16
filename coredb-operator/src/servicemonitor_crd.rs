@@ -6,7 +6,6 @@ use kube::CustomResource;
 use schemars::JsonSchema;
 use serde::{Serialize, Deserialize};
 use std::collections::BTreeMap;
-use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 
 /// Specification of desired Service selection for target discovery by Prometheus.
 #[derive(CustomResource, Serialize, Deserialize, Clone, Debug, JsonSchema)]

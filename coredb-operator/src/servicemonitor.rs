@@ -2,13 +2,12 @@ use crate::{
     servicemonitor_crd::{ServiceMonitor, ServiceMonitorSelector, ServiceMonitorSpec, ServiceMonitorEndpoints},
     Context, CoreDB, Error,
 };
-use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta};
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta};
 use kube::{
     api::{Patch, PatchParams},
     Api, Resource, ResourceExt,
 };
 use std::{collections::BTreeMap, sync::Arc};
-use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 
 pub async fn reconcile_servicemonitor(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
     let client = ctx.client.clone();
