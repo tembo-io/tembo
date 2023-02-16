@@ -6,6 +6,10 @@ pub fn default_postgres_exporter_enabled() -> bool {
     true
 }
 
+pub fn default_service_monitor_enabled() -> bool {
+    false
+}
+
 pub fn default_uid() -> i32 {
     999
 }

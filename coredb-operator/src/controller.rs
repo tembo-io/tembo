@@ -51,6 +51,8 @@ pub struct CoreDBSpec {
     pub replicas: i32,
     #[serde(default = "defaults::default_postgres_exporter_enabled")]
     pub postgresExporterEnabled: bool,
+    #[serde(default = "defaults::default_service_monitor_enabled")]
+    pub serviceMonitorEnabled: bool,
     #[serde(default = "defaults::default_image")]
     pub image: String,
     #[serde(default = "defaults::default_postgres_exporter_image")]

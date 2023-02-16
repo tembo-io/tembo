@@ -12,6 +12,10 @@ use kube::{
 use std::{collections::BTreeMap, sync::Arc};
 
 pub async fn reconcile_servicemonitor(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
+    if !(cdb.spec.serviceMonitorEnabled) {
+        return Ok(());
+    }
+
     let client = ctx.client.clone();
     let ns = cdb.namespace().unwrap();
     let name = cdb.name_any();
