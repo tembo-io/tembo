@@ -1156,6 +1156,7 @@ dependencies = [
  "base64",
  "bytes",
  "chrono",
+ "schemars",
  "serde",
  "serde-value",
  "serde_json",
