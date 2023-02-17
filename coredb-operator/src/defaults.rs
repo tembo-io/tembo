@@ -1,3 +1,5 @@
+use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
+
 pub fn default_replicas() -> i32 {
     1
 }
@@ -16,6 +18,10 @@ pub fn default_port() -> i32 {
 
 pub fn default_image() -> String {
     "quay.io/coredb/postgres:c03124e".to_owned()
+}
+
+pub fn default_storage() -> Quantity {
+    Quantity("8Gi".to_string())
 }
 
 pub fn default_postgres_exporter_image() -> String {

@@ -9,7 +9,7 @@ pub mod telemetry;
 mod metrics;
 pub use metrics::Metrics;
 
-mod defaults;
+pub mod defaults;
 mod extensions;
 #[cfg(test)] pub mod fixtures;
 mod postgres_exporter_role;

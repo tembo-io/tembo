@@ -29,7 +29,7 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
     let oref = cdb.controller_owner_ref(&()).unwrap();
     labels.insert("app".to_owned(), "coredb".to_owned());
     labels.insert("statefulset".to_owned(), name.to_owned());
-    pvc_requests.insert("storage".to_string(), Quantity("8Gi".to_string()));
+    pvc_requests.insert("storage".to_string(), cdb.spec.storage.clone());
 
     let postgres_env = Some(vec![EnvVar {
         name: "POSTGRES_PASSWORD".to_owned(),

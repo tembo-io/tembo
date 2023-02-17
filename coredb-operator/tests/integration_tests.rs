@@ -12,11 +12,11 @@
 #[cfg(test)]
 mod test {
 
-    use controller::{is_pod_ready, CoreDB};
+    use controller::{defaults::default_storage, is_pod_ready, CoreDB};
     use k8s_openapi::{
-        api::core::v1::{Container, Namespace, Pod, PodSpec, Secret},
+        api::core::v1::{Container, Namespace, PersistentVolumeClaim, Pod, PodSpec, Secret},
         apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
-        apimachinery::pkg::apis::meta::v1::ObjectMeta,
+        apimachinery::pkg::{api::resource::Quantity, apis::meta::v1::ObjectMeta},
     };
     use kube::{
         api::{AttachParams, Patch, PatchParams, PostParams},
@@ -160,6 +160,14 @@ mod test {
             pod_name, timeout_seconds_pod_ready
         ));
         println!("Found pod ready: {}", pod_name);
+
+        // Assert default storage values are applied to PVC
+        let pvc_api: Api<PersistentVolumeClaim> = Api::namespaced(client.clone(), namespace);
+        let default_storage: Quantity = default_storage();
+        let pvc = pvc_api.get(&*format!("data-{}", pod_name)).await.unwrap();
+        let storage = pvc.spec.unwrap().resources.unwrap().requests.unwrap();
+        let s = storage.get("storage").unwrap().to_owned();
+        assert_eq!(default_storage, s);
 
         // Assert no tables found
         let result = coredb_resource
