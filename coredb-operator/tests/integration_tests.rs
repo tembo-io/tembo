@@ -12,9 +12,9 @@
 #[cfg(test)]
 mod test {
 
-    use controller::{is_pod_ready, CoreDB};
+    use controller::{is_pod_ready, servicemonitor_crd::ServiceMonitor, CoreDB};
     use k8s_openapi::{
-        api::core::v1::{Container, Namespace, Pod, Service, PodSpec, Secret},
+        api::core::v1::{Container, Namespace, Pod, PodSpec, Secret, Service},
         apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
         apimachinery::pkg::apis::meta::v1::ObjectMeta,
     };
@@ -23,7 +23,6 @@ mod test {
         runtime::wait::{await_condition, conditions, Condition},
         Api, Client, Config,
     };
-    use controller::servicemonitor_crd::ServiceMonitor;
     use rand::Rng;
     use std::{str, thread, time::Duration};
     use tokio::io::AsyncReadExt;
