@@ -92,7 +92,7 @@ spec:
       serviceAccountName: coredb-controller
       containers:
       - name: coredb-controller
-        image: quay.io/coredb/coredb-operator:2023.2.15
+        image: quay.io/coredb/coredb-operator:2023.2.15-fix.1
         imagePullPolicy: Always
         resources:
           limits:
