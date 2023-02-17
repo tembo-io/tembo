@@ -15,8 +15,4 @@ pub enum PgmqError {
     /// a database error
     #[error("database error {0}")]
     DatabaseError(#[from] sqlx::Error),
-
-    // value errors
-    #[error("database error {0}")]
-    InvalidDatabaseValueError(String),
 }
