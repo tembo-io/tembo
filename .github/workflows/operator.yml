@@ -83,8 +83,7 @@ jobs:
           helm upgrade monitoring \
             --install \
             --values=./scripts/kube-prometheus-stack-values.yaml \
-            prometheus-community/kube-prometheus-stack \
-            &
+            prometheus-community/kube-prometheus-stack
       - name: Apply safety check label to namespace
         run: |
           kubectl label namespace default safe-to-run-coredb-tests=true
@@ -127,4 +126,6 @@ jobs:
           kubectl get -o yaml pods
           echo "=========="
           kubectl get -o yaml coredb
+          echo "=========="
+          kubectl get -o yaml servicemonitors
           echo "=========="

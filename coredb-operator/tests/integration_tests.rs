@@ -255,7 +255,7 @@ mod test {
             if result_stdout.contains(&name.clone()) {
                 break;
             }
-            thread::sleep(Duration::from_millis(1000));
+            thread::sleep(Duration::from_millis(2000));
         }
         assert!(result_stdout.contains(&name.clone()));
         println!("Found CoreDB as a target of Prometheus");
