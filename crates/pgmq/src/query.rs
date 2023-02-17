@@ -244,7 +244,7 @@ pub fn pop(name: &str) -> String {
 }
 
 /// panics if input is valid queue. otherwise does nothing.
-fn check_input(input: &str) {
+pub fn check_input(input: &str) {
     lazy_static! {
         static ref RE: Regex = Regex::new(r#"^[a-zA-Z0-9_]+$"#).unwrap();
     }
