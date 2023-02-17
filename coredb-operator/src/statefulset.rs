@@ -26,8 +26,7 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
     let name = cdb.name_any();
     let mut pvc_requests: BTreeMap<String, Quantity> = BTreeMap::new();
     let oref = cdb.controller_owner_ref(&()).unwrap();
-
-    pvc_requests.insert("storage".to_string(), Quantity("8Gi".to_string()));
+    pvc_requests.insert("storage".to_string(), cdb.spec.storage.clone());
 
     let mut labels: BTreeMap<String, String> = BTreeMap::new();
     labels.insert("app".to_owned(), "coredb".to_string());
