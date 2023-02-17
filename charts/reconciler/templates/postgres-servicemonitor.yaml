@@ -1,0 +1,17 @@
+{{- if .Values.serviceMonitors.coredb.enabled -}}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "reconciler.fullname" . }}-coredbs
+  namespace: {{ .Release.Namespace }}
+spec:
+  endpoints:
+  - path: /metrics
+    port: "metrics"
+  namespaceSelector:
+    any: true
+  selector:
+    matchLabels:
+      app: coredb
+      component: metrics
+{{- end }}

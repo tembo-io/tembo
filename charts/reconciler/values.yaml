@@ -8,6 +8,10 @@ secret:
   # Or you can use an existing secret instead
   useExistingSecret: ~
 
+serviceMonitors:
+  coredb:
+    enabled: true
+
 image:
   repository: quay.io/coredb/reconciler
   tag: "latest"
