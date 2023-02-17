@@ -11,7 +11,7 @@
 
 #[cfg(test)]
 mod test {
-
+    // test flake
     use controller::{is_pod_ready, CoreDB};
     use k8s_openapi::{
         api::core::v1::{Container, Namespace, Pod, PodSpec, Secret},
