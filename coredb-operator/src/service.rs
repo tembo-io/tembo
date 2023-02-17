@@ -13,10 +13,15 @@ pub async fn reconcile_svc(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
     let client = ctx.client.clone();
     let ns = cdb.namespace().unwrap();
     let name = cdb.name_any();
-    let mut labels: BTreeMap<String, String> = BTreeMap::new();
     let svc_api: Api<Service> = Api::namespaced(client, &ns);
     let oref = cdb.controller_owner_ref(&()).unwrap();
-    labels.insert("app".to_owned(), "coredb".to_owned());
+
+    let mut selector_labels: BTreeMap<String, String> = BTreeMap::new();
+    selector_labels.insert("app".to_owned(), "coredb".to_string());
+    selector_labels.insert("coredb.io/name".to_owned(), cdb.name_any());
+
+    let mut labels = selector_labels.clone();
+    labels.insert("component".to_owned(), "postgres".to_owned());
 
     let svc: Service = Service {
         metadata: ObjectMeta {
@@ -31,7 +36,7 @@ pub async fn reconcile_svc(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
                 port: cdb.spec.port.clone(),
                 ..ServicePort::default()
             }]),
-            selector: Some(labels.clone()),
+            selector: Some(selector_labels.clone()),
             ..ServiceSpec::default()
         }),
         ..Service::default()
@@ -51,6 +56,13 @@ pub async fn reconcile_svc(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
         return Ok(());
     }
 
+    let mut selector_labels: BTreeMap<String, String> = BTreeMap::new();
+    selector_labels.insert("app".to_owned(), "coredb".to_string());
+    selector_labels.insert("coredb.io/name".to_owned(), cdb.name_any());
+
+    let mut labels = selector_labels.clone();
+    labels.insert("component".to_owned(), "metrics".to_owned());
+
     let metrics_svc: Service = Service {
         metadata: ObjectMeta {
             name: Some(name.to_owned()),
@@ -62,10 +74,11 @@ pub async fn reconcile_svc(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
         spec: Some(ServiceSpec {
             ports: Some(vec![ServicePort {
                 port: 80,
+                name: Some("metrics".to_string()),
                 target_port: Some(IntOrString::String("metrics".to_string())),
                 ..ServicePort::default()
             }]),
-            selector: Some(labels.clone()),
+            selector: Some(selector_labels.clone()),
             ..ServiceSpec::default()
         }),
         ..Service::default()

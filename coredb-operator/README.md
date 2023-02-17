@@ -36,12 +36,17 @@ cargo test
 
 #### Integration testing
 
+To automatically set up a local cluster for functional testing, use this script
+```
+./scripts/reset-local-test-cluster.sh
+```
+Or, you can follow the below steps.
+
 - Connect to a cluster that is safe to run the tests against
 - Set your kubecontext to any namespace, and label it to indicate it is safe to run tests against this cluster (do not do against non-test clusters)
 ```
 kubectl label namespace default safe-to-run-coredb-tests=true
 ```
-
 - Start or install the controller you want to test (see the following sections)
 - Run the integration tests
 ```
