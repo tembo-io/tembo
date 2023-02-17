@@ -24,12 +24,14 @@ use std::{collections::BTreeMap, sync::Arc};
 pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
     let ns = cdb.namespace().unwrap();
     let name = cdb.name_any();
-    let mut labels: BTreeMap<String, String> = BTreeMap::new();
     let mut pvc_requests: BTreeMap<String, Quantity> = BTreeMap::new();
     let oref = cdb.controller_owner_ref(&()).unwrap();
-    labels.insert("app".to_owned(), "coredb".to_owned());
-    labels.insert("statefulset".to_owned(), name.to_owned());
     pvc_requests.insert("storage".to_string(), cdb.spec.storage.clone());
+
+    let mut labels: BTreeMap<String, String> = BTreeMap::new();
+    labels.insert("app".to_owned(), "coredb".to_string());
+    labels.insert("coredb.io/name".to_owned(), cdb.name_any());
+    labels.insert("statefulset".to_owned(), name.to_owned());
 
     let postgres_env = Some(vec![EnvVar {
         name: "POSTGRES_PASSWORD".to_owned(),
@@ -75,6 +77,7 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
             }),
             name: "postgres".to_string(),
             image: Some(cdb.spec.image.clone()),
+            resources: Some(cdb.spec.resources.clone()),
             ports: Some(vec![ContainerPort {
                 container_port: 5432,
                 ..ContainerPort::default()
