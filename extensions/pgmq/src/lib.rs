@@ -5,7 +5,7 @@ use pgx::warning;
 pgx::pg_module_magic!();
 
 pub mod partition;
-use pgmq_crate::query::{check_input, delete, init_queue, pop, read, TABLE_PREFIX};
+use pgmq_crate::query::{archive, check_input, delete, init_queue, pop, read, TABLE_PREFIX};
 
 #[pg_extern]
 fn pgmq_create(queue_name: &str) -> Result<(), spi::Error> {
@@ -126,6 +126,32 @@ fn pgmq_delete(queue_name: &str, msg_id: i64) -> Result<Option<bool>, spi::Error
 
     Spi::connect(|mut client| {
         let tup_table = client.update(&delete(queue_name, &msg_id), None, None);
+        match tup_table {
+            Ok(tup_table) => num_deleted = tup_table.len(),
+            Err(e) => {
+                error!("error deleting message: {}", e);
+            }
+        }
+    });
+    match num_deleted {
+        1 => Ok(Some(true)),
+        0 => {
+            warning!("no message found with msg_id: {}", msg_id);
+            Ok(Some(false))
+        }
+        _ => {
+            error!("multiple messages found with msg_id: {}", msg_id);
+        }
+    }
+}
+
+/// archive a message forever instead of deleting it
+#[pg_extern]
+fn pgmq_archive(queue_name: &str, msg_id: i64) -> Result<Option<bool>, spi::Error> {
+    let mut num_deleted = 0;
+
+    Spi::connect(|mut client| {
+        let tup_table = client.update(&archive(queue_name, &msg_id), None, None);
         match tup_table {
             Ok(tup_table) => num_deleted = tup_table.len(),
             Err(e) => {
@@ -385,6 +411,41 @@ mod tests {
             Spi::get_one::<i64>(&format!("SELECT count(*) FROM {TABLE_PREFIX}_{qname}"))
                 .expect("SQL select failed");
         assert_eq!(init_count.unwrap(), 0);
+    }
+
+    #[pg_test]
+    fn test_archive() {
+        let qname = r#"test_archive"#;
+        let _ = pgmq_create(&qname).unwrap();
+        // no messages in the queue
+        let retval = Spi::get_one::<i64>(&format!("SELECT count(*) FROM {TABLE_PREFIX}_{qname}"))
+            .expect("SQL select failed");
+        assert_eq!(retval.unwrap(), 0);
+        // no messages in queue archive
+        let retval = Spi::get_one::<i64>(&format!(
+            "SELECT count(*) FROM {TABLE_PREFIX}_{qname}_archive"
+        ))
+        .expect("SQL select failed");
+        assert_eq!(retval.unwrap(), 0);
+        // put a message on the queue
+        let msg_id = pgmq_send(&qname, pgx::Json(serde_json::json!({"x":"y"}))).unwrap();
+        let retval = Spi::get_one::<i64>(&format!("SELECT count(*) FROM {TABLE_PREFIX}_{qname}"))
+            .expect("SQL select failed");
+        assert_eq!(retval.unwrap(), 1);
+
+        // archive the message
+        let archived = pgmq_archive(&qname, msg_id.unwrap()).unwrap().unwrap();
+        assert!(archived);
+        // should be no messages left on the queue table
+        let retval = Spi::get_one::<i64>(&format!("SELECT count(*) FROM {TABLE_PREFIX}_{qname}"))
+            .expect("SQL select failed");
+        assert_eq!(retval.unwrap(), 0);
+        // but one on the archive table
+        let retval = Spi::get_one::<i64>(&format!(
+            "SELECT count(*) FROM {TABLE_PREFIX}_{qname}_archive"
+        ))
+        .expect("SQL select failed");
+        assert_eq!(retval.unwrap(), 1);
     }
 }
 
