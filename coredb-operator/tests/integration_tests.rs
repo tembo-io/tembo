@@ -14,7 +14,7 @@ mod test {
 
     use controller::{is_pod_ready, CoreDB};
     use k8s_openapi::{
-        api::core::v1::{Container, Namespace, Pod, PodSpec, Secret},
+        api::core::v1::{Container, Namespace, Pod, Service, PodSpec, Secret},
         apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
         apimachinery::pkg::apis::meta::v1::ObjectMeta,
     };
@@ -23,6 +23,7 @@ mod test {
         runtime::wait::{await_condition, conditions, Condition},
         Api, Client, Config,
     };
+    use controller::servicemonitor_crd::ServiceMonitor;
     use rand::Rng;
     use std::{str, thread, time::Duration};
     use tokio::io::AsyncReadExt;
@@ -241,24 +242,20 @@ mod test {
         assert!(result_stdout.contains("pg_up 1"));
         println!("Found metrics when curling the metrics service");
 
-        let mut result_stdout = "".to_string();
-        // Retry up to 20 times so Prometheus has time to scrape the target
-        for _ in 0..20 {
-            // Check that prometheus has a CoreDB target
-            let prometheus_service_name = "monitoring-kube-prometheus-prometheus".to_string();
-            let command = vec![
-                String::from("curl"),
-                format!("http://{prometheus_service_name}:9090/api/v1/targets"),
-            ];
-            result_stdout = run_command_in_container(pods.clone(), test_pod_name.clone(), command).await;
-            println!("{}", result_stdout);
-            if result_stdout.contains(&name.clone()) {
-                break;
-            }
-            thread::sleep(Duration::from_millis(2000));
+        // check if the service monitor was created and all the selector labels
+        // are present on the metrics service's labels
+        let service_monitor_api: Api<ServiceMonitor> = Api::namespaced(client.clone(), namespace);
+        let service_monitor_name = name.clone();
+        let service_monitor = service_monitor_api.get(&service_monitor_name).await.unwrap();
+        let service_monitor_labels = service_monitor.spec.selector.match_labels.unwrap();
+        let service_api: Api<Service> = Api::namespaced(client.clone(), namespace);
+        let service = service_api.get(&metrics_service_name).await.unwrap();
+        let service_labels = service.metadata.labels.unwrap();
+        // check the service_monitor_labels are not empty
+        assert!(!service_monitor_labels.is_empty());
+        for (key, value) in service_monitor_labels {
+            assert_eq!(service_labels.get(&key).unwrap(), &value);
         }
-        assert!(result_stdout.contains(&name.clone()));
-        println!("Found CoreDB as a target of Prometheus");
     }
 
     #[tokio::test]

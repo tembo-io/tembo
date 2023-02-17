@@ -17,7 +17,7 @@ mod psql;
 mod secret;
 mod service;
 mod servicemonitor;
-mod servicemonitor_crd;
+pub mod servicemonitor_crd;
 mod statefulset;
 use thiserror::Error;
 
