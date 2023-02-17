@@ -1,62 +1,70 @@
+use pgx;
 use pgx::prelude::*;
+use pgx::spi;
 use pgx::spi::SpiTupleTable;
 use pgx::warning;
 
 pgx::pg_module_magic!();
 
 pub mod partition;
+use pgmq_crate::errors::PgmqError;
 use pgmq_crate::query::{archive, check_input, delete, init_queue, pop, read, TABLE_PREFIX};
 
+use thiserror::Error;
+
+#[derive(Error, Debug)]
+enum PgmqExtError {
+    #[error("")]
+    SqlError(#[from] pgx::spi::Error),
+
+    #[error("")]
+    QueueError(#[from] PgmqError),
+}
+
 #[pg_extern]
-fn pgmq_create(queue_name: &str) -> Result<(), spi::Error> {
-    let setup = init_queue(queue_name);
+fn pgmq_create(queue_name: &str) -> Result<(), PgmqExtError> {
+    let setup = init_queue(queue_name)?;
     let ran: Result<_, spi::Error> = Spi::connect(|mut c| {
         for q in setup {
             let _ = c.update(&q, None, None)?;
         }
         Ok(())
     });
-    match ran {
-        Ok(_) => Ok(()),
-        Err(ran) => Err(ran),
-    }
+    Ok(ran?)
 }
 
 #[pg_extern]
 fn pgmq_create_partitioned(
     queue_name: &str,
     partition_size: default!(i64, 10000),
-) -> Result<(), spi::Error> {
-    let setup = partition::init_partitioned_queue(queue_name, partition_size);
+) -> Result<(), PgmqExtError> {
+    let setup = partition::init_partitioned_queue(queue_name, partition_size)?;
     let ran: Result<_, spi::Error> = Spi::connect(|mut c| {
         for q in setup {
             let _ = c.update(&q, None, None)?;
         }
         Ok(())
     });
-
-    match ran {
-        Ok(_) => Ok(()),
-        Err(ran) => Err(ran),
-    }
+    Ok(ran?)
 }
 
 #[pg_extern]
-fn pgmq_send(queue_name: &str, message: pgx::Json) -> Result<Option<i64>, spi::Error> {
+fn pgmq_send(queue_name: &str, message: pgx::Json) -> Result<Option<i64>, PgmqExtError> {
     let m = serde_json::to_string(&message.0).unwrap();
-    Spi::get_one(&enqueue_str(queue_name, &m))
+    let query = enqueue_str(queue_name, &m)?;
+    Ok(Spi::get_one(&query)?)
 }
 
-fn enqueue_str(name: &str, message: &str) -> String {
-    check_input(name);
+fn enqueue_str(name: &str, message: &str) -> Result<String, PgmqError> {
+    check_input(name)?;
     // TOOO: vt should be now() + delay
-    format!(
+    Ok(format!(
         "
         INSERT INTO {TABLE_PREFIX}_{name} (vt, message)
         VALUES (now() at time zone 'utc', '{message}'::json)
         RETURNING msg_id;
         "
-    )
+    ))
 }
 
 #[pg_extern]
@@ -102,9 +110,9 @@ fn readit(
         TimestampWithTimeZone,
         pgx::Json,
     )> = Vec::new();
-    let _: Result<(), spi::Error> = Spi::connect(|mut client| {
-        let mut tup_table: SpiTupleTable =
-            client.update(&read(queue_name, &vt, &limit), None, None)?;
+    let _: Result<(), PgmqExtError> = Spi::connect(|mut client| {
+        let query = read(queue_name, &vt, &limit)?;
+        let mut tup_table: SpiTupleTable = client.update(&query, None, None)?;
         while let Some(row) = tup_table.next() {
             let msg_id = row["msg_id"].value::<i64>()?.expect("no msg_id");
             let read_ct = row["read_ct"].value::<i32>()?.expect("no read_ct");
@@ -121,11 +129,11 @@ fn readit(
 }
 
 #[pg_extern]
-fn pgmq_delete(queue_name: &str, msg_id: i64) -> Result<Option<bool>, spi::Error> {
+fn pgmq_delete(queue_name: &str, msg_id: i64) -> Result<Option<bool>, PgmqExtError> {
     let mut num_deleted = 0;
-
+    let query = delete(queue_name, &msg_id)?;
     Spi::connect(|mut client| {
-        let tup_table = client.update(&delete(queue_name, &msg_id), None, None);
+        let tup_table = client.update(&query, None, None);
         match tup_table {
             Ok(tup_table) => num_deleted = tup_table.len(),
             Err(e) => {
@@ -147,11 +155,11 @@ fn pgmq_delete(queue_name: &str, msg_id: i64) -> Result<Option<bool>, spi::Error
 
 /// archive a message forever instead of deleting it
 #[pg_extern]
-fn pgmq_archive(queue_name: &str, msg_id: i64) -> Result<Option<bool>, spi::Error> {
+fn pgmq_archive(queue_name: &str, msg_id: i64) -> Result<Option<bool>, PgmqExtError> {
     let mut num_deleted = 0;
-
+    let query = archive(queue_name, &msg_id)?;
     Spi::connect(|mut client| {
-        let tup_table = client.update(&archive(queue_name, &msg_id), None, None);
+        let tup_table = client.update(&query, None, None);
         match tup_table {
             Ok(tup_table) => num_deleted = tup_table.len(),
             Err(e) => {
@@ -186,7 +194,7 @@ fn pgmq_pop(
             name!(message, pgx::Json),
         ),
     >,
-    spi::Error,
+    PgmqExtError,
 > {
     let results = popit(queue_name)?;
     Ok(TableIterator::new(results.into_iter()))
@@ -202,7 +210,7 @@ fn popit(
         TimestampWithTimeZone,
         pgx::Json,
     )>,
-    spi::Error,
+    PgmqExtError,
 > {
     let mut results: Vec<(
         i64,
@@ -211,8 +219,9 @@ fn popit(
         TimestampWithTimeZone,
         pgx::Json,
     )> = Vec::new();
-    let _: Result<(), spi::Error> = Spi::connect(|mut client| {
-        let tup_table: SpiTupleTable = client.update(&pop(queue_name), None, None)?;
+    let _: Result<(), PgmqExtError> = Spi::connect(|mut client| {
+        let query = pop(queue_name)?;
+        let tup_table: SpiTupleTable = client.update(&query, None, None)?;
         for row in tup_table {
             let msg_id = row["msg_id"].value::<i64>()?.expect("no msg_id");
             let read_ct = row["read_ct"].value::<i32>()?.expect("no read_ct");
