@@ -15,7 +15,8 @@ pub async fn reconcile_secret(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Err
     let mut labels: BTreeMap<String, String> = BTreeMap::new();
     let secret_api: Api<Secret> = Api::namespaced(client, &ns);
     let oref = cdb.controller_owner_ref(&()).unwrap();
-    labels.insert("app".to_owned(), "coredb".to_owned());
+    labels.insert("app".to_owned(), "coredb".to_string());
+    labels.insert("coredb.io/name".to_owned(), cdb.name_any());
 
     // check for existing secret
     let lp = ListParams::default().labels("app=coredb");
