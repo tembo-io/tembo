@@ -241,14 +241,22 @@ mod test {
         assert!(result_stdout.contains("pg_up 1"));
         println!("Found metrics when curling the metrics service");
 
-        // Check that prometheus has a CoreDB target
-        let prometheus_service_name = "monitoring-kube-prometheus-prometheus".to_string();
-        let command = vec![
-            String::from("curl"),
-            format!("http://{prometheus_service_name}:9090/api/v1/targets"),
-        ];
-        let result_stdout = run_command_in_container(pods.clone(), test_pod_name.clone(), command).await;
-        println!("{}", result_stdout);
+        let mut result_stdout = "".to_string();
+        // Retry up to 20 times so Prometheus has time to scrape the target
+        for _ in 0..20 {
+            // Check that prometheus has a CoreDB target
+            let prometheus_service_name = "monitoring-kube-prometheus-prometheus".to_string();
+            let command = vec![
+                String::from("curl"),
+                format!("http://{prometheus_service_name}:9090/api/v1/targets"),
+            ];
+            result_stdout = run_command_in_container(pods.clone(), test_pod_name.clone(), command).await;
+            println!("{}", result_stdout);
+            if result_stdout.contains(&name.clone()) {
+                break;
+            }
+            thread::sleep(Duration::from_millis(1000));
+        }
         assert!(result_stdout.contains(&name.clone()));
         println!("Found CoreDB as a target of Prometheus");
     }
