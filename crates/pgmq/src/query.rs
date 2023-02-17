@@ -272,9 +272,9 @@ mod tests {
             "foo": "bar"
         });
         msgs.push(msg);
-        let query = enqueue("yolo", &msgs);
-        assert!(query.unwrap().contains("pgmq_yolo"));
-        assert!(query.unwrap().contains("{\"foo\":\"bar\"}"));
+        let query = enqueue("yolo", &msgs).unwrap();
+        assert!(query.contains("pgmq_yolo"));
+        assert!(query.contains("{\"foo\":\"bar\"}"));
     }
 
     #[test]
@@ -283,10 +283,10 @@ mod tests {
         let vt: i32 = 20;
         let limit: i32 = 1;
 
-        let query = read(&qname, &vt, &limit);
+        let query = read(&qname, &vt, &limit).unwrap();
 
-        assert!(query.unwrap().contains(&qname));
-        assert!(query.unwrap().contains(&vt.to_string()));
+        assert!(query.contains(&qname));
+        assert!(query.contains(&vt.to_string()));
     }
 
     #[test]
@@ -294,10 +294,10 @@ mod tests {
         let qname = "myqueue";
         let msg_id: i64 = 42;
 
-        let query = delete(&qname, &msg_id);
+        let query = delete(&qname, &msg_id).unwrap();
 
-        assert!(query.unwrap().contains(&qname));
-        assert!(query.unwrap().contains(&msg_id.to_string()));
+        assert!(query.contains(&qname));
+        assert!(query.contains(&msg_id.to_string()));
     }
 
     #[test]
@@ -308,11 +308,11 @@ mod tests {
         msg_ids.push(43);
         msg_ids.push(44);
 
-        let query = delete_batch(&qname, &msg_ids);
+        let query = delete_batch(&qname, &msg_ids).unwrap();
 
-        assert!(query.unwrap().contains(&qname));
+        assert!(query.contains(&qname));
         for id in msg_ids.iter() {
-            assert!(query.unwrap().contains(&id.to_string()));
+            assert!(query.contains(&id.to_string()));
         }
     }
 
