@@ -32,7 +32,7 @@ rules:
     resources: ["statefulsets"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: [""]
-    resources: ["services", "secrets", "pods", "pods/exec"]
+    resources: ["services", "secrets", "pods", "pods/exec", "namespaces/status"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 ---
 # Binding the role to the account in coredb-operator ns
