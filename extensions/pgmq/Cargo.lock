@@ -1151,7 +1151,7 @@ dependencies = [
 
 [[package]]
 name = "pgmq"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "pgmq 0.7.4",
  "pgx",
