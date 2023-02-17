@@ -11,7 +11,7 @@ pub fn default_resources() -> ResourceRequirements {
         ("memory".to_owned(), Quantity("2Gi".to_string())),
     ]);
     let requests: BTreeMap<String, Quantity> = BTreeMap::from([
-        ("cpu".to_owned(), Quantity("0.5".to_string())),
+        ("cpu".to_owned(), Quantity("500m".to_string())),
         ("memory".to_owned(), Quantity("512Mi".to_string())),
     ]);
     ResourceRequirements {

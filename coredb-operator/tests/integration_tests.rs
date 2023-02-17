@@ -159,11 +159,11 @@ mod test {
         ));
         println!("Found pod ready: {}", pod_name);
 
-        // // Assert default resource values are applied to postgres container
-        // let default_resources: ResourceRequirements = default_resources();
-        // let pg_pod = pods.get(&pod_name).await.unwrap();
-        // let resources = pg_pod.spec.unwrap().containers[0].clone().resources;
-        // assert_eq!(default_resources, resources.unwrap());
+        // Assert default resource values are applied to postgres container
+        let default_resources: ResourceRequirements = default_resources();
+        let pg_pod = pods.get(&pod_name).await.unwrap();
+        let resources = pg_pod.spec.unwrap().containers[0].clone().resources;
+        assert_eq!(default_resources, resources.unwrap());
 
         // Assert no tables found
         let result = coredb_resource

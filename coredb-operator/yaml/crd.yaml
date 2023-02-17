@@ -53,7 +53,7 @@ spec:
                     cpu: '2'
                     memory: 2Gi
                   requests:
-                    cpu: '0.5'
+                    cpu: 500m
                     memory: 512Mi
                 description: ResourceRequirements describes the compute resource requirements.
                 properties:
