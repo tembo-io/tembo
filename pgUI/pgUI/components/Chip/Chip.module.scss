@@ -1,0 +1,18 @@
+.chip {
+  display: flex;
+  align-items: center;
+
+  .colorSwatch {
+    width: var(--space-2);
+    height: var(--space-2);
+    border-radius: 50%;
+    margin-right: var(--space-1);
+  }
+
+  span {
+    font-size: var(--size-xs);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: var(--primary-7);
+  }
+}
