@@ -1,0 +1,26 @@
+.Header {
+  width: 100%;
+  padding: var(--space-2) var(--space-6);
+  background-color: var(--primary-8);
+  color: var(--primary-3);
+
+  nav {
+    margin-right: var(--space-5);
+    li {
+      margin-left: var(--space-3);
+      list-style: none;
+      font-size: var(--size-m);
+    }
+  }
+
+  .logoGroup h1 {
+    display: none;
+    visibility: hidden;
+    font-size: var(--size-l);
+  }
+
+  .UserTag {
+    padding-left: var(--space-5);
+    border-left: 1px solid var(--primary-4);
+  }
+}

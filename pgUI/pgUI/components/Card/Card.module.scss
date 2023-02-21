@@ -1,0 +1,14 @@
+.card {
+  position: relative;
+  padding: var(--space-4);
+  background-color: var(--primary-2);
+  border: 1px solid var(--primary-4);
+  border-radius: var(--border-radius);
+  min-width: 10rem;
+  transition: all 280ms ease;
+
+  &:hover {
+    cursor: pointer;
+    border: 1px solid var(--primary-5);
+  }
+}
