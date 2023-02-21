@@ -1,26 +1,38 @@
 .Header {
   width: 100%;
-  padding: var(--space-2) var(--space-6);
+  height: 3.5rem;
+  font-size: var(--size-s);
+  padding: var(--space-3) var(--space-6);
   background-color: var(--primary-8);
   color: var(--primary-3);
+
+  h4 {
+    font-weight: var(--normal-w);
+  }
 
   nav {
     margin-right: var(--space-5);
     li {
       margin-left: var(--space-3);
       list-style: none;
-      font-size: var(--size-m);
+      &:hover {
+        color: var(--primary-2);
+      }
     }
   }
 
-  .logoGroup h1 {
-    display: none;
-    visibility: hidden;
-    font-size: var(--size-l);
+  .logoGroup {
+    margin-right: var(--space-5);
+    h1 {
+      // hide the coredb name
+      display: none;
+      visibility: hidden;
+      font-size: var(--size-l);
+    }
   }
 
   .UserTag {
     padding-left: var(--space-5);
-    border-left: 1px solid var(--primary-4);
+    border-left: 1px solid var(--primary-6);
   }
 }

@@ -5,30 +5,25 @@ import Link from 'next/link';
 import Logo from '../Logo';
 
 import styles from './Header.module.scss';
+import Button from '../Button';
 
 interface HeaderProps {
-  shortName: string;
+  userName: string;
 }
 
-const Header: FC<HeaderProps> = ({ shortName }) => {
+const Header: FC<HeaderProps> = ({ userName }) => {
   return (
     <header className={cx(styles.Header, 'd-flex v-center')}>
       <span className={cx(styles.logoGroup, 'd-flex v-center')}>
         <Logo />
         <h1>CoreDB</h1>
       </span>
-      <h4>Organization ▼</h4>
+      <h4>Organization</h4>
       <div className="d-flex" style={{ marginLeft: 'auto' }}>
         <nav>
           <ul className="d-flex v-center">
             <Link href="/">
               <li>Instances</li>
-            </Link>
-            <Link href="/team">
-              <li>Team</li>
-            </Link>
-            <Link href="/billing">
-              <li>Billing</li>
             </Link>
             <Link href="/settings">
               <li>Settings</li>
@@ -40,7 +35,7 @@ const Header: FC<HeaderProps> = ({ shortName }) => {
         </nav>
         <div className={cx(styles.UserTag, 'd-flex v-center')}>
           <div className={styles.avatar} />
-          <span>{shortName}</span>
+          <span>{userName}</span>
         </div>
       </div>
     </header>

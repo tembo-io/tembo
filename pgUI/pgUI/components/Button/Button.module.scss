@@ -1,0 +1,23 @@
+// buttons
+.btn {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: row;
+  justify-content: center;
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--border-radius);
+  font-size: var(--size-s);
+  outline: 0;
+  background-color: transparent;
+  border: 1px solid var(--primary-8);
+  color: var(--primary-8);
+  font-family: Inter;
+
+  &:hover {
+    cursor: pointer;
+    background-color: var(--primary-2);
+    // filter: brightness(85%);
+    transition: all 200ms ease;
+  }
+}

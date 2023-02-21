@@ -2,6 +2,7 @@ import type { NextPage } from 'next';
 import Head from 'next/head';
 import Main from '../components/Main';
 import Header from '../components/Header';
+import Button from '../components/Button';
 import SearchBar from '../components/SearchBar';
 
 const Home: NextPage = () => {
@@ -12,9 +13,10 @@ const Home: NextPage = () => {
         <meta name="description" content="Welcome to CoreDB" />
         <link rel="icon" href="favicon.ico" />
       </Head>
-      <Header shortName="Fun" />
+      <Header userName="Rico Suave" />
       <Main>
-        <SearchBar placeholder='Search Instances'/>
+        <SearchBar placeholder="Search Instances" />
+        <Button>Click Me</Button>
       </Main>
     </>
   );

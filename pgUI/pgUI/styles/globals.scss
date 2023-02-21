@@ -78,39 +78,6 @@ a {
   box-sizing: border-box;
 }
 
-// buttons
-.btn {
-  display: flex;
-  flex-direction: row;
-  justify-content: center;
-  align-items: center;
-  padding: var(--space-3) var(--space-4);
-  background-color: var(--accent);
-  border-radius: var(--border-radius);
-  font-size: var(--size-m);
-  outline: 0;
-  border: 0;
-  color: var(--primary-2);
-
-  &:hover {
-    cursor: pointer;
-
-    // filter: brightness(85%);
-    background-color: var(--accent-darker);
-    transition: all 200ms ease;
-  }
-
-  &.small {
-    font-size: var(--size-s);
-    font-weight: var(--light-w);
-  }
-
-  &.secondary {
-    background-color: transparent;
-    border: 1px solid var(--accent);
-  }
-}
-
 // typography classes
 .type-small {
   font-weight: var(--light-w);
