@@ -1,6 +1,6 @@
 ## CoreDB Operator
 
-A rust kubernetes controller for a [`CoreDB` resource](https://github.com/CoreDB-io/coredb/blob/main/coredb-operator/yaml/crd.yaml) using [kube-rs](https://github.com/kube-rs/kube-rs/).
+A Rust-based Kubernetes Controller for a [`CoreDB` resource](https://github.com/CoreDB-io/coredb/blob/main/coredb-operator/yaml/crd.yaml) using [kube-rs](https://github.com/kube-rs/kube-rs/).
 
 The `Controller` object reconciles `CoreDB` instances when changes to it are detected, writes to its .status object, creates associated events, and uses finalizers for guaranteed delete handling.
 
@@ -68,8 +68,8 @@ Apply the CRD from [cached file](yaml/crd.yaml), or pipe it from `crdgen` (best 
 cargo run --bin crdgen | kubectl apply -f -
 ```
 
-### Opentelemetry (optional)
-Setup an opentelemetry collector in your cluster. [Tempo](https://github.com/grafana/helm-charts/tree/main/charts/tempo) / [opentelemetry-operator](https://github.com/open-telemetry/opentelemetry-helm-charts/tree/main/charts/opentelemetry-operator) / [grafana agent](https://github.com/grafana/helm-charts/tree/main/charts/agent-operator) should all work out of the box. If your collector does not support grpc otlp you need to change the exporter in [`main.rs`](./src/main.rs).
+### OpenTelemetry (optional)
+Setup an OpenTelemetry Collector in your cluster. [Tempo](https://github.com/grafana/helm-charts/tree/main/charts/tempo) / [opentelemetry-operator](https://github.com/open-telemetry/opentelemetry-helm-charts/tree/main/charts/opentelemetry-operator) / [grafana agent](https://github.com/grafana/helm-charts/tree/main/charts/agent-operator) should all work out of the box. If your collector does not support grpc otlp you need to change the exporter in [`main.rs`](./src/main.rs).
 
 ## Running
 
