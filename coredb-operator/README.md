@@ -1,8 +1,8 @@
 ## CoreDB Operator
 
-A Rust-based Kubernetes Controller for a [`CoreDB` resource](https://github.com/CoreDB-io/coredb/blob/main/coredb-operator/yaml/crd.yaml) using [kube-rs](https://github.com/kube-rs/kube-rs/).
+A Rust-based Kubernetes Controller for a [`CoreDB Resource`](https://github.com/CoreDB-io/coredb/blob/main/coredb-operator/yaml/crd.yaml) using [kube-rs](https://github.com/kube-rs/kube-rs/).
 
-The `Controller` object reconciles `CoreDB` instances when changes to it are detected, writes to its .status object, creates associated events, and uses finalizers for guaranteed delete handling.
+The `Controller` object reconciles `CoreDB` Instances when changes to it are detected, writes to its .status object, creates associated events, and uses finalizers for guaranteed delete handling.
 
 ## Requirements
 - A Kubernetes cluster
