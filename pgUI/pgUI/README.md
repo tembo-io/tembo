@@ -2,10 +2,15 @@
 
 pgUI is an open-source, extensible web UI for Postgres and Postgres extensions.
 
-```
-npm install
-```
+Start Nextjs
 
 ```
+npm install
 npm run dev
+```
+
+### Component Library via Storybook
+
+```
+npm run storybook
 ```

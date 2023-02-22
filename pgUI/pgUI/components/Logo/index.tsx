@@ -1,6 +1,6 @@
 import Image from 'next/image';
 
-import RawLogo from '../../public/coredb-logo-globe.png'; // https://www.typescriptlang.org/docs/handbook/module-resolution.html#path-mapping
+import RawLogo from '/public/coredb-logo-globe.png'; // https://www.typescriptlang.org/docs/handbook/module-resolution.html#path-mapping
 
 export default function Logo() {
   return (
