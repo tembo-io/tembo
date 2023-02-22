@@ -24,6 +24,7 @@
     "@storybook/addon-interactions": "^7.0.0-beta.53",
     "@storybook/addon-links": "^7.0.0-beta.53",
     "@storybook/blocks": "^7.0.0-alpha.8",
+    "@storybook/preset-scss": "^1.0.3",
     "@storybook/react": "^7.0.0-beta.53",
     "@storybook/react-webpack5": "^7.0.0-beta.53",
     "@storybook/testing-library": "^0.0.14-next.1",
