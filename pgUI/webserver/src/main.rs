@@ -1,6 +1,6 @@
-use actix_web::{App, HttpServer};
-use webserver::routes;
+use actix_web::{web, App, HttpServer};
 use webserver::routes::get_queries;
+use webserver::{config, connect, routes};
 
 // UI will make requests to this webserver in order to retrieve data it needs to present (SQL query
 // data, time series data, etc)
@@ -9,8 +9,14 @@ use webserver::routes::get_queries;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    HttpServer::new(|| {
+    // load configurations from environment
+    let cfg = config::Config::default();
+    // Initialize connection to backend postgresql server
+    let conn = connect(&cfg.pg_conn_str).await.unwrap();
+
+    HttpServer::new(move || {
         App::new()
+            .app_data(web::Data::new(conn.clone()))
             .service(routes::running)
             .service(routes::connection)
             .service(get_queries)

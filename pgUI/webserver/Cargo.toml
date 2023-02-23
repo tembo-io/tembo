@@ -8,3 +8,8 @@ edition = "2021"
 [dependencies]
 actix-web = "4.3.0"
 regex = "1.7.1"
+url = "2.3.1"
+sqlx = { version = "0.6", features = [ "runtime-tokio-native-tls" , "postgres", "chrono" ] }
+log = "0.4.17"
+thiserror = "1.0.38"
+base64 = "0.21.0"
