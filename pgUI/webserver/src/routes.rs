@@ -1,7 +1,9 @@
 use actix_web::{get, post, web, HttpResponse, Responder};
 use base64::{engine::general_purpose, Engine as _};
 use regex::Regex;
-use sqlx::{Pool, Postgres};
+use sqlx::{Error, Pool, Postgres, Row};
+use sqlx::postgres::PgRow;
+use crate::connect;
 
 #[get("/")]
 pub async fn running() -> impl Responder {
@@ -36,24 +38,37 @@ pub async fn connection(conn_str: String, conn: web::Data<Pool<Postgres>>) -> im
         tx.commit().await.unwrap();
         HttpResponse::Ok().body("Connection string saved")
     }
-    // Encrypt connection string
-    // Write connection info to table
 }
 
 #[post("/get-queries")]
 pub async fn get_queries(conn: web::Data<Pool<Postgres>>) -> impl Responder {
+    let mut queries: Vec<String> = Vec::new();
     // Receive query range (time?)
-    // Connect to postgres (how will we know which instance to connect to? for now, assume there is
-    //  only one connection string stored)
+    // Connect to backend postgresql server and query for connection string
+    // TODO(ianstanton) how will we know which instance to connect to? for now, assume there is
+    //  only one connection string stored
     let mut tx = conn.begin().await.unwrap();
-    sqlx::query("CREATE TABLE IF NOT EXISTS ")
-        .execute(&mut tx)
-        .await
-        .unwrap();
-
+    let row: Result<PgRow, Error> = sqlx::query("SELECT * FROM conn_str;").fetch_one(&mut tx).await;
     tx.commit().await.unwrap();
 
+    // Connect to postgres instance
+    let conn_str_b64: String = row.unwrap().get(0);
+    // Decode connection string
+    let conn_str = b64_decode(&conn_str_b64);
+    let new_conn = connect(&conn_str).await.unwrap();
+    tx = new_conn.begin().await.unwrap();
+    let query = "SELECT * FROM conn_str;";
+    // let query = "SELECT (total_time / 1000 / 60) as total, (total_time/calls) as avg, query FROM pg_stat_statements ORDER BY 1 DESC LIMIT 100;";
+    let rows: Result<Vec<PgRow>, Error> = sqlx::query(query).fetch_all(&mut tx).await;
+    for row in rows.unwrap().iter() {
+        queries.push(row.get(0));
+    }
     // Query for range of queries
     // Return results in response
-    HttpResponse::Ok().body("Queries...")
+    HttpResponse::Ok().body(format!("Queries... {:?}", queries))
+}
+
+fn b64_decode(b64_encoded: &str) -> String {
+    let bytes = general_purpose::STANDARD.decode(b64_encoded).unwrap();
+    std::str::from_utf8(&bytes).unwrap().to_owned()
 }
