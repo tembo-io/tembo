@@ -1040,6 +1040,7 @@ name = "webserver"
 version = "0.1.0"
 dependencies = [
  "actix-web",
+ "regex",
 ]
 
 [[package]]
