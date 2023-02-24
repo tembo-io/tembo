@@ -28,6 +28,7 @@
     "@storybook/react": "^7.0.0-beta.53",
     "@storybook/react-webpack5": "^7.0.0-beta.53",
     "@storybook/testing-library": "^0.0.14-next.1",
+    "@svgr/webpack": "^6.5.1",
     "@types/node": "18.11.3",
     "@types/react": "18.0.21",
     "@types/react-dom": "18.0.6",
