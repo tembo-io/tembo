@@ -26,7 +26,7 @@ const IconButton: FC<IconButtonProps> = ({
   return (
     <button onClick={onClick} className={cx(styles.btn, styles.iconBtn)}>
       <Image
-        src={selectedIcon}
+        src={iconList.activity.src}
         width={24}
         height={24}
         alt={iconName + ' icon'}

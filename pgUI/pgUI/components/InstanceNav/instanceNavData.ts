@@ -1,16 +1,25 @@
 interface Option {
   label: string;
   link: string;
+  iconName:
+    | 'activity'
+    | 'codesandbox'
+    | 'compass'
+    | 'database'
+    | 'server'
+    | 'sliders'
+    | 'terminal'
+    | 'users';
 }
 
 const navOptions: Array<Option> = [
-  { label: 'Overview', link: '/overview˝' },
-  { label: 'SQL Runner', link: '/sql-runner' },
-  { label: 'Object Explorer', link: '/object-explorer' },
-  { label: 'Monitoring', link: '/monitoring' },
-  { label: 'Users', link: '/users' },
-  { label: 'Configuration', link: '/configuration' },
-  { label: 'Extensions', link: '/extensions' },
+  { label: 'Overview', link: '/overview˝', iconName: 'server' },
+  { label: 'SQL Runner', link: '/sql-runner', iconName: 'terminal' },
+  { label: 'Object Explorer', link: '/object-explorer', iconName: 'compass' },
+  { label: 'Monitoring', link: '/monitoring', iconName: 'activity' },
+  { label: 'Users', link: '/users', iconName: 'users' },
+  { label: 'Configuration', link: '/configuration', iconName: 'sliders' },
+  { label: 'Extensions', link: '/extensions', iconName: 'codesandbox' },
 ];
 
 export default navOptions;

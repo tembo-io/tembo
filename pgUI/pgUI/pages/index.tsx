@@ -6,6 +6,7 @@ import Header from '../components/Header';
 import SearchBar from '../components/SearchBar';
 import InstanceCard from '../components/InstanceCard';
 import IconButton from '../components/IconButton';
+import InstanceNav from '../components/InstanceNav';
 
 const Home: NextPage = () => {
   return (
@@ -16,6 +17,7 @@ const Home: NextPage = () => {
         <link rel="icon" href="favicon.ico" />
       </Head>
       <Header userName="Rico Suave" />
+      {/* <InstanceNav /> */}
       <Main>
         <SearchBar placeholder="Search Instances" />
         <div
