@@ -12,6 +12,8 @@ services:
     depends_on:
       - timescaledb
 
+# Add api
+
   pgrestinit:
     build:
       context: ./scripts
@@ -26,7 +28,7 @@ services:
     image: timescale/timescaledb-ha:pg14-latest
     restart: on-failure
     ports:
-      - 5432:5432/tcp
+      - 5434:5432/tcp
     volumes:
       - timescaledb-data:/var/lib/postgresql/data
     environment:

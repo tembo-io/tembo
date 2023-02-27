@@ -7,7 +7,7 @@ use crate::connect;
 
 #[get("/")]
 pub async fn running() -> impl Responder {
-    HttpResponse::Ok().body("Webserver is up and running!")
+    HttpResponse::Ok().body("API is up and running!")
 }
 
 #[post("/connection")]
@@ -23,13 +23,16 @@ pub async fn connection(conn_str: String, conn: web::Data<Pool<Postgres>>) -> im
         // Connect to postgres
         let mut tx = conn.begin().await.unwrap();
         // Ensure connection string table exists
+        // WRITE TO TIMESCALE DB
         sqlx::query("CREATE TABLE IF NOT EXISTS conn_str (conn text);")
             .execute(&mut tx)
             .await
             .unwrap();
-        // Encrypt connection string
+        // base64 encode connection string
+        // TODO(ianstanton) Properly encrypt connection string
         let conn_b64 = general_purpose::STANDARD.encode(conn_str);
         println!("{}", conn_b64);
+        // Create identifier for conn string
         // Write connection info to table
         sqlx::query(format!("INSERT INTO conn_str VALUES ('{}');", conn_b64).as_str())
             .execute(&mut tx)

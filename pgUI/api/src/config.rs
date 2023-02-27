@@ -10,7 +10,7 @@ impl Default for Config {
         Self {
             pg_conn_str: from_env_default(
                 "POSTGRES_CONNECTION",
-                "postgresql://postgres:postgres@0.0.0.0:5433/postgres",
+                "postgresql://postgres:postgres@0.0.0.0:5434/postgres",
             ),
         }
     }
