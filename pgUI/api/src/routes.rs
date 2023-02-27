@@ -24,17 +24,17 @@ pub async fn connection(conn_str: String, conn: web::Data<Pool<Postgres>>) -> im
         let mut tx = conn.begin().await.unwrap();
         // Ensure connection string table exists
         // WRITE TO TIMESCALE DB
-        sqlx::query("CREATE TABLE IF NOT EXISTS conn_str (conn text);")
+        sqlx::query("CREATE TABLE IF NOT EXISTS conn_str (id int, conn text);")
             .execute(&mut tx)
             .await
             .unwrap();
         // base64 encode connection string
         // TODO(ianstanton) Properly encrypt connection string
         let conn_b64 = general_purpose::STANDARD.encode(conn_str);
-        println!("{}", conn_b64);
         // Create identifier for conn string
+        let row_count =
         // Write connection info to table
-        sqlx::query(format!("INSERT INTO conn_str VALUES ('{}');", conn_b64).as_str())
+        sqlx::query(format!("INSERT INTO conn_str VALUES (1, '{}');", conn_b64).as_str())
             .execute(&mut tx)
             .await
             .unwrap();
@@ -43,9 +43,9 @@ pub async fn connection(conn_str: String, conn: web::Data<Pool<Postgres>>) -> im
     }
 }
 
-#[post("/get-queries")]
+#[get("/get-queries")]
 pub async fn get_queries(conn: web::Data<Pool<Postgres>>) -> impl Responder {
-    let mut queries: Vec<String> = Vec::new();
+    let mut queries: Vec<(f64, f64, String)> = Vec::new();
     // Receive query range (time?)
     // Connect to backend postgresql server and query for connection string
     // TODO(ianstanton) how will we know which instance to connect to? for now, assume there is
@@ -55,18 +55,17 @@ pub async fn get_queries(conn: web::Data<Pool<Postgres>>) -> impl Responder {
     tx.commit().await.unwrap();
 
     // Connect to postgres instance
-    let conn_str_b64: String = row.unwrap().get(0);
+    let conn_str_b64: String = row.unwrap().get(1);
     // Decode connection string
     let conn_str = b64_decode(&conn_str_b64);
     let new_conn = connect(&conn_str).await.unwrap();
     tx = new_conn.begin().await.unwrap();
-    let query = "SELECT * FROM conn_str;";
-    // let query = "SELECT (total_time / 1000 / 60) as total, (total_time/calls) as avg, query FROM pg_stat_statements ORDER BY 1 DESC LIMIT 100;";
+    // let query = "SELECT * FROM conn_str;";
+    let query = "SELECT (total_exec_time / 1000 / 60) as total, (total_exec_time/calls) as avg, query FROM pg_stat_statements ORDER BY 1 DESC LIMIT 10;";
     let rows: Result<Vec<PgRow>, Error> = sqlx::query(query).fetch_all(&mut tx).await;
     for row in rows.unwrap().iter() {
-        queries.push(row.get(0));
+        queries.push((row.get(0), row.get(1), row.get(2)));
     }
-    // Query for range of queries
     // Return results in response
     HttpResponse::Ok().body(format!("Queries... {:?}", queries))
 }

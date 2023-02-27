@@ -1,6 +1,6 @@
 use actix_web::{web, App, HttpServer};
-use webserver::routes::get_queries;
-use webserver::{config, connect, routes};
+use api::routes::get_queries;
+use api::{config, connect, routes};
 
 // UI will make requests to this webserver in order to retrieve data it needs to present (SQL query
 // data, time series data, etc)

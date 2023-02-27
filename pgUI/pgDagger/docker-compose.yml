@@ -86,7 +86,9 @@ services:
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
-    command: -p 5433
+    volumes:
+      - ./postgres.conf:/etc/postgresql/postgresql.conf
+    command: postgres -c config_file=/etc/postgresql/postgresql.conf -p 5433
 
 volumes:
   timescaledb-data:
