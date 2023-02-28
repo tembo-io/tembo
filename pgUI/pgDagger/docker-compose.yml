@@ -13,12 +13,12 @@ services:
       - timescaledb
 
   api:
-    image: quay.io/coredb/api:65070c4
+    image: quay.io/coredb/api:test
     ports:
       - 8080:8080
     environment:
       POSTGRES_CONNECTION: postgres://postgres:postgres@timescaledb:5432/postgres
-    command: /usr/local/bin/api
+    command: /usr/local/bin/pgui-api
     depends_on:
       - timescaledb
 
