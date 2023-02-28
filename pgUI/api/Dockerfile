@@ -2,7 +2,7 @@ FROM rust:1.66.1 as builder
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src
 RUN cargo build --release && \
-    cargo clean -p webserver
+    cargo clean -p api
 RUN cargo install --path .
 
 # second stage.

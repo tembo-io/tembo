@@ -13,6 +13,16 @@ services:
       - timescaledb
 
 # Add api
+  api:
+    image: quay.io/coredb/api:094b691
+    restart: unless-stopped
+    ports:
+      - 8080:8080
+    environment:
+      POSTGRES_CONNECTION: postgres://postgres:postgres@timescaledb:5432/postgres
+    command: /usr/local/bin/api
+    depends_on:
+      - timescaledb
 
   pgrestinit:
     build:
