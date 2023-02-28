@@ -1,9 +1,9 @@
+use crate::connect;
 use actix_web::{get, post, web, HttpResponse, Responder};
 use base64::{engine::general_purpose, Engine as _};
 use regex::Regex;
-use sqlx::{Error, Pool, Postgres, Row};
 use sqlx::postgres::PgRow;
-use crate::connect;
+use sqlx::{Error, Pool, Postgres, Row};
 
 #[get("/")]
 pub async fn running() -> impl Responder {
@@ -32,7 +32,6 @@ pub async fn connection(conn_str: String, conn: web::Data<Pool<Postgres>>) -> im
         // TODO(ianstanton) Properly encrypt connection string
         let conn_b64 = general_purpose::STANDARD.encode(conn_str);
         // Create identifier for conn string
-        let row_count =
         // Write connection info to table
         sqlx::query(format!("INSERT INTO conn_str VALUES (1, '{}');", conn_b64).as_str())
             .execute(&mut tx)
@@ -46,12 +45,11 @@ pub async fn connection(conn_str: String, conn: web::Data<Pool<Postgres>>) -> im
 #[get("/get-queries")]
 pub async fn get_queries(conn: web::Data<Pool<Postgres>>) -> impl Responder {
     let mut queries: Vec<(f64, f64, String)> = Vec::new();
-    // Receive query range (time?)
     // Connect to backend postgresql server and query for connection string
-    // TODO(ianstanton) how will we know which instance to connect to? for now, assume there is
-    //  only one connection string stored
     let mut tx = conn.begin().await.unwrap();
-    let row: Result<PgRow, Error> = sqlx::query("SELECT * FROM conn_str;").fetch_one(&mut tx).await;
+    let row: Result<PgRow, Error> = sqlx::query("SELECT * FROM conn_str;")
+        .fetch_one(&mut tx)
+        .await;
     tx.commit().await.unwrap();
 
     // Connect to postgres instance
@@ -60,7 +58,6 @@ pub async fn get_queries(conn: web::Data<Pool<Postgres>>) -> impl Responder {
     let conn_str = b64_decode(&conn_str_b64);
     let new_conn = connect(&conn_str).await.unwrap();
     tx = new_conn.begin().await.unwrap();
-    // let query = "SELECT * FROM conn_str;";
     let query = "SELECT (total_exec_time / 1000 / 60) as total, (total_exec_time/calls) as avg, query FROM pg_stat_statements ORDER BY 1 DESC LIMIT 10;";
     let rows: Result<Vec<PgRow>, Error> = sqlx::query(query).fetch_all(&mut tx).await;
     for row in rows.unwrap().iter() {

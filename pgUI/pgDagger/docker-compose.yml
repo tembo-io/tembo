@@ -17,7 +17,7 @@ services:
   pgrestinit:
     build:
       context: ./scripts
-      dockerfile: Dockerfile.init
+      dockerfile: Dockerfile-pgrst.init
     environment:
       PGRST_DB_SCHEMA: public
       POSTGRES_CONNECTION: postgresql://postgres:postgres@timescaledb:5432/postgres
@@ -89,6 +89,15 @@ services:
     volumes:
       - ./postgres.conf:/etc/postgresql/postgresql.conf
     command: postgres -c config_file=/etc/postgresql/postgresql.conf -p 5433
+
+  arbitrary_postgres_init:
+    build:
+      context: ./scripts
+      dockerfile: Dockerfile-arbitrary-pg.init
+    environment:
+          POSTGRES_CONNECTION: postgresql://postgres:postgres@arbitrary_postgres:5433/postgres
+    depends_on:
+      - arbitrary_postgres
 
 volumes:
   timescaledb-data:

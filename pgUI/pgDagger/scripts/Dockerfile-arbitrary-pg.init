@@ -1,0 +1,7 @@
+FROM python:3.11.2-slim-bullseye
+
+RUN pip3 install psycopg2-binary sqlalchemy tenacity
+
+COPY arbitrary_pg_init.py .
+
+CMD python3 arbitrary_pg_init.py
