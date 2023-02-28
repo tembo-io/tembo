@@ -20,4 +20,19 @@
     // filter: brightness(85%);
     transition: all 200ms ease;
   }
+
+  &.iconBtn {
+    border: 0;
+    padding: var(--space-2);
+    border-radius: 50px;
+
+    &:hover {
+      background-color: var(--primary-4);
+    }
+
+    svg {
+      height: 24px;
+      width: 24px;
+    }
+  }
 }

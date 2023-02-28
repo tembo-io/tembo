@@ -5,7 +5,6 @@ import Link from 'next/link';
 import Logo from '../Logo';
 
 import styles from './Header.module.scss';
-import Button from '../Button';
 
 interface HeaderProps {
   userName: string;
@@ -15,8 +14,10 @@ const Header: FC<HeaderProps> = ({ userName }) => {
   return (
     <header className={cx(styles.Header, 'd-flex v-center')}>
       <span className={cx(styles.logoGroup, 'd-flex v-center')}>
-        <Logo />
-        <h1>CoreDB</h1>
+        <Link href="/">
+          <Logo />
+          <h1>CoreDB</h1>
+        </Link>
       </span>
       <h4>Organization</h4>
       <div className="d-flex" style={{ marginLeft: 'auto' }}>
