@@ -7,8 +7,8 @@ export default function Logo() {
   return (
     <Image
       src={RawLogo}
-      width={36}
-      height={36}
+      width={32}
+      height={32}
       alt="The CoreDB logo - a multicolored globe"
     />
   );

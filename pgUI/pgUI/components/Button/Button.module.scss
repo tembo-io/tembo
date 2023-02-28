@@ -27,7 +27,12 @@
     border-radius: 50px;
 
     &:hover {
-      background-color: var(--primary-3);
+      background-color: var(--primary-4);
+    }
+
+    svg {
+      height: 24px;
+      width: 24px;
     }
   }
 }

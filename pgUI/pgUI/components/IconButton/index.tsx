@@ -1,5 +1,4 @@
 import React, { FC } from 'react';
-import Image from 'next/image';
 import cx from 'classnames';
 import iconList from '../../public/icons/iconList';
 
@@ -25,12 +24,8 @@ const IconButton: FC<IconButtonProps> = ({
   const selectedIcon = iconList[iconName].src;
   return (
     <button onClick={onClick} className={cx(styles.btn, styles.iconBtn)}>
-      <Image
-        src={iconList.activity.src}
-        width={24}
-        height={24}
-        alt={iconName + ' icon'}
-      />
+      {/* <img src={`/icons/${iconName}.svg`} alt={iconList[iconName].alt} /> */}
+      {selectedIcon}
     </button>
   );
 };
