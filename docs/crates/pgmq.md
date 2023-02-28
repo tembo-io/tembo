@@ -1,0 +1,1 @@
+--8<-- "crates/pgmq/README.md"
