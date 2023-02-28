@@ -20,6 +20,7 @@ steps:
     image: python:3.10.2
     commands:
       - curl -sSL https://install.python-poetry.org | POETRY_HOME=/ POETRY_VERSION=1.2.2 python3 -
+      - poetry install
       - poetry run mkdocs gh-deploy --force
 
 jobs:
