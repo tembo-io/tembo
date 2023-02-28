@@ -1,0 +1,39 @@
+
+name: mkdocs CI workflow
+
+defaults:
+  run:
+    shell: bash
+    working-directory: ./
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/docs.yml'
+      - 'docs/**'
+      - mkdocs.yml
+
+steps:
+  - name: publish-docs
+    image: python:3.10.2
+    commands:
+      - curl -sSL https://install.python-poetry.org | POETRY_HOME=/ POETRY_VERSION=1.2.2 python3 -
+      - poetry install
+      - poetry run mkdocs gh-deploy --force
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: 3.x
+      - uses: actions/cache@v2
+        with:
+          key: ${{ github.ref }}
+          path: .cache
+      - run: curl -sSL https://install.python-poetry.org | POETRY_HOME=/ POETRY_VERSION=1.2.2 python3 -
+      - run: poetry run mkdocs gh-deploy --force
