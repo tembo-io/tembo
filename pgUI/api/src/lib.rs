@@ -8,7 +8,7 @@ use sqlx::{ConnectOptions, Pool, Postgres};
 use url::{ParseError, Url};
 
 /// Connect to postgresql server
-pub async fn connect(url: &str) -> Result<Pool<Postgres>, errors::WebserverError> {
+pub async fn connect(url: &str) -> Result<Pool<Postgres>, errors::PgUIAPIError> {
     let options = conn_options(url)?;
     let pgp = PgPoolOptions::new()
         .acquire_timeout(std::time::Duration::from_secs(10))

@@ -234,19 +234,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "api"
-version = "0.1.0"
-dependencies = [
- "actix-web",
- "base64 0.21.0",
- "log",
- "regex",
- "sqlx",
- "thiserror",
- "url",
-]
-
-[[package]]
 name = "atoi"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1172,6 +1159,19 @@ name = "percent-encoding"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "478c572c3d73181ff3c2539045f6eb99e5491218eae919370993b890cdbdd98e"
+
+[[package]]
+name = "pgui-api"
+version = "0.1.0"
+dependencies = [
+ "actix-web",
+ "base64 0.21.0",
+ "log",
+ "regex",
+ "sqlx",
+ "thiserror",
+ "url",
+]
 
 [[package]]
 name = "pin-project-lite"

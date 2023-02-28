@@ -1,11 +1,9 @@
 use actix_web::{web, App, HttpServer};
-use api::routes::get_queries;
-use api::{config, connect, routes};
+use pgui_api::routes::get_queries;
+use pgui_api::{config, connect, routes};
 
-// UI will make requests to this webserver in order to retrieve data it needs to present (SQL query
+// pgUI will make requests to this webserver in order to retrieve data it needs to present (SQL query
 // data, time series data, etc)
-
-// Webserver should take the request, run some SQL query and return the results
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
