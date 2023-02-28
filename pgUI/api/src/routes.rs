@@ -12,9 +12,8 @@ pub async fn running() -> impl Responder {
 
 #[post("/connection")]
 pub async fn connection(conn_str: String, conn: web::Data<Pool<Postgres>>) -> impl Responder {
-    // Receive postgres connection string
     // Validate connection string format
-    // TODO(ianstanton) regex needs to be tweaked a bit
+    // TODO(ianstanton) regex needs to be tweaked a bit (password)
     let re = Regex::new(r"(postgres|postgresql)://[a-zA-Z][0-9a-zA-Z_-]*:[a-zA-Z][0-9a-zA-Z_-]*@[a-zA-Z][0-9a-zA-Z_-]*:[0-9]*/[a-zA-Z][0-9a-zA-Z_-]*$").unwrap();
     if !re.is_match(&conn_str) {
         println!("Connection string is improperly formatted");
@@ -23,7 +22,6 @@ pub async fn connection(conn_str: String, conn: web::Data<Pool<Postgres>>) -> im
         // Connect to postgres
         let mut tx = conn.begin().await.unwrap();
         // Ensure connection string table exists
-        // WRITE TO TIMESCALE DB
         sqlx::query("CREATE TABLE IF NOT EXISTS conn_str (id int, conn text);")
             .execute(&mut tx)
             .await

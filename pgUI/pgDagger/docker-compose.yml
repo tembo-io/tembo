@@ -12,10 +12,8 @@ services:
     depends_on:
       - timescaledb
 
-# Add api
   api:
-    image: quay.io/coredb/api:094b691
-    restart: unless-stopped
+    image: quay.io/coredb/api:65070c4
     ports:
       - 8080:8080
     environment:
