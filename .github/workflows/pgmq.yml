@@ -47,7 +47,13 @@ jobs:
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
-      - name: run all tests
-        run: make test
-      - name: teardown
-        run: make test.cleanup
+      #- name: run all tests
+      #  run: make test
+      #- name: teardown
+      #  run: make test.cleanup
+      # temporary debugging aid
+      - name: Setup upterm session
+        #if: failure()
+        uses: lhotari/action-upterm@v1
+        with:
+          limit-access-to-actor: true

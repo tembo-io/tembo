@@ -1,22 +1,63 @@
+use lazy_static::lazy_static;
+use pg_embed::pg_enums::PgAuthMethod;
+use pg_embed::pg_fetch::{PgFetchSettings, PostgresVersion};
+use pg_embed::postgres::{PgEmbed, PgSettings};
 use pgmq::{self, query::TABLE_PREFIX, Message};
+use port_selector::Port;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sqlx::{Pool, Postgres, Row};
-use std::env;
+use std::time::Duration;
+use temp_dir::TempDir;
+use tokio::sync::Mutex;
 
-async fn init_queue(qname: &str) -> pgmq::PGMQueue {
-    let pgpass = env::var("POSTGRES_PASSWORD").unwrap_or_else(|_| "postgres".to_owned());
-    let queue = pgmq::PGMQueue::new(format!("postgres://postgres:{}@0.0.0.0:5432", pgpass))
-        .await
-        .expect("failed to connect to postgres");
+lazy_static! {
+    static ref PG: Mutex<()> = Mutex::new(());
+}
+
+async fn prepare_pg() -> Result<PgEmbed, anyhow::Error> {
+    let dir = TempDir::new()?;
+    let port = port_selector::random_free_tcp_port().unwrap_or(Port::default());
+    let pg_settings = PgSettings {
+        database_dir: dir.path().to_path_buf(),
+        port,
+        user: "postgres".to_string(),
+        password: "password".to_string(),
+        auth_method: PgAuthMethod::Plain,
+        persistent: false,
+        timeout: Some(Duration::from_secs(15)),
+        migration_dir: None,
+    };
+    dir.leak();
+    let fetch_settings = PgFetchSettings {
+        version: PostgresVersion("15.1.0"),
+        ..Default::default()
+    };
+
+    // (Temporary) workaround for PgEmbed's buggy implementation
+    // of concurrent downloads. Pending a fix in `pg-embed`
+    let mut pg = async {
+        let _lock = PG.lock().await;
+        let mut pg = PgEmbed::new(pg_settings, fetch_settings).await?;
+        pg.setup().await.map(|_| pg)
+    }
+    .await?;
+
+    pg.start_db().await?;
+    pg.create_database("test").await?;
+
+    Ok(pg)
+}
+
+async fn init_queue(qname: &str) -> Result<(PgEmbed, pgmq::PGMQueue), anyhow::Error> {
+    let pg = prepare_pg().await?;
+    let queue = pgmq::PGMQueue::new(pg.db_uri.clone()).await?;
     // make sure queue doesn't exist before the test
-    let _ = queue.destroy(qname).await.unwrap();
+    let _ = queue.destroy(qname).await?;
     // CREATE QUEUE
-    let q_success = queue.create(qname).await;
-    println!("q_success: {:?}", q_success);
-    assert!(q_success.is_ok());
-    queue
+    queue.create(qname).await?;
+    Ok((pg, queue))
 }
 
 #[derive(Serialize, Debug, Deserialize)]
@@ -63,10 +104,10 @@ async fn fallible_rowcount(
 }
 
 #[tokio::test]
-async fn test_lifecycle() {
+async fn test_lifecycle() -> Result<(), anyhow::Error> {
     let test_queue = "test_queue_0".to_owned();
 
-    let queue = init_queue(&test_queue).await;
+    let (_pg, queue) = init_queue(&test_queue).await?;
 
     // CREATE QUEUE
     let q_success = queue.create(&test_queue).await;
@@ -121,13 +162,15 @@ async fn test_lifecycle() {
 
     // table empty
     assert_eq!(num_rows, 0);
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn test_fifo() {
+async fn test_fifo() -> Result<(), anyhow::Error> {
     let test_queue = "test_fifo_queue".to_owned();
 
-    let queue = init_queue(&test_queue).await;
+    let (_pg, queue) = init_queue(&test_queue).await?;
 
     // PUBLISH THREE MESSAGES
     let msg = serde_json::json!({
@@ -177,13 +220,15 @@ async fn test_fifo() {
     assert_eq!(read1.msg_id, 1);
     assert_eq!(read2.msg_id, 2);
     assert_eq!(read3.msg_id, 3);
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn test_read_batch() {
+async fn test_read_batch() -> Result<(), anyhow::Error> {
     let test_queue = "test_read_batch".to_owned();
 
-    let queue = init_queue(&test_queue).await;
+    let (_pg, queue) = init_queue(&test_queue).await?;
 
     // PUBLISH THREE MESSAGES
     let msg = serde_json::json!({
@@ -216,13 +261,15 @@ async fn test_read_batch() {
     let num_rows = rowcount(&test_queue, &queue.connection).await;
     // assert there are still 3 (invisible) entries on the table
     assert_eq!(num_rows, 3);
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn test_send_batch() {
+async fn test_send_batch() -> Result<(), anyhow::Error> {
     let test_queue = "test_send_batch".to_owned();
 
-    let queue = init_queue(&test_queue).await;
+    let (_pg, queue) = init_queue(&test_queue).await?;
 
     // Send 3 messages to queue as batch
     let msgs = vec![
@@ -275,12 +322,14 @@ async fn test_send_batch() {
         let index = i + 1;
         assert_eq!(message.msg_id.to_string(), index.to_string());
     }
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn test_delete_batch() {
+async fn test_delete_batch() -> Result<(), anyhow::Error> {
     let test_queue = "test_delete_batch".to_owned();
-    let queue = init_queue(&test_queue).await;
+    let (_pg, queue) = init_queue(&test_queue).await?;
     let vt: i32 = 1;
     let mut msg_id_first_last: Vec<i64> = Vec::new();
 
@@ -352,14 +401,16 @@ async fn test_delete_batch() {
     // Assert there are no messages to read from queue
     let msg = queue.read::<Value>(&test_queue, Some(&vt)).await.unwrap();
     assert!(msg.is_none());
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn test_serde() {
+async fn test_serde() -> Result<(), anyhow::Error> {
     // series of tests serializing to queue and deserializing from queue
     let mut rng = rand::thread_rng();
     let test_queue = "test_ser_queue".to_owned();
-    let queue = init_queue(&test_queue).await;
+    let (_pg, queue) = init_queue(&test_queue).await?;
 
     // STRUCT => STRUCT
     // enqueue a struct and read a struct
@@ -451,12 +502,14 @@ async fn test_serde() {
         msg_read.message["num"].as_u64().unwrap(),
         msg["num"].as_u64().unwrap()
     );
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn test_pop() {
+async fn test_pop() -> Result<(), anyhow::Error> {
     let test_queue = "test_pop_queue".to_owned();
-    let queue = init_queue(&test_queue).await;
+    let (_pg, queue) = init_queue(&test_queue).await?;
     let msg = MyMessage::default();
     let msg = queue.send(&test_queue, &msg).await.unwrap();
     assert_eq!(msg, 1);
@@ -465,12 +518,14 @@ async fn test_pop() {
     let num_rows = rowcount(&test_queue, &queue.connection).await;
     // popped record is deleted on read
     assert_eq!(num_rows, 0);
+
+    Ok(())
 }
 
 #[tokio::test]
-async fn test_archive() {
+async fn test_archive() -> Result<(), anyhow::Error> {
     let test_queue = "test_archive_queue".to_owned();
-    let queue = init_queue(&test_queue).await;
+    let (_pg, queue) = init_queue(&test_queue).await?;
     let msg = MyMessage::default();
     let msg = queue.send(&test_queue, &msg).await.unwrap();
     assert_eq!(msg, 1);
@@ -482,15 +537,14 @@ async fn test_archive() {
     let num_rows_archive = rowcount(&format!("{test_queue}_archive"), &queue.connection).await;
     // archived record is now on the archive table
     assert_eq!(num_rows_archive, 1);
+
+    Ok(())
 }
 
 /// test db operations that should produce errors
 #[tokio::test]
-async fn test_database_error_modes() {
-    let pgpass = env::var("POSTGRES_PASSWORD").unwrap_or_else(|_| "postgres".to_owned());
-    let queue = pgmq::PGMQueue::new(format!("postgres://postgres:{}@0.0.0.0:5432", pgpass))
-        .await
-        .expect("failed to connect to postgres");
+async fn test_database_error_modes() -> Result<(), anyhow::Error> {
+    let (_pg, queue) = init_queue("unused").await?;
     // let's not create the queues and make sure we get an error
     let msg_id = queue.send("doesNotExist", &"foo").await;
     assert!(msg_id.is_err());
@@ -530,13 +584,15 @@ async fn test_database_error_modes() {
         // didnt get an error. bad.
         _ => panic!("expected a db error, got {:?}", read_msg),
     }
+
+    Ok(())
 }
 
 /// test parsing operations that should produce errors
 #[tokio::test]
-async fn test_parsing_error_modes() {
+async fn test_parsing_error_modes() -> Result<(), anyhow::Error> {
     let test_queue = "test_parsing_queue".to_owned();
-    let queue = init_queue(&test_queue).await;
+    let (_pg, queue) = init_queue(&test_queue).await?;
     let msg = MyMessage::default();
     let _ = queue.send(&test_queue, &msg).await.unwrap();
 
@@ -556,13 +612,15 @@ async fn test_parsing_error_modes() {
         // didnt get an error. bad.
         _ => panic!("expected a parse error, got {:?}", read_msg),
     }
+
+    Ok(())
 }
 
 /// destroy queue should clean up appropriately
 #[tokio::test]
-async fn test_destroy() {
+async fn test_destroy() -> Result<(), anyhow::Error> {
     let test_queue = "test_destroy_queue".to_owned();
-    let queue = init_queue(&test_queue).await;
+    let (_pg, queue) = init_queue(&test_queue).await?;
     let msg = MyMessage::default();
     // send two messages
     let msg1 = queue.send(&test_queue, &msg).await.unwrap();
@@ -600,4 +658,6 @@ async fn test_destroy() {
         .unwrap()
         .get::<i64, usize>(0);
     assert_eq!(rowcount, 0);
+
+    Ok(())
 }

@@ -15,7 +15,8 @@ repository = "https://github.com/CoreDB-io/coredb/tree/main/crates/pgmq"
 chrono = { version = "0.4.23", features = [ "serde" ] }
 serde = { version = "1.0.152" }
 serde_json = { version = "1.0.91", features = [ "raw_value" ] }
-sqlx = { version = "0.6", features = [ "runtime-tokio-native-tls" , "postgres", "chrono" ] }
+# In order to enable native-tls, `pg-embed` needs to support this
+sqlx = { version = "0.6", features = [ "runtime-tokio-rustls" , "postgres", "chrono" ] }
 thiserror = "1.0.38"
 tokio = { version = "1", features = ["macros"] }
 log = "0.4.17"
@@ -27,6 +28,10 @@ criterion = "0.4"
 rand = "0.8.5"
 regex = "1.5.4"
 lazy_static = "1.4.0"
+pg-embed = "0.7.1"
+port-selector = "0.1.6"
+anyhow = "1.0.69"
+temp-dir = "0.1.11"
 
 [[bench]]
 name = "parsing"
