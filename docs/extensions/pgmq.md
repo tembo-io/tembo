@@ -1,0 +1,1 @@
+--8<-- "extensions/pgmq/README.md"
