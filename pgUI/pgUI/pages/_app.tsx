@@ -31,8 +31,6 @@ function WithGlobalLoader({
 }
 
 function MyApp({ Component, pageProps }: AppProps) {
-  console.log('component', Component, 'page props', pageProps);
-
   return (
     <WithGlobalLoader>
       <Head>
