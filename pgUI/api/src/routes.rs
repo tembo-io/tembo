@@ -31,6 +31,7 @@ pub async fn connection(conn_str: String, conn: web::Data<Pool<Postgres>>) -> im
         let conn_b64 = general_purpose::STANDARD.encode(conn_str);
         // Create identifier for conn string
         // Write connection info to table
+        // TODO(ianstanton) Accept user provided ID and use in INSERT
         sqlx::query(format!("INSERT INTO conn_str VALUES (1, '{}');", conn_b64).as_str())
             .execute(&mut tx)
             .await
@@ -45,11 +46,11 @@ pub async fn get_queries(conn: web::Data<Pool<Postgres>>) -> impl Responder {
     let mut queries: Vec<(f64, f64, String)> = Vec::new();
     // Connect to backend postgresql server and query for connection string
     let mut tx = conn.begin().await.unwrap();
+    // TODO(ianstanton) Query conn_str for a connection string with a given ID
     let row: Result<PgRow, Error> = sqlx::query("SELECT * FROM conn_str;")
         .fetch_one(&mut tx)
         .await;
     tx.commit().await.unwrap();
-
     // Connect to postgres instance
     let conn_str_b64: String = row.unwrap().get(1);
     // Decode connection string
