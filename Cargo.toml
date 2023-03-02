@@ -1,5 +1,5 @@
 [package]
-name = "trunk"
+name = "pg-trunk"
 version = "0.0.1-alpha.1"
 edition = "2021"
 authors = ["Steven Miller"]
@@ -8,6 +8,10 @@ homepage = "https://trnk.io"
 license = "Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/coredb-io/trunk"
+
+[[bin]]
+name = "trunk"
+path = "src/main.rs"
 
 [dependencies]
 clap = { version = "4.1.1", features = ["derive"] }
