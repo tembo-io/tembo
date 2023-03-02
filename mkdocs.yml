@@ -1,0 +1,32 @@
+site_name: CoreDB
+theme:
+  name: material
+  palette:
+    - scheme: default
+      toggle:
+        icon: material/weather-night
+        name: dark mode
+    - scheme: slate
+      toggle:
+        icon: material/weather-sunny
+        name: light mode
+nav:
+  - CoreDB: 'index.md'
+  - Kubernetes Operator: 'operator/index.md'
+  - Extensions:
+    - pgmq: 'extensions/pgmq.md'
+  - Libraries:
+    - pgmq: 'crates/pgmq.md'
+markdown_extensions:
+- toc:
+    permalink: true
+- markdown.extensions.codehilite:
+    guess_lang: false
+- admonition
+- codehilite
+- extra
+- pymdownx.snippets:
+    check_paths: true
+plugins:
+  - search
+  - mkdocstrings

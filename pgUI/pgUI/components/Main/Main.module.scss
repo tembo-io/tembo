@@ -1,6 +1,13 @@
 .wrapper {
+  display: grid;
   width: 100%;
   height: 100vh;
-  padding: var(--space-5) var(--space-8);
   background-color: var(--primary-3);
+  &.leftBar {
+    grid-template-columns: 3.5rem 1fr;
+  }
+
+  .content {
+    padding: var(--space-4) var(--space-8);
+  }
 }
