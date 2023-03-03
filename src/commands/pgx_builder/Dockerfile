@@ -29,10 +29,20 @@ ENV PATH="/var/lib/postgresql/.cargo/bin:${PATH}"
 ARG PGX_VERSION=0.7.1
 
 # Install tcdi/pgx
-RUN cargo install cargo-pgx --version $PGX_VERSION
+RUN cargo install cargo-pgx --version "${PGX_VERSION}"
 RUN cargo pgx init --pg${PGVERSION} /usr/bin/pg_config
 
 COPY --chown=postgres:postgres . /app
 WORKDIR /app
 
+ARG EXTENSION_NAME
+ARG EXTENSION_VERSION
+
 RUN cargo pgx package
+
+ENV OUTPUT_DIR="/app/trunk-output"
+ENV BUILD_DIR="/app/target/release/${EXTENSION_NAME}-pg${PGVERSION}/"
+RUN mkdir -p ${OUTPUT_DIR}
+
+RUN cp -r ${BUILD_DIR}$(/usr/bin/pg_config --pkglibdir)/*.so $OUTPUT_DIR && \
+    cp -r ${BUILD_DIR}$(/usr/bin/pg_config --sharedir)/extension/* $OUTPUT_DIR

@@ -1,4 +1,5 @@
 mod commands;
+mod sync_utils;
 
 use crate::commands::SubCommand;
 use async_trait::async_trait;

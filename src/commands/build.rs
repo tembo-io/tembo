@@ -24,7 +24,7 @@ impl SubCommand for BuildCommand {
             let dependencies = cargo_toml.get("dependencies").unwrap().as_table().unwrap();
             if dependencies.contains_key("pgx") {
                 println!("Detected that we are building a pgx extension");
-                build_pgx(path, &self.output_path).await?;
+                build_pgx(path, &self.output_path, cargo_toml).await?;
                 return Ok(());
             }
         }
