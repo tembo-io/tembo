@@ -1,6 +1,7 @@
 mod commands;
 
 use crate::commands::SubCommand;
+use async_trait::async_trait;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
@@ -18,17 +19,19 @@ enum SubCommands {
     Install(commands::install::InstallCommand),
 }
 
+#[async_trait]
 impl SubCommand for SubCommands {
-    fn execute(&self) {
+    async fn execute(&self) -> Result<(), anyhow::Error> {
         match self {
-            SubCommands::Build(cmd) => cmd.execute(),
-            SubCommands::Publish(cmd) => cmd.execute(),
-            SubCommands::Install(cmd) => cmd.execute(),
+            SubCommands::Build(cmd) => cmd.execute().await,
+            SubCommands::Publish(cmd) => cmd.execute().await,
+            SubCommands::Install(cmd) => cmd.execute().await,
         }
     }
 }
 
-fn main() {
+#[tokio::main]
+async fn main() {
     let cli = Cli::parse();
-    cli.command.execute();
+    cli.command.execute().await.unwrap();
 }

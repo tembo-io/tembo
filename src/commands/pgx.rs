@@ -1,3 +1,4 @@
+use futures_util::stream::StreamExt;
 use std::include_str;
 use std::path::Path;
 use tar::Header;
@@ -18,11 +19,10 @@ pub enum PgxBuildError {
     DockerError(#[from] bollard::errors::Error),
 }
 
-pub fn build_pgx(path: &Path, _output_path: &str) -> Result<(), PgxBuildError> {
+pub async fn build_pgx(path: &Path, _output_path: &str) -> Result<(), PgxBuildError> {
     // your code for building a pgx extension goes here
     println!("Building pgx extension at path {}", &path.display());
     let dockerfile = include_str!("./pgx_builder/Dockerfile");
-    println!("{dockerfile}");
 
     let mut tar = tar::Builder::new(Vec::new());
     tar.append_dir_all(".", path)?;
@@ -42,17 +42,30 @@ pub fn build_pgx(path: &Path, _output_path: &str) -> Result<(), PgxBuildError> {
     let docker = Docker::connect_with_local_defaults()?;
     let mut image_build_stream = docker.build_image(options, None, Some(tar.into_inner()?.into()));
 
-    let runtime = tokio::runtime::Runtime::new().unwrap();
-    let handle = runtime.handle();
-    handle.block_on(async {
-        use futures_util::stream::StreamExt;
-        while let Some(Ok(BuildInfo {
-            stream: Some(s), ..
-        })) = image_build_stream.next().await
-        {
-            print!("{s}");
+    while let Some(next) = image_build_stream.next().await {
+        match next {
+            Ok(BuildInfo {
+                stream: Some(s), ..
+            }) => {
+                print!("{s}");
+            }
+            Ok(BuildInfo {
+                error: Some(err),
+                error_detail,
+                ..
+            }) => {
+                eprintln!(
+                    "ERROR: {} (detail: {})",
+                    err,
+                    error_detail.unwrap_or_default().message.unwrap_or_default()
+                );
+            }
+            Ok(_) => {}
+            Err(err) => {
+                return Err(err)?;
+            }
         }
-    });
+    }
 
     Ok(())
 }

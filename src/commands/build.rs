@@ -1,5 +1,6 @@
 use super::SubCommand;
 use crate::commands::pgx::build_pgx;
+use async_trait::async_trait;
 use clap::Args;
 use std::path::Path;
 use toml::Table;
@@ -12,8 +13,9 @@ pub struct BuildCommand {
     output_path: String,
 }
 
+#[async_trait]
 impl SubCommand for BuildCommand {
-    fn execute(&self) {
+    async fn execute(&self) -> Result<(), anyhow::Error> {
         println!("Building from path {}", self.path);
         let path = Path::new(&self.path);
         if path.join("Cargo.toml").exists() {
@@ -22,10 +24,11 @@ impl SubCommand for BuildCommand {
             let dependencies = cargo_toml.get("dependencies").unwrap().as_table().unwrap();
             if dependencies.contains_key("pgx") {
                 println!("Detected that we are building a pgx extension");
-                build_pgx(path, &self.output_path);
-                return;
+                build_pgx(path, &self.output_path).await?;
+                return Ok(());
             }
         }
         println!("Did not understand what to build");
+        Ok(())
     }
 }
