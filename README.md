@@ -1,12 +1,10 @@
 # Motivation
 
-Here at CoreDB, we’re thrilled to offer a SaaS option for Postgres users that not only elevates the developer experience, but also maintains close ties to the community. While designing the service, the need for an advanced registry for Postgres extensions became clear. To this end, we’re launching an open source home for Postgres extensions: Trunk!
+In the course of building [CoreDB](https://coredb.io)'s Managed Postgres SaaS product, we desire a registry of Postgres extensions, and a uniform interface to install them, to exist. To this end, we’re launching an open-source home for Postgres extensions: `trunk`
 
-# Trunk
+# Introducing Trunk
 
 Trunk serves as registry where users can publish, search, and download community-made Postgres extensions. Inspired by popular developer hubs, such as [crates.io](http://crates.io) (Rust), [pypi.org](http://pypi.org) (Python), and [npmjs.com](http://npmjs.com) (JavaScript), Trunk aims to foster an information-rich environment. Here, developers can be proud to showcase their contributions, and users can gain insights into valuable metrics on downloads and trends. We also aim to provide an intuitive experience, supported by tutorials and guides.
-
-We are confident Trunk will empower users and support an excellent SaaS experience. We would love for you to join us to make this project a reality!
 
 # Roadmap
 
