@@ -63,7 +63,7 @@ const InstanceCard: FC<Props> = ({
       //   href={
       //     paths.entities({ ...router.query, entity: dbName, id: String(id) }).view
       //   }>
-      href="/instances/1">
+      href={`/instances/${id}`}>
       <Card>
         {hasMenuOptions && <button className={styles.contextMenu}>more</button>}
         <Chip label={properties.status} type={statusColor} />

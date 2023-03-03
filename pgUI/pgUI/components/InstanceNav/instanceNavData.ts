@@ -13,7 +13,7 @@ interface Option {
 }
 
 const navOptions: Array<Option> = [
-  { label: 'Overview', link: '/overview˝', iconName: 'server' },
+  { label: 'Overview', link: '/overview', iconName: 'server' },
   { label: 'SQL Runner', link: '/sql-runner', iconName: 'terminal' },
   { label: 'Object Explorer', link: '/object-explorer', iconName: 'compass' },
   { label: 'Monitoring', link: '/monitoring', iconName: 'activity' },

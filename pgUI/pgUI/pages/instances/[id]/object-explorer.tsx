@@ -2,10 +2,10 @@ import React from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 
-import Header from '../../components/Header';
-import Main from '../../components/Main';
+import Header from '../../../components/Header';
+import Main from '../../../components/Main';
 
-const Instance = () => {
+const MonitoringPage = () => {
   const router = useRouter();
   const { id } = router.query;
 
@@ -13,15 +13,15 @@ const Instance = () => {
     <>
       <Head>
         <title>CoreDB</title>
-        <meta name="description" content="Welcome to CoreDB" />
+        <meta name="description" content="Object Explorer" />
         <link rel="icon" href="favicon.ico" />
       </Head>
       <Header userName="Rico Suave" />
       <Main hasLeftBar>
-        <p>Instance: {id}</p>
+        <p>Object Explorer: {id}</p>
       </Main>
     </>
   );
 };
 
-export default Instance;
+export default MonitoringPage;

@@ -10,4 +10,14 @@ module.exports = {
 
     return config;
   },
+
+  async redirects() {
+    return [
+      {
+        source: '/instances/:id',
+        destination: '/instances/:id/overview', // Matched parameters can be used in the destination
+        permanent: true,
+      },
+    ];
+  },
 };

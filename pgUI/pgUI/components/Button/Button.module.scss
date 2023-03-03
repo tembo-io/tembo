@@ -27,6 +27,10 @@
     border-radius: 50px;
 
     &:hover {
+      background-color: rgba(0, 0, 0, .1);
+    }
+
+    &.active {
       background-color: var(--primary-4);
     }
 
