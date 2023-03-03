@@ -24,7 +24,8 @@ serde_json = "1.0.91"
 serde_yaml = "0.9.17"
 tar = "0.4.38"
 thiserror = "1.0.38"
-tokio = { version = "1.26.0", features = ["rt","rt-multi-thread","macros"] }
+tokio = { version = "1.26.0", features = ["rt","rt-multi-thread","macros","sync"] }
+tokio-stream = "0.1.12"
 toml = "0.7.2"
 
 [dev-dependencies]
