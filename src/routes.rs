@@ -15,7 +15,19 @@ pub async fn running() -> impl Responder {
 #[get("/get-extensions")]
 pub async fn get_extensions(cfg: web::Data<S3Config>) -> impl Responder {
     let mut extensions: Vec<&Object> = Vec::new();
-    let list: Result<Vec<ListBucketResult>, S3Error> = s3_list(&cfg.bucket_name, &cfg.region).await;
+    let mut credentials = Credentials::default().unwrap();
+    if (cfg.aws_access_key != "") && (cfg.aws_secret_key != "") {
+        credentials = Credentials::new(
+            Some(&cfg.aws_access_key),
+            Some(&cfg.aws_secret_key),
+            None,
+            None,
+            None,
+        )
+        .unwrap();
+    }
+    let list: Result<Vec<ListBucketResult>, S3Error> =
+        s3_list(&cfg.bucket_name, &cfg.region, credentials).await;
     let ulist = list.unwrap();
     for ext in ulist[0].contents.iter() {
         extensions.push(ext);
@@ -23,10 +35,12 @@ pub async fn get_extensions(cfg: web::Data<S3Config>) -> impl Responder {
     HttpResponse::Ok().body(format!("Extensions... {:?}", extensions))
 }
 
-pub async fn s3_list(bucket_name: &str, region: &str) -> Result<Vec<ListBucketResult>, S3Error> {
+pub async fn s3_list(
+    bucket_name: &str,
+    region: &str,
+    credentials: Credentials,
+) -> Result<Vec<ListBucketResult>, S3Error> {
     let region = region.parse()?;
-    // TODO(ianstanton) Allow for reading creds from env var
-    let credentials = Credentials::default()?;
     let bucket = Bucket::new(bucket_name, region, credentials)?;
     let list = bucket.list("".to_string(), Some("".to_string())).await?;
     Ok::<Vec<ListBucketResult>, S3Error>(list)
