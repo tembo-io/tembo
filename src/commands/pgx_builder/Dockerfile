@@ -1,13 +1,14 @@
 ARG PG_VERSION=15
-ARG PGX_VERSION
+ARG PGX_VERSION=0.7.1
 
 FROM quay.io/coredb/pgx-builder:pg${PG_VERSION}-pgx${PGX_VERSION}
 
-ARG PG_VERSION=15
-ARG PGX_VERSION
-
-COPY --chown=postgres:postgres . /app
 WORKDIR /app
+
+ARG PG_VERSION=15
+ARG PGX_VERSION=0.7.1
+
+COPY --chown=postgres:postgres . .
 
 ARG EXTENSION_NAME
 ARG EXTENSION_VERSION

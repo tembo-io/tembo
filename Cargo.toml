@@ -1,6 +1,6 @@
 [package]
 name = "pg-trunk"
-version = "0.0.1-alpha.2"
+version = "0.0.1-alpha.3"
 edition = "2021"
 authors = ["Steven Miller"]
 description = "A package manager for PostgreSQL extensions"
@@ -21,6 +21,7 @@ clap = { version = "4.1.1", features = ["derive"] }
 futures-util = "0.3.26"
 hyper = "0.14.24"
 rand = "0.8.5"
+semver = "1.0.16"
 serde_json = "1.0.91"
 serde_yaml = "0.9.17"
 tar = "0.4.38"

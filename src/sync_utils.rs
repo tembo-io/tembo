@@ -80,7 +80,7 @@ impl Read for ByteStreamReceiver {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         // Serve from the buffer first
         let mut received_bytes = if !self.buffer.is_empty() {
-            std::mem::replace(&mut self.buffer, Vec::new())
+            std::mem::take(&mut self.buffer)
         } else {
             // Otherwise, read from the receiver
             match self.receiver.blocking_recv() {
@@ -90,7 +90,7 @@ impl Read for ByteStreamReceiver {
         };
         // Combine existing buffer with the received bytes
         // TODO: optimize for the first case (of serving the buffer)
-        let mut bytes = std::mem::replace(&mut self.buffer, Vec::new());
+        let mut bytes = std::mem::take(&mut self.buffer);
         bytes.append(&mut received_bytes);
 
         // Finding how much we can it into `buf`
@@ -98,7 +98,7 @@ impl Read for ByteStreamReceiver {
         let (a, b) = bytes.split_at(amt);
 
         // The remainder of the entire buffer goes back into the buffer
-        if b.len() > 0 {
+        if !b.is_empty() {
             self.buffer.extend_from_slice(b);
         }
 

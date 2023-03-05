@@ -18,11 +18,28 @@ RUN apt-get update && \
 
 USER postgres
 
+# When Rust 1.68.0 is released, use this instead of nightly
+# for enabling sparse registry, a feature required for
+# multi-stage build to work.
+#
+# ENV CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
+
 # Install Rust
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain nightly
 ENV PATH="/var/lib/postgresql/.cargo/bin:${PATH}"
 
 # Install tcdi/pgx
 ARG PGX_VERSION=0.7.1
-RUN rm -rf ~/.cargo/registry/* && cargo +nightly install -Z sparse-registry cargo-pgx --version "${PGX_VERSION}"
+RUN cargo --version && cargo install -Z sparse-registry cargo-pgx --version "${PGX_VERSION}"
 RUN cargo pgx init --pg${PG_VERSION} /usr/bin/pg_config
+
+# Pre build default pgx dependencies
+WORKDIR /install_deps
+RUN cargo pgx new install_default_deps && \
+    cd install_default_deps && \
+    cargo pgx package
+
+WORKDIR /app
+
+# working directory includes pre-built common dependencies
+RUN mv /install_deps/install_default_deps/target ./target

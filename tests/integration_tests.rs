@@ -25,15 +25,19 @@ fn install() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
-fn pgmq() -> Result<(), Box<dyn std::error::Error>> {
+fn build_extension() -> Result<(), Box<dyn std::error::Error>> {
     let mut rng = rand::thread_rng();
     let output_dir = format!("/tmp/pgmq_test_{}", rng.gen_range(0..1000000));
 
+    // Construct a path relative to the current file's directory
+    let mut extension_path = std::path::PathBuf::from(file!());
+    extension_path.pop(); // Remove the file name from the path
+    extension_path.push("test_extension");
+
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
-    // TODO replace by a hello-world pgx extension instead of assuming a local extension is present
     cmd.arg("build");
     cmd.arg("--path");
-    cmd.arg("/Users/steven/CLionProjects/coredb/extensions/pgmq");
+    cmd.arg(extension_path.as_os_str());
     cmd.arg("--output-path");
     cmd.arg(output_dir.clone());
     cmd.assert().code(0);
