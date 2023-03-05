@@ -1,36 +1,10 @@
-ARG UBUNTU_VERSION=22.04
-FROM ubuntu:${UBUNTU_VERSION}
+ARG PG_VERSION=15
+ARG PGX_VERSION
 
-ARG DEBIAN_FRONTEND=noninteractive
-ENV TZ=Etc/UTC
+FROM quay.io/coredb/pgx-builder:pg${PG_VERSION}-pgx${PGX_VERSION}
 
-# Apt-fast
-RUN apt-get update && apt-get install software-properties-common -y
-
-RUN add-apt-repository ppa:apt-fast/stable --yes
-RUN apt-get update && apt-get -y install apt-fast
-
-RUN apt-fast install apt-fast curl unzip gpg wget -y
-
-# PostgreSQL
-RUN curl https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor | tee /etc/apt/trusted.gpg.d/apt.postgresql.org.gpg > /dev/null
-RUN echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list
-
-ARG PGVERSION=15
-
-RUN apt-get update && apt-fast install -y postgresql-${PGVERSION} postgresql-server-dev-${PGVERSION} pkg-config libssl-dev build-essential libclang-dev clang
-
-USER postgres
-
-# Install Rust
-RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
-ENV PATH="/var/lib/postgresql/.cargo/bin:${PATH}"
-
-ARG PGX_VERSION=0.7.1
-
-# Install tcdi/pgx
-RUN cargo install cargo-pgx --version "${PGX_VERSION}"
-RUN cargo pgx init --pg${PGVERSION} /usr/bin/pg_config
+ARG PG_VERSION=15
+ARG PGX_VERSION
 
 COPY --chown=postgres:postgres . /app
 WORKDIR /app
@@ -41,7 +15,7 @@ ARG EXTENSION_VERSION
 RUN cargo pgx package
 
 ENV OUTPUT_DIR="/app/trunk-output"
-ENV BUILD_DIR="/app/target/release/${EXTENSION_NAME}-pg${PGVERSION}/"
+ENV BUILD_DIR="/app/target/release/${EXTENSION_NAME}-pg${PG_VERSION}/"
 RUN mkdir -p ${OUTPUT_DIR}
 
 RUN cp -r ${BUILD_DIR}$(/usr/bin/pg_config --pkglibdir)/*.so $OUTPUT_DIR && \
