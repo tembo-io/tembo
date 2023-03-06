@@ -288,7 +288,6 @@ mod test {
         println!("{}", result.stdout.clone().unwrap());
         // assert does not contain postgis
         assert!(!result.stdout.clone().unwrap().contains("postgis"));
-
     }
 
     #[tokio::test]
