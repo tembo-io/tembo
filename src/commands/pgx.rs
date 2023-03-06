@@ -242,7 +242,7 @@ pub async fn build_pgx(
 
     let mut file_stream = docker.download_from_container(&container.id, options);
 
-    let mut file = File::create(format!("{output_path}/result.tar"))?;
+    let mut file = File::create(format!("{output_path}/result.trunk.tar"))?;
     while let Some(next) = file_stream.next().await {
         match next {
             Ok(bytes) => {
