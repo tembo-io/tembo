@@ -285,6 +285,8 @@ mod test {
             .await
             .unwrap();
 
+        // give it time to drop
+        thread::sleep(Duration::from_millis(5000));
         println!("{}", result.stdout.clone().unwrap());
         // assert does not contain postgis
         assert!(!result.stdout.clone().unwrap().contains("postgis"));
