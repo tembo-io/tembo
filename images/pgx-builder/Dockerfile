@@ -33,13 +33,4 @@ ARG PGX_VERSION=0.7.1
 RUN cargo --version && cargo install -Z sparse-registry cargo-pgx --version "${PGX_VERSION}"
 RUN cargo pgx init --pg${PG_VERSION} /usr/bin/pg_config
 
-# Pre build default pgx dependencies
-WORKDIR /install_deps
-RUN cargo pgx new install_default_deps && \
-    cd install_default_deps && \
-    cargo pgx package
-
 WORKDIR /app
-
-# working directory includes pre-built common dependencies
-RUN mv /install_deps/install_default_deps/target ./target
