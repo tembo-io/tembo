@@ -17,6 +17,7 @@ on:
     branches:
       - main
       - 'release/[0-9]+.[0-9]+'
+      - operator-extensions
 
 jobs:
   lint:
