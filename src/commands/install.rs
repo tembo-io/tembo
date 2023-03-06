@@ -34,23 +34,19 @@ impl SubCommand for InstallCommand {
             println!("The file {} does not exist", self.file);
             return Ok(());
         }
-        // execute pg_config to get the environment
-        let pg_config_output = std::process::Command::new(pg_config.clone())
-            .output()
-            .expect("failed to execute pg_config");
-        println!(
-            "pg_config output: {}",
-            String::from_utf8_lossy(&pg_config_output.stdout)
-        );
-        // RUN cp -r ${BUILD_DIR}$(/usr/bin/pg_config --pkglibdir)/*.so $OUTPUT_DIR && \
-        // cp -r ${BUILD_DIR}$(/usr/bin/pg_config --sharedir)/extension/* $OUTPUT_DIR
+
         let package_lib_dir = std::process::Command::new(pg_config.clone())
             .arg("--pkglibdir")
             .output()
             .expect("failed to execute pg_config")
             .stdout;
-        let package_lib_dir = String::from_utf8_lossy(&package_lib_dir).to_string();
-        let package_lib_dir = std::path::Path::new(&package_lib_dir);
+        let package_lib_dir = String::from_utf8_lossy(&package_lib_dir)
+            .trim_end()
+            .to_string();
+        let package_lib_dir_path = std::path::PathBuf::from(&package_lib_dir);
+        dbg!(&package_lib_dir_path);
+        let package_lib_dir = std::fs::canonicalize(&package_lib_dir_path)
+            .expect("failed to find path to package lib dir");
 
         let sharedir = std::process::Command::new(pg_config.clone())
             .arg("--sharedir")
@@ -58,11 +54,26 @@ impl SubCommand for InstallCommand {
             .expect("failed to execute pg_config")
             .stdout;
 
-        let sharedir = String::from_utf8_lossy(&sharedir).to_string();
-        let sharedir = std::path::Path::new(&sharedir);
+        let sharedir = String::from_utf8_lossy(&sharedir).trim_end().to_string();
+        let sharedir_path = std::path::PathBuf::from(&sharedir);
+        dbg!(&sharedir_path);
+        let sharedir =
+            std::fs::canonicalize(sharedir_path).expect("failed to find path to share dir");
+        // if this is a symlink, then resolve the symlink
 
-        println!("Using pklibdir: {:?}", package_lib_dir);
-        println!("Using pg_config: {:?}", sharedir);
+        if !package_lib_dir.exists() && !package_lib_dir.is_dir() {
+            println!(
+                "The package lib dir {} does not exist",
+                package_lib_dir.display()
+            );
+            return Ok(());
+        }
+        if !sharedir.exists() && !sharedir.is_dir() {
+            println!("The share dir {} does not exist", sharedir.display());
+            return Ok(());
+        }
+        println!("Using pkglibdir: {:?}", package_lib_dir);
+        println!("Using sharedir: {:?}", sharedir);
         Ok(())
     }
 }
