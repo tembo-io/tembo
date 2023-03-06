@@ -25,7 +25,7 @@ pub async fn manage_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Er
                 // this will no-op if we've already created the extension
                 let result = cdb
                     .psql(
-                        format!("CREATE EXTENSION {ext_name} IF NOT EXISTS;"),
+                        format!("CREATE EXTENSION IF NOT EXISTS {ext_name};"),
                         "postgres".to_owned(),
                         client.clone(),
                     )
