@@ -275,10 +275,20 @@ mod test {
         let coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
 
         // Assert extension no longer created
+        // Assert extension 'postgis' was created
         let result = coredb_resource
-            .psql("\\dt".to_string(), "postgres".to_string(), client.clone())
+            .psql(
+                "select extname from pg_catalog.pg_extension;".to_string(),
+                "postgres".to_string(),
+                client.clone(),
+            )
             .await
             .unwrap();
+
+        println!("{}", result.stdout.clone().unwrap());
+        // assert does not contain postgis
+        assert!(!result.stdout.clone().unwrap().contains("postgis"));
+
     }
 
     #[tokio::test]
