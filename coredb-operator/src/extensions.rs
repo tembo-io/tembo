@@ -34,7 +34,6 @@ pub async fn manage_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Er
                 debug!("Result: {}", result.stdout.clone().unwrap());
             } else {
                 info!("Dropping extension: {}", ext_name);
-                // this will no-op if we've already created the extension
                 let result = cdb
                     .psql(
                         format!("DROP EXTENSION IF EXISTS {ext_name};"),
