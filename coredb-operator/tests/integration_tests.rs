@@ -118,7 +118,7 @@ mod test {
             },
             "spec": {
                 "replicas": replicas,
-                "enabledExtensions": ["postgis"]
+                "extensions": [{"name": "postgis", "enabled": true, "version": "1.1.1", "schema": "public"}]
             }
         });
         let params = PatchParams::apply("coredb-integration-test");
@@ -298,7 +298,7 @@ mod test {
             },
             "spec": {
                 "replicas": 1,
-                "enabledExtensions": ["postgis"]
+                "extensions": [{"name": "postgis", "enabled": true, "version": "1.1.1", "schema": "public"}],
             }
         });
         let params = PatchParams::apply("coredb-integration-test");
