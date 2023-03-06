@@ -255,6 +255,30 @@ mod test {
         let result_stdout = run_command_in_container(pods.clone(), test_pod_name.clone(), command).await;
         assert!(result_stdout.contains("pg_up 1"));
         println!("Found metrics when curling the metrics service");
+
+        // Assert we can drop an extension after its been created
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "replicas": replicas,
+                "extensions": [{"name": "postgis", "enabled": false, "version": "1.1.1", "schema": "public"}]
+            }
+        });
+
+        // Apply crd with extension disabled
+        let params = PatchParams::apply("coredb-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        let coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        // Assert extension no longer created
+        let result = coredb_resource
+            .psql("\\dt".to_string(), "postgres".to_string(), client.clone())
+            .await
+            .unwrap();
     }
 
     #[tokio::test]
