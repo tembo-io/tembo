@@ -66,7 +66,7 @@ pub struct CoreDBSpec {
     #[serde(default = "defaults::default_uid")]
     pub uid: i32,
     #[serde(default = "defaults::default_extensions")]
-    pub enabledExtensions: Vec<String>,
+    pub extensions: Vec<Extension>,
 }
 
 /// The status object of `CoreDB`
@@ -84,6 +84,25 @@ pub struct Context {
     pub diagnostics: Arc<RwLock<Diagnostics>>,
     /// Prometheus metrics
     pub metrics: Metrics,
+}
+
+#[derive(Clone, Debug, Deserialize, JsonSchema, Serialize, PartialEq)]
+pub struct Extension {
+    pub name: String,
+    pub version: String,
+    pub enabled: bool,
+    pub schema: String,
+}
+
+impl Default for Extension {
+    fn default() -> Self {
+        Extension {
+            name: "pg_stat_statements".to_owned(),
+            version: "1.9".to_owned(),
+            enabled: true,
+            schema: "postgres".to_owned(),
+        }
+    }
 }
 
 #[instrument(skip(ctx, cdb), fields(trace_id))]

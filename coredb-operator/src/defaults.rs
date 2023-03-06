@@ -1,6 +1,8 @@
 use k8s_openapi::{api::core::v1::ResourceRequirements, apimachinery::pkg::api::resource::Quantity};
 use std::collections::BTreeMap;
 
+use crate::Extension;
+
 pub fn default_replicas() -> i32 {
     1
 }
@@ -44,6 +46,6 @@ pub fn default_postgres_exporter_image() -> String {
     "quay.io/prometheuscommunity/postgres-exporter:v0.11.1".to_owned()
 }
 
-pub fn default_extensions() -> Vec<String> {
-    vec![]
+pub fn default_extensions() -> Vec<Extension> {
+    vec![Extension::default()]
 }
