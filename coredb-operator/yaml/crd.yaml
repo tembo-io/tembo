@@ -26,11 +26,7 @@ spec:
               This provides a hook for generating the CRD yaml (in crdgen.rs)
             properties:
               extensions:
-                default:
-                - name: pg_stat_statements
-                  version: '1.9'
-                  enabled: true
-                  schema: postgres
+                default: []
                 items:
                   properties:
                     enabled:
