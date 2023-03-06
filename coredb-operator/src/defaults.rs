@@ -47,5 +47,5 @@ pub fn default_postgres_exporter_image() -> String {
 }
 
 pub fn default_extensions() -> Vec<Extension> {
-    vec![Extension::default()]
+    vec![]
 }
