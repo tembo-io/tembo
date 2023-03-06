@@ -118,7 +118,7 @@ mod test {
             },
             "spec": {
                 "replicas": replicas,
-                "enabledExtensions": ["postgis"]
+                "extensions": [{"name": "postgis", "enabled": true, "version": "1.1.1", "schema": "public"}]
             }
         });
         let params = PatchParams::apply("coredb-integration-test");
@@ -255,6 +255,41 @@ mod test {
         let result_stdout = run_command_in_container(pods.clone(), test_pod_name.clone(), command).await;
         assert!(result_stdout.contains("pg_up 1"));
         println!("Found metrics when curling the metrics service");
+
+        // Assert we can drop an extension after its been created
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "replicas": replicas,
+                "extensions": [{"name": "postgis", "enabled": false, "version": "1.1.1", "schema": "public"}]
+            }
+        });
+
+        // Apply crd with extension disabled
+        let params = PatchParams::apply("coredb-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        let coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        // give it time to drop
+        thread::sleep(Duration::from_millis(5000));
+
+        // Assert extension no longer created
+        let result = coredb_resource
+            .psql(
+                "select extname from pg_catalog.pg_extension;".to_string(),
+                "postgres".to_string(),
+                client.clone(),
+            )
+            .await
+            .unwrap();
+
+        println!("{}", result.stdout.clone().unwrap());
+        // assert does not contain postgis
+        assert!(!result.stdout.clone().unwrap().contains("postgis"));
     }
 
     #[tokio::test]
@@ -298,7 +333,7 @@ mod test {
             },
             "spec": {
                 "replicas": 1,
-                "enabledExtensions": ["postgis"]
+                "extensions": [{"name": "postgis", "enabled": true, "version": "1.1.1", "schema": "public"}],
             }
         });
         let params = PatchParams::apply("coredb-integration-test");

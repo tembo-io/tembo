@@ -1,11 +1,11 @@
 use crate::{Context, CoreDB, Error};
 use regex::Regex;
 use std::sync::Arc;
-use tracing::debug;
+use tracing::{debug, info, warn};
 
-pub async fn create_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
+pub async fn manage_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
     let client = ctx.client.clone();
-    let extensions = &cdb.spec.enabledExtensions;
+    let extensions = &cdb.spec.extensions;
     let re = Regex::new(r"[a-zA-Z][0-9a-zA-Z_-]*$").unwrap();
 
     // TODO(ianstanton) Some extensions will fail to create. We need to handle and surface any errors.
@@ -13,20 +13,37 @@ pub async fn create_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Er
 
     // iterate through list of extensions and run CREATE EXTENSION <extension-name> for each
     for ext in extensions {
-        if !re.is_match(ext) {
-            debug!("Extension {} is not formatted properly. Skipping creation.", ext)
+        let ext_name = ext.name.as_str();
+        if !re.is_match(ext_name) {
+            warn!(
+                "Extension {} is not formatted properly. Skipping operation.",
+                ext_name
+            )
         } else {
-            debug!("Creating extension: {}", ext);
-            // this will no-op if we've already created the extension
-            let result = cdb
-                .psql(
-                    format!("CREATE EXTENSION {};", ext),
-                    "postgres".to_owned(),
-                    client.clone(),
-                )
-                .await
-                .unwrap();
-            debug!("Result: {}", result.stdout.clone().unwrap());
+            if ext.enabled {
+                info!("Creating extension: {}", ext_name);
+                // this will no-op if we've already created the extension
+                let result = cdb
+                    .psql(
+                        format!("CREATE EXTENSION IF NOT EXISTS {ext_name};"),
+                        "postgres".to_owned(),
+                        client.clone(),
+                    )
+                    .await
+                    .unwrap();
+                debug!("Result: {}", result.stdout.clone().unwrap());
+            } else {
+                info!("Dropping extension: {}", ext_name);
+                let result = cdb
+                    .psql(
+                        format!("DROP EXTENSION IF EXISTS {ext_name};"),
+                        "postgres".to_owned(),
+                        client.clone(),
+                    )
+                    .await
+                    .unwrap();
+                debug!("Result: {}", result.stdout.clone().unwrap());
+            }
         }
     }
     Ok(())
