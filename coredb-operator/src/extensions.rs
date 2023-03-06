@@ -1,7 +1,7 @@
 use crate::{Context, CoreDB, Error};
 use regex::Regex;
 use std::sync::Arc;
-use tracing::debug;
+use tracing::{debug, info, warn};
 
 pub async fn manage_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
     let client = ctx.client.clone();
@@ -15,13 +15,13 @@ pub async fn manage_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Er
     for ext in extensions {
         let ext_name = ext.name.as_str();
         if !re.is_match(ext_name) {
-            debug!(
-                "Extension {} is not formatted properly. Skipping creation.",
+            warn!(
+                "Extension {} is not formatted properly. Skipping operation.",
                 ext_name
             )
         } else {
             if ext.enabled {
-                debug!("Creating extension: {}", ext_name);
+                info!("Creating extension: {}", ext_name);
                 // this will no-op if we've already created the extension
                 let result = cdb
                     .psql(
@@ -33,7 +33,7 @@ pub async fn manage_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Er
                     .unwrap();
                 debug!("Result: {}", result.stdout.clone().unwrap());
             } else {
-                debug!("Dropping extension: {}", ext_name);
+                info!("Dropping extension: {}", ext_name);
                 // this will no-op if we've already created the extension
                 let result = cdb
                     .psql(
