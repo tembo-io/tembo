@@ -29,6 +29,7 @@ thiserror = "1.0.38"
 tokio = { version = "1.26.0", features = ["rt","rt-multi-thread","macros","sync"] }
 tokio-stream = "0.1.12"
 toml = "0.7.2"
+which = "4.4.0"
 
 [dev-dependencies]
 assert_cmd = "2.0.8"
