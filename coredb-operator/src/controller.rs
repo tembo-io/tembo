@@ -23,7 +23,7 @@ use kube::{
 };
 
 use crate::{
-    extensions::create_extensions, postgres_exporter_role::create_postgres_exporter_role,
+    extensions::manage_extensions, postgres_exporter_role::create_postgres_exporter_role,
     secret::reconcile_secret,
 };
 use k8s_openapi::{
@@ -193,7 +193,7 @@ impl CoreDB {
             return Ok(Action::requeue(Duration::from_secs(1)));
         }
 
-        create_extensions(self, ctx.clone()).await.expect(&format!(
+        manage_extensions(self, ctx.clone()).await.expect(&format!(
             "Error creating extensions on CoreDB {}",
             self.metadata.name.clone().unwrap()
         ));

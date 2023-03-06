@@ -11,7 +11,8 @@ pub use metrics::Metrics;
 
 pub mod defaults;
 mod extensions;
-#[cfg(test)] pub mod fixtures;
+#[cfg(test)]
+pub mod fixtures;
 mod postgres_exporter_role;
 mod psql;
 mod secret;
