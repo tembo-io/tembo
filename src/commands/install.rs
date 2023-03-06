@@ -55,7 +55,7 @@ impl SubCommand for InstallCommand {
             .stdout;
 
         let sharedir = String::from_utf8_lossy(&sharedir).trim_end().to_string();
-        let sharedir_path = std::path::PathBuf::from(&sharedir);
+        let sharedir_path = std::path::PathBuf::from(&sharedir).join("extension");
         dbg!(&sharedir_path);
         let sharedir =
             std::fs::canonicalize(sharedir_path).expect("failed to find path to share dir");
