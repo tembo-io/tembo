@@ -278,7 +278,6 @@ mod test {
         thread::sleep(Duration::from_millis(5000));
 
         // Assert extension no longer created
-        // Assert extension 'postgis' was created
         let result = coredb_resource
             .psql(
                 "select extname from pg_catalog.pg_extension;".to_string(),
