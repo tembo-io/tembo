@@ -274,6 +274,9 @@ mod test {
         let patch = Patch::Apply(&coredb_json);
         let coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
 
+        // give it time to drop
+        thread::sleep(Duration::from_millis(5000));
+
         // Assert extension no longer created
         // Assert extension 'postgis' was created
         let result = coredb_resource
@@ -285,8 +288,6 @@ mod test {
             .await
             .unwrap();
 
-        // give it time to drop
-        thread::sleep(Duration::from_millis(5000));
         println!("{}", result.stdout.clone().unwrap());
         // assert does not contain postgis
         assert!(!result.stdout.clone().unwrap().contains("postgis"));

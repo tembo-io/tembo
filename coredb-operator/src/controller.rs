@@ -194,7 +194,7 @@ impl CoreDB {
         }
 
         manage_extensions(self, ctx.clone()).await.expect(&format!(
-            "Error creating extensions on CoreDB {}",
+            "Error updating extensions on CoreDB {}",
             self.metadata.name.clone().unwrap()
         ));
 
