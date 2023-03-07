@@ -4,12 +4,11 @@ set -xe
 # Run this command to populate the extensions directory for a local build
 
 GIT_ROOT=$(git rev-parse --show-toplevel)
-cd ${GIT_ROOT}/postgres
+THIS_DIR="${GIT_ROOT}/postgres"
+cd $THIS_DIR
 
-cd ${GIT_ROOT}/extensions/pgmq
-/bin/bash build-extension.sh
+cargo install --version 0.0.1-alpha.3 pg-trunk
 
-cd ${GIT_ROOT}/postgres
 mkdir extensions || true
 
-cp ${GIT_ROOT}/extensions/pgmq/*.deb ./extensions/
+trunk build --path ${GIT_ROOT}/extensions/pgmq/ --output-path ${THIS_DIR}/extensions

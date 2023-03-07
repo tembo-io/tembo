@@ -38,7 +38,7 @@ RUN apt-get update && apt-get install -y \
         git \
         postgresql-server-dev-15 \
         # pg_stat_statement's package
-        postgresql-contrib \ 
+        postgresql-contrib \
         # postgresql server
         postgresql-15 \
         # extensions
@@ -47,12 +47,16 @@ RUN apt-get update && apt-get install -y \
         postgresql-15-repack \
         postgresql-15-pgaudit \
         && rm -rf /var/lib/apt/lists/*
-	
+
 COPY ./postgresql.conf /usr/share/postgresql/${PG_MAJOR}/postgresql.conf.sample
 
+# This will be 'trunk install' once that is done.
+# When 'trunk publish' and 'trunk install' from repository are done,
+# then we also do not need the COPY above or pre-build hooks,
+# we can just download and install in one RUN command.
 COPY extensions/ /extensions
-
-RUN for extension in $(ls /extensions); do dpkg -i /extensions/${extension}; done
+COPY install-extensions.sh .
+RUN /bin/bash install-extensions.sh
 
 RUN git clone https://github.com/pgpartman/pg_partman.git &&\
     cd pg_partman && \
