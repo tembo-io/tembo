@@ -32,3 +32,4 @@ We just got started, but here's what we're working on:
   [our mailing list](https://coredb.io)
 
 [Discord]: https://discord.gg/7bGYA9NPux
+
