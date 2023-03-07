@@ -1,6 +1,5 @@
 # Reconciler
 
-
 The reconciler is responsible for creating, updating, deleting database instances (custom resource) on a kubernetes cluster.
 It runs in each data plane and performs these actions based on messages written to a queue in the control plane.
 Upon connecting to this queue, it will continuously poll for new messages posted by the `cp-service` component.

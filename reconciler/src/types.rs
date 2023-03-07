@@ -9,6 +9,12 @@ pub struct CRUDevent {
     pub body: EventBody,
 }
 
+pub enum UpdateEvent {
+    ToggleExtension,
+    UpdateInfra,
+    InstallExtension,
+}
+
 #[derive(Debug, Deserialize, Serialize)]
 pub struct EventBody {
     pub resource_type: String,
@@ -16,7 +22,7 @@ pub struct EventBody {
     pub storage: Option<String>,
     pub memory: Option<String>,
     pub cpu: Option<String>,
-    pub extensions: Option<Vec<String>>,
+    pub extensions: Option<Vec<Extension>>,
 }
 
 /// message returned to control plane
@@ -38,4 +44,23 @@ pub struct State {
 pub enum Status {
     Up,
     Deleted,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
+pub struct Extension {
+    pub name: String,
+    pub version: String,
+    pub enabled: bool,
+    pub schema: String,
+}
+
+impl Default for Extension {
+    fn default() -> Self {
+        Extension {
+            name: "pg_stat_statements".to_owned(),
+            version: "1.9".to_owned(),
+            enabled: true,
+            schema: "postgres".to_owned(),
+        }
+    }
 }

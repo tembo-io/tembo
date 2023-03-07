@@ -33,7 +33,7 @@ pub async fn generate_spec(event_body: &types::EventBody) -> Value {
         },
         "spec": {
             "replicas": 1,
-            "enabledExtensions": event_body.extensions
+            "extensions": event_body.extensions,
         },
     });
     spec
