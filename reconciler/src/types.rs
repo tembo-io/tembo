@@ -1,5 +1,6 @@
 use serde::{Deserialize, Serialize};
 
+use crate::coredb_crd;
 /// incoming message from control plane
 #[derive(Debug, Deserialize, Serialize)]
 pub struct CRUDevent {
@@ -22,7 +23,7 @@ pub struct EventBody {
     pub storage: Option<String>,
     pub memory: Option<String>,
     pub cpu: Option<String>,
-    pub extensions: Option<Vec<Extension>>,
+    pub extensions: Option<Vec<coredb_crd::CoreDBExtensions>>,
 }
 
 /// message returned to control plane
@@ -44,23 +45,4 @@ pub struct State {
 pub enum Status {
     Up,
     Deleted,
-}
-
-#[derive(Clone, Debug, Deserialize, Serialize, PartialEq)]
-pub struct Extension {
-    pub name: String,
-    pub version: String,
-    pub enabled: bool,
-    pub schema: String,
-}
-
-impl Default for Extension {
-    fn default() -> Self {
-        Extension {
-            name: "pg_stat_statements".to_owned(),
-            version: "1.9".to_owned(),
-            enabled: true,
-            schema: "postgres".to_owned(),
-        }
-    }
 }
