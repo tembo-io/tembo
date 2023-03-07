@@ -2,8 +2,8 @@ use kube::{Client, ResourceExt};
 use log::{info, warn};
 use pgmq::{Message, PGMQueue};
 use reconciler::{
-    create_ing_route_tcp, create_namespace, create_or_update, delete, delete_namespace,
-    generate_spec, get_all, get_pg_conn,
+    create_ing_route_tcp, create_metrics_ingress, create_namespace, create_or_update, delete,
+    delete_namespace, generate_spec, get_all, get_pg_conn,
 };
 use std::env;
 use std::{thread, time};
@@ -69,6 +69,11 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 create_ing_route_tcp(client.clone(), namespace.clone())
                     .await
                     .expect("error creating IngressRouteTCP");
+
+                // create /metrics ingress
+                create_metrics_ingress(client.clone(), namespace.clone())
+                    .await
+                    .expect("error creating ingress for /metrics");
 
                 // generate PostgresCluster spec based on values in body
                 let spec = generate_spec(&crud_event_body).await;

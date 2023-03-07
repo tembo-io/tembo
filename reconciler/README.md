@@ -38,7 +38,7 @@ Prerequisites:
 1. Install Traefik in the cluster
    1. `helm repo add traefik https://traefik.github.io/charts`
    2. `helm repo update`
-   3. `helm install --namespace=traefik-v2 --values ./tests/traefik-values.yaml traefik traefik/traefik`
+   3. `helm install --create-namespace --namespace=traefik-v2 --values ./tests/traefik-values.yaml traefik traefik/traefik`
 
 1. Set up local postgres queue
 
@@ -48,6 +48,11 @@ Prerequisites:
    - `PG_CONN_URL`
    - `CONTROL_PLANE_EVENTS_QUEUE`
    - `DATA_PLANE_EVENTS_QUEUE`
+```
+export PG_CONN_URL=postgres://postgres:postgres@localhost:5432/postgres
+export CONTROL_PLANE_EVENTS_QUEUE=myqueue_control_plane
+export DATA_PLANE_EVENTS_QUEUE=myqueue_data_plane
+```
 
 1. Run the reconciler
 

@@ -53,7 +53,7 @@ mod test {
         });
 
         let msg_id = queue.send(&myqueue, &msg).await;
-        println!("msg_id: {:?}", msg_id);
+        println!("msg_id: {msg_id:?}");
 
         let client = kube_client().await;
 
@@ -61,17 +61,14 @@ mod test {
 
         let timeout_seconds_start_pod = 90;
 
-        let pod_name = format!("{}-0", name);
+        let pod_name = format!("{name}-0");
 
         let _check_for_pod = tokio::time::timeout(
             std::time::Duration::from_secs(timeout_seconds_start_pod),
             await_condition(pods.clone(), &pod_name, conditions::is_pod_running()),
         )
         .await
-        .expect(&format!(
-            "Did not find the pod {} to be running after waiting {} seconds",
-            pod_name, timeout_seconds_start_pod
-        ));
+        .unwrap_or_else(|_| panic!("Did not find the pod {pod_name} to be running after waiting {timeout_seconds_start_pod} seconds"));
     }
 
     async fn kube_client() -> kube::Client {
@@ -101,6 +98,6 @@ mod test {
         .await
         .expect("Custom Resource Definition for CoreDB was not found, do you need to install that before running the tests?");
 
-        return client;
+        client
     }
 }

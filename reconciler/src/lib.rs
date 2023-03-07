@@ -6,6 +6,7 @@ use base64::{engine::general_purpose, Engine as _};
 use coredb_crd::CoreDB;
 use ingress_route_tcp_crd::IngressRouteTCP;
 use k8s_openapi::api::core::v1::{Namespace, Secret};
+use k8s_openapi::api::networking::v1::Ingress;
 use kube::api::{DeleteParams, ListParams, Patch, PatchParams};
 #[allow(unused_imports)] // Remove after COR-166
 use kube::runtime::wait::{await_condition, Condition};
@@ -46,17 +47,17 @@ pub async fn create_ing_route_tcp(client: Client, name: String) -> Result<(), Er
         "apiVersion": "traefik.containo.us/v1alpha1",
         "kind": "IngressRouteTCP",
         "metadata": {
-            "name": format!("{}", name),
-            "namespace": format!("{}", name),
+            "name": format!("{name}"),
+            "namespace": format!("{name}"),
         },
         "spec": {
             "entryPoints": ["postgresql"],
             "routes": [
                 {
-                    "match": format!("HostSNI(`{}.coredb.io`) || HostSNI(`{}.coredb-development.com`)", name, name),
+                    "match": format!("HostSNI(`{name}.coredb.io`) || HostSNI(`{name}.coredb-development.com`)"),
                     "services": [
                         {
-                            "name": format!("{}", name),
+                            "name": format!("{name}"),
                             "port": 5432,
                         },
                     ],
@@ -70,6 +71,50 @@ pub async fn create_ing_route_tcp(client: Client, name: String) -> Result<(), Er
     info!("\nCreating or updating IngressRouteTCP: {}", name);
     let _o = ing_api
         .patch(&name, &params, &Patch::Apply(&ing))
+        .await
+        .map_err(Error::KubeError)?;
+    Ok(())
+}
+
+pub async fn create_metrics_ingress(client: Client, name: String) -> Result<(), Error> {
+    let ing_api: Api<Ingress> = Api::namespaced(client, &name);
+    let params = PatchParams::apply("reconciler").force();
+    let ingress = serde_json::json!({
+        "apiVersion": "networking.k8s.io/v1",
+        "kind": "Ingress",
+        "metadata": {
+            "name": format!("{name}"),
+            "namespace": format!("{name}"),
+        },
+        "spec": {
+            "ingressClassName": "traefik",
+            "rules": [
+                {
+                    "host": format!("{name}.coredb.io"),
+                    "http": {
+                        "paths": [
+                            {
+                                "path": "/metrics",
+                                "pathType": "Prefix",
+                                "backend": {
+                                    "service": {
+                                        "name": format!("{name}-metrics"),
+                                        "port": {
+                                            "number": 80,
+                                        },
+                                    },
+                                },
+                            },
+                        ],
+                    },
+                },
+            ],
+        },
+    });
+
+    info!("\nCreating or updating Ingress: {}", name);
+    let _o = ing_api
+        .patch(&name, &params, &Patch::Apply(&ingress))
         .await
         .map_err(Error::KubeError)?;
     Ok(())
@@ -118,7 +163,7 @@ pub async fn create_namespace(client: Client, name: String) -> Result<(), Error>
         "apiVersion": "v1",
         "kind": "Namespace",
         "metadata": {
-            "name": format!("{}", name),
+            "name": format!("{name}"),
         }
     });
     info!("\nCreating namespace {} if it does not exist", name);
@@ -144,7 +189,7 @@ pub async fn delete_namespace(client: Client, name: String) -> Result<(), Error>
 #[allow(unused_variables)]
 pub async fn get_pg_conn(client: Client, name: String) -> Result<String, Error> {
     // read secret <name>-connection
-    let secret_name = format!("{}-connection", name);
+    let secret_name = format!("{name}-connection");
 
     let secret_api: Api<Secret> = Api::namespaced(client, &name.clone());
 
@@ -171,8 +216,8 @@ pub async fn get_pg_conn(client: Client, name: String) -> Result<String, Error> 
     let user = b64_decode(&string_user);
     let password = b64_decode(&string_pw);
 
-    let host = format!("{}.coredb-development.com", name);
-    let connection_string = format!("postgresql://{}:{}@{}:5432", user, password, host);
+    let host = format!("{name}.coredb-development.com");
+    let connection_string = format!("postgresql://{user}:{password}@{host}:5432");
 
     Ok(connection_string)
 }
