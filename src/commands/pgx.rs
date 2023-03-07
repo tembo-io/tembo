@@ -6,28 +6,116 @@ use semver::{Version, VersionReq};
 use std::collections::HashMap;
 use std::default::Default;
 use std::fs::File;
-use std::io::Write;
-use std::path::Path;
+use std::io::Cursor;
+use std::path::{Path, PathBuf};
 use std::string::FromUtf8Error;
 use std::{fs, include_str};
 
 use futures_util::stream::StreamExt;
+use futures_util::TryFutureExt;
 
 use rand::Rng;
-use tar::Header;
+use tar::{Archive, Builder, EntryType, Header};
 use thiserror::Error;
 
 use bollard::image::BuildImageOptions;
 use bollard::Docker;
 
-use crate::sync_utils::ByteStreamSender;
+use crate::sync_utils::{ByteStreamSyncReceiver, ByteStreamSyncSender};
 use bollard::models::BuildInfo;
-use futures_util::FutureExt;
+use elf::endian::AnyEndian;
+use elf::ElfBytes;
 use hyper::Body;
+use serde::{Deserialize, Serialize};
+use tee_readwrite::TeeReader;
 use tokio::sync::mpsc;
 use tokio::task;
+use tokio::task::JoinError;
 use tokio_stream::wrappers::ReceiverStream;
 use toml::Value;
+
+/// Packaged file
+#[derive(Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "kebab-case")]
+pub enum PackagedFile {
+    ControlFile {
+        name: PathBuf,
+    },
+    SqlFile {
+        name: PathBuf,
+    },
+    SharedObject {
+        name: PathBuf,
+        architecture: Option<String>,
+    },
+    Bitcode {
+        name: PathBuf,
+    },
+    Extra {
+        name: PathBuf,
+    },
+}
+
+impl PackagedFile {
+    pub fn from<P: AsRef<Path>>(path: P) -> Self {
+        let extension = path.as_ref().extension();
+        if let Some(ext) = extension {
+            match ext.to_str() {
+                Some("control") => PackagedFile::ControlFile {
+                    name: path.as_ref().to_path_buf(),
+                },
+                Some("sql") => PackagedFile::SqlFile {
+                    name: path.as_ref().to_path_buf(),
+                },
+                Some("so") => PackagedFile::SharedObject {
+                    name: path.as_ref().to_path_buf(),
+                    architecture: None,
+                },
+                Some("bc") => PackagedFile::Bitcode {
+                    name: path.as_ref().to_path_buf(),
+                },
+                Some(_) | None => PackagedFile::Extra {
+                    name: path.as_ref().to_path_buf(),
+                },
+            }
+        } else {
+            PackagedFile::Extra {
+                name: path.as_ref().to_path_buf(),
+            }
+        }
+    }
+}
+
+/// Package manifest
+#[derive(Serialize, Deserialize)]
+pub struct Manifest {
+    #[serde(rename = "name")]
+    pub extension_name: String,
+    #[serde(rename = "version")]
+    pub extension_version: String,
+    pub sys: String,
+    pub files: Option<Vec<PackagedFile>>,
+}
+
+impl Manifest {
+    pub fn merge(&mut self, other: Self) {
+        if let Some(files) = other.files {
+            self.files.replace(files);
+        }
+    }
+
+    pub fn add_file<P: AsRef<Path> + Into<PathBuf>>(&mut self, path: P) -> &mut PackagedFile {
+        let files = match self.files {
+            None => {
+                self.files.replace(Vec::new());
+                self.files.as_mut().unwrap()
+            }
+            Some(ref mut files) => files,
+        };
+        files.push(PackagedFile::from(path));
+        files.last_mut().unwrap()
+    }
+}
 
 #[derive(Error, Debug)]
 pub enum PgxBuildError {
@@ -45,6 +133,12 @@ pub enum PgxBuildError {
 
     #[error("Cargo manifest error: {0}")]
     ManifestError(String),
+
+    #[error("Async join error: {0}")]
+    JoinError(#[from] JoinError),
+
+    #[error("Other error: {0}")]
+    OtherError(#[from] anyhow::Error),
 }
 
 fn semver_from_range(pgx_range: &str) -> Result<String, PgxBuildError> {
@@ -131,7 +225,7 @@ pub async fn build_pgx(
     println!("Building pgx extension at path {}", &path.display());
     let dockerfile = include_str!("./pgx_builder/Dockerfile");
 
-    let (receiver, sender, stream) = ByteStreamSender::new();
+    let (receiver, sender, stream) = ByteStreamSyncSender::new();
     // Making path owned so we can send it to the tarring task below without having to worry
     // about the lifetime of the reference.
     let path = path.to_owned();
@@ -240,18 +334,96 @@ pub async fn build_pgx(
 
     let options = Some(DownloadFromContainerOptions { path: output_dir });
 
-    let mut file_stream = docker.download_from_container(&container.id, options);
+    let file_stream = docker.download_from_container(&container.id, options);
 
-    let mut file = File::create(format!("{output_path}/result.trunk.tar"))?;
-    while let Some(next) = file_stream.next().await {
-        match next {
-            Ok(bytes) => {
-                file.write_all(&bytes).unwrap();
-            }
-            Err(err) => {
-                return Err(err)?;
+    let receiver = ByteStreamSyncReceiver::new();
+    let receiver_sender = receiver.sender();
+    let output_path = output_path.to_owned();
+    let extension_name = extension_name.to_owned();
+    let extension_version = extension_version.to_owned();
+    let tar_handle = task::spawn_blocking(move || {
+        let file = File::create(format!(
+            "{output_path}/{extension_name}-{extension_version}.tar.gz"
+        ))?;
+        let mut archive = Archive::new(receiver);
+        let mut new_archive = Builder::new(flate2::write::GzEncoder::new(
+            file,
+            flate2::Compression::default(),
+        ));
+        let mut manifest = Manifest {
+            extension_name,
+            extension_version,
+            sys: "linux".to_string(),
+            files: None,
+        };
+        if let Ok(entries) = archive.entries() {
+            for entry in entries {
+                if let Ok(entry) = entry {
+                    let name = entry.path()?.to_path_buf();
+                    if name.to_str() == Some("manifest.json") {
+                        manifest.merge(serde_json::from_reader(entry)?);
+                    } else {
+                        let name = name.strip_prefix("trunk-output")?;
+
+                        if !name.to_string_lossy().is_empty() {
+                            let mut header = Header::new_gnu();
+                            header.set_mode(entry.header().mode()?);
+                            header.set_mtime(entry.header().mtime()?);
+                            header.set_size(entry.size());
+                            header.set_cksum();
+                            let entry_type = entry.header().entry_type();
+
+                            let mut buf = Vec::new();
+                            let mut tee = TeeReader::new(entry, &mut buf, true);
+
+                            new_archive.append_data(&mut header, name, &mut tee)?;
+
+                            let (_entry, buf) = tee.into_inner();
+
+                            if entry_type == EntryType::file() {
+                                let file = manifest.add_file(name);
+                                match file {
+                                    PackagedFile::SharedObject {
+                                        ref mut architecture,
+                                        ..
+                                    } => {
+                                        let elf = ElfBytes::<AnyEndian>::minimal_parse(buf)?;
+                                        let target_arch = match elf.ehdr.e_machine {
+                                            elf::abi::EM_386 => "x86",
+                                            elf::abi::EM_X86_64 => "x86_64",
+                                            elf::abi::EM_AARCH64 => "aarch64",
+                                            elf::abi::EM_ARM => "aarch32",
+                                            _ => "unknown",
+                                        }
+                                        .to_string();
+                                        architecture.replace(target_arch);
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
+        let manifest = serde_json::to_string_pretty(&manifest).unwrap_or_default();
+        let mut header = Header::new_gnu();
+        header.set_size(manifest.as_bytes().len() as u64);
+        header.set_cksum();
+        new_archive.append_data(&mut header, "manifest.json", Cursor::new(manifest))?;
+        Ok::<_, anyhow::Error>(())
+    });
+
+    let result = tokio::join!(
+        receiver_sender
+            .stream_to_end(file_stream)
+            .map_err(anyhow::Error::from),
+        tar_handle.map_err(anyhow::Error::from),
+    );
+    match result {
+        (_, Err(err)) => return Err(err)?,
+        (Err(err), _) => return Err(err)?,
+        _ => {}
     }
 
     // stop the container

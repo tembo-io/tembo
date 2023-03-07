@@ -1,3 +1,6 @@
+use futures_util::stream::StreamExt;
+use futures_util::Stream;
+use std::fmt::Display;
 use std::io::{Read, Write};
 use std::{cmp, io};
 use tokio::sync::mpsc;
@@ -5,12 +8,12 @@ use tokio::sync::mpsc;
 /// Sends a byte stream in chunks to [tokio::mpsc] channel
 ///
 /// It implements [std::io::Write] so it can be used in a sync task
-pub(crate) struct ByteStreamSender {
+pub(crate) struct ByteStreamSyncSender {
     sender: mpsc::Sender<Result<Vec<u8>, io::Error>>,
     buffer: Vec<u8>,
 }
 
-impl ByteStreamSender {
+impl ByteStreamSyncSender {
     /// Creates a new ByteStream
     pub(crate) fn new() -> (
         mpsc::Receiver<Result<Vec<u8>, io::Error>>,
@@ -26,13 +29,13 @@ impl ByteStreamSender {
     }
 }
 
-impl Drop for ByteStreamSender {
+impl Drop for ByteStreamSyncSender {
     fn drop(&mut self) {
         let _ = self.flush();
     }
 }
 
-impl Write for ByteStreamSender {
+impl Write for ByteStreamSyncSender {
     fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
         self.buffer.extend_from_slice(buf);
         if self.buffer.len() > BUFFER_SIZE {
@@ -54,29 +57,72 @@ impl Write for ByteStreamSender {
 /// Receives a byte stream in chunks from [tokio::mpsc] channel
 ///
 /// It implements [std::io::Read] so it can be used in a sync task
-pub struct ByteStreamReceiver {
+pub struct ByteStreamSyncReceiver {
     receiver: mpsc::Receiver<Vec<u8>>,
+    sender: mpsc::Sender<Vec<u8>>,
     buffer: Vec<u8>,
+}
+
+/// Used to send byte stream from async to sync ([ByteStreamSyncReceiver])
+pub struct ByteStreamReceiverAsyncSender {
+    sender: mpsc::Sender<Vec<u8>>,
 }
 
 // The number is completely arbitrary at the moment
 const RECEIVER_CHANNEL_BUFFER_SIZE: usize = 24;
 
-impl ByteStreamReceiver {
+impl ByteStreamSyncReceiver {
     /// Creates a new ByteStream
-    pub fn new() -> (mpsc::Sender<Vec<u8>>, Self) {
+    pub fn new() -> Self {
         let (sender, receiver) = mpsc::channel(RECEIVER_CHANNEL_BUFFER_SIZE);
-        (
+        Self {
+            receiver,
             sender,
-            Self {
-                receiver,
-                buffer: Vec::new(),
-            },
-        )
+            buffer: Vec::new(),
+        }
+    }
+
+    /// Returns a handle that can send
+    pub fn sender(&self) -> ByteStreamReceiverAsyncSender {
+        ByteStreamReceiverAsyncSender {
+            sender: self.sender.clone(),
+        }
     }
 }
 
-impl Read for ByteStreamReceiver {
+#[derive(thiserror::Error, Debug)]
+pub enum ByteStreamReceiverSenderError<E: Display> {
+    #[error("send error: {0}")]
+    SendError(#[from] mpsc::error::SendError<Vec<u8>>),
+
+    #[error("stream error: {0}")]
+    StreamError(E),
+}
+
+impl ByteStreamReceiverAsyncSender {
+    pub async fn stream_to_end<
+        S: Unpin + Stream<Item = Result<B, E>>,
+        B: Into<Vec<u8>>,
+        E: Display,
+    >(
+        self,
+        mut stream: S,
+    ) -> Result<(), ByteStreamReceiverSenderError<E>> {
+        while let Some(next) = stream.next().await {
+            match next {
+                Ok(bytes) => {
+                    self.sender.send(bytes.into()).await?;
+                }
+                Err(err) => {
+                    return Err(ByteStreamReceiverSenderError::StreamError(err));
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+impl Read for ByteStreamSyncReceiver {
     fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
         // Serve from the buffer first
         let mut received_bytes = if !self.buffer.is_empty() {
