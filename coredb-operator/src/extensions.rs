@@ -20,29 +20,31 @@ pub async fn manage_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Er
                 ext_name
             )
         } else {
-            if ext.enabled {
-                info!("Creating extension: {}", ext_name);
-                // this will no-op if we've already created the extension
-                let result = cdb
-                    .psql(
-                        format!("CREATE EXTENSION IF NOT EXISTS {ext_name};"),
-                        "postgres".to_owned(),
-                        client.clone(),
-                    )
-                    .await
-                    .unwrap();
-                debug!("Result: {}", result.stdout.clone().unwrap());
-            } else {
-                info!("Dropping extension: {}", ext_name);
-                let result = cdb
-                    .psql(
-                        format!("DROP EXTENSION IF EXISTS {ext_name};"),
-                        "postgres".to_owned(),
-                        client.clone(),
-                    )
-                    .await
-                    .unwrap();
-                debug!("Result: {}", result.stdout.clone().unwrap());
+            for ext_loc in ext.locations.iter() {
+                if ext_loc.enabled {
+                    info!("Creating extension: {}", ext_name);
+                    // this will no-op if we've already created the extension
+                    let result = cdb
+                        .psql(
+                            format!("CREATE EXTENSION IF NOT EXISTS {ext_name};"),
+                            "postgres".to_owned(),
+                            client.clone(),
+                        )
+                        .await
+                        .unwrap();
+                    debug!("Result: {}", result.stdout.clone().unwrap());
+                } else {
+                    info!("Dropping extension: {}", ext_name);
+                    let result = cdb
+                        .psql(
+                            format!("DROP EXTENSION IF EXISTS {ext_name};"),
+                            "postgres".to_owned(),
+                            client.clone(),
+                        )
+                        .await
+                        .unwrap();
+                    debug!("Result: {}", result.stdout.clone().unwrap());
+                }
             }
         }
     }
