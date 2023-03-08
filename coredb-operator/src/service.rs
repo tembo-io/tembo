@@ -33,7 +33,7 @@ pub async fn reconcile_svc(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
         },
         spec: Some(ServiceSpec {
             ports: Some(vec![ServicePort {
-                port: cdb.spec.port.clone(),
+                port: cdb.spec.port,
                 ..ServicePort::default()
             }]),
             selector: Some(selector_labels.clone()),
