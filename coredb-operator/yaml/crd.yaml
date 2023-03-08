@@ -33,18 +33,18 @@ spec:
                       items:
                         properties:
                           database:
-                            nullable: true
+                            default: postrgres
                             type: string
                           enabled:
                             type: boolean
                           schema:
-                            nullable: true
+                            default: public
                             type: string
                           version:
+                            nullable: true
                             type: string
                         required:
                         - enabled
-                        - version
                         type: object
                       type: array
                     name:

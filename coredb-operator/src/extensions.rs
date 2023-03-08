@@ -21,11 +21,7 @@ pub async fn manage_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Er
             )
         } else {
             for ext_loc in ext.locations.iter() {
-                let database_name = ext_loc
-                    .database
-                    .as_ref()
-                    .expect("database name missing")
-                    .to_owned();
+                let database_name= ext_loc.database.to_owned();
                 if !re.is_match(&database_name) {
                     warn!(
                         "Extension.Database {}.{} is not formatted properly. Skipping operation.",
@@ -35,7 +31,7 @@ pub async fn manage_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Er
                 }
                 if ext_loc.enabled {
                     info!("Creating extension: {}, database {}", ext_name, database_name);
-                    let schema_name = ext_loc.schema.as_ref().expect("schema name missing").to_owned();
+                    let schema_name = ext_loc.schema.to_owned();
                     if !re.is_match(&schema_name) {
                         warn!(
                             "Extension.Database.Schema {}.{}.{} is not formatted properly. Skipping operation.",
