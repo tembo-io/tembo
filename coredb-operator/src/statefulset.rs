@@ -11,9 +11,8 @@ use k8s_openapi::{
     apimachinery::pkg::{api::resource::Quantity, apis::meta::v1::LabelSelector},
 };
 use kube::{
-    api::{Api, ObjectMeta, Patch, PatchParams, ResourceExt, DeleteParams},
-    Resource,
-    Client,
+    api::{Api, DeleteParams, ObjectMeta, Patch, PatchParams, ResourceExt},
+    Client, Resource,
 };
 
 use k8s_openapi::{
@@ -231,34 +230,44 @@ pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
     let sts_api: Api<StatefulSet> = Api::namespaced(client, &sts.clone().metadata.namespace.unwrap());
     // If cdb is running and storage is resized in CoreDB Custom Resource then follow steps to resize PVC
     // Reference Article: https://itnext.io/resizing-statefulset-persistent-volumes-with-zero-downtime-916ebc65b1d4
-    if cdb.status.is_some() && cdb.status.clone().unwrap().running && cdb.status.clone().unwrap().storage != cdb.spec.storage {
-	delete_sts(ctx.client.clone(), &sts).await;
-	update_pvc(ctx.client.clone(), &sts, &cdb).await;
+    if cdb.status.is_some()
+        && cdb.status.clone().unwrap().running
+        && cdb.status.clone().unwrap().storage != cdb.spec.storage
+    {
+        delete_sts(ctx.client.clone(), &sts).await;
+        update_pvc(ctx.client.clone(), &sts, &cdb).await;
     }
 
     let ps = PatchParams::apply("cntrlr").force();
     let _o = sts_api
-	.patch(&sts.clone().metadata.name.unwrap(), &ps, &Patch::Apply(&sts))
-	.await
-	.map_err(Error::KubeError)?;
+        .patch(&sts.clone().metadata.name.unwrap(), &ps, &Patch::Apply(&sts))
+        .await
+        .map_err(Error::KubeError)?;
 
     Ok(())
 }
 
-async fn delete_sts(client:Client, sts: &StatefulSet) {
+async fn delete_sts(client: Client, sts: &StatefulSet) {
     let sts_api: Api<StatefulSet> = Api::namespaced(client, &sts.clone().metadata.namespace.unwrap());
 
     let sts_name = sts.clone().metadata.name.unwrap();
 
-    let delete_params:DeleteParams = DeleteParams { dry_run: false, grace_period_seconds: None, propagation_policy: Some(kube::api::PropagationPolicy::Orphan), preconditions: None };
+    let delete_params: DeleteParams = DeleteParams {
+        dry_run: false,
+        grace_period_seconds: None,
+        propagation_policy: Some(kube::api::PropagationPolicy::Orphan),
+        preconditions: None,
+    };
 
-    let _o = sts_api.delete(&sts_name, &delete_params)
-	.await
-	.map_err(Error::KubeError);
+    let _o = sts_api
+        .delete(&sts_name, &delete_params)
+        .await
+        .map_err(Error::KubeError);
 }
 
 async fn update_pvc(client: Client, sts: &StatefulSet, cdb: &CoreDB) {
-    let pvc_api: Api<PersistentVolumeClaim> = Api::namespaced(client, &sts.clone().metadata.namespace.unwrap());
+    let pvc_api: Api<PersistentVolumeClaim> =
+        Api::namespaced(client, &sts.clone().metadata.namespace.unwrap());
 
     let sts_name = sts.clone().metadata.name.unwrap();
     let pvc_name = format!("data-{}-0", sts_name);
@@ -270,19 +279,25 @@ async fn update_pvc(client: Client, sts: &StatefulSet, cdb: &CoreDB) {
     pvc.metadata.managed_fields = None;
 
     pvc.spec = Some(PersistentVolumeClaimSpec {
-	access_modes: Some(vec!["ReadWriteOnce".to_owned()]),
-	resources: Some(ResourceRequirements {
-	    limits: None,
-	    requests: Some(pvc_requests),
-	}),
-	..PersistentVolumeClaimSpec::default()
-	});
+        access_modes: Some(vec!["ReadWriteOnce".to_owned()]),
+        resources: Some(ResourceRequirements {
+            limits: None,
+            requests: Some(pvc_requests),
+        }),
+        ..PersistentVolumeClaimSpec::default()
+    });
 
-    let patch_params:PatchParams = PatchParams { dry_run: false, force: true, field_manager: Some("cntrlr".to_string()), field_validation: None };
+    let patch_params: PatchParams = PatchParams {
+        dry_run: false,
+        force: true,
+        field_manager: Some("cntrlr".to_string()),
+        field_validation: None,
+    };
 
-    let _o = pvc_api.patch(&pvc_name, &patch_params, &Patch::Apply(pvc))
-	.await
-	.map_err(Error::KubeError);
+    let _o = pvc_api
+        .patch(&pvc_name, &patch_params, &Patch::Apply(pvc))
+        .await
+        .map_err(Error::KubeError);
 }
 
 #[cfg(test)]
