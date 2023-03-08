@@ -105,19 +105,21 @@ impl Default for Extension {
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize, PartialEq)]
 pub struct ExtensionInstallLocation {
     pub enabled: bool,
-    // no database or schema with disabled
-    pub database: Option<String>,
-    pub schema: Option<String>,
-    pub version: String,
+    // no database or schema when disabled
+    #[serde(default = "defaults::default_database")]
+    pub database: String,
+    #[serde(default = "defaults::default_schema")]
+    pub schema: String,
+    pub version: Option<String>,
 }
 
 impl Default for ExtensionInstallLocation {
     fn default() -> Self {
         ExtensionInstallLocation {
-            schema: Some("public".to_owned()),
-            database: Some("postgres".to_owned()),
+            schema: "public".to_owned(),
+            database: "postgres".to_owned(),
             enabled: true,
-            version: "1.9".to_owned(),
+            version: Some("1.9".to_owned()),
         }
     }
 }
