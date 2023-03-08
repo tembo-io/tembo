@@ -21,7 +21,7 @@ pub async fn manage_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Er
             )
         } else {
             for ext_loc in ext.locations.iter() {
-                let database_name= ext_loc.database.to_owned();
+                let database_name = ext_loc.database.to_owned();
                 if !re.is_match(&database_name) {
                     warn!(
                         "Extension.Database {}.{} is not formatted properly. Skipping operation.",
