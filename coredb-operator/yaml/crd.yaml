@@ -29,24 +29,29 @@ spec:
                 default: []
                 items:
                   properties:
-                    database:
+                    locations:
                       items:
-                        type: string
+                        properties:
+                          database:
+                            nullable: true
+                            type: string
+                          enabled:
+                            type: boolean
+                          schema:
+                            nullable: true
+                            type: string
+                          version:
+                            type: string
+                        required:
+                        - enabled
+                        - version
+                        type: object
                       type: array
-                    enabled:
-                      type: boolean
                     name:
                       type: string
-                    schema:
-                      type: string
-                    version:
-                      type: string
                   required:
-                  - database
-                  - enabled
+                  - locations
                   - name
-                  - schema
-                  - version
                   type: object
                 type: array
               image:
