@@ -89,20 +89,34 @@ pub struct Context {
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize, PartialEq)]
 pub struct Extension {
     pub name: String,
-    pub version: String,
-    pub enabled: bool,
-    pub schema: String,
-    pub database: Vec<String>,
+    pub locations: Vec<ExtensionInstallLocation>,
 }
 
 impl Default for Extension {
     fn default() -> Self {
         Extension {
             name: "pg_stat_statements".to_owned(),
-            version: "1.9".to_owned(),
-            enabled: true,
+            locations: vec![ExtensionInstallLocation::default()],
+        }
+    }
+}
+
+
+#[derive(Clone, Debug, Deserialize, JsonSchema, Serialize, PartialEq)]
+pub struct ExtensionInstallLocation {
+    pub database: String,
+    pub schema: String,
+    pub version: String,
+    pub enabled: bool,
+}
+
+impl Default for ExtensionInstallLocation {
+    fn default() -> Self {
+        ExtensionInstallLocation {
             schema: "public".to_owned(),
-            database: vec!["postgres".to_owned()],
+            database: "postgres".to_owned(),
+            enabled: true,
+            version: "1.9".to_owned(),
         }
     }
 }
