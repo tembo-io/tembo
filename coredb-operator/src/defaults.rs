@@ -49,3 +49,11 @@ pub fn default_postgres_exporter_image() -> String {
 pub fn default_extensions() -> Vec<Extension> {
     vec![]
 }
+
+pub fn default_database() -> String {
+    "postrgres".to_owned()
+}
+
+pub fn default_schema() -> String {
+    "public".to_owned()
+}

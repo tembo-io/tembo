@@ -20,29 +20,47 @@ pub async fn manage_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Er
                 ext_name
             )
         } else {
-            if ext.enabled {
-                info!("Creating extension: {}", ext_name);
-                // this will no-op if we've already created the extension
-                let result = cdb
-                    .psql(
-                        format!("CREATE EXTENSION IF NOT EXISTS {ext_name};"),
-                        "postgres".to_owned(),
-                        client.clone(),
-                    )
-                    .await
-                    .unwrap();
-                debug!("Result: {}", result.stdout.clone().unwrap());
-            } else {
-                info!("Dropping extension: {}", ext_name);
-                let result = cdb
-                    .psql(
-                        format!("DROP EXTENSION IF EXISTS {ext_name};"),
-                        "postgres".to_owned(),
-                        client.clone(),
-                    )
-                    .await
-                    .unwrap();
-                debug!("Result: {}", result.stdout.clone().unwrap());
+            for ext_loc in ext.locations.iter() {
+                let database_name = ext_loc.database.to_owned();
+                if !re.is_match(&database_name) {
+                    warn!(
+                        "Extension.Database {}.{} is not formatted properly. Skipping operation.",
+                        ext_name, database_name
+                    );
+                    continue;
+                }
+                if ext_loc.enabled {
+                    info!("Creating extension: {}, database {}", ext_name, database_name);
+                    let schema_name = ext_loc.schema.to_owned();
+                    if !re.is_match(&schema_name) {
+                        warn!(
+                            "Extension.Database.Schema {}.{}.{} is not formatted properly. Skipping operation.",
+                            ext_name, database_name, schema_name
+                        );
+                        continue;
+                    }
+                    // this will no-op if we've already created the extension
+                    let result = cdb
+                        .psql(
+                            format!("CREATE EXTENSION IF NOT EXISTS {ext_name} SCHEMA {schema_name};"),
+                            database_name,
+                            client.clone(),
+                        )
+                        .await
+                        .unwrap();
+                    debug!("Result: {}", result.stdout.clone().unwrap());
+                } else {
+                    info!("Dropping extension: {}, database {}", ext_name, database_name);
+                    let result = cdb
+                        .psql(
+                            format!("DROP EXTENSION IF EXISTS {ext_name};"),
+                            database_name,
+                            client.clone(),
+                        )
+                        .await
+                        .unwrap();
+                    debug!("Result: {}", result.stdout.clone().unwrap());
+                }
             }
         }
     }
