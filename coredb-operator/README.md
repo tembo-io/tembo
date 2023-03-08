@@ -1,10 +1,11 @@
-## CoreDB Operator
+# CoreDB Operator
 
 A Rust-based Kubernetes Controller for a [`CoreDB Resource`](https://github.com/CoreDB-io/coredb/blob/main/coredb-operator/yaml/crd.yaml) using [kube-rs](https://github.com/kube-rs/kube-rs/).
 
 The `Controller` object reconciles `CoreDB` Instances when changes to it are detected, writes to its .status object, creates associated events, and uses finalizers for guaranteed delete handling.
 
 ## Requirements
+
 - A Kubernetes cluster
 - The [CRD](yaml/crd.yaml)
 - Opentelemetry collector (**optional**)
@@ -14,44 +15,51 @@ The `Controller` object reconciles `CoreDB` Instances when changes to it are det
 Run linting with `cargo fmt` and `clippy`
 
 Clippy:
-```
+
+```bash
 rustup component add clippy
 cargo clippy
 ```
 
 cargo fmt:
-```
+
+```bash
 rustup component add rustfmt --toolchain nightly
 cargo +nightly fmt
 ```
 
 ### Testing
 
-
 #### Unit testing
 
-```
+```bash
 cargo test
 ```
 
 #### Integration testing
 
 To automatically set up a local cluster for functional testing, use this script
-```
+
+```bash
 ./scripts/reset-local-test-cluster.sh
 ```
+
 Or, you can follow the below steps.
 
 - Connect to a cluster that is safe to run the tests against
 - Set your kubecontext to any namespace, and label it to indicate it is safe to run tests against this cluster (do not do against non-test clusters)
-```
+
+```bash
 kubectl label namespace default safe-to-run-coredb-tests=true
 ```
+
 - Start or install the controller you want to test (see the following sections)
 - Run the integration tests
-```
+
+```bash
 cargo test -- --ignored
 ```
+
 - The integration tests assume you already have installed or are running the operator connected to the cluster.
 
 #### Other testing notes
@@ -59,9 +67,11 @@ cargo test -- --ignored
 - Include the `--nocapture` flag to show print statements during test runs
 
 ### Cluster
+
 As an example; install [`kind`](https://kind.sigs.k8s.io/docs/user/quick-start/#installation). Once installed, follow [these instructions](https://kind.sigs.k8s.io/docs/user/local-registry/) to create a kind cluster connected to a local image registry.
 
 ### CRD
+
 Apply the CRD from [cached file](yaml/crd.yaml), or pipe it from `crdgen` (best if changing it):
 
 ```sh
@@ -69,6 +79,7 @@ cargo run --bin crdgen | kubectl apply -f -
 ```
 
 ### OpenTelemetry (optional)
+
 Setup an OpenTelemetry Collector in your cluster. [Tempo](https://github.com/grafana/helm-charts/tree/main/charts/tempo) / [opentelemetry-operator](https://github.com/open-telemetry/opentelemetry-helm-charts/tree/main/charts/opentelemetry-operator) / [grafana agent](https://github.com/grafana/helm-charts/tree/main/charts/agent-operator) should all work out of the box. If your collector does not support grpc otlp you need to change the exporter in [`main.rs`](./src/main.rs).
 
 ## Running
@@ -81,11 +92,14 @@ cargo run
 
 - Or, you can run with auto-reloading your local changes.
 - First, install cargo-watch
-```
+
+```bash
 cargo install cargo-watch
 ```
+
 - Then, run with auto-reload
-```
+
+```bash
 cargo watch -x 'run'
 ```
 
@@ -96,17 +110,21 @@ OPENTELEMETRY_ENDPOINT_URL=https://0.0.0.0:55680 RUST_LOG=info,kube=trace,contro
 ```
 
 ### In-cluster
+
 Compile the controller with:
+
 ```sh
 just compile
 ```
 
 Build an image with:
+
 ```sh
 just build
 ```
 
 Push the image to your local registry with:
+
 ```sh
 docker push localhost:5001/controller:<tag>
 ```
@@ -121,6 +139,7 @@ kubectl port-forward service/coredb-controller 8080:80
 **NB**: namespace is assumed to be `default`. If you need a different namespace, you can replace `default` with whatever you want in the yaml and set the namespace in your current-context to get all the commands here to work.
 
 ## Usage
+
 In either of the run scenarios, your app is listening on port `8080`, and it will observe `CoreDB` events.
 
 Try some of:
@@ -134,6 +153,7 @@ kubectl edit coredb sample-coredb # change replicas
 The reconciler will run and write the status object on every change. You should see results in the logs of the pod, or on the .status object outputs of `kubectl get coredb -o yaml`.
 
 ### Webapp output
+
 The sample web server exposes some example metrics and debug information you can inspect with `curl`.
 
 ```sh
@@ -163,7 +183,6 @@ $ curl 0.0.0.0:8080/
 ```
 
 The metrics will be auto-scraped if you have a standard [`PodMonitor` for `prometheus.io/scrape`](https://github.com/prometheus-community/helm-charts/blob/b69e89e73326e8b504102a75d668dc4351fcdb78/charts/prometheus/values.yaml#L1608-L1650).
-
 
 ## Development
 
