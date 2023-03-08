@@ -29,6 +29,10 @@ spec:
                 default: []
                 items:
                   properties:
+                    database:
+                      items:
+                        type: string
+                      type: array
                     enabled:
                       type: boolean
                     name:
@@ -38,6 +42,7 @@ spec:
                     version:
                       type: string
                   required:
+                  - database
                   - enabled
                   - name
                   - schema

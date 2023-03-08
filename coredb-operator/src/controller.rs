@@ -92,6 +92,7 @@ pub struct Extension {
     pub version: String,
     pub enabled: bool,
     pub schema: String,
+    pub database: Vec<String>,
 }
 
 impl Default for Extension {
@@ -100,7 +101,8 @@ impl Default for Extension {
             name: "pg_stat_statements".to_owned(),
             version: "1.9".to_owned(),
             enabled: true,
-            schema: "postgres".to_owned(),
+            schema: "public".to_owned(),
+            database: vec!["postgres".to_owned()],
         }
     }
 }

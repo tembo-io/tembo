@@ -8,4 +8,6 @@ spec:
     - name: "pg_stat_statements"
       enabled: true
       version: "1.9"
-      schema: "postgres"
+      schema: "public"
+      database:
+        - "postgres"

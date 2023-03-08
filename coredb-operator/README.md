@@ -163,3 +163,12 @@ $ curl 0.0.0.0:8080/
 ```
 
 The metrics will be auto-scraped if you have a standard [`PodMonitor` for `prometheus.io/scrape`](https://github.com/prometheus-community/helm-charts/blob/b69e89e73326e8b504102a75d668dc4351fcdb78/charts/prometheus/values.yaml#L1608-L1650).
+
+
+## Development
+
+Updating the CRD:
+
+- Edit the [CoreDBSpec struct](./src/controller.rs) as needed.
+
+- `> cargo run --bin crdgen > yaml/crd.yaml`
