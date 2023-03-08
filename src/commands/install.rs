@@ -2,6 +2,7 @@ use super::SubCommand;
 use async_trait::async_trait;
 use clap::Args;
 use std::path::PathBuf;
+use tokio_task_manager::Task;
 
 #[derive(Args)]
 pub struct InstallCommand {
@@ -13,7 +14,7 @@ pub struct InstallCommand {
 
 #[async_trait]
 impl SubCommand for InstallCommand {
-    async fn execute(&self) -> Result<(), anyhow::Error> {
+    async fn execute(&self, _task: Task) -> Result<(), anyhow::Error> {
         let installed_pg_config = which::which("pg_config").ok();
         let pg_config = self
             .pg_config

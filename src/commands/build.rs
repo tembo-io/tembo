@@ -3,6 +3,7 @@ use crate::commands::pgx::build_pgx;
 use async_trait::async_trait;
 use clap::Args;
 use std::path::Path;
+use tokio_task_manager::Task;
 use toml::Table;
 
 #[derive(Args)]
@@ -15,7 +16,7 @@ pub struct BuildCommand {
 
 #[async_trait]
 impl SubCommand for BuildCommand {
-    async fn execute(&self) -> Result<(), anyhow::Error> {
+    async fn execute(&self, task: Task) -> Result<(), anyhow::Error> {
         println!("Building from path {}", self.path);
         let path = Path::new(&self.path);
         if path.join("Cargo.toml").exists() {
@@ -24,7 +25,7 @@ impl SubCommand for BuildCommand {
             let dependencies = cargo_toml.get("dependencies").unwrap().as_table().unwrap();
             if dependencies.contains_key("pgx") {
                 println!("Detected that we are building a pgx extension");
-                build_pgx(path, &self.output_path, cargo_toml).await?;
+                build_pgx(path, &self.output_path, cargo_toml, task).await?;
                 return Ok(());
             }
         }

@@ -31,6 +31,7 @@ use tokio::sync::mpsc;
 use tokio::task;
 use tokio::task::JoinError;
 use tokio_stream::wrappers::ReceiverStream;
+use tokio_task_manager::Task;
 use toml::Value;
 
 #[derive(Error, Debug)]
@@ -97,10 +98,48 @@ fn semver_from_range(pgx_range: &str) -> Result<String, PgxBuildError> {
     Ok(pgx_version)
 }
 
+/// Used to stop container when dropped, relies on using [tokio_task_manager::TaskManager::wait]
+/// to ensure `Drop` will run to completion
+struct ReclaimableContainer<'a> {
+    id: &'a str,
+    docker: Docker,
+    task: Task,
+}
+
+impl<'a> ReclaimableContainer<'a> {
+    #[must_use]
+    pub fn new(name: &'a str, docker: &Docker, task: Task) -> Self {
+        Self {
+            id: name,
+            docker: docker.clone(),
+            task,
+        }
+    }
+}
+
+impl<'a> Drop for ReclaimableContainer<'a> {
+    fn drop(&mut self) {
+        let docker = self.docker.clone();
+        let id = self.id.to_string();
+        let handle = tokio::runtime::Handle::current();
+        let mut task = self.task.clone();
+        handle.spawn(async move {
+            println!("Stopping {}", id);
+            docker
+                .stop_container(&id, None)
+                .await
+                .expect("error stopping container");
+            println!("Stopped {}", id);
+            task.wait().await;
+        });
+    }
+}
+
 pub async fn build_pgx(
     path: &Path,
     output_path: &str,
     cargo_toml: toml::Table,
+    task: Task,
 ) -> Result<(), PgxBuildError> {
     let cargo_package_info = cargo_toml
         .get("package")
@@ -250,6 +289,9 @@ pub async fn build_pgx(
         .start_container(&container.id, None::<StartContainerOptions<String>>)
         .await?;
 
+    // This will stop the container, whether we return an error or not
+    let _ = ReclaimableContainer::new(&container.id, &docker, task);
+
     // output_path is the locally output path
     fs::create_dir_all(output_path)?;
 
@@ -345,9 +387,6 @@ pub async fn build_pgx(
     let _ = receiver_sender.stream_to_end(file_stream).await;
     // Handle the error
     let _ = tar_handle.await??;
-
-    // stop the container
-    docker.stop_container(&container.id, None).await?;
 
     Ok(())
 }
