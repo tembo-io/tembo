@@ -351,7 +351,16 @@ mod test {
             },
             "spec": {
                 "replicas": 1,
-                "extensions": [{"name": "postgis", "enabled": true, "version": "1.1.1", "schema": "public"}],
+                "extensions": [
+                    {
+                        "name": "postgis",
+                        "locations": [{
+                            "enabled": false,
+                            "version": "1.1.1",
+                            "database": "postgres",
+                            "schema": "public"}
+                        ]
+                    }]
             }
         });
         let params = PatchParams::apply("coredb-integration-test");
