@@ -7,12 +7,11 @@ use std::collections::HashMap;
 use std::default::Default;
 use std::fs::File;
 use std::io::Cursor;
-use std::path::Path;
+use std::path::{Path, StripPrefixError};
 use std::string::FromUtf8Error;
 use std::{fs, include_str};
 
 use futures_util::stream::StreamExt;
-use futures_util::TryFutureExt;
 
 use rand::Rng;
 use tar::{Archive, Builder, EntryType, Header};
@@ -53,6 +52,15 @@ pub enum PgxBuildError {
 
     #[error("Async join error: {0}")]
     JoinError(#[from] JoinError),
+
+    #[error("Parsing ELF file error: {0}")]
+    ElfError(#[from] elf::ParseError),
+
+    #[error("Tar layout error: trunk-output not found")]
+    TarLayoutError(#[from] StripPrefixError),
+
+    #[error("JSON parsing error: {0}")]
+    JsonError(#[from] serde_json::Error),
 
     #[error("Other error: {0}")]
     OtherError(#[from] anyhow::Error),
@@ -329,20 +337,14 @@ pub async fn build_pgx(
         header.set_cksum();
         header.set_mode(0o644);
         new_archive.append_data(&mut header, "manifest.json", Cursor::new(manifest))?;
-        Ok::<_, anyhow::Error>(())
+        Ok::<_, PgxBuildError>(())
     });
 
-    let result = tokio::join!(
-        receiver_sender
-            .stream_to_end(file_stream)
-            .map_err(anyhow::Error::from),
-        tar_handle.map_err(anyhow::Error::from),
-    );
-    match result {
-        (_, Err(err)) => return Err(err)?,
-        (Err(err), _) => return Err(err)?,
-        _ => {}
-    }
+    // Wait until completion of streaming, but ignore its error as it would only error out
+    // if tar_handle errors out.
+    let _ = receiver_sender.stream_to_end(file_stream).await;
+    // Handle the error
+    let _ = tar_handle.await??;
 
     // stop the container
     docker.stop_container(&container.id, None).await?;
