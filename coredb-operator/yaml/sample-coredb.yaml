@@ -5,7 +5,9 @@ metadata:
 spec:
   replicas: 1
   extensions:
-    - name: "pg_stat_statements"
-      enabled: true
-      version: "1.9"
-      schema: "postgres"
+    - name: pg_stat_statements
+      locations: 
+        - enabled: true
+          database: postgres
+          schema: public
+          version: "1.9"
