@@ -73,6 +73,8 @@ pub struct CoreDBSpec {
 #[derive(Deserialize, Serialize, Clone, Default, Debug, JsonSchema)]
 pub struct CoreDBStatus {
     pub running: bool,
+    #[serde(default = "defaults::default_storage")]
+    pub storage: Quantity,
 }
 
 // Context for our reconciler
@@ -159,20 +161,6 @@ impl CoreDB {
         let name = self.name_any();
         let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &ns);
 
-        // always overwrite status object with what we saw
-        let new_status = Patch::Apply(json!({
-            "apiVersion": "coredb.io/v1alpha1",
-            "kind": "CoreDB",
-            "status": CoreDBStatus {
-                running: true,
-            }
-        }));
-        let ps = PatchParams::apply("cntrlr").force();
-        let _o = coredbs
-            .patch_status(&name, &ps, &new_status)
-            .await
-            .map_err(Error::KubeError)?;
-
         // reconcile secret
         reconcile_secret(self, ctx.clone())
             .await
@@ -220,6 +208,21 @@ impl CoreDB {
                 self.metadata.name.clone().unwrap()
             )
         });
+
+        // always overwrite status object with what we saw
+        let new_status = Patch::Apply(json!({
+            "apiVersion": "coredb.io/v1alpha1",
+            "kind": "CoreDB",
+            "status": CoreDBStatus {
+                running: true,
+		storage: self.spec.storage.clone()
+            }
+        }));
+        let ps = PatchParams::apply("cntrlr").force();
+        let _o = coredbs
+            .patch_status(&name, &ps, &new_status)
+            .await
+            .map_err(Error::KubeError)?;
 
         // If no events were received, check back every minute
         Ok(Action::requeue(Duration::from_secs(60)))
