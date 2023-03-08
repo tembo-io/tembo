@@ -86,10 +86,10 @@ impl PsqlCommand {
         // https://docs.rs/k8s-openapi/latest/k8s_openapi/apimachinery/pkg/apis/meta/v1/struct.Status.html
         let status = attached_process.take_status().unwrap().await.unwrap();
 
-        return Ok(PsqlOutput::new(
+        Ok(PsqlOutput::new(
             Some(result_stdout),
             Some(result_stderr),
             Some(status),
-        ));
+        ))
     }
 }

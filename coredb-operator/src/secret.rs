@@ -33,7 +33,7 @@ pub async fn reconcile_secret(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Err
     }
 
     // generate secret data
-    let data = secret_data(&cdb, &name, &ns);
+    let data = secret_data(cdb, &name, &ns);
 
     let secret: Secret = Secret {
         metadata: ObjectMeta {
@@ -88,8 +88,7 @@ fn secret_data(cdb: &CoreDB, name: &str, ns: &str) -> BTreeMap<String, ByteStrin
 
 fn b64_encode(string: &str) -> ByteString {
     let bytes_vec = string.as_bytes().to_vec();
-    let byte_string = ByteString(bytes_vec);
-    byte_string
+    ByteString(bytes_vec)
 }
 
 fn generate_password() -> String {
