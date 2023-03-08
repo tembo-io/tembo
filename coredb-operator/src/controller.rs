@@ -103,7 +103,6 @@ impl Default for Extension {
     }
 }
 
-
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize, PartialEq)]
 pub struct ExtensionInstallLocation {
     pub enabled: bool,
@@ -211,7 +210,7 @@ impl CoreDB {
             "kind": "CoreDB",
             "status": CoreDBStatus {
                 running: true,
-		storage: self.spec.storage.clone()
+        storage: self.spec.storage.clone()
             }
         }));
         let ps = PatchParams::apply("cntrlr").force();
