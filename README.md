@@ -25,3 +25,9 @@ Trunk serves as registry where users can publish, search, and download community
 `trunk install`
 
 - Download and install the extension distribution, in whichever environment trunk is run
+
+`trunk init`
+- setup your environment to build a new Postrgres extension.
+
+`trunk test`
+- facilitate the automated unit and integration testing Postgres extensions.
