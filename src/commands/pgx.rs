@@ -308,10 +308,10 @@ pub async fn build_pgx(
     let output_path = output_path.to_owned();
     let extension_name = extension_name.to_owned();
     let extension_version = extension_version.to_owned();
+    let package_path = format!("{output_path}/{extension_name}-{extension_version}.tar.gz");
+    let file = File::create(&package_path)?;
+
     let tar_handle = task::spawn_blocking(move || {
-        let file = File::create(format!(
-            "{output_path}/{extension_name}-{extension_version}.tar.gz"
-        ))?;
         let mut archive = Archive::new(receiver);
         let mut new_archive = Builder::new(flate2::write::GzEncoder::new(
             file,
@@ -387,6 +387,8 @@ pub async fn build_pgx(
     let _ = receiver_sender.stream_to_end(file_stream).await;
     // Handle the error
     let _ = tar_handle.await??;
+
+    println!("Packaged to {}", package_path);
 
     Ok(())
 }

@@ -1,7 +1,12 @@
 use super::SubCommand;
+use crate::manifest::{Manifest, PackagedFile};
 use async_trait::async_trait;
 use clap::Args;
-use std::path::PathBuf;
+use flate2::read::GzDecoder;
+use std::fs::File;
+use std::io::Seek;
+use std::path::{Path, PathBuf};
+use tar::{Archive, EntryType};
 use tokio_task_manager::Task;
 
 #[derive(Args)]
@@ -12,6 +17,24 @@ pub struct InstallCommand {
     file: Option<PathBuf>,
 }
 
+#[derive(thiserror::Error, Debug)]
+pub enum PgxInstallError {
+    #[error("unknown file type")]
+    UnknownFileType,
+
+    #[error("pg_config not found")]
+    PgConfigNotFound,
+
+    #[error("IO Error: {0}")]
+    IoError(#[from] std::io::Error),
+
+    #[error("JSON parsing error: {0}")]
+    JsonError(#[from] serde_json::Error),
+
+    #[error("Package manifest not found")]
+    ManifestNotFound,
+}
+
 #[async_trait]
 impl SubCommand for InstallCommand {
     async fn execute(&self, _task: Task) -> Result<(), anyhow::Error> {
@@ -20,18 +43,8 @@ impl SubCommand for InstallCommand {
             .pg_config
             .as_ref()
             .or_else(|| installed_pg_config.as_ref())
-            .ok_or(anyhow::Error::msg("pg_config not found"))?;
+            .ok_or(PgxInstallError::PgConfigNotFound)?;
         println!("Using pg_config: {}", pg_config.to_string_lossy());
-
-        // check if self.file is a path that exists to a file
-        if let Some(ref file) = self.file {
-            if !file.exists() {
-                return Err(anyhow::Error::msg(format!(
-                    "{} does not exist",
-                    file.display()
-                )));
-            }
-        }
 
         let package_lib_dir = std::process::Command::new(pg_config)
             .arg("--pkglibdir")
@@ -48,10 +61,13 @@ impl SubCommand for InstallCommand {
             .output()?
             .stdout;
 
-        let sharedir = String::from_utf8_lossy(&sharedir).trim_end().to_string();
-        let sharedir_path = std::path::PathBuf::from(&sharedir).join("extension");
+        let sharedir = PathBuf::from(String::from_utf8_lossy(&sharedir).trim_end().to_string());
+        let extension_dir_path = sharedir.join("extension");
 
-        let sharedir = std::fs::canonicalize(sharedir_path)?;
+        let extension_dir = std::fs::canonicalize(extension_dir_path)?;
+
+        let bitcode_dir = std::path::PathBuf::from(&sharedir).join("bitcode");
+
         // if this is a symlink, then resolve the symlink
 
         if !package_lib_dir.exists() && !package_lib_dir.is_dir() {
@@ -61,12 +77,126 @@ impl SubCommand for InstallCommand {
             );
             return Ok(());
         }
-        if !sharedir.exists() && !sharedir.is_dir() {
-            println!("The share dir {} does not exist", sharedir.display());
+        if !extension_dir.exists() && !extension_dir.is_dir() {
+            println!("Extension dir {} does not exist", extension_dir.display());
             return Ok(());
         }
         println!("Using pkglibdir: {:?}", package_lib_dir);
-        println!("Using sharedir: {:?}", sharedir);
+        println!("Using sharedir: {:?}", extension_dir);
+
+        // If file is specified
+        if let Some(ref file) = self.file {
+            let f = File::open(file)?;
+
+            let mut input = match file
+                .extension()
+                .into_iter()
+                .filter_map(|s| s.to_str())
+                .next()
+            {
+                Some("gz") => {
+                    // unzip the archive into a temporary file
+                    let decoder = GzDecoder::new(f);
+                    let mut tempfile = tempfile::tempfile()?;
+                    use read_write_pipe::*;
+                    tempfile.write_reader(decoder)?;
+                    tempfile.rewind()?;
+                    tempfile
+                }
+                Some("tar") => f,
+                _ => return Err(PgxInstallError::UnknownFileType)?,
+            };
+
+            // First pass: get to the manifest
+            // Because we're going over entries with `Seek` enabled, we're not reading everything.
+            let mut archive = Archive::new(&input);
+
+            let mut manifest: Option<Manifest> = None;
+            let entries = archive.entries_with_seek()?;
+            for entry in entries {
+                let entry = entry?;
+                let name = entry.path()?;
+                if entry.header().entry_type() == EntryType::file()
+                    && name == Path::new("manifest.json")
+                {
+                    manifest.replace(serde_json::from_reader(entry)?);
+                }
+            }
+
+            // Second pass: extraction
+            input.rewind()?;
+            let mut archive = Archive::new(&input);
+
+            if let Some(mut manifest) = manifest {
+                let manifest_files = manifest.files.take().unwrap_or_default();
+                println!(
+                    "Installing {} {}",
+                    manifest.extension_name, manifest.extension_version
+                );
+                let host_arch = if cfg!(target_arch = "aarch64") {
+                    "aarch64"
+                } else if cfg!(target_arch = "arm") {
+                    "aarch32"
+                } else if cfg!(target_arch = "x86_64") {
+                    "x86_64"
+                } else if cfg!(target = "x86") {
+                    "x86"
+                } else {
+                    "unsupported"
+                };
+
+                let entries = archive.entries_with_seek()?;
+                for entry in entries {
+                    let mut entry = entry?;
+                    let name = entry.path()?;
+                    if let Some(file) = manifest_files.get(name.as_ref()) {
+                        match file {
+                            PackagedFile::ControlFile { .. } => {
+                                println!("[+] {} => {}", name.display(), extension_dir.display());
+                                entry.unpack_in(&extension_dir)?;
+                            }
+                            PackagedFile::SqlFile { .. } => {
+                                println!("[+] {} => {}", name.display(), extension_dir.display());
+                                entry.unpack_in(&extension_dir)?;
+                            }
+                            PackagedFile::SharedObject {
+                                architecture: None, ..
+                            } => {
+                                println!(
+                                    "[+] {} (no arch) => {}",
+                                    name.display(),
+                                    package_lib_dir.display()
+                                );
+                                entry.unpack_in(&package_lib_dir)?;
+                            }
+                            PackagedFile::SharedObject {
+                                architecture: Some(ref architecture),
+                                ..
+                            } if architecture == host_arch => {
+                                println!("[+] {} => {}", name.display(), package_lib_dir.display());
+                                entry.unpack_in(&package_lib_dir)?;
+                            }
+                            PackagedFile::SharedObject {
+                                architecture: Some(ref architecture),
+                                ..
+                            } => {
+                                println!("[ ] {} (arch) skipped {}", name.display(), architecture);
+                            }
+                            PackagedFile::Bitcode { .. } => {
+                                println!("[+] {} => {}", name.display(), bitcode_dir.display());
+                                entry.unpack_in(&bitcode_dir)?;
+                            }
+                            PackagedFile::Extra { .. } => {
+                                println!("[+] {} => {}", name.display(), sharedir.display());
+                                entry.unpack_in(&sharedir)?;
+                            }
+                        }
+                    }
+                }
+            } else {
+                return Err(PgxInstallError::ManifestNotFound)?;
+            }
+        }
         Ok(())
     }
 }
