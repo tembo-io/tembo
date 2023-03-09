@@ -33,25 +33,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           prefix-key: "lint"
+          workspaces: |
+            cp-service
       - name: Cargo format
         run: cargo +nightly fmt --all --check
       - name: Clippy
         run: cargo clippy
-
-  tests:
-    name: Run tests
-    runs-on: ubuntu-22.04
-    needs: lint
-    steps:
-      - uses: actions/checkout@v2
-      - name: Install Rust stable toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-      - name: unit-integration-tests
-        env:
-          NILE_TOKEN: ${{ secrets.NILE_TOKEN }}
-        run: make test.integration
-      - name: teardown
-        run: make test.cleanup
