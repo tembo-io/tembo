@@ -223,21 +223,6 @@ impl CoreDB {
             .await
             .map_err(Error::KubeError)?;
 
-        // always overwrite status object with what we saw
-        let new_status = Patch::Apply(json!({
-            "apiVersion": "coredb.io/v1alpha1",
-            "kind": "CoreDB",
-            "status": CoreDBStatus {
-                running: true,
-        storage: self.spec.storage.clone()
-            }
-        }));
-        let ps = PatchParams::apply("cntrlr").force();
-        let _o = coredbs
-            .patch_status(&name, &ps, &new_status)
-            .await
-            .map_err(Error::KubeError)?;
-
         // If no events were received, check back every minute
         Ok(Action::requeue(Duration::from_secs(60)))
     }
