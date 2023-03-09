@@ -16,7 +16,7 @@ pub async fn running() -> impl Responder {
 pub async fn get_extensions(cfg: web::Data<S3Config>) -> impl Responder {
     let mut extensions: Vec<&Object> = Vec::new();
     let mut credentials = Credentials::default().unwrap();
-    if (cfg.aws_access_key != "") && (cfg.aws_secret_key != "") {
+    if (!cfg.aws_access_key.is_empty()) && (!cfg.aws_secret_key.is_empty()) {
         credentials = Credentials::new(
             Some(&cfg.aws_access_key),
             Some(&cfg.aws_secret_key),
