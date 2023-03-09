@@ -18,9 +18,9 @@ Trunk serves as registry where users can publish, search, and download community
 
 - this command will push compiled binaries to an open source repository
 
-`trnk.io`
+`the website (coming soon)`
 
-- trnk.io is the planned open source repository, available to all postgres extension developers
+- trunk's dedicated website will be home to the planned open source repository, available to all postgres extension developers
 
 `trunk install`
 
