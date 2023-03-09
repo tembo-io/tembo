@@ -11,7 +11,7 @@ pub struct S3Config {
 impl Default for S3Config {
     fn default() -> Self {
         Self {
-            bucket_name: from_env_default("BUCKET_NAME", "extension-registry"),
+            bucket_name: from_env_default("BUCKET_NAME", "trunk-registry"),
             region: from_env_default("REGION", "us-east-1"),
             aws_access_key: from_env_default("AWS_ACCESS_KEY_ID", ""),
             aws_secret_key: from_env_default("AWS_SECRET_ACCESS_KEY", ""),

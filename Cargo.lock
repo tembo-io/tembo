@@ -526,15 +526,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "extension-registry"
-version = "0.1.0"
-dependencies = [
- "actix-web",
- "anyhow",
- "rust-s3",
-]
-
-[[package]]
 name = "fastrand"
 version = "1.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1678,6 +1669,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "24eb03ba0eab1fd845050058ce5e616558e8f8d8fca633e6b163fe25c797213a"
 dependencies = [
  "once_cell",
+]
+
+[[package]]
+name = "trunk-registry"
+version = "0.1.0"
+dependencies = [
+ "actix-web",
+ "anyhow",
+ "rust-s3",
 ]
 
 [[package]]

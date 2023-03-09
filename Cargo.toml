@@ -1,5 +1,5 @@
 [package]
-name = "extension-registry"
+name = "trunk-registry"
 version = "0.1.0"
 edition = "2021"
 

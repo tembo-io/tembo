@@ -1,5 +1,5 @@
 use actix_web::{web, App, HttpServer};
-use extension_registry::{config, routes};
+use trunk_registry::{config, routes};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
