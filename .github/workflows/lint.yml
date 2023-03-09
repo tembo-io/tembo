@@ -33,8 +33,6 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           prefix-key: "lint"
-          workspaces: |
-            cp-service
       - name: Cargo format
         run: cargo +nightly fmt --all --check
       - name: Clippy
