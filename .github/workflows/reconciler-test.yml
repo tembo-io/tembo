@@ -18,7 +18,34 @@ on:
       - main
       - release**
 
+env:
+  COREDB_OPERATOR_VERSION: 2023.3.6
+
 jobs:
+  codegen:
+    name: codegen check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install minimal nightly with rustfmt
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          components: rustfmt
+      - name: Codegen check
+        run: |
+          cargo install kopium
+          wget https://raw.githubusercontent.com/CoreDB-io/coredb/release/${COREDB_OPERATOR_VERSION}/coredb-operator/yaml/crd.yaml
+          kopium -f crd.yaml > src/coredb_crd.rs
+          cargo fmt
+          if git diff --quiet -- src/coredb_crd.rs; then
+              echo "Codegen is up to date"
+          else
+              echo "Codegen is stale"
+              git diff src/coredb_crd.rs
+              exit 1
+          fi
   lint:
     name: Run linters
     runs-on: ubuntu-latest
@@ -94,7 +121,7 @@ jobs:
           helm install --namespace=traefik-v2 --values ./tests/traefik-values.yaml traefik traefik/traefik
 
           # Install the CoreDB operator
-          cargo install --version 2023.3.6 coredb-cli
+          cargo install --version ${COREDB_OPERATOR_VERSION} coredb-cli
           coredb-cli install
           kubectl get crds
 
