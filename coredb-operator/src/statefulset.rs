@@ -71,7 +71,7 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
             ]),
             env: postgres_env.clone(),
             security_context: Some(SecurityContext {
-                run_as_user: Some(cdb.spec.uid.clone() as i64),
+                run_as_user: Some(cdb.spec.uid as i64),
                 allow_privilege_escalation: Some(false),
                 ..SecurityContext::default()
             }),
@@ -130,14 +130,14 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
 
     let sts: StatefulSet = StatefulSet {
         metadata: ObjectMeta {
-            name: Some(name.to_owned()),
-            namespace: Some(ns.to_owned()),
+            name: Some(name),
+            namespace: Some(ns),
             labels: Some(labels.clone()),
             owner_references: Some(vec![oref]),
             ..ObjectMeta::default()
         },
         spec: Some(StatefulSetSpec {
-            replicas: Some(cdb.spec.replicas.clone()),
+            replicas: Some(cdb.spec.replicas),
             selector: LabelSelector {
                 match_expressions: None,
                 match_labels: Some(labels.clone()),
@@ -146,10 +146,10 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
                 spec: Some(PodSpec {
                     containers,
                     init_containers: Option::from(vec![Container {
-                        env: postgres_env.clone(),
+                        env: postgres_env,
                         name: "pg-directory-init".to_string(),
                         image: Some(cdb.spec.image.clone()),
-                        volume_mounts: postgres_volume_mounts.clone(),
+                        volume_mounts: postgres_volume_mounts,
                         security_context: Some(SecurityContext {
                             // Run the init container as root
                             run_as_user: Some(0),
@@ -219,7 +219,7 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
         }),
         ..StatefulSet::default()
     };
-    return sts;
+    sts
 }
 
 pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
@@ -235,7 +235,7 @@ pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
         && cdb.status.clone().unwrap().storage != cdb.spec.storage
     {
         delete_sts(ctx.client.clone(), &sts).await;
-        update_pvc(ctx.client.clone(), &sts, &cdb).await;
+        update_pvc(ctx.client.clone(), &sts, cdb).await;
     }
 
     let ps = PatchParams::apply("cntrlr").force();
@@ -270,7 +270,7 @@ async fn update_pvc(client: Client, sts: &StatefulSet, cdb: &CoreDB) {
         Api::namespaced(client, &sts.clone().metadata.namespace.unwrap());
 
     let sts_name = sts.clone().metadata.name.unwrap();
-    let pvc_name = format!("data-{}-0", sts_name);
+    let pvc_name = format!("data-{sts_name}-0");
     let mut pvc_requests: BTreeMap<String, Quantity> = BTreeMap::new();
     pvc_requests.insert("storage".to_string(), cdb.spec.storage.clone());
 

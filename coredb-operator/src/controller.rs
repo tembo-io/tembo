@@ -189,20 +189,24 @@ impl CoreDB {
 
         create_postgres_exporter_role(self, ctx.clone())
             .await
-            .expect(&format!(
-                "Error creating postgres_exporter on CoreDB {}",
-                self.metadata.name.clone().unwrap()
-            ));
+            .unwrap_or_else(|_| {
+                panic!(
+                    "Error creating postgres_exporter on CoreDB {}",
+                    self.metadata.name.clone().unwrap()
+                )
+            });
 
         if !is_pod_ready().matches_object(Some(&primary_pod)) {
             debug!("Did not find primary pod");
             return Ok(Action::requeue(Duration::from_secs(1)));
         }
 
-        manage_extensions(self, ctx.clone()).await.expect(&format!(
-            "Error updating extensions on CoreDB {}",
-            self.metadata.name.clone().unwrap()
-        ));
+        manage_extensions(self, ctx.clone()).await.unwrap_or_else(|_| {
+            panic!(
+                "Error updating extensions on CoreDB {}",
+                self.metadata.name.clone().unwrap()
+            )
+        });
 
         // always overwrite status object with what we saw
         let new_status = Patch::Apply(json!({
@@ -256,7 +260,7 @@ impl CoreDB {
         let sts = stateful_set_from_cdb(self);
         let sts_name = sts.metadata.name.unwrap();
         let sts_namespace = sts.metadata.namespace.unwrap();
-        let label_selector = format!("statefulset={}", sts_name);
+        let label_selector = format!("statefulset={sts_name}");
         let list_params = ListParams::default().labels(&label_selector);
         let pods: Api<Pod> = Api::namespaced(client, &sts_namespace);
         let pods = pods.list(&list_params);
@@ -272,7 +276,7 @@ impl CoreDB {
             })));
         }
         let primary = pod_list.items[0].clone();
-        return Ok(primary);
+        Ok(primary)
     }
 
     pub async fn psql(
@@ -329,7 +333,7 @@ pub fn is_postgres_ready() -> impl Condition<Pod> + 'static {
                 }
             }
         }
-        return false;
+        false
     }
 }
 

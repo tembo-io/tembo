@@ -37,7 +37,7 @@ mod test {
     async fn create_test_buddy(pods_api: Api<Pod>, name: String) -> String {
         // Launch a pod we can connect to if we want to
         // run commands inside the cluster.
-        let test_pod_name = format!("test-buddy-{}", name);
+        let test_pod_name = format!("test-buddy-{name}");
         let pod = Pod {
             metadata: ObjectMeta {
                 name: Some(test_pod_name.clone()),
@@ -59,7 +59,7 @@ mod test {
 
         let _pod = pods_api.create(&PostParams::default(), &pod).await.unwrap();
 
-        return test_pod_name;
+        test_pod_name
     }
 
     async fn run_command_in_container(pods_api: Api<Pod>, pod_name: String, command: Vec<String>) -> String {
@@ -82,7 +82,7 @@ mod test {
         let mut result_stdout = String::new();
         stdout_reader.read_to_string(&mut result_stdout).await.unwrap();
 
-        return result_stdout;
+        result_stdout
     }
 
     #[tokio::test]
@@ -108,7 +108,7 @@ mod test {
         let test_pod_name = create_test_buddy(pods.clone(), name.to_string()).await;
 
         // Apply a basic configuration of CoreDB
-        println!("Creating CoreDB resource {}", name);
+        println!("Creating CoreDB resource {name}");
         let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), namespace);
         let coredb_json = serde_json::json!({
             "apiVersion": API_VERSION,
@@ -136,46 +136,37 @@ mod test {
 
         // Wait for secret to be created
         let secret_api: Api<Secret> = Api::namespaced(client.clone(), namespace);
-        let secret_name = format!("{}-connection", name);
-        println!("Waiting for secret to be created: {}", secret_name);
+        let secret_name = format!("{name}-connection");
+        println!("Waiting for secret to be created: {secret_name}");
         let establish = await_condition(secret_api.clone(), &secret_name, wait_for_secret());
         let _ = tokio::time::timeout(Duration::from_secs(timeout_seconds_secret_present), establish)
             .await
-            .expect(&format!(
-                "Did not find the secret {} present after waiting {} seconds",
-                secret_name, timeout_seconds_secret_present
-            ));
-        println!("Found secret: {}", secret_name);
+            .unwrap_or_else(|_| panic!("Did not find the secret {secret_name} present after waiting {timeout_seconds_secret_present} seconds"));
+        println!("Found secret: {secret_name}");
 
         // Wait for Pod to be created
-        let pod_name = format!("{}-0", name);
+        let pod_name = format!("{name}-0");
 
-        println!("Waiting for pod to be running: {}", pod_name);
+        println!("Waiting for pod to be running: {pod_name}");
         let _check_for_pod = tokio::time::timeout(
             Duration::from_secs(timeout_seconds_start_pod),
             await_condition(pods.clone(), &pod_name, conditions::is_pod_running()),
         )
         .await
-        .expect(&format!(
-            "Did not find the pod {} to be running after waiting {} seconds",
-            pod_name, timeout_seconds_start_pod
-        ));
-        println!("Waiting for pod to be ready: {}", pod_name);
+        .unwrap_or_else(|_| panic!("Did not find the pod {pod_name} to be running after waiting {timeout_seconds_start_pod} seconds"));
+        println!("Waiting for pod to be ready: {pod_name}");
         let _check_for_pod_ready = tokio::time::timeout(
             Duration::from_secs(timeout_seconds_pod_ready),
             await_condition(pods.clone(), &pod_name, is_pod_ready()),
         )
         .await
-        .expect(&format!(
-            "Did not find the pod {} to be ready after waiting {} seconds",
-            pod_name, timeout_seconds_pod_ready
-        ));
-        println!("Found pod ready: {}", pod_name);
+        .unwrap_or_else(|_| panic!("Did not find the pod {pod_name} to be ready after waiting {timeout_seconds_pod_ready} seconds"));
+        println!("Found pod ready: {pod_name}");
 
         // Assert default storage values are applied to PVC
         let pvc_api: Api<PersistentVolumeClaim> = Api::namespaced(client.clone(), namespace);
         let default_storage: Quantity = default_storage();
-        let pvc = pvc_api.get(&*format!("data-{}", pod_name)).await.unwrap();
+        let pvc = pvc_api.get(&format!("data-{pod_name}")).await.unwrap();
         let storage = pvc.spec.unwrap().resources.unwrap().requests.unwrap();
         let s = storage.get("storage").unwrap().to_owned();
         assert_eq!(default_storage, s);
@@ -256,7 +247,7 @@ mod test {
         assert!(result.stdout.clone().unwrap().contains("postgres_exporter"));
 
         // Assert we can curl the metrics from the service
-        let metrics_service_name = format!("{}-metrics", name);
+        let metrics_service_name = format!("{name}-metrics");
         let command = vec![
             String::from("curl"),
             format!("http://{metrics_service_name}/metrics"),
@@ -307,7 +298,7 @@ mod test {
 
         println!("{}", result.stdout.clone().unwrap());
         // assert does not contain postgis
-        assert!(!result.stdout.clone().unwrap().contains("postgis"));
+        assert!(!result.stdout.unwrap().contains("postgis"));
     }
 
     #[tokio::test]
@@ -326,11 +317,11 @@ mod test {
             "apiVersion": "v1",
             "kind": "Namespace",
             "metadata": {
-                "name": format!("{}", namespace),
+                "name": format!("{namespace}"),
             }
         });
         ns_api
-            .patch(&namespace, &params, &Patch::Apply(&ns))
+            .patch(namespace, &params, &Patch::Apply(&ns))
             .await
             .unwrap();
 
@@ -341,7 +332,7 @@ mod test {
         let timeout_seconds_coredb_deleted = 30;
 
         // Create coredb
-        println!("Creating CoreDB resource {}", name);
+        println!("Creating CoreDB resource {name}");
         let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), namespace);
         let coredb_json = serde_json::json!({
             "apiVersion": API_VERSION,
@@ -368,32 +359,26 @@ mod test {
         coredbs.patch(name, &params, &patch).await.unwrap();
 
         // Assert coredb is running
-        let pod_name = format!("{}-0", name);
+        let pod_name = format!("{name}-0");
         let pods: Api<Pod> = Api::namespaced(client.clone(), namespace);
-        println!("Waiting for pod to be running: {}", pod_name);
+        println!("Waiting for pod to be running: {pod_name}");
         let _check_for_pod = tokio::time::timeout(
             Duration::from_secs(timeout_seconds_start_pod),
             await_condition(pods.clone(), &pod_name, conditions::is_pod_running()),
         )
         .await
-        .expect(&format!(
-            "Did not find the pod {} to be running after waiting {} seconds",
-            pod_name, timeout_seconds_start_pod
-        ));
-        println!("Waiting for pod to be ready: {}", pod_name);
+        .unwrap_or_else(|_| panic!("Did not find the pod {pod_name} to be running after waiting {timeout_seconds_start_pod} seconds"));
+        println!("Waiting for pod to be ready: {pod_name}");
         let _check_for_pod_ready = tokio::time::timeout(
             Duration::from_secs(timeout_seconds_pod_ready),
             await_condition(pods.clone(), &pod_name, is_pod_ready()),
         )
         .await
-        .expect(&format!(
-            "Did not find the pod {} to be ready after waiting {} seconds",
-            pod_name, timeout_seconds_pod_ready
-        ));
-        println!("Found pod ready: {}", pod_name);
+        .unwrap_or_else(|_| panic!("Did not find the pod {pod_name} to be ready after waiting {timeout_seconds_pod_ready} seconds"));
+        println!("Found pod ready: {pod_name}");
 
         // Delete namespace
-        ns_api.delete(&namespace, &Default::default()).await.unwrap();
+        ns_api.delete(namespace, &Default::default()).await.unwrap();
 
         // Assert coredb has been deleted
         // TODO(ianstanton) This doesn't assert the object is gone for good. Tried implementing something
@@ -401,30 +386,27 @@ mod test {
         println!("Waiting for CoreDB to be deleted: {}", &name);
         let _assert_coredb_deleted = tokio::time::timeout(
             Duration::from_secs(timeout_seconds_coredb_deleted),
-            await_condition(coredbs.clone(), &name, conditions::is_deleted("")),
+            await_condition(coredbs.clone(), name, conditions::is_deleted("")),
         )
         .await
-        .expect(&format!(
-            "CoreDB {} was not deleted after waiting {} seconds",
-            name, timeout_seconds_coredb_deleted
-        ));
+        .unwrap_or_else(|_| {
+            panic!("CoreDB {name} was not deleted after waiting {timeout_seconds_coredb_deleted} seconds")
+        });
 
         // Assert namespace has been deleted
         println!("Waiting for namespace to be deleted: {}", &namespace);
-        let _assert_ns_deleted =
-            tokio::time::timeout(Duration::from_secs(timeout_seconds_ns_deleted), async move {
-                loop {
-                    let get_ns = ns_api.get_opt(&namespace).await.unwrap();
-                    if get_ns == None {
-                        break;
-                    }
+        tokio::time::timeout(Duration::from_secs(timeout_seconds_ns_deleted), async move {
+            loop {
+                let get_ns = ns_api.get_opt(namespace).await.unwrap();
+                if get_ns.is_none() {
+                    break;
                 }
-            })
-            .await
-            .expect(&format!(
-                "Namespace {} was not deleted after waiting {} seconds",
-                namespace, timeout_seconds_ns_deleted
-            ));
+            }
+        })
+        .await
+        .unwrap_or_else(|_| {
+            panic!("Namespace {namespace} was not deleted after waiting {timeout_seconds_ns_deleted} seconds")
+        });
     }
 
     async fn kube_client() -> Client {
@@ -442,7 +424,7 @@ mod test {
 
         // List the namespaces with the specified labels
         let namespaces: Api<Namespace> = Api::all(client.clone());
-        let namespace = namespaces.get(&selected_namespace).await.unwrap();
+        let namespace = namespaces.get(selected_namespace).await.unwrap();
         let labels = namespace.metadata.labels.unwrap();
         assert!(
             labels.contains_key("safe-to-run-coredb-tests"),
@@ -467,7 +449,7 @@ mod test {
         .await
         .expect("Custom Resource Definition for CoreDB was not found.");
 
-        return client;
+        client
     }
 
     fn wait_for_secret() -> impl Condition<Secret> {

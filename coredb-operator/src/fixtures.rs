@@ -72,7 +72,7 @@ impl ApiServerVerifier {
 
     pub fn handle_coredb_patch(self, coredb_: &CoreDB) -> JoinHandle<()> {
         let handle = self.0;
-        let coredb = coredb_.clone();
+        let _coredb = coredb_.clone();
         tokio::spawn(async move {
             pin_mut!(handle);
 
