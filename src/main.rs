@@ -7,7 +7,7 @@ async fn main() -> std::io::Result<()> {
     let cfg = config::S3Config::default();
     HttpServer::new(move || {
         App::new()
-            .app_data(web::Data::new(cfg.clone()))
+            .app_data(web::Dataa::new(cfg.clone()))
             .service(routes::running)
             .service(routes::get_extensions)
     })
