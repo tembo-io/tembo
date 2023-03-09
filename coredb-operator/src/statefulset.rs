@@ -235,7 +235,7 @@ pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
         && cdb.status.clone().unwrap().storage != cdb.spec.storage
     {
         delete_sts(ctx.client.clone(), &sts).await;
-        update_pvc(ctx.client.clone(), &sts, &cdb).await;
+        update_pvc(ctx.client.clone(), &sts, cdb).await;
     }
 
     let ps = PatchParams::apply("cntrlr").force();
