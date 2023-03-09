@@ -1,2 +1,2 @@
 # extension-registry
-Name TBD
+The community's registry for Postgres extensions.
