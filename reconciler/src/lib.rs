@@ -1,4 +1,4 @@
-mod coredb_crd;
+pub mod coredb_crd;
 mod ingress_route_tcp_crd;
 pub mod types;
 
@@ -25,23 +25,20 @@ pub enum Error {
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 
-pub async fn generate_spec(event_body: &types::EventBody) -> Value {
+pub async fn generate_spec(namespace: &str, spec: &coredb_crd::CoreDBSpec) -> Value {
     let spec = serde_json::json!({
         "apiVersion": "coredb.io/v1alpha1",
         "kind": "CoreDB",
         "metadata": {
-            "name": format!("{}", event_body.resource_name),
+            "name": namespace,
         },
-        "spec": {
-            "replicas": 1,
-            "extensions": event_body.extensions,
-        },
+        "spec": spec,
     });
     spec
 }
 
-pub async fn create_ing_route_tcp(client: Client, name: String) -> Result<(), Error> {
-    let ing_api: Api<IngressRouteTCP> = Api::namespaced(client, &name);
+pub async fn create_ing_route_tcp(client: Client, name: &str) -> Result<(), Error> {
+    let ing_api: Api<IngressRouteTCP> = Api::namespaced(client, name);
     let params = PatchParams::apply("reconciler").force();
     let ing = serde_json::json!({
         "apiVersion": "traefik.containo.us/v1alpha1",
@@ -70,14 +67,14 @@ pub async fn create_ing_route_tcp(client: Client, name: String) -> Result<(), Er
     });
     info!("\nCreating or updating IngressRouteTCP: {}", name);
     let _o = ing_api
-        .patch(&name, &params, &Patch::Apply(&ing))
+        .patch(name, &params, &Patch::Apply(&ing))
         .await
         .map_err(Error::KubeError)?;
     Ok(())
 }
 
-pub async fn create_metrics_ingress(client: Client, name: String) -> Result<(), Error> {
-    let ing_api: Api<Ingress> = Api::namespaced(client, &name);
+pub async fn create_metrics_ingress(client: Client, name: &str) -> Result<(), Error> {
+    let ing_api: Api<Ingress> = Api::namespaced(client, name);
     let params = PatchParams::apply("reconciler").force();
     let ingress = serde_json::json!({
         "apiVersion": "networking.k8s.io/v1",
@@ -114,7 +111,7 @@ pub async fn create_metrics_ingress(client: Client, name: String) -> Result<(), 
 
     info!("\nCreating or updating Ingress: {}", name);
     let _o = ing_api
-        .patch(&name, &params, &Patch::Apply(&ingress))
+        .patch(name, &params, &Patch::Apply(&ingress))
         .await
         .map_err(Error::KubeError)?;
     Ok(())
@@ -131,32 +128,32 @@ pub async fn get_all(client: Client, namespace: String) -> Vec<CoreDB> {
 
 pub async fn create_or_update(
     client: Client,
-    namespace: String,
+    namespace: &str,
     deployment: serde_json::Value,
 ) -> Result<(), Error> {
-    let pg_cluster_api: Api<CoreDB> = Api::namespaced(client, &namespace);
+    let pg_cluster_api: Api<CoreDB> = Api::namespaced(client, namespace);
     let params = PatchParams::apply("reconciler").force();
     let name: String = serde_json::from_value(deployment["metadata"]["name"].clone()).unwrap();
     info!("\nCreating or updating CoreDB: {}", name);
-    let _o = pg_cluster_api
+    let _ = pg_cluster_api
         .patch(&name, &params, &Patch::Apply(&deployment))
         .await
         .map_err(Error::KubeError)?;
     Ok(())
 }
 
-pub async fn delete(client: Client, namespace: String, name: String) -> Result<(), Error> {
-    let pg_cluster_api: Api<CoreDB> = Api::namespaced(client, &namespace);
+pub async fn delete(client: Client, namespace: &str, name: &str) -> Result<(), Error> {
+    let pg_cluster_api: Api<CoreDB> = Api::namespaced(client, namespace);
     let params = DeleteParams::default();
     info!("\nDeleting CoreDB: {}", name);
     let _o = pg_cluster_api
-        .delete(&name, &params)
+        .delete(name, &params)
         .await
         .map_err(Error::KubeError);
     Ok(())
 }
 
-pub async fn create_namespace(client: Client, name: String) -> Result<(), Error> {
+pub async fn create_namespace(client: Client, name: &str) -> Result<(), Error> {
     let ns_api: Api<Namespace> = Api::all(client);
     let params = PatchParams::apply("reconciler").force();
     let ns = serde_json::json!({
@@ -168,30 +165,27 @@ pub async fn create_namespace(client: Client, name: String) -> Result<(), Error>
     });
     info!("\nCreating namespace {} if it does not exist", name);
     let _o = ns_api
-        .patch(&name, &params, &Patch::Apply(&ns))
+        .patch(name, &params, &Patch::Apply(&ns))
         .await
         .map_err(Error::KubeError)?;
     Ok(())
 }
 
-pub async fn delete_namespace(client: Client, name: String) -> Result<(), Error> {
+pub async fn delete_namespace(client: Client, name: &str) -> Result<(), Error> {
     let ns_api: Api<Namespace> = Api::all(client);
     let params = DeleteParams::default();
     info!("\nDeleting namespace: {}", name);
-    let _o = ns_api
-        .delete(&name, &params)
-        .await
-        .map_err(Error::KubeError);
+    let _ = ns_api.delete(name, &params).await.map_err(Error::KubeError);
     Ok(())
 }
 
 // remove after COR-166
 #[allow(unused_variables)]
-pub async fn get_pg_conn(client: Client, name: String) -> Result<String, Error> {
+pub async fn get_pg_conn(client: Client, name: &str) -> Result<String, Error> {
     // read secret <name>-connection
     let secret_name = format!("{name}-connection");
 
-    let secret_api: Api<Secret> = Api::namespaced(client, &name.clone());
+    let secret_api: Api<Secret> = Api::namespaced(client, name);
 
     // wait for secret to exist
     let establish = await_condition(secret_api.clone(), &secret_name, wait_for_secret());

@@ -22,6 +22,8 @@ mod test {
     };
     use pgmq::PGMQueue;
     use rand::Rng;
+    use reconciler::{coredb_crd as crd, types};
+    use std::collections::BTreeMap;
 
     #[tokio::test]
     #[ignore]
@@ -38,19 +40,40 @@ mod test {
         let name = &format!("test-coredb-{}", rng.gen_range(0..100000));
         let namespace = name.clone();
 
-        let msg = serde_json::json!({
-        "body": {
-           "cpu": "100m",
-           "mem": "500Mi",
-           "storage": "1Gi",
-           "resource_name": name,
-           "resource_type": "CoreDB",
-           "extensions": [{"name": "postgis", "enabled": true, "version": "1.1.1", "schema": "public"}],
-        },
-        "data_plane_id": "org_02s3owPQskuGXHE8vYsGSY",
-        "event_id": "coredb-poc1.org_02s3owPQskuGXHE8vYsGSY.CoreDB.inst_02s4UKVbRy34SAYVSwZq2H",
-        "message_type": "Create"
-        });
+        let limits: BTreeMap<String, String> = BTreeMap::from([
+            ("cpu".to_owned(), "100m".to_string()),
+            ("memory".to_owned(), "500Mi".to_string()),
+        ]);
+
+        // reconciler receives a CRUDevent from control plane
+        let msg = types::CRUDevent {
+            data_plane_id: "org_02s3owPQskuGXHE8vYsGSY".to_owned(),
+            event_id: format!(
+                "{name}.org_02s3owPQskuGXHE8vYsGSY.CoreDB.inst_02s4UKVbRy34SAYVSwZq2H",
+                name = name
+            ),
+            event_type: types::Event::Create,
+            dbname: name.clone(),
+            spec: crd::CoreDBSpec {
+                image: None,
+                postgres_exporter_enabled: None,
+                postgres_exporter_image: None,
+                extensions: Some(vec![crd::CoreDBExtensions {
+                    name: "postgis".to_owned(),
+                    enabled: true,
+                    version: "1.1.1".to_owned(),
+                    schema: "public".to_owned(),
+                }]),
+                storage: Some("1Gi".to_owned()),
+                port: None,
+                replicas: Some(1),
+                resources: Some(crd::CoreDBResources {
+                    limits: Some(limits),
+                    requests: None,
+                }),
+                uid: None,
+            },
+        };
 
         let msg_id = queue.send(&myqueue, &msg).await;
         println!("msg_id: {msg_id:?}");

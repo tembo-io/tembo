@@ -1,14 +1,14 @@
 use kube::{Client, ResourceExt};
 use log::{info, warn};
 use pgmq::{Message, PGMQueue};
+use reconciler::types;
 use reconciler::{
     create_ing_route_tcp, create_metrics_ingress, create_namespace, create_or_update, delete,
     delete_namespace, generate_spec, get_all, get_pg_conn,
 };
 use std::env;
 use std::{thread, time};
-
-use reconciler::types;
+use types::{CRUDevent, Event};
 
 #[tokio::main]
 async fn run() -> Result<(), Box<dyn std::error::Error>> {
@@ -31,10 +31,11 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
 
     loop {
         // Read from queue (check for new message)
-        let read_msg: Message = match queue
-            .read(&control_plane_events_queue, Some(&30_i32))
-            .await?
-        {
+        // messages that dont fit a CRUDevent will error
+        let read_msg = queue
+            .read::<CRUDevent>(&control_plane_events_queue, Some(&30_i32))
+            .await?;
+        let read_msg: Message<CRUDevent> = match read_msg {
             Some(message) => {
                 info!("read_msg: {:?}", message);
                 message
@@ -44,89 +45,90 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 continue;
             }
         };
-        let data_plane_id: String =
-            serde_json::from_value(read_msg.message["data_plane_id"].clone()).unwrap();
-        let event_id: String =
-            serde_json::from_value(read_msg.message["event_id"].clone()).unwrap();
+
+        // TODO: recycld messages should get archived, logged, alerted
+        // if read_msg.read_ct >=2 {
+        //     warn!("recycled message: {:?}", read_msg);
+        //     queue.archive(queue_name, &read_msg.msg_id).await?;
+        //     continue;
+        // }
 
         // Based on message_type in message, create, update, delete PostgresCluster
-        match serde_json::from_str(&read_msg.message["message_type"].to_string()).unwrap() {
-            Some("SnapShot") => {
-                info!("Doing nothing for now")
-            }
-            Some("Create") | Some("Update") => {
-                let crud_event_body =
-                    serde_json::from_value::<types::EventBody>(read_msg.message["body"].clone())
-                        .expect("error parsing body");
-                // create namespace if it does not exist
-                let namespace: String = crud_event_body.resource_name.clone();
-
-                create_namespace(client.clone(), namespace.clone())
+        match read_msg.message.event_type {
+            Event::Create | Event::Update => {
+                info!("Doing nothing for now");
+                create_namespace(client.clone(), &read_msg.message.dbname)
                     .await
                     .expect("error creating namespace");
 
                 // create IngressRouteTCP
-                create_ing_route_tcp(client.clone(), namespace.clone())
+                create_ing_route_tcp(client.clone(), &read_msg.message.dbname)
                     .await
                     .expect("error creating IngressRouteTCP");
 
                 // create /metrics ingress
-                create_metrics_ingress(client.clone(), namespace.clone())
+                create_metrics_ingress(client.clone(), &read_msg.message.dbname)
                     .await
                     .expect("error creating ingress for /metrics");
 
                 // generate PostgresCluster spec based on values in body
-                let spec = generate_spec(&crud_event_body).await;
+                let spec = generate_spec(&read_msg.message.dbname, &read_msg.message.spec).await;
 
                 // create or update PostgresCluster
-                create_or_update(client.clone(), namespace.clone(), spec)
+                create_or_update(client.clone(), &read_msg.message.dbname, spec)
                     .await
                     .expect("error creating or updating PostgresCluster");
                 // get connection string values from secret
-                let connection_string = get_pg_conn(client.clone(), namespace.clone())
+                let connection_string = get_pg_conn(client.clone(), &read_msg.message.dbname)
                     .await
                     .expect("error getting secret");
 
-                // report state
+                let report_event = match read_msg.message.event_type {
+                    Event::Create => Event::Created,
+                    Event::Update => Event::Updated,
+                    _ => unreachable!(),
+                };
                 let msg = types::StateToControlPlane {
-                    data_plane_id,
-                    event_id,
-                    state: types::State {
-                        connection: Some(connection_string),
-                        status: types::Status::Up,
-                    },
+                    data_plane_id: read_msg.message.data_plane_id,
+                    event_id: read_msg.message.event_id,
+                    event_type: report_event,
+                    spec: Some(read_msg.message.spec.clone()),
+                    connection: Some(connection_string),
                 };
                 let msg_id = queue.send(&data_plane_events_queue, &msg).await?;
                 info!("msg_id: {:?}", msg_id);
             }
-            Some("Delete") => {
-                let name: String =
-                    serde_json::from_value(read_msg.message["body"]["resource_name"].clone())
-                        .unwrap();
-
+            Event::Delete => {
+                info!("Doing nothing for now");
                 // delete PostgresCluster
-                delete(client.clone(), name.clone(), name.clone())
-                    .await
-                    .expect("error deleting PostgresCluster");
+                delete(
+                    client.clone(),
+                    &read_msg.message.dbname,
+                    &read_msg.message.dbname,
+                )
+                .await
+                .expect("error deleting PostgresCluster");
 
                 // delete namespace
-                delete_namespace(client.clone(), name.clone())
+                delete_namespace(client.clone(), &read_msg.message.dbname)
                     .await
                     .expect("error deleting namespace");
 
                 // report state
                 let msg = types::StateToControlPlane {
-                    data_plane_id,
-                    event_id,
-                    state: types::State {
-                        connection: None,
-                        status: types::Status::Deleted,
-                    },
+                    data_plane_id: read_msg.message.data_plane_id,
+                    event_id: read_msg.message.event_id,
+                    event_type: Event::Deleted,
+                    spec: None,
+                    connection: None,
                 };
                 let msg_id = queue.send(&data_plane_events_queue, &msg).await?;
                 info!("msg_id: {:?}", msg_id);
             }
-            _ => warn!("action was not in expected format"),
+            _ => {
+                warn!("action was not in expected format");
+                continue;
+            }
         }
 
         // TODO (ianstanton) This is here as an example for now. We want to use

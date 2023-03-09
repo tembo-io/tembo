@@ -16,7 +16,7 @@ thiserror = "1.0.38"
 env_logger = "0.10.0"
 log = "0.4.17"
 tokio-postgres = "0.7.7"
-pgmq = "0.3.0"
+pgmq = "0.8.1"
 base64 = "0.21.0"
 
 [dependencies.kube]
