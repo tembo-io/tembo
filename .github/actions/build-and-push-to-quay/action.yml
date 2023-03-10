@@ -107,7 +107,6 @@ runs:
           docker tag ${{ inputs.image_name }} ${{ inputs.image_name }}:$tag
         done
     - name: Push To quay.io
-      if: ${{ github.ref == 'refs/heads/main' }}
       uses: redhat-actions/push-to-registry@v2
       with:
         registry: ${{ inputs.registry }}
