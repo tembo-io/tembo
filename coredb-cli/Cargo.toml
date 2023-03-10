@@ -1,6 +1,6 @@
 [package]
 name = "coredb-cli"
-version = "2023.3.9"
+version = "2023.3.9+1"
 edition = "2021"
 authors = ["CoreDB.io"]
 description = "The CLI for CoreDB"
