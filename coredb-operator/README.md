@@ -191,3 +191,4 @@ Updating the CRD:
 - Edit the [CoreDBSpec struct](./src/controller.rs) as needed.
 
 - `> cargo run --bin crdgen > yaml/crd.yaml`
+
