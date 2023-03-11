@@ -476,7 +476,6 @@ dependencies = [
  "hyper",
  "k8s-openapi",
  "kube",
- "log",
  "opentelemetry",
  "opentelemetry-otlp",
  "passwords",

@@ -23,7 +23,7 @@ use kube::{
 };
 
 use crate::{
-    extensions::{exec_get_all_extensions, manage_extensions},
+    extensions::{get_all_extensions, manage_extensions},
     postgres_exporter_role::create_postgres_exporter_role,
     secret::reconcile_secret,
 };
@@ -203,15 +203,12 @@ impl CoreDB {
             return Ok(Action::requeue(Duration::from_secs(1)));
         }
 
-        let extensions: Vec<Extension> =
-            exec_get_all_extensions(self, ctx.clone())
-                .await
-                .unwrap_or_else(|_| {
-                    panic!(
-                        "Error getting extensions on CoreDB {}",
-                        self.metadata.name.clone().unwrap()
-                    )
-                });
+        let extensions: Vec<Extension> = get_all_extensions(self, ctx.clone()).await.unwrap_or_else(|_| {
+            panic!(
+                "Error getting extensions on CoreDB {}",
+                self.metadata.name.clone().unwrap()
+            )
+        });
 
         // TODO(chuckhend) - reconcile extensions before create/drop in manage_extensions
         manage_extensions(self, ctx.clone()).await.unwrap_or_else(|_| {

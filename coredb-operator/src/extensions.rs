@@ -129,7 +129,7 @@ pub async fn manage_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Er
     Ok(())
 }
 
-pub async fn exec_list_databases(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<String>, Error> {
+pub async fn list_databases(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<String>, Error> {
     let client = ctx.client.clone();
     let psql_out = cdb
         .psql(
@@ -154,11 +154,7 @@ pub async fn exec_list_databases(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<
     Ok(databases)
 }
 
-pub async fn exec_list_extensions(
-    cdb: &CoreDB,
-    ctx: Arc<Context>,
-    database: &str,
-) -> Result<Vec<ExtRow>, Error> {
+pub async fn list_extensions(cdb: &CoreDB, ctx: Arc<Context>, database: &str) -> Result<Vec<ExtRow>, Error> {
     let client = ctx.client.clone();
     let psql_out = cdb
         .psql(
@@ -189,16 +185,16 @@ pub async fn exec_list_extensions(
     Ok(extensions)
 }
 
-// wrangle the extensions in installed
-// return as the crd / spec
-pub async fn exec_get_all_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<Extension>, Error> {
-    let databases = exec_list_databases(cdb, ctx.clone()).await?;
+
+/// list databases then get all extensions from each database
+pub async fn get_all_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<Extension>, Error> {
+    let databases = list_databases(cdb, ctx.clone()).await?;
 
     let mut ext_hashmap: HashMap<String, Vec<ExtensionInstallLocation>> = HashMap::new();
     // query every database for extensions
     // transform results by extension name, rather than by database
     for db in databases {
-        let extensions = exec_list_extensions(cdb, ctx.clone(), &db).await?;
+        let extensions = list_extensions(cdb, ctx.clone(), &db).await?;
         for ext in extensions {
             let extlocation = ExtensionInstallLocation {
                 database: db.clone(),
