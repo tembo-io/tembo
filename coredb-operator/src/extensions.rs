@@ -234,10 +234,10 @@ pub async fn get_all_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<E
 pub async fn reconcile_extensions(coredb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<Extension>, Error> {
     // always get the current state of extensions in the database
     // this is due to out of band changes - manual create/drop extension
-    let current_extensions = get_all_extensions(coredb, ctx.clone()).await?;
+    let actual_extensions = get_all_extensions(coredb, ctx.clone()).await?;
     let desired_extensions = coredb.spec.extensions.clone();
 
-    let diff = diff_extensions(&current_extensions, &desired_extensions);
+    let diff = diff_extensions(&desired_extensions, &actual_extensions);
     toggle_extensions(coredb, &diff, ctx.clone()).await?;
 
     // return final state of extensions
@@ -250,7 +250,9 @@ pub async fn reconcile_extensions(coredb: &CoreDB, ctx: Arc<Context>) -> Result<
 fn diff_extensions(desired: &[Extension], actual: &[Extension]) -> Vec<Extension> {
     let set_desired: HashSet<_> = desired.iter().cloned().collect();
     let set_actual: HashSet<_> = actual.iter().cloned().collect();
-    set_desired.difference(&set_actual).cloned().collect()
+    let diff: Vec<Extension> = set_desired.difference(&set_actual).cloned().collect();
+    info!("Extensions diff: {:?}", diff);
+    diff
 }
 
 #[test]

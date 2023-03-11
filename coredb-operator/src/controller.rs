@@ -201,8 +201,6 @@ impl CoreDB {
             return Ok(Action::requeue(Duration::from_secs(1)));
         }
 
-
-        // TODO(chuckhend) - reconcile extensions before create/drop in manage_extensions
         let extensions: Vec<Extension> = reconcile_extensions(self, ctx.clone()).await.unwrap();
 
         let new_status = Patch::Apply(json!({
