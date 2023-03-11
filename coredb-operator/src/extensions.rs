@@ -14,11 +14,6 @@ pub struct ExtRow {
     pub schema: String,
 }
 
-// contains all the extensions in a database
-pub struct DbExt {
-    pub dbname: String,
-    pub extensions: Vec<ExtRow>,
-}
 
 const LIST_DATABASES_QUERY: &str = r#"SELECT datname FROM pg_database WHERE datistemplate = false;"#;
 const LIST_EXTENSIONS_QUERY: &str = r#"select
@@ -148,7 +143,7 @@ pub async fn exec_list_databases(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<
     let mut databases = vec![];
     for line in result_string.lines().skip(2) {
         let fields: Vec<&str> = line.split('|').map(|s| s.trim()).collect();
-        if fields.len() < 4 {
+        if fields.is_empty() {
             debug!("Done:{:?}", fields);
             continue;
         }
@@ -200,6 +195,8 @@ pub async fn exec_get_all_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<
     let databases = exec_list_databases(cdb, ctx.clone()).await?;
 
     let mut ext_hashmap: HashMap<String, Vec<ExtensionInstallLocation>> = HashMap::new();
+    // query every database for extensions
+    // transform results by extension name, rather than by database
     for db in databases {
         let extensions = exec_list_extensions(cdb, ctx.clone(), &db).await?;
         for ext in extensions {

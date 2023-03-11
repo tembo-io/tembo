@@ -270,7 +270,7 @@ async fn update_pvc(client: Client, sts: &StatefulSet, cdb: &CoreDB) {
         Api::namespaced(client, &sts.clone().metadata.namespace.unwrap());
 
     let sts_name = sts.clone().metadata.name.unwrap();
-    let pvc_name = format!("data-{}-0", sts_name);
+    let pvc_name = format!("data-{sts_name}-0");
     let mut pvc_requests: BTreeMap<String, Quantity> = BTreeMap::new();
     pvc_requests.insert("storage".to_string(), cdb.spec.storage.clone());
 

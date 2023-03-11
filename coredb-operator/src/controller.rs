@@ -203,15 +203,17 @@ impl CoreDB {
             return Ok(Action::requeue(Duration::from_secs(1)));
         }
 
-        let extensions: Vec<Extension> = exec_get_all_extensions(self, ctx.clone())
-            .await
-            .unwrap_or_else(|_| {
-                panic!(
-                    "Error getting extensions on CoreDB {}",
-                    self.metadata.name.clone().unwrap()
-                )
-            });
-        // TODO(chuckehnd) - reconcile extensions before create/drop in manage_extensionscarg
+        let extensions: Vec<Extension> =
+            exec_get_all_extensions(self, ctx.clone())
+                .await
+                .unwrap_or_else(|_| {
+                    panic!(
+                        "Error getting extensions on CoreDB {}",
+                        self.metadata.name.clone().unwrap()
+                    )
+                });
+
+        // TODO(chuckhend) - reconcile extensions before create/drop in manage_extensions
         manage_extensions(self, ctx.clone()).await.unwrap_or_else(|_| {
             panic!(
                 "Error updating extensions on CoreDB {}",
@@ -233,7 +235,12 @@ impl CoreDB {
         let _o = coredbs
             .patch_status(&name, &ps, &new_status)
             .await
-            .map_err(Error::KubeError)?;
+            .unwrap_or_else(|_| {
+                panic!(
+                    "Error patching status on CoreDB {}",
+                    self.metadata.name.clone().unwrap()
+                )
+            });
 
         // If no events were received, check back every minute
         Ok(Action::requeue(Duration::from_secs(60)))
