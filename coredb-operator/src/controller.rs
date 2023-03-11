@@ -23,7 +23,8 @@ use kube::{
 };
 
 use crate::{
-    extensions::manage_extensions, postgres_exporter_role::create_postgres_exporter_role,
+    extensions::{exec_get_all_extensions, manage_extensions},
+    postgres_exporter_role::create_postgres_exporter_role,
     secret::reconcile_secret,
 };
 use k8s_openapi::{
@@ -75,6 +76,7 @@ pub struct CoreDBStatus {
     pub running: bool,
     #[serde(default = "defaults::default_storage")]
     pub storage: Quantity,
+    pub extensions: Option<Vec<Extension>>,
 }
 
 // Context for our reconciler
@@ -201,6 +203,15 @@ impl CoreDB {
             return Ok(Action::requeue(Duration::from_secs(1)));
         }
 
+        let extensions: Vec<Extension> = exec_get_all_extensions(self, ctx.clone())
+            .await
+            .unwrap_or_else(|_| {
+                panic!(
+                    "Error getting extensions on CoreDB {}",
+                    self.metadata.name.clone().unwrap()
+                )
+            });
+        // TODO(chuckehnd) - reconcile extensions before create/drop in manage_extensionscarg
         manage_extensions(self, ctx.clone()).await.unwrap_or_else(|_| {
             panic!(
                 "Error updating extensions on CoreDB {}",
@@ -214,7 +225,8 @@ impl CoreDB {
             "kind": "CoreDB",
             "status": CoreDBStatus {
                 running: true,
-        storage: self.spec.storage.clone()
+                storage: self.spec.storage.clone(),
+                extensions: Some(extensions),
             }
         }));
         let ps = PatchParams::apply("cntrlr").force();

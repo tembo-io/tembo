@@ -200,6 +200,35 @@ spec:
             description: The status object of `CoreDB`
             nullable: true
             properties:
+              extensions:
+                items:
+                  properties:
+                    locations:
+                      items:
+                        properties:
+                          database:
+                            default: postrgres
+                            type: string
+                          enabled:
+                            type: boolean
+                          schema:
+                            default: public
+                            type: string
+                          version:
+                            nullable: true
+                            type: string
+                        required:
+                        - enabled
+                        type: object
+                      type: array
+                    name:
+                      type: string
+                  required:
+                  - locations
+                  - name
+                  type: object
+                nullable: true
+                type: array
               running:
                 type: boolean
               storage:
