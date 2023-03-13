@@ -121,8 +121,8 @@ jobs:
           helm install --namespace=traefik-v2 --values ./tests/traefik-values.yaml traefik traefik/traefik
 
           # Install the CoreDB operator
-          cargo install --version ${COREDB_OPERATOR_VERSION} coredb-cli
-          coredb-cli install
+          cargo install coredb-cli
+          coredb-cli install --branch release/${COREDB_OPERATOR_VERSION}
           kubectl get crds
 
           # Start local postgres for the Nile queues
