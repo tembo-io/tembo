@@ -75,7 +75,6 @@ impl ApiServerVerifier {
         let coredb = coredb_.clone();
         tokio::spawn(async move {
             pin_mut!(handle);
-
             // After the PATCH to CoreDB, we expect a GET on Secrets
             let (request, send) = handle
                 .next_request()
@@ -168,9 +167,9 @@ impl ApiServerVerifier {
             assert_eq!(
                 request.uri().to_string(),
                 format!(
-			"/apis/coredb.io/v1alpha1/namespaces/testns/coredbs/{}/status?&force=true&fieldManager=cntrlr",
-			coredb.name_any()
-		)
+                    "/apis/coredb.io/v1alpha1/namespaces/testns/coredbs/{}/status?&force=true&fieldManager=cntrlr",
+                    coredb.name_any()
+                )
             );
             let req_body = to_bytes(request.into_body()).await.unwrap();
             let json: serde_json::Value =

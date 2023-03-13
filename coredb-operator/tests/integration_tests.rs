@@ -313,7 +313,13 @@ mod test {
 
         println!("{}", result.stdout.clone().unwrap());
         // assert does not contain postgis
-        assert!(!result.stdout.unwrap().contains("postgis"));
+        assert!(!result.stdout.clone().unwrap().contains("postgis"));
+
+        // assert extensions made it into the status
+        let spec = coredbs.get(name).await.unwrap();
+        let status = spec.status.unwrap();
+        let extensions = status.extensions.unwrap();
+        assert!(extensions.len() > 0);
     }
 
     #[tokio::test]
