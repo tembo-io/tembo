@@ -14,7 +14,6 @@ pub struct ExtRow {
     pub schema: String,
 }
 
-
 const LIST_DATABASES_QUERY: &str = r#"SELECT datname FROM pg_database WHERE datistemplate = false;"#;
 const LIST_EXTENSIONS_QUERY: &str = r#"select
 distinct on
@@ -184,7 +183,6 @@ pub async fn list_extensions(cdb: &CoreDB, ctx: Arc<Context>, database: &str) ->
     info!("Found {} extensions", num_extensions);
     Ok(extensions)
 }
-
 
 /// list databases then get all extensions from each database
 pub async fn get_all_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<Extension>, Error> {

@@ -103,7 +103,6 @@ impl Default for Extension {
     }
 }
 
-
 #[derive(Clone, Debug, Deserialize, JsonSchema, Serialize, PartialEq)]
 pub struct ExtensionInstallLocation {
     pub enabled: bool,
@@ -202,12 +201,13 @@ impl CoreDB {
             return Ok(Action::requeue(Duration::from_secs(1)));
         }
 
-        let extensions: Vec<Extension> = get_all_extensions(self, ctx.clone()).await.unwrap_or_else(|_| {
-            panic!(
-                "Error getting extensions on CoreDB {}",
-                self.metadata.name.clone().unwrap()
-            )
-        });
+        let mut extensions: Vec<Extension> =
+            get_all_extensions(self, ctx.clone()).await.unwrap_or_else(|_| {
+                panic!(
+                    "Error getting extensions on CoreDB {}",
+                    self.metadata.name.clone().unwrap()
+                )
+            });
 
         // TODO(chuckhend) - reconcile extensions before create/drop in manage_extensions
         manage_extensions(self, ctx.clone()).await.unwrap_or_else(|_| {
@@ -216,7 +216,8 @@ impl CoreDB {
                 self.metadata.name.clone().unwrap()
             )
         });
-
+        // must be sorted same, else reconcile will trigger again
+        extensions.sort_by_key(|e| e.name.clone());
         let new_status = Patch::Apply(json!({
             "apiVersion": "coredb.io/v1alpha1",
             "kind": "CoreDB",
