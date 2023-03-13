@@ -75,6 +75,8 @@ pub struct CoreDBSpec {
 pub struct CoreDBStatus {
     pub running: bool,
     pub extensions: Option<Vec<Extension>>,
+    #[serde(default = "defaults::default_storage")]
+    pub storage: Quantity,
 }
 
 // Context for our reconciler
@@ -218,24 +220,21 @@ impl CoreDB {
         });
         // must be sorted same, else reconcile will trigger again
         extensions.sort_by_key(|e| e.name.clone());
+        // always overwrite status object with what we saw
         let new_status = Patch::Apply(json!({
             "apiVersion": "coredb.io/v1alpha1",
             "kind": "CoreDB",
             "status": CoreDBStatus {
                 running: true,
-                extensions: Some(extensions),
+        storage: self.spec.storage.clone(),
+        extensions: Some(extensions),
             }
         }));
         let ps = PatchParams::apply("cntrlr").force();
         let _o = coredbs
             .patch_status(&name, &ps, &new_status)
             .await
-            .unwrap_or_else(|_| {
-                panic!(
-                    "Error patching status on CoreDB {}",
-                    self.metadata.name.clone().unwrap()
-                )
-            });
+            .map_err(Error::KubeError)?;
 
         // If no events were received, check back every minute
         Ok(Action::requeue(Duration::from_secs(60)))
