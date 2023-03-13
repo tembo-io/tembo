@@ -13,6 +13,11 @@ spec:
   selector:
     matchLabels:
       {{- include "reconciler.selectorLabels" . | nindent 6 }}
+  strategy:
+    rollingUpdate:
+      maxSurge: 25%
+      maxUnavailable: 25%
+    type: RollingUpdate
   template:
     metadata:
       {{- with .Values.podAnnotations }}
@@ -29,11 +34,6 @@ spec:
       serviceAccountName: {{ include "reconciler.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
-      strategy:
-        rollingUpdate:
-          maxSurge: 25%
-          maxUnavailable: 25%
-        type: RollingUpdate
       containers:
         - name: {{ .Chart.Name }}
           command:
