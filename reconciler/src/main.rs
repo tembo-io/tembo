@@ -57,7 +57,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         //     continue;
         // }
 
-        // Based on message_type in message, create, update, delete PostgresCluster
+        // Based on message_type in message, create, update, delete CoreDB
         match read_msg.message.event_type {
             // every event is for a single namespace
             Event::Create | Event::Update => {
@@ -75,21 +75,21 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                     .await
                     .expect("error creating ingress for /metrics");
 
-                // generate PostgresCluster spec based on values in body
+                // generate CoreDB spec based on values in body
                 let spec = generate_spec(&read_msg.message.dbname, &read_msg.message.spec).await;
 
                 let spec_js = serde_json::to_string(&spec).unwrap();
                 warn!("spec: {}", spec_js);
-                // create or update PostgresCluster
+                // create or update CoreDB
                 create_or_update(client.clone(), &read_msg.message.dbname, spec)
                     .await
-                    .expect("error creating or updating PostgresCluster");
+                    .expect("error creating or updating CoreDB");
                 // get connection string values from secret
                 let connection_string = get_pg_conn(client.clone(), &read_msg.message.dbname)
                     .await
                     .expect("error getting secret");
 
-                // read spec.status from PostgresCluster
+                // read spec.status from CoreDB
                 // this should wait until it is able to receive an actual update from the cluster
                 // retrying actions with kube
                 // limit to 60 seconds - 20 retries, 5 seconds between retries
@@ -134,14 +134,14 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 info!("msg_id: {:?}", msg_id);
             }
             Event::Delete => {
-                // delete PostgresCluster
+                // delete CoreDB
                 delete(
                     client.clone(),
                     &read_msg.message.dbname,
                     &read_msg.message.dbname,
                 )
                 .await
-                .expect("error deleting PostgresCluster");
+                .expect("error deleting CoreDB");
 
                 // delete namespace
                 delete_namespace(client.clone(), &read_msg.message.dbname)
@@ -166,11 +166,11 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         }
 
         // TODO (ianstanton) This is here as an example for now. We want to use
-        //  this to ensure a PostgresCluster exists before we attempt to delete it.
-        // Get all existing PostgresClusters
+        //  this to ensure a CoreDB exists before we attempt to delete it.
+        // Get all existing CoreDB
         let vec = get_all(client.clone(), "default");
         for pg in vec.await.iter() {
-            info!("found PostgresCluster {}", pg.name_any());
+            info!("found CoreDB {}", pg.name_any());
         }
         thread::sleep(time::Duration::from_secs(1));
 

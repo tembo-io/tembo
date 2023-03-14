@@ -111,8 +111,8 @@ pub async fn create_metrics_ingress(client: Client, name: &str) -> Result<(), Re
 }
 
 pub async fn get_all(client: Client, namespace: &str) -> Vec<CoreDB> {
-    let pg_cluster_api: Api<CoreDB> = Api::namespaced(client, namespace);
-    let pg_list = pg_cluster_api
+    let coredb_api: Api<CoreDB> = Api::namespaced(client, namespace);
+    let pg_list = coredb_api
         .list(&ListParams::default())
         .await
         .expect("could not get CoreDBs");
@@ -120,8 +120,8 @@ pub async fn get_all(client: Client, namespace: &str) -> Vec<CoreDB> {
 }
 
 pub async fn get_one(client: Client, namespace: &str) -> Result<CoreDB, ReconcilerError> {
-    let pg_cluster_api: Api<CoreDB> = Api::namespaced(client, namespace);
-    let pg_instance = pg_cluster_api.get(namespace).await?;
+    let coredb_api: Api<CoreDB> = Api::namespaced(client, namespace);
+    let pg_instance = coredb_api.get(namespace).await?;
     debug!("Namespace: {}, CoreDB: {:?}", namespace, pg_instance);
     Ok(pg_instance)
 }
@@ -145,11 +145,11 @@ pub async fn create_or_update(
     namespace: &str,
     deployment: serde_json::Value,
 ) -> Result<(), ReconcilerError> {
-    let pg_cluster_api: Api<CoreDB> = Api::namespaced(client, namespace);
+    let coredb_api: Api<CoreDB> = Api::namespaced(client, namespace);
     let params = PatchParams::apply("reconciler").force();
     let name: String = serde_json::from_value(deployment["metadata"]["name"].clone()).unwrap();
     info!("\nCreating or updating CoreDB: {}", name);
-    let _ = pg_cluster_api
+    let _ = coredb_api
         .patch(&name, &params, &Patch::Apply(&deployment))
         .await
         .map_err(ReconcilerError::KubeError)?;
@@ -157,10 +157,10 @@ pub async fn create_or_update(
 }
 
 pub async fn delete(client: Client, namespace: &str, name: &str) -> Result<(), ReconcilerError> {
-    let pg_cluster_api: Api<CoreDB> = Api::namespaced(client, namespace);
+    let coredb_api: Api<CoreDB> = Api::namespaced(client, namespace);
     let params = DeleteParams::default();
     info!("\nDeleting CoreDB: {}", name);
-    let _o = pg_cluster_api
+    let _o = coredb_api
         .delete(name, &params)
         .await
         .map_err(ReconcilerError::KubeError);
