@@ -1,31 +1,24 @@
 pub mod coredb_crd;
+pub mod errors;
 mod ingress_route_tcp_crd;
 pub mod types;
 
 use base64::{engine::general_purpose, Engine as _};
+use coredb_crd as crd;
 use coredb_crd::CoreDB;
+use errors::ReconcilerError;
 use ingress_route_tcp_crd::IngressRouteTCP;
 use k8s_openapi::api::core::v1::{Namespace, Secret};
 use k8s_openapi::api::networking::v1::Ingress;
 use kube::api::{DeleteParams, ListParams, Patch, PatchParams};
-#[allow(unused_imports)] // Remove after COR-166
 use kube::runtime::wait::{await_condition, Condition};
 use kube::{Api, Client};
-use log::info;
-#[allow(unused_imports)] // Remove after COR-166
+use log::{debug, info};
 use serde_json::{from_str, to_string, Value};
-use std::fmt::Debug;
-use thiserror::Error;
 
-#[derive(Error, Debug)]
-pub enum Error {
-    #[error("Kube Error: {0}")]
-    KubeError(#[source] kube::Error),
-}
+pub type Result<T, E = ReconcilerError> = std::result::Result<T, E>;
 
-pub type Result<T, E = Error> = std::result::Result<T, E>;
-
-pub async fn generate_spec(namespace: &str, spec: &coredb_crd::CoreDBSpec) -> Value {
+pub async fn generate_spec(namespace: &str, spec: &crd::CoreDBSpec) -> Value {
     let spec = serde_json::json!({
         "apiVersion": "coredb.io/v1alpha1",
         "kind": "CoreDB",
@@ -37,7 +30,7 @@ pub async fn generate_spec(namespace: &str, spec: &coredb_crd::CoreDBSpec) -> Va
     spec
 }
 
-pub async fn create_ing_route_tcp(client: Client, name: &str) -> Result<(), Error> {
+pub async fn create_ing_route_tcp(client: Client, name: &str) -> Result<(), ReconcilerError> {
     let ing_api: Api<IngressRouteTCP> = Api::namespaced(client, name);
     let params = PatchParams::apply("reconciler").force();
     let ing = serde_json::json!({
@@ -69,11 +62,11 @@ pub async fn create_ing_route_tcp(client: Client, name: &str) -> Result<(), Erro
     let _o = ing_api
         .patch(name, &params, &Patch::Apply(&ing))
         .await
-        .map_err(Error::KubeError)?;
+        .map_err(ReconcilerError::KubeError)?;
     Ok(())
 }
 
-pub async fn create_metrics_ingress(client: Client, name: &str) -> Result<(), Error> {
+pub async fn create_metrics_ingress(client: Client, name: &str) -> Result<(), ReconcilerError> {
     let ing_api: Api<Ingress> = Api::namespaced(client, name);
     let params = PatchParams::apply("reconciler").force();
     let ingress = serde_json::json!({
@@ -113,12 +106,12 @@ pub async fn create_metrics_ingress(client: Client, name: &str) -> Result<(), Er
     let _o = ing_api
         .patch(name, &params, &Patch::Apply(&ingress))
         .await
-        .map_err(Error::KubeError)?;
+        .map_err(ReconcilerError::KubeError)?;
     Ok(())
 }
 
-pub async fn get_all(client: Client, namespace: String) -> Vec<CoreDB> {
-    let pg_cluster_api: Api<CoreDB> = Api::namespaced(client, &namespace);
+pub async fn get_all(client: Client, namespace: &str) -> Vec<CoreDB> {
+    let pg_cluster_api: Api<CoreDB> = Api::namespaced(client, namespace);
     let pg_list = pg_cluster_api
         .list(&ListParams::default())
         .await
@@ -126,11 +119,32 @@ pub async fn get_all(client: Client, namespace: String) -> Vec<CoreDB> {
     pg_list.items
 }
 
+pub async fn get_one(client: Client, namespace: &str) -> Result<CoreDB, ReconcilerError> {
+    let pg_cluster_api: Api<CoreDB> = Api::namespaced(client, namespace);
+    let pg_instance = pg_cluster_api.get(namespace).await?;
+    debug!("Namespace: {}, CoreDB: {:?}", namespace, pg_instance);
+    Ok(pg_instance)
+}
+
+// returns CoreDB when status is present, otherwise returns an error
+pub async fn get_coredb_status(
+    client: Client,
+    namespace: &str,
+) -> Result<crd::CoreDB, ReconcilerError> {
+    let coredb = get_one(client, namespace).await?;
+
+    if coredb.status.is_none() {
+        Err(ReconcilerError::NoStatusReported)
+    } else {
+        Ok(coredb)
+    }
+}
+
 pub async fn create_or_update(
     client: Client,
     namespace: &str,
     deployment: serde_json::Value,
-) -> Result<(), Error> {
+) -> Result<(), ReconcilerError> {
     let pg_cluster_api: Api<CoreDB> = Api::namespaced(client, namespace);
     let params = PatchParams::apply("reconciler").force();
     let name: String = serde_json::from_value(deployment["metadata"]["name"].clone()).unwrap();
@@ -138,22 +152,22 @@ pub async fn create_or_update(
     let _ = pg_cluster_api
         .patch(&name, &params, &Patch::Apply(&deployment))
         .await
-        .map_err(Error::KubeError)?;
+        .map_err(ReconcilerError::KubeError)?;
     Ok(())
 }
 
-pub async fn delete(client: Client, namespace: &str, name: &str) -> Result<(), Error> {
+pub async fn delete(client: Client, namespace: &str, name: &str) -> Result<(), ReconcilerError> {
     let pg_cluster_api: Api<CoreDB> = Api::namespaced(client, namespace);
     let params = DeleteParams::default();
     info!("\nDeleting CoreDB: {}", name);
     let _o = pg_cluster_api
         .delete(name, &params)
         .await
-        .map_err(Error::KubeError);
+        .map_err(ReconcilerError::KubeError);
     Ok(())
 }
 
-pub async fn create_namespace(client: Client, name: &str) -> Result<(), Error> {
+pub async fn create_namespace(client: Client, name: &str) -> Result<(), ReconcilerError> {
     let ns_api: Api<Namespace> = Api::all(client);
     let params = PatchParams::apply("reconciler").force();
     let ns = serde_json::json!({
@@ -167,21 +181,24 @@ pub async fn create_namespace(client: Client, name: &str) -> Result<(), Error> {
     let _o = ns_api
         .patch(name, &params, &Patch::Apply(&ns))
         .await
-        .map_err(Error::KubeError)?;
+        .map_err(ReconcilerError::KubeError)?;
     Ok(())
 }
 
-pub async fn delete_namespace(client: Client, name: &str) -> Result<(), Error> {
+pub async fn delete_namespace(client: Client, name: &str) -> Result<(), ReconcilerError> {
     let ns_api: Api<Namespace> = Api::all(client);
     let params = DeleteParams::default();
     info!("\nDeleting namespace: {}", name);
-    let _ = ns_api.delete(name, &params).await.map_err(Error::KubeError);
+    let _ = ns_api
+        .delete(name, &params)
+        .await
+        .map_err(ReconcilerError::KubeError);
     Ok(())
 }
 
 // remove after COR-166
 #[allow(unused_variables)]
-pub async fn get_pg_conn(client: Client, name: &str) -> Result<String, Error> {
+pub async fn get_pg_conn(client: Client, name: &str) -> Result<String, ReconcilerError> {
     // read secret <name>-connection
     let secret_name = format!("{name}-connection");
 

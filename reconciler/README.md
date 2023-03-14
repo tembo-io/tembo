@@ -33,18 +33,18 @@ Prerequisites:
 
 1. Install CoreDB operator in the cluster
    1. `cargo install coredb-cli`
-   2. `coredb-cli install`
+   2. `coredb-cli install --branch main`
 
-1. Install Traefik in the cluster
+2. Install Traefik in the cluster
    1. `helm repo add traefik https://traefik.github.io/charts`
    2. `helm repo update`
    3. `helm install --create-namespace --namespace=traefik-v2 --values ./tests/traefik-values.yaml traefik traefik/traefik`
 
-1. Set up local postgres queue
+3. Set up local postgres queue
 
    `❯ docker run -d --name pgmq -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres`
 
-1. Set the following environment variables:
+4. Set the following environment variables:
    - `PG_CONN_URL`
    - `CONTROL_PLANE_EVENTS_QUEUE`
    - `DATA_PLANE_EVENTS_QUEUE`
@@ -58,8 +58,7 @@ export DATA_PLANE_EVENTS_QUEUE=myqueue_data_plane
 
    `❯ cargo run`
 
-1. Next, you'll need to post some messages to the queue for the reconciler to pick up. That can be performed in functional testing like this `cargo test -- --ignored`
-
+2. Next, you'll need to post some messages to the queue for the reconciler to pick up. That can be performed in functional testing like this `cargo test -- --ignored`
 
 ## Codegen
 
@@ -71,8 +70,14 @@ Install `kopium` if you don't have it already.
 
 Download the specified CoreDB spec.
 
-`wget https://raw.githubusercontent.com/CoreDB-io/coredb/release/2023.3.6/coredb-operator/yaml/crd.yaml`
+`wget https://raw.githubusercontent.com/CoreDB-io/coredb/release/2023.3.9/coredb-operator/yaml/crd.yaml`
 
 Generate the Rust code:
 
 `kopium -f crd.yaml > src/coredb_crd.rs`
+
+## Integration Testing
+
+1. Ensure operator is running locally (see instructions above)
+2. Start the Reconciler using test configuration: `make run.test`
+3. In another terminal session, `cargo test -- --ignored`

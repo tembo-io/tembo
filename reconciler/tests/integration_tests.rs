@@ -11,7 +11,6 @@
 
 #[cfg(test)]
 mod test {
-
     use k8s_openapi::{
         api::core::v1::Pod,
         apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
@@ -21,9 +20,14 @@ mod test {
         Api, Client, Config,
     };
     use pgmq::PGMQueue;
+
     use rand::Rng;
-    use reconciler::{coredb_crd as crd, types};
+    use reconciler::{
+        coredb_crd as crd,
+        types::{self, StateToControlPlane},
+    };
     use std::collections::BTreeMap;
+    use std::{thread, time};
 
     #[tokio::test]
     #[ignore]
@@ -41,11 +45,30 @@ mod test {
         let namespace = name.clone();
 
         let limits: BTreeMap<String, String> = BTreeMap::from([
-            ("cpu".to_owned(), "100m".to_string()),
-            ("memory".to_owned(), "500Mi".to_string()),
+            ("cpu".to_owned(), "1".to_string()),
+            ("memory".to_owned(), "1Gi".to_string()),
         ]);
 
         // reconciler receives a CRUDevent from control plane
+        let spec_js = serde_json::json!({
+            "extensions": Some(vec![crd::CoreDBExtensions {
+                name: "postgis".to_owned(),
+                locations: vec![crd::CoreDBExtensionsLocations {
+                    enabled: true,
+                    version: Some("1.1.1".to_owned()),
+                    schema: Some("public".to_owned()),
+                    database: Some("postgres".to_owned()),
+                }],
+            }]),
+            "storage": Some("1Gi".to_owned()),
+            "replicas": Some(1),
+            "resources": Some(crd::CoreDBResources {
+                limits: Some(limits),
+                requests: None,
+            }),
+        });
+        let spec: crd::CoreDBSpec = serde_json::from_value(spec_js).unwrap();
+
         let msg = types::CRUDevent {
             data_plane_id: "org_02s3owPQskuGXHE8vYsGSY".to_owned(),
             event_id: format!(
@@ -54,25 +77,7 @@ mod test {
             ),
             event_type: types::Event::Create,
             dbname: name.clone(),
-            spec: crd::CoreDBSpec {
-                image: None,
-                postgres_exporter_enabled: None,
-                postgres_exporter_image: None,
-                extensions: Some(vec![crd::CoreDBExtensions {
-                    name: "postgis".to_owned(),
-                    enabled: true,
-                    version: "1.1.1".to_owned(),
-                    schema: "public".to_owned(),
-                }]),
-                storage: Some("1Gi".to_owned()),
-                port: None,
-                replicas: Some(1),
-                resources: Some(crd::CoreDBResources {
-                    limits: Some(limits),
-                    requests: None,
-                }),
-                uid: None,
-            },
+            spec: spec,
         };
 
         let msg_id = queue.send(&myqueue, &msg).await;
@@ -92,6 +97,28 @@ mod test {
         )
         .await
         .unwrap_or_else(|_| panic!("Did not find the pod {pod_name} to be running after waiting {timeout_seconds_start_pod} seconds"));
+
+        // wait for reconciler to send message to data_plane_events queue
+        thread::sleep(time::Duration::from_secs(15));
+
+        // read message from data_plane_events queue
+        let msg = queue
+            .read::<StateToControlPlane>("myqueue_data_plane", Some(&10_i32))
+            .await
+            .unwrap();
+        assert!(
+            msg.is_some(),
+            "Reconciler did not send a message to myqueue_data_plane...yet"
+        );
+        let spec = msg.unwrap().message.spec.expect("No spec found in message");
+        assert!(
+            spec.extensions.is_some(),
+            "Extension object missing from spec"
+        );
+        let extensions = spec
+            .extensions
+            .expect("No extensions found in message spec");
+        assert!(extensions.len() > 0, "Expected at least one extension");
     }
 
     async fn kube_client() -> kube::Client {

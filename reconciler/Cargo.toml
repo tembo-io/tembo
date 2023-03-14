@@ -15,9 +15,10 @@ schemars = "0.8.11"
 thiserror = "1.0.38"
 env_logger = "0.10.0"
 log = "0.4.17"
-tokio-postgres = "0.7.7"
 pgmq = "0.8.1"
 base64 = "0.21.0"
+tokio-retry = "0.3.0"
+# coredb-controller = "0.0.1-alpha.1"
 
 [dependencies.kube]
 features = ["runtime", "client", "derive"]
