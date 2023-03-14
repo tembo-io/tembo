@@ -20,6 +20,10 @@ jobs:
           ref: release/2023.2.15
       - uses: azure/setup-kubectl@v3
       - uses: azure/setup-helm@v3
+      - name: Set version strings
+        id: versions
+        run: |
+          echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
       - name: Build and upload operator image
         uses: ./coredb/.github/actions/build-and-push-to-quay
         with:
@@ -45,6 +49,7 @@ jobs:
             --set secret.useExistingSecret='queue-conn' \
             --set dataPlaneEventsQueue=data_plane_events \
             --set controlPlaneEventsQueue=saas_queue \
+           --set image.tag=${{ steps.versions.outputs.SHORT_SHA }} \
             --namespace reconciler \
             reconciler \
             charts/reconciler
