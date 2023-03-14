@@ -4,9 +4,6 @@ on:
   push:
     branches:
       - main
-    paths:
-    - 'reconciler/**'
-    - '.github/workflows/reconciler-deploy.yml'
 
 jobs:
   push_to_registry:
