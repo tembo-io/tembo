@@ -79,7 +79,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 let spec = generate_spec(&read_msg.message.dbname, &read_msg.message.spec).await;
 
                 let spec_js = serde_json::to_string(&spec).unwrap();
-                warn!("spec: {}", spec_js);
+                debug!("spec: {}", spec_js);
                 // create or update CoreDB
                 create_or_update(client.clone(), &read_msg.message.dbname, spec)
                     .await
@@ -105,7 +105,10 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 let mut current_spec = result?;
                 let spec_js = serde_json::to_string(&current_spec.spec).unwrap();
-                debug!("{} spec: {:?}", &read_msg.message.dbname, spec_js);
+                debug!(
+                    "dbname: {}, current_spec: {:?}",
+                    &read_msg.message.dbname, spec_js
+                );
 
                 // get actual extensions from crd status
                 let actual_extension = match current_spec.status {
@@ -131,7 +134,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                     connection: Some(connection_string),
                 };
                 let msg_id = queue.send(&data_plane_events_queue, &msg).await?;
-                info!("msg_id: {:?}", msg_id);
+                info!("sent msg_id: {:?}", msg_id);
             }
             Event::Delete => {
                 // delete CoreDB
@@ -157,7 +160,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                     connection: None,
                 };
                 let msg_id = queue.send(&data_plane_events_queue, &msg).await?;
-                info!("msg_id: {:?}", msg_id);
+                info!("sent msg_id: {:?}", msg_id);
             }
             _ => {
                 warn!("action was not in expected format");
