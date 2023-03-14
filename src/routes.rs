@@ -1,4 +1,4 @@
-use crate::config::S3Config;
+use crate::config::Config;
 use actix_web::{get, web, HttpResponse, Responder};
 use anyhow::Result;
 use s3::bucket::Bucket;
@@ -13,7 +13,7 @@ pub async fn running() -> impl Responder {
 
 // get all extensions in s3 bucket
 #[get("/get-extensions")]
-pub async fn get_extensions(cfg: web::Data<S3Config>) -> impl Responder {
+pub async fn get_extensions(cfg: web::Data<Config>) -> impl Responder {
     let mut extensions: Vec<&Object> = Vec::new();
     let mut credentials = Credentials::default().unwrap();
     if (!cfg.aws_access_key.is_empty()) && (!cfg.aws_secret_key.is_empty()) {

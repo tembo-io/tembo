@@ -1,5 +1,5 @@
 CREATE TABLE versions (
-    id SERIAL4,
+    id BIGSERIAL PRIMARY KEY,
     extension_id INT4,
     num VARCHAR,
     updated_at TIMESTAMP,

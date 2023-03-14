@@ -1,5 +1,5 @@
 CREATE TABLE extensions (
-    id INT4,
+    id BIGSERIAL PRIMARY KEY,
     name VARCHAR,
     updated_at TIMESTAMP,
     created_at TIMESTAMP,
