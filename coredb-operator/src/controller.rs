@@ -203,7 +203,9 @@ impl CoreDB {
             return Ok(Action::requeue(Duration::from_secs(1)));
         }
 
-        let extensions: Vec<Extension> = reconcile_extensions(self, ctx.clone()).await.unwrap();
+        let mut extensions: Vec<Extension> = reconcile_extensions(self, ctx.clone()).await.unwrap();
+        // must be sorted same, else reconcile will trigger again
+        extensions.sort_by_key(|e| e.name.clone());
 
         let new_status = Patch::Apply(json!({
             "apiVersion": "coredb.io/v1alpha1",
