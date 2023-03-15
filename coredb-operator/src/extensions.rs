@@ -9,6 +9,7 @@ use std::{
 };
 use tracing::{debug, info, warn};
 
+
 #[derive(Debug)]
 pub struct ExtRow {
     pub name: String,
@@ -75,9 +76,6 @@ pub async fn toggle_extensions(
 ) -> Result<(), Error> {
     let client = ctx.client.clone();
     let re = Regex::new(r"[a-zA-Z][0-9a-zA-Z_-]*$").unwrap();
-
-    // TODO(ianstanton) Some extensions will fail to create. We need to handle and surface any errors.
-    //  Logging result at debug level for now.
 
     // iterate through list of extensions and run CREATE EXTENSION <extension-name> for each
     for ext in extensions {
@@ -148,10 +146,14 @@ pub async fn list_databases(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<Strin
         .await
         .unwrap();
     let result_string = psql_out.stdout.unwrap();
+    Ok(parse_databases(&result_string))
+}
+
+fn parse_databases(psql_str: &str) -> Vec<String> {
     let mut databases = vec![];
-    for line in result_string.lines().skip(2) {
+    for line in psql_str.lines().skip(2) {
         let fields: Vec<&str> = line.split('|').map(|s| s.trim()).collect();
-        if fields.is_empty() {
+        if fields.is_empty() || fields[0].is_empty() || fields[0].contains("rows)") {
             debug!("Done:{:?}", fields);
             continue;
         }
@@ -159,7 +161,7 @@ pub async fn list_databases(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<Strin
     }
     let num_databases = databases.len();
     info!("Found {} databases", num_databases);
-    Ok(databases)
+    databases
 }
 
 /// lists all extensions in a single database
@@ -174,8 +176,12 @@ pub async fn list_extensions(cdb: &CoreDB, ctx: Arc<Context>, database: &str) ->
         .await
         .unwrap();
     let result_string = psql_out.stdout.unwrap();
+    Ok(parse_extensions(&result_string))
+}
+
+fn parse_extensions(psql_str: &str) -> Vec<ExtRow> {
     let mut extensions = vec![];
-    for line in result_string.lines().skip(2) {
+    for line in psql_str.lines().skip(2) {
         let fields: Vec<&str> = line.split('|').map(|s| s.trim()).collect();
         if fields.len() < 4 {
             debug!("Done:{:?}", fields);
@@ -191,13 +197,14 @@ pub async fn list_extensions(cdb: &CoreDB, ctx: Arc<Context>, database: &str) ->
     }
     let num_extensions = extensions.len();
     info!("Found {} extensions", num_extensions);
-    Ok(extensions)
+    extensions
 }
 
 /// list databases then get all extensions from each database
 pub async fn get_all_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<Extension>, Error> {
     let databases = list_databases(cdb, ctx.clone()).await?;
-
+    warn!("Databases: {:?}", databases);
+    // sleep 10
     let mut ext_hashmap: HashMap<String, Vec<ExtensionInstallLocation>> = HashMap::new();
     // query every database for extensions
     // transform results by extension name, rather than by database
@@ -253,69 +260,123 @@ fn diff_extensions(desired: &[Extension], actual: &[Extension]) -> Vec<Extension
     diff
 }
 
-#[test]
-fn test_diff() {
-    let postgis_disabled = Extension {
-        name: "postgis".to_owned(),
-        locations: vec![ExtensionInstallLocation {
-            enabled: false,
-            database: "postgres".to_owned(),
-            schema: "public".to_owned(),
-            version: Some("1.1.1".to_owned()),
-        }],
-    };
 
-    let pgmq_enabled = Extension {
-        name: "pgmq".to_owned(),
-        locations: vec![ExtensionInstallLocation {
-            enabled: true,
-            database: "postgres".to_owned(),
-            schema: "public".to_owned(),
-            version: Some("1.1.1".to_owned()),
-        }],
-    };
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    let pgmq_disabled = Extension {
-        name: "pgmq".to_owned(),
-        locations: vec![ExtensionInstallLocation {
-            enabled: false,
-            database: "postgres".to_owned(),
-            schema: "public".to_owned(),
-            version: Some("1.1.1".to_owned()),
-        }],
-    };
+    #[test]
+    fn test_diff() {
+        let postgis_disabled = Extension {
+            name: "postgis".to_owned(),
+            locations: vec![ExtensionInstallLocation {
+                enabled: false,
+                database: "postgres".to_owned(),
+                schema: "public".to_owned(),
+                version: Some("1.1.1".to_owned()),
+            }],
+        };
 
-    let desired = vec![postgis_disabled.clone(), pgmq_enabled.clone()];
-    let actual = vec![postgis_disabled.clone(), pgmq_disabled.clone()];
-    // diff should be that we need to enable pgmq
-    let diff = diff_extensions(&desired, &actual);
-    assert_eq!(diff.len(), 1);
-    assert_eq!(diff[0], pgmq_enabled);
+        let pgmq_enabled = Extension {
+            name: "pgmq".to_owned(),
+            locations: vec![ExtensionInstallLocation {
+                enabled: true,
+                database: "postgres".to_owned(),
+                schema: "public".to_owned(),
+                version: Some("1.1.1".to_owned()),
+            }],
+        };
 
-    // order does not matter
-    let desired = vec![pgmq_enabled.clone(), postgis_disabled.clone()];
-    let actual = vec![postgis_disabled.clone(), pgmq_disabled.clone()];
-    // diff will still be to enable pgmq
-    let diff = diff_extensions(&desired, &actual);
-    assert_eq!(diff.len(), 1);
-    assert_eq!(diff[0], pgmq_enabled);
+        let pgmq_disabled = Extension {
+            name: "pgmq".to_owned(),
+            locations: vec![ExtensionInstallLocation {
+                enabled: false,
+                database: "postgres".to_owned(),
+                schema: "public".to_owned(),
+                version: Some("1.1.1".to_owned()),
+            }],
+        };
 
-    let desired = vec![postgis_disabled.clone(), pgmq_enabled.clone()];
-    let actual = vec![postgis_disabled.clone(), pgmq_disabled.clone()];
-    // diff should be that we need to enable pgmq
-    let diff = diff_extensions(&desired, &actual);
-    assert_eq!(diff.len(), 1);
-    assert_eq!(diff[0], pgmq_enabled);
+        let desired = vec![postgis_disabled.clone(), pgmq_enabled.clone()];
+        let actual = vec![postgis_disabled.clone(), pgmq_disabled.clone()];
+        // diff should be that we need to enable pgmq
+        let diff = diff_extensions(&desired, &actual);
+        assert_eq!(diff.len(), 1);
+        assert_eq!(diff[0], pgmq_enabled);
 
-    let desired = vec![postgis_disabled.clone(), pgmq_enabled.clone()];
-    let actual = vec![postgis_disabled.clone(), pgmq_enabled.clone()];
-    // diff == actual, so diff should be empty
-    let diff = diff_extensions(&desired, &actual);
-    assert_eq!(diff.len(), 0);
+        // order does not matter
+        let desired = vec![pgmq_enabled.clone(), postgis_disabled.clone()];
+        let actual = vec![postgis_disabled.clone(), pgmq_disabled.clone()];
+        // diff will still be to enable pgmq
+        let diff = diff_extensions(&desired, &actual);
+        assert_eq!(diff.len(), 1);
+        assert_eq!(diff[0], pgmq_enabled);
 
-    let desired = vec![postgis_disabled.clone()];
-    let actual = vec![postgis_disabled.clone(), pgmq_enabled.clone()];
-    // less extensions desired than exist - should be a no op
-    let diff = diff_extensions(&desired, &actual);
-    assert_eq!(diff.len(), 0);
+        let desired = vec![postgis_disabled.clone(), pgmq_enabled.clone()];
+        let actual = vec![postgis_disabled.clone(), pgmq_disabled.clone()];
+        // diff should be that we need to enable pgmq
+        let diff = diff_extensions(&desired, &actual);
+        assert_eq!(diff.len(), 1);
+        assert_eq!(diff[0], pgmq_enabled);
+
+        let desired = vec![postgis_disabled.clone(), pgmq_enabled.clone()];
+        let actual = vec![postgis_disabled.clone(), pgmq_enabled.clone()];
+        // diff == actual, so diff should be empty
+        let diff = diff_extensions(&desired, &actual);
+        assert_eq!(diff.len(), 0);
+
+        let desired = vec![postgis_disabled.clone()];
+        let actual = vec![postgis_disabled.clone(), pgmq_enabled.clone()];
+        // less extensions desired than exist - should be a no op
+        let diff = diff_extensions(&desired, &actual);
+        assert_eq!(diff.len(), 0);
+    }
+
+
+    #[test]
+    fn test_parse_databases() {
+        let two_cols = "datname  
+        ----------
+         postgres
+         cat
+         dog
+        (3 rows)
+        
+        ";
+
+        let rows = parse_databases(two_cols);
+        println!("{:?}", rows);
+        assert_eq!(rows.len(), 3);
+        assert_eq!(rows[0], "postgres");
+        assert_eq!(rows[1], "cat");
+        assert_eq!(rows[2], "dog");
+    }
+
+    #[test]
+    fn test_parse_extensions() {
+        let ext_psql = "        name        | version | enabled |   schema   
+        --------------------+---------+---------+------------
+         adminpack          | 2.1     | f       | public
+         amcheck            | 1.3     | f       | public
+         autoinc            | 1.0     | f       | public
+         bloom              | 1.0     | f       | public
+         btree_gin          | 1.3     | f       | public
+         btree_gist         | 1.7     | f       | public
+         citext             | 1.6     | f       | public
+         cube               | 1.5     | f       | public
+         dblink             | 1.2     | f       | public";
+
+
+        let ext = parse_extensions(ext_psql);
+        assert_eq!(ext.len(), 9);
+        assert_eq!(ext[0].name, "adminpack");
+        assert_eq!(ext[0].enabled, false);
+        assert_eq!(ext[0].version, "2.1".to_owned());
+        assert_eq!(ext[0].schema, "public".to_owned());
+
+        assert_eq!(ext[8].name, "dblink");
+        assert_eq!(ext[8].enabled, false);
+        assert_eq!(ext[8].version, "1.2".to_owned());
+        assert_eq!(ext[8].schema, "public".to_owned());
+    }
 }
