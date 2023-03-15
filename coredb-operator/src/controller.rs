@@ -23,8 +23,7 @@ use kube::{
 };
 
 use crate::{
-    extensions::{get_all_extensions, manage_extensions},
-    postgres_exporter_role::create_postgres_exporter_role,
+    extensions::reconcile_extensions, postgres_exporter_role::create_postgres_exporter_role,
     secret::reconcile_secret,
 };
 use k8s_openapi::{
@@ -90,7 +89,7 @@ pub struct Context {
     pub metrics: Metrics,
 }
 
-#[derive(Clone, Debug, Deserialize, JsonSchema, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, JsonSchema, Serialize, PartialEq)]
 pub struct Extension {
     pub name: String,
     pub locations: Vec<ExtensionInstallLocation>,
@@ -105,7 +104,8 @@ impl Default for Extension {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, JsonSchema, Serialize, PartialEq)]
+
+#[derive(Clone, Debug, Deserialize, Eq, Hash, JsonSchema, Serialize, PartialEq)]
 pub struct ExtensionInstallLocation {
     pub enabled: bool,
     // no database or schema when disabled
@@ -209,24 +209,10 @@ impl CoreDB {
             return Ok(Action::requeue(Duration::from_secs(1)));
         }
 
-        let mut extensions: Vec<Extension> =
-            get_all_extensions(self, ctx.clone()).await.unwrap_or_else(|_| {
-                panic!(
-                    "Error getting extensions on CoreDB {}",
-                    self.metadata.name.clone().unwrap()
-                )
-            });
-
-        // TODO(chuckhend) - reconcile extensions before create/drop in manage_extensions
-        manage_extensions(self, ctx.clone()).await.unwrap_or_else(|_| {
-            panic!(
-                "Error updating extensions on CoreDB {}",
-                self.metadata.name.clone().unwrap()
-            )
-        });
+        let mut extensions: Vec<Extension> = reconcile_extensions(self, ctx.clone()).await.unwrap();
         // must be sorted same, else reconcile will trigger again
         extensions.sort_by_key(|e| e.name.clone());
-        // always overwrite status object with what we saw
+
         let new_status = Patch::Apply(json!({
             "apiVersion": "coredb.io/v1alpha1",
             "kind": "CoreDB",
