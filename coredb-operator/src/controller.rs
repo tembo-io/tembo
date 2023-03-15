@@ -210,10 +210,6 @@ impl CoreDB {
             return Ok(Action::requeue(Duration::from_secs(1)));
         }
 
-        if !is_pod_ready().matches_object(Some(&primary_pod)) {
-            debug!("Did not find primary pod");
-            return Ok(Action::requeue(Duration::from_secs(1)));
-        }
         let mut extensions: Vec<Extension> = reconcile_extensions(self, ctx.clone()).await.unwrap();
         // must be sorted same, else reconcile will trigger again
         extensions.sort_by_key(|e| e.name.clone());
