@@ -139,7 +139,10 @@ async fn reconcile(cdb: Arc<CoreDB>, ctx: Arc<Context>) -> Result<Action> {
     info!("Reconciling CoreDB \"{}\" in {}", cdb.name_any(), ns);
     finalizer(&coredbs, COREDB_FINALIZER, cdb, |event| async {
         match event {
-            Finalizer::Apply(cdb) => cdb.reconcile(ctx.clone()).await,
+            Finalizer::Apply(cdb) => match cdb.reconcile(ctx.clone()).await {
+                Ok(action) => Ok(action),
+                Err(requeue_action) => Ok(requeue_action),
+            },
             Finalizer::Cleanup(cdb) => cdb.cleanup(ctx.clone()).await,
         }
     })
@@ -155,7 +158,7 @@ fn error_policy(cdb: Arc<CoreDB>, error: &Error, ctx: Arc<Context>) -> Action {
 
 impl CoreDB {
     // Reconcile (for non-finalizer related changes)
-    async fn reconcile(&self, ctx: Arc<Context>) -> Result<Action> {
+    async fn reconcile(&self, ctx: Arc<Context>) -> Result<Action, Action> {
         let client = ctx.client.clone();
         let _recorder = ctx.diagnostics.read().await.recorder(client.clone(), self);
         let ns = self.namespace().unwrap();
@@ -163,19 +166,22 @@ impl CoreDB {
         let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &ns);
 
         // reconcile secret
-        reconcile_secret(self, ctx.clone())
-            .await
-            .expect("error reconciling secret");
+        reconcile_secret(self, ctx.clone()).await.map_err(|e| {
+            error!("Error reconciling secret: {:?}", e);
+            Action::requeue(Duration::from_secs(10))
+        })?;
 
         // reconcile statefulset
-        reconcile_sts(self, ctx.clone())
-            .await
-            .expect("error reconciling statefulset");
+        reconcile_sts(self, ctx.clone()).await.map_err(|e| {
+            error!("Error reconciling statefulset: {:?}", e);
+            Action::requeue(Duration::from_secs(10))
+        })?;
 
         // reconcile service
-        reconcile_svc(self, ctx.clone())
-            .await
-            .expect("error reconciling service");
+        reconcile_svc(self, ctx.clone()).await.map_err(|e| {
+            error!("Error reconciling service: {:?}", e);
+            Action::requeue(Duration::from_secs(10))
+        })?;
 
         let primary_pod = self.primary_pod(ctx.client.clone()).await;
         if primary_pod.is_err() {
@@ -221,10 +227,10 @@ impl CoreDB {
             }
         }));
         let ps = PatchParams::apply("cntrlr").force();
-        let _o = coredbs
-            .patch_status(&name, &ps, &new_status)
-            .await
-            .map_err(Error::KubeError)?;
+        let _o = coredbs.patch_status(&name, &ps, &new_status).await.map_err(|e| {
+            error!("Error updating CoreDB status: {:?}", e);
+            Action::requeue(Duration::from_secs(10))
+        })?;
 
         // If no events were received, check back every minute
         Ok(Action::requeue(Duration::from_secs(60)))
@@ -296,7 +302,7 @@ impl CoreDB {
             .name
             .unwrap();
 
-        return PsqlCommand::new(
+        PsqlCommand::new(
             pod_name,
             self.metadata.namespace.clone().unwrap(),
             command,
@@ -304,7 +310,7 @@ impl CoreDB {
             client,
         )
         .execute()
-        .await;
+        .await
     }
 }
 
