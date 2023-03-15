@@ -25,33 +25,33 @@ default = []
 telemetry = ["tonic", "opentelemetry-otlp"]
 
 [dependencies]
-actix-web = "4.2.1"
-futures = "0.3.25"
-tokio = { version = "1.22.0", features = ["macros", "rt-multi-thread"] }
-k8s-openapi = { version = "0.16.0", features = ["v1_24", "schemars"], default-features = false }
-schemars = { version = "0.8.11", features = ["chrono"] }
-serde = { version = "1.0.148", features = ["derive"] }
-serde_json = "1.0.89"
-serde_yaml = "0.9.14"
+actix-web = "4.3.1"
+futures = "0.3.27"
+tokio = { version = "1.26.0", features = ["macros", "rt-multi-thread"] }
+k8s-openapi = { version = "0.17.0", features = ["v1_24", "schemars"], default-features = false }
+schemars = { version = "0.8.12", features = ["chrono"] }
+serde = { version = "1.0.156", features = ["derive"] }
+serde_json = "1.0.94"
+serde_yaml = "0.9.19"
 prometheus = "0.13.3"
-chrono = { version = "0.4.23", features = ["serde"] }
+chrono = { version = "0.4.24", features = ["serde"] }
 tracing = "0.1.37"
 tracing-subscriber = { version = "0.3.16", features = ["json", "env-filter"] }
 tracing-opentelemetry = "0.18.0"
 opentelemetry = { version = "0.18.0", features = ["trace", "rt-tokio"] }
 opentelemetry-otlp = { version = "0.11.0", features = ["tokio"], optional = true }
 tonic = { version = "0.8.3", optional = true }
-thiserror = "1.0.37"
+thiserror = "1.0.39"
 passwords = "3.1.12"
 regex = "1.7.1"
 
 [dev-dependencies]
 assert-json-diff = "2.0.2"
-http = "0.2.8"
-hyper = "0.14.23"
+http = "0.2.9"
+hyper = "0.14.25"
 rand = "0.8.5"
 tower-test = "0.4.0"
 
 [dependencies.kube]
 features = ["runtime", "client", "derive", "ws"]
-version = "0.77.0"
+version = "0.80.0"
