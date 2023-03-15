@@ -25,7 +25,7 @@ pub enum Error {
     SerializationError(#[source] serde_json::Error),
 
     #[error("Kube Error: {0}")]
-    KubeError(#[source] kube::Error),
+    KubeError(#[from] kube::Error),
 
     #[error("Finalizer Error: {0}")]
     // NB: awkward type because finalizer::Error embeds the reconciler error (which is this)
