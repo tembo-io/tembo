@@ -153,7 +153,11 @@ fn parse_databases(psql_str: &str) -> Vec<String> {
     let mut databases = vec![];
     for line in psql_str.lines().skip(2) {
         let fields: Vec<&str> = line.split('|').map(|s| s.trim()).collect();
-        if fields.is_empty() || fields[0].is_empty() || fields[0].contains("rows)") {
+        if fields.is_empty()
+            || fields[0].is_empty()
+            || fields[0].contains("rows)")
+            || fields[0].contains("row)")
+        {
             debug!("Done:{:?}", fields);
             continue;
         }
@@ -203,7 +207,7 @@ fn parse_extensions(psql_str: &str) -> Vec<ExtRow> {
 /// list databases then get all extensions from each database
 pub async fn get_all_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<Extension>, Error> {
     let databases = list_databases(cdb, ctx.clone()).await?;
-    warn!("Databases: {:?}", databases);
+    debug!("databases: {:?}", databases);
     // sleep 10
     let mut ext_hashmap: HashMap<String, Vec<ExtensionInstallLocation>> = HashMap::new();
     // query every database for extensions
@@ -335,7 +339,7 @@ mod tests {
 
     #[test]
     fn test_parse_databases() {
-        let two_cols = " datname  
+        let three_db = " datname  
         ----------
          postgres
          cat
@@ -344,7 +348,21 @@ mod tests {
         
          ";
 
-        let rows = parse_databases(two_cols);
+        let rows = parse_databases(three_db);
+        println!("{:?}", rows);
+        assert_eq!(rows.len(), 3);
+        assert_eq!(rows[0], "postgres");
+        assert_eq!(rows[1], "cat");
+        assert_eq!(rows[2], "dog");
+
+        let one_db = " datname  
+        ----------
+         postgres
+        (1 row)
+        
+         ";
+
+        let rows = parse_databases(one_db);
         println!("{:?}", rows);
         assert_eq!(rows.len(), 3);
         assert_eq!(rows[0], "postgres");
