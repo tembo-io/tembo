@@ -27,5 +27,5 @@ impl Default for Config {
 
 /// source a variable from environment - use default if not exists
 fn from_env_default(key: &str, default: &str) -> String {
-    env::var(key).unwrap_or_else(|_| default.to_owned())
+    dotenv::var(key).unwrap_or_else(|_| env::var(key).unwrap_or_else(|_| default.to_owned()))
 }
