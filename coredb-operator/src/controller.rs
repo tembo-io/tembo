@@ -195,11 +195,7 @@ impl CoreDB {
             return Ok(Action::requeue(Duration::from_secs(1)));
         }
 
-        if !is_pod_ready().matches_object(Some(&primary_pod)) {
-            debug!("Did not find primary pod");
-            return Ok(Action::requeue(Duration::from_secs(1)));
-        }
-
+        // creating exporter role is pre-requisite to the postgres pod becoming "ready"
         create_postgres_exporter_role(self, ctx.clone())
             .await
             .unwrap_or_else(|_| {
@@ -208,6 +204,11 @@ impl CoreDB {
                     self.metadata.name.clone().unwrap()
                 )
             });
+
+        if !is_pod_ready().matches_object(Some(&primary_pod)) {
+            debug!("Did not find primary pod");
+            return Ok(Action::requeue(Duration::from_secs(1)));
+        }
 
         if !is_pod_ready().matches_object(Some(&primary_pod)) {
             debug!("Did not find primary pod");
