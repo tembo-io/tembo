@@ -18,7 +18,7 @@ impl Default for Config {
                 "postgres://postgres@localhost/trunk_registry",
             ),
             bucket_name: from_env_default("S3_BUCKET", "trunk-registry"),
-            region: from_env_default("S3_REGION", "us-east-1"),
+            region: from_env_default("S3_REGION", ""),
             aws_access_key: from_env_default("AWS_ACCESS_KEY", ""),
             aws_secret_key: from_env_default("AWS_SECRET_KEY", ""),
         }

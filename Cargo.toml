@@ -7,7 +7,6 @@ edition = "2021"
 
 [dependencies]
 actix-web = "4.3.1"
-rust-s3 = "0.32.3"
 anyhow = "1.0.69"
 sqlx = { version = "0.6.2", features = [ "runtime-tokio-native-tls" , "postgres" ] }
 url = "2.3.1"
@@ -18,3 +17,4 @@ serde = { version = "1.0.154", features = ["derive"] }
 futures = "0.3.26"
 serde_json = "1.0.94"
 chrono = "0.4.23"
+registry-s3 = { path = "registry-s3" }
