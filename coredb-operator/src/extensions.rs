@@ -335,14 +335,14 @@ mod tests {
 
     #[test]
     fn test_parse_databases() {
-        let two_cols = "datname  
+        let two_cols = " datname  
         ----------
          postgres
          cat
          dog
         (3 rows)
         
-        ";
+         ";
 
         let rows = parse_databases(two_cols);
         println!("{:?}", rows);
