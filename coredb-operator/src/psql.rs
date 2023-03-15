@@ -65,8 +65,7 @@ impl PsqlCommand {
         let mut attached_process = self
             .pods_api
             .exec(self.pod_name.as_str(), &psql_command, &attach_params)
-            .await
-            .unwrap();
+            .await?;
 
         // https://docs.rs/tokio/latest/tokio/io/trait.AsyncReadExt.html#method.read_to_string
         // Since waiting for EOF to be reached, a join is not needed and the attached_process will
