@@ -3,7 +3,10 @@ use crate::{
     Context, CoreDB, Error,
 };
 use regex::Regex;
-use std::{collections::HashMap, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+};
 use tracing::{debug, info, warn};
 
 #[derive(Debug)]
@@ -64,9 +67,13 @@ name asc,
 enabled desc
 "#;
 
-pub async fn manage_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
+/// handles create/drop extensions
+pub async fn toggle_extensions(
+    cdb: &CoreDB,
+    extensions: &[Extension],
+    ctx: Arc<Context>,
+) -> Result<(), Error> {
     let client = ctx.client.clone();
-    let extensions = &cdb.spec.extensions;
     let re = Regex::new(r"[a-zA-Z][0-9a-zA-Z_-]*$").unwrap();
 
     // TODO(ianstanton) Some extensions will fail to create. We need to handle and surface any errors.
@@ -81,6 +88,7 @@ pub async fn manage_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Er
                 ext_name
             )
         } else {
+            // extensions can be installed in multiple databases but only a single schema
             for ext_loc in ext.locations.iter() {
                 let database_name = ext_loc.database.to_owned();
                 if !re.is_match(&database_name) {
@@ -128,6 +136,7 @@ pub async fn manage_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Er
     Ok(())
 }
 
+/// returns all the databases in an instance
 pub async fn list_databases(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<String>, Error> {
     let client = ctx.client.clone();
     let psql_out = cdb
@@ -153,6 +162,7 @@ pub async fn list_databases(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<Strin
     Ok(databases)
 }
 
+/// lists all extensions in a single database
 pub async fn list_extensions(cdb: &CoreDB, ctx: Arc<Context>, database: &str) -> Result<Vec<ExtRow>, Error> {
     let client = ctx.client.clone();
     let psql_out = cdb
@@ -215,4 +225,97 @@ pub async fn get_all_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<E
         });
     }
     Ok(ext_spec)
+}
+
+
+/// reconcile extensions between the spec and the database
+pub async fn reconcile_extensions(coredb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<Extension>, Error> {
+    // always get the current state of extensions in the database
+    // this is due to out of band changes - manual create/drop extension
+    let actual_extensions = get_all_extensions(coredb, ctx.clone()).await?;
+    let desired_extensions = coredb.spec.extensions.clone();
+
+    let diff = diff_extensions(&desired_extensions, &actual_extensions);
+    toggle_extensions(coredb, &diff, ctx.clone()).await?;
+
+    // return final state of extensions
+    get_all_extensions(coredb, ctx.clone()).await
+}
+
+
+// returns any elements that are in the desired, and not in actual
+// any Extensions returned by this function need to get "applied"
+fn diff_extensions(desired: &[Extension], actual: &[Extension]) -> Vec<Extension> {
+    let set_desired: HashSet<_> = desired.iter().cloned().collect();
+    let set_actual: HashSet<_> = actual.iter().cloned().collect();
+    let diff: Vec<Extension> = set_desired.difference(&set_actual).cloned().collect();
+    info!("Extensions diff: {:?}", diff);
+    diff
+}
+
+#[test]
+fn test_diff() {
+    let postgis_disabled = Extension {
+        name: "postgis".to_owned(),
+        locations: vec![ExtensionInstallLocation {
+            enabled: false,
+            database: "postgres".to_owned(),
+            schema: "public".to_owned(),
+            version: Some("1.1.1".to_owned()),
+        }],
+    };
+
+    let pgmq_enabled = Extension {
+        name: "pgmq".to_owned(),
+        locations: vec![ExtensionInstallLocation {
+            enabled: true,
+            database: "postgres".to_owned(),
+            schema: "public".to_owned(),
+            version: Some("1.1.1".to_owned()),
+        }],
+    };
+
+    let pgmq_disabled = Extension {
+        name: "pgmq".to_owned(),
+        locations: vec![ExtensionInstallLocation {
+            enabled: false,
+            database: "postgres".to_owned(),
+            schema: "public".to_owned(),
+            version: Some("1.1.1".to_owned()),
+        }],
+    };
+
+    let desired = vec![postgis_disabled.clone(), pgmq_enabled.clone()];
+    let actual = vec![postgis_disabled.clone(), pgmq_disabled.clone()];
+    // diff should be that we need to enable pgmq
+    let diff = diff_extensions(&desired, &actual);
+    assert_eq!(diff.len(), 1);
+    assert_eq!(diff[0], pgmq_enabled);
+
+    // order does not matter
+    let desired = vec![pgmq_enabled.clone(), postgis_disabled.clone()];
+    let actual = vec![postgis_disabled.clone(), pgmq_disabled.clone()];
+    // diff will still be to enable pgmq
+    let diff = diff_extensions(&desired, &actual);
+    assert_eq!(diff.len(), 1);
+    assert_eq!(diff[0], pgmq_enabled);
+
+    let desired = vec![postgis_disabled.clone(), pgmq_enabled.clone()];
+    let actual = vec![postgis_disabled.clone(), pgmq_disabled.clone()];
+    // diff should be that we need to enable pgmq
+    let diff = diff_extensions(&desired, &actual);
+    assert_eq!(diff.len(), 1);
+    assert_eq!(diff[0], pgmq_enabled);
+
+    let desired = vec![postgis_disabled.clone(), pgmq_enabled.clone()];
+    let actual = vec![postgis_disabled.clone(), pgmq_enabled.clone()];
+    // diff == actual, so diff should be empty
+    let diff = diff_extensions(&desired, &actual);
+    assert_eq!(diff.len(), 0);
+
+    let desired = vec![postgis_disabled.clone()];
+    let actual = vec![postgis_disabled.clone(), pgmq_enabled.clone()];
+    // less extensions desired than exist - should be a no op
+    let diff = diff_extensions(&desired, &actual);
+    assert_eq!(diff.len(), 0);
 }
