@@ -7,7 +7,7 @@ use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
 };
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 
 #[derive(Debug)]
@@ -89,6 +89,7 @@ pub async fn toggle_extensions(
             // extensions can be installed in multiple databases but only a single schema
             for ext_loc in ext.locations.iter() {
                 let database_name = ext_loc.database.to_owned();
+
                 if !re.is_match(&database_name) {
                     warn!(
                         "Extension.Database {}.{} is not formatted properly. Skipping operation.",
@@ -96,37 +97,37 @@ pub async fn toggle_extensions(
                     );
                     continue;
                 }
-                if ext_loc.enabled {
-                    info!("Creating extension: {}, database {}", ext_name, database_name);
-                    let schema_name = ext_loc.schema.to_owned();
-                    if !re.is_match(&schema_name) {
-                        warn!(
-                            "Extension.Database.Schema {}.{}.{} is not formatted properly. Skipping operation.",
-                            ext_name, database_name, schema_name
-                        );
-                        continue;
+                let command = match ext_loc.enabled {
+                    true => {
+                        info!("Creating extension: {}, database {}", ext_name, database_name);
+                        let schema_name = ext_loc.schema.to_owned();
+                        if !re.is_match(&schema_name) {
+                            warn!(
+                                "Extension.Database.Schema {}.{}.{} is not formatted properly. Skipping operation.",
+                                ext_name, database_name, schema_name
+                            );
+                            continue;
+                        }
+                        format!("CREATE EXTENSION IF NOT EXISTS {ext_name} SCHEMA {schema_name};")
                     }
-                    // this will no-op if we've already created the extension
-                    let result = cdb
-                        .psql(
-                            format!("CREATE EXTENSION IF NOT EXISTS {ext_name} SCHEMA {schema_name};"),
-                            database_name,
-                            client.clone(),
-                        )
-                        .await
-                        .unwrap();
-                    debug!("Result: {}", result.stdout.clone().unwrap());
-                } else {
-                    info!("Dropping extension: {}, database {}", ext_name, database_name);
-                    let result = cdb
-                        .psql(
-                            format!("DROP EXTENSION IF EXISTS {ext_name};"),
-                            database_name,
-                            client.clone(),
-                        )
-                        .await
-                        .unwrap();
-                    debug!("Result: {}", result.stdout.clone().unwrap());
+                    false => {
+                        info!("Dropping extension: {}, database {}", ext_name, database_name);
+                        format!("DROP EXTENSION IF EXISTS {ext_name};")
+                    }
+                };
+
+                let result = cdb
+                    .psql(command.clone(), database_name.clone(), client.clone())
+                    .await;
+
+                match result {
+                    Ok(result) => {
+                        debug!("Result: {}", result.stdout.clone().unwrap());
+                    }
+                    Err(err) => {
+                        error!("error managing extension");
+                        return Err(err.into());
+                    }
                 }
             }
         }
@@ -364,10 +365,8 @@ mod tests {
 
         let rows = parse_databases(one_db);
         println!("{:?}", rows);
-        assert_eq!(rows.len(), 3);
+        assert_eq!(rows.len(), 1);
         assert_eq!(rows[0], "postgres");
-        assert_eq!(rows[1], "cat");
-        assert_eq!(rows[2], "dog");
     }
 
     #[test]
