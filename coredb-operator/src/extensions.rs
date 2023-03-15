@@ -144,8 +144,7 @@ pub async fn list_databases(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<Strin
             "postgres".to_owned(),
             client.clone(),
         )
-        .await
-        .unwrap();
+        .await?;
     let result_string = psql_out.stdout.unwrap();
     Ok(parse_databases(&result_string))
 }

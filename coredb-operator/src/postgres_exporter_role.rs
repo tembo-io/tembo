@@ -39,7 +39,6 @@ pub async fn create_postgres_exporter_role(cdb: &CoreDB, ctx: Arc<Context>) -> R
             "postgres".to_owned(),
             client.clone(),
         )
-        .await
-        .unwrap();
+        .await?;
     Ok(())
 }
