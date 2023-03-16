@@ -32,33 +32,28 @@ Prerequisites:
    `❯ kind create cluster`
 
 1. Install CoreDB operator in the cluster
-   1. `cargo install coredb-cli`
-   2. `coredb-cli install --branch main`
+
+   `> cargo install coredb-cli`
+
+   `> coredb-cli install --branch main`
 
 2. Install Traefik in the cluster
-   1. `helm repo add traefik https://traefik.github.io/charts`
-   2. `helm repo update`
-   3. `helm install --create-namespace --namespace=traefik-v2 --values ./tests/traefik-values.yaml traefik traefik/traefik`
+   
+   `> make setup.traefik`
 
 3. Set up local postgres queue
 
    `❯ docker run -d --name pgmq -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres`
 
-4. Set the following environment variables:
-   - `PG_CONN_URL`
-   - `CONTROL_PLANE_EVENTS_QUEUE`
-   - `DATA_PLANE_EVENTS_QUEUE`
-```
-export PG_CONN_URL=postgres://postgres:postgres@localhost:5432/postgres
-export CONTROL_PLANE_EVENTS_QUEUE=myqueue_control_plane
-export DATA_PLANE_EVENTS_QUEUE=myqueue_data_plane
-```
+4. Run the reconciler
 
-1. Run the reconciler
+   `❯ make run.local`
 
-   `❯ cargo run`
+5. Or, run the reconciler with the test configuration:
 
-2. Next, you'll need to post some messages to the queue for the reconciler to pick up. That can be performed in functional testing like this `cargo test -- --ignored`
+   `❯ make run.test`
+
+6. Next, you'll need to post some messages to the queue for the reconciler to pick up. That can be performed in functional testing like this `cargo test -- --ignored`.
 
 ## Codegen
 
@@ -66,15 +61,15 @@ This project requires generated client side types for the coredb-operator. To up
 
 Install `kopium` if you don't have it already.
 
-```cargo install kopium```
+   `> cargo install kopium`
 
 Download the specified CoreDB spec.
 
-`wget https://raw.githubusercontent.com/CoreDB-io/coredb/release/2023.3.9/coredb-operator/yaml/crd.yaml`
+   `> wget https://raw.githubusercontent.com/CoreDB-io/coredb/release/2023.3.9/coredb-operator/yaml/crd.yaml`
 
-Generate the Rust code:
+Generate the Rust code. Note: there are several overrides. Inspect the git diff and adjust accordingly.
 
-`kopium -f crd.yaml > src/coredb_crd.rs`
+   `> kopium -f crd.yaml > src/coredb_crd.rs`
 
 ## Integration Testing
 

@@ -47,6 +47,8 @@ pub struct CoreDBSpec {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct CoreDBExtensions {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
     pub locations: Vec<CoreDBExtensionsLocations>,
     pub name: String,
 }
@@ -75,4 +77,6 @@ pub struct CoreDBStatus {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub extensions: Option<Vec<CoreDBExtensions>>,
     pub running: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub storage: Option<String>,
 }

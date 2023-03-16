@@ -53,6 +53,7 @@ mod test {
         let spec_js = serde_json::json!({
             "extensions": Some(vec![crd::CoreDBExtensions {
                 name: "postgis".to_owned(),
+                description: Some("PostGIS extension".to_owned()),
                 locations: vec![crd::CoreDBExtensionsLocations {
                     enabled: true,
                     version: Some("1.1.1".to_owned()),
