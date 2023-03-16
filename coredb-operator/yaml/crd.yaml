@@ -29,6 +29,8 @@ spec:
                 default: []
                 items:
                   properties:
+                    description:
+                      type: string
                     locations:
                       items:
                         properties:
@@ -50,6 +52,7 @@ spec:
                     name:
                       type: string
                   required:
+                  - description
                   - locations
                   - name
                   type: object
@@ -203,6 +206,8 @@ spec:
               extensions:
                 items:
                   properties:
+                    description:
+                      type: string
                     locations:
                       items:
                         properties:
@@ -224,6 +229,7 @@ spec:
                     name:
                       type: string
                   required:
+                  - description
                   - locations
                   - name
                   type: object
