@@ -30,6 +30,7 @@ spec:
                 items:
                   properties:
                     description:
+                      default: No description provided
                       type: string
                     locations:
                       items:
@@ -52,7 +53,6 @@ spec:
                     name:
                       type: string
                   required:
-                  - description
                   - locations
                   - name
                   type: object
@@ -207,6 +207,7 @@ spec:
                 items:
                   properties:
                     description:
+                      default: No description provided
                       type: string
                     locations:
                       items:
@@ -229,7 +230,6 @@ spec:
                     name:
                       type: string
                   required:
-                  - description
                   - locations
                   - name
                   type: object
