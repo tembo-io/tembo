@@ -410,12 +410,18 @@ mod tests {
         assert_eq!(ext[0].enabled, false);
         assert_eq!(ext[0].version, "2.1".to_owned());
         assert_eq!(ext[0].schema, "public".to_owned());
-        assert_eq!(ext[0].description, "administrative functions for PostgreSQL".to_owned());
+        assert_eq!(
+            ext[0].description,
+            "administrative functions for PostgreSQL".to_owned()
+        );
 
         assert_eq!(ext[8].name, "dblink");
         assert_eq!(ext[8].enabled, false);
         assert_eq!(ext[8].version, "1.2".to_owned());
         assert_eq!(ext[8].schema, "public".to_owned());
-        assert_eq!(ext[8].description, "connect to other PostgreSQL databases from within a database".to_owned());
+        assert_eq!(
+            ext[8].description,
+            "connect to other PostgreSQL databases from within a database".to_owned()
+        );
     }
 }

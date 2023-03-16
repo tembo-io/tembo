@@ -92,6 +92,7 @@ pub struct Context {
 #[derive(Clone, Debug, Deserialize, Eq, Hash, JsonSchema, Serialize, PartialEq)]
 pub struct Extension {
     pub name: String,
+    #[serde(default = "defaults::default_description")]
     pub description: String,
     pub locations: Vec<ExtensionInstallLocation>,
 }
