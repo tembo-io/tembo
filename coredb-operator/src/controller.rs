@@ -92,6 +92,8 @@ pub struct Context {
 #[derive(Clone, Debug, Deserialize, Eq, Hash, JsonSchema, Serialize, PartialEq)]
 pub struct Extension {
     pub name: String,
+    #[serde(default = "defaults::default_description")]
+    pub description: String,
     pub locations: Vec<ExtensionInstallLocation>,
 }
 
@@ -99,6 +101,7 @@ impl Default for Extension {
     fn default() -> Self {
         Extension {
             name: "pg_stat_statements".to_owned(),
+            description: " track planning and execution statistics of all SQL statements executed".to_owned(),
             locations: vec![ExtensionInstallLocation::default()],
         }
     }

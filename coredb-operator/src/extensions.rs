@@ -13,6 +13,7 @@ use tracing::{debug, error, info, warn};
 #[derive(Debug)]
 pub struct ExtRow {
     pub name: String,
+    pub description: String,
     pub version: String,
     pub enabled: bool,
     pub schema: String,
@@ -25,14 +26,19 @@ distinct on
 from
 (
 select
-    *
+    name,
+    version,
+    enabled,
+    schema,
+    description
 from
     (
     select
         t0.extname as name,
         t0.extversion as version,
         true as enabled,
-        t1.nspname as schema
+        t1.nspname as schema,
+        comment as description
     from
         (
         select
@@ -41,23 +47,32 @@ from
             extversion
         from
             pg_extension
-    ) t0,
+) t0,
         (
         select
             oid,
             nspname
         from
             pg_namespace
-    ) t1
+) t1,
+        (
+        select
+            name,
+            comment
+        from
+            pg_catalog.pg_available_extensions
+) t2
     where
         t1.oid = t0.extnamespace
+        and t2.name = t0.extname 
 ) installed
 union
-select 
+select
     name,
     default_version as version,
     false as enabled,
-    'public' as schema
+    'public' as schema,
+    comment as description
 from
     pg_catalog.pg_available_extensions
 order by
@@ -187,7 +202,7 @@ fn parse_extensions(psql_str: &str) -> Vec<ExtRow> {
     let mut extensions = vec![];
     for line in psql_str.lines().skip(2) {
         let fields: Vec<&str> = line.split('|').map(|s| s.trim()).collect();
-        if fields.len() < 4 {
+        if fields.len() < 5 {
             debug!("Done:{:?}", fields);
             continue;
         }
@@ -196,6 +211,7 @@ fn parse_extensions(psql_str: &str) -> Vec<ExtRow> {
             version: fields[1].to_owned(),
             enabled: fields[2] == "t",
             schema: fields[3].to_owned(),
+            description: fields[4].to_owned(),
         };
         extensions.push(package);
     }
@@ -208,8 +224,9 @@ fn parse_extensions(psql_str: &str) -> Vec<ExtRow> {
 pub async fn get_all_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<Extension>, Error> {
     let databases = list_databases(cdb, ctx.clone()).await?;
     debug!("databases: {:?}", databases);
-    // sleep 10
-    let mut ext_hashmap: HashMap<String, Vec<ExtensionInstallLocation>> = HashMap::new();
+
+    // (ext name, description) => [ExtensionInstallLocation]
+    let mut ext_hashmap: HashMap<(String, String), Vec<ExtensionInstallLocation>> = HashMap::new();
     // query every database for extensions
     // transform results by extension name, rather than by database
     for db in databases {
@@ -222,16 +239,17 @@ pub async fn get_all_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<E
                 schema: ext.schema,
             };
             ext_hashmap
-                .entry(ext.name)
+                .entry((ext.name, ext.description))
                 .or_insert_with(Vec::new)
                 .push(extlocation);
         }
     }
 
     let mut ext_spec: Vec<Extension> = Vec::new();
-    for (ext_name, ext_locations) in &ext_hashmap {
+    for ((extname, extdescr), ext_locations) in &ext_hashmap {
         ext_spec.push(Extension {
-            name: ext_name.clone(),
+            name: extname.clone(),
+            description: extdescr.clone(),
             locations: ext_locations.clone(),
         });
     }
@@ -273,6 +291,7 @@ mod tests {
     fn test_diff() {
         let postgis_disabled = Extension {
             name: "postgis".to_owned(),
+            description: "my description".to_owned(),
             locations: vec![ExtensionInstallLocation {
                 enabled: false,
                 database: "postgres".to_owned(),
@@ -283,6 +302,7 @@ mod tests {
 
         let pgmq_enabled = Extension {
             name: "pgmq".to_owned(),
+            description: "my description".to_owned(),
             locations: vec![ExtensionInstallLocation {
                 enabled: true,
                 database: "postgres".to_owned(),
@@ -293,6 +313,7 @@ mod tests {
 
         let pgmq_disabled = Extension {
             name: "pgmq".to_owned(),
+            description: "my description".to_owned(),
             locations: vec![ExtensionInstallLocation {
                 enabled: false,
                 database: "postgres".to_owned(),
@@ -370,18 +391,18 @@ mod tests {
 
     #[test]
     fn test_parse_extensions() {
-        let ext_psql = "        name        | version | enabled |   schema   
-        --------------------+---------+---------+------------
-         adminpack          | 2.1     | f       | public
-         amcheck            | 1.3     | f       | public
-         autoinc            | 1.0     | f       | public
-         bloom              | 1.0     | f       | public
-         btree_gin          | 1.3     | f       | public
-         btree_gist         | 1.7     | f       | public
-         citext             | 1.6     | f       | public
-         cube               | 1.5     | f       | public
-         dblink             | 1.2     | f       | public";
-
+        let ext_psql = "        name        | version | enabled |   schema   |                              description                               
+        --------------------+---------+---------+------------+------------------------------------------------------------------------
+         adminpack          | 2.1     | f       | public     | administrative functions for PostgreSQL
+         amcheck            | 1.3     | f       | public     | functions for verifying relation integrity
+         autoinc            | 1.0     | f       | public     | functions for autoincrementing fields
+         bloom              | 1.0     | f       | public     | bloom access method - signature file based index
+         btree_gin          | 1.3     | f       | public     | support for indexing common datatypes in GIN
+         btree_gist         | 1.7     | f       | public     | support for indexing common datatypes in GiST
+         citext             | 1.6     | f       | public     | data type for case-insensitive character strings
+         cube               | 1.5     | f       | public     | data type for multidimensional cubes
+         dblink             | 1.2     | f       | public     | connect to other PostgreSQL databases from within a database
+         (9 rows)";
 
         let ext = parse_extensions(ext_psql);
         assert_eq!(ext.len(), 9);
@@ -389,10 +410,18 @@ mod tests {
         assert_eq!(ext[0].enabled, false);
         assert_eq!(ext[0].version, "2.1".to_owned());
         assert_eq!(ext[0].schema, "public".to_owned());
+        assert_eq!(
+            ext[0].description,
+            "administrative functions for PostgreSQL".to_owned()
+        );
 
         assert_eq!(ext[8].name, "dblink");
         assert_eq!(ext[8].enabled, false);
         assert_eq!(ext[8].version, "1.2".to_owned());
         assert_eq!(ext[8].schema, "public".to_owned());
+        assert_eq!(
+            ext[8].description,
+            "connect to other PostgreSQL databases from within a database".to_owned()
+        );
     }
 }

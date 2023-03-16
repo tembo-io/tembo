@@ -121,6 +121,7 @@ mod test {
                 "extensions": [
                     {
                         "name": "postgis",
+                        "description": "PostGIS extension",
                         "locations": [{
                             "enabled": true,
                             "version": "1.1.1",
@@ -283,6 +284,7 @@ mod test {
                 "extensions": [
                     {
                         "name": "postgis",
+                        "description": "PostGIS extension",
                         "locations": [{
                             "enabled": false,
                             "version": "1.1.1",
@@ -320,6 +322,7 @@ mod test {
         let status = spec.status.unwrap();
         let extensions = status.extensions.unwrap();
         assert!(extensions.len() > 0);
+        assert!(extensions[0].description.len() > 0);
     }
 
     #[tokio::test]
@@ -366,6 +369,7 @@ mod test {
                 "extensions": [
                     {
                         "name": "postgis",
+                        "description": "PostGIS extension",
                         "locations": [{
                             "enabled": false,
                             "version": "1.1.1",
