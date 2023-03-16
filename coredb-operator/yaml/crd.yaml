@@ -29,6 +29,9 @@ spec:
                 default: []
                 items:
                   properties:
+                    description:
+                      default: No description provided
+                      type: string
                     locations:
                       items:
                         properties:
@@ -203,6 +206,9 @@ spec:
               extensions:
                 items:
                   properties:
+                    description:
+                      default: No description provided
+                      type: string
                     locations:
                       items:
                         properties:

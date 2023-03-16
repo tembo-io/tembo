@@ -57,3 +57,7 @@ pub fn default_database() -> String {
 pub fn default_schema() -> String {
     "public".to_owned()
 }
+
+pub fn default_description() -> String {
+    "No description provided".to_owned()
+}
