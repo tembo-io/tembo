@@ -10,7 +10,7 @@ use tokio_task_manager::{Task, TaskManager};
 
 #[derive(Parser)]
 #[command(author, version, about, long_about = None)]
-#[command(propagate_version = true)]
+#[command(propagate_version = false)]
 struct Cli {
     #[command(subcommand)]
     command: SubCommands,
