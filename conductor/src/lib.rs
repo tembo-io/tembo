@@ -6,7 +6,7 @@ pub mod types;
 use base64::{engine::general_purpose, Engine as _};
 use coredb_crd as crd;
 use coredb_crd::CoreDB;
-use errors::ReconcilerError;
+use errors::ConductorError;
 use ingress_route_tcp_crd::IngressRouteTCP;
 use k8s_openapi::api::core::v1::{Namespace, Secret};
 use k8s_openapi::api::networking::v1::Ingress;
@@ -16,7 +16,7 @@ use kube::{Api, Client};
 use log::{debug, info};
 use serde_json::{from_str, to_string, Value};
 
-pub type Result<T, E = ReconcilerError> = std::result::Result<T, E>;
+pub type Result<T, E = ConductorError> = std::result::Result<T, E>;
 
 pub async fn generate_spec(namespace: &str, spec: &crd::CoreDBSpec) -> Value {
     let spec = serde_json::json!({
@@ -30,9 +30,9 @@ pub async fn generate_spec(namespace: &str, spec: &crd::CoreDBSpec) -> Value {
     spec
 }
 
-pub async fn create_ing_route_tcp(client: Client, name: &str) -> Result<(), ReconcilerError> {
+pub async fn create_ing_route_tcp(client: Client, name: &str) -> Result<(), ConductorError> {
     let ing_api: Api<IngressRouteTCP> = Api::namespaced(client, name);
-    let params = PatchParams::apply("reconciler").force();
+    let params = PatchParams::apply("conductor").force();
     let ing = serde_json::json!({
         "apiVersion": "traefik.containo.us/v1alpha1",
         "kind": "IngressRouteTCP",
@@ -62,13 +62,13 @@ pub async fn create_ing_route_tcp(client: Client, name: &str) -> Result<(), Reco
     let _o = ing_api
         .patch(name, &params, &Patch::Apply(&ing))
         .await
-        .map_err(ReconcilerError::KubeError)?;
+        .map_err(ConductorError::KubeError)?;
     Ok(())
 }
 
-pub async fn create_metrics_ingress(client: Client, name: &str) -> Result<(), ReconcilerError> {
+pub async fn create_metrics_ingress(client: Client, name: &str) -> Result<(), ConductorError> {
     let ing_api: Api<Ingress> = Api::namespaced(client, name);
-    let params = PatchParams::apply("reconciler").force();
+    let params = PatchParams::apply("conductor").force();
     let ingress = serde_json::json!({
         "apiVersion": "networking.k8s.io/v1",
         "kind": "Ingress",
@@ -106,7 +106,7 @@ pub async fn create_metrics_ingress(client: Client, name: &str) -> Result<(), Re
     let _o = ing_api
         .patch(name, &params, &Patch::Apply(&ingress))
         .await
-        .map_err(ReconcilerError::KubeError)?;
+        .map_err(ConductorError::KubeError)?;
     Ok(())
 }
 
@@ -119,7 +119,7 @@ pub async fn get_all(client: Client, namespace: &str) -> Vec<CoreDB> {
     pg_list.items
 }
 
-pub async fn get_one(client: Client, namespace: &str) -> Result<CoreDB, ReconcilerError> {
+pub async fn get_one(client: Client, namespace: &str) -> Result<CoreDB, ConductorError> {
     let coredb_api: Api<CoreDB> = Api::namespaced(client, namespace);
     let pg_instance = coredb_api.get(namespace).await?;
     debug!("Namespace: {}, CoreDB: {:?}", namespace, pg_instance);
@@ -130,11 +130,11 @@ pub async fn get_one(client: Client, namespace: &str) -> Result<CoreDB, Reconcil
 pub async fn get_coredb_status(
     client: Client,
     namespace: &str,
-) -> Result<crd::CoreDB, ReconcilerError> {
+) -> Result<crd::CoreDB, ConductorError> {
     let coredb = get_one(client, namespace).await?;
 
     if coredb.status.is_none() {
-        Err(ReconcilerError::NoStatusReported)
+        Err(ConductorError::NoStatusReported)
     } else {
         Ok(coredb)
     }
@@ -144,32 +144,32 @@ pub async fn create_or_update(
     client: Client,
     namespace: &str,
     deployment: serde_json::Value,
-) -> Result<(), ReconcilerError> {
+) -> Result<(), ConductorError> {
     let coredb_api: Api<CoreDB> = Api::namespaced(client, namespace);
-    let params = PatchParams::apply("reconciler").force();
+    let params = PatchParams::apply("conductor").force();
     let name: String = serde_json::from_value(deployment["metadata"]["name"].clone()).unwrap();
     info!("\nCreating or updating CoreDB: {}", name);
     let _ = coredb_api
         .patch(&name, &params, &Patch::Apply(&deployment))
         .await
-        .map_err(ReconcilerError::KubeError)?;
+        .map_err(ConductorError::KubeError)?;
     Ok(())
 }
 
-pub async fn delete(client: Client, namespace: &str, name: &str) -> Result<(), ReconcilerError> {
+pub async fn delete(client: Client, namespace: &str, name: &str) -> Result<(), ConductorError> {
     let coredb_api: Api<CoreDB> = Api::namespaced(client, namespace);
     let params = DeleteParams::default();
     info!("\nDeleting CoreDB: {}", name);
     let _o = coredb_api
         .delete(name, &params)
         .await
-        .map_err(ReconcilerError::KubeError);
+        .map_err(ConductorError::KubeError);
     Ok(())
 }
 
-pub async fn create_namespace(client: Client, name: &str) -> Result<(), ReconcilerError> {
+pub async fn create_namespace(client: Client, name: &str) -> Result<(), ConductorError> {
     let ns_api: Api<Namespace> = Api::all(client);
-    let params = PatchParams::apply("reconciler").force();
+    let params = PatchParams::apply("conductor").force();
     let ns = serde_json::json!({
         "apiVersion": "v1",
         "kind": "Namespace",
@@ -181,24 +181,24 @@ pub async fn create_namespace(client: Client, name: &str) -> Result<(), Reconcil
     let _o = ns_api
         .patch(name, &params, &Patch::Apply(&ns))
         .await
-        .map_err(ReconcilerError::KubeError)?;
+        .map_err(ConductorError::KubeError)?;
     Ok(())
 }
 
-pub async fn delete_namespace(client: Client, name: &str) -> Result<(), ReconcilerError> {
+pub async fn delete_namespace(client: Client, name: &str) -> Result<(), ConductorError> {
     let ns_api: Api<Namespace> = Api::all(client);
     let params = DeleteParams::default();
     info!("\nDeleting namespace: {}", name);
     let _ = ns_api
         .delete(name, &params)
         .await
-        .map_err(ReconcilerError::KubeError);
+        .map_err(ConductorError::KubeError);
     Ok(())
 }
 
 // remove after COR-166
 #[allow(unused_variables)]
-pub async fn get_pg_conn(client: Client, name: &str) -> Result<String, ReconcilerError> {
+pub async fn get_pg_conn(client: Client, name: &str) -> Result<String, ConductorError> {
     // read secret <name>-connection
     let secret_name = format!("{name}-connection");
 

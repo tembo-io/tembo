@@ -13,7 +13,7 @@ serviceMonitors:
     enabled: true
 
 image:
-  repository: quay.io/coredb/reconciler
+  repository: quay.io/coredb/conductor
   tag: "latest"
   pullPolicy: IfNotPresent
 

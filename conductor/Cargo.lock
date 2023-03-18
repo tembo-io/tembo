@@ -153,6 +153,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "conductor"
+version = "0.1.0"
+dependencies = [
+ "base64 0.21.0",
+ "env_logger",
+ "futures",
+ "k8s-openapi",
+ "kube",
+ "log",
+ "pgmq",
+ "rand",
+ "schemars",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "tokio",
+ "tokio-retry",
+]
+
+[[package]]
 name = "core-foundation"
 version = "0.9.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1374,26 +1394,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ec0be4795e2f6a28069bec0b5ff3e2ac9bafc99e6a9a7dc3547996c5c816922c"
 dependencies = [
  "getrandom",
-]
-
-[[package]]
-name = "reconciler"
-version = "0.1.0"
-dependencies = [
- "base64 0.21.0",
- "env_logger",
- "futures",
- "k8s-openapi",
- "kube",
- "log",
- "pgmq",
- "rand",
- "schemars",
- "serde",
- "serde_json",
- "thiserror",
- "tokio",
- "tokio-retry",
 ]
 
 [[package]]

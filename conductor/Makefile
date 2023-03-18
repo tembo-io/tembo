@@ -18,7 +18,7 @@ cluster.reset:
 	helm install --create-namespace --namespace=traefik-v2 --values ./tests/traefik-values.yaml traefik traefik/traefik
 
 run.test:
-	echo "Running reconciler with test configuration"
+	echo "Running conductor with test configuration"
 	PG_CONN_URL=postgresql://postgres:postgres@0.0.0.0:5432/postgres \
 	RUST_BACKTRACE=1 \
 	RUST_LOG=debug \

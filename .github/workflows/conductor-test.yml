@@ -1,17 +1,17 @@
-name: Reconciler test workflow
+name: conductor test workflow
 
 defaults:
   run:
     shell: bash
-    working-directory: ./reconciler/
+    working-directory: ./conductor/
 
 on:
   pull_request:
     branches:
       - main
     paths:
-    - '.github/workflows/reconciler-test.yml'
-    - 'reconciler/**'
+    - '.github/workflows/conductor-test.yml'
+    - 'conductor/**'
   # Always run tests on main or release branches
   push:
     branches:
@@ -32,9 +32,9 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
         with:
-          prefix-key: "reconciler-lint"
+          prefix-key: "conductor-lint"
           workspaces: |
-            reconciler
+            conductor
       - name: Cargo format
         run: cargo +nightly fmt --all --check
       - name: Clippy
@@ -49,9 +49,9 @@ jobs:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
         with:
-          prefix-key: "reconciler-test"
+          prefix-key: "conductor-test"
           workspaces: |
-            reconciler
+            conductor
       - name: Unit tests
         run: cargo test
 
@@ -77,9 +77,9 @@ jobs:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
         with:
-          prefix-key: "reconciler-functional-test"
+          prefix-key: "conductor-functional-test"
           workspaces: |
-            reconciler
+            conductor
       - name: Run functional / integration tests
         run: |
           set -xe
@@ -98,7 +98,7 @@ jobs:
           # Start local postgres for the Nile queues
           docker run -d --name pgmq -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres
 
-          # Start reconciler with test configuration
+          # Start conductor with test configuration
           make run.test &
 
           # Run the tests

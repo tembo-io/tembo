@@ -5,14 +5,14 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "reconciler.fullname" . }}
+  name: {{ include "conductor.fullname" . }}
   labels:
-    {{- include "reconciler.labels" . | nindent 4 }}
+    {{- include "conductor.labels" . | nindent 4 }}
 spec:
   replicas: 1
   selector:
     matchLabels:
-      {{- include "reconciler.selectorLabels" . | nindent 6 }}
+      {{- include "conductor.selectorLabels" . | nindent 6 }}
   strategy:
     rollingUpdate:
       maxSurge: 25%
@@ -25,24 +25,24 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        {{- include "reconciler.selectorLabels" . | nindent 8 }}
+        {{- include "conductor.selectorLabels" . | nindent 8 }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "reconciler.fullname" . }}
+      serviceAccountName: {{ include "conductor.fullname" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
         - name: {{ .Chart.Name }}
           command:
-          - ./usr/local/bin/reconciler
+          - ./usr/local/bin/conductor
           env:
           - name: PG_CONN_URL
             valueFrom:
               secretKeyRef:
-                name: {{ include "reconciler.secretName" . }}
+                name: {{ include "conductor.secretName" . }}
                 key: connection
           - name: CONTROL_PLANE_EVENTS_QUEUE
             value: {{ .Values.controlPlaneEventsQueue }}

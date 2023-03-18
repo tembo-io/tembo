@@ -1,10 +1,10 @@
-use kube::{Client, ResourceExt};
-use log::{debug, error, info, warn};
-use pgmq::{Message, PGMQueue};
-use reconciler::{
+use conductor::{
     create_ing_route_tcp, create_metrics_ingress, create_namespace, create_or_update, delete,
     delete_namespace, generate_spec, get_all, get_coredb_status, get_pg_conn, types,
 };
+use kube::{Client, ResourceExt};
+use log::{debug, error, info, warn};
+use pgmq::{Message, PGMQueue};
 use std::env;
 use std::{thread, time};
 use tokio_retry::strategy::FixedInterval;
@@ -50,7 +50,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
 
         // TODO: recycled messages should get archived, logged, alerted
         // this auto-archive of bad messages should only get implemented after
-        // control-plane has a scheduled reconciler process implemented
+        // control-plane has a scheduled conductor process implemented
         // if read_msg.read_ct >= 2 {
         //     warn!("recycled message: {:?}", read_msg);
         //     queue.archive(queue_name, &read_msg.msg_id).await?;
