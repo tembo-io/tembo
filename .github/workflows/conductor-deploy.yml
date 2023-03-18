@@ -50,7 +50,7 @@ jobs:
             --set dataPlaneEventsQueue=data_plane_events \
             --set controlPlaneEventsQueue=saas_queue \
             --set image.tag=${{ steps.versions.outputs.SHORT_SHA }} \
-            --create-namespace
+            --create-namespace \
             --namespace conductor \
             conductor \
             charts/conductor
