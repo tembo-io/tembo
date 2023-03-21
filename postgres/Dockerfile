@@ -46,6 +46,7 @@ RUN apt-get update && apt-get install -y \
         postgresql-15-cron \
         postgresql-15-repack \
         postgresql-15-pgaudit \
+        pgbackrest \
         && rm -rf /var/lib/apt/lists/*
 
 COPY ./postgresql.conf /usr/share/postgresql/${PG_MAJOR}/postgresql.conf.sample
