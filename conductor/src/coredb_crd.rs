@@ -40,6 +40,8 @@ pub struct CoreDBSpec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resources: Option<CoreDBResources>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stop: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub storage: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub uid: Option<i32>,
