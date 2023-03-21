@@ -67,6 +67,8 @@ pub struct CoreDBSpec {
     pub uid: i32,
     #[serde(default = "defaults::default_extensions")]
     pub extensions: Vec<Extension>,
+    #[serde(default = "defaults::default_stop")]
+    pub stop: bool,
 }
 
 /// The status object of `CoreDB`

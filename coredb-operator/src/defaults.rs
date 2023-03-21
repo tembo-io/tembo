@@ -61,3 +61,7 @@ pub fn default_schema() -> String {
 pub fn default_description() -> String {
     "No description provided".to_owned()
 }
+
+pub fn default_stop() -> bool {
+    false
+}
