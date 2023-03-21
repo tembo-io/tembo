@@ -6,11 +6,12 @@ The `Controller` object reconciles `CoreDB` Instances when changes to it are det
 
 ## Requirements
 
-- A Kubernetes cluster
-- The [CRD](yaml/crd.yaml)
+- A Kubernetes cluster: [kind](https://github.com/kubernetes-sigs/kind)
+- [rust](https://www.rust-lang.org/)
+- [just](https://github.com/casey/just)
 - Opentelemetry collector (**optional**)
 
-### Linting
+### Rust Linting
 
 Run linting with `cargo fmt` and `clippy`
 
@@ -24,8 +25,31 @@ cargo clippy
 cargo fmt:
 
 ```bash
+rustup toolchain install nightly
 rustup component add rustfmt --toolchain nightly
 cargo +nightly fmt
+```
+
+### Running
+
+To build and run the operator locally
+
+```bash
+just start-kind
+just run
+```
+
+- Or, you can run with auto reloading your local changes.
+- First, install cargo-watch
+
+```bash
+cargo install cargo-watch
+```
+
+- Then, run with auto reload
+
+```bash
+just watch
 ```
 
 ### Testing
@@ -33,15 +57,17 @@ cargo +nightly fmt
 #### Unit testing
 
 ```bash
-cargo test
+just test
 ```
 
 #### Integration testing
 
-To automatically set up a local cluster for functional testing, use this script
+To automatically set up a local cluster for functional testing, use this script.
+This will start a local kind cluster, annotate the `default` namespace for testing
+and install the CRD definition. 
 
 ```bash
-./scripts/reset-local-test-cluster.sh
+just start-kind
 ```
 
 Or, you can follow the below steps.
@@ -50,7 +76,7 @@ Or, you can follow the below steps.
 - Set your kubecontext to any namespace, and label it to indicate it is safe to run tests against this cluster (do not do against non-test clusters)
 
 ```bash
-kubectl label namespace default safe-to-run-coredb-tests=true
+NAMESPACE=<namespace> just annotate
 ```
 
 - Start or install the controller you want to test (see the following sections)
@@ -75,10 +101,10 @@ As an example; install [`kind`](https://kind.sigs.k8s.io/docs/user/quick-start/#
 Apply the CRD from [cached file](yaml/crd.yaml), or pipe it from `crdgen` (best if changing it):
 
 ```sh
-cargo run --bin crdgen | kubectl apply -f -
+just install-crd
 ```
 
-### OpenTelemetry (optional)
+### OpenTelemetry (TDB)
 
 Setup an OpenTelemetry Collector in your cluster. [Tempo](https://github.com/grafana/helm-charts/tree/main/charts/tempo) / [opentelemetry-operator](https://github.com/open-telemetry/opentelemetry-helm-charts/tree/main/charts/opentelemetry-operator) / [grafana agent](https://github.com/grafana/helm-charts/tree/main/charts/agent-operator) should all work out of the box. If your collector does not support grpc otlp you need to change the exporter in [`main.rs`](./src/main.rs).
 
@@ -90,18 +116,6 @@ Setup an OpenTelemetry Collector in your cluster. [Tempo](https://github.com/gra
 cargo run
 ```
 
-- Or, you can run with auto-reloading your local changes.
-- First, install cargo-watch
-
-```bash
-cargo install cargo-watch
-```
-
-- Then, run with auto-reload
-
-```bash
-cargo watch -x 'run'
-```
 
 - Or, with optional telemetry (change as per requirements):
 
