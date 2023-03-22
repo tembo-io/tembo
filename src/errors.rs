@@ -16,6 +16,19 @@ pub enum ExtensionRegistryError {
     #[error("database error {0}")]
     DatabaseError(#[from] sqlx::Error),
 
+    /// a response error
     #[error("response error")]
     ResponseError(),
+
+    /// a payload error
+    #[error("payload error")]
+    PayloadError(#[from] error::PayloadError),
+
+    /// a bad request error
+    #[error("bad request error")]
+    ErrorBadRequest(#[from] error::Error),
+
+    /// a serde json error
+    #[error("serde json error")]
+    SerdeJsonError(#[from] serde_json::Error),
 }

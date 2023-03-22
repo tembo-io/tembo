@@ -4,7 +4,7 @@ use crate::config::Config;
 use crate::connect;
 use crate::errors::ExtensionRegistryError;
 use crate::views::extension_publish::ExtensionUpload;
-use actix_web::{error, post, web, HttpResponse, Responder};
+use actix_web::{error, post, web, HttpResponse};
 use futures::StreamExt;
 use sqlx::Row;
 
@@ -15,14 +15,19 @@ const MAX_SIZE: usize = 262_144; // max payload size is 256k
 /// existing extension.
 
 #[post("/extensions/new")]
-pub async fn publish(cfg: web::Data<Config>, mut payload: web::Payload) -> impl Responder {
+pub async fn publish(
+    cfg: web::Data<Config>,
+    mut payload: web::Payload,
+) -> Result<HttpResponse, ExtensionRegistryError> {
     // Get request body
     let mut body = web::BytesMut::new();
     while let Some(chunk) = payload.next().await {
         let chunk = chunk?;
         // limit max size of in-memory payload
         if (body.len() + chunk.len()) > MAX_SIZE {
-            return Err(error::ErrorBadRequest("overflow"));
+            return Err(ExtensionRegistryError::from(error::ErrorBadRequest(
+                "overflow",
+            )));
         }
         body.extend_from_slice(&chunk);
     }
@@ -31,16 +36,14 @@ pub async fn publish(cfg: web::Data<Config>, mut payload: web::Payload) -> impl 
     let new_extension = serde_json::from_slice::<ExtensionUpload>(&body)?;
 
     // Set database conn
-    let conn = connect(&cfg.database_url)
-        .await
-        .expect("Error establishing connection");
+    let conn = connect(&cfg.database_url).await?;
 
     // Create a transaction on the database, if there are no errors,
     // commit the transactions to record a new or updated extension.
-    let mut tx = conn.begin().await.expect("Error creating transaction");
+    let mut tx = conn.begin().await?;
 
     // Validate name input
-    check_input(&new_extension.name).expect("Invalid format for name");
+    check_input(&new_extension.name)?;
 
     // Check if extension exists
     let query = format!(
@@ -48,16 +51,13 @@ pub async fn publish(cfg: web::Data<Config>, mut payload: web::Payload) -> impl 
         new_extension.name
     );
 
-    let exists = sqlx::query(&query)
-        .fetch_optional(&mut tx)
-        .await
-        .expect("error");
+    let exists = sqlx::query(&query).fetch_optional(&mut tx).await?;
 
     match exists {
         // TODO(ianstanton) Refactor into separate functions
         Some(exists) => {
             // Extension exists
-            let mut tx = conn.begin().await.expect("Error creating transaction");
+            let mut tx = conn.begin().await?;
             let time = chrono::offset::Utc::now().naive_utc();
             let extension_id: i64 = exists.get(0);
 
@@ -67,10 +67,7 @@ pub async fn publish(cfg: web::Data<Config>, mut payload: web::Payload) -> impl 
                 extension_id, new_extension.vers
             );
 
-            let version_exists = sqlx::query(&query)
-                .fetch_optional(&mut tx)
-                .await
-                .expect("Error executing query");
+            let version_exists = sqlx::query(&query).fetch_optional(&mut tx).await?;
 
             match version_exists {
                 Some(_version_exists) => {
@@ -82,10 +79,7 @@ pub async fn publish(cfg: web::Data<Config>, mut payload: web::Payload) -> impl 
             AND num = '{}'",
                         time, extension_id, new_extension.vers
                     );
-                    sqlx::query(&query)
-                        .execute(&mut tx)
-                        .await
-                        .expect("Error executing query");
+                    sqlx::query(&query).execute(&mut tx).await?;
                 }
                 None => {
                     // Create new record in versions table
@@ -100,10 +94,7 @@ pub async fn publish(cfg: web::Data<Config>, mut payload: web::Payload) -> impl 
                         "f",
                         new_extension.license.unwrap()
                     );
-                    sqlx::query(&query)
-                        .execute(&mut tx)
-                        .await
-                        .expect("Error executing query");
+                    sqlx::query(&query).execute(&mut tx).await?;
                 }
             }
 
@@ -114,15 +105,12 @@ pub async fn publish(cfg: web::Data<Config>, mut payload: web::Payload) -> impl 
             WHERE name = '{}'",
                 time, new_extension.name,
             );
-            sqlx::query(&query)
-                .execute(&mut tx)
-                .await
-                .expect("Error executing query");
-            tx.commit().await.expect("Error committing transaction");
+            sqlx::query(&query).execute(&mut tx).await?;
+            tx.commit().await?;
         }
         None => {
             // Else, create new record in extensions table
-            let mut tx = conn.begin().await.expect("Error creating transaction");
+            let mut tx = conn.begin().await?;
             let time = chrono::offset::Utc::now().naive_utc();
             let query = format!(
                 "
@@ -135,10 +123,7 @@ pub async fn publish(cfg: web::Data<Config>, mut payload: web::Payload) -> impl 
                 new_extension.description.unwrap(),
                 new_extension.homepage.unwrap()
             );
-            let id_row = sqlx::query(&query)
-                .fetch_one(&mut tx)
-                .await
-                .expect("Error fetching row");
+            let id_row = sqlx::query(&query).fetch_one(&mut tx).await?;
             let extension_id: i64 = id_row.get(0);
 
             // Create new record in versions table
@@ -153,11 +138,8 @@ pub async fn publish(cfg: web::Data<Config>, mut payload: web::Payload) -> impl 
                 "f",
                 new_extension.license.unwrap()
             );
-            sqlx::query(&query)
-                .execute(&mut tx)
-                .await
-                .expect("Error executing query");
-            tx.commit().await.expect("Error committing transaction");
+            sqlx::query(&query).execute(&mut tx).await?;
+            tx.commit().await?;
         }
     }
 
