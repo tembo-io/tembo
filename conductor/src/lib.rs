@@ -198,7 +198,10 @@ pub async fn delete_namespace(client: Client, name: &str) -> Result<(), Conducto
 
 // remove after COR-166
 #[allow(unused_variables)]
-pub async fn get_pg_conn(client: Client, name: &str) -> Result<String, ConductorError> {
+pub async fn get_pg_conn(
+    client: Client,
+    name: &str,
+) -> Result<types::ConnectionInfo, ConductorError> {
     // read secret <name>-connection
     let secret_name = format!("{name}-connection");
 
@@ -224,16 +227,17 @@ pub async fn get_pg_conn(client: Client, name: &str) -> Result<String, Conductor
     let byte_pw = to_string(pw_data).unwrap();
     let string_pw: String = from_str(&byte_pw).unwrap();
 
-    let user = b64_decode(&string_user);
-    let password = b64_decode(&string_pw);
-
     let host = format!("{name}.coredb-development.com");
-    let connection_string = format!("postgresql://{user}:{password}@{host}:5432");
 
-    Ok(connection_string)
+    Ok(types::ConnectionInfo {
+        host,
+        port: 5432,
+        user: string_user,
+        password: string_pw,
+    })
 }
 
-#[allow(dead_code)] // remove after COR-166
+#[allow(dead_code)]
 fn b64_decode(b64_encoded: &str) -> String {
     let bytes = general_purpose::STANDARD.decode(b64_encoded).unwrap();
     std::str::from_utf8(&bytes).unwrap().to_owned()

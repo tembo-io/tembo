@@ -85,7 +85,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                     .await
                     .expect("error creating or updating CoreDB");
                 // get connection string values from secret
-                let connection_string = get_pg_conn(client.clone(), &read_msg.message.dbname)
+                let conn_info = get_pg_conn(client.clone(), &read_msg.message.dbname)
                     .await
                     .expect("error getting secret");
 
@@ -131,7 +131,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                     event_id: read_msg.message.event_id,
                     event_type: report_event,
                     spec: Some(current_spec.spec),
-                    connection: Some(connection_string),
+                    connection: Some(conn_info),
                 };
                 let msg_id = queue.send(&data_plane_events_queue, &msg).await?;
                 info!("sent msg_id: {:?}", msg_id);
