@@ -2,12 +2,17 @@ use crate::{
     controller::{Extension, ExtensionInstallLocation},
     Context, CoreDB, Error,
 };
+use lazy_static::lazy_static;
 use regex::Regex;
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
 };
 use tracing::{debug, error, info, warn};
+
+lazy_static! {
+    static ref VALID_INPUT: Regex = Regex::new(r"^[a-zA-Z]([a-zA-Z0-9]*[-_]?)*[a-zA-Z0-9]+$").unwrap();
+}
 
 
 #[derive(Debug)]
@@ -90,12 +95,11 @@ pub async fn toggle_extensions(
     ctx: Arc<Context>,
 ) -> Result<(), Error> {
     let client = ctx.client.clone();
-    let re = Regex::new(r"[a-zA-Z][0-9a-zA-Z_-]*$").unwrap();
 
     // iterate through list of extensions and run CREATE EXTENSION <extension-name> for each
     for ext in extensions {
         let ext_name = ext.name.as_str();
-        if !re.is_match(ext_name) {
+        if !check_input(ext_name) {
             warn!(
                 "Extension {} is not formatted properly. Skipping operation.",
                 ext_name
@@ -105,7 +109,7 @@ pub async fn toggle_extensions(
             for ext_loc in ext.locations.iter() {
                 let database_name = ext_loc.database.to_owned();
 
-                if !re.is_match(&database_name) {
+                if !check_input(&database_name) {
                     warn!(
                         "Extension.Database {}.{} is not formatted properly. Skipping operation.",
                         ext_name, database_name
@@ -116,18 +120,18 @@ pub async fn toggle_extensions(
                     true => {
                         info!("Creating extension: {}, database {}", ext_name, database_name);
                         let schema_name = ext_loc.schema.to_owned();
-                        if !re.is_match(&schema_name) {
+                        if !check_input(&schema_name) {
                             warn!(
                                 "Extension.Database.Schema {}.{}.{} is not formatted properly. Skipping operation.",
                                 ext_name, database_name, schema_name
                             );
                             continue;
                         }
-                        format!("CREATE EXTENSION IF NOT EXISTS {ext_name} SCHEMA {schema_name};")
+                        format!("CREATE EXTENSION IF NOT EXISTS \"{ext_name}\" SCHEMA {schema_name};")
                     }
                     false => {
                         info!("Dropping extension: {}, database {}", ext_name, database_name);
-                        format!("DROP EXTENSION IF EXISTS {ext_name};")
+                        format!("DROP EXTENSION IF EXISTS \"{ext_name}\";")
                     }
                 };
 
@@ -148,6 +152,11 @@ pub async fn toggle_extensions(
         }
     }
     Ok(())
+}
+
+
+pub fn check_input(input: &str) -> bool {
+    VALID_INPUT.is_match(input)
 }
 
 /// returns all the databases in an instance
@@ -423,5 +432,27 @@ mod tests {
             ext[8].description,
             "connect to other PostgreSQL databases from within a database".to_owned()
         );
+    }
+
+    #[test]
+    fn test_check_input() {
+        let invalids = ["extension--", "data;", "invalid^#$$characters", ";invalid", ""];
+        for i in invalids.iter() {
+            assert!(!check_input(i), "input {} should be invalid", i);
+        }
+
+        let valids = [
+            "extension_a",
+            "schema_abc",
+            "extension",
+            "NewExtension",
+            "NewExtension123",
+            "postgis_tiger_geocoder-3",
+            "address_standardizer-3",
+            "xml2",
+        ];
+        for i in valids.iter() {
+            assert!(check_input(i), "input {} should be valid", i);
+        }
     }
 }
