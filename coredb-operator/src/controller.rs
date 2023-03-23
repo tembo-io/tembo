@@ -188,57 +188,71 @@ impl CoreDB {
             Action::requeue(Duration::from_secs(10))
         })?;
 
-        let primary_pod = self.primary_pod(ctx.client.clone()).await;
-        if primary_pod.is_err() {
-            debug!("Did not find primary pod");
-            return Ok(Action::requeue(Duration::from_secs(1)));
-        }
-        let primary_pod = primary_pod.unwrap();
+        let new_status = match self.spec.stop {
+            false => {
+                let primary_pod = self.primary_pod(ctx.client.clone()).await;
+                if primary_pod.is_err() {
+                    debug!("Did not find primary pod");
+                    return Ok(Action::requeue(Duration::from_secs(1)));
+                }
+                let primary_pod = primary_pod.unwrap();
 
-        if !is_postgres_ready().matches_object(Some(&primary_pod)) {
-            debug!("Postgres is not ready");
-            return Ok(Action::requeue(Duration::from_secs(1)));
-        }
+                if !is_postgres_ready().matches_object(Some(&primary_pod)) {
+                    debug!("Postgres is not ready");
+                    return Ok(Action::requeue(Duration::from_secs(1)));
+                }
+                // creating exporter role is pre-requisite to the postgres pod becoming "ready"
+                create_postgres_exporter_role(self, ctx.clone())
+                    .await
+                    .map_err(|e| {
+                        error!(
+                            "Error creating postgres_exporter on CoreDB {}, {}",
+                            self.metadata.name.clone().unwrap(),
+                            e
+                        );
+                        Action::requeue(Duration::from_secs(5))
+                    })?;
 
-        // creating exporter role is pre-requisite to the postgres pod becoming "ready"
-        create_postgres_exporter_role(self, ctx.clone())
-            .await
-            .map_err(|e| {
-                error!(
-                    "Error creating postgres_exporter on CoreDB {}, {}",
-                    self.metadata.name.clone().unwrap(),
-                    e
-                );
-                Action::requeue(Duration::from_secs(5))
-            })?;
+                if !is_pod_ready().matches_object(Some(&primary_pod)) {
+                    debug!("Did not find primary pod");
+                    return Ok(Action::requeue(Duration::from_secs(1)));
+                }
 
-        if !is_pod_ready().matches_object(Some(&primary_pod)) {
-            debug!("Did not find primary pod");
-            return Ok(Action::requeue(Duration::from_secs(1)));
-        }
+                let mut extensions: Vec<Extension> =
+                    reconcile_extensions(self, ctx.clone()).await.map_err(|e| {
+                        error!("Error reconciling extensions: {:?}", e);
+                        Action::requeue(Duration::from_secs(10))
+                    })?;
 
-        let mut extensions: Vec<Extension> = reconcile_extensions(self, ctx.clone()).await.map_err(|e| {
-            error!("Error reconciling extensions: {:?}", e);
-            Action::requeue(Duration::from_secs(10))
-        })?;
+                // must be sorted same, else reconcile will trigger again
+                extensions.sort_by_key(|e| e.name.clone());
+                CoreDBStatus {
+                    running: true,
+                    storage: self.spec.storage.clone(),
+                    extensions: Some(extensions),
+                }
+            }
+            true => CoreDBStatus {
+                running: false,
+                storage: self.spec.storage.clone(),
+                extensions: Some(self.status.as_ref().unwrap().extensions.clone().unwrap()),
+            },
+        };
 
-        // must be sorted same, else reconcile will trigger again
-        extensions.sort_by_key(|e| e.name.clone());
-
-        let new_status = Patch::Apply(json!({
+        let patch_status = Patch::Apply(json!({
             "apiVersion": "coredb.io/v1alpha1",
             "kind": "CoreDB",
-            "status": CoreDBStatus {
-                running: true,
-        storage: self.spec.storage.clone(),
-        extensions: Some(extensions),
-            }
+            "status": new_status
         }));
+
         let ps = PatchParams::apply("cntrlr").force();
-        let _o = coredbs.patch_status(&name, &ps, &new_status).await.map_err(|e| {
-            error!("Error updating CoreDB status: {:?}", e);
-            Action::requeue(Duration::from_secs(10))
-        })?;
+        let _o = coredbs
+            .patch_status(&name, &ps, &patch_status)
+            .await
+            .map_err(|e| {
+                error!("Error updating CoreDB status: {:?}", e);
+                Action::requeue(Duration::from_secs(10))
+            })?;
 
         // If no events were received, check back every minute
         Ok(Action::requeue(Duration::from_secs(60)))
@@ -273,7 +287,7 @@ impl CoreDB {
         Ok(Action::await_change())
     }
 
-    async fn primary_pod(&self, client: Client) -> Result<Pod, Error> {
+    pub async fn primary_pod(&self, client: Client) -> Result<Pod, Error> {
         let sts = stateful_set_from_cdb(self);
         let sts_name = sts.metadata.name.unwrap();
         let sts_namespace = sts.metadata.namespace.unwrap();

@@ -3,7 +3,7 @@ kind: CoreDB
 metadata:
   name: sample-coredb
 spec:
-  replicas: 1
+  stop: false
   extensions:
     - name: pg_stat_statements
       locations: 
