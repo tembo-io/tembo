@@ -9,6 +9,7 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .app_data(web::Data::new(cfg.clone()))
             .service(routes::running)
+            .service(routes::get_all_extensions)
             .service(publish::publish)
             .service(download::download)
     })
