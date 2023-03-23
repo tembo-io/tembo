@@ -450,6 +450,193 @@ mod test {
         });
     }
 
+
+    #[tokio::test]
+    #[ignore]
+    async fn test_stop_instance() {
+        // Initialize the Kubernetes client
+        let client = kube_client().await;
+
+        // Configurations
+        let mut rng = rand::thread_rng();
+        let name = &format!("test-stop-coredb-{}", rng.gen_range(0..100000));
+        let namespace = "default";
+        let kind = "CoreDB";
+        let replicas = 1;
+
+        // Timeout settings while waiting for an event
+        let timeout_seconds_start_pod = 60;
+        let timeout_seconds_pod_ready = 30;
+        let timeout_seconds_secret_present = 30;
+
+        // Create a pod we can use to run commands in the cluster
+        let pods: Api<Pod> = Api::namespaced(client.clone(), namespace);
+        // let test_pod_name = create_test_buddy(pods.clone(), name.to_string()).await;
+
+        // Apply a basic configuration of CoreDB
+        println!("Creating CoreDB resource {}", name);
+        let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), namespace);
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "stop": false
+            }
+        });
+        let params = PatchParams::apply("coredb-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        let coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        // Wait for secret to be created
+        let secret_api: Api<Secret> = Api::namespaced(client.clone(), namespace);
+        let secret_name = format!("{}-connection", name);
+        println!("Waiting for secret to be created: {}", secret_name);
+        let establish = await_condition(secret_api.clone(), &secret_name, wait_for_secret());
+        let _ = tokio::time::timeout(Duration::from_secs(timeout_seconds_secret_present), establish)
+            .await
+            .unwrap_or_else(|_| {
+                panic!(
+                    "Did not find the secret {} present after waiting {} seconds",
+                    secret_name, timeout_seconds_secret_present
+                )
+            });
+        println!("Found secret: {}", secret_name);
+
+        // Wait for Pod to be created
+        let pod_name = format!("{}-0", name);
+
+        println!("Waiting for pod to be running: {}", pod_name);
+        let _check_for_pod = tokio::time::timeout(
+            Duration::from_secs(timeout_seconds_start_pod),
+            await_condition(pods.clone(), &pod_name, conditions::is_pod_running()),
+        )
+        .await
+        .unwrap_or_else(|_| {
+            panic!(
+                "Did not find the pod {} to be running after waiting {} seconds",
+                pod_name, timeout_seconds_start_pod
+            )
+        });
+        println!("Waiting for pod to be ready: {}", pod_name);
+        let _check_for_pod_ready = tokio::time::timeout(
+            Duration::from_secs(timeout_seconds_pod_ready),
+            await_condition(pods.clone(), &pod_name, is_pod_ready()),
+        )
+        .await
+        .unwrap_or_else(|_| {
+            panic!(
+                "Did not find the pod {} to be ready after waiting {} seconds",
+                pod_name, timeout_seconds_pod_ready
+            )
+        });
+        println!("Found pod ready: {}", pod_name);
+
+        // Assert default resource values are applied to postgres container
+        let default_resources: ResourceRequirements = default_resources();
+        let pg_pod = pods.get(&pod_name).await.unwrap();
+        let resources = pg_pod.spec.unwrap().containers[0].clone().resources;
+        assert_eq!(default_resources, resources.unwrap());
+
+        // Assert no tables found
+        let result = coredb_resource
+            .psql("\\dt".to_string(), "postgres".to_string(), client.clone())
+            .await
+            .unwrap();
+        println!("{}", result.stderr.clone().unwrap());
+        assert!(result
+            .stderr
+            .clone()
+            .unwrap()
+            .contains("Did not find any relations."));
+
+        // Create a table
+        let result = coredb_resource
+            .psql(
+                "
+                CREATE TABLE stop_test (
+                   id serial PRIMARY KEY,
+                   created_at TIMESTAMP DEFAULT NOW()
+                );
+                "
+                .to_string(),
+                "postgres".to_string(),
+                client.clone(),
+            )
+            .await
+            .unwrap();
+        println!("{}", result.stdout.clone().unwrap());
+        assert!(result.stdout.clone().unwrap().contains("CREATE TABLE"));
+
+        // Assert table exists
+        let result = coredb_resource
+            .psql("\\dt".to_string(), "postgres".to_string(), client.clone())
+            .await
+            .unwrap();
+        println!("{}", result.stdout.clone().unwrap());
+        assert!(result.stdout.clone().unwrap().contains("stop_test"));
+
+        thread::sleep(Duration::from_millis(5000));
+
+        // stop the instance
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "stop": true,
+            }
+        });
+
+        // Apply crd with stop flag enabled
+        let params = PatchParams::apply("coredb-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        let coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        // give it time to stop
+        thread::sleep(Duration::from_millis(5000));
+
+        // pod must not be ready
+        let res = coredb_resource.primary_pod(client.clone()).await;
+        assert!(res.is_err());
+
+        // start again
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "stop": false,
+            }
+        });
+        // Apply with stop flag disabled
+        let params = PatchParams::apply("coredb-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        let coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        // give it time to start
+        println!("Waiting for pod to be running: {}", pod_name);
+        let check_for_pod = tokio::time::timeout(
+            Duration::from_secs(timeout_seconds_start_pod),
+            await_condition(pods.clone(), &pod_name, conditions::is_pod_running()),
+        );
+        assert!(check_for_pod.await.is_ok());
+        // assert table still exist
+        let result = coredb_resource
+            .psql("\\dt".to_string(), "postgres".to_string(), client.clone())
+            .await
+            .unwrap();
+        println!("{}", result.stdout.clone().unwrap());
+        assert!(result.stdout.clone().unwrap().contains("stop_test"));
+    }
+
+
     async fn kube_client() -> Client {
         // Get the name of the currently selected namespace
         let kube_config = Config::infer()
