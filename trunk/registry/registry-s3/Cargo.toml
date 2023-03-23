@@ -4,6 +4,7 @@ version = "0.2.0"
 license = "MIT OR Apache-2.0"
 description = "Interaction between pgtrunk.io and S3 for storing crate files"
 edition = "2021"
+publish = false
 
 [lib]
 name = "s3"
