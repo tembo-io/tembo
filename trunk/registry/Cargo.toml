@@ -17,5 +17,5 @@ serde = { version = "1.0.154", features = ["derive"] }
 futures = "0.3.26"
 serde_json = "1.0.94"
 chrono = "0.4.23"
-registry-s3 = { path = "registry-s3" }
+registry-s3 = { version = "0.1.0", path = "registry-s3" }
 dotenv = "0.15.0"
