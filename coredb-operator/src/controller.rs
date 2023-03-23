@@ -287,7 +287,7 @@ impl CoreDB {
         Ok(Action::await_change())
     }
 
-    async fn primary_pod(&self, client: Client) -> Result<Pod, Error> {
+    pub async fn primary_pod(&self, client: Client) -> Result<Pod, Error> {
         let sts = stateful_set_from_cdb(self);
         let sts_name = sts.metadata.name.unwrap();
         let sts_namespace = sts.metadata.namespace.unwrap();
