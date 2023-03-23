@@ -128,6 +128,13 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
         });
     }
 
+    // 0 replicas on sts when stopping
+    // 1 replica in all other cases
+    let replicas = match cdb.spec.stop {
+        true => 0,
+        false => 1,
+    };
+
     let sts: StatefulSet = StatefulSet {
         metadata: ObjectMeta {
             name: Some(name),
@@ -137,7 +144,7 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
             ..ObjectMeta::default()
         },
         spec: Some(StatefulSetSpec {
-            replicas: Some(cdb.spec.replicas),
+            replicas: Some(replicas),
             selector: LabelSelector {
                 match_expressions: None,
                 match_labels: Some(labels.clone()),
