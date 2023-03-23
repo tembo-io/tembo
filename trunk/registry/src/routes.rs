@@ -2,7 +2,7 @@ use crate::config::Config;
 use crate::connect;
 use crate::errors::ExtensionRegistryError;
 use actix_web::{get, web, HttpResponse, Responder};
-use sqlx::{Connection, Row};
+use sqlx::Row;
 
 #[get("/")]
 pub async fn running() -> impl Responder {
