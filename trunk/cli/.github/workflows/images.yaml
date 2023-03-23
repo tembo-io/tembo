@@ -1,0 +1,42 @@
+name: PGX builder images
+
+on:
+  push:
+    branches:
+      - 'main'
+
+jobs:
+  build_and_push_images:
+    name: Build and push images
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        pg_version:
+          - "15"
+          - "14"
+        pgx_version:
+          - "0.7.1"
+          - "0.7.2"
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v3
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v2
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+      - name: Login to Quay.io
+        uses: docker/login-action@v2
+        with:
+          registry: quay.io
+          username: ${{ secrets.QUAY_USER }}
+          password: ${{ secrets.QUAY_PASSWORD }}
+      - name: Build and push
+        run: |
+          set -xe
+          docker buildx build \
+            --build-arg PG_VERSION=${{ matrix.pg_version }} \
+            --build-arg PGX_VERSION=${{ matrix.pgx_version }} \
+            --platform linux/amd64,linux/arm64 \
+            --tag quay.io/coredb/pgx-builder:pg${{ matrix.pg_version }}-pgx${{ matrix.pgx_version }} \
+            --pull --push images/pgx-builder
