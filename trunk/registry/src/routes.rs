@@ -25,5 +25,5 @@ pub async fn get_all_extensions(
         extensions.push(row.get(1));
     }
     // Return results in response
-    Ok(HttpResponse::Ok().body(format!("Extensions... {:?}", extensions)))
+    Ok(HttpResponse::Ok().body(format!("{:?}", extensions)))
 }
