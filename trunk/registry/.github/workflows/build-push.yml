@@ -1,0 +1,44 @@
+name: build and push workflow
+
+defaults:
+  run:
+    shell: bash
+    working-directory: ./
+
+on:
+  pull_request:
+    branches:
+      - main
+
+  # Always run on main or release branches
+  push:
+    branches:
+      - main
+      - release**
+
+jobs:
+  build-deploy:
+    name: Build and push image
+    runs-on: ubuntu-20.04
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v3
+      - name: Set version strings
+        id: versions
+        run: |
+          echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+      - name: Build image
+        run: |
+          set -xe
+          docker build -t pgtrunkio-backend .
+          docker tag pgtrunkio-backend pgtrunkio-backend:latest
+          docker tag pgtrunkio-backend pgtrunkio-backend:${{ steps.versions.outputs.SHORT_SHA }}
+      - name: Push To quay.io
+        if: ${{ github.ref == 'refs/heads/main' }}
+        uses: redhat-actions/push-to-registry@v2
+        with:
+          registry: quay.io/coredb
+          image: pgtrunkio-backend
+          tags: latest ${{ steps.versions.outputs.SHORT_SHA }}
+          username: ${{ secrets.QUAY_USER }}
+          password: ${{ secrets.QUAY_PASSWORD }}
