@@ -7,6 +7,9 @@ inputs:
   changed_relative_to_branch:
     description: 'The branch on the origin to compare with to determine if this directory has changed. For example "main".'
     required: true
+  ignore_dirs:
+    description: A list of directories to ignore.
+    required: false
 outputs:
   build_matrix:
     description: "Input this output to your matrix build in a following job, like this 'fromJson(needs.find_directories.outputs.build_matrix)'"
@@ -14,7 +17,7 @@ outputs:
 runs:
   using: "composite"
   steps:
-    - name: Find directories with Dockerfiles
+    - name: Find directories with a given file type
       shell: bash
       id: find_directories
       run: |
