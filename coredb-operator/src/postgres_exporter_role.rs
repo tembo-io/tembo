@@ -1,4 +1,4 @@
-use crate::{Context, CoreDB, Error};
+use crate::{apis::coredb_types::CoreDB, Context, Error};
 use std::sync::Arc;
 use tracing::debug;
 

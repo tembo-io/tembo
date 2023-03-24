@@ -13,8 +13,9 @@
 mod test {
 
     use controller::{
+        apis::coredb_types::CoreDB,
         defaults::{default_resources, default_storage},
-        is_pod_ready, CoreDB,
+        is_pod_ready,
     };
     use k8s_openapi::{
         api::core::v1::{
@@ -450,7 +451,6 @@ mod test {
         });
     }
 
-
     #[tokio::test]
     #[ignore]
     async fn test_stop_instance() {
@@ -635,7 +635,6 @@ mod test {
         println!("{}", result.stdout.clone().unwrap());
         assert!(result.stdout.clone().unwrap().contains("stop_test"));
     }
-
 
     async fn kube_client() -> Client {
         // Get the name of the currently selected namespace

@@ -1,5 +1,8 @@
 //! Helper methods only available for tests
-use crate::{Context, CoreDB, CoreDBSpec, CoreDBStatus, Metrics, COREDB_FINALIZER};
+use crate::{
+    apis::coredb_types::{CoreDB, CoreDBSpec, CoreDBStatus},
+    Context, Metrics, COREDB_FINALIZER,
+};
 use assert_json_diff::assert_json_include;
 use futures::pin_mut;
 use http::{Request, Response};
