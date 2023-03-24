@@ -450,7 +450,6 @@ mod test {
         });
     }
 
-
     #[tokio::test]
     #[ignore]
     async fn test_stop_instance() {
@@ -635,7 +634,6 @@ mod test {
         println!("{}", result.stdout.clone().unwrap());
         assert!(result.stdout.clone().unwrap().contains("stop_test"));
     }
-
 
     async fn kube_client() -> Client {
         // Get the name of the currently selected namespace

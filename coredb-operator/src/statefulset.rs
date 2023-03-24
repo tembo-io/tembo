@@ -1,4 +1,4 @@
-use crate::{Context, CoreDB, Error, Result};
+use crate::{apis::coredb_types::CoreDB, Context, Error, Result};
 use k8s_openapi::{
     api::{
         apps::v1::{StatefulSet, StatefulSetSpec},
@@ -310,7 +310,10 @@ async fn update_pvc(client: Client, sts: &StatefulSet, cdb: &CoreDB) {
 #[cfg(test)]
 mod tests {
     use super::{stateful_set_from_cdb, StatefulSet};
-    use crate::{CoreDB, CoreDBSpec};
+    use crate::{
+        apis::coredb_types::{CoreDB, CoreDBSpec},
+        CoreDB, CoreDBSpec,
+    };
     use kube::Resource;
 
     #[test]

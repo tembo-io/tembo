@@ -1,6 +1,7 @@
 /// Expose all controller components used by main
 pub mod controller;
 pub use crate::controller::*;
+pub mod apis;
 
 /// Log and trace integrations
 pub mod telemetry;
@@ -8,7 +9,6 @@ pub mod telemetry;
 /// Metrics
 mod metrics;
 pub use metrics::Metrics;
-
 pub mod defaults;
 mod extensions;
 #[cfg(test)] pub mod fixtures;

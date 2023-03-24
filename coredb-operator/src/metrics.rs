@@ -1,4 +1,4 @@
-use crate::{CoreDB, Error};
+use crate::{apis::coredb_types::CoreDB, Error};
 use kube::ResourceExt;
 use prometheus::{histogram_opts, opts, HistogramVec, IntCounter, IntCounterVec, Registry};
 use tokio::time::Instant;
