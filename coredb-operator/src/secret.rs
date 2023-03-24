@@ -1,4 +1,4 @@
-use crate::{Context, CoreDB, Error};
+use crate::{apis::coredb_types::CoreDB, Context, Error};
 use k8s_openapi::{api::core::v1::Secret, apimachinery::pkg::apis::meta::v1::ObjectMeta, ByteString};
 use kube::{
     api::{ListParams, Patch, PatchParams},

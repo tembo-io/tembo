@@ -1,7 +1,7 @@
 use k8s_openapi::{api::core::v1::ResourceRequirements, apimachinery::pkg::api::resource::Quantity};
 use std::collections::BTreeMap;
 
-use crate::Extension;
+use crate::extensions::Extension;
 
 pub fn default_replicas() -> i32 {
     1

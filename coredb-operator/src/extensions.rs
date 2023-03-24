@@ -1,9 +1,8 @@
-use crate::{
-    controller::{Extension, ExtensionInstallLocation},
-    Context, CoreDB, Error,
-};
+use crate::{apis::coredb_types::CoreDB, defaults, Context, Error};
 use lazy_static::lazy_static;
 use regex::Regex;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
@@ -14,6 +13,45 @@ lazy_static! {
     static ref VALID_INPUT: Regex = Regex::new(r"^[a-zA-Z]([a-zA-Z0-9]*[-_]?)*[a-zA-Z0-9]+$").unwrap();
 }
 
+#[derive(Clone, Debug, Deserialize, Eq, Hash, JsonSchema, Serialize, PartialEq)]
+pub struct Extension {
+    pub name: String,
+    #[serde(default = "defaults::default_description")]
+    pub description: String,
+    pub locations: Vec<ExtensionInstallLocation>,
+}
+
+impl Default for Extension {
+    fn default() -> Self {
+        Extension {
+            name: "pg_stat_statements".to_owned(),
+            description: " track planning and execution statistics of all SQL statements executed".to_owned(),
+            locations: vec![ExtensionInstallLocation::default()],
+        }
+    }
+}
+
+#[derive(Clone, Debug, Deserialize, Eq, Hash, JsonSchema, Serialize, PartialEq)]
+pub struct ExtensionInstallLocation {
+    pub enabled: bool,
+    // no database or schema when disabled
+    #[serde(default = "defaults::default_database")]
+    pub database: String,
+    #[serde(default = "defaults::default_schema")]
+    pub schema: String,
+    pub version: Option<String>,
+}
+
+impl Default for ExtensionInstallLocation {
+    fn default() -> Self {
+        ExtensionInstallLocation {
+            schema: "public".to_owned(),
+            database: "postgres".to_owned(),
+            enabled: true,
+            version: Some("1.9".to_owned()),
+        }
+    }
+}
 
 #[derive(Debug)]
 pub struct ExtRow {
@@ -154,7 +192,6 @@ pub async fn toggle_extensions(
     Ok(())
 }
 
-
 pub fn check_input(input: &str) -> bool {
     VALID_INPUT.is_match(input)
 }
@@ -265,7 +302,6 @@ pub async fn get_all_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<E
     Ok(ext_spec)
 }
 
-
 /// reconcile extensions between the spec and the database
 pub async fn reconcile_extensions(coredb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<Extension>, Error> {
     // always get the current state of extensions in the database
@@ -280,7 +316,6 @@ pub async fn reconcile_extensions(coredb: &CoreDB, ctx: Arc<Context>) -> Result<
     get_all_extensions(coredb, ctx.clone()).await
 }
 
-
 // returns any elements that are in the desired, and not in actual
 // any Extensions returned by this function need to get "applied"
 fn diff_extensions(desired: &[Extension], actual: &[Extension]) -> Vec<Extension> {
@@ -290,7 +325,6 @@ fn diff_extensions(desired: &[Extension], actual: &[Extension]) -> Vec<Extension
     info!("Extensions diff: {:?}", diff);
     diff
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -365,7 +399,6 @@ mod tests {
         let diff = diff_extensions(&desired, &actual);
         assert_eq!(diff.len(), 0);
     }
-
 
     #[test]
     fn test_parse_databases() {
