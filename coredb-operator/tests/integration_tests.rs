@@ -13,8 +13,9 @@
 mod test {
 
     use controller::{
+        apis::coredb_types::CoreDB,
         defaults::{default_resources, default_storage},
-        is_pod_ready, CoreDB,
+        is_pod_ready,
     };
     use k8s_openapi::{
         api::core::v1::{

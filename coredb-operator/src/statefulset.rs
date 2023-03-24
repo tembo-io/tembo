@@ -310,10 +310,7 @@ async fn update_pvc(client: Client, sts: &StatefulSet, cdb: &CoreDB) {
 #[cfg(test)]
 mod tests {
     use super::{stateful_set_from_cdb, StatefulSet};
-    use crate::{
-        apis::coredb_types::{CoreDB, CoreDBSpec},
-        CoreDB, CoreDBSpec,
-    };
+    use crate::apis::coredb_types::{CoreDB, CoreDBSpec};
     use kube::Resource;
 
     #[test]
