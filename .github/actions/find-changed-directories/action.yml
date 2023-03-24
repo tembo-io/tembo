@@ -25,6 +25,7 @@ runs:
         git fetch origin ${{ inputs.changed_relative_to_branch }} || true
         # Get directories with a Dockerfile that have not changed
         # relative to the branch we are pulling into
+        echo "${{inputs.ignore_dirs}}"
         directories=$(
         find . -name ${{ inputs.contains_the_file }} -not -path "*/target/*" -not -path "*/.github/*" -exec dirname {} \; | while read dir; do
           # This will check if the directory has changed relative to the branch we are PRing
