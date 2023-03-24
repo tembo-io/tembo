@@ -14,6 +14,8 @@ const MAX_SIZE: usize = 262_144; // max payload size is 256k
 /// Used by `trunk publish` to publish a new extension or to publish a new version of an
 /// existing extension.
 
+// trigger build
+
 #[post("/extensions/new")]
 pub async fn publish(
     cfg: web::Data<Config>,
