@@ -332,7 +332,7 @@ impl PGMQueue {
         message: &T,
     ) -> Result<i64, errors::PgmqError> {
         let msg = serde_json::json!(&message);
-        let msgs:[serde_json::Value;1] = [msg];
+        let msgs: [serde_json::Value; 1] = [msg];
         let row: PgRow = sqlx::query(&query::enqueue(queue_name, &msgs)?)
             .fetch_one(&self.connection)
             .await?;
