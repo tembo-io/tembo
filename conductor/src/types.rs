@@ -6,6 +6,7 @@ use crate::types;
 /// incoming message from control plane
 #[derive(Debug, Deserialize, Serialize)]
 pub struct CRUDevent {
+    pub organization_name: String,
     pub data_plane_id: String,
     pub event_id: String,
     pub event_type: Event,

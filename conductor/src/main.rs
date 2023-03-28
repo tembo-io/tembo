@@ -57,35 +57,39 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         //     continue;
         // }
 
+        let namespace = format!(
+            "org-{}-inst-{}",
+            read_msg.message.organization_name, read_msg.message.dbname
+        );
         // Based on message_type in message, create, update, delete CoreDB
         match read_msg.message.event_type {
             // every event is for a single namespace
             Event::Create | Event::Update => {
-                create_namespace(client.clone(), &read_msg.message.dbname)
+                create_namespace(client.clone(), &namespace)
                     .await
                     .expect("error creating namespace");
 
                 // create IngressRouteTCP
-                create_ing_route_tcp(client.clone(), &read_msg.message.dbname)
+                create_ing_route_tcp(client.clone(), &namespace)
                     .await
                     .expect("error creating IngressRouteTCP");
 
                 // create /metrics ingress
-                create_metrics_ingress(client.clone(), &read_msg.message.dbname)
+                create_metrics_ingress(client.clone(), &namespace)
                     .await
                     .expect("error creating ingress for /metrics");
 
                 // generate CoreDB spec based on values in body
-                let spec = generate_spec(&read_msg.message.dbname, &read_msg.message.spec).await;
+                let spec = generate_spec(&namespace, &read_msg.message.spec).await;
 
                 let spec_js = serde_json::to_string(&spec).unwrap();
                 debug!("spec: {}", spec_js);
                 // create or update CoreDB
-                create_or_update(client.clone(), &read_msg.message.dbname, spec)
+                create_or_update(client.clone(), &namespace, spec)
                     .await
                     .expect("error creating or updating CoreDB");
                 // get connection string values from secret
-                let conn_info = get_pg_conn(client.clone(), &read_msg.message.dbname)
+                let conn_info = get_pg_conn(client.clone(), &namespace)
                     .await
                     .expect("error getting secret");
 
@@ -96,7 +100,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 // TODO: need a better way to handle this
                 let retry_strategy = FixedInterval::from_millis(5000).take(20);
                 let result = Retry::spawn(retry_strategy.clone(), || {
-                    get_coredb_status(client.clone(), &read_msg.message.dbname)
+                    get_coredb_status(client.clone(), &namespace)
                 })
                 .await;
                 if result.is_err() {
@@ -105,16 +109,13 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 let mut current_spec = result?;
                 let spec_js = serde_json::to_string(&current_spec.spec).unwrap();
-                debug!(
-                    "dbname: {}, current_spec: {:?}",
-                    &read_msg.message.dbname, spec_js
-                );
+                debug!("dbname: {}, current_spec: {:?}", &namespace, spec_js);
 
                 // get actual extensions from crd status
                 let actual_extension = match current_spec.status {
                     Some(status) => status.extensions,
                     None => {
-                        warn!("No extensions in: {:?}", &read_msg.message.dbname);
+                        warn!("No extensions in: {:?}", &namespace);
                         None
                     }
                 };
@@ -138,16 +139,12 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             }
             Event::Delete => {
                 // delete CoreDB
-                delete(
-                    client.clone(),
-                    &read_msg.message.dbname,
-                    &read_msg.message.dbname,
-                )
-                .await
-                .expect("error deleting CoreDB");
+                delete(client.clone(), &namespace, &namespace)
+                    .await
+                    .expect("error deleting CoreDB");
 
                 // delete namespace
-                delete_namespace(client.clone(), &read_msg.message.dbname)
+                delete_namespace(client.clone(), &namespace)
                     .await
                     .expect("error deleting namespace");
 
