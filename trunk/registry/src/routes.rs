@@ -3,6 +3,16 @@ use crate::connect;
 use crate::errors::ExtensionRegistryError;
 use actix_web::{get, web, HttpResponse, Responder};
 use sqlx::Row;
+use serde::Serialize;
+
+#[derive(Debug, Serialize)]
+pub struct Extension {
+    name: String,
+    description: String,
+    homepage: String,
+    documentation: String,
+    repository: String
+}
 
 #[get("/")]
 pub async fn running() -> impl Responder {
@@ -13,7 +23,7 @@ pub async fn running() -> impl Responder {
 pub async fn get_all_extensions(
     cfg: web::Data<Config>,
 ) -> Result<HttpResponse, ExtensionRegistryError> {
-    let mut extensions: Vec<String> = Vec::new();
+    let mut extensions: Vec<Extension> = Vec::new();
     // Set database conn
     let conn = connect(&cfg.database_url).await?;
     // Create a transaction on the database, if there are no errors,
@@ -22,8 +32,16 @@ pub async fn get_all_extensions(
     let query = format!("SELECT * FROM extensions",);
     let rows = sqlx::query(&query).fetch_all(&mut tx).await?;
     for row in rows.iter() {
-        extensions.push(row.get(1));
+        let ext = Extension {
+            name: row.get(1),
+            description: row.get(5),
+            homepage: row.get(6),
+            documentation: "".to_string(),
+            repository: "".to_string()
+        };
+        extensions.push(ext);
     }
     // Return results in response
-    Ok(HttpResponse::Ok().body(format!("{:?}", extensions)))
+    let json = serde_json::to_string(&extensions);
+    Ok(HttpResponse::Ok().body(format!("{:?}", json)))
 }
