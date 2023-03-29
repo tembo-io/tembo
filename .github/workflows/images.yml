@@ -28,8 +28,8 @@ jobs:
           # or main branches.
           changed_relative_to_branch: ${{ github.base_ref || 'not-a-branch' }}
           ignore_dirs: |
-            ./trunk/registry
-            ./trunk/cli/images/pgx-builder
+            trunk/registry
+            trunk/cli/images/pgx-builder
 
   build_and_push_images:
     name: Build and push images
