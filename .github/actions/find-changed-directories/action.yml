@@ -10,6 +10,7 @@ inputs:
   ignore_dirs:
     description: A list of directories to ignore.
     required: false
+    default: ''
 outputs:
   build_matrix:
     description: "Input this output to your matrix build in a following job, like this 'fromJson(needs.find_directories.outputs.build_matrix)'"
@@ -29,7 +30,7 @@ runs:
         EXCLUDE_DIRS=("${{ inputs.ignore_dirs }}")
         EXCLUDE_OPTS=()
         for exclude_dir in "${EXCLUDE_DIRS[@]}"; do
-          EXCLUDE_OPTS+=("-not" "-path" "'$exclude_dir'")
+          EXCLUDE_OPTS+=("-not" "-path" "*/$exclude_dir/*")
         done
         directories=$(
         find . -name ${{ inputs.contains_the_file }} -not -path "*/target/*" -not -path "*/.github/*" "${EXCLUDE_OPTS[@]}" -exec dirname {} \; | while read dir; do
