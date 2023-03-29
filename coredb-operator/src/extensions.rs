@@ -318,7 +318,6 @@ pub async fn reconcile_extensions(coredb: &CoreDB, ctx: Arc<Context>) -> Result<
     }
 
     // otherwise, need to determine the plan to apply
-    // (extension_to_install) and (changed_extensions)
     let (changed_extensions, extensions_to_install) = extension_plan(&desired_extensions, &actual_extensions);
 
     toggle_extensions(coredb, &changed_extensions, ctx.clone()).await?;
@@ -343,8 +342,8 @@ fn diff_extensions(desired: &[Extension], actual: &[Extension]) -> Vec<Extension
 
 /// determines which extensions need create/drop and which need to be trunk installed
 /// this is intended to be called after diff_extensions()
-/// roughly O(n^2) where n is the number of extensions that have changed in this reconciliation loop
-/// it is unlikely that n will grow beyond 10s of extensions
+/// roughly O(n x N), n=changed extensions, N=total installed
+/// it is unlikely that n will grow >=10s of extensions, N <100s
 fn extension_plan(have_changed: &[Extension], actual: &[Extension]) -> (Vec<Extension>, Vec<Extension>) {
     let mut changed = Vec::new();
     let mut to_install = Vec::new();
