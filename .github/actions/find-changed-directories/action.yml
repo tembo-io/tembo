@@ -11,7 +11,7 @@ inputs:
     description: A list of directories to ignore.
     required: false
     type: array
-    default: []
+    default: ''
 outputs:
   build_matrix:
     description: "Input this output to your matrix build in a following job, like this 'fromJson(needs.find_directories.outputs.build_matrix)'"
