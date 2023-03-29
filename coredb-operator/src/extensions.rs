@@ -5,6 +5,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
+    process::Command,
     sync::Arc,
 };
 use tracing::{debug, error, info, warn};
@@ -192,6 +193,29 @@ pub async fn toggle_extensions(
     Ok(())
 }
 
+// pub fn install_extensions(extensions: &[Extension]) -> Result<(), Error> {
+//     for ext in extensions.iter() {
+//         // execute trunk install on the extension
+//         let exec_cmd = Command::new("trunk install")
+//             .arg(ext.name.as_str())
+//             .output();
+//         match exec_cmd {
+
+//             Ok(out) => {
+//                 let stdout = String::from_utf8_lossy(&out.stdout);
+//                 let stderr = String::from_utf8_lossy(&out.stderr);
+//                 debug!("stdout: {}", stdout);
+//                 debug!("stderr: {}", stderr);
+//             }
+//             Err(err) => {
+//                 error!("error installing extension: {}", err);
+//                 return Err(err.into());
+//             }
+//         }
+//     }
+//     Ok(())
+// }
+
 pub fn check_input(input: &str) -> bool {
     VALID_INPUT.is_match(input)
 }
@@ -309,26 +333,116 @@ pub async fn reconcile_extensions(coredb: &CoreDB, ctx: Arc<Context>) -> Result<
     let actual_extensions = get_all_extensions(coredb, ctx.clone()).await?;
     let desired_extensions = coredb.spec.extensions.clone();
 
-    let diff = diff_extensions(&desired_extensions, &actual_extensions);
-    toggle_extensions(coredb, &diff, ctx.clone()).await?;
+    // most of the time there will be no changes
+    let extensions_changed = diff_extensions(&desired_extensions, &actual_extensions);
+
+    if extensions_changed.len() == 0 {
+        // no further work when no changes
+        return Ok(actual_extensions);
+    }
+
+    // otherwise, need to determine the plan to apply
+    // (extension_to_install) and (changed_extensions)
+    // extensions to install are a extensions_changed
+    let (changed_extensions, extensions_to_install) = extension_plan(&desired_extensions, &actual_extensions);
+
+    // first install the extensions that need to be installed
+    // let install_success = install_extensions(&extensions_to_install).await;
+    toggle_extensions(coredb, &changed_extensions, ctx.clone()).await?;
+
 
     // return final state of extensions
     get_all_extensions(coredb, ctx.clone()).await
 }
 
 // returns any elements that are in the desired, and not in actual
-// any Extensions returned by this function need to get "applied"
+// any Extensions returned by this function need either create or drop extension
+// cheap way to determine if there have been any sort of changes to extensions
 fn diff_extensions(desired: &[Extension], actual: &[Extension]) -> Vec<Extension> {
     let set_desired: HashSet<_> = desired.iter().cloned().collect();
     let set_actual: HashSet<_> = actual.iter().cloned().collect();
     let diff: Vec<Extension> = set_desired.difference(&set_actual).cloned().collect();
-    info!("Extensions diff: {:?}", diff);
+    debug!("Extensions diff: {:?}", diff);
     diff
 }
+
+
+/// determines which extensions need create/drop and which need to be trunk installed
+/// this is intended to be called after diff_extensions()
+/// roughly O(n^2) where n is the number of extensions that have changed in this reconciliation loop
+/// it is unlikely that n will grow beyond 10s of extensions
+fn extension_plan(have_changed: &[Extension], actual: &[Extension]) -> (Vec<Extension>, Vec<Extension>) {
+    let mut changed = Vec::new();
+    let mut to_install = Vec::new();
+
+    for extension_desired in have_changed {
+        // check if the extension name exists in the actual list
+        for extension_actual in actual {
+            if extension_desired.name == extension_actual.name {
+                changed.push(extension_desired.clone());
+                break;
+            }
+        }
+        // if it doesn't exist, it needs to be installed
+        to_install.push(extension_desired.clone());
+    }
+
+    (changed, to_install)
+}
+
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// extensions that need to be installed for the first time should never be the same as an extension
+    /// that is already installed but needs to be toggled on or off
+    #[test]
+    fn test_extension_plan() {
+        let postgis_disabled = Extension {
+            name: "postgis".to_owned(),
+            description: "my description".to_owned(),
+            locations: vec![ExtensionInstallLocation {
+                enabled: false,
+                database: "postgres".to_owned(),
+                schema: "public".to_owned(),
+                version: Some("1.1.1".to_owned()),
+            }],
+        };
+        let postgis_enabled = Extension {
+            name: "postgis".to_owned(),
+            description: "my description".to_owned(),
+            locations: vec![ExtensionInstallLocation {
+                enabled: false,
+                database: "postgres".to_owned(),
+                schema: "public".to_owned(),
+                version: Some("1.1.1".to_owned()),
+            }],
+        };
+        let pgmq_disabled = Extension {
+            name: "pgmq".to_owned(),
+            description: "my description".to_owned(),
+            locations: vec![ExtensionInstallLocation {
+                enabled: false,
+                database: "postgres".to_owned(),
+                schema: "public".to_owned(),
+                version: Some("1.1.1".to_owned()),
+            }],
+        };
+        // two extensions desired, postgis disabled and pgmq disabled
+        let desired = vec![postgis_disabled.clone(), pgmq_disabled.clone()];
+        // one extension installed, postgis enabled
+        let actual = vec![postgis_enabled.clone()];
+
+        // determine which one needs to be installed
+        let to_install = diff_extensions(&desired, &actual);
+        assert!(
+            to_install.len() == 1,
+            "expected one extension to install, found extensions {:?}",
+            to_install
+        );
+        assert_eq!(to_install[0], pgmq_disabled);
+    }
 
     #[test]
     fn test_diff() {
