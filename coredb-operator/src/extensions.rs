@@ -342,15 +342,15 @@ fn diff_extensions(desired: &[Extension], actual: &[Extension]) -> Vec<Extension
 
 /// determines which extensions need create/drop and which need to be trunk installed
 /// this is intended to be called after diff_extensions()
-/// roughly O(n x N), n=changed extensions, N=total installed
-/// it is unlikely that n will grow >=10s of extensions, N <100s
 fn extension_plan(have_changed: &[Extension], actual: &[Extension]) -> (Vec<Extension>, Vec<Extension>) {
     let mut changed = Vec::new();
     let mut to_install = Vec::new();
 
+    // have_changed is unlikely to ever be >10s of extensions
     for extension_desired in have_changed {
         // check if the extension name exists in the actual list
         let mut found = false;
+        // actual unlikely to be > 100s of extensions
         for extension_actual in actual {
             if extension_desired.name == extension_actual.name {
                 found = true;
