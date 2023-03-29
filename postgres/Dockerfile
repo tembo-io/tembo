@@ -58,11 +58,18 @@ COPY extensions/ /extensions
 COPY install-extensions.sh .
 RUN /bin/bash install-extensions.sh
 
-RUN git clone https://github.com/pgpartman/pg_partman.git &&\
-    cd pg_partman && \
-    make install && \
-    cd ../ && \
-    rm -rf pg_partman
+# install pg_partman
+RUN git clone https://github.com/pgpartman/pg_partman.git && \
+        cd pg_partman && \
+        make install && \
+        cd ../ && \
+        rm -rf pg_partman
+
+RUN git clone --branch v0.4.1 https://github.com/pgvector/pgvector.git && \
+        cd pgvector && \
+        make && \
+        make install && \
+        cd ../ && rm -rf pgvector
 
 COPY docker-entrypoint.sh /usr/local/bin/
 ENTRYPOINT ["docker-entrypoint.sh"]
