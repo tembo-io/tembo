@@ -371,8 +371,6 @@ fn extension_plan(have_changed: &[Extension], actual: &[Extension]) -> (Vec<Exte
 mod tests {
     use super::*;
 
-    /// extensions that need to be installed for the first time should never be the same as an extension
-    /// that is already installed but needs to be toggled on or off
     #[test]
     fn test_diff_and_plan() {
         let postgis_disabled = Extension {
