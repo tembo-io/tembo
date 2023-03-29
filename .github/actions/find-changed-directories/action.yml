@@ -29,7 +29,7 @@ runs:
         EXCLUDE_DIRS=("${{ inputs.ignore_dirs }}")
         EXCLUDE_OPTS=()
         for exclude_dir in "${EXCLUDE_DIRS[@]}"; do
-          EXCLUDE_OPTS+=("-not" "-path" "$exclude_dir")
+          EXCLUDE_OPTS+=("-not" "-path" "'$exclude_dir'")
         done
         directories=$(
         find . -name ${{ inputs.contains_the_file }} -not -path "*/target/*" -not -path "*/.github/*" "${EXCLUDE_OPTS[@]}" -exec dirname {} \; | while read dir; do
