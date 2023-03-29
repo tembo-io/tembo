@@ -5,7 +5,6 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
-    process::Command,
     sync::Arc,
 };
 use tracing::{debug, error, info, warn};
@@ -313,7 +312,7 @@ pub async fn reconcile_extensions(coredb: &CoreDB, ctx: Arc<Context>) -> Result<
     // most of the time there will be no changes
     let extensions_changed = diff_extensions(&desired_extensions, &actual_extensions);
 
-    if extensions_changed.len() == 0 {
+    if extensions_changed.is_empty() {
         // no further work when no changes
         return Ok(actual_extensions);
     }
@@ -342,7 +341,6 @@ fn diff_extensions(desired: &[Extension], actual: &[Extension]) -> Vec<Extension
     diff
 }
 
-
 /// determines which extensions need create/drop and which need to be trunk installed
 /// this is intended to be called after diff_extensions()
 /// roughly O(n^2) where n is the number of extensions that have changed in this reconciliation loop
@@ -369,7 +367,6 @@ fn extension_plan(have_changed: &[Extension], actual: &[Extension]) -> (Vec<Exte
 
     (changed, to_install)
 }
-
 
 #[cfg(test)]
 mod tests {
