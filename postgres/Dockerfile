@@ -68,7 +68,7 @@ RUN git clone https://github.com/pgpartman/pg_partman.git && \
 RUN git clone --branch v0.4.1 https://github.com/pgvector/pgvector.git && \
         cd pgvector && \
         make && \
-        make install \
+        make install && \
         cd ../ && rm -rf pgvector
 
 COPY docker-entrypoint.sh /usr/local/bin/
