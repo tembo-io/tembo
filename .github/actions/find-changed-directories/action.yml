@@ -19,7 +19,7 @@ outputs:
 runs:
   using: "composite"
   steps:
-    - name: Find directories with a given file type
+    - name: Find directories with a given file name
       shell: bash
       id: find_directories
       run: |
