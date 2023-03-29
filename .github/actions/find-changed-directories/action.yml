@@ -33,7 +33,6 @@ runs:
         for exclude_dir in "${EXCLUDE_DIRS[@]}"; do
           EXCLUDE_OPTS+=("-not" "-path" "*/$exclude_dir/*")
         done
-        echo "${{ignore_paths}}"
         directories=$(
         find . -name ${{ inputs.contains_the_file }} -not -path "*/target/*" -not -path "*/.github/*" "${EXCLUDE_OPTS[@]}" -exec dirname {} \; | while read dir; do
           # This will check if the directory has changed relative to the branch we are PRing
