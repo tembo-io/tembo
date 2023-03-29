@@ -377,14 +377,18 @@ fn extension_plan(have_changed: &[Extension], actual: &[Extension]) -> (Vec<Exte
 
     for extension_desired in have_changed {
         // check if the extension name exists in the actual list
+        let mut found = false;
         for extension_actual in actual {
             if extension_desired.name == extension_actual.name {
+                found = true;
                 changed.push(extension_desired.clone());
                 break;
             }
         }
         // if it doesn't exist, it needs to be installed
-        to_install.push(extension_desired.clone());
+        if !found {
+            to_install.push(extension_desired.clone());
+        }
     }
 
     (changed, to_install)
@@ -398,7 +402,7 @@ mod tests {
     /// extensions that need to be installed for the first time should never be the same as an extension
     /// that is already installed but needs to be toggled on or off
     #[test]
-    fn test_extension_plan() {
+    fn test_diff_and_plan() {
         let postgis_disabled = Extension {
             name: "postgis".to_owned(),
             description: "my description".to_owned(),
@@ -413,7 +417,7 @@ mod tests {
             name: "postgis".to_owned(),
             description: "my description".to_owned(),
             locations: vec![ExtensionInstallLocation {
-                enabled: false,
+                enabled: true,
                 database: "postgres".to_owned(),
                 schema: "public".to_owned(),
                 version: Some("1.1.1".to_owned()),
@@ -429,19 +433,54 @@ mod tests {
                 version: Some("1.1.1".to_owned()),
             }],
         };
-        // two extensions desired, postgis disabled and pgmq disabled
-        let desired = vec![postgis_disabled.clone(), pgmq_disabled.clone()];
-        // one extension installed, postgis enabled
-        let actual = vec![postgis_enabled.clone()];
+        let pg_stat_enabled = Extension {
+            name: "pg_stat_statements".to_owned(),
+            description: "my description".to_owned(),
+            locations: vec![ExtensionInstallLocation {
+                enabled: true,
+                database: "postgres".to_owned(),
+                schema: "public".to_owned(),
+                version: Some("1.1.1".to_owned()),
+            }],
+        };
+        // three desired
+        let desired = vec![
+            postgis_disabled.clone(),
+            pgmq_disabled.clone(),
+            pg_stat_enabled.clone(),
+        ];
+        // two currently installed
+        let actual = vec![postgis_enabled.clone(), pgmq_disabled.clone()];
+        // postgis changed from enabled to disabled, and pg_stat is added
+        // no change to pgmq
 
-        // determine which one needs to be installed
-        let to_install = diff_extensions(&desired, &actual);
+        // determine which extensions have changed or are new
+        let mut diff = diff_extensions(&desired, &actual);
         assert!(
-            to_install.len() == 1,
-            "expected one extension to install, found extensions {:?}",
-            to_install
+            diff.len() == 2,
+            "expected two changed extensions, found extensions {:?}",
+            diff
         );
-        assert_eq!(to_install[0], pgmq_disabled);
+        // should be postgis and pg_stat that are the diff
+        // sort the diff
+        diff.sort_by_key(|e| e.name.clone());
+        assert_eq!(diff[0], pg_stat_enabled, "expected pg_stat, found {:?}", diff[0]);
+        assert_eq!(diff[1], postgis_disabled, "expected postgis, found {:?}", diff[1]);
+        // determine which of these are is a change and which is an install op
+        let (changed, to_install) = extension_plan(&diff, &actual);
+        assert_eq!(changed.len(), 1);
+        assert!(
+            changed[0] == postgis_disabled,
+            "expected postgis changed to disabled, found {:?}",
+            changed[0]
+        );
+
+        assert_eq!(to_install.len(), 1, "expected 1 install, found {:?}", to_install);
+        assert!(
+            to_install[0] == pg_stat_enabled,
+            "expected pg_stat to install, found {:?}",
+            to_install[0]
+        );
     }
 
     #[test]
