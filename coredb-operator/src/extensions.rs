@@ -193,29 +193,6 @@ pub async fn toggle_extensions(
     Ok(())
 }
 
-// pub fn install_extensions(extensions: &[Extension]) -> Result<(), Error> {
-//     for ext in extensions.iter() {
-//         // execute trunk install on the extension
-//         let exec_cmd = Command::new("trunk install")
-//             .arg(ext.name.as_str())
-//             .output();
-//         match exec_cmd {
-
-//             Ok(out) => {
-//                 let stdout = String::from_utf8_lossy(&out.stdout);
-//                 let stderr = String::from_utf8_lossy(&out.stderr);
-//                 debug!("stdout: {}", stdout);
-//                 debug!("stderr: {}", stderr);
-//             }
-//             Err(err) => {
-//                 error!("error installing extension: {}", err);
-//                 return Err(err.into());
-//             }
-//         }
-//     }
-//     Ok(())
-// }
-
 pub fn check_input(input: &str) -> bool {
     VALID_INPUT.is_match(input)
 }
@@ -343,13 +320,11 @@ pub async fn reconcile_extensions(coredb: &CoreDB, ctx: Arc<Context>) -> Result<
 
     // otherwise, need to determine the plan to apply
     // (extension_to_install) and (changed_extensions)
-    // extensions to install are a extensions_changed
     let (changed_extensions, extensions_to_install) = extension_plan(&desired_extensions, &actual_extensions);
 
-    // first install the extensions that need to be installed
-    // let install_success = install_extensions(&extensions_to_install).await;
     toggle_extensions(coredb, &changed_extensions, ctx.clone()).await?;
-
+    debug!("extensions to install: {:?}", extensions_to_install);
+    // TODO: trunk install >extensions_to_install< on container
 
     // return final state of extensions
     get_all_extensions(coredb, ctx.clone()).await
@@ -361,7 +336,8 @@ pub async fn reconcile_extensions(coredb: &CoreDB, ctx: Arc<Context>) -> Result<
 fn diff_extensions(desired: &[Extension], actual: &[Extension]) -> Vec<Extension> {
     let set_desired: HashSet<_> = desired.iter().cloned().collect();
     let set_actual: HashSet<_> = actual.iter().cloned().collect();
-    let diff: Vec<Extension> = set_desired.difference(&set_actual).cloned().collect();
+    let mut diff: Vec<Extension> = set_desired.difference(&set_actual).cloned().collect();
+    diff.sort_by_key(|e| e.name.clone());
     debug!("Extensions diff: {:?}", diff);
     diff
 }
@@ -455,15 +431,13 @@ mod tests {
         // no change to pgmq
 
         // determine which extensions have changed or are new
-        let mut diff = diff_extensions(&desired, &actual);
+        let diff = diff_extensions(&desired, &actual);
         assert!(
             diff.len() == 2,
             "expected two changed extensions, found extensions {:?}",
             diff
         );
         // should be postgis and pg_stat that are the diff
-        // sort the diff
-        diff.sort_by_key(|e| e.name.clone());
         assert_eq!(diff[0], pg_stat_enabled, "expected pg_stat, found {:?}", diff[0]);
         assert_eq!(diff[1], postgis_disabled, "expected postgis, found {:?}", diff[1]);
         // determine which of these are is a change and which is an install op
