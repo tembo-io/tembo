@@ -309,26 +309,147 @@ pub async fn reconcile_extensions(coredb: &CoreDB, ctx: Arc<Context>) -> Result<
     let actual_extensions = get_all_extensions(coredb, ctx.clone()).await?;
     let desired_extensions = coredb.spec.extensions.clone();
 
-    let diff = diff_extensions(&desired_extensions, &actual_extensions);
-    toggle_extensions(coredb, &diff, ctx.clone()).await?;
+    // most of the time there will be no changes
+    let extensions_changed = diff_extensions(&desired_extensions, &actual_extensions);
+
+    if extensions_changed.is_empty() {
+        // no further work when no changes
+        return Ok(actual_extensions);
+    }
+
+    // otherwise, need to determine the plan to apply
+    let (changed_extensions, extensions_to_install) = extension_plan(&desired_extensions, &actual_extensions);
+
+    toggle_extensions(coredb, &changed_extensions, ctx.clone()).await?;
+    debug!("extensions to install: {:?}", extensions_to_install);
+    // TODO: trunk install >extensions_to_install< on container
 
     // return final state of extensions
     get_all_extensions(coredb, ctx.clone()).await
 }
 
 // returns any elements that are in the desired, and not in actual
-// any Extensions returned by this function need to get "applied"
+// any Extensions returned by this function need either create or drop extension
+// cheap way to determine if there have been any sort of changes to extensions
 fn diff_extensions(desired: &[Extension], actual: &[Extension]) -> Vec<Extension> {
     let set_desired: HashSet<_> = desired.iter().cloned().collect();
     let set_actual: HashSet<_> = actual.iter().cloned().collect();
-    let diff: Vec<Extension> = set_desired.difference(&set_actual).cloned().collect();
-    info!("Extensions diff: {:?}", diff);
+    let mut diff: Vec<Extension> = set_desired.difference(&set_actual).cloned().collect();
+    diff.sort_by_key(|e| e.name.clone());
+    debug!("Extensions diff: {:?}", diff);
     diff
+}
+
+/// determines which extensions need create/drop and which need to be trunk installed
+/// this is intended to be called after diff_extensions()
+fn extension_plan(have_changed: &[Extension], actual: &[Extension]) -> (Vec<Extension>, Vec<Extension>) {
+    let mut changed = Vec::new();
+    let mut to_install = Vec::new();
+
+    // have_changed is unlikely to ever be >10s of extensions
+    for extension_desired in have_changed {
+        // check if the extension name exists in the actual list
+        let mut found = false;
+        // actual unlikely to be > 100s of extensions
+        for extension_actual in actual {
+            if extension_desired.name == extension_actual.name {
+                found = true;
+                changed.push(extension_desired.clone());
+                break;
+            }
+        }
+        // if it doesn't exist, it needs to be installed
+        if !found {
+            to_install.push(extension_desired.clone());
+        }
+    }
+
+    (changed, to_install)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_diff_and_plan() {
+        let postgis_disabled = Extension {
+            name: "postgis".to_owned(),
+            description: "my description".to_owned(),
+            locations: vec![ExtensionInstallLocation {
+                enabled: false,
+                database: "postgres".to_owned(),
+                schema: "public".to_owned(),
+                version: Some("1.1.1".to_owned()),
+            }],
+        };
+        let postgis_enabled = Extension {
+            name: "postgis".to_owned(),
+            description: "my description".to_owned(),
+            locations: vec![ExtensionInstallLocation {
+                enabled: true,
+                database: "postgres".to_owned(),
+                schema: "public".to_owned(),
+                version: Some("1.1.1".to_owned()),
+            }],
+        };
+        let pgmq_disabled = Extension {
+            name: "pgmq".to_owned(),
+            description: "my description".to_owned(),
+            locations: vec![ExtensionInstallLocation {
+                enabled: false,
+                database: "postgres".to_owned(),
+                schema: "public".to_owned(),
+                version: Some("1.1.1".to_owned()),
+            }],
+        };
+        let pg_stat_enabled = Extension {
+            name: "pg_stat_statements".to_owned(),
+            description: "my description".to_owned(),
+            locations: vec![ExtensionInstallLocation {
+                enabled: true,
+                database: "postgres".to_owned(),
+                schema: "public".to_owned(),
+                version: Some("1.1.1".to_owned()),
+            }],
+        };
+        // three desired
+        let desired = vec![
+            postgis_disabled.clone(),
+            pgmq_disabled.clone(),
+            pg_stat_enabled.clone(),
+        ];
+        // two currently installed
+        let actual = vec![postgis_enabled.clone(), pgmq_disabled.clone()];
+        // postgis changed from enabled to disabled, and pg_stat is added
+        // no change to pgmq
+
+        // determine which extensions have changed or are new
+        let diff = diff_extensions(&desired, &actual);
+        assert!(
+            diff.len() == 2,
+            "expected two changed extensions, found extensions {:?}",
+            diff
+        );
+        // should be postgis and pg_stat that are the diff
+        assert_eq!(diff[0], pg_stat_enabled, "expected pg_stat, found {:?}", diff[0]);
+        assert_eq!(diff[1], postgis_disabled, "expected postgis, found {:?}", diff[1]);
+        // determine which of these are is a change and which is an install op
+        let (changed, to_install) = extension_plan(&diff, &actual);
+        assert_eq!(changed.len(), 1);
+        assert!(
+            changed[0] == postgis_disabled,
+            "expected postgis changed to disabled, found {:?}",
+            changed[0]
+        );
+
+        assert_eq!(to_install.len(), 1, "expected 1 install, found {:?}", to_install);
+        assert!(
+            to_install[0] == pg_stat_enabled,
+            "expected pg_stat to install, found {:?}",
+            to_install[0]
+        );
+    }
 
     #[test]
     fn test_diff() {
