@@ -165,7 +165,7 @@ pub async fn toggle_extensions(
                             );
                             continue;
                         }
-                        format!("CREATE EXTENSION IF NOT EXISTS \"{ext_name}\" SCHEMA {schema_name};")
+                        format!("CREATE EXTENSION IF NOT EXISTS \"{ext_name}\" SCHEMA {schema_name} cascade;")
                     }
                     false => {
                         info!("Dropping extension: {}, database {}", ext_name, database_name);
