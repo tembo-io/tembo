@@ -27,9 +27,8 @@ runs:
         # Get directories with a Dockerfile that have not changed
         # relative to the branch we are pulling into
         echo "${{inputs.ignore_dirs}}"
-        dirs=${${{inputs.ignore_dirs}}%$'\n'*}
-        echo $dirs
-        EXCLUDE_DIRS=dirs
+        IFS=$'\n' read -r -d '' -a array <<< "${{ inputs.ignore_dirs }}"
+        EXCLUDE_DIRS=$IFS
         EXCLUDE_OPTS=()
         for exclude_dir in "${EXCLUDE_DIRS[@]}"; do
           EXCLUDE_OPTS+=("-not" "-path" "*/$exclude_dir/*")
