@@ -12,7 +12,6 @@ pub mod views;
 use log::LevelFilter;
 use url::{ParseError, Url};
 
-asdf
 
 // Connect to postgresql server
 pub async fn connect(url: &str) -> Result<Pool<Postgres>, errors::ExtensionRegistryError> {
