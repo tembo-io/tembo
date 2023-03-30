@@ -46,99 +46,105 @@ pub async fn publish(
     check_input(&new_extension.name)?;
 
     // Check if extension exists
-    let query = format!(
-        "SELECT * FROM extensions WHERE name = '{}' IS TRUE",
+    let exists = sqlx::query!(
+        "SELECT * FROM extensions WHERE name = $1",
         new_extension.name
-    );
-
-    let exists = sqlx::query(&query).fetch_optional(&mut tx).await?;
+    )
+    .fetch_optional(&mut tx)
+    .await?;
 
     match exists {
         // TODO(ianstanton) Refactor into separate functions
         Some(exists) => {
             // Extension exists
             let mut tx = conn.begin().await?;
-            let time = chrono::offset::Utc::now().naive_utc();
-            let extension_id: i64 = exists.get(0);
+            let extension_id = exists.id;
 
             // Check if version exists
-            let query = format!(
-                "SELECT * FROM versions WHERE extension_id = {} and num = '{}' IS TRUE",
-                extension_id, new_extension.vers
-            );
-
-            let version_exists = sqlx::query(&query).fetch_optional(&mut tx).await?;
+            let version_exists = sqlx::query!(
+                "SELECT *
+                FROM versions
+                WHERE 
+                    extension_id = $1
+                    and num = $2",
+                extension_id as i32,
+                new_extension.vers.to_string()
+            )
+            .fetch_optional(&mut tx)
+            .await?;
 
             match version_exists {
                 Some(_version_exists) => {
                     // Update updated_at timestamp
-                    let query = format!(
+                    sqlx::query!(
                         "UPDATE versions
-            SET updated_at = '{}'
-            WHERE extension_id = {}
-            AND num = '{}'",
-                        time, extension_id, new_extension.vers
-                    );
-                    sqlx::query(&query).execute(&mut tx).await?;
+                    SET updated_at = (now() at time zone 'utc')
+                    WHERE extension_id = $1
+                    AND num = $2",
+                        extension_id as i32,
+                        new_extension.vers.to_string()
+                    )
+                    .execute(&mut tx)
+                    .await?;
                 }
                 None => {
                     // Create new record in versions table
-                    let query = format!(
+                    sqlx::query!(
                         "
                     INSERT INTO versions(extension_id, num, created_at, yanked, license)
-                    VALUES ('{}', '{}', '{}', '{}', '{}')
+                    VALUES ($1, $2, (now() at time zone 'utc'), $3, $4)
                     ",
-                        extension_id,
-                        new_extension.vers,
-                        time,
-                        "f",
+                        extension_id as i32,
+                        new_extension.vers.to_string(),
+                        false,
                         new_extension.license.unwrap()
-                    );
-                    sqlx::query(&query).execute(&mut tx).await?;
+                    )
+                    .execute(&mut tx)
+                    .await?;
                 }
             }
 
             // Set updated_at time on extension
-            let query = format!(
+            sqlx::query!(
                 "UPDATE extensions
-            SET updated_at = '{}'
-            WHERE name = '{}'",
-                time, new_extension.name,
-            );
-            sqlx::query(&query).execute(&mut tx).await?;
+            SET updated_at = (now() at time zone 'utc')
+            WHERE name = $1",
+                new_extension.name,
+            )
+            .execute(&mut tx)
+            .await?;
             tx.commit().await?;
         }
         None => {
             // Else, create new record in extensions table
             let mut tx = conn.begin().await?;
-            let time = chrono::offset::Utc::now().naive_utc();
-            let query = format!(
+            let id_row = sqlx::query!(
                 "
             INSERT INTO extensions(name, created_at, description, homepage)
-            VALUES ('{}', '{}', '{}', '{}')
+            VALUES ($1, (now() at time zone 'utc'), $2, $3)
             RETURNING id
             ",
                 new_extension.name,
-                time,
                 new_extension.description.unwrap(),
                 new_extension.homepage.unwrap()
-            );
-            let id_row = sqlx::query(&query).fetch_one(&mut tx).await?;
-            let extension_id: i64 = id_row.get(0);
+            )
+            .fetch_one(&mut tx)
+            .await?;
+            let extension_id = id_row.id;
 
             // Create new record in versions table
-            let query = format!(
+            sqlx::query!(
                 "
-                    INSERT INTO versions(extension_id, num, created_at, yanked, license)
-                    VALUES ('{}', '{}', '{}', '{}', '{}')
-                    ",
-                extension_id,
-                new_extension.vers,
-                time,
-                "f",
+            INSERT INTO versions(extension_id, num, created_at, yanked, license)
+            VALUES ($1, $2, (now() at time zone 'utc'), $3, $4)
+            ",
+                extension_id as i32,
+                new_extension.vers.to_string(),
+                false,
                 new_extension.license.unwrap()
-            );
-            sqlx::query(&query).execute(&mut tx).await?;
+            )
+            .execute(&mut tx)
+            .await?;
             tx.commit().await?;
         }
     }
