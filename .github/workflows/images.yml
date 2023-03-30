@@ -29,6 +29,7 @@ jobs:
           changed_relative_to_branch: ${{ github.base_ref || 'not-a-branch' }}
           ignore_dirs: |-
             trunk/registry
+            trunk/cli/src/commands/pgx_builder
   build_and_push_images:
     name: Build and push images
     runs-on: ubuntu-20.04
