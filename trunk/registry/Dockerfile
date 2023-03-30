@@ -9,4 +9,3 @@ RUN cargo install --path .
 # second stage.
 FROM debian
 COPY --from=builder /usr/local/cargo/bin/* /usr/local/bin/
-#test to trigger action
