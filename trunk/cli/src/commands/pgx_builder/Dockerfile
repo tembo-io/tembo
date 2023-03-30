@@ -14,6 +14,7 @@ ARG EXTENSION_NAME
 ARG EXTENSION_VERSION
 
 RUN cargo pgx package
+RUN echo "test"
 
 ENV OUTPUT_DIR="/app/trunk-output"
 ENV BUILD_DIR="/app/target/release/${EXTENSION_NAME}-pg${PG_VERSION}/"
