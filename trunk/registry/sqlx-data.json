@@ -1,0 +1,307 @@
+{
+  "db": "PostgreSQL",
+  "3b932eb9f7a785a2bb9ec6c1753f8c31d34486c37d9489708041b17ab01a5417": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      }
+    },
+    "query": "UPDATE extensions\n            SET updated_at = (now() at time zone 'utc')\n            WHERE name = $1"
+  },
+  "48a96a05f91d89cfd30f0cd3b119f0690a53d71d82ad9d40a5b0a07941fc31c9": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int8"
+        },
+        {
+          "name": "name",
+          "ordinal": 1,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "updated_at",
+          "ordinal": 2,
+          "type_info": "Timestamp"
+        },
+        {
+          "name": "created_at",
+          "ordinal": 3,
+          "type_info": "Timestamp"
+        },
+        {
+          "name": "downloads",
+          "ordinal": 4,
+          "type_info": "Int4"
+        },
+        {
+          "name": "description",
+          "ordinal": 5,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "homepage",
+          "ordinal": 6,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "documentation",
+          "ordinal": 7,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "repository",
+          "ordinal": 8,
+          "type_info": "Varchar"
+        }
+      ],
+      "nullable": [
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "parameters": {
+        "Left": []
+      }
+    },
+    "query": "SELECT * FROM extensions"
+  },
+  "4b2365bc80293846957f284d63c2d23a2ac6d2e3629e1f836f12c0eca2dd4339": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int8"
+        },
+        {
+          "name": "name",
+          "ordinal": 1,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "updated_at",
+          "ordinal": 2,
+          "type_info": "Timestamp"
+        },
+        {
+          "name": "created_at",
+          "ordinal": 3,
+          "type_info": "Timestamp"
+        },
+        {
+          "name": "downloads",
+          "ordinal": 4,
+          "type_info": "Int4"
+        },
+        {
+          "name": "description",
+          "ordinal": 5,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "homepage",
+          "ordinal": 6,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "documentation",
+          "ordinal": 7,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "repository",
+          "ordinal": 8,
+          "type_info": "Varchar"
+        }
+      ],
+      "nullable": [
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      }
+    },
+    "query": "SELECT * FROM extensions WHERE name = $1"
+  },
+  "6cdd35899d214093e96bd8cae07778d12089e0a8712cfe94dc6b747c9b37c3d5": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Text"
+        ]
+      }
+    },
+    "query": "UPDATE versions\n                    SET updated_at = (now() at time zone 'utc')\n                    WHERE extension_id = $1\n                    AND num = $2"
+  },
+  "7a931ec93bcc1516737bfc65fd24b339401996a7f23891c7770a3b5b5c79ffc2": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int8"
+        },
+        {
+          "name": "extension_id",
+          "ordinal": 1,
+          "type_info": "Int4"
+        },
+        {
+          "name": "num",
+          "ordinal": 2,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "updated_at",
+          "ordinal": 3,
+          "type_info": "Timestamp"
+        },
+        {
+          "name": "created_at",
+          "ordinal": 4,
+          "type_info": "Timestamp"
+        },
+        {
+          "name": "downloads",
+          "ordinal": 5,
+          "type_info": "Int4"
+        },
+        {
+          "name": "features",
+          "ordinal": 6,
+          "type_info": "Jsonb"
+        },
+        {
+          "name": "yanked",
+          "ordinal": 7,
+          "type_info": "Bool"
+        },
+        {
+          "name": "license",
+          "ordinal": 8,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "extension_size",
+          "ordinal": 9,
+          "type_info": "Int4"
+        },
+        {
+          "name": "published_by",
+          "ordinal": 10,
+          "type_info": "Int4"
+        },
+        {
+          "name": "checksum",
+          "ordinal": 11,
+          "type_info": "Bpchar"
+        },
+        {
+          "name": "links",
+          "ordinal": 12,
+          "type_info": "Varchar"
+        }
+      ],
+      "nullable": [
+        false,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true,
+        true
+      ],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Text"
+        ]
+      }
+    },
+    "query": "SELECT *\n                FROM versions\n                WHERE \n                    extension_id = $1\n                    and num = $2"
+  },
+  "c5ad3eb48a64a84f9a09a0b2cb9c27f3bb3ef3c9b5d11c532d97e9a3030d8c6b": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Varchar",
+          "Varchar",
+          "Varchar"
+        ]
+      }
+    },
+    "query": "\n            INSERT INTO extensions(name, created_at, description, homepage)\n            VALUES ($1, (now() at time zone 'utc'), $2, $3)\n            RETURNING id\n            "
+  },
+  "c9f6b97900ea30be7f940f72c7e20ab21cd00f5f5ef4e4e52c228e2b7e070e9b": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Varchar",
+          "Bool",
+          "Varchar"
+        ]
+      }
+    },
+    "query": "\n                    INSERT INTO versions(extension_id, num, created_at, yanked, license)\n                    VALUES ($1, $2, (now() at time zone 'utc'), $3, $4)\n                    "
+  },
+  "f1213b6f0350efbce183597c665e9494141b8063f4fdd096c11337272b484556": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Int4",
+          "Varchar",
+          "Bool",
+          "Varchar"
+        ]
+      }
+    },
+    "query": "\n            INSERT INTO versions(extension_id, num, created_at, yanked, license)\n            VALUES ($1, $2, (now() at time zone 'utc'), $3, $4)\n            "
+  }
+}
