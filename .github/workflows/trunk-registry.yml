@@ -19,6 +19,9 @@ on:
       - main
       - release**
 
+env:
+  DATABASE_URL: ${{ secrets.TRUNK_REGISTRY_DEV_DB_URL }}
+
 jobs:
   lint:
     name: Run linters
