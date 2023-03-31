@@ -19,6 +19,11 @@ on:
       - main
       - release**
 
+# Required for sqlx query!() macro used in registry code.
+# See https://docs.rs/sqlx/0.6.2/sqlx/macro.query.html#requirements for more info.
+env:
+  DATABASE_URL: ${{ secrets.TRUNK_REGISTRY_DEV_DB_URL }}
+
 jobs:
   lint:
     name: Run linters
