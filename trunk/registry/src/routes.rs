@@ -2,7 +2,6 @@ use crate::config::Config;
 use crate::connect;
 use crate::errors::ExtensionRegistryError;
 use actix_web::{get, web, HttpResponse, Responder};
-use log::info;
 #[get("/")]
 pub async fn running() -> impl Responder {
     HttpResponse::Ok().body("API is up and running!")
