@@ -2,7 +2,6 @@ use crate::config::Config;
 use crate::connect;
 use crate::errors::ExtensionRegistryError;
 use actix_web::{get, web, HttpResponse, Responder};
-use sqlx::Row;
 use serde::Serialize;
 
 #[derive(Debug, Serialize)]
@@ -11,7 +10,7 @@ pub struct Extension {
     description: String,
     homepage: String,
     documentation: String,
-    repository: String
+    repository: String,
 }
 
 #[get("/")]
@@ -38,7 +37,7 @@ pub async fn get_all_extensions(
             description: row.description.as_ref().unwrap().to_owned(),
             homepage: row.homepage.as_ref().unwrap().to_owned(),
             documentation: row.documentation.as_ref().unwrap().to_owned(),
-            repository: row.repository.as_ref().unwrap().to_owned()
+            repository: row.repository.as_ref().unwrap().to_owned(),
         };
         extensions.push(ext);
     }
