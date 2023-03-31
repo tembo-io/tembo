@@ -2,7 +2,6 @@ use crate::config::Config;
 use crate::connect;
 use crate::errors::ExtensionRegistryError;
 use actix_web::{get, web, HttpResponse, Responder};
-use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
 #[get("/")]
@@ -36,5 +35,5 @@ pub async fn get_all_extensions(
     }
     // Return results in response
     let json = serde_json::to_string_pretty(&extensions)?;
-    Ok(HttpResponse::Ok().body(format!("{}", json)))
+    Ok(HttpResponse::Ok().body(json))
 }
