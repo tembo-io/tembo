@@ -30,7 +30,7 @@ jobs:
         with:
           profile: minimal
           toolchain: nightly
-          components: rustfmt, clippy
+          components: rustfmt, clippy, sqlx-cli
       - uses: Swatinem/rust-cache@v2
         with:
           prefix-key: "lint"
