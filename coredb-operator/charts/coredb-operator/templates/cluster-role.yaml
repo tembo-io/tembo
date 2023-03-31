@@ -1,0 +1,21 @@
+# Access for the service account
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: control-cdb
+rules:
+  - apiGroups: ["coredb.io"]
+    resources: ["coredbs", "coredbs/status"]
+    verbs: ["get", "list", "watch", "patch"]
+  - apiGroups: ["events.k8s.io"]
+    resources: ["events"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "patch"]
+  - apiGroups: ["apps"]
+    resources: ["statefulsets"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["services", "secrets", "pods", "pods/exec", "namespaces/status"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]

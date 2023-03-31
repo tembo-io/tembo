@@ -1,0 +1,33 @@
+logLevel: debug
+
+image:
+  repository: quay.io/coredb/cp-service
+  pullPolicy: IfNotPresent
+  tag: ""
+
+# Update default resources after measuring in practice
+resources:
+  limits:
+    cpu: 1000m
+    memory: 128Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+podAnnotations: {}
+
+nodeSelector: {}
+tolerations: []
+affinity: {}
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
