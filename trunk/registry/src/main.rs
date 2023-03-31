@@ -1,3 +1,4 @@
+use actix_cors::Cors;
 use actix_web::{web, App, HttpServer};
 use trunk_registry::{config, download, publish, routes};
 
@@ -7,7 +8,9 @@ async fn main() -> std::io::Result<()> {
     // load configurations from environment
     let cfg = config::Config::default();
     HttpServer::new(move || {
+        let cors = Cors::permissive();
         App::new()
+            .wrap(cors)
             .app_data(web::Data::new(cfg.clone()))
             .service(routes::running)
             .service(routes::get_all_extensions)
