@@ -7,6 +7,10 @@ inputs:
   changed_relative_to_branch:
     description: 'The branch on the origin to compare with to determine if this directory has changed. For example "main".'
     required: true
+  ignore_dirs:
+    description: A list of directories to ignore.
+    required: false
+    default: ''
 outputs:
   build_matrix:
     description: "Input this output to your matrix build in a following job, like this 'fromJson(needs.find_directories.outputs.build_matrix)'"
@@ -14,7 +18,7 @@ outputs:
 runs:
   using: "composite"
   steps:
-    - name: Find directories with Dockerfiles
+    - name: Find directories with a given file name
       shell: bash
       id: find_directories
       run: |
@@ -22,8 +26,14 @@ runs:
         git fetch origin ${{ inputs.changed_relative_to_branch }} || true
         # Get directories with a Dockerfile that have not changed
         # relative to the branch we are pulling into
+        echo "${{inputs.ignore_dirs}}"
+        IFS=', ' read -r -a array <<< "${{inputs.ignore_dirs}}"
+        EXCLUDE_OPTS=()
+        for exclude_dir in "${array[@]}"; do
+          EXCLUDE_OPTS+=("-not" "-path" "*/$exclude_dir/*")
+        done
         directories=$(
-        find . -name ${{ inputs.contains_the_file }} -not -path "*/target/*" -not -path "*/.github/*" -exec dirname {} \; | while read dir; do
+        find . -name ${{ inputs.contains_the_file }} -not -path "*/target/*" -not -path "*/.github/*" "${EXCLUDE_OPTS[@]}" -exec dirname {} \; | while read dir; do
           # This will check if the directory has changed relative to the branch we are PRing
           # into, and if it's not a PR, in the case of main or release/**, then it will
           # build all docker directories

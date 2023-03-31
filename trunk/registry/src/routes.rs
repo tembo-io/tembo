@@ -29,15 +29,16 @@ pub async fn get_all_extensions(
     // Create a transaction on the database, if there are no errors,
     // commit the transactions to record a new or updated extension.
     let mut tx = conn.begin().await?;
-    let query = format!("SELECT * FROM extensions",);
-    let rows = sqlx::query(&query).fetch_all(&mut tx).await?;
+    let rows = sqlx::query!("SELECT * FROM extensions")
+        .fetch_all(&mut tx)
+        .await?;
     for row in rows.iter() {
         let ext = Extension {
-            name: row.get(1),
-            description: row.get(5),
-            homepage: row.get(6),
-            documentation: "".to_string(),
-            repository: "".to_string()
+            name: row.name.as_ref().unwrap().to_owned(),
+            description: row.description.as_ref().unwrap().to_owned(),
+            homepage: row.homepage.as_ref().unwrap().to_owned(),
+            documentation: row.documentation.as_ref().unwrap().to_owned(),
+            repository: row.repository.as_ref().unwrap().to_owned()
         };
         extensions.push(ext);
     }

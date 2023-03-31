@@ -3,6 +3,7 @@ use trunk_registry::{config, download, publish, routes};
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    env_logger::init();
     // load configurations from environment
     let cfg = config::Config::default();
     HttpServer::new(move || {

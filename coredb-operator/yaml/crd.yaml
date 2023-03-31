@@ -58,7 +58,7 @@ spec:
                   type: object
                 type: array
               image:
-                default: quay.io/coredb/postgres:c03124e
+                default: quay.io/coredb/postgres:293e42f
                 type: string
               port:
                 default: 5432
