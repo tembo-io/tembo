@@ -30,7 +30,9 @@ jobs:
         with:
           profile: minimal
           toolchain: nightly
-          components: rustfmt, clippy, sqlx-cli
+          components: rustfmt, clippy
+      - name: install sqlx-cli
+        run: cargo install sqlx-cli
       - uses: Swatinem/rust-cache@v2
         with:
           prefix-key: "lint"
