@@ -25,13 +25,13 @@ pub async fn get_all_extensions(
         .await?;
     for row in rows.iter() {
         let data = json!(
-            {
-              "name": row.name.to_owned(),
-              "description": row.description.to_owned(),
-              "homepage": row.homepage.to_owned(),
-              "documentation": row.documentation.to_owned(),
-              "repository": row.repository.to_owned()
-            });
+        {
+          "name": row.name.to_owned(),
+          "description": row.description.to_owned(),
+          "homepage": row.homepage.to_owned(),
+          "documentation": row.documentation.to_owned(),
+          "repository": row.repository.to_owned()
+        });
         extensions.push(data);
     }
     // Return results in response
