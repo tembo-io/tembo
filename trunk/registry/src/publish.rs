@@ -6,7 +6,6 @@ use crate::errors::ExtensionRegistryError;
 use crate::views::extension_publish::ExtensionUpload;
 use actix_web::{error, post, web, HttpResponse};
 use futures::StreamExt;
-use sqlx::Row;
 
 const MAX_SIZE: usize = 262_144; // max payload size is 256k
 

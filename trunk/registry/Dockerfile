@@ -1,5 +1,5 @@
 FROM rust:1.68.0 as builder
-COPY Cargo.toml Cargo.lock ./
+COPY sqlx-data.json Cargo.toml Cargo.lock ./
 COPY src ./src
 COPY registry-s3 ./registry-s3
 RUN cargo build && \

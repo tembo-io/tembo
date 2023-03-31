@@ -9,7 +9,7 @@ publish = false
 [dependencies]
 actix-web = "4.3.1"
 anyhow = "1.0.69"
-sqlx = { version = "0.6.2", features = [ "json", "runtime-tokio-native-tls" , "postgres", "time" ] }
+sqlx = { version = "0.6.2", features = [ "json", "runtime-tokio-native-tls" , "postgres", "time", "offline" ] }
 url = "2.3.1"
 thiserror = "1.0.39"
 log = "0.4.17"
