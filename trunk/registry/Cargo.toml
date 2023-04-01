@@ -9,6 +9,7 @@ publish = false
 [dependencies]
 actix-web = "4.3.1"
 actix-cors = "0.6.4"
+actix-multipart = "0.6.0"
 anyhow = "1.0.69"
 sqlx = { version = "0.6.2", features = [ "json", "runtime-tokio-native-tls" , "postgres", "time", "offline" ] }
 url = "2.3.1"
