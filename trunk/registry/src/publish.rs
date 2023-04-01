@@ -22,9 +22,9 @@ pub async fn publish(
     // Get request body
     let mut metadata = web::BytesMut::new();
     let mut file = web::BytesMut::new();
-    while let Some(mut field) = payload.try_next().await.unwrap() {
+    while let Some(mut field) = payload.try_next().await? {
         // Field is stream of Bytes
-        while let Some(chunk) = field.try_next().await.unwrap() {
+        while let Some(chunk) = field.try_next().await? {
             // limit max size of in-memory payload
             if (chunk.len()) > MAX_SIZE {
                 return Err(ExtensionRegistryError::from(error::ErrorBadRequest(

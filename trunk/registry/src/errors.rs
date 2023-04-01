@@ -1,4 +1,5 @@
 //! Custom errors types for extension registry
+use actix_multipart::MultipartError;
 use actix_web::error;
 use thiserror::Error;
 use url::ParseError;
@@ -31,4 +32,8 @@ pub enum ExtensionRegistryError {
     /// a serde json error
     #[error("serde json error")]
     SerdeJsonError(#[from] serde_json::Error),
+
+    /// a multipart error
+    #[error("multipart error")]
+    MultipartError(#[from] MultipartError),
 }
