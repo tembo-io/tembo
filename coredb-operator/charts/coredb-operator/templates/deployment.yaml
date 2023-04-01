@@ -22,8 +22,8 @@ spec:
       serviceAccountName: coredb-controller
       containers:
       - name: coredb-controller
-        image: quay.io/coredb/coredb-operator:latest
-        imagePullPolicy: Always
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
         resources:
           limits:
             cpu: 200m
