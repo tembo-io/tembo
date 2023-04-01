@@ -90,6 +90,11 @@ jobs:
           set -xe
           cargo run --bin crdgen > yaml/crd.yaml
           git diff --exit-code yaml/crd.yaml
+      - name: Check CRD is updated in the charts directory
+        run: |
+          set -xe
+          cargo run --bin crdgen > charts/coredb-operator/templates/crd.yaml
+          git diff --exit-code charts/coredb-operator/templates/crd.yaml
       - name: Run functional / integration tests
         run: |
           set -xe
