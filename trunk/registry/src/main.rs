@@ -18,6 +18,7 @@ async fn main() -> std::io::Result<()> {
         .run(&conn)
         .await
         .expect("error running migrations");
+
     HttpServer::new(move || {
         let cors = Cors::permissive();
         App::new()
