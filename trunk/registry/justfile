@@ -1,9 +1,9 @@
 DATABASE_URL := "postgresql://postgres:postgres@0.0.0.0:5432/postgres"
 
 format:
-	cargo +nightly fmt --all
-	DATABASE_URL=${DATABASE_URL} cargo clippy
-	cargo sqlx prepare
+    cargo +nightly fmt --all
+    DATABASE_URL=${DATABASE_URL} cargo clippy
+    cargo sqlx prepare
 
 run-migrations:
     sqlx migrate run
