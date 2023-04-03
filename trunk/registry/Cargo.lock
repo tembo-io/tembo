@@ -2153,6 +2153,7 @@ dependencies = [
  "futures",
  "log",
  "registry-s3",
+ "reqwest",
  "semver",
  "serde",
  "serde_json",

@@ -3,10 +3,14 @@
 use crate::config::Config;
 use crate::connect;
 use crate::errors::ExtensionRegistryError;
+use crate::uploader::Uploader;
 use crate::views::extension_publish::ExtensionUpload;
 use actix_multipart::Multipart;
 use actix_web::{error, post, web, HttpResponse};
 use futures::TryStreamExt;
+use reqwest::{Body, Client};
+use s3::Bucket;
+use Uploader::S3;
 
 const MAX_SIZE: usize = 262_144; // max payload size is 256k
 
@@ -41,6 +45,26 @@ pub async fn publish(
 
     // Deserialize body
     let new_extension = serde_json::from_slice::<ExtensionUpload>(&metadata)?;
+    let body = Body::from(file.freeze());
+    let client = Client::new();
+    Uploader::upload_extension(
+        &S3 {
+            bucket: Box::new(Bucket::new(
+                &cfg.bucket_name,
+                &cfg.region,
+                &cfg.aws_access_key,
+                &cfg.aws_secret_key,
+                "https",
+            )),
+            index_bucket: None,
+            cdn: None,
+        },
+        &client,
+        body,
+        &new_extension,
+        &new_extension.vers,
+    )
+    .await?;
 
     // Set database conn
     let conn = connect(&cfg.database_url).await?;
@@ -104,7 +128,7 @@ pub async fn publish(
                         extension_id as i32,
                         new_extension.vers.to_string(),
                         false,
-                        new_extension.license.unwrap()
+                        new_extension.license
                     )
                     .execute(&mut tx)
                     .await?;
@@ -132,8 +156,8 @@ pub async fn publish(
             RETURNING id
             ",
                 new_extension.name,
-                new_extension.description.unwrap(),
-                new_extension.homepage.unwrap()
+                new_extension.description,
+                new_extension.homepage
             )
             .fetch_one(&mut tx)
             .await?;
@@ -148,7 +172,7 @@ pub async fn publish(
                 extension_id as i32,
                 new_extension.vers.to_string(),
                 false,
-                new_extension.license.unwrap()
+                new_extension.license
             )
             .execute(&mut tx)
             .await?;

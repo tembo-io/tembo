@@ -23,3 +23,4 @@ chrono = "0.4.23"
 registry-s3 = { version = "0.2.0", path = "registry-s3" }
 dotenv = "0.15.0"
 env_logger = "0.10.0"
+reqwest = "0.11.14"

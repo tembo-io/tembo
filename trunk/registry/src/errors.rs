@@ -36,4 +36,8 @@ pub enum ExtensionRegistryError {
     /// a multipart error
     #[error("multipart error")]
     MultipartError(#[from] MultipartError),
+
+    /// a reqwest error
+    #[error("reqwest error")]
+    ReqwestError(#[from] reqwest::Error),
 }

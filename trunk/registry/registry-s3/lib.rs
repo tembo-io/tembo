@@ -2,8 +2,7 @@
 
 use chrono::prelude::Utc;
 use hmac::{Hmac, Mac};
-use reqwest::{
-    blocking::{Body, Client, Response},
+use reqwest::{{Body, Client, Response},
     header,
 };
 use sha1::Sha1;
@@ -22,22 +21,22 @@ pub struct Bucket {
 
 impl Bucket {
     pub fn new(
-        name: String,
-        region: Option<String>,
-        access_key: String,
-        secret_key: String,
+        name: &String,
+        region: &Option<String>,
+        access_key: &String,
+        secret_key: &String,
         proto: &str,
     ) -> Bucket {
         Bucket {
-            name,
-            region,
-            access_key,
-            secret_key,
+            name: name.to_string(),
+            region: region.clone(),
+            access_key: access_key.to_string(),
+            secret_key: secret_key.to_string(),
             proto: proto.to_string(),
         }
     }
 
-    pub fn put<R: Into<Body>>(
+    pub async fn put<R: Into<Body>>(
         &self,
         client: &Client,
         path: &str,
@@ -59,12 +58,12 @@ impl Bucket {
             .headers(extra_headers)
             .body(content.into())
             .timeout(Duration::from_secs(60))
-            .send()?
+            .send().await?
             .error_for_status()
             .map_err(Into::into)
     }
 
-    pub fn delete(&self, client: &Client, path: &str) -> Result<Response, Error> {
+    pub async fn delete(&self, client: &Client, path: &str) -> Result<Response, Error> {
         let path = path.strip_prefix('/').unwrap_or(path);
         let date = Utc::now().to_rfc2822();
         let auth = self.auth("DELETE", &date, path, "", "");
@@ -74,7 +73,7 @@ impl Bucket {
             .delete(url)
             .header(header::DATE, date)
             .header(header::AUTHORIZATION, auth)
-            .send()?
+            .send().await?
             .error_for_status()
             .map_err(Into::into)
     }
