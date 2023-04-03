@@ -1,4 +1,4 @@
-CREATE TABLE extensions (
+CREATE TABLE IF NOT EXISTS extensions (
     id BIGSERIAL PRIMARY KEY,
     name VARCHAR,
     updated_at TIMESTAMP,

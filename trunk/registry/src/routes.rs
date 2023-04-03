@@ -1,8 +1,7 @@
-use crate::config::Config;
-use crate::connect;
 use crate::errors::ExtensionRegistryError;
 use actix_web::{get, web, HttpResponse, Responder};
 use serde_json::{json, Value};
+use sqlx::{Pool, Postgres};
 
 #[get("/")]
 pub async fn running() -> impl Responder {
@@ -11,11 +10,10 @@ pub async fn running() -> impl Responder {
 
 #[get("/extensions/all")]
 pub async fn get_all_extensions(
-    cfg: web::Data<Config>,
+    conn: web::Data<Pool<Postgres>>,
 ) -> Result<HttpResponse, ExtensionRegistryError> {
     let mut extensions: Vec<Value> = Vec::new();
-    // Set database conn
-    let conn = connect(&cfg.database_url).await?;
+
     // Create a transaction on the database, if there are no errors,
     // commit the transactions to record a new or updated extension.
     let mut tx = conn.begin().await?;

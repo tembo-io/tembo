@@ -1,4 +1,4 @@
-CREATE TABLE versions (
+CREATE TABLE IF NOT EXISTS versions (
     id BIGSERIAL PRIMARY KEY,
     extension_id INT4,
     num VARCHAR,
