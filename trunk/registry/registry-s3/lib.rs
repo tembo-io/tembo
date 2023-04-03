@@ -2,8 +2,8 @@
 
 use chrono::prelude::Utc;
 use hmac::{Hmac, Mac};
-use reqwest::{{Body, Client, Response},
-    header,
+use reqwest::{
+    header, {Body, Client, Response},
 };
 use sha1::Sha1;
 use std::time::Duration;
@@ -58,7 +58,8 @@ impl Bucket {
             .headers(extra_headers)
             .body(content.into())
             .timeout(Duration::from_secs(60))
-            .send().await?
+            .send()
+            .await?
             .error_for_status()
             .map_err(Into::into)
     }
@@ -73,7 +74,8 @@ impl Bucket {
             .delete(url)
             .header(header::DATE, date)
             .header(header::AUTHORIZATION, auth)
-            .send().await?
+            .send()
+            .await?
             .error_for_status()
             .map_err(Into::into)
     }
