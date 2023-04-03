@@ -1,10 +1,16 @@
 //! Functionality related to publishing a new extension or version of an extension.
 
+use crate::config::Config;
 use crate::errors::ExtensionRegistryError;
+use crate::uploader::Uploader;
 use crate::views::extension_publish::ExtensionUpload;
+use actix_multipart::Multipart;
 use actix_web::{error, post, web, HttpResponse};
-use futures::StreamExt;
+use futures::TryStreamExt;
+use reqwest::{Body, Client};
+use s3::Bucket;
 use sqlx::{Pool, Postgres};
+use Uploader::S3;
 
 const MAX_SIZE: usize = 262_144; // max payload size is 256k
 
@@ -14,24 +20,32 @@ const MAX_SIZE: usize = 262_144; // max payload size is 256k
 
 #[post("/extensions/new")]
 pub async fn publish(
+    cfg: web::Data<Config>,
     conn: web::Data<Pool<Postgres>>,
-    mut payload: web::Payload,
+    mut payload: Multipart,
 ) -> Result<HttpResponse, ExtensionRegistryError> {
     // Get request body
-    let mut body = web::BytesMut::new();
-    while let Some(chunk) = payload.next().await {
-        let chunk = chunk?;
-        // limit max size of in-memory payload
-        if (body.len() + chunk.len()) > MAX_SIZE {
-            return Err(ExtensionRegistryError::from(error::ErrorBadRequest(
-                "overflow",
-            )));
+    let mut metadata = web::BytesMut::new();
+    let mut file = web::BytesMut::new();
+    while let Some(mut field) = payload.try_next().await? {
+        // Field is stream of Bytes
+        while let Some(chunk) = field.try_next().await? {
+            // limit max size of in-memory payload
+            if (chunk.len()) > MAX_SIZE {
+                return Err(ExtensionRegistryError::from(error::ErrorBadRequest(
+                    "overflow",
+                )));
+            }
+            if field.name() == "metadata" {
+                metadata.extend_from_slice(&chunk);
+            } else if field.name() == "file" {
+                file.extend_from_slice(&chunk);
+            }
         }
-        body.extend_from_slice(&chunk);
     }
 
     // Deserialize body
-    let new_extension = serde_json::from_slice::<ExtensionUpload>(&body)?;
+    let new_extension = serde_json::from_slice::<ExtensionUpload>(&metadata)?;
 
     // Create a transaction on the database, if there are no errors,
     // commit the transactions to record a new or updated extension.
@@ -92,7 +106,7 @@ pub async fn publish(
                         extension_id as i32,
                         new_extension.vers.to_string(),
                         false,
-                        new_extension.license.unwrap()
+                        new_extension.license
                     )
                     .execute(&mut tx)
                     .await?;
@@ -120,8 +134,8 @@ pub async fn publish(
             RETURNING id
             ",
                 new_extension.name,
-                new_extension.description.unwrap(),
-                new_extension.homepage.unwrap()
+                new_extension.description,
+                new_extension.homepage
             )
             .fetch_one(&mut tx)
             .await?;
@@ -136,7 +150,7 @@ pub async fn publish(
                 extension_id as i32,
                 new_extension.vers.to_string(),
                 false,
-                new_extension.license.unwrap()
+                new_extension.license
             )
             .execute(&mut tx)
             .await?;
@@ -145,8 +159,25 @@ pub async fn publish(
     }
 
     // TODO(ianstanton) Generate checksum
-    // TODO(ianstanton) Upload extension tar.gz
-
+    let file_body = Body::from(file.freeze());
+    let client = Client::new();
+    Uploader::upload_extension(
+        &S3 {
+            bucket: Box::new(Bucket::new(
+                &cfg.bucket_name,
+                &cfg.region,
+                &cfg.aws_access_key,
+                &cfg.aws_secret_key,
+                "https",
+            )),
+            cdn: None,
+        },
+        &client,
+        file_body,
+        &new_extension,
+        &new_extension.vers,
+    )
+    .await?;
     Ok(HttpResponse::Ok().body(format!(
         "Successfully published extension {} version {}",
         new_extension.name, new_extension.vers

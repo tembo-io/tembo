@@ -4,7 +4,7 @@ use std::env;
 pub struct Config {
     pub database_url: String,
     pub bucket_name: String,
-    pub region: String,
+    pub region: Option<String>,
     pub aws_access_key: String,
     pub aws_secret_key: String,
 }
@@ -18,7 +18,7 @@ impl Default for Config {
                 "postgres://postgres@localhost/trunk_registry",
             ),
             bucket_name: from_env_default("S3_BUCKET", "trunk-registry"),
-            region: from_env_default("S3_REGION", ""),
+            region: Some(from_env_default("S3_REGION", "")),
             aws_access_key: from_env_default("AWS_ACCESS_KEY", ""),
             aws_secret_key: from_env_default("AWS_SECRET_KEY", ""),
         }

@@ -24,6 +24,7 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .wrap(cors)
             .app_data(web::Data::new(conn.clone()))
+            .app_data(web::Data::new(cfg.clone()))
             .service(routes::running)
             .service(routes::get_all_extensions)
             .service(publish::publish)

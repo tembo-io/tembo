@@ -10,13 +10,12 @@ pub async fn download(cfg: web::Data<Config>, path: web::Path<(String, String)>)
     let (name, version) = path.into_inner();
     let bucket = uploader::Uploader::S3 {
         bucket: Box::new(s3::Bucket::new(
-            cfg.bucket_name.to_string(),
-            Option::from(cfg.region.to_string()),
-            cfg.aws_access_key.to_string(),
-            cfg.aws_secret_key.to_string(),
+            &cfg.bucket_name.to_string(),
+            &cfg.region,
+            &cfg.aws_access_key.to_string(),
+            &cfg.aws_secret_key.to_string(),
             "https",
         )),
-        index_bucket: None,
         cdn: None,
     };
     // TODO(ianstanton) Increment download count for extension
