@@ -8,6 +8,7 @@ use coredb_crd as crd;
 use coredb_crd::CoreDB;
 use errors::ConductorError;
 use ingress_route_tcp_crd::IngressRouteTCP;
+use k8s_openapi::api::apps::v1::StatefulSet;
 use k8s_openapi::api::core::v1::{Namespace, Secret};
 use k8s_openapi::api::networking::v1::Ingress;
 use kube::api::{DeleteParams, ListParams, Patch, PatchParams};
@@ -254,6 +255,16 @@ pub fn wait_for_secret() -> impl Condition<Secret> {
         }
         false
     }
+}
+
+pub async fn restart_statefulset(
+    client: Client,
+    namespace: &str,
+    statefulset_name: &str,
+) -> Result<(), ConductorError> {
+    let sts: Api<StatefulSet> = Api::namespaced(client, namespace);
+    sts.restart(statefulset_name).await?;
+    Ok(())
 }
 
 #[test]

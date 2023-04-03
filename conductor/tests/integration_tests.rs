@@ -12,7 +12,7 @@
 #[cfg(test)]
 mod test {
     use k8s_openapi::{
-        api::core::v1::Pod,
+        api::{apps::v1::StatefulSet, core::v1::Pod},
         apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
     };
     use kube::{
@@ -22,7 +22,7 @@ mod test {
     use pgmq::PGMQueue;
 
     use conductor::{
-        coredb_crd as crd,
+        coredb_crd as crd, restart_statefulset,
         types::{self, StateToControlPlane},
     };
     use rand::Rng;
@@ -122,6 +122,30 @@ mod test {
             .extensions
             .expect("No extensions found in message spec");
         assert!(extensions.len() > 0, "Expected at least one extension");
+
+        restart_statefulset(client.clone(), &namespace, &namespace)
+            .await
+            .expect("failed restarting statefulset");
+        thread::sleep(time::Duration::from_secs(10));
+        // Verify that the statefulSet was updated with the restartedAt annotation
+        let sts: Api<StatefulSet> = Api::namespaced(client.clone(), &namespace);
+        let updated_statefulset = sts
+            .get(&namespace)
+            .await
+            .expect("Failed to get StatefulSet");
+        let annot = updated_statefulset
+            .spec
+            .expect("no spec found")
+            .template
+            .metadata
+            .expect("no metadata")
+            .annotations
+            .expect("no annotations found");
+        let restarted_at_annotation = annot.get("kube.kubernetes.io/restartedAt");
+        assert!(
+            restarted_at_annotation.is_some(),
+            "StatefulSet was not restarted."
+        );
     }
 
     async fn kube_client() -> kube::Client {
