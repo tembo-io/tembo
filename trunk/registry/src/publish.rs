@@ -1,5 +1,6 @@
 //! Functionality related to publishing a new extension or version of an extension.
 
+use crate::config::Config;
 use crate::errors::ExtensionRegistryError;
 use crate::uploader::Uploader;
 use crate::views::extension_publish::ExtensionUpload;
@@ -8,9 +9,8 @@ use actix_web::{error, post, web, HttpResponse};
 use futures::TryStreamExt;
 use reqwest::{Body, Client};
 use s3::Bucket;
-use Uploader::S3;
 use sqlx::{Pool, Postgres};
-use crate::config::Config;
+use Uploader::S3;
 
 const MAX_SIZE: usize = 262_144; // max payload size is 256k
 
