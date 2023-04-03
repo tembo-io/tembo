@@ -6,6 +6,7 @@ use std::fs::File;
 use std::path::PathBuf;
 use std::{env, fs};
 
+// https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control
 const CACHE_CONTROL_IMMUTABLE: &str = "public,max-age=31536000,immutable";
 
 #[derive(Clone, Debug)]
