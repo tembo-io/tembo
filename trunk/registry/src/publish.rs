@@ -1,11 +1,10 @@
 //! Functionality related to publishing a new extension or version of an extension.
 
-use crate::config::Config;
-use crate::connect;
 use crate::errors::ExtensionRegistryError;
 use crate::views::extension_publish::ExtensionUpload;
 use actix_web::{error, post, web, HttpResponse};
 use futures::StreamExt;
+use sqlx::{Pool, Postgres};
 
 const MAX_SIZE: usize = 262_144; // max payload size is 256k
 
@@ -15,7 +14,7 @@ const MAX_SIZE: usize = 262_144; // max payload size is 256k
 
 #[post("/extensions/new")]
 pub async fn publish(
-    cfg: web::Data<Config>,
+    conn: web::Data<Pool<Postgres>>,
     mut payload: web::Payload,
 ) -> Result<HttpResponse, ExtensionRegistryError> {
     // Get request body
@@ -33,9 +32,6 @@ pub async fn publish(
 
     // Deserialize body
     let new_extension = serde_json::from_slice::<ExtensionUpload>(&body)?;
-
-    // Set database conn
-    let conn = connect(&cfg.database_url).await?;
 
     // Create a transaction on the database, if there are no errors,
     // commit the transactions to record a new or updated extension.
