@@ -40,4 +40,8 @@ pub enum ExtensionRegistryError {
     /// a reqwest error
     #[error("reqwest error")]
     ReqwestError(#[from] reqwest::Error),
+
+    /// a std io error
+    #[error("std io error")]
+    StdIoError(#[from] std::io::Error),
 }

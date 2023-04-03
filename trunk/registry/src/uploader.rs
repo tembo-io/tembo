@@ -92,11 +92,11 @@ impl Uploader {
             Uploader::Local => {
                 let filename = Self::local_uploads_path(path, upload_bucket);
                 let dir = filename.parent().unwrap();
-                fs::create_dir_all(dir).unwrap();
-                let mut file = File::create(&filename).unwrap();
+                fs::create_dir_all(dir)?;
+                let mut file = File::create(&filename)?;
                 let body = content.into();
                 let mut buffer = body.as_bytes().unwrap();
-                std::io::copy(&mut buffer, &mut file).unwrap();
+                std::io::copy(&mut buffer, &mut file)?;
                 println!("Uploading to {:?}", filename);
                 Ok(filename.to_str().map(String::from))
             }
