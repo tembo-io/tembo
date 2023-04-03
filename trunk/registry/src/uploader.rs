@@ -12,7 +12,6 @@ const CACHE_CONTROL_IMMUTABLE: &str = "public,max-age=31536000,immutable";
 pub enum Uploader {
     S3 {
         bucket: Box<s3::Bucket>,
-        index_bucket: Option<Box<s3::Bucket>>,
         cdn: Option<String>,
     },
 
@@ -22,7 +21,6 @@ pub enum Uploader {
 
 pub enum UploadBucket {
     Default,
-    Index,
 }
 
 impl Uploader {
@@ -53,11 +51,8 @@ impl Uploader {
     }
 
     /// Returns the absolute path to the locally uploaded file.
-    fn local_uploads_path(path: &str, upload_bucket: UploadBucket) -> PathBuf {
-        let path = match upload_bucket {
-            UploadBucket::Index => PathBuf::from("index").join(path),
-            UploadBucket::Default => PathBuf::from(path),
-        };
+    fn local_uploads_path(path: &str) -> PathBuf {
+        let path = PathBuf::from(path);
         env::current_dir().unwrap().join("local_uploads").join(path)
     }
 
@@ -68,18 +63,10 @@ impl Uploader {
         content: R,
         content_type: &str,
         extra_headers: header::HeaderMap,
-        upload_bucket: UploadBucket,
     ) -> Result<Option<String>, ExtensionRegistryError> {
         match *self {
-            Uploader::S3 {
-                ref bucket,
-                ref index_bucket,
-                ..
-            } => {
-                let bucket = match upload_bucket {
-                    UploadBucket::Default => Some(bucket),
-                    UploadBucket::Index => index_bucket.as_ref(),
-                };
+            Uploader::S3 { ref bucket, .. } => {
+                let bucket = Some(bucket);
 
                 if let Some(bucket) = bucket {
                     bucket
@@ -90,7 +77,7 @@ impl Uploader {
                 Ok(Some(String::from(path)))
             }
             Uploader::Local => {
-                let filename = Self::local_uploads_path(path, upload_bucket);
+                let filename = Self::local_uploads_path(path);
                 let dir = filename.parent().unwrap();
                 fs::create_dir_all(dir)?;
                 let mut file = File::create(&filename)?;
@@ -118,15 +105,8 @@ impl Uploader {
             header::HeaderValue::from_static(CACHE_CONTROL_IMMUTABLE),
         );
         println!("Uploading");
-        self.upload(
-            http_client,
-            &path,
-            body,
-            "application/gzip",
-            extra_headers,
-            UploadBucket::Default,
-        )
-        .await?;
+        self.upload(http_client, &path, body, "application/gzip", extra_headers)
+            .await?;
         Ok("test".to_owned())
     }
 }

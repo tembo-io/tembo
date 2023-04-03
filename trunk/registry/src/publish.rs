@@ -46,26 +46,6 @@ pub async fn publish(
 
     // Deserialize body
     let new_extension = serde_json::from_slice::<ExtensionUpload>(&metadata)?;
-    let body = Body::from(file.freeze());
-    let client = Client::new();
-    Uploader::upload_extension(
-        &S3 {
-            bucket: Box::new(Bucket::new(
-                &cfg.bucket_name,
-                &cfg.region,
-                &cfg.aws_access_key,
-                &cfg.aws_secret_key,
-                "https",
-            )),
-            index_bucket: None,
-            cdn: None,
-        },
-        &client,
-        body,
-        &new_extension,
-        &new_extension.vers,
-    )
-    .await?;
 
     // Create a transaction on the database, if there are no errors,
     // commit the transactions to record a new or updated extension.
@@ -179,8 +159,25 @@ pub async fn publish(
     }
 
     // TODO(ianstanton) Generate checksum
-    // TODO(ianstanton) Upload extension tar.gz
-
+    let file_body = Body::from(file.freeze());
+    let client = Client::new();
+    Uploader::upload_extension(
+        &S3 {
+            bucket: Box::new(Bucket::new(
+                &cfg.bucket_name,
+                &cfg.region,
+                &cfg.aws_access_key,
+                &cfg.aws_secret_key,
+                "https",
+            )),
+            cdn: None,
+        },
+        &client,
+        file_body,
+        &new_extension,
+        &new_extension.vers,
+    )
+    .await?;
     Ok(HttpResponse::Ok().body(format!(
         "Successfully published extension {} version {}",
         new_extension.name, new_extension.vers

@@ -16,7 +16,6 @@ pub async fn download(cfg: web::Data<Config>, path: web::Path<(String, String)>)
             &cfg.aws_secret_key.to_string(),
             "https",
         )),
-        index_bucket: None,
         cdn: None,
     };
     // TODO(ianstanton) Increment download count for extension
