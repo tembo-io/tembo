@@ -1,10 +1,7 @@
 use crate::errors::ExtensionRegistryError;
 use crate::views::extension_publish::ExtensionUpload;
-use reqwest::header;
-use reqwest::{Body, Client};
-use std::fs::File;
-use std::path::PathBuf;
-use std::{env, fs};
+use aws_sdk_s3 as aws_s3;
+use aws_sdk_s3::primitives::ByteStream;
 
 // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control
 const CACHE_CONTROL_IMMUTABLE: &str = "public,max-age=31536000,immutable";
@@ -51,63 +48,37 @@ impl Uploader {
         format!("extensions/{name}/{name}-{version}.tar.gz")
     }
 
-    /// Returns the absolute path to the locally uploaded file.
-    fn local_uploads_path(path: &str) -> PathBuf {
-        let path = PathBuf::from(path);
-        env::current_dir().unwrap().join("local_uploads").join(path)
-    }
-
-    pub async fn upload<R: Into<Body>>(
-        &self,
-        client: &Client,
+    pub async fn upload(
+        bucket_name: &String,
+        s3_client: &aws_s3::Client,
         path: &str,
-        content: R,
+        content: ByteStream,
         content_type: &str,
-        extra_headers: header::HeaderMap,
     ) -> Result<Option<String>, ExtensionRegistryError> {
-        match *self {
-            Uploader::S3 { ref bucket, .. } => {
-                let bucket = Some(bucket);
-
-                if let Some(bucket) = bucket {
-                    bucket
-                        .put(client, path, content, content_type, extra_headers)
-                        .await?;
-                }
-
-                Ok(Some(String::from(path)))
-            }
-            Uploader::Local => {
-                let filename = Self::local_uploads_path(path);
-                let dir = filename.parent().unwrap();
-                fs::create_dir_all(dir)?;
-                let mut file = File::create(&filename)?;
-                let body = content.into();
-                let mut buffer = body.as_bytes().unwrap();
-                std::io::copy(&mut buffer, &mut file)?;
-                println!("Uploading to {:?}", filename);
-                Ok(filename.to_str().map(String::from))
-            }
-        }
+        s3_client
+            .put_object()
+            .bucket(bucket_name)
+            .content_type(content_type)
+            .body(content)
+            .key(path)
+            .cache_control(CACHE_CONTROL_IMMUTABLE)
+            .send()
+            .await
+            .expect("TODO: panic message");
+        Ok(Some(String::from(path)))
     }
 
     /// Uploads an extension file.
-    pub async fn upload_extension<R: Into<Body>>(
-        &self,
-        http_client: &Client,
-        body: R,
+    pub async fn upload_extension(
+        bucket_name: &String,
+        s3_client: &aws_s3::Client,
+        file: ByteStream,
         extension: &ExtensionUpload,
         vers: &semver::Version,
     ) -> Result<String, ExtensionRegistryError> {
         let path = Uploader::extension_path(&extension.name, &vers.to_string());
-        let mut extra_headers = header::HeaderMap::new();
-        extra_headers.insert(
-            header::CACHE_CONTROL,
-            header::HeaderValue::from_static(CACHE_CONTROL_IMMUTABLE),
-        );
         println!("Uploading");
-        self.upload(http_client, &path, body, "application/gzip", extra_headers)
-            .await?;
+        Uploader::upload(bucket_name, s3_client, &path, file, "application/gzip").await?;
         Ok("test".to_owned())
     }
 }

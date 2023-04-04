@@ -6,11 +6,11 @@ use crate::uploader::Uploader;
 use crate::views::extension_publish::ExtensionUpload;
 use actix_multipart::Multipart;
 use actix_web::{error, post, web, HttpResponse};
+use aws_config::SdkConfig;
+use aws_sdk_s3 as aws_s3;
+use aws_sdk_s3::primitives::ByteStream;
 use futures::TryStreamExt;
-use reqwest::{Body, Client};
-use s3::Bucket;
 use sqlx::{Pool, Postgres};
-use Uploader::S3;
 
 const MAX_SIZE: usize = 262_144; // max payload size is 256k
 
@@ -22,6 +22,7 @@ const MAX_SIZE: usize = 262_144; // max payload size is 256k
 pub async fn publish(
     cfg: web::Data<Config>,
     conn: web::Data<Pool<Postgres>>,
+    aws_config: web::Data<SdkConfig>,
     mut payload: Multipart,
 ) -> Result<HttpResponse, ExtensionRegistryError> {
     // Get request body
@@ -159,21 +160,12 @@ pub async fn publish(
     }
 
     // TODO(ianstanton) Generate checksum
-    let file_body = Body::from(file.freeze());
-    let client = Client::new();
+    let file_byte_stream = ByteStream::from(file.freeze());
+    let client = aws_s3::Client::new(&aws_config);
     Uploader::upload_extension(
-        &S3 {
-            bucket: Box::new(Bucket::new(
-                &cfg.bucket_name,
-                &cfg.region,
-                &cfg.aws_access_key,
-                &cfg.aws_secret_key,
-                "https",
-            )),
-            cdn: None,
-        },
+        &cfg.bucket_name,
         &client,
-        file_body,
+        file_byte_stream,
         &new_extension,
         &new_extension.vers,
     )

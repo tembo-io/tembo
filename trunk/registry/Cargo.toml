@@ -24,3 +24,6 @@ registry-s3 = { version = "0.2.0", path = "registry-s3" }
 dotenv = "0.15.0"
 env_logger = "0.10.0"
 reqwest = "0.11.14"
+aws-config = "0.55.0"
+aws-sdk-s3 = "0.25.0"
+tokio = { version = "1", features = ["full"] }
