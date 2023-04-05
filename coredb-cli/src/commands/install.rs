@@ -14,7 +14,7 @@ impl SubCommand for InstallCommand {
             .arg("apply")
             .arg("-f")
             .arg(
-                format!("https://raw.githubusercontent.com/CoreDB-io/coredb/{}/coredb-operator/yaml/crd.yaml", self.branch)
+                format!("https://raw.githubusercontent.com/CoreDB-io/coredb/{}/coredb-operator/charts/coredb-operator/templates/crd.yaml", self.branch)
                 )
             .output()
             .expect("Failed to execute 'kubectl' command.");
