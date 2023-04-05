@@ -1,7 +1,11 @@
 use crate::errors::ExtensionRegistryError;
 use crate::views::extension_publish::ExtensionUpload;
 use aws_sdk_s3;
+use aws_sdk_s3::error::SdkError;
+use aws_sdk_s3::operation::put_object::{PutObjectError, PutObjectOutput};
 use aws_sdk_s3::primitives::ByteStream;
+use aws_sdk_s3::types::ServerSideEncryption::Aes256;
+use log::debug;
 
 // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control
 const CACHE_CONTROL_IMMUTABLE: &str = "public,max-age=31536000,immutable";
@@ -26,17 +30,19 @@ pub async fn upload(
     path: &str,
     content: ByteStream,
     content_type: &str,
-) -> Result<Option<String>, ExtensionRegistryError> {
-    s3_client
+) -> Result<PutObjectOutput, SdkError<PutObjectError>> {
+    let obj = s3_client
         .put_object()
         .bucket(bucket_name)
         .content_type(content_type)
         .body(content)
         .key(path)
         .cache_control(CACHE_CONTROL_IMMUTABLE)
+        .set_server_side_encryption(Some(Aes256))
         .send()
-        .await?;
-    Ok(Some(String::from(path)))
+        .await;
+    debug!("OBJECT: {:?}", obj);
+    obj
 }
 
 /// Uploads an extension file.
