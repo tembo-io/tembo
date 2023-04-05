@@ -204,4 +204,4 @@ Updating the CRD:
 
 - Edit the [CoreDBSpec struct](./src/controller.rs) as needed.
 
-- `> generate-crd`
+- `> just generate-crd`
