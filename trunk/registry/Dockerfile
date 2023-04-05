@@ -9,3 +9,6 @@ RUN cargo install --path .
 # second stage.
 FROM debian
 COPY --from=builder /usr/local/cargo/bin/* /usr/local/bin/
+RUN apt-get update
+RUN apt-get install -y --no-install-recommends ca-certificates
+RUN update-ca-certificates
