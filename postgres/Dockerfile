@@ -71,6 +71,12 @@ RUN git clone --branch v0.4.1 https://github.com/pgvector/pgvector.git && \
         make install && \
         cd ../ && rm -rf pgvector
 
+# cache extensions and shared libraries
+RUN mkdir /tmp/pg_sharedir && \
+        mkdir /tmp/pg_pkglibdir && \
+        cp -r $(pg_config --sharedir)/* /tmp/pg_sharedir && \
+        cp -r $(pg_config --pkglibdir)/* /tmp/pg_pkglibdir
+
 COPY docker-entrypoint.sh /usr/local/bin/
 ENTRYPOINT ["docker-entrypoint.sh"]
 
