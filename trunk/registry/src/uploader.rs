@@ -35,8 +35,7 @@ pub async fn upload(
         .key(path)
         .cache_control(CACHE_CONTROL_IMMUTABLE)
         .send()
-        .await
-        .expect("TODO: panic message");
+        .await?;
     Ok(Some(String::from(path)))
 }
 
@@ -51,5 +50,5 @@ pub async fn upload_extension(
     let path = extension_path(&extension.name, &vers.to_string());
     println!("Uploading");
     upload(bucket_name, s3_client, &path, file, "application/gzip").await?;
-    Ok("test".to_owned())
+    Ok("Successfully uploaded extension".to_owned())
 }
