@@ -2,12 +2,12 @@
 
 use crate::config::Config;
 use crate::errors::ExtensionRegistryError;
-use crate::uploader::Uploader;
+use crate::uploader::upload_extension;
 use crate::views::extension_publish::ExtensionUpload;
 use actix_multipart::Multipart;
 use actix_web::{error, post, web, HttpResponse};
 use aws_config::SdkConfig;
-use aws_sdk_s3 as aws_s3;
+use aws_sdk_s3;
 use aws_sdk_s3::primitives::ByteStream;
 use futures::TryStreamExt;
 use sqlx::{Pool, Postgres};
@@ -161,8 +161,8 @@ pub async fn publish(
 
     // TODO(ianstanton) Generate checksum
     let file_byte_stream = ByteStream::from(file.freeze());
-    let client = aws_s3::Client::new(&aws_config);
-    Uploader::upload_extension(
+    let client = aws_sdk_s3::Client::new(&aws_config);
+    upload_extension(
         &cfg.bucket_name,
         &client,
         file_byte_stream,
