@@ -5,6 +5,7 @@ use async_trait::async_trait;
 use clap::Args;
 use hyper::header::CONTENT_TYPE;
 use reqwest::header::HeaderMap;
+use serde_json::json;
 use tokio_task_manager::Task;
 
 #[derive(Args)]
@@ -34,7 +35,15 @@ impl SubCommand for PublishCommand {
             headers.insert(CONTENT_TYPE, "application/octet-stream".parse().unwrap());
             let file = fs::read(file).unwrap();
             let file_part = reqwest::multipart::Part::bytes(file).file_name("pgmq-0.2.1.tar.gz").headers(headers);
-            let metadata = reqwest::multipart::Part::text("{\"name\": \"pgmq\", \"vers\": \"0.2.1\", \"description\": \"A lightweight distributed message queue. Like AWS SQS and RSMQ but on Postgres.\", \"documentation\": null, \"license\": \"Apache-2.0\", \"repository\": \"https://github.com/CoreDB-io/coredb/tree/main/extensions/pgmq\"}");
+            let m = json!({
+                "name": self.name,
+                "vers": self.version,
+                "description": self.description,
+                "documentation": self.documentation,
+                "license": self.license,
+                "repository": self.repository
+            });
+            let metadata = reqwest::multipart::Part::text(m.to_string());
             let form = reqwest::multipart::Form::new().part("metadata", metadata).part("file", file_part);
             let client = reqwest::Client::new();
             let url = format!("{}/extensions/new", self.registry);
