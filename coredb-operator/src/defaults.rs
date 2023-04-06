@@ -44,12 +44,12 @@ pub fn default_storage() -> Quantity {
 
 
 pub fn default_sharedir_storage() -> Quantity {
-    Quantity("250Mi".to_string())
+    Quantity("1Gi".to_string())
 }
 
 
 pub fn default_pkglibdir_storage() -> Quantity {
-    Quantity("250Mi".to_string())
+    Quantity("1Gi".to_string())
 }
 
 

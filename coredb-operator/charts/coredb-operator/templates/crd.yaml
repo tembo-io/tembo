@@ -61,7 +61,7 @@ spec:
                 default: quay.io/coredb/postgres:6e3c4a7
                 type: string
               pkglibdirStorage:
-                default: 250Mi
+                default: 1Gi
                 description: |-
                   Quantity is a fixed-point representation of a number. It provides convenient marshaling/unmarshaling in JSON and YAML, in addition to String() and AsInt64() accessors.
 
@@ -195,7 +195,7 @@ spec:
                     type: object
                 type: object
               sharedirStorage:
-                default: 250Mi
+                default: 1Gi
                 description: |-
                   Quantity is a fixed-point representation of a number. It provides convenient marshaling/unmarshaling in JSON and YAML, in addition to String() and AsInt64() accessors.
 
@@ -309,6 +309,7 @@ spec:
                 nullable: true
                 type: array
               pkglibdirStorage:
+                default: 1Gi
                 description: |-
                   Quantity is a fixed-point representation of a number. It provides convenient marshaling/unmarshaling in JSON and YAML, in addition to String() and AsInt64() accessors.
 
@@ -345,6 +346,7 @@ spec:
               running:
                 type: boolean
               sharedirStorage:
+                default: 1Gi
                 description: |-
                   Quantity is a fixed-point representation of a number. It provides convenient marshaling/unmarshaling in JSON and YAML, in addition to String() and AsInt64() accessors.
 
@@ -414,9 +416,7 @@ spec:
                   This format is intended to make it difficult to use these numbers without writing some sort of special handling code in the hopes that that will cause implementors to also use a fixed point implementation.
                 type: string
             required:
-            - pkglibdirStorage
             - running
-            - sharedirStorage
             type: object
         required:
         - spec

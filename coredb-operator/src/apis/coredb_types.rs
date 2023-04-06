@@ -50,6 +50,8 @@ pub struct CoreDBStatus {
     pub extensions: Option<Vec<Extension>>,
     #[serde(default = "defaults::default_storage")]
     pub storage: Quantity,
+    #[serde(default = "defaults::default_sharedir_storage")]
     pub sharedirStorage: Quantity,
+    #[serde(default = "defaults::default_pkglibdir_storage")]
     pub pkglibdirStorage: Quantity,
 }

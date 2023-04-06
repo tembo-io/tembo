@@ -333,8 +333,8 @@ mod test {
                 "name": name
             },
             "spec": {
-                "pkglibdirStorage": "1000Mi",
-                "sharedirStorage" : "1000Mi"
+                "pkglibdirStorage": "2Gi",
+                "sharedirStorage" : "2Gi"
 
             }
         });
@@ -347,7 +347,7 @@ mod test {
         // https://github.com/rancher/local-path-provisioner/issues/323
         let storage = pvc.spec.unwrap().resources.unwrap().requests.unwrap();
         let s = storage.get("storage").unwrap().to_owned();
-        assert_eq!(Quantity("1000Mi".to_owned()), s);
+        assert_eq!(Quantity("2Gi".to_owned()), s);
     }
 
     #[tokio::test]
