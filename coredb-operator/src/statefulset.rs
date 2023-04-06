@@ -202,6 +202,8 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
                             docker_create_db_directories
                             
                             find $(pg_config --sharedir) -user root -type f -ctime +1 -delete
+                            find $(pg_config --pkglibdir) -user root -type f -ctime +1 -delete
+
                             cp -r /tmp/pg_sharedir/* $(pg_config --sharedir)/
                             cp -r /tmp/pg_pkglibdir/* $(pg_config --pkglibdir)/
 
