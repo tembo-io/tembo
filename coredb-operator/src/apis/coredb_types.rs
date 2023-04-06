@@ -22,6 +22,10 @@ pub struct CoreDBSpec {
     pub resources: ResourceRequirements,
     #[serde(default = "defaults::default_storage")]
     pub storage: Quantity,
+    #[serde(default = "defaults::default_sharedir_storage")]
+    pub sharedir_storage: Quantity,
+    #[serde(default = "defaults::default_pkglibdir_storage")]
+    pub pkglibdir_storage: Quantity,
     #[serde(default = "defaults::default_postgres_exporter_enabled")]
     pub postgresExporterEnabled: bool,
     #[serde(default = "defaults::default_image")]
