@@ -1,4 +1,4 @@
-use crate::{apis::coredb_types::CoreDB, Context, Error, Result};
+use crate::{apis::coredb_types::CoreDB, Context, Error, Result, defaults::default_image, defaults::default_postgres_exporter_image};
 use k8s_openapi::{
     api::{
         apps::v1::{StatefulSet, StatefulSetSpec},
@@ -12,7 +12,7 @@ use k8s_openapi::{
 };
 use kube::{
     api::{Api, DeleteParams, ObjectMeta, Patch, PatchParams, ResourceExt},
-    Client, Resource,
+    Resource,
 };
 
 use k8s_openapi::{
@@ -20,6 +20,7 @@ use k8s_openapi::{
     apimachinery::pkg::util::intstr::IntOrString,
 };
 use std::{collections::BTreeMap, sync::Arc};
+use tracing::info;
 
 const PKGLIBDIR: &str = "/usr/lib/postgresql/15/lib";
 const SHAREDIR: &str = "/usr/share/postgresql/15";
@@ -95,7 +96,7 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
                 ..SecurityContext::default()
             }),
             name: "postgres".to_string(),
-            image: Some(cdb.spec.image.clone()),
+            image: Some(default_image()),
             resources: Some(cdb.spec.resources.clone()),
             ports: Some(vec![ContainerPort {
                 container_port: 5432,
@@ -116,7 +117,7 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
     if cdb.spec.postgresExporterEnabled {
         containers.push(Container {
             name: "postgres-exporter".to_string(),
-            image: Some(cdb.spec.postgresExporterImage.clone()),
+            image: Some(default_postgres_exporter_image()),
             args: Some(vec!["--auto-discover-databases".to_string()]),
             env: Some(vec![EnvVar {
                 name: "DATA_SOURCE_NAME".to_string(),
@@ -174,7 +175,7 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
                     init_containers: Option::from(vec![Container {
                         env: postgres_env,
                         name: "pg-directory-init".to_string(),
-                        image: Some(cdb.spec.image.clone()),
+                        image: Some(default_image()),
                         volume_mounts: postgres_volume_mounts,
                         security_context: Some(SecurityContext {
                             // Run the init container as root
@@ -309,12 +310,35 @@ pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
     let sts_api: Api<StatefulSet> = Api::namespaced(client, &sts.clone().metadata.namespace.unwrap());
     // If cdb is running and storage is resized in CoreDB Custom Resource then follow steps to resize PVC
     // Reference Article: https://itnext.io/resizing-statefulset-persistent-volumes-with-zero-downtime-916ebc65b1d4
-    if cdb.status.is_some()
-        && cdb.status.clone().unwrap().running
-        && cdb.status.clone().unwrap().storage != cdb.spec.storage
-    {
-        delete_sts(ctx.client.clone(), &sts).await;
-        update_pvc(ctx.client.clone(), &sts, cdb).await;
+
+    // determine pvcs that changed
+    let pvcs_to_update = match cdb.status.is_some() && cdb.status.clone().unwrap().running {
+        true => {
+            let mut pvcs_to_update = Vec::new();
+            if cdb.status.clone().unwrap().storage != cdb.spec.storage {
+                pvcs_to_update.push(("data".to_string(), cdb.spec.storage.clone()));
+            }
+            if cdb.status.clone().unwrap().sharedirStorage != cdb.spec.sharedirStorage {
+                pvcs_to_update.push(("sharedir".to_string(), cdb.spec.sharedirStorage.clone()));
+            }
+            if cdb.status.clone().unwrap().pkglibdirStorage != cdb.spec.pkglibdirStorage {
+                pvcs_to_update.push(("pkglibdir".to_string(), cdb.spec.pkglibdirStorage.clone()));
+            }
+            pvcs_to_update
+        }
+        false => Vec::new(),
+    };
+    if !pvcs_to_update.is_empty() {
+        let sts_name = sts.clone().metadata.name.unwrap();
+        let sts_namespace = &sts.clone().metadata.namespace.unwrap();
+
+        // why do delete first, then update?
+        delete_sts_no_cascade(&sts_api, &sts_name).await;
+
+        let pvc_api: Api<PersistentVolumeClaim> = Api::namespaced(ctx.client.clone(), &sts_namespace);
+        for (pvc_name, qty) in pvcs_to_update {
+            update_pvc(&pvc_api, &sts_name, &pvc_name, qty).await;
+        }
     }
 
     let ps = PatchParams::apply("cntrlr").force();
@@ -326,11 +350,7 @@ pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
     Ok(())
 }
 
-async fn delete_sts(client: Client, sts: &StatefulSet) {
-    let sts_api: Api<StatefulSet> = Api::namespaced(client, &sts.clone().metadata.namespace.unwrap());
-
-    let sts_name = sts.clone().metadata.name.unwrap();
-
+async fn delete_sts_no_cascade(sts_api: &Api<StatefulSet>, sts_name: &str) {
     let delete_params: DeleteParams = DeleteParams {
         dry_run: false,
         grace_period_seconds: None,
@@ -344,16 +364,16 @@ async fn delete_sts(client: Client, sts: &StatefulSet) {
         .map_err(Error::KubeError);
 }
 
-async fn update_pvc(client: Client, sts: &StatefulSet, cdb: &CoreDB) {
-    let pvc_api: Api<PersistentVolumeClaim> =
-        Api::namespaced(client, &sts.clone().metadata.namespace.unwrap());
-
-    let sts_name = sts.clone().metadata.name.unwrap();
-    let pvc_name = format!("data-{sts_name}-0");
+async fn update_pvc(pvc_api: &Api<PersistentVolumeClaim>, sts_name: &str, pvc_name: &str, value: Quantity) {
+    info!(
+        "Updating PVC {} for StatefulSet {}, Value: {:?}",
+        pvc_name, sts_name, value
+    );
+    let pvc_full_name = format!("{pvc_name}-{sts_name}-0");
     let mut pvc_requests: BTreeMap<String, Quantity> = BTreeMap::new();
-    pvc_requests.insert("storage".to_string(), cdb.spec.storage.clone());
+    pvc_requests.insert("storage".to_string(), value);
 
-    let mut pvc = pvc_api.get(&pvc_name).await.unwrap();
+    let mut pvc = pvc_api.get(&pvc_full_name).await.unwrap();
 
     pvc.metadata.managed_fields = None;
 
@@ -374,7 +394,7 @@ async fn update_pvc(client: Client, sts: &StatefulSet, cdb: &CoreDB) {
     };
 
     let _o = pvc_api
-        .patch(&pvc_name, &patch_params, &Patch::Apply(pvc))
+        .patch(&pvc_full_name, &patch_params, &Patch::Apply(pvc))
         .await
         .map_err(Error::KubeError);
 }
