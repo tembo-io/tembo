@@ -33,9 +33,9 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
     let mut pvc_requests_datadir: BTreeMap<String, Quantity> = BTreeMap::new();
     pvc_requests_datadir.insert("storage".to_string(), cdb.spec.storage.clone());
     let mut pvc_requests_sharedir: BTreeMap<String, Quantity> = BTreeMap::new();
-    pvc_requests_sharedir.insert("storage".to_string(), cdb.spec.sharedir_storage.clone());
+    pvc_requests_sharedir.insert("storage".to_string(), cdb.spec.sharedirStorage.clone());
     let mut pvc_requests_pkglibdir: BTreeMap<String, Quantity> = BTreeMap::new();
-    pvc_requests_pkglibdir.insert("storage".to_string(), cdb.spec.pkglibdir_storage.clone());
+    pvc_requests_pkglibdir.insert("storage".to_string(), cdb.spec.pkglibdirStorage.clone());
 
     let mut labels: BTreeMap<String, String> = BTreeMap::new();
     labels.insert("app".to_owned(), "coredb".to_string());

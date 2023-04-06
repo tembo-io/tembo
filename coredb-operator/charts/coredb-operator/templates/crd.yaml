@@ -60,7 +60,7 @@ spec:
               image:
                 default: quay.io/coredb/postgres:6e3c4a7
                 type: string
-              pkglibdir_storage:
+              pkglibdirStorage:
                 default: 250Mi
                 description: |-
                   Quantity is a fixed-point representation of a number. It provides convenient marshaling/unmarshaling in JSON and YAML, in addition to String() and AsInt64() accessors.
@@ -194,7 +194,7 @@ spec:
                     description: 'Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                     type: object
                 type: object
-              sharedir_storage:
+              sharedirStorage:
                 default: 250Mi
                 description: |-
                   Quantity is a fixed-point representation of a number. It provides convenient marshaling/unmarshaling in JSON and YAML, in addition to String() and AsInt64() accessors.
