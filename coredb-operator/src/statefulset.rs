@@ -208,21 +208,16 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
                             cp -r /tmp/pg_pkglibdir/* $(pg_config --pkglibdir)/
 
                             chown :postgres $(pg_config --sharedir)
-                            chown :postgres $(pg_config --sharedir)/extension 
-                            chown :postgres $(pg_config --sharedir)/bitcode || :
                             chmod 2775 $(pg_config --sharedir)
+                            
+                            chown :postgres $(pg_config --sharedir)/extension 
                             chmod 2775 $(pg_config --sharedir)/extension
+
+                            chown :postgres $(pg_config --sharedir)/bitcode || :
                             chmod 2775 $(pg_config --sharedir)/bitcode || :
                             
                             chown :postgres $(pg_config --pkglibdir)
                             chmod 2775 $(pg_config --pkglibdir)
-
-                            cp -r /tmp/pg_sharedir/* $(pg_config --sharedir)/
-                            cp -r /tmp/pg_pkglibdir/* $(pg_config --pkglibdir)/
-                            chown -R :postgres $(pg_config --sharedir)
-                            chmod -R 2775 $(pg_config --sharedir)
-                            chown -R :postgres $(pg_config --pkglibdir)
-                            chmod -R 2775 $(pg_config --pkglibdir)
 
                             # https://www.postgresql.org/docs/current/ssl-tcp.html
                             cd /certs
