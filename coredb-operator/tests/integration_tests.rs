@@ -324,6 +324,26 @@ mod test {
         let extensions = status.extensions.unwrap();
         assert!(extensions.len() > 0);
         assert!(extensions[0].description.len() > 0);
+
+        // Change size of a PVC
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "pkglibdirStorage": "1000Mi"
+
+            }
+        });
+        let params = PatchParams::apply("coredb-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        let _ = coredbs.patch(name, &params, &patch).await.unwrap();
+        let pvc = pvc_api.get(&format!("pkglibdir-{}", pod_name)).await.unwrap();
+        let storage = pvc.spec.unwrap().resources.unwrap().requests.unwrap();
+        let s = storage.get("storage").unwrap().to_owned();
+        assert_eq!(Quantity("1000Mi".to_owned()), s);
     }
 
     #[tokio::test]
@@ -462,7 +482,6 @@ mod test {
         let name = &format!("test-stop-coredb-{}", rng.gen_range(0..100000));
         let namespace = "default";
         let kind = "CoreDB";
-        let replicas = 1;
 
         // Timeout settings while waiting for an event
         let timeout_seconds_start_pod = 60;
