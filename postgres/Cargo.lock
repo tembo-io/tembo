@@ -4,4 +4,4 @@ version = 3
 
 [[package]]
 name = "coredb"
-version = "15.1.0-coredb.7"
+version = "15.2.0-coredb.3"

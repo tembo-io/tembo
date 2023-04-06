@@ -21,12 +21,21 @@ use k8s_openapi::{
 };
 use std::{collections::BTreeMap, sync::Arc};
 
+const PKGLIBDIR: &str = "/usr/lib/postgresql/15/lib";
+const SHAREDIR: &str = "/usr/share/postgresql/15";
+const DATADIR: &str = "/var/lib/postgresql/data";
+
+
 pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
     let ns = cdb.namespace().unwrap();
     let name = cdb.name_any();
-    let mut pvc_requests: BTreeMap<String, Quantity> = BTreeMap::new();
     let oref = cdb.controller_owner_ref(&()).unwrap();
-    pvc_requests.insert("storage".to_string(), cdb.spec.storage.clone());
+    let mut pvc_requests_datadir: BTreeMap<String, Quantity> = BTreeMap::new();
+    pvc_requests_datadir.insert("storage".to_string(), cdb.spec.storage.clone());
+    let mut pvc_requests_sharedir: BTreeMap<String, Quantity> = BTreeMap::new();
+    pvc_requests_sharedir.insert("storage".to_string(), cdb.spec.sharedir_storage.clone());
+    let mut pvc_requests_pkglibdir: BTreeMap<String, Quantity> = BTreeMap::new();
+    pvc_requests_pkglibdir.insert("storage".to_string(), cdb.spec.pkglibdir_storage.clone());
 
     let mut labels: BTreeMap<String, String> = BTreeMap::new();
     labels.insert("app".to_owned(), "coredb".to_string());
@@ -49,12 +58,22 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
     let postgres_volume_mounts = Some(vec![
         VolumeMount {
             name: "data".to_owned(),
-            mount_path: "/var/lib/postgresql/data".to_owned(),
+            mount_path: DATADIR.to_owned(),
             ..VolumeMount::default()
         },
         VolumeMount {
             name: "certs".to_owned(),
             mount_path: "/certs".to_owned(),
+            ..VolumeMount::default()
+        },
+        VolumeMount {
+            name: "pkglibdir".to_owned(),
+            mount_path: PKGLIBDIR.to_owned(),
+            ..VolumeMount::default()
+        },
+        VolumeMount {
+            name: "sharedir".to_owned(),
+            mount_path: SHAREDIR.to_owned(),
             ..VolumeMount::default()
         },
     ]);
@@ -182,6 +201,13 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
                             docker_setup_env
                             docker_create_db_directories
 
+                            cp -r /tmp/pg_sharedir/* $(pg_config --sharedir)/
+                            cp -r /tmp/pg_pkglibdir/* $(pg_config --pkglibdir)/
+                            chown -R :postgres $(pg_config --sharedir)
+                            chmod -R 2775 $(pg_config --sharedir)
+                            chown -R :postgres $(pg_config --pkglibdir)
+                            chmod -R 2775 $(pg_config --pkglibdir)
+
                             # https://www.postgresql.org/docs/current/ssl-tcp.html
                             cd /certs
                             openssl req -new -x509 -days 365 -nodes -text -out server.crt \
@@ -207,21 +233,53 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
                     ..ObjectMeta::default()
                 }),
             },
-            volume_claim_templates: Some(vec![PersistentVolumeClaim {
-                metadata: ObjectMeta {
-                    name: Some("data".to_string()),
-                    ..ObjectMeta::default()
-                },
-                spec: Some(PersistentVolumeClaimSpec {
-                    access_modes: Some(vec!["ReadWriteOnce".to_owned()]),
-                    resources: Some(ResourceRequirements {
-                        limits: None,
-                        requests: Some(pvc_requests),
+            volume_claim_templates: Some(vec![
+                PersistentVolumeClaim {
+                    metadata: ObjectMeta {
+                        name: Some("data".to_string()),
+                        ..ObjectMeta::default()
+                    },
+                    spec: Some(PersistentVolumeClaimSpec {
+                        access_modes: Some(vec!["ReadWriteOnce".to_owned()]),
+                        resources: Some(ResourceRequirements {
+                            limits: None,
+                            requests: Some(pvc_requests_datadir),
+                        }),
+                        ..PersistentVolumeClaimSpec::default()
                     }),
-                    ..PersistentVolumeClaimSpec::default()
-                }),
-                status: None,
-            }]),
+                    status: None,
+                },
+                PersistentVolumeClaim {
+                    metadata: ObjectMeta {
+                        name: Some("sharedir".to_string()),
+                        ..ObjectMeta::default()
+                    },
+                    spec: Some(PersistentVolumeClaimSpec {
+                        access_modes: Some(vec!["ReadWriteOnce".to_owned()]),
+                        resources: Some(ResourceRequirements {
+                            limits: None,
+                            requests: Some(pvc_requests_sharedir),
+                        }),
+                        ..PersistentVolumeClaimSpec::default()
+                    }),
+                    status: None,
+                },
+                PersistentVolumeClaim {
+                    metadata: ObjectMeta {
+                        name: Some("pkglibdir".to_string()),
+                        ..ObjectMeta::default()
+                    },
+                    spec: Some(PersistentVolumeClaimSpec {
+                        access_modes: Some(vec!["ReadWriteOnce".to_owned()]),
+                        resources: Some(ResourceRequirements {
+                            limits: None,
+                            requests: Some(pvc_requests_pkglibdir),
+                        }),
+                        ..PersistentVolumeClaimSpec::default()
+                    }),
+                    status: None,
+                },
+            ]),
             ..StatefulSetSpec::default()
         }),
         ..StatefulSet::default()

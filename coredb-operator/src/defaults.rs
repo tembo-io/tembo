@@ -35,12 +35,23 @@ pub fn default_port() -> i32 {
 }
 
 pub fn default_image() -> String {
-    "quay.io/coredb/postgres:293e42f".to_owned()
+    "quay.io/coredb/postgres:6e3c4a7".to_owned()
 }
 
 pub fn default_storage() -> Quantity {
     Quantity("8Gi".to_string())
 }
+
+
+pub fn default_sharedir_storage() -> Quantity {
+    Quantity("250Mi".to_string())
+}
+
+
+pub fn default_pkglibdir_storage() -> Quantity {
+    Quantity("250Mi".to_string())
+}
+
 
 pub fn default_postgres_exporter_image() -> String {
     "quay.io/prometheuscommunity/postgres-exporter:v0.11.1".to_owned()
