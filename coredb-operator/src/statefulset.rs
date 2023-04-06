@@ -334,7 +334,7 @@ pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
     };
     if !pvcs_to_update.is_empty() {
         let sts_name = sts.clone().metadata.name.unwrap();
-        let sts_namespace = &sts.clone().metadata.namespace.unwrap();
+        let sts_namespace = sts.clone().metadata.namespace.unwrap();
 
         // why do delete first, then update?
         delete_sts_no_cascade(&sts_api, &sts_name).await;
@@ -363,7 +363,7 @@ async fn delete_sts_no_cascade(sts_api: &Api<StatefulSet>, sts_name: &str) {
     };
 
     let _o = sts_api
-        .delete(&sts_name, &delete_params)
+        .delete(sts_name, &delete_params)
         .await
         .map_err(Error::KubeError);
 }
