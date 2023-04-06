@@ -1,4 +1,8 @@
-use crate::{apis::coredb_types::CoreDB, Context, Error, Result, defaults::default_image, defaults::default_postgres_exporter_image};
+use crate::{
+    apis::coredb_types::CoreDB,
+    defaults::{default_image, default_postgres_exporter_image},
+    Context, Error, Result,
+};
 use k8s_openapi::{
     api::{
         apps::v1::{StatefulSet, StatefulSetSpec},
