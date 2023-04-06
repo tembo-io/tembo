@@ -201,21 +201,24 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
                             docker_setup_env
                             docker_create_db_directories
                             
+                            # remove stale files
                             find $(pg_config --sharedir) -user root -type f -ctime +1 -delete
                             find $(pg_config --pkglibdir) -user root -type f -ctime +1 -delete
-
+                            # copy system files from image cache to volumes directories
                             cp -r /tmp/pg_sharedir/* $(pg_config --sharedir)/
                             cp -r /tmp/pg_pkglibdir/* $(pg_config --pkglibdir)/
-
+                            
+                            # set permissions to the places that trunk writes
+                            # sharedir
                             chown :postgres $(pg_config --sharedir)
                             chmod 2775 $(pg_config --sharedir)
-                            
+                            # sharedir/extension
                             chown :postgres $(pg_config --sharedir)/extension 
                             chmod 2775 $(pg_config --sharedir)/extension
-
+                            # sharedir/bitcode
                             chown :postgres $(pg_config --sharedir)/bitcode || :
                             chmod 2775 $(pg_config --sharedir)/bitcode || :
-                            
+                            # pkglibdir
                             chown :postgres $(pg_config --pkglibdir)
                             chmod 2775 $(pg_config --pkglibdir)
 
