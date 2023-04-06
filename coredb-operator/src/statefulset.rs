@@ -24,7 +24,7 @@ use k8s_openapi::{
     apimachinery::pkg::util::intstr::IntOrString,
 };
 use std::{collections::BTreeMap, sync::Arc};
-use tracing::info;
+use tracing::{error, info};
 
 const PKGLIBDIR: &str = "/usr/lib/postgresql/15/lib";
 const SHAREDIR: &str = "/usr/share/postgresql/15";
@@ -332,6 +332,7 @@ pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
         }
         false => Vec::new(),
     };
+    error!("pvcs_to_update: {:?}", pvcs_to_update);
     if !pvcs_to_update.is_empty() {
         let sts_name = sts.clone().metadata.name.unwrap();
         let sts_namespace = sts.clone().metadata.namespace.unwrap();
