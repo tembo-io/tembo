@@ -324,6 +324,30 @@ mod test {
         let extensions = status.extensions.unwrap();
         assert!(extensions.len() > 0);
         assert!(extensions[0].description.len() > 0);
+
+        // Change size of a PVC
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "pkglibdirStorage": "2Gi",
+                "sharedirStorage" : "2Gi"
+
+            }
+        });
+        let params = PatchParams::apply("coredb-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        let _ = coredbs.patch(name, &params, &patch).await.unwrap();
+        thread::sleep(Duration::from_millis(10000));
+        let pvc = pvc_api.get(&format!("pkglibdir-{}", pod_name)).await.unwrap();
+        // checking that the request is set, but its not the status
+        // https://github.com/rancher/local-path-provisioner/issues/323
+        let storage = pvc.spec.unwrap().resources.unwrap().requests.unwrap();
+        let s = storage.get("storage").unwrap().to_owned();
+        assert_eq!(Quantity("2Gi".to_owned()), s);
     }
 
     #[tokio::test]
@@ -462,7 +486,6 @@ mod test {
         let name = &format!("test-stop-coredb-{}", rng.gen_range(0..100000));
         let namespace = "default";
         let kind = "CoreDB";
-        let replicas = 1;
 
         // Timeout settings while waiting for an event
         let timeout_seconds_start_pod = 60;
