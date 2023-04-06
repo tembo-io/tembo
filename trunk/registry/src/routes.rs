@@ -28,6 +28,8 @@ pub async fn get_all_extensions(
         {
           "name": row.name.to_owned(),
           "latestVersion": latest,
+          "createdAt": row.created_at.unwrap().to_string(),
+          "updatedAt": row.updated_at.unwrap().to_string(),
           "description": row.description.to_owned(),
           "homepage": row.homepage.to_owned(),
           "documentation": row.documentation.to_owned(),
