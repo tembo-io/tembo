@@ -44,9 +44,12 @@ pub struct CoreDBSpec {
 
 /// The status object of `CoreDB`
 #[derive(Deserialize, Serialize, Clone, Default, Debug, JsonSchema)]
+#[allow(non_snake_case)]
 pub struct CoreDBStatus {
     pub running: bool,
     pub extensions: Option<Vec<Extension>>,
     #[serde(default = "defaults::default_storage")]
     pub storage: Quantity,
+    pub sharedirStorage: Quantity,
+    pub pkglibdirStorage: Quantity,
 }
