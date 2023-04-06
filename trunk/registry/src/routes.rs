@@ -27,7 +27,7 @@ pub async fn get_all_extensions(
         let data = json!(
         {
           "name": row.name.to_owned(),
-          "latest_version": latest,
+          "latestVersion": latest,
           "description": row.description.to_owned(),
           "homepage": row.homepage.to_owned(),
           "documentation": row.documentation.to_owned(),
