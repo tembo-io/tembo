@@ -1,6 +1,6 @@
 # CoreDB Operator
 
-A Rust-based Kubernetes Controller for a [`CoreDB Resource`](https://github.com/CoreDB-io/coredb/blob/main/coredb-operator/yaml/crd.yaml) using [kube-rs](https://github.com/kube-rs/kube-rs/).
+A Rust-based Kubernetes Controller for a [`CoreDB Resource`](https://github.com/CoreDB-io/coredb/blob/main/coredb-operator/charts/coredb-operator/templates/crd.yaml) using [kube-rs](https://github.com/kube-rs/kube-rs/).
 
 The `Controller` object reconciles `CoreDB` Instances when changes to it are detected, writes to its .status object, creates associated events, and uses finalizers for guaranteed delete handling.
 
@@ -98,7 +98,7 @@ As an example; install [`kind`](https://kind.sigs.k8s.io/docs/user/quick-start/#
 
 ### CRD
 
-Apply the CRD from [cached file](yaml/crd.yaml), or pipe it from `crdgen` (best if changing it):
+Apply the CRD from [cached file](charts/coredb-operator/templates/crd.yaml), or pipe it from `crdgen` (best if changing it):
 
 ```sh
 just install-crd
@@ -204,5 +204,4 @@ Updating the CRD:
 
 - Edit the [CoreDBSpec struct](./src/controller.rs) as needed.
 
-- `> cargo run --bin crdgen > yaml/crd.yaml`
-- `> cargo run --bin crdgen > charts/coredb-operator/templates/crd.yaml`
+- `> just generate-crd`
