@@ -33,9 +33,9 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
     let mut pvc_requests_datadir: BTreeMap<String, Quantity> = BTreeMap::new();
     pvc_requests_datadir.insert("storage".to_string(), cdb.spec.storage.clone());
     let mut pvc_requests_sharedir: BTreeMap<String, Quantity> = BTreeMap::new();
-    pvc_requests_sharedir.insert("storage".to_string(), cdb.spec.sharedir_storage.clone());
+    pvc_requests_sharedir.insert("storage".to_string(), cdb.spec.sharedirStorage.clone());
     let mut pvc_requests_pkglibdir: BTreeMap<String, Quantity> = BTreeMap::new();
-    pvc_requests_pkglibdir.insert("storage".to_string(), cdb.spec.pkglibdir_storage.clone());
+    pvc_requests_pkglibdir.insert("storage".to_string(), cdb.spec.pkglibdirStorage.clone());
 
     let mut labels: BTreeMap<String, String> = BTreeMap::new();
     labels.insert("app".to_owned(), "coredb".to_string());
@@ -200,13 +200,27 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
 
                             docker_setup_env
                             docker_create_db_directories
-
+                            
+                            # remove stale files
+                            find $(pg_config --sharedir) -user root -type f -ctime +1 -delete
+                            find $(pg_config --pkglibdir) -user root -type f -ctime +1 -delete
+                            # copy system files from image cache to volumes directories
                             cp -r /tmp/pg_sharedir/* $(pg_config --sharedir)/
                             cp -r /tmp/pg_pkglibdir/* $(pg_config --pkglibdir)/
-                            chown -R :postgres $(pg_config --sharedir)
-                            chmod -R 2775 $(pg_config --sharedir)
-                            chown -R :postgres $(pg_config --pkglibdir)
-                            chmod -R 2775 $(pg_config --pkglibdir)
+                            
+                            # set permissions to the places that trunk writes
+                            # sharedir
+                            chown :postgres $(pg_config --sharedir)
+                            chmod 2775 $(pg_config --sharedir)
+                            # sharedir/extension
+                            chown :postgres $(pg_config --sharedir)/extension 
+                            chmod 2775 $(pg_config --sharedir)/extension
+                            # sharedir/bitcode
+                            chown :postgres $(pg_config --sharedir)/bitcode || :
+                            chmod 2775 $(pg_config --sharedir)/bitcode || :
+                            # pkglibdir
+                            chown :postgres $(pg_config --pkglibdir)
+                            chmod 2775 $(pg_config --pkglibdir)
 
                             # https://www.postgresql.org/docs/current/ssl-tcp.html
                             cd /certs

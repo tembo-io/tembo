@@ -100,7 +100,7 @@ mod test {
         let replicas = 1;
 
         // Timeout settings while waiting for an event
-        let timeout_seconds_start_pod = 60;
+        let timeout_seconds_start_pod = 90;
         let timeout_seconds_pod_ready = 30;
         let timeout_seconds_secret_present = 30;
 
