@@ -1,3 +1,4 @@
+use crate::download::latest_version;
 use crate::errors::ExtensionRegistryError;
 use actix_web::{get, web, HttpResponse, Responder};
 use serde_json::{json, Value};
@@ -21,9 +22,12 @@ pub async fn get_all_extensions(
         .fetch_all(&mut tx)
         .await?;
     for row in rows.iter() {
+        let name = row.name.to_owned().unwrap();
+        let latest = latest_version(&name, conn.clone()).await?;
         let data = json!(
         {
           "name": row.name.to_owned(),
+          "latest_version": latest,
           "description": row.description.to_owned(),
           "homepage": row.homepage.to_owned(),
           "documentation": row.documentation.to_owned(),
