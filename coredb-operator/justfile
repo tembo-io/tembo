@@ -10,11 +10,11 @@ default:
 
 # generate crd
 generate-crd:
-  cargo run --bin crdgen > yaml/crd.yaml
+  cargo run --bin crdgen > charts/coredb-operator/templates/crd.yaml
 
 # generate and install crd into the cluster
 install-crd: generate-crd
-  kubectl apply -f yaml/crd.yaml
+  kubectl apply -f charts/coredb-operator/templates/crd.yaml
 
 # delete kind
 delete-kind:
