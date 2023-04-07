@@ -1,4 +1,4 @@
-use crate::{apis::coredb_types::CoreDB, defaults, Context, Error};
+use crate::{apis::coredb_types::CoreDB, defaults, exec, Context, Error};
 use lazy_static::lazy_static;
 use regex::Regex;
 use schemars::JsonSchema;
@@ -125,6 +125,55 @@ order by
 name asc,
 enabled desc
 "#;
+
+/// handles installing extensions
+pub async fn install_extension(
+    cdb: &CoreDB,
+    extensions: &[Extension],
+    ctx: Arc<Context>,
+) -> Result<(), Error> {
+    debug!("extensions to install: {:?}", extensions);
+    let client = ctx.client.clone();
+
+    let pod_name = cdb
+        .primary_pod(client.clone())
+        .await
+        .unwrap()
+        .metadata
+        .name
+        .unwrap();
+
+    let mut errors: Vec<Error> = Vec::new();
+    for ext in extensions.iter() {
+        let version = ext.locations[0].version.clone().unwrap();
+        let cmd = vec![
+            "trunk".to_owned(),
+            "install".to_owned(),
+            ext.name.clone(),
+            "--version".to_owned(),
+            version,
+        ];
+        let result = cdb.exec(pod_name.clone(), client.clone(), &cmd).await;
+
+        match result {
+            Ok(result) => {
+                debug!("installed extension: {}", result.stdout.clone().unwrap());
+            }
+            Err(err) => {
+                error!("error installing extension, {}", err);
+                errors.push(err);
+            }
+        }
+    }
+    let num_success = extensions.len() - errors.len();
+    info!(
+        "Successfully installed {} / {} extensions",
+        num_success,
+        extensions.len()
+    );
+    Ok(())
+}
+
 
 /// handles create/drop extensions
 pub async fn toggle_extensions(
@@ -321,12 +370,12 @@ pub async fn reconcile_extensions(coredb: &CoreDB, ctx: Arc<Context>) -> Result<
     let (changed_extensions, extensions_to_install) = extension_plan(&desired_extensions, &actual_extensions);
 
     toggle_extensions(coredb, &changed_extensions, ctx.clone()).await?;
-    debug!("extensions to install: {:?}", extensions_to_install);
-    // TODO: trunk install >extensions_to_install< on container
+    install_extension(coredb, &extensions_to_install, ctx.clone()).await?;
 
     // return final state of extensions
     get_all_extensions(coredb, ctx.clone()).await
 }
+
 
 // returns any elements that are in the desired, and not in actual
 // any Extensions returned by this function need either create or drop extension
