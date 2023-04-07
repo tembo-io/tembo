@@ -58,7 +58,7 @@ jobs:
         # ensure migration cache is up-to-date
         run: cargo sqlx prepare --check
         env:
-          DATABASE_URL: "postgresql://postgres:postgres@postgres:5432/postgres"
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/postgres"
   build-push:
     name: Build and push image
     runs-on: ubuntu-20.04
