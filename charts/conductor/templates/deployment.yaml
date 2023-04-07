@@ -1,7 +1,3 @@
-{{- if or (not .Values.controlPlaneEventsQueue) (not .Values.dataPlaneEventsQueue) (not .Values.dataPlaneBasedomain)-}}
-{{ fail "Both controlPlaneEventsQueue and dataPlaneEventsQueue must be set in the helm values" }}
-{{- end }}
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
