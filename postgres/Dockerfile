@@ -1,4 +1,4 @@
-FROM rust:1.66.1 as builder
+FROM rust:bookworm as builder
 RUN cargo install --version 0.0.1-alpha.4 pg-trunk
 
 FROM ubuntu:22.04
