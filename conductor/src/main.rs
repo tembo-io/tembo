@@ -94,7 +94,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                     .await
                     .expect("error creating or updating CoreDB");
                 // get connection string values from secret
-                let conn_info = get_pg_conn(client.clone(), &namespace)
+                let conn_info = get_pg_conn(client.clone(), &namespace, &data_plane_basedomain)
                     .await
                     .expect("error getting secret");
 
@@ -192,7 +192,8 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 // UPDATE SPEC OBJECT WITH ACTUAL EXTENSIONS
                 current_spec.spec.extensions = actual_extension;
 
-                let conn_info = get_pg_conn(client.clone(), &namespace).await;
+                let conn_info =
+                    get_pg_conn(client.clone(), &namespace, &data_plane_basedomain).await;
 
                 types::StateToControlPlane {
                     data_plane_id: read_msg.message.data_plane_id,

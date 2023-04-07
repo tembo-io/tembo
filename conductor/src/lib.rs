@@ -210,6 +210,7 @@ pub async fn delete_namespace(client: Client, name: &str) -> Result<(), Conducto
 pub async fn get_pg_conn(
     client: Client,
     name: &str,
+    basedomain: &str,
 ) -> Result<types::ConnectionInfo, ConductorError> {
     // read secret <name>-connection
     let secret_name = format!("{name}-connection");
@@ -236,7 +237,7 @@ pub async fn get_pg_conn(
     let byte_pw = to_string(pw_data).unwrap();
     let string_pw: String = from_str(&byte_pw).unwrap();
 
-    let host = format!("{name}.coredb-development.com");
+    let host = format!("{name}.{basedomain}");
 
     Ok(types::ConnectionInfo {
         host,
