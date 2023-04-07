@@ -1,4 +1,4 @@
-{{- if or (not .Values.controlPlaneEventsQueue) (not .Values.dataPlaneEventsQueue) -}}
+{{- if or (not .Values.controlPlaneEventsQueue) (not .Values.dataPlaneEventsQueue) (not .Values.dataPlaneBasedomain)-}}
 {{ fail "Both controlPlaneEventsQueue and dataPlaneEventsQueue must be set in the helm values" }}
 {{- end }}
 
@@ -48,6 +48,8 @@ spec:
             value: {{ .Values.controlPlaneEventsQueue }}
           - name: DATA_PLANE_EVENTS_QUEUE
             value: {{ .Values.dataPlaneEventsQueue }}
+          - name: DATA_PLANE_BASEDOMAIN
+            value: {{ .Values.dataPlaneBasedomain }}
           - name: RUST_LOG
             value: {{ .Values.logLevel }}
           securityContext:

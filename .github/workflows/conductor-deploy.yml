@@ -48,6 +48,7 @@ jobs:
             --install \
             --set secret.useExistingSecret='queue-conn' \
             --set dataPlaneEventsQueue=data_plane_events \
+            --set dataPlaneBasedomain='coredb-development.com' \
             --set controlPlaneEventsQueue=saas_queue \
             --set image.tag=${{ steps.versions.outputs.SHORT_SHA }} \
             --create-namespace \

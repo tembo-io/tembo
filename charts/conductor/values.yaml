@@ -1,6 +1,7 @@
 controlPlaneEventsQueue: ~
 dataPlaneEventsQueue: ~
-logLevel: debug
+dataPlaneBasedomain: ~
+logLevel: info
 
 secret:
   # You must set the connection string for the postgres queue

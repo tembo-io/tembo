@@ -8,6 +8,7 @@ run.local:
 	RUST_LOG=debug \
 	CONTROL_PLANE_EVENTS_QUEUE=saas_queue \
 	DATA_PLANE_EVENTS_QUEUE=data_plane_events \
+	DATA_PLANE_BASEDOMAIN=coredb-development.com \
 	cargo run
 
 cluster.reset:
@@ -24,6 +25,7 @@ run.test:
 	RUST_LOG=debug \
 	CONTROL_PLANE_EVENTS_QUEUE=myqueue_control_plane \
 	DATA_PLANE_EVENTS_QUEUE=myqueue_data_plane \
+	DATA_PLANE_BASEDOMAIN=coredb-development.com \
 	cargo run
 
 
