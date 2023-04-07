@@ -9,7 +9,6 @@ use tracing::error;
 pub struct ExecOutput {
     pub stdout: Option<String>,
     pub stderr: Option<String>,
-    // k8s_openapi::apimachinery::pkg::apis::meta::v1::Status
     pub status: Option<Status>,
 }
 
