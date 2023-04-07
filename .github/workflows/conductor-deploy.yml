@@ -33,26 +33,3 @@ jobs:
           docker_directory: ./conductor
           quay_user: ${{ secrets.QUAY_USER }}
           quay_password: ${{ secrets.QUAY_PASSWORD }}
-      - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v2
-        with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_OLD_ACCOUNT }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_OLD_ACCOUNT }}
-          aws-region: us-east-1
-      - name: Configure Kubeconfig
-        run: |
-          aws eks --region us-east-1 update-kubeconfig --name coredb-pgaas
-      - name: Update the conductor
-        run: |
-          helm upgrade \
-            --install \
-            --set secret.useExistingSecret='queue-conn' \
-            --set dataPlaneEventsQueue=data_plane_events \
-            --set dataPlaneBasedomain='coredb-development.com' \
-            --set controlPlaneEventsQueue=saas_queue \
-            --set image.tag=${{ steps.versions.outputs.SHORT_SHA }} \
-            --create-namespace \
-            --namespace conductor \
-            conductor \
-            charts/conductor
-          kubectl rollout restart --namespace conductor deployments || true
