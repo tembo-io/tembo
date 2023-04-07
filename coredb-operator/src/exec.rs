@@ -3,7 +3,7 @@ use kube::{api::Api, client::Client, core::subresource::AttachParams};
 use tokio::io::AsyncReadExt;
 
 use crate::Error;
-use tracing::{debug, error, info, warn};
+use tracing::error;
 
 #[derive(Debug)]
 pub struct ExecOutput {

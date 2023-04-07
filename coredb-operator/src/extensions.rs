@@ -1,4 +1,4 @@
-use crate::{apis::coredb_types::CoreDB, defaults, exec, Context, Error};
+use crate::{apis::coredb_types::CoreDB, defaults, Context, Error};
 use lazy_static::lazy_static;
 use regex::Regex;
 use schemars::JsonSchema;
