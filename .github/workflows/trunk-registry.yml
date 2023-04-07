@@ -37,8 +37,6 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-    env:
-      DATABASE_URL: "postgresql://postgres:postgres@postgres:5432/postgres"
     steps:
       - uses: actions/checkout@v3
       - name: Install minimal nightly with clippy and rustfmt
@@ -59,6 +57,8 @@ jobs:
       - name: Migrations
         # ensure migration cache is up-to-date
         run: cargo sqlx prepare --check
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@postgres:5432/postgres"
   build-push:
     name: Build and push image
     runs-on: ubuntu-20.04
