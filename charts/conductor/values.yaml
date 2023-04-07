@@ -3,11 +3,13 @@ dataPlaneEventsQueue: ~
 dataPlaneBasedomain: ~
 logLevel: info
 
-secret:
-  # You must set the connection string for the postgres queue
-  postgresConnectionString: ~
-  # Or you can use an existing secret instead
-  useExistingSecret: ~
+externalSecrets:
+  refreshInterval: "5m"
+  parameterStore:
+    name: "secret-store-parameter-store"
+    kind: ClusterSecretStore
+  secretName: ~
+  secretRegex: ~
 
 serviceMonitors:
   coredb:

@@ -42,8 +42,8 @@ spec:
           - name: PG_CONN_URL
             valueFrom:
               secretKeyRef:
-                name: {{ include "conductor.secretName" . }}
-                key: connection
+                name: data-plane
+                key: _data-plane_postgres_connection_string
           - name: CONTROL_PLANE_EVENTS_QUEUE
             value: {{ .Values.controlPlaneEventsQueue }}
           - name: DATA_PLANE_EVENTS_QUEUE

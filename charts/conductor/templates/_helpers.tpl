@@ -60,15 +60,3 @@ Create the name of the service account to use
 {{- default "default" .Values.serviceAccount.name }}
 {{- end }}
 {{- end }}
-
-
-{{/*
-Create the name of the secret to use
-*/}}
-{{- define "conductor.secretName" -}}
-{{- if not .Values.secret.useExistingSecret }}
-{{- include "conductor.fullname" . }}
-{{- else }}
-{{- .Values.secret.useExistingSecret }}
-{{- end }}
-{{- end }}
