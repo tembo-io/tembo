@@ -256,7 +256,7 @@ impl CoreDB {
         .await
     }
 
-    pub async fn exec(&self, command: &[String], client: Client) -> Result<ExecOutput, kube::Error> {
+    pub async fn exec(&self, command: &[String], client: Client) -> Result<ExecOutput, Error> {
         let pod_name = self
             .primary_pod(client.clone())
             .await

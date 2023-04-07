@@ -73,6 +73,16 @@ impl ExecCommand {
                     command, response
                 )))
             }
+            _ => {
+                error!(
+                    "Undefined response from kube API {:?}, command: {:?}",
+                    response, command
+                );
+                Err(Error::KubeExecError(format!(
+                    "Error executing command: {:?}. response: {:?}",
+                    command, response
+                )))
+            }
         }
     }
 }
