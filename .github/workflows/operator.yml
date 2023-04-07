@@ -94,6 +94,7 @@ jobs:
         run: |
           set -xe
           # Install the CRD
+          kubectl patch storageclass standard -p '{"allowVolumeExpansion": true}'
           cargo run --bin crdgen | kubectl apply -f -
           kubectl get crds
           # Start the operator in the background

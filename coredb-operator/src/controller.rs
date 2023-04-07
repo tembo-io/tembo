@@ -145,12 +145,16 @@ impl CoreDB {
                 CoreDBStatus {
                     running: true,
                     storage: self.spec.storage.clone(),
+                    sharedirStorage: self.spec.sharedirStorage.clone(),
+                    pkglibdirStorage: self.spec.pkglibdirStorage.clone(),
                     extensions: Some(extensions),
                 }
             }
             true => CoreDBStatus {
                 running: false,
                 storage: self.spec.storage.clone(),
+                sharedirStorage: self.spec.sharedirStorage.clone(),
+                pkglibdirStorage: self.spec.pkglibdirStorage.clone(),
                 extensions: Some(self.status.as_ref().unwrap().extensions.clone().unwrap()),
             },
         };
