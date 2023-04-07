@@ -6,6 +6,7 @@ use futures::{
 };
 
 use crate::{
+    exec::{ExecCommand, ExecOutput},
     psql::{PsqlCommand, PsqlOutput},
     service::reconcile_svc,
     statefulset::{reconcile_sts, stateful_set_from_cdb},
@@ -253,6 +254,20 @@ impl CoreDB {
         )
         .execute()
         .await
+    }
+
+    pub async fn exec(&self, command: &[String], client: Client) -> Result<ExecOutput, kube::Error> {
+        let pod_name = self
+            .primary_pod(client.clone())
+            .await
+            .unwrap()
+            .metadata
+            .name
+            .unwrap();
+
+        ExecCommand::new(pod_name, self.metadata.namespace.clone().unwrap(), client)
+            .execute(command)
+            .await
     }
 }
 
