@@ -1,4 +1,9 @@
+FROM rust:1.66.1 as builder
+RUN cargo install --version 0.0.1-alpha.4 pg-trunk
+
 FROM ubuntu:22.04
+
+COPY --from=builder /usr/local/cargo/bin/trunk /usr/bin/trunk
 
 ARG DEBIAN_FRONTEND=noninteractive
 ENV TZ=Etc/UTC
