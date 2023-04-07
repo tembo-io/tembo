@@ -256,15 +256,12 @@ impl CoreDB {
         .await
     }
 
-    pub async fn exec(&self, command: &[String], client: Client) -> Result<ExecOutput, Error> {
-        let pod_name = self
-            .primary_pod(client.clone())
-            .await
-            .unwrap()
-            .metadata
-            .name
-            .unwrap();
-
+    pub async fn exec(
+        &self,
+        pod_name: String,
+        client: Client,
+        command: &[String],
+    ) -> Result<ExecOutput, Error> {
         ExecCommand::new(pod_name, self.metadata.namespace.clone().unwrap(), client)
             .execute(command)
             .await
