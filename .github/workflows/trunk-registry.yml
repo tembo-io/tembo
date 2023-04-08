@@ -59,17 +59,11 @@ jobs:
         run: cargo +nightly fmt --all --check
       - name: Run migrations
         # ensure migration cache is up-to-date
-        env:
-          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/postgres"
         run: cargo sqlx migrate run
       - name: Migrations check
         # ensure migration cache is up-to-date
-        env:
-          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/postgres"
         run: cargo sqlx prepare --check
       - name: Clippy
-        env:
-          DATABASE_URL: "postgresql://postgres:postgres@0.0.0.0:5432/postgres"
         run: cargo clippy -- -Dwarnings
 
 
