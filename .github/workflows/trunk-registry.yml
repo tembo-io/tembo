@@ -24,7 +24,7 @@ jobs:
     name: Run linters
     runs-on: ubuntu-22.04
     env:
-      DATABASE_URL: "postgresql://postgres:postgres@0.0.0.0:5432/postgres"
+      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/postgres"
     services:
       # Label used to access the service container
       postgres:
@@ -58,11 +58,13 @@ jobs:
       - name: Cargo format
         run: cargo +nightly fmt --all --check
       - name: Clippy
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@0.0.0.0:5432/postgres"
         run: cargo clippy -- -Dwarnings
       - name: Migrations
         # ensure migration cache is up-to-date
         env:
-          DATABASE_URL: "postgresql://postgres:postgres@0.0.0.0:5432/postgres"
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/postgres"
         run: cargo sqlx prepare --check
 
   build-push:
