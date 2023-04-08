@@ -57,12 +57,17 @@ jobs:
           prefix-key: "lint"
       - name: Cargo format
         run: cargo +nightly fmt --all --check
-      - name: Migrations
+      - name: Run migrations
         # ensure migration cache is up-to-date
         env:
           DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/postgres"
         run:
-        - cargo sqlx migrate
+          - cargo sqlx migrate
+      - name: Migrations check
+        # ensure migration cache is up-to-date
+        env:
+          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/postgres"
+        run:
         - cargo sqlx prepare --check
       - name: Clippy
         env:
