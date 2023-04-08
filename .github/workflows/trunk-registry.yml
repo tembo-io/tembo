@@ -61,7 +61,7 @@ jobs:
         # ensure migration cache is up-to-date
         env:
           DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/postgres"
-        run: cargo sqlx migrate
+        run: cargo sqlx migrate run
       - name: Migrations check
         # ensure migration cache is up-to-date
         env:
