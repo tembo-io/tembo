@@ -61,7 +61,9 @@ jobs:
         # ensure migration cache is up-to-date
         env:
           DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/postgres"
-        run: cargo sqlx prepare --check
+        run:
+        - cargo sqlx migrate
+        - cargo sqlx prepare --check
       - name: Clippy
         env:
           DATABASE_URL: "postgresql://postgres:postgres@0.0.0.0:5432/postgres"
