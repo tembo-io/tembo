@@ -19,7 +19,7 @@ inputs:
     required: true
     description: "Quay 'robot user' access token"
   publish_calver:
-    description: 'Should we tag with calender versioning?'
+    description: 'Should we tag with calendar versioning?'
     required: false
     default: false
   calver_suffix:
