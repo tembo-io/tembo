@@ -126,6 +126,55 @@ name asc,
 enabled desc
 "#;
 
+/// handles installing extensions
+pub async fn install_extension(
+    cdb: &CoreDB,
+    extensions: &[Extension],
+    ctx: Arc<Context>,
+) -> Result<(), Error> {
+    debug!("extensions to install: {:?}", extensions);
+    let client = ctx.client.clone();
+
+    let pod_name = cdb
+        .primary_pod(client.clone())
+        .await
+        .unwrap()
+        .metadata
+        .name
+        .unwrap();
+
+    let mut errors: Vec<Error> = Vec::new();
+    for ext in extensions.iter() {
+        let version = ext.locations[0].version.clone().unwrap();
+        let cmd = vec![
+            "trunk".to_owned(),
+            "install".to_owned(),
+            ext.name.clone(),
+            "--version".to_owned(),
+            version,
+        ];
+        let result = cdb.exec(pod_name.clone(), client.clone(), &cmd).await;
+
+        match result {
+            Ok(result) => {
+                debug!("installed extension: {}", result.stdout.clone().unwrap());
+            }
+            Err(err) => {
+                error!("error installing extension, {}", err);
+                errors.push(err);
+            }
+        }
+    }
+    let num_success = extensions.len() - errors.len();
+    info!(
+        "Successfully installed {} / {} extensions",
+        num_success,
+        extensions.len()
+    );
+    Ok(())
+}
+
+
 /// handles create/drop extensions
 pub async fn toggle_extensions(
     cdb: &CoreDB,
@@ -302,32 +351,6 @@ pub async fn get_all_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<E
     Ok(ext_spec)
 }
 
-/// reconcile extensions between the spec and the database
-pub async fn reconcile_extensions(coredb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<Extension>, Error> {
-    // always get the current state of extensions in the database
-    // this is due to out of band changes - manual create/drop extension
-    let actual_extensions = get_all_extensions(coredb, ctx.clone()).await?;
-    let desired_extensions = coredb.spec.extensions.clone();
-
-    // most of the time there will be no changes
-    let extensions_changed = diff_extensions(&desired_extensions, &actual_extensions);
-
-    if extensions_changed.is_empty() {
-        // no further work when no changes
-        return Ok(actual_extensions);
-    }
-
-    // otherwise, need to determine the plan to apply
-    let (changed_extensions, extensions_to_install) = extension_plan(&desired_extensions, &actual_extensions);
-
-    toggle_extensions(coredb, &changed_extensions, ctx.clone()).await?;
-    debug!("extensions to install: {:?}", extensions_to_install);
-    // TODO: trunk install >extensions_to_install< on container
-
-    // return final state of extensions
-    get_all_extensions(coredb, ctx.clone()).await
-}
-
 // returns any elements that are in the desired, and not in actual
 // any Extensions returned by this function need either create or drop extension
 // cheap way to determine if there have been any sort of changes to extensions
@@ -366,6 +389,32 @@ fn extension_plan(have_changed: &[Extension], actual: &[Extension]) -> (Vec<Exte
 
     (changed, to_install)
 }
+
+/// reconcile extensions between the spec and the database
+pub async fn reconcile_extensions(coredb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<Extension>, Error> {
+    // always get the current state of extensions in the database
+    // this is due to out of band changes - manual create/drop extension
+    let actual_extensions = get_all_extensions(coredb, ctx.clone()).await?;
+    let desired_extensions = coredb.spec.extensions.clone();
+
+    // most of the time there will be no changes
+    let extensions_changed = diff_extensions(&desired_extensions, &actual_extensions);
+
+    if extensions_changed.is_empty() {
+        // no further work when no changes
+        return Ok(actual_extensions);
+    }
+
+    // otherwise, need to determine the plan to apply
+    let (changed_extensions, extensions_to_install) = extension_plan(&desired_extensions, &actual_extensions);
+
+    toggle_extensions(coredb, &changed_extensions, ctx.clone()).await?;
+    install_extension(coredb, &extensions_to_install, ctx.clone()).await?;
+
+    // return final state of extensions
+    get_all_extensions(coredb, ctx.clone()).await
+}
+
 
 #[cfg(test)]
 mod tests {
