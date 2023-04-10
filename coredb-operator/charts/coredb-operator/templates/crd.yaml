@@ -58,7 +58,7 @@ spec:
                   type: object
                 type: array
               image:
-                default: quay.io/coredb/postgres:6e3c4a7
+                default: quay.io/coredb/postgres:d45c5b1
                 type: string
               pkglibdirStorage:
                 default: 1Gi
