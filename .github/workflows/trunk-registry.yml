@@ -19,15 +19,29 @@ on:
       - main
       - release**
 
-# Required for sqlx query!() macro used in registry code.
-# See https://docs.rs/sqlx/0.6.2/sqlx/macro.query.html#requirements for more info.
-env:
-  DATABASE_URL: ${{ secrets.TRUNK_REGISTRY_DEV_DB_URL }}
-
 jobs:
   lint:
     name: Run linters
     runs-on: ubuntu-22.04
+    env:
+      DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/postgres"
+    services:
+      # Label used to access the service container
+      postgres:
+        # Docker Hub image
+        image: postgres
+        # Provide the password for postgres
+        env:
+          POSTGRES_PASSWORD: postgres
+        # Set health checks to wait until postgres has started
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          # Maps tcp port 5432 on service container to the host
+          - 5432:5432
     steps:
       - uses: actions/checkout@v3
       - name: Install minimal nightly with clippy and rustfmt
@@ -43,11 +57,16 @@ jobs:
           prefix-key: "lint"
       - name: Cargo format
         run: cargo +nightly fmt --all --check
-      - name: Clippy
-        run: cargo clippy -- -Dwarnings
-      - name: Migrations
+      - name: Run migrations
+        # ensure migration cache is up-to-date
+        run: cargo sqlx migrate run
+      - name: Migrations check
         # ensure migration cache is up-to-date
         run: cargo sqlx prepare --check
+      - name: Clippy
+        run: cargo clippy -- -Dwarnings
+
+
   build-push:
     name: Build and push image
     runs-on: ubuntu-20.04
