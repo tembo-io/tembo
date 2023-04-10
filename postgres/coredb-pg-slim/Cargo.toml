@@ -1,0 +1,15 @@
+[package]
+name = "coredb-pg-slim"
+version = "15.2.0-coredb-pg-slim.1"
+edition = "2021"
+authors = ["CoreDB.io"]
+description = "CoreDB distribution of postgres"
+homepage = "https://www.coredb.io"
+license = "MIT"
+readme = "README.md"
+repository = "https://github.com/CoreDB-io/coredb/tree/main/postgres"
+
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]

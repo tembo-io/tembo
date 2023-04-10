@@ -4,7 +4,7 @@ set -xe
 # Run this command to populate the extensions directory for a local build
 
 GIT_ROOT=$(git rev-parse --show-toplevel)
-THIS_DIR="${GIT_ROOT}/postgres"
+THIS_DIR="${GIT_ROOT}/postgres/coredb-pg"
 cd $THIS_DIR
 
 cargo install --version 0.0.1-alpha.3 pg-trunk
