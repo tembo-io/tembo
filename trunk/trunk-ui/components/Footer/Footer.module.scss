@@ -1,0 +1,17 @@
+.footer {
+  margin: 10px 20px;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+}
+.text {
+  font-style: normal;
+  font-weight: 400;
+  font-size: 12px;
+  line-height: 15px;
+  color: rgba(255, 255, 255, 0.87);
+  margin: 0 5px;
+}
+.image {
+  margin: 0 2px;
+}
