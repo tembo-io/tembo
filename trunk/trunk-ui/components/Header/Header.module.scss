@@ -11,3 +11,34 @@
   font-size: 24px;
   line-height: 29px;
 }
+.loginButton {
+  all: unset;
+  background-color: transparent;
+  display: flex;
+  align-items: center;
+  border: 1px solid white;
+  border-radius: 4px;
+  padding: 0 30px;
+  height: 48px;
+  cursor: pointer;
+  &:hover .authText {
+    display: none;
+  }
+  &:hover .logout {
+    display: block;
+  }
+}
+.authText {
+  display: block;
+  color: white;
+  font-weight: 400;
+  font-size: 16px;
+  margin-left: 10px;
+}
+.logout {
+  display: none;
+  color: white;
+  font-weight: 400;
+  font-size: 16px;
+  margin-left: 10px;
+}
