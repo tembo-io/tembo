@@ -35,4 +35,13 @@ In the future:
 * A [new UI](https://github.com/CoreDB-io/coredb/tree/main/pgUI) for Postgres and its extensions
 * A [CLI](https://github.com/CoreDB-io/coredb/tree/main/coredb-cli) built with Rust
 
+## CoreDB Cloud
+
+The team at CoreDB is building CoreDB Cloud, a dev-first, fully-extensible, fully-managed, secure, and 
+scalable Postgres service. The managed service will provide a growing ecosystem of easily-installed 
+extensions, allowing you to expand the capabilities of your database.
+
+The service is in private beta, but you can join the waitlist at [https://coredb.io](https://coredb.io).
+
+
 [Discord]: https://discord.gg/7bGYA9NPux

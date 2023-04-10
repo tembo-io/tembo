@@ -6,6 +6,7 @@ pub mod apis;
 /// Log and trace integrations
 pub mod telemetry;
 
+mod exec;
 /// Metrics
 mod metrics;
 pub use metrics::Metrics;
@@ -21,6 +22,9 @@ use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum Error {
+    #[error("An error occurred in kube-exec: {0}")]
+    KubeExecError(String),
+
     #[error("SerializationError: {0}")]
     SerializationError(#[source] serde_json::Error),
 
