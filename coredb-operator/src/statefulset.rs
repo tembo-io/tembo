@@ -376,14 +376,13 @@ pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
             (pvcs_to_update, pvcs_to_create)
         }
         false => {
-            warn!("cdb is not running, skipping pvc update");
-            return Ok(());
+            debug!("cdb is not running");
+            (vec![], vec![])
         }
     };
 
 
     if !pvcs_to_update.is_empty() {
-        // only patch PVCs when there are updates
         delete_sts_no_cascade(&sts_api, &sts_name).await?;
         let pvc_api: Api<PersistentVolumeClaim> = Api::namespaced(ctx.client.clone(), &sts_namespace);
         for (pvc_full_name, qty) in pvcs_to_update {
@@ -391,15 +390,13 @@ pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
         }
     }
 
-
     if !pvcs_to_create.is_empty() {
-        // delete sts whenever there is a CREATE or UPDATE PVC event
         delete_sts_no_cascade(&sts_api, &sts_name).await?;
         let primary_pod = cdb.primary_pod(client.clone()).await?;
         let pod_api: Api<Pod> = Api::namespaced(client.clone(), &sts_namespace);
 
         let prim_pod_name = primary_pod.metadata.name.unwrap();
-        info!("deleting pod: {}", prim_pod_name);
+        warn!("deleting pod to attach pvc: {}", prim_pod_name);
         pod_api.delete(&prim_pod_name, &DeleteParams::default()).await?;
     }
 
@@ -408,7 +405,6 @@ pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
         .patch(&sts.clone().metadata.name.unwrap(), &ps, &Patch::Apply(&sts))
         .await
         .map_err(Error::KubeError)?;
-
     Ok(())
 }
 
