@@ -423,7 +423,7 @@ async fn delete_sts_no_cascade(sts_api: &Api<StatefulSet>, sts_name: &str) -> Re
         .delete(sts_name, &delete_params)
         .await
         .map_err(Error::KubeError)?;
-    thread::sleep(Duration::from_millis(1000));
+    thread::sleep(Duration::from_millis(3000));
     Ok(())
 }
 
