@@ -1,6 +1,6 @@
 [package]
 name = "coredb-pg"
-version = "15.2.0-coredb-pg.1"
+version = "15.2.0-coredb-pg.2"
 edition = "2021"
 authors = ["CoreDB.io"]
 description = "CoreDB distribution of postgres"
