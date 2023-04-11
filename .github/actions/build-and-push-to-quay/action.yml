@@ -113,8 +113,7 @@ runs:
         username: ${{ inputs.quay_user }}
         password: ${{ inputs.quay_password }}
     - name: Push to Quay
-      # switch to main before merge
-      # if: ${{ github.ref == 'refs/heads/main' }}
+      if: ${{ github.ref == 'refs/heads/main' }}
       shell: bash
       run: |
         set -xe
