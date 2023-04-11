@@ -395,11 +395,13 @@ pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
     if !pvcs_to_create.is_empty() {
         // delete sts whenever there is a CREATE or UPDATE PVC event
         delete_sts_no_cascade(&sts_api, &sts_name).await?;
-        let pod_name = format!("{}-0", sts_namespace);
+        let primary_pod = cdb.primary_pod(client.clone()).await?;
         let pod_api: Api<Pod> = Api::namespaced(client.clone(), &sts_namespace);
-        // let pod = pod_api.get(&pod_name).await?;
-        info!("deleting pod: {}", pod_name);
-        pod_api.delete(&pod_name, &DeleteParams::default()).await?;
+        
+        let prim_pod_name = primary_pod.metadata.name.unwrap();
+        let delete_pod_name = format!("{}-0", prim_pod_name);
+        info!("deleting pod: {}", delete_pod_name);
+        pod_api.delete(&delete_pod_name, &DeleteParams::default()).await?;
     }
 
     let ps = PatchParams::apply("cntrlr").force();
