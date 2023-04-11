@@ -31,7 +31,10 @@ jobs:
             trunk/registry, trunk/cli/src/commands/pgx_builder
   build_and_push_images:
     name: Build and push images
-    runs-on: ubuntu-20.04
+    runs-on:
+      - self-hosted
+      - dind
+      - large-8x8
     needs:
       - find_directories
     strategy:
