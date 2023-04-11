@@ -11,7 +11,6 @@
 
 #[cfg(test)]
 mod test {
-
     use controller::{
         apis::coredb_types::CoreDB,
         defaults::{default_resources, default_storage},
@@ -34,6 +33,12 @@ mod test {
     use tokio::io::AsyncReadExt;
 
     const API_VERSION: &str = "coredb.io/v1alpha1";
+    // Timeout settings while waiting for an event
+    const TIMEOUT_SECONDS_START_POD: u64 = 90;
+    const TIMEOUT_SECONDS_POD_READY: u64 = 30;
+    const TIMEOUT_SECONDS_SECRET_PRESENT: u64 = 30;
+    const TIMEOUT_SECONDS_NS_DELETED: u64 = 30;
+    const TIMEOUT_SECONDS_COREDB_DELETED: u64 = 30;
 
     async fn create_test_buddy(pods_api: Api<Pod>, name: String) -> String {
         // Launch a pod we can connect to if we want to
@@ -99,11 +104,6 @@ mod test {
         let kind = "CoreDB";
         let replicas = 1;
 
-        // Timeout settings while waiting for an event
-        let timeout_seconds_start_pod = 90;
-        let timeout_seconds_pod_ready = 30;
-        let timeout_seconds_secret_present = 30;
-
         // Create a pod we can use to run commands in the cluster
         let pods: Api<Pod> = Api::namespaced(client.clone(), namespace);
         let test_pod_name = create_test_buddy(pods.clone(), name.to_string()).await;
@@ -141,12 +141,12 @@ mod test {
         let secret_name = format!("{}-connection", name);
         println!("Waiting for secret to be created: {}", secret_name);
         let establish = await_condition(secret_api.clone(), &secret_name, wait_for_secret());
-        let _ = tokio::time::timeout(Duration::from_secs(timeout_seconds_secret_present), establish)
+        let _ = tokio::time::timeout(Duration::from_secs(TIMEOUT_SECONDS_SECRET_PRESENT), establish)
             .await
             .unwrap_or_else(|_| {
                 panic!(
                     "Did not find the secret {} present after waiting {} seconds",
-                    secret_name, timeout_seconds_secret_present
+                    secret_name, TIMEOUT_SECONDS_SECRET_PRESENT
                 )
             });
         println!("Found secret: {}", secret_name);
@@ -156,26 +156,26 @@ mod test {
 
         println!("Waiting for pod to be running: {}", pod_name);
         let _check_for_pod = tokio::time::timeout(
-            Duration::from_secs(timeout_seconds_start_pod),
+            Duration::from_secs(TIMEOUT_SECONDS_START_POD),
             await_condition(pods.clone(), &pod_name, conditions::is_pod_running()),
         )
         .await
         .unwrap_or_else(|_| {
             panic!(
                 "Did not find the pod {} to be running after waiting {} seconds",
-                pod_name, timeout_seconds_start_pod
+                pod_name, TIMEOUT_SECONDS_START_POD
             )
         });
         println!("Waiting for pod to be ready: {}", pod_name);
         let _check_for_pod_ready = tokio::time::timeout(
-            Duration::from_secs(timeout_seconds_pod_ready),
+            Duration::from_secs(TIMEOUT_SECONDS_POD_READY),
             await_condition(pods.clone(), &pod_name, is_pod_ready()),
         )
         .await
         .unwrap_or_else(|_| {
             panic!(
                 "Did not find the pod {} to be ready after waiting {} seconds",
-                pod_name, timeout_seconds_pod_ready
+                pod_name, TIMEOUT_SECONDS_POD_READY
             )
         });
         println!("Found pod ready: {}", pod_name);
@@ -374,12 +374,6 @@ mod test {
             .await
             .unwrap();
 
-        // Timeout settings while waiting for an event
-        let timeout_seconds_start_pod = 60;
-        let timeout_seconds_pod_ready = 30;
-        let timeout_seconds_ns_deleted = 30;
-        let timeout_seconds_coredb_deleted = 30;
-
         // Create coredb
         println!("Creating CoreDB resource {}", name);
         let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), namespace);
@@ -413,26 +407,26 @@ mod test {
         let pods: Api<Pod> = Api::namespaced(client.clone(), namespace);
         println!("Waiting for pod to be running: {}", pod_name);
         let _check_for_pod = tokio::time::timeout(
-            Duration::from_secs(timeout_seconds_start_pod),
+            Duration::from_secs(TIMEOUT_SECONDS_START_POD),
             await_condition(pods.clone(), &pod_name, conditions::is_pod_running()),
         )
         .await
         .unwrap_or_else(|_| {
             panic!(
                 "Did not find the pod {} to be running after waiting {} seconds",
-                pod_name, timeout_seconds_start_pod
+                pod_name, TIMEOUT_SECONDS_START_POD
             )
         });
         println!("Waiting for pod to be ready: {}", pod_name);
         let _check_for_pod_ready = tokio::time::timeout(
-            Duration::from_secs(timeout_seconds_pod_ready),
+            Duration::from_secs(TIMEOUT_SECONDS_POD_READY),
             await_condition(pods.clone(), &pod_name, is_pod_ready()),
         )
         .await
         .unwrap_or_else(|_| {
             panic!(
                 "Did not find the pod {} to be ready after waiting {} seconds",
-                pod_name, timeout_seconds_pod_ready
+                pod_name, TIMEOUT_SECONDS_POD_READY
             )
         });
         println!("Found pod ready: {}", pod_name);
@@ -445,20 +439,20 @@ mod test {
         //  similar to the loop used in namespace delete assertion, but received a comparison error.
         println!("Waiting for CoreDB to be deleted: {}", &name);
         let _assert_coredb_deleted = tokio::time::timeout(
-            Duration::from_secs(timeout_seconds_coredb_deleted),
+            Duration::from_secs(TIMEOUT_SECONDS_COREDB_DELETED),
             await_condition(coredbs.clone(), name, conditions::is_deleted("")),
         )
         .await
         .unwrap_or_else(|_| {
             panic!(
                 "CoreDB {} was not deleted after waiting {} seconds",
-                name, timeout_seconds_coredb_deleted
+                name, TIMEOUT_SECONDS_COREDB_DELETED
             )
         });
 
         // Assert namespace has been deleted
         println!("Waiting for namespace to be deleted: {}", &namespace);
-        tokio::time::timeout(Duration::from_secs(timeout_seconds_ns_deleted), async move {
+        tokio::time::timeout(Duration::from_secs(TIMEOUT_SECONDS_NS_DELETED), async move {
             loop {
                 let get_ns = ns_api.get_opt(namespace).await.unwrap();
                 if get_ns.is_none() {
@@ -470,7 +464,7 @@ mod test {
         .unwrap_or_else(|_| {
             panic!(
                 "Namespace {} was not deleted after waiting {} seconds",
-                namespace, timeout_seconds_ns_deleted
+                namespace, TIMEOUT_SECONDS_NS_DELETED
             )
         });
     }
@@ -486,11 +480,6 @@ mod test {
         let name = &format!("test-stop-coredb-{}", rng.gen_range(0..100000));
         let namespace = "default";
         let kind = "CoreDB";
-
-        // Timeout settings while waiting for an event
-        let timeout_seconds_start_pod = 60;
-        let timeout_seconds_pod_ready = 30;
-        let timeout_seconds_secret_present = 30;
 
         // Create a pod we can use to run commands in the cluster
         let pods: Api<Pod> = Api::namespaced(client.clone(), namespace);
@@ -518,12 +507,12 @@ mod test {
         let secret_name = format!("{}-connection", name);
         println!("Waiting for secret to be created: {}", secret_name);
         let establish = await_condition(secret_api.clone(), &secret_name, wait_for_secret());
-        let _ = tokio::time::timeout(Duration::from_secs(timeout_seconds_secret_present), establish)
+        let _ = tokio::time::timeout(Duration::from_secs(TIMEOUT_SECONDS_SECRET_PRESENT), establish)
             .await
             .unwrap_or_else(|_| {
                 panic!(
                     "Did not find the secret {} present after waiting {} seconds",
-                    secret_name, timeout_seconds_secret_present
+                    secret_name, TIMEOUT_SECONDS_SECRET_PRESENT
                 )
             });
         println!("Found secret: {}", secret_name);
@@ -533,26 +522,26 @@ mod test {
 
         println!("Waiting for pod to be running: {}", pod_name);
         let _check_for_pod = tokio::time::timeout(
-            Duration::from_secs(timeout_seconds_start_pod),
+            Duration::from_secs(TIMEOUT_SECONDS_START_POD),
             await_condition(pods.clone(), &pod_name, conditions::is_pod_running()),
         )
         .await
         .unwrap_or_else(|_| {
             panic!(
                 "Did not find the pod {} to be running after waiting {} seconds",
-                pod_name, timeout_seconds_start_pod
+                pod_name, TIMEOUT_SECONDS_START_POD
             )
         });
         println!("Waiting for pod to be ready: {}", pod_name);
         let _check_for_pod_ready = tokio::time::timeout(
-            Duration::from_secs(timeout_seconds_pod_ready),
+            Duration::from_secs(TIMEOUT_SECONDS_POD_READY),
             await_condition(pods.clone(), &pod_name, is_pod_ready()),
         )
         .await
         .unwrap_or_else(|_| {
             panic!(
                 "Did not find the pod {} to be ready after waiting {} seconds",
-                pod_name, timeout_seconds_pod_ready
+                pod_name, TIMEOUT_SECONDS_POD_READY
             )
         });
         println!("Found pod ready: {}", pod_name);
@@ -646,7 +635,7 @@ mod test {
         // give it time to start
         println!("Waiting for pod to be running: {}", pod_name);
         let check_for_pod = tokio::time::timeout(
-            Duration::from_secs(timeout_seconds_start_pod),
+            Duration::from_secs(TIMEOUT_SECONDS_START_POD),
             await_condition(pods.clone(), &pod_name, conditions::is_pod_running()),
         );
         assert!(check_for_pod.await.is_ok());
