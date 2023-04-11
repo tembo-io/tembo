@@ -16,10 +16,6 @@ inputs:
   subdirectory:
     description: 'The subdirectory to update'
     required: true
-  yq_version:
-    description: 'The version of yq to use'
-    default: '4.33.3'
-    required: false
   clone_into:
     description: 'The directory to clone the argocd repo into'
     default: 'argocd-repo'
@@ -43,15 +39,15 @@ runs:
       git config --global user.email "admin+github@coredb.io"
       git checkout ${{ inputs.branch }} || git checkout -b ${{ inputs.branch }}
   - name: Update trunk registry
-    uses: mikefarah/yq@v${{ inputs.yq_version }}
+    uses: mikefarah/yq@v4.33.3
     with:
       cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/pgtrunkio-backend.yaml
   - name: Update coredb operator helm chart
-    uses: mikefarah/yq@v${{ inputs.yq_version }}
+    uses: mikefarah/yq@v4.33.3
     with:
       cmd: yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/coredb-operator.yaml
   - name: Update coredb operator image
-    uses: mikefarah/yq@v${{ inputs.yq_version }}
+    uses: mikefarah/yq@v4.33.3
     with:
       cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/coredb-operator.yaml
   - name: Git commit and push to remote
