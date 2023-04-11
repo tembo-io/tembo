@@ -432,7 +432,6 @@ pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
         }
         Err(e) => {
             error!("create_update_result: {:?}", e);
-            return Err(e);
         }
     }
 
