@@ -15,7 +15,7 @@ use k8s_openapi::{
     apimachinery::pkg::{api::resource::Quantity, apis::meta::v1::LabelSelector},
 };
 use kube::{
-    api::{Api, DeleteParams, ObjectMeta, Patch, PatchParams, ResourceExt},
+    api::{Api, DeleteParams, ListParams, ObjectMeta, Patch, PatchParams, ResourceExt},
     Resource,
 };
 
@@ -24,7 +24,7 @@ use k8s_openapi::{
     apimachinery::pkg::util::intstr::IntOrString,
 };
 use std::{collections::BTreeMap, sync::Arc};
-use tracing::{debug, info};
+use tracing::{debug, error, info};
 
 const PKGLIBDIR: &str = "/usr/lib/postgresql/15/lib";
 const SHAREDIR: &str = "/usr/share/postgresql/15";
@@ -306,43 +306,89 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
     sts
 }
 
+fn diff_pvcs(expected: &[String], actual: &[String]) -> Vec<String> {
+    let mut to_create = vec![];
+    for pvc in expected {
+        if !actual.contains(pvc) {
+            to_create.push(pvc.to_string());
+        }
+    }
+    to_create
+}
+
+async fn list_pvcs(ctx: Arc<Context>, sts_name: &str, sts_namespace: &str) -> Result<Vec<String>, Error> {
+    let label_selector = format!("statefulset={sts_name}");
+    let list_params = ListParams::default().labels(&label_selector);
+    let pvc_api: Api<PersistentVolumeClaim> = Api::namespaced(ctx.client.clone(), &sts_namespace);
+
+    // list all PVCs in namespace
+    let all_pvcs = pvc_api.list(&list_params).await?;
+    Ok(all_pvcs
+        .into_iter()
+        .map(|pvc| pvc.metadata.name.unwrap())
+        .collect())
+}
+
 pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
     let client = ctx.client.clone();
 
     let sts: StatefulSet = stateful_set_from_cdb(cdb);
 
     let sts_api: Api<StatefulSet> = Api::namespaced(client, &sts.clone().metadata.namespace.unwrap());
+
+    let sts_name = sts.clone().metadata.name.unwrap();
+    let sts_namespace = sts.clone().metadata.namespace.unwrap();
+
     // If cdb is running and storage is resized in CoreDB Custom Resource then follow steps to resize PVC
     // Reference Article: https://itnext.io/resizing-statefulset-persistent-volumes-with-zero-downtime-916ebc65b1d4
 
-    // determine pvcs that changed
-    let pvcs_to_update = match cdb.status.is_some() && cdb.status.clone().unwrap().running {
+    // determine pvcs that changed or need to be created
+    let pvcs_to_update_or_create = match cdb.status.is_some() && cdb.status.clone().unwrap().running {
         true => {
-            let mut pvcs_to_update = Vec::new();
-            if cdb.status.clone().unwrap().storage != cdb.spec.storage {
-                pvcs_to_update.push(("data".to_string(), cdb.spec.storage.clone()));
+            let mut pvc_to_apply = Vec::new();
+            let data_pvc_name = pvc_full_name("data", &sts_name);
+            let pkglib_pvc_name = pvc_full_name("pkglibdir", &sts_name);
+            let share_pvc_name = pvc_full_name("sharedir", &sts_name);
+
+            // reconcile expected vs actual pvcs
+            // this is what needs to be created
+            let expected_pvcs = vec![
+                data_pvc_name.clone(),
+                pkglib_pvc_name.clone(),
+                share_pvc_name.clone(),
+            ];
+            let actual_pvcs = list_pvcs(ctx.clone(), &sts_name, &sts_namespace).await?;
+            // if there is a diff, it needs to be created. assumes we never delete a pvc.
+            let pvcs_to_create = diff_pvcs(&expected_pvcs, &actual_pvcs);
+            debug!("pvcs_to_create: {:?}", pvcs_to_create);
+
+            // determine if PVCs changed
+            // if the PVCs needed to be created, or updated - append to vec of pvcs to patch
+            if cdb.status.clone().unwrap().storage != cdb.spec.storage
+                || pvcs_to_create.contains(&data_pvc_name)
+            {
+                pvc_to_apply.push((data_pvc_name, cdb.spec.storage.clone()));
             }
-            if cdb.status.clone().unwrap().sharedirStorage != cdb.spec.sharedirStorage {
-                pvcs_to_update.push(("sharedir".to_string(), cdb.spec.sharedirStorage.clone()));
+            if cdb.status.clone().unwrap().sharedirStorage != cdb.spec.sharedirStorage
+                || pvcs_to_create.contains(&share_pvc_name)
+            {
+                pvc_to_apply.push((share_pvc_name, cdb.spec.sharedirStorage.clone()));
             }
-            if cdb.status.clone().unwrap().pkglibdirStorage != cdb.spec.pkglibdirStorage {
-                pvcs_to_update.push(("pkglibdir".to_string(), cdb.spec.pkglibdirStorage.clone()));
+            if cdb.status.clone().unwrap().pkglibdirStorage != cdb.spec.pkglibdirStorage
+                || pvcs_to_create.contains(&pkglib_pvc_name)
+            {
+                pvc_to_apply.push((pkglib_pvc_name, cdb.spec.pkglibdirStorage.clone()));
             }
-            pvcs_to_update
+            pvc_to_apply
         }
         false => Vec::new(),
     };
-    debug!("pvcs_to_update: {:?}", pvcs_to_update);
-    if !pvcs_to_update.is_empty() {
-        let sts_name = sts.clone().metadata.name.unwrap();
-        let sts_namespace = sts.clone().metadata.namespace.unwrap();
-
-        // why do delete first, then update?
+    debug!("pvcs_to_update: {:?}", pvcs_to_update_or_create);
+    if !pvcs_to_update_or_create.is_empty() {
         delete_sts_no_cascade(&sts_api, &sts_name).await;
-
         let pvc_api: Api<PersistentVolumeClaim> = Api::namespaced(ctx.client.clone(), &sts_namespace);
-        for (pvc_name, qty) in pvcs_to_update {
-            update_pvc(&pvc_api, &sts_name, &pvc_name, qty).await;
+        for (pvc_full_name, qty) in pvcs_to_update_or_create {
+            update_pvc(&pvc_api, &pvc_full_name, qty).await;
         }
     }
 
@@ -369,12 +415,12 @@ async fn delete_sts_no_cascade(sts_api: &Api<StatefulSet>, sts_name: &str) {
         .map_err(Error::KubeError);
 }
 
-async fn update_pvc(pvc_api: &Api<PersistentVolumeClaim>, sts_name: &str, pvc_name: &str, value: Quantity) {
-    info!(
-        "Updating PVC {} for StatefulSet {}, Value: {:?}",
-        pvc_name, sts_name, value
-    );
-    let pvc_full_name = format!("{pvc_name}-{sts_name}-0");
+fn pvc_full_name(pvc_name: &str, sts_name: &str) -> String {
+    format!("{pvc_name}-{sts_name}-0")
+}
+
+async fn update_pvc(pvc_api: &Api<PersistentVolumeClaim>, pvc_full_name: &str, value: Quantity) {
+    info!("Updating PVC {}, Value: {:?}", pvc_full_name, value);
     let mut pvc_requests: BTreeMap<String, Quantity> = BTreeMap::new();
     pvc_requests.insert("storage".to_string(), value);
 
