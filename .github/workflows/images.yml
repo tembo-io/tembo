@@ -81,7 +81,7 @@ jobs:
           quay_password: ${{ secrets.QUAY_PASSWORD }}
 
   argocd_update:
-    name: Prepare update for ArgoCD in dev environment
+    name: ArgoCD update automation
     if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-20.04
     strategy:
