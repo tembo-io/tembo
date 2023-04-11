@@ -21,7 +21,7 @@
   padding: 0 30px;
   height: 48px;
   cursor: pointer;
-  &:hover .authText {
+  &:hover .userName {
     display: none;
   }
   &:hover .logout {
@@ -29,7 +29,6 @@
   }
 }
 .authText {
-  display: block;
   color: white;
   font-weight: 400;
   font-size: 16px;
@@ -41,4 +40,7 @@
   font-weight: 400;
   font-size: 16px;
   margin-left: 10px;
+}
+.userName {
+  display: block;
 }
