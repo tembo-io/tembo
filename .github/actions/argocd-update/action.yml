@@ -19,7 +19,11 @@ inputs:
   yq_version:
     description: 'The version of yq to use'
     default: '4.33.3'
-    required: true
+    required: false
+  clone_into:
+    description: 'The directory to clone the argocd repo into'
+    default: 'argocd-repo'
+    required: false
 outputs: {}
 runs:
   using: "composite"
@@ -29,29 +33,32 @@ runs:
     with:
       repository: ${{ inputs.repository }}
       ssh-key: ${{ inputs.ssh_key }}
+      path: ${{ inputs.clone_into }}
   - name: Git commit and push to remote
     shell: bash
     run: |
       set -xe
+      cd ${{ inputs.clone_into }}
       git config --global user.name "coredb-service-user"
       git config --global user.email "admin+github@coredb.io"
       git checkout ${{ inputs.branch }} || git checkout -b ${{ inputs.branch }}
   - name: Update trunk registry
     uses: mikefarah/yq@v${{ inputs.yq_version }}
     with:
-      cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.subdirectory }}/pgtrunkio-backend.yaml
+      cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/pgtrunkio-backend.yaml
   - name: Update coredb operator helm chart
     uses: mikefarah/yq@v${{ inputs.yq_version }}
     with:
-      cmd: yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.subdirectory }}/coredb-operator.yaml
+      cmd: yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/coredb-operator.yaml
   - name: Update coredb operator image
     uses: mikefarah/yq@v${{ inputs.yq_version }}
     with:
-      cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.subdirectory }}/coredb-operator.yaml
+      cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/coredb-operator.yaml
   - name: Git commit and push to remote
     shell: bash
     run: |
       set -xe
+      cd ${{ inputs.clone_into }}
       git add --all
       # debugging
       git diff HEAD

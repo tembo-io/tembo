@@ -104,10 +104,8 @@ jobs:
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
-        with:
-          path: /tmp/coredb-io
       - name: Check out the repo
-        uses: /tmp/coredb-io/.github/actions/argocd-update
+        uses: ./.github/actions/argocd-update
         with:
           repository: ${{ matrix.repository }}
           ssh_key: ${{ secrets.SERVICE_USER_GITHUB_SSH_KEY }}
