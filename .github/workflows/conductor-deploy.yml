@@ -23,8 +23,6 @@ jobs:
           repository: coredb-io/coredb
           path: ./coredb
           ref: a0034703ad57d5179c0217beb39b88ca23417f43
-      - uses: azure/setup-kubectl@v3
-      - uses: azure/setup-helm@v3
       - name: Set version strings
         id: versions
         run: |
