@@ -106,12 +106,19 @@ runs:
         for tag in "${TAG_ARRAY[@]}"; do
           docker tag ${{ inputs.image_name }} ${{ inputs.image_name }}:$tag
         done
-    - name: Push To quay.io
-      if: ${{ github.ref == 'refs/heads/main' }}
-      uses: redhat-actions/push-to-registry@v2
+    - name: Login to Quay
+      uses: docker/login-action@v2
       with:
         registry: ${{ inputs.registry }}
-        image: ${{ inputs.image_name }}
-        tags: ${{ steps.tags.outputs.TAGS }}
         username: ${{ inputs.quay_user }}
         password: ${{ inputs.quay_password }}
+    - name: Push to Quay
+      if: ${{ github.ref == 'refs/heads/main' }}
+      shell: bash
+      run: |
+        set -xe
+        IFS=' ' read -ra TAG_ARRAY <<< "${{ steps.tags.outputs.TAGS }}"
+        for tag in "${TAG_ARRAY[@]}"; do
+          docker tag ${{ inputs.image_name }}:$tag ${{ inputs.registry}}/${{ inputs.image_name }}:$tag
+          docker push ${{ inputs.registry}}/${{ inputs.image_name }}:$tag
+        done
