@@ -344,9 +344,9 @@ pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
     // Reference Article: https://itnext.io/resizing-statefulset-persistent-volumes-with-zero-downtime-916ebc65b1d4
 
     // determine pvcs that changed or need to be created
-    let (pvcs_to_update, pvcs_to_create) = match cdb.status.is_some() && cdb.status.clone().unwrap().running {
+    let pvcs_to_apply = match cdb.status.is_some() && cdb.status.clone().unwrap().running {
         true => {
-            let mut pvcs_to_update = Vec::new();
+            let mut pvcs_to_apply = Vec::new();
             let data_pvc_name = pvc_full_name("data", &sts_name);
             let pkglib_pvc_name = pvc_full_name("pkglibdir", &sts_name);
             let share_pvc_name = pvc_full_name("sharedir", &sts_name);
@@ -363,17 +363,23 @@ pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
             warn!("pvcs_to_create: {:?}", pvcs_to_create);
 
             // determine if PVCs changed
-            if cdb.status.clone().unwrap().storage != cdb.spec.storage {
-                pvcs_to_update.push((data_pvc_name, cdb.spec.storage.clone()));
+            if cdb.status.clone().unwrap().storage != cdb.spec.storage
+                || pvcs_to_create.contains(&data_pvc_name)
+            {
+                pvcs_to_apply.push((data_pvc_name, cdb.spec.storage.clone()));
             }
-            if cdb.status.clone().unwrap().sharedirStorage != cdb.spec.sharedirStorage {
-                pvcs_to_update.push((share_pvc_name, cdb.spec.sharedirStorage.clone()));
+            if cdb.status.clone().unwrap().sharedirStorage != cdb.spec.sharedirStorage
+                || pvcs_to_create.contains(&share_pvc_name)
+            {
+                pvcs_to_apply.push((share_pvc_name, cdb.spec.sharedirStorage.clone()));
             }
-            if cdb.status.clone().unwrap().pkglibdirStorage != cdb.spec.pkglibdirStorage {
-                pvcs_to_update.push((pkglib_pvc_name, cdb.spec.pkglibdirStorage.clone()));
+            if cdb.status.clone().unwrap().pkglibdirStorage != cdb.spec.pkglibdirStorage
+                || pvcs_to_create.contains(&pkglib_pvc_name)
+            {
+                pvcs_to_apply.push((pkglib_pvc_name, cdb.spec.pkglibdirStorage.clone()));
             }
-            debug!("pvcs_to_update: {:?}", pvcs_to_update);
-            (pvcs_to_update, pvcs_to_create)
+            debug!("pvcs_to_apply: {:?}", pvcs_to_apply);
+            pvcs_to_apply
         }
         false => {
             warn!("cdb is not running, skipping pvc update");
@@ -381,16 +387,11 @@ pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
         }
     };
 
-    if !pvcs_to_update.is_empty() || !pvcs_to_create.is_empty() {
-        // delete sts whenever there is a CREATE or UPDATE PVC event
+    if !pvcs_to_apply.is_empty() {
         delete_sts_no_cascade(&sts_api, &sts_name).await?;
         thread::sleep(Duration::from_millis(3000));
-    }
-
-    if !pvcs_to_update.is_empty() {
-        // only patch PVCs when there are updates
         let pvc_api: Api<PersistentVolumeClaim> = Api::namespaced(ctx.client.clone(), &sts_namespace);
-        for (pvc_full_name, qty) in pvcs_to_update {
+        for (pvc_full_name, qty) in pvcs_to_apply {
             update_pvc(&pvc_api, &pvc_full_name, qty).await;
         }
     }
