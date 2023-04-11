@@ -36,6 +36,7 @@ jobs:
           changed_relative_to_branch: ${{ github.base_ref || 'not-a-branch' }}
           ignore_dirs: |-
             trunk/cli/src/commands/pgx_builder
+
   build_and_push_images:
     name: Build and push images
     runs-on:
@@ -78,3 +79,39 @@ jobs:
           publish_latest: ${{ steps.tags.outputs.tag_latest }}
           quay_user: ${{ secrets.QUAY_USER }}
           quay_password: ${{ secrets.QUAY_PASSWORD }}
+
+  update_argocd_dev:
+    name: Update ArgoCD in dev environment
+    # if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-20.04
+    needs:
+      - find_directories
+      - build_and_push_images
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v3
+        with:
+          repository: coredb-io/app-deploy-dev
+          ssh-key: ${{ secrets.SERVICE_USER_GITHUB_SSH_KEY }}
+      - name: Update trunk registry
+        uses: mikefarah/yq@v4.33.3
+        with:
+          cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ needs.find_directories.outputs.short_sha }}"' dev/pgtrunkio-backend.yaml
+      - name: Update coredb operator helm chart
+        uses: mikefarah/yq@v4.33.3
+        with:
+          cmd: yq -i '.spec.source.targetRevision= "${{ needs.find_directories.outputs.short_sha }}"' dev/coredb-operator.yaml
+      - name: Update coredb operator image
+        uses: mikefarah/yq@v4.33.3
+        with:
+          cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ needs.find_directories.outputs.short_sha }}"' dev/coredb-operator.yaml
+      - name: Git commit and push to remote
+        run: |
+          set -xe
+          git config --global user.name "coredb-service-user"
+          git config --global user.email "admin+github@coredb.io"
+          git add --all
+          # debugging
+          git diff HEAD
+          git commit -m "Update from coredb-io/coredb: ${{ needs.push_to_registry.outputs.short_sha }}"
+          git push origin main
