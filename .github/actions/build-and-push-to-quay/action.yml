@@ -114,7 +114,7 @@ runs:
         password: ${{ inputs.quay_password }}
     - name: Push to Quay
       # switch to main before merge
-      if: ${{ github.ref == 'refs/heads/push-with-docker' }}
+      # if: ${{ github.ref == 'refs/heads/main' }}
       shell: bash
       run: |
         set -xe
