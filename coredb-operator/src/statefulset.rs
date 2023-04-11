@@ -341,17 +341,17 @@ pub async fn handle_create_update(
 ) -> Result<(), Error> {
     let client = ctx.client.clone();
     if !pvcs_to_update.is_empty() {
-        delete_sts_no_cascade(&sts_api, &sts_name).await?;
-        let pvc_api: Api<PersistentVolumeClaim> = Api::namespaced(ctx.client.clone(), &sts_namespace);
+        delete_sts_no_cascade(&sts_api, sts_name).await?;
+        let pvc_api: Api<PersistentVolumeClaim> = Api::namespaced(ctx.client.clone(), sts_namespace);
         for (pvc_full_name, qty) in pvcs_to_update {
-            update_pvc(&pvc_api, &pvc_full_name, qty).await;
+            update_pvc(&pvc_api, &pvc_full_name, qty).await?;
         }
     }
 
     if !pvcs_to_create.is_empty() {
-        delete_sts_no_cascade(&sts_api, &sts_name).await?;
+        delete_sts_no_cascade(&sts_api, sts_name).await?;
         let primary_pod = cdb.primary_pod(client.clone()).await?;
-        let pod_api: Api<Pod> = Api::namespaced(client.clone(), &sts_namespace);
+        let pod_api: Api<Pod> = Api::namespaced(client.clone(), sts_namespace);
         let prim_pod_name = primary_pod
             .metadata
             .name
