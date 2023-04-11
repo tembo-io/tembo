@@ -428,7 +428,7 @@ pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
     // ensure we always make it to the PATCH operation below
     match create_update_result {
         Ok(_) => {
-            info!("successfully create_update sts/pvc resources");
+            debug!("successfully create_update sts/pvc resources");
         }
         Err(e) => {
             error!("create_update_result: {:?}", e);

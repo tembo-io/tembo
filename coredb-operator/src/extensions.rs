@@ -311,7 +311,7 @@ fn parse_extensions(psql_str: &str) -> Vec<ExtRow> {
         extensions.push(package);
     }
     let num_extensions = extensions.len();
-    info!("Found {} extensions", num_extensions);
+    debug!("Found {} extensions", num_extensions);
     extensions
 }
 
@@ -348,6 +348,8 @@ pub async fn get_all_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<E
             locations: ext_locations.clone(),
         });
     }
+    // put them in order
+    ext_spec.sort_by_key(|e| e.name.clone());
     Ok(ext_spec)
 }
 
@@ -395,7 +397,8 @@ pub async fn reconcile_extensions(coredb: &CoreDB, ctx: Arc<Context>) -> Result<
     // always get the current state of extensions in the database
     // this is due to out of band changes - manual create/drop extension
     let actual_extensions = get_all_extensions(coredb, ctx.clone()).await?;
-    let desired_extensions = coredb.spec.extensions.clone();
+    let mut desired_extensions = coredb.spec.extensions.clone();
+    desired_extensions.sort_by_key(|e| e.name.clone());
 
     // most of the time there will be no changes
     let extensions_changed = diff_extensions(&desired_extensions, &actual_extensions);
@@ -407,7 +410,6 @@ pub async fn reconcile_extensions(coredb: &CoreDB, ctx: Arc<Context>) -> Result<
 
     // otherwise, need to determine the plan to apply
     let (changed_extensions, extensions_to_install) = extension_plan(&desired_extensions, &actual_extensions);
-
     toggle_extensions(coredb, &changed_extensions, ctx.clone()).await?;
     install_extension(coredb, &extensions_to_install, ctx.clone()).await?;
 
