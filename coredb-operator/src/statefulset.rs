@@ -18,6 +18,7 @@ use kube::{
     api::{Api, DeleteParams, ListParams, ObjectMeta, Patch, PatchParams, ResourceExt},
     Resource,
 };
+use std::{str, thread, time::Duration};
 
 use k8s_openapi::{
     api::core::v1::{EmptyDirVolumeSource, HTTPGetAction, Volume},
@@ -383,6 +384,7 @@ pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
     if !pvcs_to_update.is_empty() || !pvcs_to_create.is_empty() {
         // delete sts whenever there is a CREATE or UPDATE PVC event
         delete_sts_no_cascade(&sts_api, &sts_name).await?;
+        thread::sleep(Duration::from_millis(3000));
     }
 
     if !pvcs_to_update.is_empty() {
