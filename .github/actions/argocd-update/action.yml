@@ -1,0 +1,59 @@
+name: 'Argo CD update'
+description: 'Push changes to a branch in ArgoCD'
+inputs:
+  repository:
+    description: 'The ArgoCD repository'
+    required: true
+  ssh_key:
+    description: 'The SSH key for the repository'
+    required: true
+  branch:
+    description: 'The branch to update'
+    required: true
+  version:
+    description: 'The version to use for updating'
+    required: true
+  subdirectory:
+    description: 'The subdirectory to update'
+    required: true
+  yq_version:
+    description: 'The version of yq to use'
+    default: '4.33.3'
+    required: true
+outputs: {}
+runs:
+  using: "composite"
+  steps:
+  - name: Check out the repo
+    uses: actions/checkout@v3
+    with:
+      repository: ${{ inputs.repository }}
+      ssh-key: ${{ inputs.ssh_key }}
+  - name: Git commit and push to remote
+    shell: bash
+    run: |
+      set -xe
+      git config --global user.name "coredb-service-user"
+      git config --global user.email "admin+github@coredb.io"
+      git checkout ${{ inputs.branch }} || git checkout -b ${{ inputs.branch }}
+  - name: Update trunk registry
+    uses: mikefarah/yq@v${{ inputs.yq_version }}
+    with:
+      cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.subdirectory }}/pgtrunkio-backend.yaml
+  - name: Update coredb operator helm chart
+    uses: mikefarah/yq@v${{ inputs.yq_version }}
+    with:
+      cmd: yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.subdirectory }}/coredb-operator.yaml
+  - name: Update coredb operator image
+    uses: mikefarah/yq@v${{ inputs.yq_version }}
+    with:
+      cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.subdirectory }}/coredb-operator.yaml
+  - name: Git commit and push to remote
+    shell: bash
+    run: |
+      set -xe
+      git add --all
+      # debugging
+      git diff HEAD
+      git commit -m "Update from coredb-io/coredb: ${{ inputs.version }}"
+      git push origin ${{ inputs.branch }}
