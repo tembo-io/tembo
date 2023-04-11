@@ -360,7 +360,7 @@ pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
             let actual_pvcs = list_pvcs(ctx.clone(), &sts_name, &sts_namespace).await?;
             // if there is a diff, it needs to be created. assumes we never delete a pvc.
             let pvcs_to_create = diff_pvcs(&expected_pvcs, &actual_pvcs);
-            warn!("pvcs_to_create: {:?}", pvcs_to_create);
+            debug!("pvcs_to_create: {:?}", pvcs_to_create);
 
             // determine if PVCs changed
             if cdb.status.clone().unwrap().storage != cdb.spec.storage {
@@ -415,7 +415,7 @@ async fn delete_sts_no_cascade(sts_api: &Api<StatefulSet>, sts_name: &str) -> Re
         propagation_policy: Some(kube::api::PropagationPolicy::Orphan),
         preconditions: None,
     };
-    warn!("deleting sts: {}", sts_name);
+    info!("deleting_sts_no_cascade: {}", sts_name);
     let _ = sts_api
         .delete(sts_name, &delete_params)
         .await
