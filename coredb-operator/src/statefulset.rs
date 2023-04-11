@@ -24,7 +24,7 @@ use k8s_openapi::{
     apimachinery::pkg::util::intstr::IntOrString,
 };
 use std::{collections::BTreeMap, sync::Arc};
-use tracing::{debug, error, info};
+use tracing::{debug, info};
 
 const PKGLIBDIR: &str = "/usr/lib/postgresql/15/lib";
 const SHAREDIR: &str = "/usr/share/postgresql/15";
@@ -319,7 +319,7 @@ fn diff_pvcs(expected: &[String], actual: &[String]) -> Vec<String> {
 async fn list_pvcs(ctx: Arc<Context>, sts_name: &str, sts_namespace: &str) -> Result<Vec<String>, Error> {
     let label_selector = format!("statefulset={sts_name}");
     let list_params = ListParams::default().labels(&label_selector);
-    let pvc_api: Api<PersistentVolumeClaim> = Api::namespaced(ctx.client.clone(), &sts_namespace);
+    let pvc_api: Api<PersistentVolumeClaim> = Api::namespaced(ctx.client.clone(), sts_namespace);
 
     // list all PVCs in namespace
     let all_pvcs = pvc_api.list(&list_params).await?;
@@ -424,7 +424,7 @@ async fn update_pvc(pvc_api: &Api<PersistentVolumeClaim>, pvc_full_name: &str, v
     let mut pvc_requests: BTreeMap<String, Quantity> = BTreeMap::new();
     pvc_requests.insert("storage".to_string(), value);
 
-    let mut pvc = pvc_api.get(&pvc_full_name).await.unwrap();
+    let mut pvc = pvc_api.get(pvc_full_name).await.unwrap();
 
     pvc.metadata.managed_fields = None;
 
@@ -445,7 +445,7 @@ async fn update_pvc(pvc_api: &Api<PersistentVolumeClaim>, pvc_full_name: &str, v
     };
 
     let _o = pvc_api
-        .patch(&pvc_full_name, &patch_params, &Patch::Apply(pvc))
+        .patch(pvc_full_name, &patch_params, &Patch::Apply(pvc))
         .await
         .map_err(Error::KubeError);
 }
