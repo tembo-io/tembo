@@ -8,7 +8,10 @@ on:
 jobs:
   push_to_registry:
     name: Build and push image
-    runs-on: ubuntu-20.04
+    runs-on:
+      - self-hosted
+      - dind
+      - large-8x8
     outputs:
       short_sha: ${{ steps.versions.outputs.SHORT_SHA }}
     steps:
@@ -19,7 +22,7 @@ jobs:
         with:
           repository: coredb-io/coredb
           path: ./coredb
-          ref: release/2023.2.15
+          ref: a0034703ad57d5179c0217beb39b88ca23417f43
       - uses: azure/setup-kubectl@v3
       - uses: azure/setup-helm@v3
       - name: Set version strings
