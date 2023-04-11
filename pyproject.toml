@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "coredb"
 version = "0.1.0"
-description = "Depdencies for CoreDb MkDocs"
+description = "Dependencies for CoreDb MkDocs"
 authors = ["Coredb Admin <admin@coredb.io>"]
 readme = "README.md"
 

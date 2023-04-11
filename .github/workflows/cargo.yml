@@ -35,8 +35,8 @@ jobs:
   cargo_publish:
     # On a pull request, this is validating that the version
     # is not already published to crates.io, and on a push to
-    # main or release branches, it is publishing if the verison
-    # does not exist, ignoring if the verison is already
+    # main or release branches, it is publishing if the version
+    # does not exist, ignoring if the version is already
     # published.
     name: Cargo publish or validate
     runs-on: ubuntu-20.04
