@@ -7,7 +7,7 @@ const inter = Inter({ subsets: ["latin"], weight: ["400"] });
 
 export default function Hero() {
   return (
-    <section className={styles.hero}>
+    <section>
       <h1 className={cx(inter.className, styles.title)}>Expand Your Postgres Capabilities</h1>
       <h2 className={cx(inter.className, styles.subtitle)}>The easiest way to publish and install PostgreSQL extensions. </h2>
       <p className={cx(inter.className, styles.body)}>
