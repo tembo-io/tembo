@@ -25,7 +25,7 @@ use k8s_openapi::{
     apimachinery::pkg::util::intstr::IntOrString,
 };
 use std::{collections::BTreeMap, sync::Arc};
-use tracing::{debug, info, warn};
+use tracing::{debug, error, info, warn};
 
 const PKGLIBDIR: &str = "/usr/lib/postgresql/15/lib";
 const SHAREDIR: &str = "/usr/share/postgresql/15";
@@ -330,6 +330,38 @@ async fn list_pvcs(ctx: Arc<Context>, sts_name: &str, sts_namespace: &str) -> Re
         .collect())
 }
 
+pub async fn handle_create_update(
+    cdb: &CoreDB,
+    pvcs_to_update: Vec<(String, Quantity)>,
+    sts_api: Api<StatefulSet>,
+    pvcs_to_create: Vec<String>,
+    ctx: Arc<Context>,
+    sts_namespace: &str,
+    sts_name: &str,
+) -> Result<(), Error> {
+    let client = ctx.client.clone();
+    if !pvcs_to_update.is_empty() {
+        delete_sts_no_cascade(&sts_api, sts_name).await?;
+        let pvc_api: Api<PersistentVolumeClaim> = Api::namespaced(ctx.client.clone(), sts_namespace);
+        for (pvc_full_name, qty) in pvcs_to_update {
+            update_pvc(&pvc_api, &pvc_full_name, qty).await?;
+        }
+    }
+
+    if !pvcs_to_create.is_empty() {
+        delete_sts_no_cascade(&sts_api, sts_name).await?;
+        let primary_pod = cdb.primary_pod(client.clone()).await?;
+        let pod_api: Api<Pod> = Api::namespaced(client.clone(), sts_namespace);
+        let prim_pod_name = primary_pod
+            .metadata
+            .name
+            .ok_or(Error::PodError("pod missing".to_owned()))?;
+        warn!("deleting pod to attach pvc: {}", prim_pod_name);
+        pod_api.delete(&prim_pod_name, &DeleteParams::default()).await?;
+    }
+    Ok(())
+}
+
 pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
     let client = ctx.client.clone();
 
@@ -381,23 +413,26 @@ pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
         }
     };
 
-
-    if !pvcs_to_update.is_empty() {
-        delete_sts_no_cascade(&sts_api, &sts_name).await?;
-        let pvc_api: Api<PersistentVolumeClaim> = Api::namespaced(ctx.client.clone(), &sts_namespace);
-        for (pvc_full_name, qty) in pvcs_to_update {
-            update_pvc(&pvc_api, &pvc_full_name, qty).await;
+    let create_update_result = handle_create_update(
+        cdb,
+        pvcs_to_update,
+        sts_api.clone(),
+        pvcs_to_create,
+        ctx,
+        &sts_namespace,
+        &sts_name,
+    )
+    .await;
+    // never panic when handling create/update
+    // this operation includes deleting a STS, and pods
+    // ensure we always make it to the PATCH operation below
+    match create_update_result {
+        Ok(_) => {
+            info!("successfully create_update sts/pvc resources");
         }
-    }
-
-    if !pvcs_to_create.is_empty() {
-        delete_sts_no_cascade(&sts_api, &sts_name).await?;
-        let primary_pod = cdb.primary_pod(client.clone()).await?;
-        let pod_api: Api<Pod> = Api::namespaced(client.clone(), &sts_namespace);
-
-        let prim_pod_name = primary_pod.metadata.name.unwrap();
-        warn!("deleting pod to attach pvc: {}", prim_pod_name);
-        pod_api.delete(&prim_pod_name, &DeleteParams::default()).await?;
+        Err(e) => {
+            error!("create_update_result: {:?}", e);
+        }
     }
 
     let ps = PatchParams::apply("cntrlr").force();
@@ -428,12 +463,16 @@ fn pvc_full_name(pvc_name: &str, sts_name: &str) -> String {
     format!("{pvc_name}-{sts_name}-0")
 }
 
-async fn update_pvc(pvc_api: &Api<PersistentVolumeClaim>, pvc_full_name: &str, value: Quantity) {
+async fn update_pvc(
+    pvc_api: &Api<PersistentVolumeClaim>,
+    pvc_full_name: &str,
+    value: Quantity,
+) -> Result<(), Error> {
     info!("Updating PVC {}, Value: {:?}", pvc_full_name, value);
     let mut pvc_requests: BTreeMap<String, Quantity> = BTreeMap::new();
     pvc_requests.insert("storage".to_string(), value);
 
-    let mut pvc = pvc_api.get(pvc_full_name).await.unwrap();
+    let mut pvc = pvc_api.get(pvc_full_name).await?;
 
     pvc.metadata.managed_fields = None;
 
@@ -457,6 +496,7 @@ async fn update_pvc(pvc_api: &Api<PersistentVolumeClaim>, pvc_full_name: &str, v
         .patch(pvc_full_name, &patch_params, &Patch::Apply(pvc))
         .await
         .map_err(Error::KubeError);
+    Ok(())
 }
 
 #[cfg(test)]
