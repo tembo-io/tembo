@@ -1,5 +1,6 @@
 # CoreDB Operator
 
+
 A Rust-based Kubernetes Controller for a [`CoreDB Resource`](https://github.com/CoreDB-io/coredb/blob/main/coredb-operator/charts/coredb-operator/templates/crd.yaml) using [kube-rs](https://github.com/kube-rs/kube-rs/).
 
 The `Controller` object reconciles `CoreDB` Instances when changes to it are detected, writes to its .status object, creates associated events, and uses finalizers for guaranteed delete handling.
@@ -64,7 +65,7 @@ just test
 
 To automatically set up a local cluster for functional testing, use this script.
 This will start a local kind cluster, annotate the `default` namespace for testing
-and install the CRD definition. 
+and install the CRD definition.
 
 ```bash
 just start-kind
