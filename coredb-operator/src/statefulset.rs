@@ -397,11 +397,10 @@ pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
         delete_sts_no_cascade(&sts_api, &sts_name).await?;
         let primary_pod = cdb.primary_pod(client.clone()).await?;
         let pod_api: Api<Pod> = Api::namespaced(client.clone(), &sts_namespace);
-        
+
         let prim_pod_name = primary_pod.metadata.name.unwrap();
-        let delete_pod_name = format!("{}-0", prim_pod_name);
-        info!("deleting pod: {}", delete_pod_name);
-        pod_api.delete(&delete_pod_name, &DeleteParams::default()).await?;
+        info!("deleting pod: {}", prim_pod_name);
+        pod_api.delete(&prim_pod_name, &DeleteParams::default()).await?;
     }
 
     let ps = PatchParams::apply("cntrlr").force();
