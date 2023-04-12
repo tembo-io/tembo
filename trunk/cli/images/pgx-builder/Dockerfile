@@ -1,5 +1,5 @@
 ARG UBUNTU_VERSION=22.04
-FROM ubuntu:${UBUNTU_VERSION}
+FROM quay.io/coredb/ubuntu:${UBUNTU_VERSION}
 
 ARG DEBIAN_FRONTEND=noninteractive
 ENV TZ=Etc/UTC
