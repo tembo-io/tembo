@@ -134,13 +134,15 @@ pub async fn publish(
             let mut tx = conn.begin().await?;
             let id_row = sqlx::query!(
                 "
-            INSERT INTO extensions(name, created_at, description, homepage)
-            VALUES ($1, (now() at time zone 'utc'), $2, $3)
+            INSERT INTO extensions(name, created_at, description, homepage, documentation, repository)
+            VALUES ($1, (now() at time zone 'utc'), $2, $3, $4, $5)
             RETURNING id
             ",
                 new_extension.name,
                 new_extension.description,
-                new_extension.homepage
+                new_extension.homepage,
+                new_extension.documentation,
+                new_extension.repository
             )
             .fetch_one(&mut tx)
             .await?;
