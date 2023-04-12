@@ -133,45 +133,47 @@ impl CoreDB {
                 if !is_pod_ready().matches_object(Some(&primary_pod)) {
                     debug!("Did not find primary pod");
                     return Ok(Action::requeue(Duration::from_secs(1)));
+                } else {
+                    // coredb is ready
+                    let patch_status = json!({
+                        "status": {"running": true}
+                    });
+                    patch_cdb_status_strategic(&coredbs, &name, patch_status).await?;
                 }
 
-                let extensions: Vec<Extension> =
-                    reconcile_extensions(self, ctx.clone()).await.map_err(|e| {
+                let extensions: Vec<Extension> = reconcile_extensions(self, ctx.clone(), &coredbs, &name)
+                    .await
+                    .map_err(|e| {
                         error!("Error reconciling extensions: {:?}", e);
                         Action::requeue(Duration::from_secs(10))
                     })?;
 
                 CoreDBStatus {
                     running: true,
+                    extensionsUpdating: false,
                     storage: self.spec.storage.clone(),
                     sharedirStorage: self.spec.sharedirStorage.clone(),
                     pkglibdirStorage: self.spec.pkglibdirStorage.clone(),
-                    extensions: Some(extensions),
+                    extensions: extensions,
                 }
             }
             true => CoreDBStatus {
                 running: false,
+                extensionsUpdating: false,
                 storage: self.spec.storage.clone(),
                 sharedirStorage: self.spec.sharedirStorage.clone(),
                 pkglibdirStorage: self.spec.pkglibdirStorage.clone(),
-                extensions: Some(self.status.as_ref().unwrap().extensions.clone().unwrap()),
+                extensions: self.status.as_ref().unwrap().extensions.clone(),
             },
         };
 
-        let patch_status = Patch::Apply(json!({
+        let patch_status = json!({
             "apiVersion": "coredb.io/v1alpha1",
             "kind": "CoreDB",
             "status": new_status
-        }));
+        });
 
-        let ps = PatchParams::apply("cntrlr").force();
-        let _o = coredbs
-            .patch_status(&name, &ps, &patch_status)
-            .await
-            .map_err(|e| {
-                error!("Error updating CoreDB status: {:?}", e);
-                Action::requeue(Duration::from_secs(10))
-            })?;
+        patch_cdb_status_force(&coredbs, &name, patch_status).await?;
 
         // If no events were received, check back every minute
         Ok(Action::requeue(Duration::from_secs(60)))
@@ -296,6 +298,36 @@ pub fn is_postgres_ready() -> impl Condition<Pod> + 'static {
         }
         false
     }
+}
+
+pub async fn patch_cdb_status_force(
+    cdb: &Api<CoreDB>,
+    name: &str,
+    patch: serde_json::Value,
+) -> Result<(), Action> {
+    let ps = PatchParams::apply("cntrlr").force();
+    let patch_status = Patch::Apply(patch);
+    debug!("Force Patching CoreDB status: {:?}", patch_status);
+    let _o = cdb.patch_status(&name, &ps, &patch_status).await.map_err(|e| {
+        error!("Error updating CoreDB status: {:?}", e);
+        Action::requeue(Duration::from_secs(10))
+    })?;
+    Ok(())
+}
+
+pub async fn patch_cdb_status_strategic(
+    cdb: &Api<CoreDB>,
+    name: &str,
+    patch: serde_json::Value,
+) -> Result<(), Action> {
+    let pp = PatchParams::default();
+    let patch_status = Patch::Merge(patch);
+    debug!("Merge Patching CoreDB status: {:?}", patch_status);
+    let _o = cdb.patch_status(&name, &pp, &patch_status).await.map_err(|e| {
+        error!("Error updating CoreDB status: {:?}", e);
+        Action::requeue(Duration::from_secs(10))
+    })?;
+    Ok(())
 }
 
 /// Diagnostics to be exposed by the web server
