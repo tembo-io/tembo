@@ -37,7 +37,7 @@ runs:
       cd ${{ inputs.clone_into }}
       git config --global user.name "coredb-service-user"
       git config --global user.email "admin+github@coredb.io"
-      git checkout ${{ inputs.branch }} || git checkout -b ${{ inputs.branch }}
+      git fetch origin ${{ inputs.branch }} && git checkout ${{ inputs.branch }} || git checkout -b ${{ inputs.branch }}
   - name: Update trunk registry
     uses: mikefarah/yq@v4.33.3
     with:
