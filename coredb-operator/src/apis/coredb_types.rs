@@ -49,8 +49,7 @@ pub struct CoreDBStatus {
     pub running: bool,
     #[serde(default = "defaults::default_extensions_updating")]
     pub extensionsUpdating: bool,
-    #[serde(default = "defaults::default_extensions")]
-    pub extensions: Vec<Extension>,
+    pub extensions: Option<Vec<Extension>>,
     #[serde(default = "defaults::default_storage")]
     pub storage: Quantity,
     #[serde(default = "defaults::default_sharedir_storage")]
