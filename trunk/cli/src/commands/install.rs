@@ -19,7 +19,7 @@ pub struct InstallCommand {
     file: Option<PathBuf>,
     #[arg(long = "version", short = 'v')]
     version: String,
-    #[arg(long = "registry", short = 'r', default_value = "https://pgtrunk.io")]
+    #[arg(long = "registry", short = 'r', default_value = "https://registry.pgtrunk.io")]
     registry: String,
 }
 

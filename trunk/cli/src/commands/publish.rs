@@ -20,6 +20,8 @@ pub struct PublishCommand {
     description: Option<String>,
     #[arg(long = "documentation", short = 'D')]
     documentation: Option<String>,
+    #[arg(long = "homepage", short = 'H')]
+    homepage: Option<String>,
     #[arg(long = "license", short = 'l')]
     license: Option<String>,
     #[arg(long = "registry", short = 'r', default_value = "https://pgtrunk.io")]
@@ -68,6 +70,7 @@ impl SubCommand for PublishCommand {
             "vers": self.version,
             "description": self.description,
             "documentation": self.documentation,
+            "homepage": self.homepage,
             "license": self.license,
             "repository": self.repository
         });
