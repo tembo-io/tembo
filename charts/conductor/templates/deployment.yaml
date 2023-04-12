@@ -40,12 +40,6 @@ spec:
               secretKeyRef:
                 name: data-plane
                 key: _data-plane_postgres_connection_string
-          - name: CONTROL_PLANE_EVENTS_QUEUE
-            value: {{ .Values.controlPlaneEventsQueue }}
-          - name: DATA_PLANE_EVENTS_QUEUE
-            value: {{ .Values.dataPlaneEventsQueue }}
-          - name: DATA_PLANE_BASEDOMAIN
-            value: {{ .Values.dataPlaneBasedomain }}
           - name: RUST_LOG
             value: {{ .Values.logLevel }}
           {{- if .Values.env }}{{ .Values.env | default list | toYaml | nindent 10 }}{{- end }}
