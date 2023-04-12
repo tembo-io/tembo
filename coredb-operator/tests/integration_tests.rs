@@ -328,8 +328,8 @@ mod test {
         let spec = coredbs.get(name).await.unwrap();
         let status = spec.status.unwrap();
         let extensions = status.extensions;
-        assert!(extensions.len() > 0);
-        assert!(extensions[0].description.len() > 0);
+        assert!(extensions.clone().expect("expected extensions").len() > 0);
+        assert!(extensions.expect("expected extensions")[0].description.len() > 0);
 
         // Change size of a PVC
         let coredb_json = serde_json::json!({
