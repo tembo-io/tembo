@@ -24,7 +24,11 @@ pub struct PublishCommand {
     homepage: Option<String>,
     #[arg(long = "license", short = 'l')]
     license: Option<String>,
-    #[arg(long = "registry", short = 'r', default_value = "https://pgtrunk.io")]
+    #[arg(
+        long = "registry",
+        short = 'r',
+        default_value = "https://registry.pgtrunk.io"
+    )]
     registry: String,
     #[arg(long = "repository", short = 'R')]
     repository: Option<String>,

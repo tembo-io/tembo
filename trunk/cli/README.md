@@ -40,7 +40,7 @@ This purpose-built registry would provide a centralized location for developers 
 
 ### The Website
 
-We will launch a website ([code being built here](https://github.com/coreDB-io/pgtrunk.io)) to help developers both discover and learn about extensions. This website is key to our success, as it will drive attention, traffic, etc, and lead users to the CLI tool.
+We will launch a [website](https://pgtrunk.io) to help developers both discover and learn about extensions. This website is key to our success, as it will drive attention, traffic, etc, and lead users to the CLI tool.
 
 Features will include:
 
