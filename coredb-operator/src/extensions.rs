@@ -1,4 +1,4 @@
-use crate::{apis::coredb_types::CoreDB, controller::patch_cdb_status_strategic, defaults, Context, Error};
+use crate::{apis::coredb_types::CoreDB, controller::patch_cdb_status_merge, defaults, Context, Error};
 use kube::api::Api;
 use lazy_static::lazy_static;
 use regex::Regex;
@@ -379,19 +379,20 @@ fn extension_plan(have_changed: &[Extension], actual: &[Extension]) -> (Vec<Exte
         for extension_actual in actual {
             if extension_desired.name == extension_actual.name {
                 found = true;
-                // determine if any enabled toggle has changed
-                for loc_desired in extension_desired.locations.clone() {
+                // extension exists, therefore has been installed
+                // determine if the `enabled` toggle has changed
+                'loc: for loc_desired in extension_desired.locations.clone() {
                     for loc_actual in extension_actual.locations.clone() {
                         if loc_desired.database == loc_actual.database {
                             // TODO: when we want to support version changes, this is where we would do it
                             if loc_desired.enabled != loc_actual.enabled {
-                                warn!("desired: {:?}, actual: {:?}", extension_desired, extension_actual);
+                                debug!("desired: {:?}, actual: {:?}", extension_desired, extension_actual);
                                 changed.push(extension_desired.clone());
+                                break 'loc;
                             }
                         }
                     }
                 }
-                break;
             }
         }
         // if it doesn't exist, it needs to be installed
@@ -431,25 +432,21 @@ pub async fn reconcile_extensions(
     let (changed_extensions, extensions_to_install) = extension_plan(&extensions_changed, &actual_extensions);
 
     if !changed_extensions.is_empty() || !extensions_to_install.is_empty() {
-        // "apiVersion": "coredb.io/v1alpha1",
-        // "kind": "CoreDB",
         let status = serde_json::json!({
             "status": {"extensionsUpdating": true}
         });
-        // todo: what is desired behavior when we are unable to change the status here?
-        let _ = patch_cdb_status_strategic(&cdb_api, name, status).await;
+        // TODO:
+        let _ = patch_cdb_status_merge(cdb_api, name, status).await;
         if !changed_extensions.is_empty() {
             toggle_extensions(coredb, &changed_extensions, ctx.clone()).await?;
         }
         if !extensions_to_install.is_empty() {
             install_extension(coredb, &extensions_to_install, ctx.clone()).await?;
         }
-        // "apiVersion": "coredb.io/v1alpha1",
-        // "kind": "CoreDB",
         let status = serde_json::json!({
             "status": {"extensionsUpdating": false}
         });
-        let _ = patch_cdb_status_strategic(&cdb_api, name, status).await;
+        let _ = patch_cdb_status_merge(cdb_api, name, status).await;
     }
     // return final state of extensions
     get_all_extensions(coredb, ctx.clone()).await

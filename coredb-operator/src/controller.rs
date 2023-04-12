@@ -138,7 +138,7 @@ impl CoreDB {
                     let patch_status = json!({
                         "status": {"running": true}
                     });
-                    patch_cdb_status_strategic(&coredbs, &name, patch_status).await?;
+                    patch_cdb_status_merge(&coredbs, &name, patch_status).await?;
                 }
 
                 let extensions: Vec<Extension> = reconcile_extensions(self, ctx.clone(), &coredbs, &name)
@@ -154,7 +154,7 @@ impl CoreDB {
                     storage: self.spec.storage.clone(),
                     sharedirStorage: self.spec.sharedirStorage.clone(),
                     pkglibdirStorage: self.spec.pkglibdirStorage.clone(),
-                    extensions: extensions,
+                    extensions,
                 }
             }
             true => CoreDBStatus {
@@ -307,23 +307,23 @@ pub async fn patch_cdb_status_force(
 ) -> Result<(), Action> {
     let ps = PatchParams::apply("cntrlr").force();
     let patch_status = Patch::Apply(patch);
-    debug!("Force Patching CoreDB status: {:?}", patch_status);
-    let _o = cdb.patch_status(&name, &ps, &patch_status).await.map_err(|e| {
+    debug!("force-patching CoreDB status: {:?}", patch_status);
+    let _o = cdb.patch_status(name, &ps, &patch_status).await.map_err(|e| {
         error!("Error updating CoreDB status: {:?}", e);
         Action::requeue(Duration::from_secs(10))
     })?;
     Ok(())
 }
 
-pub async fn patch_cdb_status_strategic(
+pub async fn patch_cdb_status_merge(
     cdb: &Api<CoreDB>,
     name: &str,
     patch: serde_json::Value,
 ) -> Result<(), Action> {
     let pp = PatchParams::default();
     let patch_status = Patch::Merge(patch);
-    debug!("Merge Patching CoreDB status: {:?}", patch_status);
-    let _o = cdb.patch_status(&name, &pp, &patch_status).await.map_err(|e| {
+    debug!("json-merge-patching CoreDB status: {:?}", patch_status);
+    let _o = cdb.patch_status(name, &pp, &patch_status).await.map_err(|e| {
         error!("Error updating CoreDB status: {:?}", e);
         Action::requeue(Duration::from_secs(10))
     })?;
