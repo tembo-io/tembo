@@ -133,12 +133,6 @@ impl CoreDB {
                 if !is_pod_ready().matches_object(Some(&primary_pod)) {
                     debug!("Did not find primary pod");
                     return Ok(Action::requeue(Duration::from_secs(1)));
-                } else {
-                    // coredb is ready
-                    let patch_status = json!({
-                        "status": {"running": true}
-                    });
-                    patch_cdb_status_merge(&coredbs, &name, patch_status).await?;
                 }
 
                 let extensions: Vec<Extension> = reconcile_extensions(self, ctx.clone(), &coredbs, &name)
@@ -154,7 +148,7 @@ impl CoreDB {
                     storage: self.spec.storage.clone(),
                     sharedirStorage: self.spec.sharedirStorage.clone(),
                     pkglibdirStorage: self.spec.pkglibdirStorage.clone(),
-                    extensions,
+                    extensions: Some(extensions),
                 }
             }
             true => CoreDBStatus {
@@ -163,7 +157,12 @@ impl CoreDB {
                 storage: self.spec.storage.clone(),
                 sharedirStorage: self.spec.sharedirStorage.clone(),
                 pkglibdirStorage: self.spec.pkglibdirStorage.clone(),
-                extensions: self.status.as_ref().unwrap().extensions.clone(),
+                extensions: self
+                    .status
+                    .as_ref()
+                    .expect("no extensions in `status`")
+                    .extensions
+                    .clone(),
             },
         };
 
