@@ -3,7 +3,7 @@ name: Trunk registry workflow
 defaults:
   run:
     shell: bash
-    working-directory: ./trunk/registry/
+    working-directory: ./trunk/trunk-registry/
 
 on:
   pull_request:
@@ -11,7 +11,7 @@ on:
       - main
     paths:
       - '.github/workflows/trunk-registry.yml'
-      - 'trunk/registry/**'
+      - 'trunk/trunk-registry/**'
 
   # Always run on main or release branches
   push:
@@ -65,30 +65,3 @@ jobs:
         run: cargo sqlx prepare --check
       - name: Clippy
         run: cargo clippy -- -Dwarnings
-
-
-  build-push:
-    name: Build and push image
-    runs-on: ubuntu-20.04
-    steps:
-      - name: Check out the repo
-        uses: actions/checkout@v3
-      - name: Set version strings
-        id: versions
-        run: |
-          echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
-      - name: Build image
-        run: |
-          set -xe
-          docker build -t pgtrunkio-backend .
-          docker tag pgtrunkio-backend pgtrunkio-backend:latest
-          docker tag pgtrunkio-backend pgtrunkio-backend:${{ steps.versions.outputs.SHORT_SHA }}
-      - name: Push To quay.io
-        if: ${{ github.ref == 'refs/heads/main' }}
-        uses: redhat-actions/push-to-registry@v2
-        with:
-          registry: quay.io/coredb
-          image: pgtrunkio-backend
-          tags: latest ${{ steps.versions.outputs.SHORT_SHA }}
-          username: ${{ secrets.QUAY_USER }}
-          password: ${{ secrets.QUAY_PASSWORD }}

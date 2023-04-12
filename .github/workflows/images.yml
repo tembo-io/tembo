@@ -13,9 +13,16 @@ jobs:
     runs-on: ubuntu-20.04
     outputs:
       build_images: ${{ steps.find_directories.outputs.build_matrix }}
+      short_sha: ${{ steps.versions.outputs.SHORT_SHA }}
+      branch_name: ${{ steps.versions.outputs.BRANCH_NAME }}
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
+      - name: Set version strings
+        id: versions
+        run: |
+          echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+          echo "BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_OUTPUT
       - name: Find directories with Dockerfiles that changed
         id: find_directories
         uses: ./.github/actions/find-changed-directories
@@ -28,10 +35,14 @@ jobs:
           # or main branches.
           changed_relative_to_branch: ${{ github.base_ref || 'not-a-branch' }}
           ignore_dirs: |-
-            trunk/registry, trunk/cli/src/commands/pgx_builder
+            trunk/cli/src/commands/pgx_builder
+
   build_and_push_images:
     name: Build and push images
-    runs-on: ubuntu-20.04
+    runs-on:
+      - self-hosted
+      - dind
+      - large-8x8
     needs:
       - find_directories
     strategy:
@@ -43,7 +54,7 @@ jobs:
       - name: Determine which tags to publish
         id: tags
         run: |
-          BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
+          BRANCH_NAME="${{ needs.find_directories.outputs.branch_name }}"
           if [ "${BRANCH_NAME}" == "main" ]; then
             echo "tag_latest=true" >> $GITHUB_OUTPUT
             echo "tag_cargo=true" >> $GITHUB_OUTPUT
@@ -68,3 +79,36 @@ jobs:
           publish_latest: ${{ steps.tags.outputs.tag_latest }}
           quay_user: ${{ secrets.QUAY_USER }}
           quay_password: ${{ secrets.QUAY_PASSWORD }}
+
+  argocd_update:
+    name: ArgoCD update automation
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-20.04
+    strategy:
+      # fail-fast means to cancel all jobs if one fails
+      fail-fast: false
+      matrix:
+        include:
+          - repository: coredb-io/app-deploy-dev
+            subdirectory: dev
+            branch: main
+          - repository: coredb-io/app-deploy
+            subdirectory: staging
+            branch: staging-updates
+          - repository: coredb-io/app-deploy
+            subdirectory: prod
+            branch: prod-updates
+    needs:
+      - find_directories
+      - build_and_push_images
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v3
+      - name: Check out the repo
+        uses: ./.github/actions/argocd-update
+        with:
+          repository: ${{ matrix.repository }}
+          ssh_key: ${{ secrets.SERVICE_USER_GITHUB_SSH_KEY }}
+          branch: ${{ matrix.branch }}
+          version: ${{ needs.find_directories.outputs.short_sha }}
+          subdirectory: ${{ matrix.subdirectory }}
