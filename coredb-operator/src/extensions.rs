@@ -388,7 +388,10 @@ fn extension_plan(have_changed: &[Extension], actual: &[Extension]) -> (Vec<Exte
             to_install.push(extension_desired.clone());
         }
     }
-
+    debug!(
+        "extension to create/drop: {:?}, extensions to install: {:?}",
+        to_install, changed
+    );
     (changed, to_install)
 }
 
@@ -409,7 +412,7 @@ pub async fn reconcile_extensions(coredb: &CoreDB, ctx: Arc<Context>) -> Result<
     }
 
     // otherwise, need to determine the plan to apply
-    let (changed_extensions, extensions_to_install) = extension_plan(&desired_extensions, &actual_extensions);
+    let (changed_extensions, extensions_to_install) = extension_plan(&extensions_changed, &actual_extensions);
     toggle_extensions(coredb, &changed_extensions, ctx.clone()).await?;
     install_extension(coredb, &extensions_to_install, ctx.clone()).await?;
 
@@ -422,6 +425,36 @@ pub async fn reconcile_extensions(coredb: &CoreDB, ctx: Arc<Context>) -> Result<
 mod tests {
     use super::*;
 
+    #[test]
+    fn test_extension_plan() {
+        let postgis_disabled = Extension {
+            name: "postgis".to_owned(),
+            description: "my description".to_owned(),
+            locations: vec![ExtensionInstallLocation {
+                enabled: false,
+                database: "postgres".to_owned(),
+                schema: "public".to_owned(),
+                version: Some("1.1.1".to_owned()),
+            }],
+        };
+
+        let pgmq_disabled = Extension {
+            name: "pgmq".to_owned(),
+            description: "my description".to_owned(),
+            locations: vec![ExtensionInstallLocation {
+                enabled: false,
+                database: "postgres".to_owned(),
+                schema: "public".to_owned(),
+                version: Some("1.1.1".to_owned()),
+            }],
+        };
+        let diff = vec![pgmq_disabled];
+        let actual = vec![postgis_disabled];
+        let (changed, to_install) = extension_plan(&diff, &actual);
+
+        assert!(changed.is_empty());
+        assert!(to_install.len() == 1);
+    }
     #[test]
     fn test_diff_and_plan() {
         let postgis_disabled = Extension {
