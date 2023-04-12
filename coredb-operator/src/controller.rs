@@ -307,7 +307,6 @@ pub async fn patch_cdb_status_force(
 ) -> Result<(), Action> {
     let ps = PatchParams::apply("cntrlr").force();
     let patch_status = Patch::Apply(patch);
-    debug!("force-patching CoreDB status: {:?}", patch_status);
     let _o = cdb.patch_status(name, &ps, &patch_status).await.map_err(|e| {
         error!("Error updating CoreDB status: {:?}", e);
         Action::requeue(Duration::from_secs(10))
@@ -322,7 +321,6 @@ pub async fn patch_cdb_status_merge(
 ) -> Result<(), Action> {
     let pp = PatchParams::default();
     let patch_status = Patch::Merge(patch);
-    debug!("json-merge-patching CoreDB status: {:?}", patch_status);
     let _o = cdb.patch_status(name, &pp, &patch_status).await.map_err(|e| {
         error!("Error updating CoreDB status: {:?}", e);
         Action::requeue(Duration::from_secs(10))

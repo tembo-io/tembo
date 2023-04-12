@@ -323,7 +323,6 @@ mod test {
             "results should not contain postgis: {}",
             result.stdout.clone().unwrap()
         );
-        assert!(!result.stdout.clone().unwrap().contains("postgis"));
 
         // assert extensions made it into the status
         let spec = coredbs.get(name).await.unwrap();
