@@ -321,7 +321,7 @@ mod test {
         // assert extensions made it into the status
         let spec = coredbs.get(name).await.unwrap();
         let status = spec.status.unwrap();
-        let extensions = status.extensions.unwrap();
+        let extensions = status.extensions;
         assert!(extensions.len() > 0);
         assert!(extensions[0].description.len() > 0);
 
