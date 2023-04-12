@@ -1,7 +1,7 @@
-FROM rust:bookworm as builder
+FROM quay.io/coredb/rust:1.68.2 as builder
 RUN cargo install --version 0.0.1-alpha.4 pg-trunk
 
-FROM ubuntu:22.04
+FROM quay.io/coredb/ubuntu:22.04
 
 COPY --from=builder /usr/local/cargo/bin/trunk /usr/bin/trunk
 
