@@ -1,6 +1,3 @@
-controlPlaneEventsQueue: ~
-dataPlaneEventsQueue: ~
-dataPlaneBasedomain: ~
 logLevel: info
 
 externalSecrets:
@@ -46,3 +43,4 @@ securityContext: {}
 nodeSelector: {}
 tolerations: []
 affinity: {}
+env: {}
