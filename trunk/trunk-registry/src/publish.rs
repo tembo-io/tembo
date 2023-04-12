@@ -88,9 +88,10 @@ pub async fn publish(
                     // Update updated_at timestamp
                     sqlx::query!(
                         "UPDATE versions
-                    SET updated_at = (now() at time zone 'utc')
-                    WHERE extension_id = $1
-                    AND num = $2",
+                    SET updated_at = (now() at time zone 'utc'), license = $1
+                    WHERE extension_id = $2
+                    AND num = $3",
+                        new_extension.license,
                         extension_id as i32,
                         new_extension.vers.to_string()
                     )
