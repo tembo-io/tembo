@@ -32,6 +32,8 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     // Infer the runtime environment and try to create a Kubernetes Client
     let client = Client::try_default().await?;
 
+    // amount of time to wait after requeueing a message
+    const REQUEUE_VT_SEC: i64 = 5;
     loop {
         // Read from queue (check for new message)
         // messages that dont fit a CRUDevent will error
@@ -50,15 +52,14 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             }
         };
 
-        // TODO: recycled messages should get archived, logged, alerted
-        // this auto-archive of bad messages should only get implemented after
-        // control-plane has a scheduled conductor process implemented
+        // TODO(chuckhend): recycled messages should get archived, logged, alerted
+        // note: messages are recycled on purpose, so alerting probably needs to be
+        // at some recycle count >= 20
         // if read_msg.read_ct >= 2 {
         //     warn!("recycled message: {:?}", read_msg);
         //     queue.archive(queue_name, &read_msg.msg_id).await?;
         //     continue;
         // }
-
         let namespace = format!(
             "org-{}-inst-{}",
             read_msg.message.organization_name, read_msg.message.dbname
@@ -98,21 +99,54 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                     .await
                     .expect("error getting secret");
 
-                // read spec.status from CoreDB
-                // this should wait until it is able to receive an actual update from the cluster
-                // retrying actions with kube
-                // limit to 60 seconds - 20 retries, 5 seconds between retries
-                // TODO: need a better way to handle this
-                let retry_strategy = FixedInterval::from_millis(5000).take(20);
-                let result = Retry::spawn(retry_strategy.clone(), || {
-                    get_coredb_status(client.clone(), &namespace)
-                })
-                .await;
-                if result.is_err() {
-                    error!("error getting CoreDB status: {:?}", result);
+                let result = get_coredb_status(client.clone(), &namespace).await;
+
+                // requeue if no status, no extensions, or if extensions are currently being updated
+                let num_desired_extensions = match read_msg.message.spec.extensions {
+                    Some(extensions) => extensions.len(),
+                    None => 0,
+                };
+                let requeue: bool = match &result {
+                    Ok(current_spec) => {
+                        // if the coredb is still updating the extensions, requeue this task and try again in a few seconds
+                        let status = current_spec.clone().status.expect("no status present");
+                        let updating_extension = status.extensions_updating;
+                        let no_extensions = match status.extensions {
+                            Some(extensions) => {
+                                // requeue if there are less extensions than desired
+                                // likely means that the extensions are still being updated
+                                extensions.len() < num_desired_extensions
+                            }
+                            None => true,
+                        };
+                        if updating_extension || no_extensions {
+                            warn!(
+                                "extensions updating: {}, no extensions: {}",
+                                updating_extension, no_extensions
+                            );
+                            true
+                        } else {
+                            false
+                        }
+                    }
+                    Err(err) => {
+                        error!("error getting CoreDB status: {:?}", err);
+                        true
+                    }
+                };
+
+                if requeue {
+                    // requeue then continue loop from beginning
+                    let vt: chrono::DateTime<chrono::Utc> =
+                        chrono::Utc::now() + chrono::Duration::seconds(REQUEUE_VT_SEC);
+                    let _ = queue
+                        .set_vt::<CRUDevent>(&control_plane_events_queue, &read_msg.msg_id, &vt)
+                        .await?;
                     continue;
                 }
+
                 let mut current_spec = result?;
+
                 let spec_js = serde_json::to_string(&current_spec.spec).unwrap();
                 debug!("dbname: {}, current_spec: {:?}", &namespace, spec_js);
 

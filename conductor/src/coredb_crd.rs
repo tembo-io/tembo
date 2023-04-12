@@ -78,6 +78,8 @@ pub struct CoreDBResources {
 pub struct CoreDBStatus {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub extensions: Option<Vec<CoreDBExtensions>>,
+    #[serde(rename = "extensionsUpdating")]
+    pub extensions_updating: bool,
     pub running: bool,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub storage: Option<String>,

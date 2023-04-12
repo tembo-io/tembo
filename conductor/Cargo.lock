@@ -157,6 +157,7 @@ name = "conductor"
 version = "0.1.0"
 dependencies = [
  "base64 0.21.0",
+ "chrono",
  "env_logger",
  "futures",
  "k8s-openapi",
@@ -1290,9 +1291,9 @@ checksum = "478c572c3d73181ff3c2539045f6eb99e5491218eae919370993b890cdbdd98e"
 
 [[package]]
 name = "pgmq"
-version = "0.8.1"
+version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd6975ba33a7c9af421ea36f98b0fbc480327f6709f786c76d566e62f86ec110"
+checksum = "9e5588b0cc388f3e42d2e1ff83bc1d43b423b4932ca33882d0374f16713b8c14"
 dependencies = [
  "chrono",
  "log",

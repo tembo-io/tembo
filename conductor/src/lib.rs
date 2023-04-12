@@ -14,7 +14,7 @@ use k8s_openapi::api::networking::v1::Ingress;
 use kube::api::{DeleteParams, ListParams, Patch, PatchParams};
 use kube::runtime::wait::{await_condition, Condition};
 use kube::{Api, Client};
-use log::{debug, info};
+use log::info;
 use serde_json::{from_str, to_string, Value};
 
 pub type Result<T, E = ConductorError> = std::result::Result<T, E>;
@@ -131,7 +131,6 @@ pub async fn get_all(client: Client, namespace: &str) -> Vec<CoreDB> {
 pub async fn get_one(client: Client, namespace: &str) -> Result<CoreDB, ConductorError> {
     let coredb_api: Api<CoreDB> = Api::namespaced(client, namespace);
     let pg_instance = coredb_api.get(namespace).await?;
-    debug!("Namespace: {}, CoreDB: {:?}", namespace, pg_instance);
     Ok(pg_instance)
 }
 

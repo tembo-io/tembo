@@ -1,3 +1,5 @@
+RUST_LOG:=debug
+
 fmt:
 	cargo +nightly fmt
 	cargo clippy
@@ -5,7 +7,7 @@ fmt:
 run.local:
 	PG_CONN_URL=postgresql://postgres:postgres@0.0.0.0:5432/postgres \
 	RUST_BACKTRACE=1 \
-	RUST_LOG=debug \
+	RUST_LOG=${RUST_LOG} \
 	CONTROL_PLANE_EVENTS_QUEUE=saas_queue \
 	DATA_PLANE_EVENTS_QUEUE=data_plane_events \
 	DATA_PLANE_BASEDOMAIN=coredb-development.com \
@@ -22,7 +24,7 @@ run.test:
 	echo "Running conductor with test configuration"
 	PG_CONN_URL=postgresql://postgres:postgres@0.0.0.0:5432/postgres \
 	RUST_BACKTRACE=1 \
-	RUST_LOG=debug \
+	RUST_LOG=${RUST_LOG} \
 	CONTROL_PLANE_EVENTS_QUEUE=myqueue_control_plane \
 	DATA_PLANE_EVENTS_QUEUE=myqueue_data_plane \
 	DATA_PLANE_BASEDOMAIN=coredb-development.com \
