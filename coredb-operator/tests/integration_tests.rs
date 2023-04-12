@@ -235,7 +235,7 @@ mod test {
         assert!(result.stdout.clone().unwrap().contains("customers"));
 
         // TODO(ianstanton) we need to properly wait for 'postgis' extension to be created
-        thread::sleep(Duration::from_millis(5000));
+        thread::sleep(Duration::from_millis(10000));
 
         // Assert extension 'postgis' was created
         let result = coredb_resource
@@ -260,8 +260,11 @@ mod test {
             .await
             .unwrap();
 
-        println!("{}", result.stdout.clone().unwrap());
-        assert!(result.stdout.clone().unwrap().contains("postgres_exporter"));
+        assert!(
+            result.stdout.clone().unwrap().contains("postgres_exporter"),
+            "results must contain postgres_exporter: {}",
+            result.stdout.clone().unwrap()
+        );
 
         // Assert we can curl the metrics from the service
         let metrics_service_name = format!("{}-metrics", name);
@@ -314,14 +317,17 @@ mod test {
             .await
             .unwrap();
 
-        println!("{}", result.stdout.clone().unwrap());
         // assert does not contain postgis
-        assert!(!result.stdout.clone().unwrap().contains("postgis"));
+        assert!(
+            !result.stdout.clone().unwrap().contains("postgis"),
+            "results should not contain postgis: {}",
+            result.stdout.clone().unwrap()
+        );
 
         // assert extensions made it into the status
         let spec = coredbs.get(name).await.unwrap();
         let status = spec.status.unwrap();
-        let extensions = status.extensions.unwrap();
+        let extensions = status.extensions;
         assert!(extensions.len() > 0);
         assert!(extensions[0].description.len() > 0);
 

@@ -277,6 +277,7 @@ spec:
             nullable: true
             properties:
               extensions:
+                default: []
                 items:
                   properties:
                     description:
@@ -306,8 +307,10 @@ spec:
                   - locations
                   - name
                   type: object
-                nullable: true
                 type: array
+              extensionsUpdating:
+                default: false
+                type: boolean
               pkglibdirStorage:
                 default: 1Gi
                 description: |-
