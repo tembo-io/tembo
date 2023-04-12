@@ -117,8 +117,12 @@ pub async fn publish(
             // Set updated_at time on extension
             sqlx::query!(
                 "UPDATE extensions
-            SET updated_at = (now() at time zone 'utc')
-            WHERE name = $1",
+            SET updated_at = (now() at time zone 'utc'), description = $1, documentation = $2, homepage = $3, repository = $4
+            WHERE name = $5",
+                new_extension.description,
+                new_extension.documentation,
+                new_extension.homepage,
+                new_extension.repository,
                 new_extension.name,
             )
             .execute(&mut tx)
