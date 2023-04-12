@@ -1,5 +1,8 @@
-FROM quay.io/coredb/rust:1.68.2 as builder
-RUN cargo install --version 0.0.1-alpha.4 pg-trunk
+FROM quay.io/coredb/ubuntu:22.04 as builder
+
+RUN apt-get update && apt-get install -y curl
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
+RUN /root/.cargo/bin/cargo install --version 0.0.1-alpha.4 pg-trunk
 
 FROM quay.io/coredb/ubuntu:22.04
 
