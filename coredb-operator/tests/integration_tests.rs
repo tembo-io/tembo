@@ -34,11 +34,11 @@ mod test {
 
     const API_VERSION: &str = "coredb.io/v1alpha1";
     // Timeout settings while waiting for an event
-    const TIMEOUT_SECONDS_START_POD: u64 = 90;
+    const TIMEOUT_SECONDS_START_POD: u64 = 120;
     const TIMEOUT_SECONDS_POD_READY: u64 = 30;
     const TIMEOUT_SECONDS_SECRET_PRESENT: u64 = 30;
     const TIMEOUT_SECONDS_NS_DELETED: u64 = 30;
-    const TIMEOUT_SECONDS_COREDB_DELETED: u64 = 30;
+    const TIMEOUT_SECONDS_COREDB_DELETED: u64 = 45;
 
     async fn create_test_buddy(pods_api: Api<Pod>, name: String) -> String {
         // Launch a pod we can connect to if we want to

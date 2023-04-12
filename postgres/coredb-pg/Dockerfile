@@ -1,9 +1,12 @@
-FROM rust:bookworm as builder
-RUN cargo install --version 0.0.1-alpha.4 pg-trunk
+FROM quay.io/coredb/ubuntu:22.04 as builder
 
-FROM ubuntu:22.04
+RUN apt-get update && apt-get install -y curl pkg-config libssl-dev build-essential libclang-dev clang software-properties-common
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
+RUN /root/.cargo/bin/cargo install --version 0.0.1-alpha.4 pg-trunk
 
-COPY --from=builder /usr/local/cargo/bin/trunk /usr/bin/trunk
+FROM quay.io/coredb/ubuntu:22.04
+
+COPY --from=builder /root/.cargo/bin/trunk /usr/bin/trunk
 
 ARG DEBIAN_FRONTEND=noninteractive
 ENV TZ=Etc/UTC
@@ -55,14 +58,6 @@ RUN apt-get update && apt-get install -y \
 
 COPY ./postgresql.conf /usr/share/postgresql/${PG_MAJOR}/postgresql.conf.sample
 
-# This will be 'trunk install' once that is done.
-# When 'trunk publish' and 'trunk install' from repository are done,
-# then we also do not need the COPY above or pre-build hooks,
-# we can just download and install in one RUN command.
-COPY extensions/ /extensions
-COPY install-extensions.sh .
-RUN /bin/bash install-extensions.sh
-
 # install pg_partman
 RUN git clone https://github.com/pgpartman/pg_partman.git && \
         cd pg_partman && \
@@ -75,6 +70,8 @@ RUN git clone --branch v0.4.1 https://github.com/pgvector/pgvector.git && \
         make && \
         make install && \
         cd ../ && rm -rf pgvector
+
+RUN trunk install --version 0.2.1 pgmq
 
 # cache extensions and shared libraries
 RUN mkdir /tmp/pg_sharedir && \

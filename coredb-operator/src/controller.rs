@@ -135,14 +135,12 @@ impl CoreDB {
                     return Ok(Action::requeue(Duration::from_secs(1)));
                 }
 
-                let mut extensions: Vec<Extension> =
+                let extensions: Vec<Extension> =
                     reconcile_extensions(self, ctx.clone()).await.map_err(|e| {
                         error!("Error reconciling extensions: {:?}", e);
                         Action::requeue(Duration::from_secs(10))
                     })?;
 
-                // must be sorted same, else reconcile will trigger again
-                extensions.sort_by_key(|e| e.name.clone());
                 CoreDBStatus {
                     running: true,
                     storage: self.spec.storage.clone(),

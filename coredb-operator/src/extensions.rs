@@ -144,6 +144,7 @@ pub async fn install_extension(
         .unwrap();
 
     let mut errors: Vec<Error> = Vec::new();
+    let num_to_install = extensions.len();
     for ext in extensions.iter() {
         let version = ext.locations[0].version.clone().unwrap();
         let cmd = vec![
@@ -165,11 +166,10 @@ pub async fn install_extension(
             }
         }
     }
-    let num_success = extensions.len() - errors.len();
+    let num_success = num_to_install - errors.len();
     info!(
         "Successfully installed {} / {} extensions",
-        num_success,
-        extensions.len()
+        num_success, num_to_install
     );
     Ok(())
 }
@@ -311,7 +311,7 @@ fn parse_extensions(psql_str: &str) -> Vec<ExtRow> {
         extensions.push(package);
     }
     let num_extensions = extensions.len();
-    info!("Found {} extensions", num_extensions);
+    debug!("Found {} extensions", num_extensions);
     extensions
 }
 
@@ -320,7 +320,6 @@ pub async fn get_all_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<E
     let databases = list_databases(cdb, ctx.clone()).await?;
     debug!("databases: {:?}", databases);
 
-    // (ext name, description) => [ExtensionInstallLocation]
     let mut ext_hashmap: HashMap<(String, String), Vec<ExtensionInstallLocation>> = HashMap::new();
     // query every database for extensions
     // transform results by extension name, rather than by database
@@ -348,6 +347,8 @@ pub async fn get_all_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<E
             locations: ext_locations.clone(),
         });
     }
+    // put them in order
+    ext_spec.sort_by_key(|e| e.name.clone());
     Ok(ext_spec)
 }
 
@@ -377,7 +378,11 @@ fn extension_plan(have_changed: &[Extension], actual: &[Extension]) -> (Vec<Exte
         for extension_actual in actual {
             if extension_desired.name == extension_actual.name {
                 found = true;
-                changed.push(extension_desired.clone());
+                if extension_desired != extension_actual {
+                    // if the extension exists, but the version is different, it needs to be dropped
+                    // and reinstalled
+                    changed.push(extension_desired.clone());
+                }
                 break;
             }
         }
@@ -386,7 +391,10 @@ fn extension_plan(have_changed: &[Extension], actual: &[Extension]) -> (Vec<Exte
             to_install.push(extension_desired.clone());
         }
     }
-
+    debug!(
+        "extension to create/drop: {:?}, extensions to install: {:?}",
+        changed, to_install
+    );
     (changed, to_install)
 }
 
@@ -395,7 +403,8 @@ pub async fn reconcile_extensions(coredb: &CoreDB, ctx: Arc<Context>) -> Result<
     // always get the current state of extensions in the database
     // this is due to out of band changes - manual create/drop extension
     let actual_extensions = get_all_extensions(coredb, ctx.clone()).await?;
-    let desired_extensions = coredb.spec.extensions.clone();
+    let mut desired_extensions = coredb.spec.extensions.clone();
+    desired_extensions.sort_by_key(|e| e.name.clone());
 
     // most of the time there will be no changes
     let extensions_changed = diff_extensions(&desired_extensions, &actual_extensions);
@@ -406,10 +415,13 @@ pub async fn reconcile_extensions(coredb: &CoreDB, ctx: Arc<Context>) -> Result<
     }
 
     // otherwise, need to determine the plan to apply
-    let (changed_extensions, extensions_to_install) = extension_plan(&desired_extensions, &actual_extensions);
-
-    toggle_extensions(coredb, &changed_extensions, ctx.clone()).await?;
-    install_extension(coredb, &extensions_to_install, ctx.clone()).await?;
+    let (changed_extensions, extensions_to_install) = extension_plan(&extensions_changed, &actual_extensions);
+    if !changed_extensions.is_empty() {
+        toggle_extensions(coredb, &changed_extensions, ctx.clone()).await?;
+    }
+    if !extensions_to_install.is_empty() {
+        install_extension(coredb, &extensions_to_install, ctx.clone()).await?;
+    }
 
     // return final state of extensions
     get_all_extensions(coredb, ctx.clone()).await
@@ -420,6 +432,41 @@ pub async fn reconcile_extensions(coredb: &CoreDB, ctx: Arc<Context>) -> Result<
 mod tests {
     use super::*;
 
+    #[test]
+    fn test_extension_plan() {
+        let postgis_disabled = Extension {
+            name: "postgis".to_owned(),
+            description: "my description".to_owned(),
+            locations: vec![ExtensionInstallLocation {
+                enabled: false,
+                database: "postgres".to_owned(),
+                schema: "public".to_owned(),
+                version: Some("1.1.1".to_owned()),
+            }],
+        };
+
+        let pgmq_disabled = Extension {
+            name: "pgmq".to_owned(),
+            description: "my description".to_owned(),
+            locations: vec![ExtensionInstallLocation {
+                enabled: false,
+                database: "postgres".to_owned(),
+                schema: "public".to_owned(),
+                version: Some("1.1.1".to_owned()),
+            }],
+        };
+        let diff = vec![pgmq_disabled.clone()];
+        let actual = vec![postgis_disabled];
+        let (changed, to_install) = extension_plan(&diff, &actual);
+        assert!(changed.is_empty());
+        assert!(to_install.len() == 1);
+
+        let diff = vec![pgmq_disabled.clone()];
+        let actual = vec![pgmq_disabled];
+        let (changed, to_install) = extension_plan(&diff, &actual);
+        assert!(changed.is_empty());
+        assert!(to_install.is_empty());
+    }
     #[test]
     fn test_diff_and_plan() {
         let postgis_disabled = Extension {
@@ -534,6 +581,14 @@ mod tests {
                 version: Some("1.1.1".to_owned()),
             }],
         };
+
+        // case where there are extensions in db but not on spec
+        // happens on startup, for example
+        let desired = vec![];
+        let actual = vec![postgis_disabled.clone(), pgmq_enabled.clone()];
+        // diff should be that we need to enable pgmq
+        let diff = diff_extensions(&desired, &actual);
+        assert!(diff.is_empty());
 
         let desired = vec![postgis_disabled.clone(), pgmq_enabled.clone()];
         let actual = vec![postgis_disabled.clone(), pgmq_disabled.clone()];
