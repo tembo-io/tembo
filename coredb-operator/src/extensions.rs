@@ -150,6 +150,7 @@ pub async fn install_extension(
         let cmd = vec![
             "trunk".to_owned(),
             "install".to_owned(),
+            "-r https://registry.pgtrunk.io",
             ext.name.clone(),
             "--version".to_owned(),
             version,
