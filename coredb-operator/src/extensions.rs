@@ -1,4 +1,5 @@
-use crate::{apis::coredb_types::CoreDB, defaults, Context, Error};
+use crate::{apis::coredb_types::CoreDB, controller::patch_cdb_status_merge, defaults, Context, Error};
+use kube::api::Api;
 use lazy_static::lazy_static;
 use regex::Regex;
 use schemars::JsonSchema;
@@ -379,12 +380,20 @@ fn extension_plan(have_changed: &[Extension], actual: &[Extension]) -> (Vec<Exte
         for extension_actual in actual {
             if extension_desired.name == extension_actual.name {
                 found = true;
-                if extension_desired != extension_actual {
-                    // if the extension exists, but the version is different, it needs to be dropped
-                    // and reinstalled
-                    changed.push(extension_desired.clone());
+                // extension exists, therefore has been installed
+                // determine if the `enabled` toggle has changed
+                'loc: for loc_desired in extension_desired.locations.clone() {
+                    for loc_actual in extension_actual.locations.clone() {
+                        if loc_desired.database == loc_actual.database {
+                            // TODO: when we want to support version changes, this is where we would do it
+                            if loc_desired.enabled != loc_actual.enabled {
+                                debug!("desired: {:?}, actual: {:?}", extension_desired, extension_actual);
+                                changed.push(extension_desired.clone());
+                                break 'loc;
+                            }
+                        }
+                    }
                 }
-                break;
             }
         }
         // if it doesn't exist, it needs to be installed
@@ -400,7 +409,12 @@ fn extension_plan(have_changed: &[Extension], actual: &[Extension]) -> (Vec<Exte
 }
 
 /// reconcile extensions between the spec and the database
-pub async fn reconcile_extensions(coredb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<Extension>, Error> {
+pub async fn reconcile_extensions(
+    coredb: &CoreDB,
+    ctx: Arc<Context>,
+    cdb_api: &Api<CoreDB>,
+    name: &str,
+) -> Result<Vec<Extension>, Error> {
     // always get the current state of extensions in the database
     // this is due to out of band changes - manual create/drop extension
     let actual_extensions = get_all_extensions(coredb, ctx.clone()).await?;
@@ -417,13 +431,24 @@ pub async fn reconcile_extensions(coredb: &CoreDB, ctx: Arc<Context>) -> Result<
 
     // otherwise, need to determine the plan to apply
     let (changed_extensions, extensions_to_install) = extension_plan(&extensions_changed, &actual_extensions);
-    if !changed_extensions.is_empty() {
-        toggle_extensions(coredb, &changed_extensions, ctx.clone()).await?;
-    }
-    if !extensions_to_install.is_empty() {
-        install_extension(coredb, &extensions_to_install, ctx.clone()).await?;
-    }
 
+    if !changed_extensions.is_empty() || !extensions_to_install.is_empty() {
+        let status = serde_json::json!({
+            "status": {"extensionsUpdating": true}
+        });
+        // TODO: we should have better handling/behavior for when we fail to patch the status
+        let _ = patch_cdb_status_merge(cdb_api, name, status).await;
+        if !changed_extensions.is_empty() {
+            toggle_extensions(coredb, &changed_extensions, ctx.clone()).await?;
+        }
+        if !extensions_to_install.is_empty() {
+            install_extension(coredb, &extensions_to_install, ctx.clone()).await?;
+        }
+        let status = serde_json::json!({
+            "status": {"extensionsUpdating": false}
+        });
+        let _ = patch_cdb_status_merge(cdb_api, name, status).await;
+    }
     // return final state of extensions
     get_all_extensions(coredb, ctx.clone()).await
 }
