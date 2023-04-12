@@ -435,7 +435,7 @@ pub async fn reconcile_extensions(
         let status = serde_json::json!({
             "status": {"extensionsUpdating": true}
         });
-        // TODO:
+        // TODO: we should have better handling/behavior for when we fail to patch the status
         let _ = patch_cdb_status_merge(cdb_api, name, status).await;
         if !changed_extensions.is_empty() {
             toggle_extensions(coredb, &changed_extensions, ctx.clone()).await?;
