@@ -1,4 +1,4 @@
-name: Conductor deployment automation
+name: Data plane deployment automation
 
 on:
   push:
@@ -36,32 +36,35 @@ jobs:
           docker_directory: ./conductor
           quay_user: ${{ secrets.QUAY_USER }}
           quay_password: ${{ secrets.QUAY_PASSWORD }}
-  update_argocd_dev:
-    name: Update ArgoCD in dev environment
+
+  argocd_update:
+    name: ArgoCD update automation
+    if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-20.04
+    strategy:
+      # fail-fast means to cancel all jobs if one fails
+      fail-fast: false
+      matrix:
+        include:
+          - repository: coredb-io/app-deploy-dev
+            subdirectory: dev
+            branch: main
+          - repository: coredb-io/app-deploy
+            subdirectory: staging
+            branch: staging-updates
+          - repository: coredb-io/app-deploy
+            subdirectory: prod
+            branch: prod-updates
     needs:
       - push_to_registry
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
+      - name: Check out the repo
+        uses: ./.github/actions/argocd-update
         with:
-          repository: coredb-io/app-deploy-dev
-          ssh-key: ${{ secrets.SERVICE_USER_GITHUB_SSH_KEY }}
-      - name: Update helm chart version
-        uses: mikefarah/yq@v4.33.3
-        with:
-          cmd: yq -i '.spec.source.targetRevision= "${{ needs.push_to_registry.outputs.short_sha }}"' dev/data-plane.yaml
-      - name: Update image version
-        uses: mikefarah/yq@v4.33.3
-        with:
-          cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ needs.push_to_registry.outputs.short_sha }}"' dev/data-plane.yaml
-      - name: Git commit and push to remote
-        run: |
-          set -xe
-          git config --global user.name "coredb-service-user"
-          git config --global user.email "admin+github@coredb.io"
-          git add --all
-          # debugging
-          git diff HEAD
-          git commit -m "Update from coredb-io/data-plane: ${{ needs.push_to_registry.outputs.short_sha }}"
-          git push origin main
+          repository: ${{ matrix.repository }}
+          ssh_key: ${{ secrets.SERVICE_USER_GITHUB_SSH_KEY }}
+          branch: ${{ matrix.branch }}
+          version: ${{ needs.push_to_registry.outputs.short_sha }}
+          subdirectory: ${{ matrix.subdirectory }}
