@@ -1,5 +1,6 @@
 # CoreDB
 
+
 [![](https://shields.io/endpoint?url=https://ossrank.com/shield/2103)](https://ossrank.com/p/2103)
 [![Discord Chat](https://img.shields.io/discord/1060568981725003789?label=Discord)][Discord]
 
