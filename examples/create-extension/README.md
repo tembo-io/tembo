@@ -1,0 +1,24 @@
+# Developing a Postgres Extension in Rust using PGX
+
+
+## Start
+
+- Install [Rust](https://rustup.rs/)
+
+- Install [pgx](https://github.com/tcdi/pgx#getting-started)
+
+
+
+## Init a new `pgx` project
+
+```bash
+cargo pgx new my_extension
+cd my_extension
+```
+
+inspect src/lib.rs
+
+- add another function
+
+
+`cargo pgx run`
