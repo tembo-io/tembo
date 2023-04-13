@@ -134,6 +134,30 @@
     },
     "query": "SELECT * FROM extensions WHERE name = $1"
   },
+  "4db2be5140f4d7c0edebcf62616e8ce97c5479134580a654727fbe4a83435319": {
+    "describe": {
+      "columns": [
+        {
+          "name": "id",
+          "ordinal": 0,
+          "type_info": "Int8"
+        }
+      ],
+      "nullable": [
+        false
+      ],
+      "parameters": {
+        "Left": [
+          "Varchar",
+          "Varchar",
+          "Varchar",
+          "Varchar",
+          "Varchar"
+        ]
+      }
+    },
+    "query": "\n            INSERT INTO extensions(name, created_at, updated_at, description, homepage, documentation, repository)\n            VALUES ($1, (now() at time zone 'utc'), (now() at time zone 'utc'), $2, $3, $4, $5)\n            RETURNING id\n            "
+  },
   "514adcd37018e70d0c1e0ca4c7726d6d4e733d8d3c4c893290bf87eca4452abf": {
     "describe": {
       "columns": [
@@ -169,30 +193,6 @@
       }
     },
     "query": "UPDATE extensions\n            SET updated_at = (now() at time zone 'utc'), description = $1, documentation = $2, homepage = $3, repository = $4\n            WHERE name = $5"
-  },
-  "73c1bbaff1ac8df46d0d53c561b4aaacc534002edf967e27251b811af851e09b": {
-    "describe": {
-      "columns": [
-        {
-          "name": "id",
-          "ordinal": 0,
-          "type_info": "Int8"
-        }
-      ],
-      "nullable": [
-        false
-      ],
-      "parameters": {
-        "Left": [
-          "Varchar",
-          "Varchar",
-          "Varchar",
-          "Varchar",
-          "Varchar"
-        ]
-      }
-    },
-    "query": "\n            INSERT INTO extensions(name, created_at, description, homepage, documentation, repository)\n            VALUES ($1, (now() at time zone 'utc'), $2, $3, $4, $5)\n            RETURNING id\n            "
   },
   "7a931ec93bcc1516737bfc65fd24b339401996a7f23891c7770a3b5b5c79ffc2": {
     "describe": {
