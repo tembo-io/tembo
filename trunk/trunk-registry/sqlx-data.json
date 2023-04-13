@@ -16,12 +16,12 @@
         {
           "name": "updated_at",
           "ordinal": 2,
-          "type_info": "Timestamp"
+          "type_info": "Timestamptz"
         },
         {
           "name": "created_at",
           "ordinal": 3,
-          "type_info": "Timestamp"
+          "type_info": "Timestamptz"
         },
         {
           "name": "downloads",
@@ -52,8 +52,8 @@
       "nullable": [
         false,
         true,
-        true,
-        true,
+        false,
+        false,
         true,
         true,
         true,
@@ -82,12 +82,12 @@
         {
           "name": "updated_at",
           "ordinal": 2,
-          "type_info": "Timestamp"
+          "type_info": "Timestamptz"
         },
         {
           "name": "created_at",
           "ordinal": 3,
-          "type_info": "Timestamp"
+          "type_info": "Timestamptz"
         },
         {
           "name": "downloads",
@@ -118,8 +118,8 @@
       "nullable": [
         false,
         true,
-        true,
-        true,
+        false,
+        false,
         true,
         true,
         true,
@@ -215,12 +215,12 @@
         {
           "name": "updated_at",
           "ordinal": 3,
-          "type_info": "Timestamp"
+          "type_info": "Timestamptz"
         },
         {
           "name": "created_at",
           "ordinal": 4,
-          "type_info": "Timestamp"
+          "type_info": "Timestamptz"
         },
         {
           "name": "downloads",
@@ -267,8 +267,8 @@
         false,
         true,
         true,
-        true,
-        true,
+        false,
+        false,
         true,
         true,
         true,
