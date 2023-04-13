@@ -88,9 +88,10 @@ pub async fn publish(
                     // Update updated_at timestamp
                     sqlx::query!(
                         "UPDATE versions
-                    SET updated_at = (now() at time zone 'utc')
-                    WHERE extension_id = $1
-                    AND num = $2",
+                    SET updated_at = (now() at time zone 'utc'), license = $1
+                    WHERE extension_id = $2
+                    AND num = $3",
+                        new_extension.license,
                         extension_id as i32,
                         new_extension.vers.to_string()
                     )
@@ -117,8 +118,12 @@ pub async fn publish(
             // Set updated_at time on extension
             sqlx::query!(
                 "UPDATE extensions
-            SET updated_at = (now() at time zone 'utc')
-            WHERE name = $1",
+            SET updated_at = (now() at time zone 'utc'), description = $1, documentation = $2, homepage = $3, repository = $4
+            WHERE name = $5",
+                new_extension.description,
+                new_extension.documentation,
+                new_extension.homepage,
+                new_extension.repository,
                 new_extension.name,
             )
             .execute(&mut tx)
@@ -130,13 +135,15 @@ pub async fn publish(
             let mut tx = conn.begin().await?;
             let id_row = sqlx::query!(
                 "
-            INSERT INTO extensions(name, created_at, description, homepage)
-            VALUES ($1, (now() at time zone 'utc'), $2, $3)
+            INSERT INTO extensions(name, created_at, description, homepage, documentation, repository)
+            VALUES ($1, (now() at time zone 'utc'), $2, $3, $4, $5)
             RETURNING id
             ",
                 new_extension.name,
                 new_extension.description,
-                new_extension.homepage
+                new_extension.homepage,
+                new_extension.documentation,
+                new_extension.repository
             )
             .fetch_one(&mut tx)
             .await?;
