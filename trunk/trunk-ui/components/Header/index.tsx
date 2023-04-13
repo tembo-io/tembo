@@ -4,7 +4,7 @@ import Image from "next/image";
 import { Inter } from "next/font/google";
 
 import styles from "./Header.module.scss";
-const inter = Inter({ subsets: ["latin"], weight: ["700", "400"] });
+const inter = Inter({ subsets: ["latin"], weight: ["400"] });
 
 export default function Header() {
   const { signIn, isLoaded } = useSignIn();
