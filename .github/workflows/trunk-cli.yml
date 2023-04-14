@@ -40,24 +40,9 @@ jobs:
         run: cargo +nightly fmt --check
       - name: Clippy
         run: cargo clippy
-  test:
-    name: Run unit tests
-    runs-on: ubuntu-20.04
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: "trunk-cli-test"
-          workspaces: |
-            trunk/cli
-      - name: Run tests
-        run: cargo test
 
-  functional-test:
-    name: Run functional tests
+  test:
+    name: Run tests
     runs-on:
       - self-hosted
       - dind
