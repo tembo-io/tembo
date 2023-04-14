@@ -1,5 +1,5 @@
 [package]
-name = "test_extension"
+name = "test_pgx_extension"
 version = "0.0.0"
 edition = "2021"
 publish = false
