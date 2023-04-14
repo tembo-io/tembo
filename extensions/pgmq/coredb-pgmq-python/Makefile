@@ -1,4 +1,4 @@
-SCOPE=src/
+SCOPE=coredb_pgmq_python/
 
 format:
 	poetry run black ${SCOPE}

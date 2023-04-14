@@ -70,4 +70,4 @@ jobs:
       env:
         POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_TOKEN }}
       run: |
-        poetry publish --build --dry-run
+        poetry publish --build --skip-existing --dry-run
