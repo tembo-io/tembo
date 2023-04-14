@@ -53,7 +53,7 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     # only publish off main branch
-    if: github.ref == 'refs/heads/main'
+    # if: github.ref == 'refs/heads/main'
     steps:
     - uses: actions/checkout@v2
     - name: Set up Python 3.11.0
@@ -68,4 +68,4 @@ jobs:
       env:
         POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_TOKEN }}
       run: |
-        poetry publish --build --skip-existing --dry-run
+        poetry publish --build --skip-existing
