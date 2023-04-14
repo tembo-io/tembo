@@ -1,3 +1,3 @@
-from src.coredb_pgmq_python.queue import PGMQueue  # type: ignore
+from src.coredb_pgmq_python.queue import Message, PGMQueue  # type: ignore
 
-__all__ = ["PGMQueue"]
+__all__ = ["Message", "PGMQueue"]
