@@ -1,5 +1,5 @@
 use assert_cmd::prelude::*; // Add methods on commands
-use git2::Repository;
+use git2::{Repository, build::CheckoutBuilder};
 use predicates::prelude::*; // Used for writing assertions
 use rand::Rng;
 use std::path::{Path, PathBuf};
@@ -56,28 +56,45 @@ fn build_c_extension() -> Result<(), Box<dyn std::error::Error>> {
     let repo_dir_path = current_file_path.parent().unwrap().join("pg_tle");
     let repo_dir = PathBuf::from(repo_dir_path);
     if repo_dir.exists() {
-        fs::remove_dir_all(&repo_dir).unwrap();
+        fs::remove_dir_all(&repo_dir.clone()).unwrap();
     }
-    let repo = Repository::clone(repo_url, repo_dir).unwrap();
+
+    let repo = Repository::clone(repo_url, &repo_dir).unwrap();
+
+    let refname = "v1.0.3";
+    let (object, reference) = repo.revparse_ext(refname).expect("Object not found");
+
+    repo.checkout_tree(&object, None)
+        .expect("Failed to checkout");
+
+    match reference {
+        // gref is an actual reference like branches or tags
+        Some(gref) => repo.set_head(gref.name().unwrap()),
+        // this is a commit, not a reference
+        None => repo.set_head_detached(object.id()),
+    }
+        .expect("Failed to set HEAD");
 
     // Construct a path relative to the current file's directory
-    // let mut extension_path = std::path::PathBuf::from(file!());
-    // extension_path.pop(); // Remove the file name from the path
-    // extension_path.push("pg_tle");
+    let mut extension_path = std::path::PathBuf::from(file!());
+    extension_path.pop(); // Remove the file name from the path
+    extension_path.push("pg_tle");
 
-    // let mut cmd = Command::cargo_bin(CARGO_BIN)?;
-    // cmd.arg("build");
-    // cmd.arg("--path");
-    // cmd.arg(extension_path.as_os_str());
-    // cmd.arg("--output-path");
-    // cmd.arg(output_dir.clone());
-    // cmd.assert().code(0);
-    // assert!(
-    //     std::path::Path::new(format!("{output_dir}/test_pgx_extension-0.0.0.tar.gz").as_str())
-    //         .exists()
-    // );
-    // // delete the temporary file
-    // std::fs::remove_dir_all(output_dir)?;
+    return Ok(());
+
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("build");
+    cmd.arg("--path");
+    cmd.arg(extension_path.as_os_str());
+    cmd.arg("--output-path");
+    cmd.arg(output_dir.clone());
+    cmd.assert().code(0);
+    assert!(
+        std::path::Path::new(format!("{output_dir}/test_pgx_extension-0.0.0.tar.gz").as_str())
+            .exists()
+    );
+    // delete the temporary file
+    std::fs::remove_dir_all(output_dir)?;
 
     Ok(())
 }
