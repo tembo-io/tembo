@@ -1,10 +1,9 @@
-import datetime
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import Optional, Union
 
-from psycopg.types.json import Jsonb, set_json_dumps, set_json_loads
+from psycopg.types.json import Jsonb
 from psycopg_pool import ConnectionPool
-from pydantic import BaseModel
 
 
 @dataclass
@@ -32,33 +31,34 @@ class PGMQueue:
 
     pool_size: int = 10
 
-    kwargs: Optional[dict] = field(default_factory=dict)
+    kwargs: dict = field(default_factory=dict)
 
     pool: ConnectionPool = field(init=False)
 
     def __post_init__(self) -> None:
-        conninfo = f"host={self.host} port={self.port} dbname={self.database} user={self.username} password={self.password}"
+        conninfo = f"""
+        host={self.host}
+        port={self.port}
+        dbname={self.database}
+        user={self.username}
+        password={self.password}
+        """
         self.pool = ConnectionPool(conninfo, **self.kwargs)
 
         with self.pool.connection() as conn:
-            rows = conn.execute("create extension if not exists pgmq cascade;")
-            print(rows)
+            conn.execute("create extension if not exists pgmq cascade;")
 
     def create_queue(self, queue: str) -> None:
         """Create a queue"""
         with self.pool.connection() as conn:
             conn.execute("select pgmq_create(%s);", [queue])
 
-    def create_partitioned_queue(
-        self, queue: str, partition_size: Optional[int] = None
-    ) -> None:
+    def create_partitioned_queue(self, queue: str, partition_size: Optional[int] = None) -> None:
         """Create a partitioned queue"""
         with self.pool.connection() as conn:
-            conn.execute(
-                "select pgmq_create_partitioned(%s, %s);", [queue, partition_size]
-            )
+            conn.execute("select pgmq_create_partitioned(%s, %s);", [queue, partition_size])
 
-    def send(self, queue: str, message: dict, delay: int = None) -> None:
+    def send(self, queue: str, message: dict, delay: Optional[int] = None) -> int:
         """Send a message to a queue"""
 
         with self.pool.connection() as conn:
@@ -67,29 +67,36 @@ class PGMQueue:
                 raise NotImplementedError("send_delay is not implemented in pgmq")
             message = conn.execute(
                 "select * from pgmq_send(%s, %s);",
-                [queue, Jsonb(message)],
+                [queue, Jsonb(message)],  # type: ignore
             ).fetchall()
-            return message
+        return message[0][0]
 
-    def read(
-        self, queue: str, vt: Optional[int] = None, limit: int = 1
-    ) -> Union[Message, list[Message]]:
+    def read(self, queue: str, vt: Optional[int] = None, limit: int = 1) -> Union[Message, list[Message]]:
         """Read a message from a queue"""
         with self.pool.connection() as conn:
-            rows = conn.execute(
-                "select * from pgmq_read(%s, %s, %s);", [queue, vt or self.vt, limit]
-            ).fetchall()
+            rows = conn.execute("select * from pgmq_read(%s, %s, %s);", [queue, vt or self.vt, limit]).fetchall()
 
-        messages = [
-            Message(msg_id=x[0], read_ct=x[1], enqueued_at=x[2], vt=x[3], message=x[4])
-            for x in rows
-        ]
+        messages = [Message(msg_id=x[0], read_ct=x[1], enqueued_at=x[2], vt=x[3], message=x[4]) for x in rows]
         return messages[0] if len(messages) == 1 else messages
 
+    def pop(self, queue: str) -> Message:
+        """Read a message from a queue"""
+        with self.pool.connection() as conn:
+            rows = conn.execute("select * from pgmq_pop(%s);", [queue]).fetchall()
 
-if __name__ == "__main__":
-    q = PGMQueue(host="0.0.0.0")
-    q.create_queue("test")
+        messages = [Message(msg_id=x[0], read_ct=x[1], enqueued_at=x[2], vt=x[3], message=x[4]) for x in rows]
+        return messages[0]
 
-    msg_id = q.send("test", {"hello": "world"})
-    print(msg_id)
+    def delete(self, queue: str, msg_id: int) -> bool:
+        """Delete a message from a queue"""
+        with self.pool.connection() as conn:
+            row = conn.execute("select pgmq_delete(%s, %s);", [queue, msg_id]).fetchall()
+
+        return row[0][0]
+
+    def archive(self, queue: str, msg_id: int) -> bool:
+        """Archive a message from a queue"""
+        with self.pool.connection() as conn:
+            row = conn.execute("select pgmq_archive(%s, %s);", [queue, msg_id]).fetchall()
+
+        return row[0][0]
