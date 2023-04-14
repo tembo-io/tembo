@@ -34,8 +34,6 @@ jobs:
         poetry install
     - name: Lints / Type Checking
       run: make lints
-    - name: Version Check
-      run: 
 
   tests:
     runs-on: ubuntu-latest
