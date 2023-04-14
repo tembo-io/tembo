@@ -8,6 +8,36 @@ fn hello_my_extension() -> &'static str {
 }
 
 
+
+
+#[pg_extern]
+fn list_extensions() -> Result<
+TableIterator<
+    'static,
+    (
+        name!(name, String),
+        name!(default_version, String),
+        name!(installed_version, String),
+        name!(comment, String),
+    ),
+>,
+spi::Error,
+> {
+    let query = "select name, default_version, installed_version, comment from pg_available_extensions;";
+    let results: Result<Vec<(String, String, String, String)>, spi::Error> = Spi::connect(|client| {
+        Ok(client.select(query, None, None)?.map(|row| (
+            row["name"].value::<String>(),
+            row["default_version"].value::<String>(),
+            row["installed_version"].value::<String>(),
+            row["comment"].value::<String>(),
+        ))
+        )
+    });
+    Ok(TableIterator::new(results?.into_iter()))
+}
+
+
+
 #[cfg(any(test, feature = "pg_test"))]
 #[pg_schema]
 mod tests {
