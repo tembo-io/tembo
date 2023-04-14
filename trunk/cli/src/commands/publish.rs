@@ -92,7 +92,7 @@ impl SubCommand for PublishCommand {
             .text()
             .await?;
         // Print response from registry
-        println!("{}", res);
+        println!("{res}");
         Ok(())
     }
 }

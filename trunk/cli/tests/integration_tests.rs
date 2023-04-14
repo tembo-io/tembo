@@ -16,15 +16,6 @@ fn help() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
-fn install() -> Result<(), Box<dyn std::error::Error>> {
-    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
-    cmd.arg("install");
-    cmd.assert()
-        .stdout(predicate::str::contains("not implemented"));
-    Ok(())
-}
-
-#[test]
 fn build_extension() -> Result<(), Box<dyn std::error::Error>> {
     let mut rng = rand::thread_rng();
     let output_dir = format!("/tmp/pgmq_test_{}", rng.gen_range(0..1000000));
@@ -41,7 +32,9 @@ fn build_extension() -> Result<(), Box<dyn std::error::Error>> {
     cmd.arg("--output-path");
     cmd.arg(output_dir.clone());
     cmd.assert().code(0);
-    assert!(std::path::Path::new(format!("{output_dir}/result.tar").as_str()).exists());
+    assert!(
+        std::path::Path::new(format!("{output_dir}/test_extension-0.0.0.tar.gz").as_str()).exists()
+    );
     // delete the temporary file
     std::fs::remove_dir_all(output_dir)?;
 

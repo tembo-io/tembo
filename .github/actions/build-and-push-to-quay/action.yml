@@ -113,7 +113,6 @@ runs:
         username: ${{ inputs.quay_user }}
         password: ${{ inputs.quay_password }}
     - name: Push to Quay
-      if: ${{ github.ref == 'refs/heads/main' }}
       shell: bash
       run: |
         set -xe
