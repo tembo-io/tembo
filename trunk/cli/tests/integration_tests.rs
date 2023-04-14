@@ -1,7 +1,10 @@
 use assert_cmd::prelude::*; // Add methods on commands
+use git2::Repository;
 use predicates::prelude::*; // Used for writing assertions
 use rand::Rng;
+use std::path::{Path, PathBuf};
 use std::process::Command; // Run programs
+use std::fs;
 
 const CARGO_BIN: &str = "trunk";
 
@@ -33,10 +36,48 @@ fn build_pgx_extension() -> Result<(), Box<dyn std::error::Error>> {
     cmd.arg(output_dir.clone());
     cmd.assert().code(0);
     assert!(
-        std::path::Path::new(format!("{output_dir}/test_pgx_extension-0.0.0.tar.gz").as_str()).exists()
+        std::path::Path::new(format!("{output_dir}/test_pgx_extension-0.0.0.tar.gz").as_str())
+            .exists()
     );
     // delete the temporary file
     std::fs::remove_dir_all(output_dir)?;
+
+    Ok(())
+}
+
+#[test]
+fn build_c_extension() -> Result<(), Box<dyn std::error::Error>> {
+    let mut rng = rand::thread_rng();
+    let output_dir = format!("/tmp/pg_tle_test_{}", rng.gen_range(0..1000000));
+
+    let current_file_path = Path::new(file!()).canonicalize().unwrap();
+    // Example of a C extension
+    let repo_url = "https://github.com/aws/pg_tle.git";
+    let repo_dir_path = current_file_path.parent().unwrap().join("pg_tle");
+    let repo_dir = PathBuf::from(repo_dir_path);
+    if repo_dir.exists() {
+        fs::remove_dir_all(&repo_dir).unwrap();
+    }
+    let repo = Repository::clone(repo_url, repo_dir).unwrap();
+
+    // Construct a path relative to the current file's directory
+    // let mut extension_path = std::path::PathBuf::from(file!());
+    // extension_path.pop(); // Remove the file name from the path
+    // extension_path.push("pg_tle");
+
+    // let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    // cmd.arg("build");
+    // cmd.arg("--path");
+    // cmd.arg(extension_path.as_os_str());
+    // cmd.arg("--output-path");
+    // cmd.arg(output_dir.clone());
+    // cmd.assert().code(0);
+    // assert!(
+    //     std::path::Path::new(format!("{output_dir}/test_pgx_extension-0.0.0.tar.gz").as_str())
+    //         .exists()
+    // );
+    // // delete the temporary file
+    // std::fs::remove_dir_all(output_dir)?;
 
     Ok(())
 }
