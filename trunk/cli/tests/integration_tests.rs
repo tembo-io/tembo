@@ -53,20 +53,17 @@ fn build_c_extension() -> Result<(), Box<dyn std::error::Error>> {
     let current_file_path = Path::new(file!()).canonicalize().unwrap();
     // Example of a C extension
     let repo_url = "https://github.com/aws/pg_tle.git";
+    // clone and checkout ref v1.0.3
     let repo_dir_path = current_file_path.parent().unwrap().join("pg_tle");
     let repo_dir = PathBuf::from(repo_dir_path);
     if repo_dir.exists() {
         fs::remove_dir_all(&repo_dir.clone()).unwrap();
     }
-
     let repo = Repository::clone(repo_url, &repo_dir).unwrap();
-
     let refname = "v1.0.3";
     let (object, reference) = repo.revparse_ext(refname).expect("Object not found");
-
     repo.checkout_tree(&object, None)
         .expect("Failed to checkout");
-
     match reference {
         // gref is an actual reference like branches or tags
         Some(gref) => repo.set_head(gref.name().unwrap()),
@@ -80,8 +77,6 @@ fn build_c_extension() -> Result<(), Box<dyn std::error::Error>> {
     extension_path.pop(); // Remove the file name from the path
     extension_path.push("pg_tle");
 
-    return Ok(());
-
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
     cmd.arg("build");
     cmd.arg("--path");
@@ -90,7 +85,7 @@ fn build_c_extension() -> Result<(), Box<dyn std::error::Error>> {
     cmd.arg(output_dir.clone());
     cmd.assert().code(0);
     assert!(
-        std::path::Path::new(format!("{output_dir}/test_pgx_extension-0.0.0.tar.gz").as_str())
+        std::path::Path::new(format!("{output_dir}/pg_tle-1.0.3.tar.gz").as_str())
             .exists()
     );
     // delete the temporary file
