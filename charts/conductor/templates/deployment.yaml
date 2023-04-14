@@ -5,7 +5,7 @@ metadata:
   labels:
     {{- include "conductor.labels" . | nindent 4 }}
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       {{- include "conductor.selectorLabels" . | nindent 6 }}
