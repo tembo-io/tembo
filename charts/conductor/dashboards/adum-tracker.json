@@ -26,10 +26,23 @@
   "fiscalYearStartMonth": 0,
   "gnetId": 9628,
   "graphTooltip": 0,
-  "id": 106,
+  "id": 107,
   "links": [],
   "liveNow": false,
   "panels": [
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 81,
+      "panels": [],
+      "title": "Active Deployments Under Management",
+      "type": "row"
+    },
     {
       "datasource": {
         "type": "prometheus",
@@ -91,7 +104,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 0
+        "y": 1
       },
       "id": 74,
       "options": {
@@ -219,7 +232,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 0
+        "y": 1
       },
       "id": 75,
       "options": {
@@ -323,7 +336,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 8
+        "y": 9
       },
       "id": 77,
       "options": {
@@ -337,8 +350,8 @@
         "showHeader": true,
         "sortBy": [
           {
-            "desc": false,
-            "displayName": "1h"
+            "desc": true,
+            "displayName": "24h"
           }
         ]
       },
@@ -398,7 +411,7 @@
           "refId": "1h"
         }
       ],
-      "title": "Max number of simultaneous sessions in the last 24 hours",
+      "title": "Max number of simultaneous sessions",
       "transformations": [
         {
           "id": "joinByField",
@@ -428,6 +441,207 @@
         }
       ],
       "type": "table"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 18
+      },
+      "id": 83,
+      "panels": [],
+      "title": "Utilization of databases",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "total sessions",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 12,
+        "x": 0,
+        "y": 19
+      },
+      "id": 78,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(sum by (namespace) (max_over_time(pg_stat_activity_count{}[1h])))",
+          "hide": false,
+          "legendFormat": "{{namespace}}",
+          "range": true,
+          "refId": "D"
+        }
+      ],
+      "title": "Sessions",
+      "type": "timeseries"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "Commit / hour",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 11,
+        "w": 12,
+        "x": 12,
+        "y": 19
+      },
+      "id": 79,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "(sum by (namespace) (irate(pg_stat_database_xact_commit{}[1h])))",
+          "hide": false,
+          "legendFormat": "{{namespace}}",
+          "range": true,
+          "refId": "D"
+        }
+      ],
+      "title": "Transactions",
+      "type": "timeseries"
     }
   ],
   "refresh": "5s",
@@ -516,7 +730,7 @@
     ]
   },
   "time": {
-    "from": "now-7d",
+    "from": "now-24h",
     "to": "now"
   },
   "timepicker": {
@@ -547,6 +761,6 @@
   "timezone": "",
   "title": "Cloud Tracker",
   "uid": "bE7Y7zEVz",
-  "version": 9,
+  "version": 10,
   "weekStart": ""
 }
