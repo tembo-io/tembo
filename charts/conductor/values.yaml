@@ -1,5 +1,7 @@
 logLevel: info
 
+replicas: 2
+
 externalSecrets:
   refreshInterval: "5m"
   parameterStore:
