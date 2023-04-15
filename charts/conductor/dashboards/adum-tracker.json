@@ -296,7 +296,7 @@
           "refId": "D"
         }
       ],
-      "title": "Idle (< 3 simultaneous sessions)",
+      "title": "Idle (inverse of active)",
       "type": "timeseries"
     },
     {
