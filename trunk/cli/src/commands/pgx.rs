@@ -151,7 +151,7 @@ pub async fn build_pgx(
     println!("Using pgx version {pgx_version}");
 
     println!("Building pgx extension at path {}", &path.display());
-    let dockerfile = include_str!("./pgx_builder/Dockerfile");
+    let dockerfile = include_str!("./builders/Dockerfile.pgx");
 
     let (receiver, sender, stream) = ByteStreamSyncSender::new();
     // Making path owned so we can send it to the tarring task below without having to worry

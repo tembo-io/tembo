@@ -83,6 +83,10 @@ fn build_c_extension() -> Result<(), Box<dyn std::error::Error>> {
     cmd.arg(extension_path.as_os_str());
     cmd.arg("--output-path");
     cmd.arg(output_dir.clone());
+    cmd.arg("--version");
+    cmd.arg("1.0.3");
+    cmd.arg("--name");
+    cmd.arg("pg_tle");
     cmd.assert().code(0);
     assert!(
         std::path::Path::new(format!("{output_dir}/pg_tle-1.0.3.tar.gz").as_str())

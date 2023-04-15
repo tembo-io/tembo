@@ -4,7 +4,7 @@ use tokio_task_manager::Task;
 pub mod build;
 pub mod install;
 mod pgx;
-// mod makefile;
+mod generic_build;
 pub mod publish;
 mod containers;
 
