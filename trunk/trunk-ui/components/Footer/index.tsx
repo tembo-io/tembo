@@ -6,7 +6,7 @@ import styles from "./Footer.module.scss";
 
 import Logo from "/public/images/Logo.svg";
 import CoreDB from "/public/images/CoreDB.svg";
-const inter = Inter({ subsets: ["latin"], weight: ["800", "400"] });
+const inter = Inter({ subsets: ["latin"], weight: ["400"] });
 
 export default function Footer() {
   return (

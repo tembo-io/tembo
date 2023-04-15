@@ -91,8 +91,8 @@ impl SubCommand for InstallCommand {
             println!("Extension dir {} does not exist", extension_dir.display());
             return Ok(());
         }
-        println!("Using pkglibdir: {:?}", package_lib_dir);
-        println!("Using sharedir: {:?}", sharedir);
+        println!("Using pkglibdir: {package_lib_dir:?}");
+        println!("Using sharedir: {sharedir:?}");
 
         // If file is specified
         if let Some(ref file) = self.file {
