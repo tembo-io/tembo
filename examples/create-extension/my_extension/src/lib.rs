@@ -1,6 +1,5 @@
 use pgx::prelude::*;
 use pgx::spi::SpiTupleTable;
-use pgx::log;
 
 pgx::pg_module_magic!();
 
@@ -9,62 +8,32 @@ fn hello_my_extension() -> &'static str {
     "Hello, my_extension"
 }
 
-// drop extension my_extension; create extension my_extension;
-// select * from list_extensions();
-
-// tail -f ~/.pgx/15.log
-
-
-extension_sql!(
-    r#"
-
-CREATE TABLE spi_example (
-    id serial8 not null primary key,
-    title text
-);
-
-INSERT INTO spi_example (title) VALUES ('This is a test');
-INSERT INTO spi_example (title) VALUES ('Hello There!');
-INSERT INTO spi_example (title) VALUES ('I like pudding');
-
-
-"#,
-    name = "create_sqi_example_table",
-);
-
+type ExtensionRows = Vec<(
+    Option<String>,
+    Option<String>,
+    Option<String>,
+    Option<String>,
+)>;
 
 #[pg_extern]
 fn list_extensions() -> Result<
-TableIterator<
-    'static,
-    (
-        name!(name, Option<String>),
-        name!(default_version, Option<String>),
-        name!(installed_version, Option<String>),
-        name!(comment, Option<String>),
-    ),
->,
-spi::Error,
+    TableIterator<
+        'static,
+        (
+            name!(name, Option<String>),
+            name!(default_version, Option<String>),
+            name!(installed_version, Option<String>),
+            name!(comment, Option<String>),
+        ),
+    >,
+    spi::Error,
 > {
-    let results : Result<Vec<(
-        Option<String>,
-        Option<String>,
-        Option<String>,
-        Option<String>
-    )>, spi::Error> = Spi::connect(|mut client| {
-        let mut results: Vec<(
-            Option<String>,
-            Option<String>,
-            Option<String>,
-            Option<String>
-        )> = Vec::new();
-        let query = "select * from pg_catalog.pg_available_extensions".to_owned();
+    let results: Result<ExtensionRows, spi::Error> = Spi::connect(|mut client| {
+        let mut results: ExtensionRows = Vec::new();
+        let query = "select name::text, default_version, installed_version, comment from pg_catalog.pg_available_extensions".to_owned();
         let tup_table: SpiTupleTable = client.update(&query, None, None)?;
-        log!("tup_table: {:?}", tup_table);
         for row in tup_table.into_iter() {
-            log!("row:");
             let name = row["name"].value::<String>()?;
-            println!("name: {}", name.clone().unwrap());
             let default_version = row["default_version"].value::<String>()?;
             let installed_version = row["installed_version"].value::<String>()?;
             let comment = row["comment"].value::<String>()?;
@@ -75,7 +44,6 @@ spi::Error,
     Ok(TableIterator::new(results?.into_iter()))
 }
 
-
 #[cfg(any(test, feature = "pg_test"))]
 #[pg_schema]
 mod tests {
@@ -85,10 +53,9 @@ mod tests {
     fn test_hello_my_extension() {
         assert_eq!("Hello, my_extension", crate::hello_my_extension());
     }
-
 }
 
-/// This module is required by `cargo pgx test` invocations. 
+/// This module is required by `cargo pgx test` invocations.
 /// It must be visible at the root of your extension crate.
 #[cfg(test)]
 pub mod pg_test {
