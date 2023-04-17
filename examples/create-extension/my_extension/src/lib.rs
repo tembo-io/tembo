@@ -92,6 +92,7 @@ pub extern "C" fn background_worker(_arg: pg_sys::Datum) {
     log!("Closing BGWorker: {}", BackgroundWorker::get_name());
 }
 
+
 #[cfg(any(test, feature = "pg_test"))]
 #[pg_schema]
 mod tests {

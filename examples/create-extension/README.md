@@ -1,6 +1,5 @@
 # WIP: Developing a Postgres Extension in Rust using [PGX](https://github.com/tcdi/pgx)
 
-
 ## Start
 
 - Install [Rust](https://rustup.rs/)
@@ -25,6 +24,7 @@ inspect src/lib.rs
 - call the functions
 
 - use the SPI to execute some sql
+
 ```bash
 echo "shared_preload_libraries = 'my_extension.so'" >> ~/.pgx/data-15/postgresql.conf
 ```
@@ -32,4 +32,3 @@ echo "shared_preload_libraries = 'my_extension.so'" >> ~/.pgx/data-15/postgresql
 - build a background worker
 
 - tip: watch logs from ~.pgx/
-

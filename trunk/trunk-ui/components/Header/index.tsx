@@ -4,7 +4,7 @@ import Image from "next/image";
 import { Inter } from "next/font/google";
 
 import styles from "./Header.module.scss";
-const inter = Inter({ subsets: ["latin"], weight: ["700", "400"] });
+const inter = Inter({ subsets: ["latin"], weight: ["400", "700"] });
 
 export default function Header() {
   const { signIn, isLoaded } = useSignIn();
@@ -24,7 +24,7 @@ export default function Header() {
   return (
     <header className={styles.header}>
       <h1 className={cx(inter.className, styles.title)}>Trunk</h1>
-      {user ? (
+      {/* {user ? (
         <button onClick={() => signOut()} className={styles.loginButton}>
           <Image src="/images/github.svg" alt="GitHub logo" width={20} height={20}></Image>
           <span className={cx(inter.className, styles.authText, styles.userName)}>{user.fullName}</span>
@@ -35,7 +35,7 @@ export default function Header() {
           <Image src="/images/github.svg" alt="GitHub logo" width={20} height={20}></Image>
           <span className={cx(inter.className, styles.authText)}>Sign in with GitHub</span>
         </button>
-      )}
+      )} */}
     </header>
   );
 }

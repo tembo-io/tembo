@@ -124,12 +124,12 @@ impl<'a> Drop for ReclaimableContainer<'a> {
         let handle = tokio::runtime::Handle::current();
         let mut task = self.task.clone();
         handle.spawn(async move {
-            println!("Stopping {}", id);
+            println!("Stopping {id}");
             docker
                 .stop_container(&id, None)
                 .await
                 .expect("error stopping container");
-            println!("Stopped {}", id);
+            println!("Stopped {id}");
             task.wait().await;
         });
     }
@@ -386,9 +386,9 @@ pub async fn build_pgx(
     // if tar_handle errors out.
     let _ = receiver_sender.stream_to_end(file_stream).await;
     // Handle the error
-    let _ = tar_handle.await??;
+    tar_handle.await??;
 
-    println!("Packaged to {}", package_path);
+    println!("Packaged to {package_path}");
 
     Ok(())
 }
