@@ -1,5 +1,8 @@
+use pgx::bgworkers::*;
 use pgx::prelude::*;
 use pgx::spi::SpiTupleTable;
+
+use std::time::Duration;
 
 pgx::pg_module_magic!();
 
@@ -42,6 +45,51 @@ fn list_extensions() -> Result<
         Ok(results)
     });
     Ok(TableIterator::new(results?.into_iter()))
+}
+
+#[allow(non_snake_case)]
+#[pg_guard]
+pub extern "C" fn _PG_init() {
+    BackgroundWorkerBuilder::new("My Background Process for Postgres")
+        .set_function("background_worker")
+        .set_library("my_extension")
+        .enable_spi_access()
+        .set_start_time(BgWorkerStartTime::ConsistentState)
+        .load();
+}
+
+#[pg_guard]
+#[no_mangle]
+pub extern "C" fn background_worker(_arg: pg_sys::Datum) {
+    BackgroundWorker::attach_signal_handlers(SignalWakeFlags::SIGHUP | SignalWakeFlags::SIGTERM);
+
+    BackgroundWorker::connect_worker_to_spi(Some("my_extension"), None);
+
+    let setup_query = "create table if not exists my_test_table (id serial, name timestamp);";
+    let _: Result<(), pgx::spi::Error> = BackgroundWorker::transaction(|| {
+        Spi::connect(|mut client| {
+            client.update(setup_query, None, None).unwrap();
+            Ok(())
+        })
+    });
+
+    // wake up every 10s or if we received a SIGTERM
+    while BackgroundWorker::wait_latch(Some(Duration::from_secs(2))) {
+        if BackgroundWorker::sighup_received() {
+            // on SIGHUP, do something useful
+        }
+
+        let result: Result<(), pgx::spi::Error> = BackgroundWorker::transaction(|| {
+            Spi::connect(|mut client| {
+                let query = "insert into my_test_table (name) values (now());";
+                client.update(query, None, None).unwrap();
+                Ok(())
+            })
+        });
+        result.unwrap_or_else(|e| panic!("got an error: {}", e))
+    }
+
+    log!("Closing BGWorker: {}", BackgroundWorker::get_name());
 }
 
 #[cfg(any(test, feature = "pg_test"))]

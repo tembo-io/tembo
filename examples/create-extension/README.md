@@ -25,7 +25,11 @@ inspect src/lib.rs
 - call the functions
 
 - use the SPI to execute some sql
+```bash
+echo "shared_preload_libraries = 'my_extension.so'" >> ~/.pgx/data-15/postgresql.conf
+```
 
 - build a background worker
 
 - tip: watch logs from ~.pgx/
+
