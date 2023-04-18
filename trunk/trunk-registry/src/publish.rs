@@ -33,7 +33,7 @@ pub async fn publish(
     while let Some(mut field) = payload.try_next().await? {
         let headers = field.headers();
         let auth = headers.get(AUTHORIZATION).unwrap();
-        if auth != "" {
+        if auth != cfg.auth_token {
             return Err(AuthorizationError());
         }
         // Field is stream of Bytes

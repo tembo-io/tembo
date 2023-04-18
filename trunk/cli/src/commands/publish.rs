@@ -5,8 +5,8 @@ use clap::Args;
 use reqwest::header::CONTENT_TYPE;
 use reqwest::header::{HeaderMap, AUTHORIZATION};
 use serde_json::json;
-use std::fs;
 use std::path::PathBuf;
+use std::{env, fs};
 use tokio_task_manager::Task;
 
 #[derive(Args)]
@@ -67,7 +67,8 @@ impl SubCommand for PublishCommand {
         let mut headers = HeaderMap::new();
         headers.insert(CONTENT_TYPE, "application/octet-stream".parse().unwrap());
         // Add token header from env var
-        headers.insert(AUTHORIZATION, "".parse().unwrap());
+        let auth = env::var("AUTH_TOKEN").unwrap_or_else(|_| "".to_owned());
+        headers.insert(AUTHORIZATION, auth.parse()?);
         let file_part = reqwest::multipart::Part::bytes(file)
             .file_name(name)
             .headers(headers.clone());
