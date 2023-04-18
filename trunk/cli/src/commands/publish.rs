@@ -3,7 +3,7 @@ use crate::commands::publish::PublishError::InvalidExtensionName;
 use async_trait::async_trait;
 use clap::Args;
 use reqwest::header::CONTENT_TYPE;
-use reqwest::header::{AUTHORIZATION, HeaderMap};
+use reqwest::header::{HeaderMap, AUTHORIZATION};
 use serde_json::json;
 use std::fs;
 use std::path::PathBuf;
