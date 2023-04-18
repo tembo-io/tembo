@@ -6,11 +6,13 @@ use crate::uploader::upload_extension;
 use crate::views::extension_publish::ExtensionUpload;
 use actix_multipart::Multipart;
 use actix_web::{error, post, web, HttpResponse};
+use actix_web::http::header::{AUTHORIZATION};
 use aws_config::SdkConfig;
 use aws_sdk_s3;
 use aws_sdk_s3::primitives::ByteStream;
 use futures::TryStreamExt;
 use sqlx::{Pool, Postgres};
+use crate::errors::ExtensionRegistryError::{AuthorizationError};
 
 const MAX_SIZE: usize = 262_144; // max payload size is 256k
 
@@ -29,6 +31,11 @@ pub async fn publish(
     let mut metadata = web::BytesMut::new();
     let mut file = web::BytesMut::new();
     while let Some(mut field) = payload.try_next().await? {
+        let headers = field.headers();
+        let auth = headers.get(AUTHORIZATION).unwrap();
+        if auth != "" {
+            return Err(AuthorizationError());
+        }
         // Field is stream of Bytes
         while let Some(chunk) = field.try_next().await? {
             // limit max size of in-memory payload

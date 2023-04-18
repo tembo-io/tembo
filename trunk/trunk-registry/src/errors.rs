@@ -1,6 +1,6 @@
 //! Custom errors types for extension registry
 use actix_multipart::MultipartError;
-use actix_web::error;
+use actix_web::{error};
 use aws_sdk_s3::error::SdkError;
 use aws_sdk_s3::operation::put_object::PutObjectError;
 use thiserror::Error;
@@ -22,6 +22,10 @@ pub enum ExtensionRegistryError {
     /// a response error
     #[error("response error")]
     ResponseError(),
+
+    /// an authorization error
+    #[error("authorization error")]
+    AuthorizationError(),
 
     /// a payload error
     #[error("payload error")]
