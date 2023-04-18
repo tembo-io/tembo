@@ -2,11 +2,11 @@ use super::SubCommand;
 use crate::commands::publish::PublishError::InvalidExtensionName;
 use async_trait::async_trait;
 use clap::Args;
-use hyper::header::CONTENT_TYPE;
-use reqwest::header::HeaderMap;
+use reqwest::header::CONTENT_TYPE;
+use reqwest::header::{HeaderMap, AUTHORIZATION};
 use serde_json::json;
-use std::fs;
 use std::path::PathBuf;
+use std::{env, fs};
 use tokio_task_manager::Task;
 
 #[derive(Args)]
@@ -66,9 +66,12 @@ impl SubCommand for PublishCommand {
         };
         let mut headers = HeaderMap::new();
         headers.insert(CONTENT_TYPE, "application/octet-stream".parse().unwrap());
+        // Add token header from env var
+        let auth = env::var("AUTH_TOKEN").unwrap_or_else(|_| "".to_owned());
+        headers.insert(AUTHORIZATION, auth.parse()?);
         let file_part = reqwest::multipart::Part::bytes(file)
             .file_name(name)
-            .headers(headers);
+            .headers(headers.clone());
         let m = json!({
             "name": self.name,
             "vers": self.version,
@@ -78,7 +81,7 @@ impl SubCommand for PublishCommand {
             "license": self.license,
             "repository": self.repository
         });
-        let metadata = reqwest::multipart::Part::text(m.to_string());
+        let metadata = reqwest::multipart::Part::text(m.to_string()).headers(headers);
         let form = reqwest::multipart::Form::new()
             .part("metadata", metadata)
             .part("file", file_part);
