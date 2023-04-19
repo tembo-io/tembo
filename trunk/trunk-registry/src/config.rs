@@ -1,3 +1,4 @@
+use actix_web::http::header::HeaderValue;
 use std::env;
 
 #[derive(Debug, Clone)]
@@ -7,6 +8,7 @@ pub struct Config {
     pub region: Option<String>,
     pub aws_access_key: String,
     pub aws_secret_key: String,
+    pub auth_token: HeaderValue,
 }
 
 // TODO(ianstanton) Fix load from .env
@@ -21,6 +23,7 @@ impl Default for Config {
             region: Some(from_env_default("S3_REGION", "")),
             aws_access_key: from_env_default("AWS_ACCESS_KEY", ""),
             aws_secret_key: from_env_default("AWS_SECRET_KEY", ""),
+            auth_token: from_env_default("AUTH_TOKEN", "").parse().unwrap(),
         }
     }
 }
