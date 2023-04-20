@@ -2,9 +2,11 @@
 
 use crate::config::Config;
 use crate::errors::ExtensionRegistryError;
+use crate::errors::ExtensionRegistryError::AuthorizationError;
 use crate::uploader::upload_extension;
 use crate::views::extension_publish::ExtensionUpload;
 use actix_multipart::Multipart;
+use actix_web::http::header::AUTHORIZATION;
 use actix_web::{error, post, web, HttpResponse};
 use aws_config::SdkConfig;
 use aws_sdk_s3;
@@ -29,6 +31,11 @@ pub async fn publish(
     let mut metadata = web::BytesMut::new();
     let mut file = web::BytesMut::new();
     while let Some(mut field) = payload.try_next().await? {
+        let headers = field.headers();
+        let auth = headers.get(AUTHORIZATION).unwrap();
+        if auth != cfg.auth_token {
+            return Err(AuthorizationError());
+        }
         // Field is stream of Bytes
         while let Some(chunk) = field.try_next().await? {
             // limit max size of in-memory payload

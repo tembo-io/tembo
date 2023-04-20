@@ -6,16 +6,10 @@
 
 - Install [pgx](https://github.com/tcdi/pgx#getting-started)
 
-
-
 ## Init a new `pgx` project
+- https://github.com/tcdi/pgrx/tree/master#getting-started
 
-```bash
-cargo pgx new my_extension
-cd my_extension
-```
-
-inspect src/lib.rs
+- inspect src/lib.rs
 
 - add another function
 
