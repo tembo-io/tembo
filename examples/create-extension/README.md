@@ -1,4 +1,4 @@
-# WIP: Developing a Postgres Extension in Rust using [PGX](https://github.com/tcdi/pgx)
+# Developing a Postgres Extension in Rust using [PGX](https://github.com/tcdi/pgx)
 
 ## Start
 
