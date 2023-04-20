@@ -7,8 +7,8 @@ use std::time::Duration;
 pgx::pg_module_magic!();
 
 #[pg_extern]
-fn hello_my_extension() -> &'static str {
-    "Hello, my_extension"
+fn hello_my_extension(name: String) -> String {
+    format!("Hello, {}", name)
 }
 
 type ExtensionRows = Vec<(
@@ -92,7 +92,6 @@ pub extern "C" fn background_worker(_arg: pg_sys::Datum) {
     log!("Closing BGWorker: {}", BackgroundWorker::get_name());
 }
 
-
 #[cfg(any(test, feature = "pg_test"))]
 #[pg_schema]
 mod tests {
@@ -100,7 +99,8 @@ mod tests {
 
     #[pg_test]
     fn test_hello_my_extension() {
-        assert_eq!("Hello, my_extension", crate::hello_my_extension());
+        let name = "Brian".to_owned();
+        assert_eq!("Hello, Brian", crate::hello_my_extension(name));
     }
 }
 
