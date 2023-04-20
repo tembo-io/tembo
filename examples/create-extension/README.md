@@ -9,20 +9,18 @@
 ## Init a new `pgx` project
 - https://github.com/tcdi/pgrx/tree/master#getting-started
 
-- inspect src/lib.rs
+`cargo pgx run pg15`
 
-- add another function
-
-`cargo pgx run`
-
-- call the functions
+- hell world
 
 - use the SPI to execute some sql
+
+- build a background worker
 
 ```bash
 echo "shared_preload_libraries = 'my_extension.so'" >> ~/.pgx/data-15/postgresql.conf
 ```
 
-- build a background worker
+`cargo pgx run pg15`
 
 - tip: watch logs from ~.pgx/
