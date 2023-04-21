@@ -1,4 +1,4 @@
-# WIP: Developing a Postgres Extension in Rust using [PGX](https://github.com/tcdi/pgx)
+# Developing a Postgres Extension in Rust using [PGX](https://github.com/tcdi/pgx)
 
 ## Start
 
@@ -6,29 +6,21 @@
 
 - Install [pgx](https://github.com/tcdi/pgx#getting-started)
 
-
-
 ## Init a new `pgx` project
+- https://github.com/tcdi/pgrx/tree/master#getting-started
 
-```bash
-cargo pgx new my_extension
-cd my_extension
-```
+`cargo pgx run pg15`
 
-inspect src/lib.rs
-
-- add another function
-
-`cargo pgx run`
-
-- call the functions
+- hell world
 
 - use the SPI to execute some sql
+
+- build a background worker
 
 ```bash
 echo "shared_preload_libraries = 'my_extension.so'" >> ~/.pgx/data-15/postgresql.conf
 ```
 
-- build a background worker
+`cargo pgx run pg15`
 
 - tip: watch logs from ~.pgx/
