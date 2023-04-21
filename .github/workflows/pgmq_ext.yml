@@ -10,7 +10,7 @@ on:
     branches:
       - main
     paths:
-      - '.github/workflows/pg_smq_ext.yml'
+      - '.github/workflows/pgmq_ext.yml'
       - '.github/actions/pgx-init/**'
       - './pgmq/extension/**'
   # Always run tests on main or release branches
