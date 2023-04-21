@@ -1,9 +1,9 @@
-name: Postgres Simple Message Queue (pg14)
+name: PGMQ Extension (pg14)
 
 defaults:
   run:
     shell: bash
-    working-directory: ./extensions/pgmq/
+    working-directory: ./pgmq/extension/
 
 on:
   pull_request:
@@ -12,7 +12,7 @@ on:
     paths:
       - '.github/workflows/pg_smq_ext.yml'
       - '.github/actions/pgx-init/**'
-      - 'extensions/pgmq/**'
+      - './pgmq/extension/**'
   # Always run tests on main or release branches
   push:
     branches:
@@ -33,15 +33,15 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
         with:
-          prefix-key: "pg-smq-extension-lint"
+          prefix-key: "pgmq-extension-lint"
           workspaces: |
-            extensions/pgmq
+            pgmq/extension
           # Additional directories to cache
           cache-directories: |
             /home/runner/.pgx
       - uses: ./.github/actions/pgx-init
         with:
-          working-directory: extensions/pgmq
+          working-directory: pgmq/extension
       - name: Cargo format
         run: cargo +nightly fmt --all --check
       - name: Clippy
@@ -58,15 +58,15 @@ jobs:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
         with:
-          prefix-key: "pg-smq-extension-test"
+          prefix-key: "pgmq-extension-test"
           workspaces: |
-            extensions/pgmq
+            pgmq/extension
           # Additional directories to cache
           cache-directories: |
             /home/runner/.pgx
       - uses: ./.github/actions/pgx-init
         with:
-          working-directory: extensions/pgmq
+          working-directory: pgmq/extension
       - name: test
         run: |
           sudo apt-get update && sudo apt-get install -y postgresql-server-dev-14
