@@ -73,6 +73,7 @@ jobs:
           git clone https://github.com/pgpartman/pg_partman.git && \
           cd pg_partman && \
           sudo make install && cd ../
+          ls -alh
           cp /usr/share/postgresql/14/extension/pg_partman* ~/.pgx/14.7/pgx-install/share/postgresql/extension/
           cp /usr/lib/postgresql/14/lib/pg_partman_bgw.so ~/.pgx/14.7/pgx-install/lib/postgresql/
           rm -rf ./target/pgx-test-data-* || true
