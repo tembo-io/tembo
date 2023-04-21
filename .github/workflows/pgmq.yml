@@ -1,9 +1,9 @@
-name: pgmq CI workflow
+name: pgmq crate CI workflow
 
 defaults:
   run:
     shell: bash
-    working-directory: ./crates/pgmq/
+    working-directory: pgmq/core/
 
 on:
   pull_request:
