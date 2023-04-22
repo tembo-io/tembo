@@ -246,7 +246,7 @@ pub fn pop(name: &str) -> Result<String, PgmqError> {
         "
         WITH cte AS
             (
-                SELECT *
+                SELECT msg_id
                 FROM {TABLE_PREFIX}_{name}
                 WHERE vt <= now() at time zone 'utc'
                 ORDER BY msg_id ASC
