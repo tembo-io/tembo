@@ -64,9 +64,9 @@ jobs:
           # Additional directories to cache
           cache-directories: |
             /home/runner/.pgx
-      - uses: ./.github/actions/pgx-init
-        with:
-          working-directory: pgmq/extension
+      # - uses: ./.github/actions/pgx-init
+      #   with:
+      #     working-directory: pgmq/extension
       - name: test
         run: |
           wget https://github.com/freshautomations/stoml/releases/download/v0.7.1/stoml_linux_amd64 &> /dev/null
@@ -74,6 +74,8 @@ jobs:
           chmod +x stoml
           pgrx_pg_version=$(./stoml Cargo.toml features.default)
           pgrx_pg_config=$(./stoml ~/.pgx/config.toml configs.${pgrx_pg_version})
+          echo "pgrx_pg_version: ${pgrx_pg_version}"
+          echo "pgrx_pg_config: ${pgrx_pg_config}"
           sudo apt-get update && sudo apt-get install -y postgresql-server-dev-14
           git clone https://github.com/pgpartman/pg_partman.git && \
           cd pg_partman && \
