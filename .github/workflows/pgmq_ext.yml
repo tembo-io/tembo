@@ -78,7 +78,7 @@ jobs:
           git clone https://github.com/pgpartman/pg_partman.git && \
           cd pg_partman && \
           sudo make install && cd ../
-          cp $(pg_config --sharedir)/extension/pg_partman* ${pgrx_pg_config}/extension/
-          cp $(pg_config --pkglibdir)/pg_partman_bgw.so ${pgrx_pg_config}/
+          cp $(pg_config --sharedir)/extension/pg_partman* $(${pgx_pgcfg} --sharedir)/extension/
+          cp $(pg_config --pkglibdir)/pg_partman_bgw.so $(${pgx_pgcfg} --pkglibdir)
           rm -rf ./target/pgx-test-data-* || true
           cargo pgx test ${pgrx_pg_version}
