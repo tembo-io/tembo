@@ -69,13 +69,14 @@ jobs:
           working-directory: pgmq/extension
       - name: test
         run: |
-          # TODO: trunk install --directory=pgrx_pg_config
           wget https://github.com/freshautomations/stoml/releases/download/v0.7.1/stoml_linux_amd64 &> /dev/null
           mv stoml_linux_amd64 stoml
           chmod +x stoml
           pgrx_pg_version=$(./stoml Cargo.toml features.default)
           pgrx_pg_config=$(./stoml ~/.pgx/config.toml configs.${pgrx_pg_version})
-          sudo apt-get update && sudo apt-get install -y postgresql-server-dev-all
+          curl https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor | tee /etc/apt/trusted.gpg.d/apt.postgresql.org.gpg > /dev/null
+          echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list
+          sudo apt-get update && sudo apt-get install -y postgresql-server-dev-15
           git clone https://github.com/pgpartman/pg_partman.git && \
           cd pg_partman && \
           sudo make install && cd ../
