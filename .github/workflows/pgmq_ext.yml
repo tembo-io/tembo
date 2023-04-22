@@ -74,9 +74,7 @@ jobs:
           chmod +x stoml
           pgrx_pg_version=$(./stoml Cargo.toml features.default)
           pgrx_pg_config=$(./stoml ~/.pgx/config.toml configs.${pgrx_pg_version})
-          curl https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor | tee /etc/apt/trusted.gpg.d/apt.postgresql.org.gpg > /dev/null
-          echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list
-          sudo apt-get update && sudo apt-get install -y postgresql-server-dev-15
+          sudo apt-get update && sudo apt-get install -y postgresql-server-dev-14
           git clone https://github.com/pgpartman/pg_partman.git && \
           cd pg_partman && \
           sudo make install && cd ../
