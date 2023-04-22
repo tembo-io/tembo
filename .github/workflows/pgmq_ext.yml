@@ -58,7 +58,6 @@ jobs:
          wget https://github.com/freshautomations/stoml/releases/download/v0.7.1/stoml_linux_amd64 &> /dev/null
          mv stoml_linux_amd64 stoml
          chmod +x stoml
-         sudo mv stoml /usr/local/bin/
       - uses: actions/checkout@v2
       - name: Install Rust stable toolchain
         uses: actions-rs/toolchain@v1
@@ -78,8 +77,8 @@ jobs:
       - name: test
         run: |
           # TODO: trunk install --directory=pgrx_pg_config
-          pgrx_pg_version=$(stoml Cargo.toml features.default)
-          pgrx_pg_config=$(stoml ~/.pgx/config.toml configs.${pgrx_pg_version})
+          pgrx_pg_version=$(./stoml Cargo.toml features.default)
+          pgrx_pg_config=$(./stoml ~/.pgx/config.toml configs.${pgrx_pg_version})
           sudo apt-get update && sudo apt-get install -y postgresql-server-dev-all
           git clone https://github.com/pgpartman/pg_partman.git && \
           cd pg_partman && \
@@ -87,5 +86,4 @@ jobs:
           cp $(pg_config --sharedir)/extension/pg_partman* ${pgrx_pg_config}/extension/
           cp $(pg_config --pkglibdir)/pg_partman_bgw.so ${pgrx_pg_config}/
           rm -rf ./target/pgx-test-data-* || true
-          pg_version=$(stoml Cargo.toml features.default)
-          cargo pgx test ${pg_version}
+          cargo pgx test ${pgrx_pg_version}
