@@ -51,13 +51,6 @@ jobs:
     name: Run tests
     runs-on: ubuntu-22.04
     steps:
-      - name: Install TOML parser
-        shell: bash
-        run: |
-         set -xe
-         wget https://github.com/freshautomations/stoml/releases/download/v0.7.1/stoml_linux_amd64 &> /dev/null
-         mv stoml_linux_amd64 stoml
-         chmod +x stoml
       - uses: actions/checkout@v2
       - name: Install Rust stable toolchain
         uses: actions-rs/toolchain@v1
@@ -77,6 +70,9 @@ jobs:
       - name: test
         run: |
           # TODO: trunk install --directory=pgrx_pg_config
+          wget https://github.com/freshautomations/stoml/releases/download/v0.7.1/stoml_linux_amd64 &> /dev/null
+          mv stoml_linux_amd64 stoml
+          chmod +x stoml
           pgrx_pg_version=$(./stoml Cargo.toml features.default)
           pgrx_pg_config=$(./stoml ~/.pgx/config.toml configs.${pgrx_pg_version})
           sudo apt-get update && sudo apt-get install -y postgresql-server-dev-all
