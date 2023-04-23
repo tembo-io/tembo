@@ -37,6 +37,7 @@ fn pgmq_create(queue_name: &str) -> Result<(), PgmqExtError> {
 fn pgmq_create_partitioned(
     queue_name: &str,
     partition_size: default!(i64, 10000),
+    retention_size: default!(i64, 10000),
 ) -> Result<(), PgmqExtError> {
     let setup = partition::init_partitioned_queue(queue_name, partition_size)?;
     let ran: Result<_, spi::Error> = Spi::connect(|mut c| {
@@ -374,7 +375,7 @@ mod tests {
     fn test_partitioned() {
         let qname = r#"test_internal"#;
 
-        let _ = pgmq_create_partitioned(&qname, 2).unwrap();
+        let _ = pgmq_create_partitioned(&qname, 2, 2).unwrap();
 
         let queues = listit().unwrap();
         assert_eq!(queues.len(), 1);
