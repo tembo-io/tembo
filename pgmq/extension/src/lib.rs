@@ -36,10 +36,11 @@ fn pgmq_create(queue_name: &str) -> Result<(), PgmqExtError> {
 #[pg_extern]
 fn pgmq_create_partitioned(
     queue_name: &str,
-    partition_size: default!(i64, 10000),
-    retention_size: default!(i64, 10000),
+    partition_interval: default!(String, "daily"),
+    retention_interval: default!(String, "daily"),
 ) -> Result<(), PgmqExtError> {
-    let setup = partition::init_partitioned_queue(queue_name, partition_size)?;
+    let setup =
+        partition::init_partitioned_queue(queue_name, &partition_interval, &retention_interval)?;
     let ran: Result<_, spi::Error> = Spi::connect(|mut c| {
         for q in setup {
             let _ = c.update(&q, None, None)?;
@@ -375,7 +376,10 @@ mod tests {
     fn test_partitioned() {
         let qname = r#"test_internal"#;
 
-        let _ = pgmq_create_partitioned(&qname, 2, 2).unwrap();
+        let partition_interval = "2".to_owned();
+        let retention_interval = "2".to_owned();
+
+        let _ = pgmq_create_partitioned(&qname, partition_interval, retention_interval).unwrap();
 
         let queues = listit().unwrap();
         assert_eq!(queues.len(), 1);
