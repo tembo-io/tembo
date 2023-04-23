@@ -22,7 +22,7 @@ enum PgmqExtError {
 }
 
 #[pg_extern]
-fn pgmq_create(queue_name: &str) -> Result<(), PgmqExtError> {
+fn pgmq_create_non_partitioned(queue_name: &str) -> Result<(), PgmqExtError> {
     let setup = init_queue(queue_name)?;
     let ran: Result<_, spi::Error> = Spi::connect(|mut c| {
         for q in setup {
@@ -34,7 +34,7 @@ fn pgmq_create(queue_name: &str) -> Result<(), PgmqExtError> {
 }
 
 #[pg_extern]
-fn pgmq_create_partitioned(
+fn pgmq_create(
     queue_name: &str,
     partition_interval: default!(String, "daily"),
     retention_interval: default!(String, "daily"),
@@ -278,9 +278,9 @@ mod tests {
     use pgmq_crate::query::TABLE_PREFIX;
 
     #[pg_test]
-    fn test_create() {
+    fn test_creat_non_partitioned() {
         let qname = r#"test_queue"#;
-        let _ = pgmq_create(&qname).unwrap();
+        let _ = pgmq_create_non_partitioned(&qname).unwrap();
         let retval = Spi::get_one::<i64>(&format!("SELECT count(*) FROM {TABLE_PREFIX}_{qname}"))
             .expect("SQL select failed");
         assert_eq!(retval.unwrap(), 0);
@@ -294,7 +294,7 @@ mod tests {
     #[pg_test]
     fn test_default() {
         let qname = r#"test_default"#;
-        let _ = pgmq_create(&qname);
+        let _ = pgmq_create_non_partitioned(&qname);
         let init_count =
             Spi::get_one::<i64>(&format!("SELECT count(*) FROM {TABLE_PREFIX}_{qname}"))
                 .expect("SQL select failed");
@@ -322,7 +322,7 @@ mod tests {
     #[pg_test]
     fn test_internal() {
         let qname = r#"test_internal"#;
-        let _ = pgmq_create(&qname).unwrap();
+        let _ = pgmq_create_non_partitioned(&qname).unwrap();
 
         let queues = listit().unwrap();
         assert_eq!(queues.len(), 1);
@@ -379,7 +379,7 @@ mod tests {
         let partition_interval = "2".to_owned();
         let retention_interval = "2".to_owned();
 
-        let _ = pgmq_create_partitioned(&qname, partition_interval, retention_interval).unwrap();
+        let _ = pgmq_create(&qname, partition_interval, retention_interval).unwrap();
 
         let queues = listit().unwrap();
         assert_eq!(queues.len(), 1);
@@ -431,7 +431,7 @@ mod tests {
     #[pg_test]
     fn test_archive() {
         let qname = r#"test_archive"#;
-        let _ = pgmq_create(&qname).unwrap();
+        let _ = pgmq_create_non_partitioned(&qname).unwrap();
         // no messages in the queue
         let retval = Spi::get_one::<i64>(&format!("SELECT count(*) FROM {TABLE_PREFIX}_{qname}"))
             .expect("SQL select failed");
