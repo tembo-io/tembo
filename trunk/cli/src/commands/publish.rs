@@ -67,7 +67,7 @@ impl SubCommand for PublishCommand {
         let mut headers = HeaderMap::new();
         headers.insert(CONTENT_TYPE, "application/octet-stream".parse().unwrap());
         // Add token header from env var
-        let auth = env::var("AUTH_TOKEN").unwrap_or_else(|_| "".to_owned());
+        let auth = env::var("TRUNK_AUTH_TOKEN").unwrap_or_else(|_| "".to_owned());
         headers.insert(AUTHORIZATION, auth.parse()?);
         let file_part = reqwest::multipart::Part::bytes(file)
             .file_name(name)
