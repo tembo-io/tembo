@@ -20,14 +20,6 @@ enum PgmqExtError {
     QueueError(#[from] PgmqError),
 }
 
-type MessageRow = (
-    i64,
-    i32,
-    TimestampWithTimeZone,
-    TimestampWithTimeZone,
-    pgx::JsonB,
-);
-
 #[pg_extern]
 fn pgmq_create_non_partitioned(queue_name: &str) -> Result<(), PgmqExtError> {
     let setup = init_queue(queue_name)?;
