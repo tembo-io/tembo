@@ -54,7 +54,7 @@ psql postgres://postgres:postgres@0.0.0.0:5432/postgres
 ```
 
 ```sql
--- create the extension
+-- create the extension, pg_partman is also required
 CREATE EXTENSION pgmq CASCADE;
 ```
 
