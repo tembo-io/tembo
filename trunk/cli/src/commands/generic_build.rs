@@ -249,29 +249,45 @@ pub async fn build_generic(
         println!("{}", pkglibdir_file);
     }
 
-    // // output_path is the locally output path
+    // output_path is the locally output path
     // fs::create_dir_all(output_path)?;
 
     // let mut manifest_files = Vec::new();
 
-    // for file_path in file_list {
-    //     let options = Some(DownloadFromContainerOptions { path: file_path });
-    //     let file_stream = docker.download_from_container(&container.id, options);
+    // let output_path = output_path.to_owned();
+    // let package_path = format!("{output_path}/{extension_name}-{extension_version}.tar.gz");
+    // let file = File::create(&package_path)?;
 
-    //     let receiver = ByteStreamSyncReceiver::new();
-    //     let receiver_sender = receiver.sender();
-    //     let output_path = output_path.to_owned();
-    //     let package_path = format!("{}/{}", output_path, file_path);
-    //     let file = File::create(&package_path)?;
+    // let options = Some(DownloadFromContainerOptions { path: output_dir });
+    // let file_stream = docker.download_from_container(&container.id, options);
 
-    //     let tar_handle = task::spawn_blocking(move || {
-    //         let mut archive = Archive::new(receiver);
-    //         let mut new_archive = Builder::new(flate2::write::GzEncoder::new(file, flate2::Compression::default()));
+    // let receiver = ByteStreamSyncReceiver::new();
+    // let receiver_sender = receiver.sender();
+    // let output_path = output_path.to_owned();
+    // let extension_name = extension_name.to_owned();
+    // let extension_version = extension_version.to_owned();
+    // let package_path = format!("{output_path}/{extension_name}-{extension_version}.tar.gz");
+    // let file = File::create(&package_path)?;
 
-    //         if let Ok(entries) = archive.entries() {
-    //             for entry in entries {
-    //                 if let Ok(entry) = entry {
-    //                     let name = entry.path()?.to_path_buf();
+    // let tar_handle = task::spawn_blocking(move || {
+    //     let mut archive = Archive::new(receiver);
+    //     let mut new_archive = Builder::new(flate2::write::GzEncoder::new(
+    //         file,
+    //         flate2::Compression::default(),
+    //     ));
+    //     let mut manifest = Manifest {
+    //         extension_name,
+    //         extension_version,
+    //         sys: "linux".to_string(),
+    //         files: None,
+    //     };
+    //     if let Ok(entries) = archive.entries() {
+    //         for entry in entries {
+    //             if let Ok(entry) = entry {
+    //                 let name = entry.path()?.to_path_buf();
+    //                 if name.to_str() == Some("manifest.json") {
+    //                     manifest.merge(serde_json::from_reader(entry)?);
+    //                 } else {
     //                     let name = name.strip_prefix("trunk-output")?;
 
     //                     if !name.to_string_lossy().is_empty() {
@@ -280,6 +296,7 @@ pub async fn build_generic(
     //                         header.set_mtime(entry.header().mtime()?);
     //                         header.set_size(entry.size());
     //                         header.set_cksum();
+    //                         let entry_type = entry.header().entry_type();
 
     //                         let mut buf = Vec::new();
     //                         let mut tee = TeeReader::new(entry, &mut buf, true);
@@ -288,29 +305,46 @@ pub async fn build_generic(
 
     //                         let (_entry, buf) = tee.into_inner();
 
-    //                         manifest_files.push(buf);
+    //                         if entry_type == EntryType::file() {
+    //                             let file = manifest.add_file(name);
+    //                             match file {
+    //                                 PackagedFile::SharedObject {
+    //                                     ref mut architecture,
+    //                                     ..
+    //                                 } => {
+    //                                     let elf = ElfBytes::<AnyEndian>::minimal_parse(buf)?;
+    //                                     let target_arch = match elf.ehdr.e_machine {
+    //                                         elf::abi::EM_386 => "x86",
+    //                                         elf::abi::EM_X86_64 => "x86_64",
+    //                                         elf::abi::EM_AARCH64 => "aarch64",
+    //                                         elf::abi::EM_ARM => "aarch32",
+    //                                         _ => "unknown",
+    //                                     }
+    //                                         .to_string();
+    //                                     architecture.replace(target_arch);
+    //                                 }
+    //                                 _ => {}
+    //                             }
+    //                         }
     //                     }
     //                 }
     //             }
     //         }
-    //         Ok::<_, Error>(())
-    //     });
+    //     }
+    //     let manifest = serde_json::to_string_pretty(&manifest).unwrap_or_default();
+    //     let mut header = Header::new_gnu();
+    //     header.set_size(manifest.as_bytes().len() as u64);
+    //     header.set_cksum();
+    //     header.set_mode(0o644);
+    //     new_archive.append_data(&mut header, "manifest.json", Cursor::new(manifest))?;
+    //     Ok::<_, GenericBuildError>(())
+    // });
 
-    //     let _ = receiver_sender.stream_to_end(file_stream).await;
-    //     tar_handle.await??;
-    // }
-
-    // let manifest = Manifest {
-    //     extension_name: extension_name.to_owned(),
-    //     extension_version: extension_version.to_owned(),
-    //     sys: "linux".to_string(),
-    //     files: Some(manifest_files),
-    // };
-
-    // let manifest_path = format!("{}/manifest.json", output_path);
-    // let manifest_file = File::create(manifest_path)?;
-    // let manifest_string = serde_json::to_string_pretty(&manifest).unwrap_or_default();
-    // manifest_file.write_all(manifest_string.as_bytes())?;
+    // // Wait until completion of streaming, but ignore its error as it would only error out
+    // // if tar_handle errors out.
+    // let _ = receiver_sender.stream_to_end(file_stream).await;
+    // // Handle the error
+    // tar_handle.await??;
 
     return Ok(());
 }

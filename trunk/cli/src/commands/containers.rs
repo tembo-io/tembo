@@ -1,7 +1,19 @@
+use std::fs::File;
+use std::io::Cursor;
+use std::path::Path;
+use bollard::container::DownloadFromContainerOptions;
 use bollard::Docker;
 use bollard::exec::{CreateExecOptions, StartExecOptions, StartExecResults};
+use elf::ElfBytes;
+use elf::endian::AnyEndian;
 use tokio_task_manager::Task;
 use futures_util::stream::StreamExt;
+use tar::{Archive, Builder, EntryType, Header};
+use tee_readwrite::TeeReader;
+use tokio::task;
+use crate::commands::generic_build::GenericBuildError;
+use crate::manifest::{Manifest, PackagedFile};
+use crate::sync_utils::ByteStreamSyncReceiver;
 
 /// Used to stop container when dropped, relies on using [tokio_task_manager::TaskManager::wait]
 /// to ensure `Drop` will run to completion
@@ -80,4 +92,112 @@ pub async fn exec_in_container(docker: Docker, container_id: &str, command: Vec<
 
     }
     Ok::<String, anyhow::Error>(total_output)
+}
+
+// Copy a file from inside a running container into a Trunk package
+// If the trunk package already exists, then add the file to the package
+// If the trunk package does not exist, then create it.
+pub async fn copy_from_container_into_package(docker: Docker, container_id: &str, file_path_in_container: &str, package_path: &str, extension_name: &str, extension_version: &str) -> Result<(), anyhow::Error> {
+
+    let package_path = format!("{package_path}/{extension_name}-{extension_version}.tar.gz");
+
+    // if package_path does not exist, then create it
+    if !Path::new(&package_path).exists() {
+        let _ = File::create(&package_path)?;
+    }
+    // Get file handle to trunk package
+    let file = File::open(&package_path)?;
+
+    // Stream used to pass information from docker to tar
+    let receiver = ByteStreamSyncReceiver::new();
+    let receiver_sender = receiver.sender();
+
+    // Open stream to docker for copying file
+    let options = Some(DownloadFromContainerOptions { path: file_path_in_container });
+    let file_stream = docker.download_from_container(container_id, options);
+
+    let extension_name = extension_name.to_owned();
+    let extension_version = extension_version.to_owned();
+
+    // Create a sync task within the tokio runtime to copy the file from docker to tar
+    let tar_handle = task::spawn_blocking(move || {
+        let mut archive = Archive::new(receiver);
+        let mut new_archive = Builder::new(flate2::write::GzEncoder::new(
+            file,
+            flate2::Compression::default(),
+        ));
+        let mut manifest = Manifest {
+            extension_name,
+            extension_version,
+            sys: "linux".to_string(),
+            files: None,
+        };
+        if let Ok(entries) = archive.entries() {
+            for entry in entries {
+                if let Ok(entry) = entry {
+                    let name = entry.path()?.to_path_buf();
+                    if name.to_str() == Some("manifest.json") {
+                        manifest.merge(serde_json::from_reader(entry)?);
+                    } else {
+                        let name = name.strip_prefix("trunk-output")?;
+
+                        if !name.to_string_lossy().is_empty() {
+                            let mut header = Header::new_gnu();
+                            header.set_mode(entry.header().mode()?);
+                            header.set_mtime(entry.header().mtime()?);
+                            header.set_size(entry.size());
+                            header.set_cksum();
+                            let entry_type = entry.header().entry_type();
+
+                            let mut buf = Vec::new();
+                            let mut tee = TeeReader::new(entry, &mut buf, true);
+
+                            new_archive.append_data(&mut header, name, &mut tee)?;
+
+                            let (_entry, buf) = tee.into_inner();
+
+                            if entry_type == EntryType::file() {
+                                let file = manifest.add_file(name);
+                                match file {
+                                    PackagedFile::SharedObject {
+                                        ref mut architecture,
+                                        ..
+                                    } => {
+                                        let elf = ElfBytes::<AnyEndian>::minimal_parse(buf)?;
+                                        let target_arch = match elf.ehdr.e_machine {
+                                            elf::abi::EM_386 => "x86",
+                                            elf::abi::EM_X86_64 => "x86_64",
+                                            elf::abi::EM_AARCH64 => "aarch64",
+                                            elf::abi::EM_ARM => "aarch32",
+                                            _ => "unknown",
+                                        }
+                                            .to_string();
+                                        architecture.replace(target_arch);
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        let manifest = serde_json::to_string_pretty(&manifest).unwrap_or_default();
+        let mut header = Header::new_gnu();
+        header.set_size(manifest.as_bytes().len() as u64);
+        header.set_cksum();
+        header.set_mode(0o644);
+        new_archive.append_data(&mut header, "manifest.json", Cursor::new(manifest))?;
+        Ok::<_, GenericBuildError>(())
+    });
+
+    // Wait until completion of streaming, but ignore its error as it would only error out
+    // if tar_handle errors out.
+    let _ = receiver_sender.stream_to_end(file_stream).await;
+    // Handle the error
+    tar_handle.await??;
+
+    println!("Packaged to {package_path}");
+
+    return Ok(());
 }
