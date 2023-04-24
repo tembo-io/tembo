@@ -220,15 +220,33 @@ pub async fn build_generic(
     let mut sharedir_list = vec![];
     for change in changes {
         if change.kind == 1 {
-            println!("{:?}", change.path.clone());
-            if change.path.starts_with(pkglibdir.clone()) {
-                pkglibdir_list.push(change.path);
-            } else if change.path.starts_with(sharedir.clone()) {
-                sharedir_list.push(change.path);
-            } else {
-                return Err(GenericBuildError::InvalidFileInstalled(change.path.clone()));
+            if change.path.ends_with(".so") || change.path.ends_with(".bc") || change.path.ends_with(".sql") || change.path.ends_with(".control") {
+                if change.path.starts_with(pkglibdir.clone()) {
+                    let file_in_pkglibdir = change.path;
+                    let file_in_pkglibdir = file_in_pkglibdir.strip_prefix(pkglibdir);
+                    let file_in_pkglibdir = file_in_pkglibdir.unwrap();
+                    let file_in_pkglibdir = file_in_pkglibdir.trim_start_matches("/");
+                    pkglibdir_list.push(file_in_pkglibdir.to_owned());
+                } else if change.path.starts_with(sharedir.clone()) {
+                    let file_in_sharedir = change.path;
+                    let file_in_sharedir = file_in_sharedir.strip_prefix(sharedir);
+                    let file_in_sharedir = file_in_sharedir.unwrap();
+                    let file_in_sharedir = file_in_sharedir.trim_start_matches("/");
+                    sharedir_list.push(file_in_sharedir.to_owned());
+                } else {
+                    return Err(GenericBuildError::InvalidFileInstalled(change.path.clone()));
+                }
             }
         }
+    }
+
+    println!("Sharedir files:");
+    for sharedir_file in sharedir_list {
+        println!("{}", sharedir_file);
+    }
+    println!("Pkglibdir files:");
+    for pkglibdir_file in pkglibdir_list {
+        println!("{}", pkglibdir_file);
     }
 
     // // output_path is the locally output path
