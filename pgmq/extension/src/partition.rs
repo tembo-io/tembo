@@ -23,7 +23,7 @@ pub fn init_partitioned_queue(
         create_partitioned_index(name, &partition_col)?,
         create_index(name)?,
         create_archive(name)?,
-        create_partitioned_table(name, partition_interval, &partition_col)?,
+        create_partitioned_table(name, &partition_col, partition_interval)?,
         insert_meta(name)?,
         set_retention_config(name, retention_interval)?,
     ])
@@ -47,7 +47,7 @@ fn create_partitioned_queue(queue: &str, partition_col: &str) -> Result<String, 
             enqueued_at TIMESTAMP WITH TIME ZONE DEFAULT (now() at time zone 'utc'),
             vt TIMESTAMP WITH TIME ZONE,
             message JSONB
-        ) PARTITION BY RANGE ({partition_col});;
+        ) PARTITION BY RANGE ({partition_col});
         "
     ))
 }
@@ -64,11 +64,11 @@ pub fn create_partitioned_index(queue: &str, partiton_col: &str) -> Result<Strin
 fn create_partitioned_table(
     queue: &str,
     partition_col: &str,
-    partition_size: &str,
+    partition_interval: &str,
 ) -> Result<String, PgmqError> {
     Ok(format!(
         "
-        SELECT {PARTMAN_SCHEMA}.create_parent('{PGMQ_SCHEMA}.{TABLE_PREFIX}_{queue}', '{partition_col}', 'native', '{partition_size}');
+        SELECT {PARTMAN_SCHEMA}.create_parent('{PGMQ_SCHEMA}.{TABLE_PREFIX}_{queue}', '{partition_col}', 'native', '{partition_interval}');
         "
     ))
 }
@@ -83,13 +83,13 @@ fn set_retention_config(queue: &str, retention: &str) -> Result<String, PgmqErro
     check_input(queue)?;
     Ok(format!(
         "
-        ALTER {PGMQ_SCHEMA}.part_config
+        UPDATE {PGMQ_SCHEMA}.part_config
         SET 
             retention = '{retention}',
             retention_keep_table = false,
             retention_keep_index = true,
             automatic_maintenance = 'on'
-        WHERE parent_table = {PGMQ_SCHEMA}.{TABLE_PREFIX}_{queue}
+        WHERE parent_table = '{PGMQ_SCHEMA}.{TABLE_PREFIX}_{queue}';
         "
     ))
 }
