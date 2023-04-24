@@ -39,6 +39,8 @@ fn pgmq_create(
     partition_interval: default!(String, "'daily'"),
     retention_interval: default!(String, "'5 days'"),
 ) -> Result<(), PgmqExtError> {
+    // TODO: data validation on partition_interval and retention_interval
+    // these need to both be parsed as integers, or both parsed as postgres durations
     let setup =
         partition::init_partitioned_queue(queue_name, &partition_interval, &retention_interval)?;
     let ran: Result<_, spi::Error> = Spi::connect(|mut c| {
