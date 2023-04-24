@@ -33,9 +33,13 @@ use tokio_stream::wrappers::ReceiverStream;
 use tokio_task_manager::Task;
 use toml::Value;
 use crate::commands::containers::{exec_in_container, ReclaimableContainer};
+use crate::commands::generic_build::GenericBuildError::InvalidFileInstalled;
 
 #[derive(Error, Debug)]
 pub enum GenericBuildError {
+
+    #[error("Produced a file outside of postgres sharedir or pkglibdir: {0}")]
+    InvalidFileInstalled(String),
 
     #[error("IO Error: {0}")]
     IoError(#[from] std::io::Error),
@@ -197,17 +201,33 @@ pub async fn build_generic(
 
     // This will stop the container, whether we return an error or not
     // let _ = ReclaimableContainer::new(&container.id, &docker, task);
-    exec_in_container(docker.clone(), &container.id, vec!["make", "install"]).await?;
+
+    println!("sharedir is:");
+    let sharedir = exec_in_container(docker.clone(), &container.id, vec!["pg_config", "--sharedir"]).await?;
+    let sharedir = sharedir.trim();
+    println!("pkglibdir is:");
+    let pkglibdir = exec_in_container(docker.clone(), &container.id, vec!["pg_config", "--pkglibdir"]).await?;
+    let pkglibdir= pkglibdir.trim();
+
+    println!("Determining installation files...");
+    let _exec_output = exec_in_container(docker.clone(), &container.id, vec!["make", "install"]).await?;
 
     // collect changes from container filesystem
+    println!("Collecting files...");
     let changes = docker.container_changes(&container.id).await?.expect("Expected to find changed files");
     // print all the changes
-    println!("Found new files:");
-    let mut file_list = vec![];
+    let mut pkglibdir_list = vec![];
+    let mut sharedir_list = vec![];
     for change in changes {
         if change.kind == 1 {
             println!("{:?}", change.path.clone());
-            file_list.push(change.path.clone())
+            if change.path.starts_with(pkglibdir.clone()) {
+                pkglibdir_list.push(change.path);
+            } else if change.path.starts_with(sharedir.clone()) {
+                sharedir_list.push(change.path);
+            } else {
+                return Err(GenericBuildError::InvalidFileInstalled(change.path.clone()));
+            }
         }
     }
 

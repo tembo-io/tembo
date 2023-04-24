@@ -79,5 +79,5 @@ pub async fn exec_in_container(docker: Docker, container_id: &str, command: Vec<
         }
 
     }
-    Ok::<_, anyhow::Error>(total_output)
+    Ok::<String, anyhow::Error>(total_output)
 }
