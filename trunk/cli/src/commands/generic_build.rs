@@ -1,4 +1,4 @@
-use bollard::container::{Config, CreateContainerOptions, StartContainerOptions};
+use bollard::container::{Config, CreateContainerOptions, DownloadFromContainerOptions, StartContainerOptions};
 use bollard::models::HostConfig;
 use semver::{Version, VersionReq};
 use std::collections::HashMap;
@@ -32,10 +32,11 @@ use tokio::task::JoinError;
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_task_manager::Task;
 use toml::Value;
-use crate::commands::containers::ReclaimableContainer;
+use crate::commands::containers::{exec_in_container, ReclaimableContainer};
 
 #[derive(Error, Debug)]
 pub enum GenericBuildError {
+
     #[error("IO Error: {0}")]
     IoError(#[from] std::io::Error),
 
@@ -196,49 +197,82 @@ pub async fn build_generic(
 
     // This will stop the container, whether we return an error or not
     // let _ = ReclaimableContainer::new(&container.id, &docker, task);
+    exec_in_container(docker.clone(), &container.id, vec!["make", "install"]).await?;
 
-
-    let config = CreateExecOptions {
-        cmd: Some(vec!["make", "install"]),
-        attach_stdout: Some(true),
-        ..Default::default()
-    };
-
-    let exec = docker.create_exec(&container.id, config).await?;
-    let start_exec_options = Some(StartExecOptions {
-        detach: false,
-        ..StartExecOptions::default()
-    });
-    let log_output = docker.start_exec(&exec.id, start_exec_options);
-    let mut start_exec_result = log_output.await?;
-
-    // match log_stream {
-    //     StartExecResults::Attached { .. } => {
-    //         println!("StartExecResults::Attached")
-    //         log_stream.output
-    //     },
-    //     StartExecResults::Detached => println!("StartExecResults::Detached"),
-    // }
-
-    match start_exec_result {
-        StartExecResults::Attached { output, .. } => {
-            let mut output = output
-                .map(|result| {
-                    match result {
-                        Ok(log_output) => println!("{}", log_output.to_string()),
-                        Err(error) => eprintln!("Error while reading log output: {}", error),
-                    }
-                })
-                .fuse();
-
-            // Run the output stream to completion.
-            while output.next().await.is_some() {}
-        },
-        StartExecResults::Detached => {
-            println!("Exec started in detached mode");
+    // collect changes from container filesystem
+    let changes = docker.container_changes(&container.id).await?.expect("Expected to find changed files");
+    // print all the changes
+    println!("Found new files:");
+    let mut file_list = vec![];
+    for change in changes {
+        if change.kind == 1 {
+            println!("{:?}", change.path.clone());
+            file_list.push(change.path.clone())
         }
     }
 
+    // // output_path is the locally output path
+    // fs::create_dir_all(output_path)?;
+
+    // let mut manifest_files = Vec::new();
+
+    // for file_path in file_list {
+    //     let options = Some(DownloadFromContainerOptions { path: file_path });
+    //     let file_stream = docker.download_from_container(&container.id, options);
+
+    //     let receiver = ByteStreamSyncReceiver::new();
+    //     let receiver_sender = receiver.sender();
+    //     let output_path = output_path.to_owned();
+    //     let package_path = format!("{}/{}", output_path, file_path);
+    //     let file = File::create(&package_path)?;
+
+    //     let tar_handle = task::spawn_blocking(move || {
+    //         let mut archive = Archive::new(receiver);
+    //         let mut new_archive = Builder::new(flate2::write::GzEncoder::new(file, flate2::Compression::default()));
+
+    //         if let Ok(entries) = archive.entries() {
+    //             for entry in entries {
+    //                 if let Ok(entry) = entry {
+    //                     let name = entry.path()?.to_path_buf();
+    //                     let name = name.strip_prefix("trunk-output")?;
+
+    //                     if !name.to_string_lossy().is_empty() {
+    //                         let mut header = Header::new_gnu();
+    //                         header.set_mode(entry.header().mode()?);
+    //                         header.set_mtime(entry.header().mtime()?);
+    //                         header.set_size(entry.size());
+    //                         header.set_cksum();
+
+    //                         let mut buf = Vec::new();
+    //                         let mut tee = TeeReader::new(entry, &mut buf, true);
+
+    //                         new_archive.append_data(&mut header, name, &mut tee)?;
+
+    //                         let (_entry, buf) = tee.into_inner();
+
+    //                         manifest_files.push(buf);
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //         Ok::<_, Error>(())
+    //     });
+
+    //     let _ = receiver_sender.stream_to_end(file_stream).await;
+    //     tar_handle.await??;
+    // }
+
+    // let manifest = Manifest {
+    //     extension_name: extension_name.to_owned(),
+    //     extension_version: extension_version.to_owned(),
+    //     sys: "linux".to_string(),
+    //     files: Some(manifest_files),
+    // };
+
+    // let manifest_path = format!("{}/manifest.json", output_path);
+    // let manifest_file = File::create(manifest_path)?;
+    // let manifest_string = serde_json::to_string_pretty(&manifest).unwrap_or_default();
+    // manifest_file.write_all(manifest_string.as_bytes())?;
 
     return Ok(());
 }
