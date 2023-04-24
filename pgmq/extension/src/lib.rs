@@ -36,8 +36,8 @@ fn pgmq_create_non_partitioned(queue_name: &str) -> Result<(), PgmqExtError> {
 #[pg_extern]
 fn pgmq_create(
     queue_name: &str,
-    partition_interval: default!(String, "daily"),
-    retention_interval: default!(String, "daily"),
+    partition_interval: default!(String, "'daily'"),
+    retention_interval: default!(String, "'7 days'"),
 ) -> Result<(), PgmqExtError> {
     let setup =
         partition::init_partitioned_queue(queue_name, &partition_interval, &retention_interval)?;
