@@ -881,7 +881,7 @@ impl PGMQueue {
 // Executes a query and returns a single row
 // If the query returns no rows, None is returned
 // This function is intended for internal use.
-async fn fetch_one_message<T: for<'de> Deserialize<'de>>(
+pub async fn fetch_one_message<T: for<'de> Deserialize<'de>>(
     query: &str,
     connection: &Pool<Postgres>,
 ) -> Result<Option<Message<T>>, errors::PgmqError> {
