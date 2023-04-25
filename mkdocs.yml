@@ -13,6 +13,8 @@ theme:
 nav:
   - CoreDB: 'index.md'
   - Kubernetes Operator: 'operator/index.md'
+  - Trunk:
+    - Trunk CLI: 'trunk/trunk-cli.md'
   - Extensions:
     - pgmq: 'extensions/pgmq.md'
   - Libraries:
