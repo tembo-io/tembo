@@ -25,8 +25,8 @@ We just got started, but here's what we're working on:
 * [pgtrunk.io](https://github.com/CoreDB-io/coredb/tree/main/trunk/registry) that serves as a backend for Trunk, and also provides discovery and metrics
 * A [Kubernetes Operator](https://github.com/CoreDB-io/coredb/tree/main/coredb-operator) built with Rust
 * pgmq - an easy message queue built with Rust, that we use in our managed service, which is available as 
-  [a crate](https://github.com/CoreDB-io/coredb/tree/main/crates/pgmq) or as 
-  [a Postgres extension](https://github.com/CoreDB-io/coredb/tree/main/extensions/pgmq)
+  [a crate](https://github.com/CoreDB-io/coredb/tree/main/pgmq/core) or as 
+  [a Postgres extension](https://github.com/CoreDB-io/coredb/tree/main/pgmq/extension)
 * A managed service Postgres, which you can get early access to by signing up for 
   [our mailing list](https://coredb.io)
 
