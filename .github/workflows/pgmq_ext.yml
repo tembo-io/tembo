@@ -79,7 +79,7 @@ jobs:
       #     pg_version=$(stoml Cargo.toml features.default)
       #     cargo pgx run ${pg_version} --pgcli || true
       #     cargo pgx test ${pg_version}
-      - name: Install TOML parser
+      - name: Install stoml and pg-trunk
         shell: bash
         run: |
          set -xe
@@ -87,6 +87,7 @@ jobs:
          mv stoml_linux_amd64 stoml
          chmod +x stoml
          sudo mv stoml /usr/local/bin/
+         cargo install pg-trunk
 
       - name: publish-to-trunk
         # only publish off main branch
@@ -94,7 +95,6 @@ jobs:
         env:
           TRUNK_AUTH_TOKEN: ${{ secrets.TRUNK_AUTH_TOKEN }}
         run: |
-          cargo install pg-trunk
           trunk build
           pgmq_ver=$(stoml Cargo.toml package.version)
           pgmq_descr=$(stoml Cargo.toml package.description)
