@@ -27,6 +27,7 @@ A lightweight distributed message queue. Like [AWS SQS](https://aws.amazon.com/s
     - [Delete a message](#delete-a-message)
 - [Configuration](#configuration)
   - [Partitioned Queues](#partitioned-queues)
+  - [Visibility Timeout (vt)](#visibility-timeout-vt)
 
 ## Installation
 
@@ -107,8 +108,8 @@ pgmq=# SELECT * from pgmq_read('my_queue', 30, 2);
 
  msg_id | read_ct |              vt               |          enqueued_at          |    message
 --------+---------+-------------------------------+-------------------------------+---------------
-      1 |       1 | 2023-02-07 04:56:00.650342-06 | 2023-02-07 04:54:51.530818-06 | {"foo":"bar"}
-      2 |       1 | 2023-02-07 04:56:00.650342-06 | 2023-02-07 04:54:51.530818-06 | {"foo":"bar"}
+      1 |       1 | 2023-02-07 04:56:00.650342-06 | 2023-02-07 04:54:51.530818-06 | {"foo":"bar1"}
+      2 |       1 | 2023-02-07 04:56:00.650342-06 | 2023-02-07 04:54:51.530818-06 | {"foo":"bar2"}
 ```
 
 If the queue is empty, or if all messages are currently invisible, no rows will be returned.
@@ -121,14 +122,13 @@ pgmq=# SELECT * from pgmq_read('my_queue', 30, 1);
 
 ### Pop a message
 
-
 ```sql
 -- Read a message and immediately delete it from the queue. Returns `None` if the queue is empty.
 pgmq=# SELECT * from pgmq_pop('my_queue');
 
  msg_id | read_ct |              vt               |          enqueued_at          |    message
 --------+---------+-------------------------------+-------------------------------+---------------
-      1 |       2 | 2023-02-07 04:56:00.650342-06 | 2023-02-07 04:54:51.530818-06 | {"foo":"bar"}
+      1 |       2 | 2023-02-07 04:56:00.650342-06 | 2023-02-07 04:54:51.530818-06 | {"foo":"bar1"}
 ```
 
 ### Archive a message
@@ -136,15 +136,22 @@ pgmq=# SELECT * from pgmq_pop('my_queue');
 
 ```sql
 -- Archiving a message removes it from the queue, and inserts it to the archive table.
--- TODO: implement this in the extension
-
+-- archive message with msg_id=2
+pgmq=# SELECT * from pgmq_archive('my_queue', 2);
+```
+```sql
+pgmq=#  SELECT * from pgmq_my_queue_archive;
+ msg_id | read_ct |         enqueued_at          |          deleted_at           |              vt               |     message     
+--------+---------+------------------------------+-------------------------------+-------------------------------+-----------------
+      2 |       1 | 2023-04-25 00:55:40.68417-05 | 2023-04-25 00:56:35.937594-05 | 2023-04-25 00:56:20.532012-05 | {"foo": "bar2"}```
 ```
 
 ### Delete a message
 
 ```sql
 -- Delete a message id `1` from queue named `my_queue`.
-pgmq=# select pgmq_delete('my_queue', 1);
+pgmq=# SELECT * from pgmq_send('my_queue', '{"foo": "bar3"}');
+pgmq=# SELECT pgmq_delete('my_queue', 1);
  pgmq_delete
 -------------
  t
@@ -172,9 +179,18 @@ In order for automatic partition maintenance to take place, several settings mus
  `pg_partman_bgw.interval` 
 in `postgresql.conf`. Below are the default configuration values set in CoreDB docker images.
 
-Add the following to `postgresql.conf`
+Add the following to `postgresql.conf`. Note, changing `shared_preload_libraries` requires a restart of Postgres.
 
-shared_preload_libraries = 'pg_partman_bgw'     # (change requires restart)
-pg_partman_bgw.interval = 3600
-pg_partman_bgw.role = 'keith'
-pg_partman_bgw.dbname = 'keith'
+`pg_partman_bgw.interval` sets the interval at which `pg_partman` conducts maintenance. This creates new partitions and dropping of partitions falling out of the `retention_interval`. By default, `pg_partman` will keep 4 partitions "ahead" of the currently active partition.
+
+```
+shared_preload_libraries = 'pg_partman_bgw' # requires restart of Postgrs
+pg_partman_bgw.interval = 60
+pg_partman_bgw.role = 'postgres'
+pg_partman_bgw.dbname = 'postgres'
+```
+
+
+## Visibility Timeout (vt)
+
+pgmq guarantees exactly once delivery of a message within a visibility timeout. The visibility timeout is the amount of time a message is invisible to other consumers after it has been read by a consumer. If the message is NOT deleted or archived within the visibility timeout, it will become visible again and can be read by another consumer. The visibility timeout is set when a message is read from the queue, via `pgmq_read()`. It is recommended to set a `vt` value that is greater than the expected time it takes to process a message. After the application successfully processes the message, it should call `pgmq_delete()` to completely remove the message from the queue or `pgmq_archive()` to move it to the archive table for the queue.
