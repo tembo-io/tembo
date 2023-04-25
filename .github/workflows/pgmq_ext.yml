@@ -95,8 +95,11 @@ jobs:
         env:
           TRUNK_AUTH_TOKEN: ${{ secrets.TRUNK_AUTH_TOKEN }}
         run: |
-          trunk build
           pgmq_ver=$(stoml Cargo.toml package.version)
           pgmq_descr=$(stoml Cargo.toml package.description)
           pgmq_repo=$(stoml Cargo.toml package.repository)
-          trunk publish pgmq --version 0.4.2 --file .trunk/pgmq-0.4.2.tar.gz --description "A distributed message queue for Rust applications, on Postgres." --homepage "https://github.com/CoreDB-io/coredb" --repository "https://github.com/CoreDB-io/coredb" --license "Apache-2.0"
+          echo pgmq_ver: $pgmq_ver
+          echo pgmq_descr: $pgmq_descr
+          echo pgmq_repo: $pgmq_repo
+# trunk build
+#trunk publish pgmq --version 0.4.2 --file .trunk/pgmq-0.4.2.tar.gz --description "A distributed message queue for Rust applications, on Postgres." --homepage "https://github.com/CoreDB-io/coredb" --repository "https://github.com/CoreDB-io/coredb" --license "Apache-2.0"
