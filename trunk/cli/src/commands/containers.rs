@@ -54,9 +54,12 @@ impl<'a> Drop for ReclaimableContainer<'a> {
 
 pub async fn exec_in_container(docker: Docker, container_id: &str, command: Vec<&str>) -> Result<String, anyhow::Error> {
 
+    println!("Executing in container: {:?}", command.join(" "));
+
     let config = CreateExecOptions {
         cmd: Some(command),
         attach_stdout: Some(true),
+        attach_stderr: Some(true),
         ..Default::default()
     };
 
@@ -100,10 +103,14 @@ pub async fn exec_in_container(docker: Docker, container_id: &str, command: Vec<
 pub async fn copy_from_container_into_package(docker: Docker, container_id: &str, file_path_in_container: &str, package_path: &str, extension_name: &str, extension_version: &str) -> Result<(), anyhow::Error> {
 
     let package_path = format!("{package_path}/{extension_name}-{extension_version}.tar.gz");
+    println!("Copying file {} from container into package {}", file_path_in_container, package_path);
 
     // if package_path does not exist, then create it
     if !Path::new(&package_path).exists() {
         let _ = File::create(&package_path)?;
+        println!("Created package {}", package_path);
+    } else {
+        println!("Package {} already exists, opening..", package_path);
     }
     // Get file handle to trunk package
     let file = File::open(&package_path)?;
@@ -137,6 +144,7 @@ pub async fn copy_from_container_into_package(docker: Docker, container_id: &str
                 if let Ok(entry) = entry {
                     let name = entry.path()?.to_path_buf();
                     if name.to_str() == Some("manifest.json") {
+                        println!("Found manifest.json, merging additions with existing manifest");
                         manifest.merge(serde_json::from_reader(entry)?);
                     } else {
                         let name = name.strip_prefix("trunk-output")?;
@@ -152,11 +160,13 @@ pub async fn copy_from_container_into_package(docker: Docker, container_id: &str
                             let mut buf = Vec::new();
                             let mut tee = TeeReader::new(entry, &mut buf, true);
 
+                            println!("Adding file {} to package", name.clone().to_string_lossy());
                             new_archive.append_data(&mut header, name, &mut tee)?;
 
                             let (_entry, buf) = tee.into_inner();
 
                             if entry_type == EntryType::file() {
+                                println!("Adding file {} to manifest", name.clone().to_string_lossy());
                                 let file = manifest.add_file(name);
                                 match file {
                                     PackagedFile::SharedObject {
@@ -172,6 +182,7 @@ pub async fn copy_from_container_into_package(docker: Docker, container_id: &str
                                             _ => "unknown",
                                         }
                                             .to_string();
+                                        println!("Detected architecture: {}", target_arch);
                                         architecture.replace(target_arch);
                                     }
                                     _ => {}

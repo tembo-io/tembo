@@ -33,7 +33,8 @@ use tokio::task::JoinError;
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_task_manager::Task;
 use toml::Value;
-use crate::commands::containers::{copy_from_container_into_package, ReclaimableContainer};
+use crate::commands::containers::{copy_from_container_into_package, exec_in_container, ReclaimableContainer};
+use crate::commands::generic_build::GenericBuildError;
 
 #[derive(Error, Debug)]
 pub enum PgxBuildError {
@@ -174,6 +175,12 @@ pub async fn build_pgx(
         }
     });
 
+    let mut build_args = HashMap::new();
+    build_args.insert("EXTENSION_NAME", extension_name);
+    build_args.insert("EXTENSION_VERSION", extension_version);
+    build_args.insert("PGX_VERSION", pgx_version.as_str());
+
+    // TODO: move to docker_build function
     let mut image_name = "pgx_builder_".to_string();
 
     let random_suffix = {
@@ -184,12 +191,8 @@ pub async fn build_pgx(
     image_name.push_str(&random_suffix);
     let image_name = image_name.as_str().to_owned();
 
-    let mut build_args = HashMap::new();
-    build_args.insert("EXTENSION_NAME", extension_name);
-    build_args.insert("EXTENSION_VERSION", extension_version);
-    build_args.insert("PGX_VERSION", pgx_version.as_str());
+    let docker = Docker::connect_with_local_defaults()?;
 
-    // TODO: build args in the Dockerfile such as postgres version should be configurable
     let options = BuildImageOptions {
         dockerfile: "Dockerfile",
         t: &image_name.clone(),
@@ -198,7 +201,6 @@ pub async fn build_pgx(
         ..Default::default()
     };
 
-    let docker = Docker::connect_with_local_defaults()?;
     let mut image_build_stream = docker.build_image(
         options,
         None,
@@ -230,6 +232,7 @@ pub async fn build_pgx(
         }
     }
 
+    // TODO: move to  docker_run function
     let options = Some(CreateContainerOptions {
         name: image_name.to_string(),
         platform: None,
@@ -244,6 +247,7 @@ pub async fn build_pgx(
         image: Some(image_name.to_string()),
         entrypoint: Some(vec!["sleep".to_string()]),
         cmd: Some(vec!["300".to_string()]),
+        user: Some("root".to_string()),
         host_config: Some(host_config),
         ..Default::default()
     };
@@ -254,7 +258,59 @@ pub async fn build_pgx(
         .await?;
 
     // This will stop the container, whether we return an error or not
-    let _ = ReclaimableContainer::new(&container.id, &docker, task);
+    // let _ = ReclaimableContainer::new(&container.id, &docker, task);
+
+    println!("sharedir is:");
+    let sharedir = exec_in_container(docker.clone(), &container.id, vec!["pg_config", "--sharedir"]).await?;
+    let sharedir = sharedir.trim();
+    println!("pkglibdir is:");
+    let pkglibdir = exec_in_container(docker.clone(), &container.id, vec!["pg_config", "--pkglibdir"]).await?;
+    let pkglibdir= pkglibdir.trim();
+
+    println!("Determining installation files...");
+    let _exec_output = exec_in_container(docker.clone(), &container.id, vec!["cp", "--verbose", "-R", format!("target/release/{}-pg15/usr", extension_name).as_str(), "/"]).await?;
+
+    // collect changes from container filesystem
+    println!("Collecting files...");
+    let changes = docker.container_changes(&container.id).await?.expect("Expected to find changed files");
+    // print all the changes
+    let mut pkglibdir_list = vec![];
+    let mut sharedir_list = vec![];
+    for change in changes {
+        if change.kind == 1 {
+            if change.path.ends_with(".so") || change.path.ends_with(".bc") || change.path.ends_with(".sql") || change.path.ends_with(".control") {
+                if change.path.starts_with(pkglibdir.clone()) {
+                    let file_in_pkglibdir = change.path;
+                    let file_in_pkglibdir = file_in_pkglibdir.strip_prefix(pkglibdir);
+                    let file_in_pkglibdir = file_in_pkglibdir.unwrap();
+                    let file_in_pkglibdir = file_in_pkglibdir.trim_start_matches("/");
+                    pkglibdir_list.push(file_in_pkglibdir.to_owned());
+                } else if change.path.starts_with(sharedir.clone()) {
+                    let file_in_sharedir = change.path;
+                    let file_in_sharedir = file_in_sharedir.strip_prefix(sharedir);
+                    let file_in_sharedir = file_in_sharedir.unwrap();
+                    let file_in_sharedir = file_in_sharedir.trim_start_matches("/");
+                    sharedir_list.push(file_in_sharedir.to_owned());
+                } else {
+                    println!("WARNING: file {} is not in pkglibdir or sharedir", change.path);
+                }
+            }
+        }
+    }
+
+    println!("Sharedir files:");
+    for sharedir_file in sharedir_list {
+        println!("{}", sharedir_file);
+    }
+    println!("Pkglibdir files:");
+    for pkglibdir_file in pkglibdir_list {
+        println!("{}", pkglibdir_file);
+    }
+
+    // This will stop the container, whether we return an error or not
+    // TODO: if --debug flag is set, do not run this line
+    // when this line is not run, then the builder cleans up after 300 seconds
+    // let _ = ReclaimableContainer::new(&container.id, &docker, task);
 
     // output_path is the locally output path
     fs::create_dir_all(output_path)?;
@@ -263,8 +319,6 @@ pub async fn build_pgx(
     // where we can find the files we want to download
     let output_dir = "/app/trunk-output".to_string();
 
-    let options = Some(DownloadFromContainerOptions { path: output_dir.clone() });
-
     copy_from_container_into_package(
         docker.clone(),
         &container.id,
@@ -272,7 +326,7 @@ pub async fn build_pgx(
         &output_path,
         extension_name,
         extension_version,
-    );
+    ).await?;
 
     Ok(())
 }
