@@ -52,7 +52,9 @@ class PGMQueue:
         with self.pool.connection() as conn:
             conn.execute("select pgmq_create(%s);", [queue])
 
-    def create_(self, queue: str, partition_interval: Optional[str] = 'daily', retention_interval: Optional[str] = '5 days') -> None:
+    def create_(
+        self, queue: str, partition_interval: Optional[str] = "daily", retention_interval: Optional[str] = "5 days"
+    ) -> None:
         """Create a partitioned queue"""
         with self.pool.connection() as conn:
             conn.execute("select pgmq_create_non_partitioned(%s, %s);", [queue, partition_interval, retention_interval])
