@@ -299,11 +299,11 @@ pub async fn build_pgx(
     }
 
     println!("Sharedir files:");
-    for sharedir_file in sharedir_list {
+    for sharedir_file in sharedir_list.clone() {
         println!("{}", sharedir_file);
     }
     println!("Pkglibdir files:");
-    for pkglibdir_file in pkglibdir_list {
+    for pkglibdir_file in pkglibdir_list.clone() {
         println!("{}", pkglibdir_file);
     }
 
@@ -315,18 +315,29 @@ pub async fn build_pgx(
     // output_path is the locally output path
     fs::create_dir_all(output_path)?;
 
-    // output_dir is the path inside the image
-    // where we can find the files we want to download
-    let output_dir = "/app/trunk-output".to_string();
+    for sharedir_file in sharedir_list.clone() {
+        copy_from_container_into_package(
+            docker.clone(),
+            &container.id,
+            sharedir_file.as_str(),
+            &output_path,
+            sharedir,
+            extension_name,
+            extension_version,
+        ).await?;
+    }
+    for pkglibdir_file in pkglibdir_list.clone() {
+        copy_from_container_into_package(
+            docker.clone(),
+            &container.id,
+            pkglibdir_file.as_str(),
+            &output_path,
+            pkglibdir,
+            extension_name,
+            extension_version,
+        ).await?;
+    }
 
-    copy_from_container_into_package(
-        docker.clone(),
-        &container.id,
-        &output_dir,
-        &output_path,
-        extension_name,
-        extension_version,
-    ).await?;
 
     Ok(())
 }

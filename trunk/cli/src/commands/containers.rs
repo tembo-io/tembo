@@ -1,6 +1,6 @@
 use std::fs::File;
 use std::io::Cursor;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use bollard::container::DownloadFromContainerOptions;
 use bollard::Docker;
 use bollard::exec::{CreateExecOptions, StartExecOptions, StartExecResults};
@@ -100,10 +100,11 @@ pub async fn exec_in_container(docker: Docker, container_id: &str, command: Vec<
 // Copy a file from inside a running container into a Trunk package
 // If the trunk package already exists, then add the file to the package
 // If the trunk package does not exist, then create it.
-pub async fn copy_from_container_into_package(docker: Docker, container_id: &str, file_path_in_container: &str, package_path: &str, extension_name: &str, extension_version: &str) -> Result<(), anyhow::Error> {
+pub async fn copy_from_container_into_package(docker: Docker, container_id: &str, file_to_package: &str, package_path: &str, path_prefix: &str, extension_name: &str, extension_version: &str) -> Result<(), anyhow::Error> {
 
     let package_path = format!("{package_path}/{extension_name}-{extension_version}.tar.gz");
-    println!("Copying file {} from container into package {}", file_path_in_container, package_path);
+    let full_path_to_file_to_package = format!("{path_prefix}/{file_to_package}", path_prefix=path_prefix, file_to_package=file_to_package);
+    println!("Copying file {} from container into package {}", full_path_to_file_to_package, package_path);
 
     // if package_path does not exist, then create it
     if !Path::new(&package_path).exists() {
@@ -120,11 +121,12 @@ pub async fn copy_from_container_into_package(docker: Docker, container_id: &str
     let receiver_sender = receiver.sender();
 
     // Open stream to docker for copying file
-    let options = Some(DownloadFromContainerOptions { path: file_path_in_container });
+    let options = Some(DownloadFromContainerOptions { path: full_path_to_file_to_package });
     let file_stream = docker.download_from_container(container_id, options);
 
     let extension_name = extension_name.to_owned();
     let extension_version = extension_version.to_owned();
+    let path_prefix = path_prefix.to_owned();
 
     // Create a sync task within the tokio runtime to copy the file from docker to tar
     let tar_handle = task::spawn_blocking(move || {
@@ -142,14 +144,14 @@ pub async fn copy_from_container_into_package(docker: Docker, container_id: &str
         if let Ok(entries) = archive.entries() {
             for entry in entries {
                 if let Ok(entry) = entry {
-                    let name = entry.path()?.to_path_buf();
-                    if name.to_str() == Some("manifest.json") {
+                    let path = entry.path()?.to_path_buf();
+                    if path.to_str() == Some("manifest.json") {
                         println!("Found manifest.json, merging additions with existing manifest");
                         manifest.merge(serde_json::from_reader(entry)?);
                     } else {
-                        let name = name.strip_prefix("trunk-output")?;
+                        let path = path.strip_prefix(path_prefix.to_string())?;
 
-                        if !name.to_string_lossy().is_empty() {
+                        if !path.to_string_lossy().is_empty() {
                             let mut header = Header::new_gnu();
                             header.set_mode(entry.header().mode()?);
                             header.set_mtime(entry.header().mtime()?);
@@ -160,14 +162,14 @@ pub async fn copy_from_container_into_package(docker: Docker, container_id: &str
                             let mut buf = Vec::new();
                             let mut tee = TeeReader::new(entry, &mut buf, true);
 
-                            println!("Adding file {} to package", name.clone().to_string_lossy());
-                            new_archive.append_data(&mut header, name, &mut tee)?;
+                            println!("Adding file {} to package", path.clone().to_string_lossy());
+                            new_archive.append_data(&mut header, path, &mut tee)?;
 
                             let (_entry, buf) = tee.into_inner();
 
                             if entry_type == EntryType::file() {
-                                println!("Adding file {} to manifest", name.clone().to_string_lossy());
-                                let file = manifest.add_file(name);
+                                println!("Adding file {} to manifest", path.clone().to_string_lossy());
+                                let file = manifest.add_file(path);
                                 match file {
                                     PackagedFile::SharedObject {
                                         ref mut architecture,
