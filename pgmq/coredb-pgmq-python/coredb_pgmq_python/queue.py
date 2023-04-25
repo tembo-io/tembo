@@ -24,7 +24,6 @@ class PGMQueue:
     database: str = "postgres"
     delay: int = 0
     vt: int = 30
-    partition_size: int = 5000
 
     username: str = "postgres"
     password: str = "postgres"
