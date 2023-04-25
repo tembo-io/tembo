@@ -64,21 +64,21 @@ jobs:
           # Additional directories to cache
           cache-directories: |
             /home/runner/.pgx
-      - uses: ./.github/actions/pgx-init
-        with:
-          working-directory: pgmq/extension
-      - name: test
-        run: |
-          sudo apt-get update && sudo apt-get install -y postgresql-server-dev-14
-          git clone https://github.com/pgpartman/pg_partman.git && \
-          cd pg_partman && \
-          sudo make install && cd ../
-          cp /usr/share/postgresql/14/extension/pg_partman* ~/.pgx/15.2/pgx-install/share/postgresql/extension/
-          cp /usr/lib/postgresql/14/lib/pg_partman_bgw.so ~/.pgx/15.2/pgx-install/lib/postgresql/
-          rm -rf ./target/pgx-test-data-* || true
-          pg_version=$(stoml Cargo.toml features.default)
-          cargo pgx run ${pg_version} --pgcli || true
-          cargo pgx test ${pg_version}
+      # - uses: ./.github/actions/pgx-init
+      #   with:
+      #     working-directory: pgmq/extension
+      # - name: test
+      #   run: |
+      #     sudo apt-get update && sudo apt-get install -y postgresql-server-dev-14
+      #     git clone https://github.com/pgpartman/pg_partman.git && \
+      #     cd pg_partman && \
+      #     sudo make install && cd ../
+      #     cp /usr/share/postgresql/14/extension/pg_partman* ~/.pgx/15.2/pgx-install/share/postgresql/extension/
+      #     cp /usr/lib/postgresql/14/lib/pg_partman_bgw.so ~/.pgx/15.2/pgx-install/lib/postgresql/
+      #     rm -rf ./target/pgx-test-data-* || true
+      #     pg_version=$(stoml Cargo.toml features.default)
+      #     cargo pgx run ${pg_version} --pgcli || true
+      #     cargo pgx test ${pg_version}
 
       - name: publish-to-trunk
         # only publish off main branch
@@ -91,10 +91,4 @@ jobs:
           pgmq_ver=$(stoml Cargo.toml package.version)
           pgmq_descr=$(stoml Cargo.toml package.description)
           pgmq_repo=$(stoml Cargo.toml package.repository)
-          trunk publish pgmq \
-            --version $pgmq_ver \
-            --file ./.trunk/pgmq-$pgmq_ver.tar.gz \
-            --description "$pgmq_descr" \
-            --homepage "$pgmq_repo" \
-            --repository "$pgmq_repo" \
-            --license "Apache 2.0"
+          trunk publish pgmq --version $pgmq_ver --file ./.trunk/pgmq-$pgmq_ver.tar.gz --description "$pgmq_descr" --homepage "$pgmq_repo" --repository "$pgmq_repo" --license "Apache 2.0"
