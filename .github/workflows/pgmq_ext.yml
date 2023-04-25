@@ -77,4 +77,5 @@ jobs:
           cp /usr/lib/postgresql/14/lib/pg_partman_bgw.so ~/.pgx/15.2/pgx-install/lib/postgresql/
           rm -rf ./target/pgx-test-data-* || true
           pg_version=$(stoml Cargo.toml features.default)
+          cargo pgx run ${pg_version} --pgcli || true
           cargo pgx test ${pg_version}
