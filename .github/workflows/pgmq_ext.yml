@@ -79,3 +79,20 @@ jobs:
           pg_version=$(stoml Cargo.toml features.default)
           cargo pgx run ${pg_version} --pgcli || true
           cargo pgx test ${pg_version}
+
+      - name: publish-to-trunk
+        env:
+          TRUNK_AUTH_TOKEN: ${{ secrets.TRUNK_AUTH_TOKEN }}
+        run: |
+          cargo install pg-trunk
+          trunk build
+          pgmq_ver=$(stoml Cargo.toml package.version)
+          pgmq_descr=$(stoml Cargo.toml package.description)
+          pgmq_repo=$(stoml Cargo.toml package.repository)
+          TRUNK_AUTH_TOKEN=${TRUNK_AUTH_TOKEN} trunk publish \
+            --version ${pgmq_ver} \
+            --file ./trunk/pgmq-${pgmq_ver}.tar.gz \
+            --description "${pgmq_descr}" \
+            --homepage "${pgmq_repo}" \
+            --repository "${pgmq_repo}" \
+            --license "Apache 2.0"
