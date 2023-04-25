@@ -1,4 +1,4 @@
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use bollard::container::DownloadFromContainerOptions;
@@ -97,27 +97,13 @@ pub async fn exec_in_container(docker: Docker, container_id: &str, command: Vec<
     Ok::<String, anyhow::Error>(total_output)
 }
 
-// Copy a file from inside a running container into a Trunk package
-// If the trunk package already exists, then add the file to the package
-// If the trunk package does not exist, then create it.
-pub async fn copy_from_container_into_package(docker: Docker, container_id: &str, file_to_package: &str, package_path: &str, path_prefix: &str, extension_name: &str, extension_version: &str) -> Result<(), anyhow::Error> {
+// Scan sharedir and package lib dir from a Trunk builder container for files from a provided list.
+// Package these files into a Trunk package.
+pub async fn copy_from_container_into_package(docker: Docker, container_id: &str, package_path: &str, sharedir: &str, pkglibdir: &str, sharedir_list: Vec<String>, pkglibdir_list: Vec<String>, extension_name: &str, extension_version: &str) -> Result<(), anyhow::Error> {
 
     // In this function, we open and work with .tar only, then we finalize the package with a .gz in a separate call
     let package_path = format!("{package_path}/{extension_name}-{extension_version}.tar");
-    let full_path_to_file_to_package = format!("{path_prefix}/{file_to_package}", path_prefix=path_prefix, file_to_package=file_to_package);
-    println!("Copying file {} from container into package {}", full_path_to_file_to_package, package_path);
-
-    // if package_path does not exist, then create it
-    // if !Path::new(&package_path).exists() {
-    //     let file = File::create(&package_path)?;
-    //     // Close the file
-    //     drop(file);
-    //     println!("Created package {}", package_path);
-    // } else {
-    //     println!("Package {} already exists, opening..", package_path);
-    // }
-    // // Get file handle to trunk package
-    // let file = File::open(&package_path)?;
+    println!("Creating package at: {}", package_path);
     let file = File::create(&package_path)?;
 
     // Stream used to pass information from docker to tar
@@ -125,12 +111,11 @@ pub async fn copy_from_container_into_package(docker: Docker, container_id: &str
     let receiver_sender = receiver.sender();
 
     // Open stream to docker for copying file
-    let options = Some(DownloadFromContainerOptions { path: full_path_to_file_to_package });
+    let options = Some(DownloadFromContainerOptions { path: format!("{}/extension", sharedir) });
     let file_stream = docker.download_from_container(container_id, options);
 
     let extension_name = extension_name.to_owned();
     let extension_version = extension_version.to_owned();
-    let path_prefix = path_prefix.to_owned();
 
     // Create a sync task within the tokio runtime to copy the file from docker to tar
     let tar_handle = task::spawn_blocking(move || {
@@ -152,6 +137,11 @@ pub async fn copy_from_container_into_package(docker: Docker, container_id: &str
                 if let Ok(entry) = entry {
                     // Then we will handle packaging the file
                     let path = entry.path()?.to_path_buf();
+                    println!("Scanning... {:?}", path);
+                    if !sharedir_list.contains(&path.to_str().unwrap().to_string()) {
+                        continue
+                    }
+                    println!("We should package this file!");
                     if path.to_str() == Some("manifest.json") {
                         println!("Found manifest.json, merging additions with existing manifest");
                         manifest.merge(serde_json::from_reader(entry)?);

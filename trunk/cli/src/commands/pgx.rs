@@ -315,28 +315,18 @@ pub async fn build_pgx(
     // output_path is the locally output path
     fs::create_dir_all(output_path)?;
 
-    for sharedir_file in sharedir_list.clone() {
-        copy_from_container_into_package(
-            docker.clone(),
-            &container.id,
-            sharedir_file.as_str(),
-            &output_path,
-            sharedir,
-            extension_name,
-            extension_version,
-        ).await?;
-    }
-    for pkglibdir_file in pkglibdir_list.clone() {
-        copy_from_container_into_package(
-            docker.clone(),
-            &container.id,
-            pkglibdir_file.as_str(),
-            &output_path,
-            pkglibdir,
-            extension_name,
-            extension_version,
-        ).await?;
-    }
+    copy_from_container_into_package(
+        docker.clone(),
+        &container.id,
+        &output_path,
+        sharedir,
+        pkglibdir,
+        sharedir_list,
+        pkglibdir_list,
+        extension_name,
+        extension_version,
+    ).await?;
+
 
 
     Ok(())
