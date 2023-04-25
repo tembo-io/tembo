@@ -71,7 +71,7 @@ RUN git clone --branch v0.4.1 https://github.com/pgvector/pgvector.git && \
         make install && \
         cd ../ && rm -rf pgvector
 
-RUN trunk install --version 0.2.1 pgmq
+RUN trunk install --version 0.4.1 pgmq
 
 # cache extensions and shared libraries
 RUN mkdir /tmp/pg_sharedir && \
