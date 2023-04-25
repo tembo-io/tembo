@@ -79,6 +79,14 @@ jobs:
       #     pg_version=$(stoml Cargo.toml features.default)
       #     cargo pgx run ${pg_version} --pgcli || true
       #     cargo pgx test ${pg_version}
+      - name: Install TOML parser
+        shell: bash
+        run: |
+         set -xe
+         wget https://github.com/freshautomations/stoml/releases/download/v0.7.1/stoml_linux_amd64 &> /dev/null
+         mv stoml_linux_amd64 stoml
+         chmod +x stoml
+         sudo mv stoml /usr/local/bin/
 
       - name: publish-to-trunk
         # only publish off main branch
