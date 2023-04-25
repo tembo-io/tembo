@@ -102,19 +102,23 @@ pub async fn exec_in_container(docker: Docker, container_id: &str, command: Vec<
 // If the trunk package does not exist, then create it.
 pub async fn copy_from_container_into_package(docker: Docker, container_id: &str, file_to_package: &str, package_path: &str, path_prefix: &str, extension_name: &str, extension_version: &str) -> Result<(), anyhow::Error> {
 
-    let package_path = format!("{package_path}/{extension_name}-{extension_version}.tar.gz");
+    // In this function, we open and work with .tar only, then we finalize the package with a .gz in a separate call
+    let package_path = format!("{package_path}/{extension_name}-{extension_version}.tar");
     let full_path_to_file_to_package = format!("{path_prefix}/{file_to_package}", path_prefix=path_prefix, file_to_package=file_to_package);
     println!("Copying file {} from container into package {}", full_path_to_file_to_package, package_path);
 
     // if package_path does not exist, then create it
-    if !Path::new(&package_path).exists() {
-        let _ = File::create(&package_path)?;
-        println!("Created package {}", package_path);
-    } else {
-        println!("Package {} already exists, opening..", package_path);
-    }
-    // Get file handle to trunk package
-    let file = File::open(&package_path)?;
+    // if !Path::new(&package_path).exists() {
+    //     let file = File::create(&package_path)?;
+    //     // Close the file
+    //     drop(file);
+    //     println!("Created package {}", package_path);
+    // } else {
+    //     println!("Package {} already exists, opening..", package_path);
+    // }
+    // // Get file handle to trunk package
+    // let file = File::open(&package_path)?;
+    let file = File::create(&package_path)?;
 
     // Stream used to pass information from docker to tar
     let receiver = ByteStreamSyncReceiver::new();
@@ -131,25 +135,29 @@ pub async fn copy_from_container_into_package(docker: Docker, container_id: &str
     // Create a sync task within the tokio runtime to copy the file from docker to tar
     let tar_handle = task::spawn_blocking(move || {
         let mut archive = Archive::new(receiver);
-        let mut new_archive = Builder::new(flate2::write::GzEncoder::new(
+        let mut new_archive = Builder::new(
             file,
-            flate2::Compression::default(),
-        ));
+        );
         let mut manifest = Manifest {
             extension_name,
             extension_version,
             sys: "linux".to_string(),
             files: None,
         };
+        // If the docker copy command starts to stream data
         if let Ok(entries) = archive.entries() {
+            // For each file from the tar stream returned from docker copy
             for entry in entries {
+                // If we can get the file from the stream
                 if let Ok(entry) = entry {
+                    // Then we will handle packaging the file
                     let path = entry.path()?.to_path_buf();
                     if path.to_str() == Some("manifest.json") {
                         println!("Found manifest.json, merging additions with existing manifest");
                         manifest.merge(serde_json::from_reader(entry)?);
                     } else {
-                        let path = path.strip_prefix(path_prefix.to_string())?;
+                        println!("Packaging file {:?}", path.clone());
+                        // let path = path.strip_prefix(path_prefix.to_string())?;
 
                         if !path.to_string_lossy().is_empty() {
                             let mut header = Header::new_gnu();
@@ -163,7 +171,8 @@ pub async fn copy_from_container_into_package(docker: Docker, container_id: &str
                             let mut tee = TeeReader::new(entry, &mut buf, true);
 
                             println!("Adding file {} to package", path.clone().to_string_lossy());
-                            new_archive.append_data(&mut header, path, &mut tee)?;
+                            new_archive.append_data(&mut header, path.clone(), &mut tee)?;
+                            println!("Added");
 
                             let (_entry, buf) = tee.into_inner();
 
