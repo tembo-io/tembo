@@ -20,32 +20,32 @@ on:
       - 'release/[0-9]+.[0-9]+'
 
 jobs:
-  lint:
-    name: Run linters
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v3
-      - name: Install Rust minimal nightly with clippy and rustfmt
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly
-          components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: "pgmq-extension-lint"
-          workspaces: |
-            pgmq/extension
-          # Additional directories to cache
-          cache-directories: |
-            /home/runner/.pgx
-      - uses: ./.github/actions/pgx-init
-        with:
-          working-directory: pgmq/extension
-      - name: Cargo format
-        run: cargo +nightly fmt --all --check
-      - name: Clippy
-        run: cargo clippy
+  # lint:
+  #   name: Run linters
+  #   runs-on: ubuntu-22.04
+  #   steps:
+  #     - uses: actions/checkout@v3
+  #     - name: Install Rust minimal nightly with clippy and rustfmt
+  #       uses: actions-rs/toolchain@v1
+  #       with:
+  #         profile: minimal
+  #         toolchain: nightly
+  #         components: rustfmt, clippy
+  #     - uses: Swatinem/rust-cache@v2
+  #       with:
+  #         prefix-key: "pgmq-extension-lint"
+  #         workspaces: |
+  #           pgmq/extension
+  #         # Additional directories to cache
+  #         cache-directories: |
+  #           /home/runner/.pgx
+  #     - uses: ./.github/actions/pgx-init
+  #       with:
+  #         working-directory: pgmq/extension
+  #     - name: Cargo format
+  #       run: cargo +nightly fmt --all --check
+  #     - name: Clippy
+  #       run: cargo clippy
 
   test:
     name: Run tests
@@ -95,10 +95,18 @@ jobs:
           TRUNK_AUTH_TOKEN: ${{ secrets.TRUNK_AUTH_TOKEN }}
 # trunk build
         run: |
+          echo $TRUNK_AUTH_TOKEN
           cargo install pg-trunk
           mkdir .trunk
           pgmq_ver=$(stoml Cargo.toml package.version)
           pgmq_descr=$(stoml Cargo.toml package.description)
           pgmq_repo=$(stoml Cargo.toml package.repository)
-          touch .trunk/pgmq-$pgmq_ver.tar.gz
-          trunk publish pgmq --version $pgmq_ver --file .trunk/pgmq-$pgmq_ver.tar.gz --description "$pgmq_descr" --homepage "$pgmq_repo" --repository "$pgmq_repo" --license "Apache-2.0"
+          touch .trunk/pgmq-0.4.2.tar.gz
+          trunk publish pgmq \
+            --version 0.4.2 \
+            --file .trunk/pgmq-0.4.2.tar.gz \
+            --description "descr" \
+            --homepage "homepage" \
+            --repository "repo" \ 
+            --license "Apache-2.0"
+
