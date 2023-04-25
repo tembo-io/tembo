@@ -62,9 +62,8 @@ RUN git clone https://github.com/pgpartman/pg_partman.git && \
         cd ../ && \
         rm -rf pg_partman
 
-USER postgres
-
 COPY docker-entrypoint.sh /usr/local/bin/
 ENTRYPOINT ["docker-entrypoint.sh"]
 
+USER postgres
 CMD ["postgres"]
