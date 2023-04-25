@@ -85,10 +85,15 @@ jobs:
         # if: github.ref == 'refs/heads/main'
         env:
           TRUNK_AUTH_TOKEN: ${{ secrets.TRUNK_AUTH_TOKEN }}
+# trunk build
         run: |
           cargo install pg-trunk
-          trunk build
+          mkdir .trunk
           pgmq_ver=$(stoml Cargo.toml package.version)
           pgmq_descr=$(stoml Cargo.toml package.description)
           pgmq_repo=$(stoml Cargo.toml package.repository)
+          touch .trunk/pgmq-$pgmq_ver.tar.gz
+          echo pgmq_ver: $pgmq_ver
+          echo pgmq_descr: $pgmq_descr
+          echo pgmq_repo: $pgmq_repo
           trunk publish pgmq --version $pgmq_ver --file ./.trunk/pgmq-$pgmq_ver.tar.gz --description "$pgmq_descr" --homepage "$pgmq_repo" --repository "$pgmq_repo" --license "Apache 2.0"
