@@ -93,7 +93,7 @@ jobs:
           pgmq_repo=$(stoml Cargo.toml package.repository)
           TRUNK_AUTH_TOKEN=${TRUNK_AUTH_TOKEN} trunk publish pgmq \
             --version ${pgmq_ver} \
-            --file ./trunk/pgmq-${pgmq_ver}.tar.gz \
+            --file ./.trunk/pgmq-${pgmq_ver}.tar.gz \
             --description "${pgmq_descr}" \
             --homepage "${pgmq_repo}" \
             --repository "${pgmq_repo}" \
