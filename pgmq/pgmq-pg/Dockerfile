@@ -53,6 +53,8 @@ RUN apt-get update && apt-get install -y \
 
 COPY ./postgresql.conf /usr/share/postgresql/${PG_MAJOR}/postgresql.conf.sample
 
+USER root
+
 # install pg_partman
 RUN git clone https://github.com/pgpartman/pg_partman.git && \
         cd pg_partman && \
