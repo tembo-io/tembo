@@ -81,6 +81,8 @@ jobs:
           cargo pgx test ${pg_version}
 
       - name: publish-to-trunk
+        # only publish off main branch
+        # if: github.ref == 'refs/heads/main'
         env:
           TRUNK_AUTH_TOKEN: ${{ secrets.TRUNK_AUTH_TOKEN }}
         run: |
@@ -89,7 +91,7 @@ jobs:
           pgmq_ver=$(stoml Cargo.toml package.version)
           pgmq_descr=$(stoml Cargo.toml package.description)
           pgmq_repo=$(stoml Cargo.toml package.repository)
-          TRUNK_AUTH_TOKEN=${TRUNK_AUTH_TOKEN} trunk publish \
+          TRUNK_AUTH_TOKEN=${TRUNK_AUTH_TOKEN} trunk publish pgmq \
             --version ${pgmq_ver} \
             --file ./trunk/pgmq-${pgmq_ver}.tar.gz \
             --description "${pgmq_descr}" \
