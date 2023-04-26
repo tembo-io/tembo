@@ -1,8 +1,8 @@
-use bollard::container::{Config, CreateContainerOptions, StartContainerOptions};
-use bollard::models::HostConfig;
+
+
 use semver::{Version, VersionReq};
 use std::collections::HashMap;
-use std::default::Default;
+
 
 use std::path::{Path, StripPrefixError};
 use std::string::FromUtf8Error;
@@ -10,23 +10,23 @@ use std::{fs, include_str};
 
 use futures_util::stream::StreamExt;
 
-use rand::Rng;
-use tar::Header;
+
+
 use thiserror::Error;
 
-use bollard::image::BuildImageOptions;
+
 use bollard::Docker;
 
-use crate::sync_utils::ByteStreamSyncSender;
-use bollard::models::BuildInfo;
 
-use hyper::Body;
 
-use crate::commands::containers::{build_image, package_installed_extension_files, exec_in_container, find_installed_extension_files, run_temporary_container};
+
+
+
+use crate::commands::containers::{build_image, package_installed_extension_files, exec_in_container, run_temporary_container};
 use tokio::sync::mpsc;
-use tokio::task;
+
 use tokio::task::JoinError;
-use tokio_stream::wrappers::ReceiverStream;
+
 use tokio_task_manager::Task;
 use toml::Value;
 
@@ -153,7 +153,7 @@ pub async fn build_pgx(
     build_args.insert("EXTENSION_VERSION", extension_version);
     build_args.insert("PGX_VERSION", pgx_version.as_str());
 
-    let mut image_name_prefix = "pgx_builder_".to_string();
+    let image_name_prefix = "pgx_builder_".to_string();
 
     let docker = Docker::connect_with_local_defaults()?;
 
@@ -161,11 +161,11 @@ pub async fn build_pgx(
         docker.clone(),
         &image_name_prefix,
         dockerfile,
-        &path,
+        path,
         build_args
     ).await?;
 
-    let temp_container = run_temporary_container(docker.clone(), &image_name.as_str(), _task).await?;
+    let temp_container = run_temporary_container(docker.clone(), image_name.as_str(), _task).await?;
 
     println!("Determining installation files...");
     let _exec_output = exec_in_container(

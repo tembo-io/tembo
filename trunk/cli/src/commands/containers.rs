@@ -2,8 +2,8 @@ use std::collections::HashMap;
 use bollard::container::{CreateContainerOptions, DownloadFromContainerOptions, StartContainerOptions};
 use bollard::exec::{CreateExecOptions, StartExecOptions, StartExecResults};
 use bollard::Docker;
-use elf::endian::AnyEndian;
-use elf::ElfBytes;
+
+
 use std::fs::File;
 use std::io::Cursor;
 use std::path::Path;
@@ -136,7 +136,7 @@ pub async fn run_temporary_container(
         .await?;
 
     // This will stop the container, whether we return an error or not
-    return Ok(ReclaimableContainer::new(container.id.clone(), &docker, _task));
+    Ok(ReclaimableContainer::new(container.id.clone(), &docker, _task))
 }
 
 
@@ -209,7 +209,7 @@ pub async fn find_installed_extension_files(docker: Docker, container_id: &str) 
     let mut result = HashMap::new();
     result.insert("sharedir".to_string(), sharedir_list);
     result.insert("pkglibdir".to_string(), pkglibdir_list);
-    return Ok(result);
+    Ok(result)
 }
 
 // Build an image
@@ -297,7 +297,7 @@ pub async fn build_image(
             }
         }
     }
-    return Ok(image_name.to_string());
+    Ok(image_name.to_string())
 }
 
 // Scan sharedir and package lib dir from a Trunk builder container for files from a provided list.
@@ -426,7 +426,7 @@ pub async fn package_installed_extension_files(
                             new_archive.append_data(&mut header, path.clone(), &mut tee)?;
                             println!("Added");
 
-                            let (_entry, buf) = tee.into_inner();
+                            let (_entry, _buf) = tee.into_inner();
 
                             if entry_type == EntryType::file() {
                                 println!(

@@ -1,31 +1,31 @@
-use bollard::container::{Config, CreateContainerOptions, StartContainerOptions};
-use bollard::models::HostConfig;
+
+
 
 use std::collections::HashMap;
-use std::default::Default;
+
 
 use std::{fs, include_str};
 use std::path::{Path, StripPrefixError};
 use std::string::FromUtf8Error;
 
-use futures_util::stream::StreamExt;
 
-use rand::Rng;
-use tar::Header;
+
+
+
 use thiserror::Error;
 
-use bollard::image::BuildImageOptions;
+
 use bollard::Docker;
 
-use crate::sync_utils::ByteStreamSyncSender;
-use bollard::models::BuildInfo;
 
-use hyper::Body;
+
+
+
 
 use tokio::sync::mpsc;
-use tokio::task;
+
 use tokio::task::JoinError;
-use tokio_stream::wrappers::ReceiverStream;
+
 use tokio_task_manager::Task;
 
 use crate::commands::containers::{build_image, exec_in_container, package_installed_extension_files, run_temporary_container};
@@ -99,7 +99,7 @@ pub async fn build_generic(
     build_args.insert("EXTENSION_NAME", extension_name);
     build_args.insert("EXTENSION_VERSION", extension_version);
 
-    let mut image_name_prefix = "make_builder_".to_string();
+    let image_name_prefix = "make_builder_".to_string();
 
     let docker = Docker::connect_with_local_defaults()?;
 
@@ -107,11 +107,11 @@ pub async fn build_generic(
         docker.clone(),
         &image_name_prefix,
         dockerfile,
-        &path,
+        path,
         build_args
     ).await?;
 
-    let temp_container = run_temporary_container(docker.clone(), &image_name.as_str(), _task).await?;
+    let temp_container = run_temporary_container(docker.clone(), image_name.as_str(), _task).await?;
 
     println!("Determining installation files...");
     let _exec_output = exec_in_container(
