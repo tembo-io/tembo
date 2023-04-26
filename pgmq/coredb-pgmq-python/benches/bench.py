@@ -1,25 +1,23 @@
-from datetime import datetime
+import random
 import time
-import numpy as np
 
+import numpy as np
 
 from coredb_pgmq_python import Message, PGMQueue
 
-import random
 
-
-def bench() -> None:
-    rnd = random.randint(0, 1000)
+def bench(bench_name: str, port: str, username: str) -> dict:
+    rnd = random.randint(0, 100)
     test_queue = f"bench_queue_{rnd}"
     test_message = {"hello": "world"}
 
-    queue = PGMQueue(host="localhost", port=28815, username="adamhendel", password="postgres", database="postgres")
+    queue = PGMQueue(host="localhost", port=port, username=username, password="postgres", database="postgres")
     try:
         queue.create_queue(test_queue)
     except Exception as e:
         print("table exists?")
 
-    num_iters = 10_000
+    num_iters = 1000
 
     bench_0_start = time.time()
     vt = 30
@@ -40,7 +38,7 @@ def bench() -> None:
         writes.append(time.time() - start)
     total_write_duration = time.time() - total_write_start
     print(f"total write time: {total_write_duration}")
-    summarize("writes", writes)
+    write_results = summarize("writes", writes)
 
     reads = []
     total_read_start = time.time()
@@ -55,7 +53,7 @@ def bench() -> None:
 
     total_read_time = time.time() - total_read_start
     print(f"total read time: {total_read_time}")
-    summarize("reads", reads)
+    read_results = summarize("reads", reads)
 
     # wait for all VT to expire
     while time.time() - bench_0_start < vt:
@@ -72,7 +70,7 @@ def bench() -> None:
         deletes.append(time.time() - start)
     total_delete_time = time.time() - delete_start
     print(f"total delete time: {total_delete_time}")
-    summarize("deletes", reads)
+    delete_results = summarize("deletes", deletes)
 
     # archives
     print("Benchmarking: Archiving Messages")
@@ -98,7 +96,15 @@ def bench() -> None:
         archives.append(time.time() - start)
     total_archive_time = time.time() - archive_start
     print(f"total archive time: {total_delete_time}")
-    summarize("archives", reads)
+    archive_results = summarize("archives", reads)
+
+    results = {"bench_name": bench_name}
+    results.update(write_results)
+    results.update(read_results)
+    results.update(delete_results)
+    results.update(archive_results)
+
+    return results
 
 
 def summarize(cat: str, timings: list[float]) -> None:
@@ -109,6 +115,21 @@ def summarize(cat: str, timings: list[float]) -> None:
     _max = round(np.max(timings), 4)
     print(f"Summary: {cat}")
     print(f"Count: {total}, mean: {mean}, stdev: {stdev}, min: {_min}, max: {_max}")
-
+    return {
+        # f"{cat}_count": total,
+        f"{cat}_mean": mean,
+        f"{cat}_stdev": stdev,
+        f"{cat}_min": _min,
+        f"{cat}_max": _max
+    }
 if __name__ == "__main__":
-    bench()
+    trials = [
+        ("docker", 5432, "postgres"),
+        ("native", 28815, "username")
+    ]
+    all_results = []
+    for t in trials:
+        all_results.append(
+            bench(t[0], t[1], t[2])
+        )
+    print(all_results)
