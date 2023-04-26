@@ -313,6 +313,14 @@ pub async fn package_installed_extension_files(
     let extension_name = extension_name.to_owned();
     let extension_version = extension_version.to_owned();
 
+    let target_arch = exec_in_container(
+        docker.clone(),
+        container_id,
+        vec!["uname", "-m"],
+    )
+        .await?;
+    let target_arch = target_arch.trim().to_string();
+
     let sharedir = exec_in_container(
         docker.clone(),
         container_id,
@@ -431,17 +439,7 @@ pub async fn package_installed_extension_files(
                                         ref mut architecture,
                                         ..
                                     } => {
-                                        let elf = ElfBytes::<AnyEndian>::minimal_parse(buf)?;
-                                        let target_arch = match elf.ehdr.e_machine {
-                                            elf::abi::EM_386 => "x86",
-                                            elf::abi::EM_X86_64 => "x86_64",
-                                            elf::abi::EM_AARCH64 => "aarch64",
-                                            elf::abi::EM_ARM => "aarch32",
-                                            _ => "unknown",
-                                        }
-                                        .to_string();
-                                        println!("Detected architecture: {target_arch}");
-                                        architecture.replace(target_arch);
+                                        architecture.replace(target_arch.clone());
                                     }
                                     _ => {}
                                 }
