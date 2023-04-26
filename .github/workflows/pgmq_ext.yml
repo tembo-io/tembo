@@ -79,3 +79,42 @@ jobs:
           pg_version=$(stoml Cargo.toml features.default)
           cargo pgx run ${pg_version} --pgcli || true
           cargo pgx test ${pg_version}
+
+  publish:
+    # only publish off main branch
+    if: github.ref == 'refs/heads/main'
+    name: trunk publish
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Rust stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: "pgmq-extension-test"
+          workspaces: |
+            pgmq/extension
+          # Additional directories to cache
+          cache-directories: |
+            /home/runner/.pgx
+      - name: Install stoml and pg-trunk
+        shell: bash
+        run: |
+         set -xe
+         wget https://github.com/freshautomations/stoml/releases/download/v0.7.1/stoml_linux_amd64 &> /dev/null
+         mv stoml_linux_amd64 stoml
+         chmod +x stoml
+         sudo mv stoml /usr/local/bin/
+         cargo install pg-trunk
+
+      - name: publish-to-trunk
+        env:
+          TRUNK_AUTH_TOKEN: ${{ secrets.TRUNK_AUTH_TOKEN }}
+        run: |
+          trunk build
+          pgmq_ver=$(stoml Cargo.toml package.version)
+          pgmq_descr=$(stoml Cargo.toml package.description)
+          pgmq_repo=$(stoml Cargo.toml package.repository)
+          trunk publish pgmq --version 0.4.2 --file .trunk/pgmq-0.4.2.tar.gz --description "Message Queue for postgres" --homepage "https://github.com/CoreDB-io/coredb" --repository "https://github.com/CoreDB-io/coredb" --license "Apache-2.0"
