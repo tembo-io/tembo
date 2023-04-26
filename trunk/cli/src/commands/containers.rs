@@ -401,7 +401,7 @@ pub async fn package_installed_extension_files(
                         println!("Packaging file {path:?}");
                         // trim pkglibdir or sharedir from start of path
                         if path.to_string_lossy().contains(&pkglibdir) {
-                            path = path.strip_prefix(pkglibdir.trim_end_matches("lib"))?;
+                            path = path.strip_prefix(format!("{}/", pkglibdir.clone()))?;
                         } else if path.to_string_lossy().contains(&sharedir) {
                             path = path.strip_prefix(format!("{}/", sharedir.clone()))?;
                         } else {

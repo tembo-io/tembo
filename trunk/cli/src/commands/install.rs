@@ -72,13 +72,6 @@ impl SubCommand for InstallCommand {
             .stdout;
 
         let sharedir = PathBuf::from(String::from_utf8_lossy(&sharedir).trim_end().to_string());
-        let extension_dir_path = sharedir.join("extension");
-
-        let extension_dir = std::fs::canonicalize(extension_dir_path)?;
-
-        let bitcode_dir = std::path::PathBuf::from(&sharedir).join("bitcode");
-
-        // if this is a symlink, then resolve the symlink
 
         if !package_lib_dir.exists() && !package_lib_dir.is_dir() {
             println!(
@@ -87,10 +80,7 @@ impl SubCommand for InstallCommand {
             );
             return Ok(());
         }
-        if !extension_dir.exists() && !extension_dir.is_dir() {
-            println!("Extension dir {} does not exist", extension_dir.display());
-            return Ok(());
-        }
+
         println!("Using pkglibdir: {package_lib_dir:?}");
         println!("Using sharedir: {sharedir:?}");
 
@@ -116,7 +106,7 @@ impl SubCommand for InstallCommand {
                 Some("tar") => f,
                 _ => return Err(InstallError::UnknownFileType)?,
             };
-            install(input, extension_dir, package_lib_dir, bitcode_dir, sharedir).await?;
+            install(input, package_lib_dir, sharedir).await?;
         } else {
             // If a file is not specified, then we will query the registry
             // and download the latest version of the package
@@ -137,7 +127,7 @@ impl SubCommand for InstallCommand {
             tempfile.write_reader(gz)?;
             tempfile.rewind()?;
             let input = tempfile;
-            install(input, extension_dir, package_lib_dir, bitcode_dir, sharedir).await?;
+            install(input, package_lib_dir, sharedir).await?;
         }
         Ok(())
     }
@@ -145,9 +135,7 @@ impl SubCommand for InstallCommand {
 
 async fn install(
     mut input: File,
-    extension_dir: PathBuf,
     package_lib_dir: PathBuf,
-    bitcode_dir: PathBuf,
     sharedir: PathBuf,
 ) -> Result<(), anyhow::Error> {
     // First pass: get to the manifest
@@ -200,12 +188,12 @@ async fn install(
             if let Some(file) = manifest_files.get(name.as_ref()) {
                 match file {
                     PackagedFile::ControlFile { .. } => {
-                        println!("[+] {} => {}", name.display(), extension_dir.display());
-                        entry.unpack_in(&extension_dir)?;
+                        println!("[+] {} => {}", name.display(), sharedir.display());
+                        entry.unpack_in(&sharedir)?;
                     }
                     PackagedFile::SqlFile { .. } => {
-                        println!("[+] {} => {}", name.display(), extension_dir.display());
-                        entry.unpack_in(&extension_dir)?;
+                        println!("[+] {} => {}", name.display(), sharedir.display());
+                        entry.unpack_in(&sharedir)?;
                     }
                     PackagedFile::SharedObject { .. } => {
                         println!(
@@ -216,8 +204,8 @@ async fn install(
                         entry.unpack_in(&package_lib_dir)?;
                     }
                     PackagedFile::Bitcode { .. } => {
-                        println!("[+] {} => {}", name.display(), bitcode_dir.display());
-                        entry.unpack_in(&bitcode_dir)?;
+                        println!("[+] {} => {}", name.display(), package_lib_dir.display());
+                        entry.unpack_in(&package_lib_dir)?;
                     }
                     PackagedFile::Extra { .. } => {
                         println!("[+] {} => {}", name.display(), sharedir.display());
