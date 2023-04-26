@@ -53,7 +53,7 @@ pub enum PgxBuildError {
 }
 
 fn semver_from_range(pgx_range: &str) -> Result<String, PgxBuildError> {
-    let versions = ["0.7.2", "0.7.1"];
+    let versions = ["0.7.4", "0.7.3", "0.7.2", "0.7.1"];
 
     if versions.contains(&pgx_range) {
         // If the input is already a specific version, return it as-is
@@ -213,6 +213,6 @@ mod tests {
     fn test_semver_from_range_semver_range() {
         // Test that a semver range is converted to the highest matching version
         let result = semver_from_range(">=0.7.1, <0.8.0");
-        assert_eq!(result.unwrap(), "0.7.2");
+        assert_eq!(result.unwrap(), "0.7.4");
     }
 }

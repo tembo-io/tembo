@@ -1,0 +1,5 @@
+comment = 'my_extension:  Created by pgx'
+default_version = '@CARGO_VERSION@'
+module_pathname = '$libdir/my_extension'
+relocatable = false
+superuser = true

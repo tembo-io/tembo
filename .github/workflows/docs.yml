@@ -15,14 +15,6 @@ on:
       - 'docs/**'
       - mkdocs.yml
 
-steps:
-  - name: publish-docs
-    image: python:3.10.2
-    commands:
-      - curl -sSL https://install.python-poetry.org | POETRY_HOME=/ POETRY_VERSION=1.2.2 python3 -
-      - poetry install
-      - poetry run mkdocs gh-deploy --force
-
 jobs:
   deploy:
     runs-on: ubuntu-latest
@@ -31,5 +23,6 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: 3.x
-      - run: curl -sSL https://install.python-poetry.org | POETRY_HOME=/ POETRY_VERSION=1.2.2 python3 -
+      - run: curl -sSL https://install.python-poetry.org | POETRY_VERSION=1.2.2 python3 -
+      - run: poetry install
       - run: poetry run mkdocs gh-deploy --force
