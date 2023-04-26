@@ -6,8 +6,9 @@ use bollard::Docker;
 use bollard::exec::{CreateExecOptions, StartExecOptions, StartExecResults};
 use elf::ElfBytes;
 use elf::endian::AnyEndian;
+use futures_util::stream;
 use tokio_task_manager::Task;
-use futures_util::stream::StreamExt;
+use futures_util::stream::{select, select_all, StreamExt};
 use tar::{Archive, Builder, EntryType, Header};
 use tee_readwrite::TeeReader;
 use tokio::task;
@@ -110,9 +111,13 @@ pub async fn copy_from_container_into_package(docker: Docker, container_id: &str
     let receiver = ByteStreamSyncReceiver::new();
     let receiver_sender = receiver.sender();
 
-    // Open stream to docker for copying file
-    let options = Some(DownloadFromContainerOptions { path: format!("{}/extension", sharedir) });
-    let file_stream = docker.download_from_container(container_id, options);
+    // Open stream to docker for copying files
+    let options_sharedir = Some(DownloadFromContainerOptions { path: format!("{}/extension", sharedir) });
+    let file_stream_sharedir = docker.download_from_container(container_id, options_sharedir);
+    let options_pkglibdir = Some(DownloadFromContainerOptions { path: pkglibdir });
+    let file_stream_pkglibdir = docker.download_from_container(container_id, options_pkglibdir);
+
+    let combined_stream = select(file_stream_sharedir, file_stream_pkglibdir);
 
     let extension_name = extension_name.to_owned();
     let extension_version = extension_version.to_owned();
@@ -138,7 +143,18 @@ pub async fn copy_from_container_into_package(docker: Docker, container_id: &str
                     // Then we will handle packaging the file
                     let path = entry.path()?.to_path_buf();
                     println!("Scanning... {:?}", path);
-                    if !sharedir_list.contains(&path.to_str().unwrap().to_string()) {
+                    // Check if we found a file to package in pkglibdir
+                    let pkglibdir_match = pkglibdir_list.contains(
+                        &path.to_str()
+                            .and_then(|s| s.strip_prefix("lib/").map(|s| s.to_string()))
+                            .unwrap_or_else(|| "".to_string()),
+                    );
+                    // Check if we found a file to package in sharedir
+                    let sharedir_match = path
+                        .to_str()
+                        .map(|s| sharedir_list.contains(&s.to_string()))
+                        .unwrap_or(false);
+                    if !( sharedir_match || pkglibdir_match ){
                         continue
                     }
                     println!("We should package this file!");
@@ -205,7 +221,7 @@ pub async fn copy_from_container_into_package(docker: Docker, container_id: &str
 
     // Wait until completion of streaming, but ignore its error as it would only error out
     // if tar_handle errors out.
-    let _ = receiver_sender.stream_to_end(file_stream).await;
+    let _ = receiver_sender.stream_to_end(combined_stream).await;
     // Handle the error
     tar_handle.await??;
 
