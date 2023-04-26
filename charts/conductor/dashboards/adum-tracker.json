@@ -26,7 +26,7 @@
   "fiscalYearStartMonth": 0,
   "gnetId": 9628,
   "graphTooltip": 0,
-  "id": 107,
+  "id": 300,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -642,9 +642,176 @@
       ],
       "title": "Transactions",
       "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 30
+      },
+      "id": 86,
+      "panels": [],
+      "title": "Simplified uptime",
+      "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Percent of time control plane database is running",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "dark-red",
+                "value": 98
+              },
+              {
+                "color": "#EAB839",
+                "value": 99.9
+              },
+              {
+                "color": "green",
+                "value": 99.99
+              },
+              {
+                "color": "green",
+                "value": 100
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 31
+      },
+      "id": 87,
+      "options": {
+        "colorMode": "value",
+        "graphMode": "area",
+        "justifyMode": "auto",
+        "orientation": "auto",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "textMode": "auto"
+      },
+      "pluginVersion": "9.3.6",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "avg_over_time(sum((sum by (namespace) (pg_up{namespace=~\"org-coredb-inst-control-plane-.*\"})) OR on() vector(0))[7d:]) * 100",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Uptime (7 days)",
+      "type": "stat"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "Status of control plane DB",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "fillOpacity": 70,
+            "lineWidth": 0,
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "semi-dark-red",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 0
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 9,
+        "w": 24,
+        "x": 0,
+        "y": 36
+      },
+      "id": 88,
+      "options": {
+        "alignValue": "left",
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "mergeValues": true,
+        "rowHeight": 0.9,
+        "showValue": "auto",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        }
+      },
+      "pluginVersion": "9.3.6",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "expr": "sum((sum by (namespace) (pg_up{namespace=~\"org-coredb-inst-control-plane-.*\"})) OR on() vector(0))",
+          "legendFormat": "up",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Status",
+      "type": "state-timeline"
     }
   ],
-  "refresh": "1m",
+  "refresh": "5m",
   "schemaVersion": 37,
   "style": "dark",
   "tags": [],
@@ -730,7 +897,7 @@
     ]
   },
   "time": {
-    "from": "now-24h",
+    "from": "now-7d",
     "to": "now"
   },
   "timepicker": {
@@ -761,6 +928,6 @@
   "timezone": "",
   "title": "Cloud Tracker",
   "uid": "bE7Y7zEVz",
-  "version": 10,
+  "version": 2,
   "weekStart": ""
 }
