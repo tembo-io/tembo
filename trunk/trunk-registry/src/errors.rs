@@ -23,6 +23,10 @@ pub enum ExtensionRegistryError {
     #[error("response error")]
     ResponseError(),
 
+    /// an authorization error
+    #[error("authorization error")]
+    AuthorizationError(),
+
     /// a payload error
     #[error("payload error")]
     PayloadError(#[from] error::PayloadError),

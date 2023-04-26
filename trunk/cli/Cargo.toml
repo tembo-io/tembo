@@ -1,13 +1,13 @@
 [package]
 name = "pg-trunk"
-version = "0.2.2"
+version = "0.3.2"
 edition = "2021"
 authors = ["Steven Miller", "Ian Stanton"]
 description = "A package manager for PostgreSQL extensions"
-homepage = "https://trnk.io"
+homepage = "https://pgtrunk.io"
 license = "Apache-2.0"
 readme = "README.md"
-repository = "https://github.com/coredb-io/trunk"
+repository = "https://github.com/coredb-io/coredb"
 
 [[bin]]
 name = "trunk"

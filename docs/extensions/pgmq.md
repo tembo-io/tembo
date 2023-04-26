@@ -1,1 +1,1 @@
---8<-- "extensions/pgmq/README.md"
+--8<-- "pgmq/README.md"

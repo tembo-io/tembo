@@ -3,7 +3,7 @@ name: coredb-pgmq-python CI workflow
 defaults:
   run:
     shell: bash
-    working-directory: ./extensions/pgmq/coredb-pgmq-python
+    working-directory: pgmq/coredb-pgmq-python
 
 on:
   pull_request:
@@ -11,13 +11,13 @@ on:
      - main
     paths:
       - '.github/workflows/pgmq-python.yml'
-      - 'extensions/pgmq/coredb-pgmq-python/**'
+      - 'pgmq/coredb-pgmq-python/**'
   push:
     branches:
       - main
     paths:
       - '.github/workflows/pgmq-python.yml'
-      - 'extensions/pgmq/coredb-pgmq-python/**'
+      - 'pgmq/coredb-pgmq-python/**'
 
 jobs:
   lints:

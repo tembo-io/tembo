@@ -1,0 +1,120 @@
+name: PGMQ Extension (pg14)
+
+defaults:
+  run:
+    shell: bash
+    working-directory: ./pgmq/extension/
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/pgmq_ext.yml'
+      - '.github/actions/pgx-init/**'
+      - './pgmq/extension/**'
+  # Always run tests on main or release branches
+  push:
+    branches:
+      - main
+      - 'release/[0-9]+.[0-9]+'
+
+jobs:
+  lint:
+    name: Run linters
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust minimal nightly with clippy and rustfmt
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: "pgmq-extension-lint"
+          workspaces: |
+            pgmq/extension
+          # Additional directories to cache
+          cache-directories: |
+            /home/runner/.pgx
+      - uses: ./.github/actions/pgx-init
+        with:
+          working-directory: pgmq/extension
+      - name: Cargo format
+        run: cargo +nightly fmt --all --check
+      - name: Clippy
+        run: cargo clippy
+
+  test:
+    name: Run tests
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Rust stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: "pgmq-extension-test"
+          workspaces: |
+            pgmq/extension
+          # Additional directories to cache
+          cache-directories: |
+            /home/runner/.pgx
+      - uses: ./.github/actions/pgx-init
+        with:
+          working-directory: pgmq/extension
+      - name: test
+        run: |
+          sudo apt-get update && sudo apt-get install -y postgresql-server-dev-14
+          git clone https://github.com/pgpartman/pg_partman.git && \
+          cd pg_partman && \
+          sudo make install && cd ../
+          cp /usr/share/postgresql/14/extension/pg_partman* ~/.pgx/15.2/pgx-install/share/postgresql/extension/
+          cp /usr/lib/postgresql/14/lib/pg_partman_bgw.so ~/.pgx/15.2/pgx-install/lib/postgresql/
+          rm -rf ./target/pgx-test-data-* || true
+          pg_version=$(stoml Cargo.toml features.default)
+          cargo pgx run ${pg_version} --pgcli || true
+          cargo pgx test ${pg_version}
+
+  publish:
+    # only publish off main branch
+    if: github.ref == 'refs/heads/main'
+    name: trunk publish
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Rust stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: "pgmq-extension-test"
+          workspaces: |
+            pgmq/extension
+          # Additional directories to cache
+          cache-directories: |
+            /home/runner/.pgx
+      - name: Install stoml and pg-trunk
+        shell: bash
+        run: |
+         set -xe
+         wget https://github.com/freshautomations/stoml/releases/download/v0.7.1/stoml_linux_amd64 &> /dev/null
+         mv stoml_linux_amd64 stoml
+         chmod +x stoml
+         sudo mv stoml /usr/local/bin/
+         cargo install pg-trunk
+
+      - name: publish-to-trunk
+        env:
+          TRUNK_AUTH_TOKEN: ${{ secrets.TRUNK_AUTH_TOKEN }}
+        run: |
+          trunk build
+          pgmq_ver=$(stoml Cargo.toml package.version)
+          pgmq_descr=$(stoml Cargo.toml package.description)
+          pgmq_repo=$(stoml Cargo.toml package.repository)
+          trunk publish pgmq --version 0.4.2 --file .trunk/pgmq-0.4.2.tar.gz --description "Message Queue for postgres" --homepage "https://github.com/CoreDB-io/coredb" --repository "https://github.com/CoreDB-io/coredb" --license "Apache-2.0"
