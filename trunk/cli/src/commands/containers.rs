@@ -146,7 +146,7 @@ pub async fn copy_from_container_into_package(docker: Docker, container_id: &str
                     let path = entry.path()?.to_path_buf();
                     // Check if we found a file to package in pkglibdir
                     let full_path = format!("/{}", path.to_str().unwrap_or_else(|| ""));
-                    let trimmed = full_path.trim_start_matches(&format!("{}/", pkglibdir)).trim_start_matches(&format!("{}/", sharedir)).to_string();
+                    let trimmed = full_path.trim_start_matches(&format!("{}/", pkglibdir.clone())).trim_start_matches(&format!("{}/", sharedir.clone())).to_string();
                     let pkglibdir_match = pkglibdir_list.contains(&trimmed);
                     let sharedir_match = sharedir_list.contains(&trimmed);
                     // Check if we found a file to package
@@ -158,8 +158,19 @@ pub async fn copy_from_container_into_package(docker: Docker, container_id: &str
                         println!("Found manifest.json, merging additions with existing manifest");
                         manifest.merge(serde_json::from_reader(entry)?);
                     } else {
+                        let root_path= Path::new("/");
+                        let path = root_path.join(path);
+                        let mut path = path.as_path();
                         println!("Packaging file {:?}", path.clone());
-                        // let path = path.strip_prefix(path_prefix.to_string())?;
+                        // trim pkglibdir or sharedir from start of path
+                        if path.to_string_lossy().contains(&pkglibdir) {
+                            path = path.strip_prefix(pkglibdir.trim_end_matches("lib").clone())?;
+                        } else if path.to_string_lossy().contains(&sharedir) {
+                            path = path.strip_prefix(format!("{}/", sharedir.clone()))?;
+                        } else {
+                            println!("WARNING: Skipping file because it's not in sharedir or pkglibdir {:?}", path.clone());
+                            continue
+                        }
 
                         if !path.to_string_lossy().is_empty() {
                             let mut header = Header::new_gnu();
