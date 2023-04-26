@@ -50,12 +50,10 @@ impl Drop for ReclaimableContainer {
         let handle = tokio::runtime::Handle::current();
         let mut task = self.task.clone();
         handle.spawn(async move {
-            println!("Stopping {id}");
             docker
                 .stop_container(id.clone().as_str(), None)
                 .await
                 .expect("error stopping container");
-            println!("Stopped {id}");
             task.wait().await;
         });
     }
@@ -164,7 +162,6 @@ pub async fn find_installed_extension_files(
     let pkglibdir = pkglibdir.trim();
 
     // collect changes from container filesystem
-    println!("Collecting files installed by this extension...");
     let changes = docker
         .container_changes(container_id)
         .await?
@@ -203,12 +200,13 @@ pub async fn find_installed_extension_files(
 
     println!("Sharedir files:");
     for sharedir_file in sharedir_list.clone() {
-        println!("{sharedir_file}");
+        println!("\t{sharedir_file}");
     }
     println!("Pkglibdir files:");
     for pkglibdir_file in pkglibdir_list.clone() {
-        println!("{pkglibdir_file}");
+        println!("\t{pkglibdir_file}");
     }
+    println!();
 
     let mut result = HashMap::new();
     result.insert("sharedir".to_string(), sharedir_list);
@@ -373,7 +371,7 @@ pub async fn package_installed_extension_files(
             files: None,
         };
         // If the docker copy command starts to stream data
-        println!("Scanning...");
+        println!("Create Trunk bundle:");
         let entries = archive
             .entries()
             .expect("Expected to find some files in the /usr directory");
@@ -393,7 +391,6 @@ pub async fn package_installed_extension_files(
             if !(sharedir_match || pkglibdir_match) {
                 continue;
             }
-            println!("Detected file to package: {trimmed}");
             if path.to_str() == Some("manifest.json") {
                 println!("Found manifest.json, merging additions with existing manifest");
                 manifest.merge(serde_json::from_reader(entry)?);
@@ -401,7 +398,6 @@ pub async fn package_installed_extension_files(
                 let root_path = Path::new("/");
                 let path = root_path.join(path);
                 let mut path = path.as_path();
-                println!("Packaging file {path:?}");
                 // trim pkglibdir or sharedir from start of path
                 if path.to_string_lossy().contains(&pkglibdir) {
                     path = path.strip_prefix(format!("{}/", &pkglibdir))?;
@@ -426,15 +422,13 @@ pub async fn package_installed_extension_files(
                     let mut buf = Vec::new();
                     let mut tee = TeeReader::new(entry, &mut buf, true);
 
-                    println!("Adding file {} to package", &path.to_string_lossy());
                     new_archive.append_data(&mut header, path, &mut tee)?;
-                    println!("Added");
 
                     let (_entry, _buf) = tee.into_inner();
 
                     if entry_type == EntryType::file() {
-                        println!("Adding file {} to manifest", path.to_string_lossy());
                         let _ = manifest.add_file(path);
+                        println!("\t{}", path.to_string_lossy());
                     }
                 }
             }
@@ -446,6 +440,7 @@ pub async fn package_installed_extension_files(
         header.set_cksum();
         header.set_mode(0o644);
         new_archive.append_data(&mut header, "manifest.json", Cursor::new(manifest))?;
+        println!("\tmanifest.json");
         Ok::<_, GenericBuildError>(())
     });
 
