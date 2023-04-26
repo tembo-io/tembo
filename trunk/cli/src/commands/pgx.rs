@@ -22,7 +22,7 @@ use bollard::models::BuildInfo;
 
 use hyper::Body;
 
-use crate::commands::containers::{build_image, copy_from_container_into_package, exec_in_container};
+use crate::commands::containers::{build_image, package_installed_extension_files, exec_in_container, find_installed_extension_files, run_temporary_container};
 use tokio::sync::mpsc;
 use tokio::task;
 use tokio::task::JoinError;
@@ -98,7 +98,7 @@ pub async fn build_pgx(
     path: &Path,
     output_path: &str,
     cargo_toml: toml::Table,
-    _task: Task,
+    _task: Task
 ) -> Result<(), PgxBuildError> {
     let cargo_package_info = cargo_toml
         .get("package")
@@ -153,75 +153,24 @@ pub async fn build_pgx(
     build_args.insert("EXTENSION_VERSION", extension_version);
     build_args.insert("PGX_VERSION", pgx_version.as_str());
 
-    let mut image_name = "pgx_builder_".to_string();
-
-    let random_suffix = {
-        let mut rng = rand::thread_rng();
-        rng.gen_range(0..1000000).to_string()
-    };
-
-    image_name.push_str(&random_suffix);
-    let image_name = image_name.as_str().to_owned();
+    let mut image_name_prefix = "pgx_builder_".to_string();
 
     let docker = Docker::connect_with_local_defaults()?;
 
-    let _ = build_image(
+    let image_name = build_image(
         docker.clone(),
-        &image_name,
+        &image_name_prefix,
         dockerfile,
         &path,
         build_args
     ).await?;
 
-    // TODO: move to  docker_run function
-    let options = Some(CreateContainerOptions {
-        name: image_name.to_string(),
-        platform: None,
-    });
-
-    let host_config = HostConfig {
-        auto_remove: Some(true),
-        ..Default::default()
-    };
-
-    let config = Config {
-        image: Some(image_name.to_string()),
-        entrypoint: Some(vec!["sleep".to_string()]),
-        cmd: Some(vec!["300".to_string()]),
-        user: Some("root".to_string()),
-        host_config: Some(host_config),
-        ..Default::default()
-    };
-
-    let container = docker.create_container(options, config).await?;
-    docker
-        .start_container(&container.id, None::<StartContainerOptions<String>>)
-        .await?;
-
-    // This will stop the container, whether we return an error or not
-    // let _ = ReclaimableContainer::new(&container.id, &docker, task);
-
-    println!("sharedir is:");
-    let sharedir = exec_in_container(
-        docker.clone(),
-        &container.id,
-        vec!["pg_config", "--sharedir"],
-    )
-    .await?;
-    let sharedir = sharedir.trim();
-    println!("pkglibdir is:");
-    let pkglibdir = exec_in_container(
-        docker.clone(),
-        &container.id,
-        vec!["pg_config", "--pkglibdir"],
-    )
-    .await?;
-    let pkglibdir = pkglibdir.trim();
+    let temp_container = run_temporary_container(docker.clone(), &image_name.as_str(), _task).await?;
 
     println!("Determining installation files...");
     let _exec_output = exec_in_container(
         docker.clone(),
-        &container.id,
+        &temp_container.id,
         vec![
             "cp",
             "--verbose",
@@ -232,68 +181,13 @@ pub async fn build_pgx(
     )
     .await?;
 
-    // collect changes from container filesystem
-    println!("Collecting files...");
-    let changes = docker
-        .container_changes(&container.id)
-        .await?
-        .expect("Expected to find changed files");
-    // print all the changes
-    let mut pkglibdir_list = vec![];
-    let mut sharedir_list = vec![];
-    for change in changes {
-        if change.kind == 1
-            && (change.path.ends_with(".so")
-                || change.path.ends_with(".bc")
-                || change.path.ends_with(".sql")
-                || change.path.ends_with(".control"))
-        {
-            if change.path.starts_with(pkglibdir.clone()) {
-                let file_in_pkglibdir = change.path;
-                let file_in_pkglibdir = file_in_pkglibdir.strip_prefix(pkglibdir);
-                let file_in_pkglibdir = file_in_pkglibdir.unwrap();
-                let file_in_pkglibdir = file_in_pkglibdir.trim_start_matches('/');
-                pkglibdir_list.push(file_in_pkglibdir.to_owned());
-            } else if change.path.starts_with(sharedir.clone()) {
-                let file_in_sharedir = change.path;
-                let file_in_sharedir = file_in_sharedir.strip_prefix(sharedir);
-                let file_in_sharedir = file_in_sharedir.unwrap();
-                let file_in_sharedir = file_in_sharedir.trim_start_matches('/');
-                sharedir_list.push(file_in_sharedir.to_owned());
-            } else {
-                println!(
-                    "WARNING: file {} is not in pkglibdir or sharedir",
-                    change.path
-                );
-            }
-        }
-    }
-
-    println!("Sharedir files:");
-    for sharedir_file in sharedir_list.clone() {
-        println!("{sharedir_file}");
-    }
-    println!("Pkglibdir files:");
-    for pkglibdir_file in pkglibdir_list.clone() {
-        println!("{pkglibdir_file}");
-    }
-
-    // This will stop the container, whether we return an error or not
-    // TODO: if --debug flag is set, do not run this line
-    // when this line is not run, then the builder cleans up after 300 seconds
-    // let _ = ReclaimableContainer::new(&container.id, &docker, task);
-
     // output_path is the locally output path
     fs::create_dir_all(output_path)?;
 
-    copy_from_container_into_package(
+    package_installed_extension_files(
         docker.clone(),
-        &container.id,
+        &temp_container.id,
         output_path,
-        sharedir,
-        pkglibdir,
-        sharedir_list,
-        pkglibdir_list,
         extension_name,
         extension_version,
     )
