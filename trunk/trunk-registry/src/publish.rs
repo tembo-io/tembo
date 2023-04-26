@@ -36,7 +36,7 @@ pub async fn publish(
         let auth = headers.get(AUTHORIZATION).unwrap();
         if auth != cfg.auth_token {
             error!("Authorization error");
-            return Err(AuthorizationError);
+            return Err(AuthorizationError());
         }
         // Field is stream of Bytes
         while let Some(chunk) = field.try_next().await? {
