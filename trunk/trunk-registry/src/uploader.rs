@@ -5,7 +5,7 @@ use aws_sdk_s3::error::SdkError;
 use aws_sdk_s3::operation::put_object::{PutObjectError, PutObjectOutput};
 use aws_sdk_s3::primitives::ByteStream;
 use aws_sdk_s3::types::ServerSideEncryption::Aes256;
-use log::debug;
+use log::{debug, info};
 
 // https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Cache-Control
 const CACHE_CONTROL_IMMUTABLE: &str = "public,max-age=31536000,immutable";
@@ -54,7 +54,7 @@ pub async fn upload_extension(
     vers: &semver::Version,
 ) -> Result<String, ExtensionRegistryError> {
     let path = extension_path(&extension.name, &vers.to_string());
-    println!("Uploading");
+    info!("Uploading extension: {:?}", extension);
     upload(bucket_name, s3_client, &path, file, "application/gzip").await?;
     Ok("Successfully uploaded extension".to_owned())
 }

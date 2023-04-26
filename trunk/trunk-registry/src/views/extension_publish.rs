@@ -1,7 +1,7 @@
 //! This module handles the expected information an extension should have
 use serde::Deserialize;
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 pub struct ExtensionUpload {
     pub name: String,
     pub vers: semver::Version,
