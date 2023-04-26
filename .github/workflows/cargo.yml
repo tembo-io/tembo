@@ -30,6 +30,8 @@ jobs:
           # in a pull request, and using all directories on the release
           # or main branches.
           changed_relative_to_branch: ${{ github.base_ref || 'not-a-branch' }}
+          ignore_dirs: |
+            trunk/cli/tests/test_pgx_extension
 
 
   cargo_publish:
