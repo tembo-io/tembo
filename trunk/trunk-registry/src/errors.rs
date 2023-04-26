@@ -25,7 +25,7 @@ pub enum ExtensionRegistryError {
 
     /// an authorization error
     #[error("authorization error")]
-    AuthorizationError,
+    AuthorizationError(),
 
     /// a payload error
     #[error("payload error: {0}")]
