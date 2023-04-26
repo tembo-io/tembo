@@ -1,20 +1,20 @@
-use std::fs::{File};
-use std::io::Cursor;
-use std::path::{Path};
 use bollard::container::DownloadFromContainerOptions;
-use bollard::Docker;
 use bollard::exec::{CreateExecOptions, StartExecOptions, StartExecResults};
-use elf::ElfBytes;
+use bollard::Docker;
 use elf::endian::AnyEndian;
+use elf::ElfBytes;
+use std::fs::File;
+use std::io::Cursor;
+use std::path::Path;
 
-use tokio_task_manager::Task;
-use futures_util::stream::{StreamExt};
-use tar::{Archive, Builder, EntryType, Header};
-use tee_readwrite::TeeReader;
-use tokio::task;
 use crate::commands::generic_build::GenericBuildError;
 use crate::manifest::{Manifest, PackagedFile};
 use crate::sync_utils::ByteStreamSyncReceiver;
+use futures_util::stream::StreamExt;
+use tar::{Archive, Builder, EntryType, Header};
+use tee_readwrite::TeeReader;
+use tokio::task;
+use tokio_task_manager::Task;
 
 /// Used to stop container when dropped, relies on using [tokio_task_manager::TaskManager::wait]
 /// to ensure `Drop` will run to completion
@@ -53,8 +53,11 @@ impl<'a> Drop for ReclaimableContainer<'a> {
     }
 }
 
-pub async fn exec_in_container(docker: Docker, container_id: &str, command: Vec<&str>) -> Result<String, anyhow::Error> {
-
+pub async fn exec_in_container(
+    docker: Docker,
+    container_id: &str,
+    command: Vec<&str>,
+) -> Result<String, anyhow::Error> {
     println!("Executing in container: {:?}", command.join(" "));
 
     let config = CreateExecOptions {
@@ -76,32 +79,38 @@ pub async fn exec_in_container(docker: Docker, container_id: &str, command: Vec<
     match start_exec_result {
         StartExecResults::Attached { output, .. } => {
             let mut output = output
-                .map(|result| {
-                    match result {
-                        Ok(log_output) => {
-                            println!("{log_output}");
-                            total_output.push_str(log_output.to_string().as_str());
-                        },
-                        Err(error) => eprintln!("Error while reading log output: {error}"),
+                .map(|result| match result {
+                    Ok(log_output) => {
+                        println!("{log_output}");
+                        total_output.push_str(log_output.to_string().as_str());
                     }
+                    Err(error) => eprintln!("Error while reading log output: {error}"),
                 })
                 .fuse();
 
             // Run the output stream to completion.
             while output.next().await.is_some() {}
-        },
+        }
         StartExecResults::Detached => {
             println!("Exec started in detached mode");
         }
-
     }
     Ok::<String, anyhow::Error>(total_output)
 }
 
 // Scan sharedir and package lib dir from a Trunk builder container for files from a provided list.
 // Package these files into a Trunk package.
-pub async fn copy_from_container_into_package(docker: Docker, container_id: &str, package_path: &str, sharedir: &str, pkglibdir: &str, sharedir_list: Vec<String>, pkglibdir_list: Vec<String>, extension_name: &str, extension_version: &str) -> Result<(), anyhow::Error> {
-
+pub async fn copy_from_container_into_package(
+    docker: Docker,
+    container_id: &str,
+    package_path: &str,
+    sharedir: &str,
+    pkglibdir: &str,
+    sharedir_list: Vec<String>,
+    pkglibdir_list: Vec<String>,
+    extension_name: &str,
+    extension_version: &str,
+) -> Result<(), anyhow::Error> {
     let extension_name = extension_name.to_owned();
     let extension_version = extension_version.to_owned();
     let pkglibdir = pkglibdir.to_owned();
@@ -126,9 +135,7 @@ pub async fn copy_from_container_into_package(docker: Docker, container_id: &str
     // Create a sync task within the tokio runtime to copy the file from docker to tar
     let tar_handle = task::spawn_blocking(move || {
         let mut archive = Archive::new(receiver);
-        let mut new_archive = Builder::new(
-            file,
-        );
+        let mut new_archive = Builder::new(file);
         let mut manifest = Manifest {
             extension_name,
             extension_version,
@@ -146,19 +153,22 @@ pub async fn copy_from_container_into_package(docker: Docker, container_id: &str
                     let path = entry.path()?.to_path_buf();
                     // Check if we found a file to package in pkglibdir
                     let full_path = format!("/{}", path.to_str().unwrap_or(""));
-                    let trimmed = full_path.trim_start_matches(&format!("{}/", pkglibdir.clone())).trim_start_matches(&format!("{}/", sharedir.clone())).to_string();
+                    let trimmed = full_path
+                        .trim_start_matches(&format!("{}/", pkglibdir.clone()))
+                        .trim_start_matches(&format!("{}/", sharedir.clone()))
+                        .to_string();
                     let pkglibdir_match = pkglibdir_list.contains(&trimmed);
                     let sharedir_match = sharedir_list.contains(&trimmed);
                     // Check if we found a file to package
-                    if !( sharedir_match || pkglibdir_match ){
-                        continue
+                    if !(sharedir_match || pkglibdir_match) {
+                        continue;
                     }
                     println!("Detected file to package: {trimmed}");
                     if path.to_str() == Some("manifest.json") {
                         println!("Found manifest.json, merging additions with existing manifest");
                         manifest.merge(serde_json::from_reader(entry)?);
                     } else {
-                        let root_path= Path::new("/");
+                        let root_path = Path::new("/");
                         let path = root_path.join(path);
                         let mut path = path.as_path();
                         println!("Packaging file {:?}", path.clone());
@@ -169,7 +179,7 @@ pub async fn copy_from_container_into_package(docker: Docker, container_id: &str
                             path = path.strip_prefix(format!("{}/", sharedir.clone()))?;
                         } else {
                             println!("WARNING: Skipping file because it's not in sharedir or pkglibdir {:?}", path.clone());
-                            continue
+                            continue;
                         }
 
                         if !path.to_string_lossy().is_empty() {
@@ -190,7 +200,10 @@ pub async fn copy_from_container_into_package(docker: Docker, container_id: &str
                             let (_entry, buf) = tee.into_inner();
 
                             if entry_type == EntryType::file() {
-                                println!("Adding file {} to manifest", path.clone().to_string_lossy());
+                                println!(
+                                    "Adding file {} to manifest",
+                                    path.clone().to_string_lossy()
+                                );
                                 let file = manifest.add_file(path);
                                 match file {
                                     PackagedFile::SharedObject {
@@ -205,7 +218,7 @@ pub async fn copy_from_container_into_package(docker: Docker, container_id: &str
                                             elf::abi::EM_ARM => "aarch32",
                                             _ => "unknown",
                                         }
-                                            .to_string();
+                                        .to_string();
                                         println!("Detected architecture: {target_arch}");
                                         architecture.replace(target_arch);
                                     }

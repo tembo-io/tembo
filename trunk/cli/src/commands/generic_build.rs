@@ -4,25 +4,21 @@ use bollard::models::HostConfig;
 use std::collections::HashMap;
 use std::default::Default;
 
-
+use std::include_str;
 use std::path::{Path, StripPrefixError};
 use std::string::FromUtf8Error;
-use std::{include_str};
 
 use futures_util::stream::StreamExt;
 
 use rand::Rng;
-use tar::{Header};
+use tar::Header;
 use thiserror::Error;
 
 use bollard::image::BuildImageOptions;
 use bollard::Docker;
 
-
-
-use crate::sync_utils::{ByteStreamSyncSender};
+use crate::sync_utils::ByteStreamSyncSender;
 use bollard::models::BuildInfo;
-
 
 use hyper::Body;
 
@@ -32,12 +28,10 @@ use tokio::task::JoinError;
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_task_manager::Task;
 
-use crate::commands::containers::{exec_in_container};
-
+use crate::commands::containers::exec_in_container;
 
 #[derive(Error, Debug)]
 pub enum GenericBuildError {
-
     #[error("Produced a file outside of postgres sharedir or pkglibdir: {0}")]
     InvalidFileInstalled(String),
 
@@ -95,7 +89,6 @@ pub async fn build_generic(
     extension_version: &str,
     _task: Task,
 ) -> Result<(), GenericBuildError> {
-
     println!("Building with name {}", &extension_name);
     println!("Building with version {}", &extension_version);
 
@@ -154,15 +147,15 @@ pub async fn build_generic(
     while let Some(next) = image_build_stream.next().await {
         match next {
             Ok(BuildInfo {
-                   stream: Some(s), ..
-               }) => {
+                stream: Some(s), ..
+            }) => {
                 print!("{s}");
             }
             Ok(BuildInfo {
-                   error: Some(err),
-                   error_detail,
-                   ..
-               }) => {
+                error: Some(err),
+                error_detail,
+                ..
+            }) => {
                 eprintln!(
                     "ERROR: {} (detail: {})",
                     err,
@@ -203,23 +196,42 @@ pub async fn build_generic(
     // let _ = ReclaimableContainer::new(&container.id, &docker, task);
 
     println!("sharedir is:");
-    let sharedir = exec_in_container(docker.clone(), &container.id, vec!["pg_config", "--sharedir"]).await?;
+    let sharedir = exec_in_container(
+        docker.clone(),
+        &container.id,
+        vec!["pg_config", "--sharedir"],
+    )
+    .await?;
     let sharedir = sharedir.trim();
     println!("pkglibdir is:");
-    let pkglibdir = exec_in_container(docker.clone(), &container.id, vec!["pg_config", "--pkglibdir"]).await?;
-    let pkglibdir= pkglibdir.trim();
+    let pkglibdir = exec_in_container(
+        docker.clone(),
+        &container.id,
+        vec!["pg_config", "--pkglibdir"],
+    )
+    .await?;
+    let pkglibdir = pkglibdir.trim();
 
     println!("Determining installation files...");
-    let _exec_output = exec_in_container(docker.clone(), &container.id, vec!["make", "install"]).await?;
+    let _exec_output =
+        exec_in_container(docker.clone(), &container.id, vec!["make", "install"]).await?;
 
     // collect changes from container filesystem
     println!("Collecting files...");
-    let changes = docker.container_changes(&container.id).await?.expect("Expected to find changed files");
+    let changes = docker
+        .container_changes(&container.id)
+        .await?
+        .expect("Expected to find changed files");
     // print all the changes
     let mut pkglibdir_list = vec![];
     let mut sharedir_list = vec![];
     for change in changes {
-        if change.kind == 1 && (change.path.ends_with(".so") || change.path.ends_with(".bc") || change.path.ends_with(".sql") || change.path.ends_with(".control")) {
+        if change.kind == 1
+            && (change.path.ends_with(".so")
+                || change.path.ends_with(".bc")
+                || change.path.ends_with(".sql")
+                || change.path.ends_with(".control"))
+        {
             if change.path.starts_with(pkglibdir.clone()) {
                 let file_in_pkglibdir = change.path;
                 let file_in_pkglibdir = file_in_pkglibdir.strip_prefix(pkglibdir);

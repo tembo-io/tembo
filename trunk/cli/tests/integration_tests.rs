@@ -1,10 +1,10 @@
 use assert_cmd::prelude::*; // Add methods on commands
-use git2::{Repository};
+use git2::Repository;
 use predicates::prelude::*; // Used for writing assertions
 use rand::Rng;
-use std::path::{Path};
-use std::process::Command; // Run programs
 use std::fs;
+use std::path::Path;
+use std::process::Command; // Run programs
 
 const CARGO_BIN: &str = "trunk";
 
@@ -70,7 +70,7 @@ fn build_c_extension() -> Result<(), Box<dyn std::error::Error>> {
         // this is a commit, not a reference
         None => repo.set_head_detached(object.id()),
     }
-        .expect("Failed to set HEAD");
+    .expect("Failed to set HEAD");
 
     // Construct a path relative to the current file's directory
     let mut extension_path = std::path::PathBuf::from(file!());
@@ -88,10 +88,7 @@ fn build_c_extension() -> Result<(), Box<dyn std::error::Error>> {
     cmd.arg("--name");
     cmd.arg("pg_tle");
     cmd.assert().code(0);
-    assert!(
-        std::path::Path::new(format!("{output_dir}/pg_tle-1.0.3.tar.gz").as_str())
-            .exists()
-    );
+    assert!(std::path::Path::new(format!("{output_dir}/pg_tle-1.0.3.tar.gz").as_str()).exists());
     // delete the temporary file
     std::fs::remove_dir_all(output_dir)?;
 

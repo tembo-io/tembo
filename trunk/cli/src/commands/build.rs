@@ -1,10 +1,10 @@
 use super::SubCommand;
-use crate::commands::pgx::build_pgx;
 use crate::commands::generic_build::build_generic;
+use crate::commands::pgx::build_pgx;
+use anyhow::anyhow;
 use async_trait::async_trait;
 use clap::Args;
 use std::path::Path;
-use anyhow::anyhow;
 use tokio_task_manager::Task;
 use toml::Table;
 
@@ -45,9 +45,18 @@ impl SubCommand for BuildCommand {
             // Check if version or name are missing
             if self.version.is_none() || self.name.is_none() {
                 println!("Error: --version and --name are required when building a makefile based extension");
-                return Err(anyhow!("--version and --name are required when building a makefile based extension"));
+                return Err(anyhow!(
+                    "--version and --name are required when building a makefile based extension"
+                ));
             }
-            build_generic(path, &self.output_path, self.name.clone().unwrap().as_str(), self.version.clone().unwrap().as_str(), task).await?;
+            build_generic(
+                path,
+                &self.output_path,
+                self.name.clone().unwrap().as_str(),
+                self.version.clone().unwrap().as_str(),
+                task,
+            )
+            .await?;
             return Ok(());
         }
         println!("Did not understand what to build");

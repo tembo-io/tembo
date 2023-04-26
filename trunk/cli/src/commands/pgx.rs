@@ -1,11 +1,8 @@
-use bollard::container::{
-    Config, CreateContainerOptions, StartContainerOptions,
-};
+use bollard::container::{Config, CreateContainerOptions, StartContainerOptions};
 use bollard::models::HostConfig;
 use semver::{Version, VersionReq};
 use std::collections::HashMap;
 use std::default::Default;
-
 
 use std::path::{Path, StripPrefixError};
 use std::string::FromUtf8Error;
@@ -14,27 +11,24 @@ use std::{fs, include_str};
 use futures_util::stream::StreamExt;
 
 use rand::Rng;
-use tar::{Header};
+use tar::Header;
 use thiserror::Error;
 
 use bollard::image::BuildImageOptions;
 use bollard::Docker;
 
-
-use crate::sync_utils::{ByteStreamSyncSender};
+use crate::sync_utils::ByteStreamSyncSender;
 use bollard::models::BuildInfo;
-
 
 use hyper::Body;
 
+use crate::commands::containers::{copy_from_container_into_package, exec_in_container};
 use tokio::sync::mpsc;
 use tokio::task;
 use tokio::task::JoinError;
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_task_manager::Task;
 use toml::Value;
-use crate::commands::containers::{copy_from_container_into_package, exec_in_container};
-
 
 #[derive(Error, Debug)]
 pub enum PgxBuildError {
@@ -261,23 +255,52 @@ pub async fn build_pgx(
     // let _ = ReclaimableContainer::new(&container.id, &docker, task);
 
     println!("sharedir is:");
-    let sharedir = exec_in_container(docker.clone(), &container.id, vec!["pg_config", "--sharedir"]).await?;
+    let sharedir = exec_in_container(
+        docker.clone(),
+        &container.id,
+        vec!["pg_config", "--sharedir"],
+    )
+    .await?;
     let sharedir = sharedir.trim();
     println!("pkglibdir is:");
-    let pkglibdir = exec_in_container(docker.clone(), &container.id, vec!["pg_config", "--pkglibdir"]).await?;
-    let pkglibdir= pkglibdir.trim();
+    let pkglibdir = exec_in_container(
+        docker.clone(),
+        &container.id,
+        vec!["pg_config", "--pkglibdir"],
+    )
+    .await?;
+    let pkglibdir = pkglibdir.trim();
 
     println!("Determining installation files...");
-    let _exec_output = exec_in_container(docker.clone(), &container.id, vec!["cp", "--verbose", "-R", format!("target/release/{extension_name}-pg15/usr").as_str(), "/"]).await?;
+    let _exec_output = exec_in_container(
+        docker.clone(),
+        &container.id,
+        vec![
+            "cp",
+            "--verbose",
+            "-R",
+            format!("target/release/{extension_name}-pg15/usr").as_str(),
+            "/",
+        ],
+    )
+    .await?;
 
     // collect changes from container filesystem
     println!("Collecting files...");
-    let changes = docker.container_changes(&container.id).await?.expect("Expected to find changed files");
+    let changes = docker
+        .container_changes(&container.id)
+        .await?
+        .expect("Expected to find changed files");
     // print all the changes
     let mut pkglibdir_list = vec![];
     let mut sharedir_list = vec![];
     for change in changes {
-        if change.kind == 1 && (change.path.ends_with(".so") || change.path.ends_with(".bc") || change.path.ends_with(".sql") || change.path.ends_with(".control")) {
+        if change.kind == 1
+            && (change.path.ends_with(".so")
+                || change.path.ends_with(".bc")
+                || change.path.ends_with(".sql")
+                || change.path.ends_with(".control"))
+        {
             if change.path.starts_with(pkglibdir.clone()) {
                 let file_in_pkglibdir = change.path;
                 let file_in_pkglibdir = file_in_pkglibdir.strip_prefix(pkglibdir);
@@ -291,7 +314,10 @@ pub async fn build_pgx(
                 let file_in_sharedir = file_in_sharedir.trim_start_matches('/');
                 sharedir_list.push(file_in_sharedir.to_owned());
             } else {
-                println!("WARNING: file {} is not in pkglibdir or sharedir", change.path);
+                println!(
+                    "WARNING: file {} is not in pkglibdir or sharedir",
+                    change.path
+                );
             }
         }
     }
@@ -323,9 +349,8 @@ pub async fn build_pgx(
         pkglibdir_list,
         extension_name,
         extension_version,
-    ).await?;
-
-
+    )
+    .await?;
 
     Ok(())
 }
