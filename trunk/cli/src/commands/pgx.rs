@@ -22,7 +22,7 @@ use bollard::models::BuildInfo;
 
 use hyper::Body;
 
-use crate::commands::containers::{copy_from_container_into_package, exec_in_container};
+use crate::commands::containers::{build_image, copy_from_container_into_package, exec_in_container};
 use tokio::sync::mpsc;
 use tokio::task;
 use tokio::task::JoinError;
@@ -148,33 +148,11 @@ pub async fn build_pgx(
     println!("Building pgx extension at path {}", &path.display());
     let dockerfile = include_str!("./builders/Dockerfile.pgx");
 
-    let (receiver, sender, stream) = ByteStreamSyncSender::new();
-    // Making path owned so we can send it to the tarring task below without having to worry
-    // about the lifetime of the reference.
-    let path = path.to_owned();
-    task::spawn_blocking(move || {
-        let f = || {
-            let mut tar = tar::Builder::new(stream);
-            tar.append_dir_all(".", path)?;
-
-            let mut header = Header::new_gnu();
-            header.set_size(dockerfile.len() as u64);
-            header.set_cksum();
-            tar.append_data(&mut header, "Dockerfile", dockerfile.as_bytes())?;
-            Ok(())
-        };
-        match f() {
-            Ok(()) => (),
-            Err(err) => sender.try_send(Err(err)).map(|_| ()).unwrap_or_default(),
-        }
-    });
-
     let mut build_args = HashMap::new();
     build_args.insert("EXTENSION_NAME", extension_name);
     build_args.insert("EXTENSION_VERSION", extension_version);
     build_args.insert("PGX_VERSION", pgx_version.as_str());
 
-    // TODO: move to docker_build function
     let mut image_name = "pgx_builder_".to_string();
 
     let random_suffix = {
@@ -187,44 +165,13 @@ pub async fn build_pgx(
 
     let docker = Docker::connect_with_local_defaults()?;
 
-    let options = BuildImageOptions {
-        dockerfile: "Dockerfile",
-        t: &image_name.clone(),
-        rm: true,
-        buildargs: build_args,
-        ..Default::default()
-    };
-
-    let mut image_build_stream = docker.build_image(
-        options,
-        None,
-        Some(Body::wrap_stream(ReceiverStream::new(receiver))),
-    );
-
-    while let Some(next) = image_build_stream.next().await {
-        match next {
-            Ok(BuildInfo {
-                stream: Some(s), ..
-            }) => {
-                print!("{s}");
-            }
-            Ok(BuildInfo {
-                error: Some(err),
-                error_detail,
-                ..
-            }) => {
-                eprintln!(
-                    "ERROR: {} (detail: {})",
-                    err,
-                    error_detail.unwrap_or_default().message.unwrap_or_default()
-                );
-            }
-            Ok(_) => {}
-            Err(err) => {
-                return Err(err)?;
-            }
-        }
-    }
+    let _ = build_image(
+        docker.clone(),
+        &image_name,
+        dockerfile,
+        &path,
+        build_args
+    ).await?;
 
     // TODO: move to  docker_run function
     let options = Some(CreateContainerOptions {

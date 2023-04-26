@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use bollard::container::DownloadFromContainerOptions;
 use bollard::exec::{CreateExecOptions, StartExecOptions, StartExecResults};
 use bollard::Docker;
@@ -6,14 +7,18 @@ use elf::ElfBytes;
 use std::fs::File;
 use std::io::Cursor;
 use std::path::Path;
+use bollard::image::BuildImageOptions;
+use bollard::models::BuildInfo;
 
 use crate::commands::generic_build::GenericBuildError;
 use crate::manifest::{Manifest, PackagedFile};
-use crate::sync_utils::ByteStreamSyncReceiver;
+use crate::sync_utils::{ByteStreamSyncReceiver, ByteStreamSyncSender};
 use futures_util::stream::StreamExt;
+use hyper::Body;
 use tar::{Archive, Builder, EntryType, Header};
 use tee_readwrite::TeeReader;
 use tokio::task;
+use tokio_stream::wrappers::ReceiverStream;
 use tokio_task_manager::Task;
 
 /// Used to stop container when dropped, relies on using [tokio_task_manager::TaskManager::wait]
@@ -96,6 +101,87 @@ pub async fn exec_in_container(
         }
     }
     Ok::<String, anyhow::Error>(total_output)
+}
+
+
+// Build an image
+// The Dockerfile and build directory can be in different directories.
+pub async fn build_image(
+    docker: Docker,
+    image_name: &str,
+    dockerfile_path: &str,
+    build_directory: &Path,
+    build_args: HashMap<&str, &str>
+) -> Result<(), anyhow::Error> {
+
+    let dockerfile = dockerfile_path.to_owned();
+
+    let (receiver, sender, stream) = ByteStreamSyncSender::new();
+
+    // Making build_directory owned so we can send it to the tarring task below without having to worry
+    // about the lifetime of the reference.
+    let build_directory = build_directory.to_owned();
+
+    // The docker API receives the build environment as a tar ball.
+    task::spawn_blocking(move || {
+        let f = || {
+            let mut tar = tar::Builder::new(stream);
+            tar.append_dir_all(".", build_directory)?;
+
+            let mut header = Header::new_gnu();
+            header.set_size(dockerfile.len() as u64);
+            header.set_cksum();
+            tar.append_data(&mut header, "Dockerfile", dockerfile.as_bytes())?;
+            Ok(())
+        };
+        match f() {
+            Ok(()) => (),
+            Err(err) => sender.try_send(Err(err)).map(|_| ()).unwrap_or_default(),
+        }
+    });
+
+    let image_name = image_name.to_owned();
+
+    let options = BuildImageOptions {
+        dockerfile: "Dockerfile",
+        t: &image_name.clone(),
+        rm: true,
+        buildargs: build_args,
+        ..Default::default()
+    };
+
+    let mut image_build_stream = docker.build_image(
+        options,
+        None,
+        Some(Body::wrap_stream(ReceiverStream::new(receiver))),
+    );
+
+    while let Some(next) = image_build_stream.next().await {
+        match next {
+            Ok(BuildInfo {
+                   stream: Some(s), ..
+               }) => {
+                print!("{s}");
+            }
+            Ok(BuildInfo {
+                   error: Some(err),
+                   error_detail,
+                   ..
+               }) => {
+                eprintln!(
+                    "ERROR: {} (detail: {})",
+                    err,
+                    error_detail.unwrap_or_default().message.unwrap_or_default()
+                );
+            }
+            Ok(_) => {}
+            Err(err) => {
+                return Err(err)?;
+            }
+        }
+    }
+
+    return Ok(());
 }
 
 // Scan sharedir and package lib dir from a Trunk builder container for files from a provided list.
