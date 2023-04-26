@@ -1,15 +1,16 @@
-use std::collections::HashMap;
-use bollard::container::{CreateContainerOptions, DownloadFromContainerOptions, StartContainerOptions};
+use bollard::container::{
+    CreateContainerOptions, DownloadFromContainerOptions, StartContainerOptions,
+};
 use bollard::exec::{CreateExecOptions, StartExecOptions, StartExecResults};
 use bollard::Docker;
+use std::collections::HashMap;
 
-
+use bollard::container::Config;
+use bollard::image::BuildImageOptions;
+use bollard::models::{BuildInfo, HostConfig};
 use std::fs::File;
 use std::io::Cursor;
 use std::path::Path;
-use bollard::image::BuildImageOptions;
-use bollard::models::{BuildInfo, HostConfig};
-use bollard::container::{Config};
 
 use crate::commands::generic_build::GenericBuildError;
 use crate::manifest::{Manifest, PackagedFile};
@@ -108,9 +109,8 @@ pub async fn exec_in_container(
 pub async fn run_temporary_container(
     docker: Docker,
     image: &str,
-    _task: Task
+    _task: Task,
 ) -> Result<ReclaimableContainer, anyhow::Error> {
-
     let options = Some(CreateContainerOptions {
         name: image.to_string(),
         platform: None,
@@ -136,19 +136,23 @@ pub async fn run_temporary_container(
         .await?;
 
     // This will stop the container, whether we return an error or not
-    Ok(ReclaimableContainer::new(container.id.clone(), &docker, _task))
+    Ok(ReclaimableContainer::new(
+        container.id.clone(),
+        &docker,
+        _task,
+    ))
 }
 
-
-
-pub async fn find_installed_extension_files(docker: Docker, container_id: &str) -> Result<HashMap<String, Vec<String>>, anyhow::Error> {
-
+pub async fn find_installed_extension_files(
+    docker: Docker,
+    container_id: &str,
+) -> Result<HashMap<String, Vec<String>>, anyhow::Error> {
     let sharedir = exec_in_container(
         docker.clone(),
         container_id,
         vec!["pg_config", "--sharedir"],
     )
-        .await?;
+    .await?;
     let sharedir = sharedir.trim();
 
     let pkglibdir = exec_in_container(
@@ -156,7 +160,7 @@ pub async fn find_installed_extension_files(docker: Docker, container_id: &str) 
         container_id,
         vec!["pg_config", "--pkglibdir"],
     )
-        .await?;
+    .await?;
     let pkglibdir = pkglibdir.trim();
 
     // collect changes from container filesystem
@@ -172,9 +176,9 @@ pub async fn find_installed_extension_files(docker: Docker, container_id: &str) 
     for change in changes {
         if change.kind == 1
             && (change.path.ends_with(".so")
-            || change.path.ends_with(".bc")
-            || change.path.ends_with(".sql")
-            || change.path.ends_with(".control"))
+                || change.path.ends_with(".bc")
+                || change.path.ends_with(".sql")
+                || change.path.ends_with(".control"))
         {
             if change.path.starts_with(pkglibdir.clone()) {
                 let file_in_pkglibdir = change.path;
@@ -221,9 +225,8 @@ pub async fn build_image(
     image_name_prefix: &str,
     dockerfile_path: &str,
     build_directory: &Path,
-    build_args: HashMap<&str, &str>
+    build_args: HashMap<&str, &str>,
 ) -> Result<String, anyhow::Error> {
-
     let dockerfile = dockerfile_path.to_owned();
 
     let random_suffix = {
@@ -276,15 +279,15 @@ pub async fn build_image(
     while let Some(next) = image_build_stream.next().await {
         match next {
             Ok(BuildInfo {
-                   stream: Some(s), ..
-               }) => {
+                stream: Some(s), ..
+            }) => {
                 print!("{s}");
             }
             Ok(BuildInfo {
-                   error: Some(err),
-                   error_detail,
-                   ..
-               }) => {
+                error: Some(err),
+                error_detail,
+                ..
+            }) => {
                 eprintln!(
                     "ERROR: {} (detail: {})",
                     err,
@@ -309,16 +312,10 @@ pub async fn package_installed_extension_files(
     extension_name: &str,
     extension_version: &str,
 ) -> Result<(), anyhow::Error> {
-
     let extension_name = extension_name.to_owned();
     let extension_version = extension_version.to_owned();
 
-    let target_arch = exec_in_container(
-        docker.clone(),
-        container_id,
-        vec!["uname", "-m"],
-    )
-        .await?;
+    let target_arch = exec_in_container(docker.clone(), container_id, vec!["uname", "-m"]).await?;
     let target_arch = target_arch.trim().to_string();
 
     let sharedir = exec_in_container(
@@ -326,7 +323,7 @@ pub async fn package_installed_extension_files(
         container_id,
         vec!["pg_config", "--sharedir"],
     )
-        .await?;
+    .await?;
     let sharedir = sharedir.trim();
 
     let pkglibdir = exec_in_container(
@@ -334,7 +331,7 @@ pub async fn package_installed_extension_files(
         container_id,
         vec!["pg_config", "--pkglibdir"],
     )
-        .await?;
+    .await?;
     let pkglibdir = pkglibdir.trim();
 
     let extension_files = find_installed_extension_files(docker.clone(), container_id).await?;

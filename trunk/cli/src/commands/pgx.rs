@@ -1,8 +1,5 @@
-
-
 use semver::{Version, VersionReq};
 use std::collections::HashMap;
-
 
 use std::path::{Path, StripPrefixError};
 use std::string::FromUtf8Error;
@@ -10,19 +7,13 @@ use std::{fs, include_str};
 
 use futures_util::stream::StreamExt;
 
-
-
 use thiserror::Error;
-
 
 use bollard::Docker;
 
-
-
-
-
-
-use crate::commands::containers::{build_image, package_installed_extension_files, exec_in_container, run_temporary_container};
+use crate::commands::containers::{
+    build_image, exec_in_container, package_installed_extension_files, run_temporary_container,
+};
 use tokio::sync::mpsc;
 
 use tokio::task::JoinError;
@@ -98,7 +89,7 @@ pub async fn build_pgx(
     path: &Path,
     output_path: &str,
     cargo_toml: toml::Table,
-    _task: Task
+    _task: Task,
 ) -> Result<(), PgxBuildError> {
     let cargo_package_info = cargo_toml
         .get("package")
@@ -162,10 +153,12 @@ pub async fn build_pgx(
         &image_name_prefix,
         dockerfile,
         path,
-        build_args
-    ).await?;
+        build_args,
+    )
+    .await?;
 
-    let temp_container = run_temporary_container(docker.clone(), image_name.as_str(), _task).await?;
+    let temp_container =
+        run_temporary_container(docker.clone(), image_name.as_str(), _task).await?;
 
     println!("Determining installation files...");
     let _exec_output = exec_in_container(

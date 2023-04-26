@@ -1,26 +1,12 @@
-
-
-
 use std::collections::HashMap;
 
-
-use std::{fs, include_str};
 use std::path::{Path, StripPrefixError};
 use std::string::FromUtf8Error;
-
-
-
-
+use std::{fs, include_str};
 
 use thiserror::Error;
 
-
 use bollard::Docker;
-
-
-
-
-
 
 use tokio::sync::mpsc;
 
@@ -28,7 +14,9 @@ use tokio::task::JoinError;
 
 use tokio_task_manager::Task;
 
-use crate::commands::containers::{build_image, exec_in_container, package_installed_extension_files, run_temporary_container};
+use crate::commands::containers::{
+    build_image, exec_in_container, package_installed_extension_files, run_temporary_container,
+};
 
 #[derive(Error, Debug)]
 pub enum GenericBuildError {
@@ -89,7 +77,6 @@ pub async fn build_generic(
     extension_version: &str,
     _task: Task,
 ) -> Result<(), GenericBuildError> {
-
     println!("Building with name {}", &extension_name);
     println!("Building with version {}", &extension_version);
 
@@ -108,21 +95,16 @@ pub async fn build_generic(
         &image_name_prefix,
         dockerfile,
         path,
-        build_args
-    ).await?;
+        build_args,
+    )
+    .await?;
 
-    let temp_container = run_temporary_container(docker.clone(), image_name.as_str(), _task).await?;
+    let temp_container =
+        run_temporary_container(docker.clone(), image_name.as_str(), _task).await?;
 
     println!("Determining installation files...");
-    let _exec_output = exec_in_container(
-        docker.clone(),
-        &temp_container.id,
-        vec![
-            "make",
-            "install"
-        ],
-    )
-        .await?;
+    let _exec_output =
+        exec_in_container(docker.clone(), &temp_container.id, vec!["make", "install"]).await?;
 
     // output_path is the locally output path
     fs::create_dir_all(output_path)?;
@@ -134,7 +116,7 @@ pub async fn build_generic(
         extension_name,
         extension_version,
     )
-        .await?;
+    .await?;
 
     Ok(())
 }
