@@ -1,12 +1,12 @@
 use bollard::container::{
-    Config, CreateContainerOptions, DownloadFromContainerOptions, StartContainerOptions,
+    Config, CreateContainerOptions, StartContainerOptions,
 };
 use bollard::models::HostConfig;
 use semver::{Version, VersionReq};
 use std::collections::HashMap;
 use std::default::Default;
-use std::fs::File;
-use std::io::Cursor;
+
+
 use std::path::{Path, StripPrefixError};
 use std::string::FromUtf8Error;
 use std::{fs, include_str};
@@ -14,27 +14,27 @@ use std::{fs, include_str};
 use futures_util::stream::StreamExt;
 
 use rand::Rng;
-use tar::{Archive, Builder, EntryType, Header};
+use tar::{Header};
 use thiserror::Error;
 
 use bollard::image::BuildImageOptions;
 use bollard::Docker;
 
-use crate::manifest::{Manifest, PackagedFile};
-use crate::sync_utils::{ByteStreamSyncReceiver, ByteStreamSyncSender};
+
+use crate::sync_utils::{ByteStreamSyncSender};
 use bollard::models::BuildInfo;
-use elf::endian::AnyEndian;
-use elf::ElfBytes;
+
+
 use hyper::Body;
-use tee_readwrite::TeeReader;
+
 use tokio::sync::mpsc;
 use tokio::task;
 use tokio::task::JoinError;
 use tokio_stream::wrappers::ReceiverStream;
 use tokio_task_manager::Task;
 use toml::Value;
-use crate::commands::containers::{copy_from_container_into_package, exec_in_container, ReclaimableContainer};
-use crate::commands::generic_build::GenericBuildError;
+use crate::commands::containers::{copy_from_container_into_package, exec_in_container};
+
 
 #[derive(Error, Debug)]
 pub enum PgxBuildError {
@@ -104,7 +104,7 @@ pub async fn build_pgx(
     path: &Path,
     output_path: &str,
     cargo_toml: toml::Table,
-    task: Task,
+    _task: Task,
 ) -> Result<(), PgxBuildError> {
     let cargo_package_info = cargo_toml
         .get("package")
@@ -268,7 +268,7 @@ pub async fn build_pgx(
     let pkglibdir= pkglibdir.trim();
 
     println!("Determining installation files...");
-    let _exec_output = exec_in_container(docker.clone(), &container.id, vec!["cp", "--verbose", "-R", format!("target/release/{}-pg15/usr", extension_name).as_str(), "/"]).await?;
+    let _exec_output = exec_in_container(docker.clone(), &container.id, vec!["cp", "--verbose", "-R", format!("target/release/{extension_name}-pg15/usr").as_str(), "/"]).await?;
 
     // collect changes from container filesystem
     println!("Collecting files...");
@@ -277,34 +277,32 @@ pub async fn build_pgx(
     let mut pkglibdir_list = vec![];
     let mut sharedir_list = vec![];
     for change in changes {
-        if change.kind == 1 {
-            if change.path.ends_with(".so") || change.path.ends_with(".bc") || change.path.ends_with(".sql") || change.path.ends_with(".control") {
-                if change.path.starts_with(pkglibdir.clone()) {
-                    let file_in_pkglibdir = change.path;
-                    let file_in_pkglibdir = file_in_pkglibdir.strip_prefix(pkglibdir);
-                    let file_in_pkglibdir = file_in_pkglibdir.unwrap();
-                    let file_in_pkglibdir = file_in_pkglibdir.trim_start_matches("/");
-                    pkglibdir_list.push(file_in_pkglibdir.to_owned());
-                } else if change.path.starts_with(sharedir.clone()) {
-                    let file_in_sharedir = change.path;
-                    let file_in_sharedir = file_in_sharedir.strip_prefix(sharedir);
-                    let file_in_sharedir = file_in_sharedir.unwrap();
-                    let file_in_sharedir = file_in_sharedir.trim_start_matches("/");
-                    sharedir_list.push(file_in_sharedir.to_owned());
-                } else {
-                    println!("WARNING: file {} is not in pkglibdir or sharedir", change.path);
-                }
+        if change.kind == 1 && (change.path.ends_with(".so") || change.path.ends_with(".bc") || change.path.ends_with(".sql") || change.path.ends_with(".control")) {
+            if change.path.starts_with(pkglibdir.clone()) {
+                let file_in_pkglibdir = change.path;
+                let file_in_pkglibdir = file_in_pkglibdir.strip_prefix(pkglibdir);
+                let file_in_pkglibdir = file_in_pkglibdir.unwrap();
+                let file_in_pkglibdir = file_in_pkglibdir.trim_start_matches('/');
+                pkglibdir_list.push(file_in_pkglibdir.to_owned());
+            } else if change.path.starts_with(sharedir.clone()) {
+                let file_in_sharedir = change.path;
+                let file_in_sharedir = file_in_sharedir.strip_prefix(sharedir);
+                let file_in_sharedir = file_in_sharedir.unwrap();
+                let file_in_sharedir = file_in_sharedir.trim_start_matches('/');
+                sharedir_list.push(file_in_sharedir.to_owned());
+            } else {
+                println!("WARNING: file {} is not in pkglibdir or sharedir", change.path);
             }
         }
     }
 
     println!("Sharedir files:");
     for sharedir_file in sharedir_list.clone() {
-        println!("{}", sharedir_file);
+        println!("{sharedir_file}");
     }
     println!("Pkglibdir files:");
     for pkglibdir_file in pkglibdir_list.clone() {
-        println!("{}", pkglibdir_file);
+        println!("{pkglibdir_file}");
     }
 
     // This will stop the container, whether we return an error or not
@@ -318,7 +316,7 @@ pub async fn build_pgx(
     copy_from_container_into_package(
         docker.clone(),
         &container.id,
-        &output_path,
+        output_path,
         sharedir,
         pkglibdir,
         sharedir_list,

@@ -1,8 +1,8 @@
 use assert_cmd::prelude::*; // Add methods on commands
-use git2::{Repository, build::CheckoutBuilder};
+use git2::{Repository};
 use predicates::prelude::*; // Used for writing assertions
 use rand::Rng;
-use std::path::{Path, PathBuf};
+use std::path::{Path};
 use std::process::Command; // Run programs
 use std::fs;
 
@@ -55,9 +55,9 @@ fn build_c_extension() -> Result<(), Box<dyn std::error::Error>> {
     let repo_url = "https://github.com/aws/pg_tle.git";
     // clone and checkout ref v1.0.3
     let repo_dir_path = current_file_path.parent().unwrap().join("pg_tle");
-    let repo_dir = PathBuf::from(repo_dir_path);
+    let repo_dir = repo_dir_path;
     if repo_dir.exists() {
-        fs::remove_dir_all(&repo_dir.clone()).unwrap();
+        fs::remove_dir_all(repo_dir.clone()).unwrap();
     }
     let repo = Repository::clone(repo_url, &repo_dir).unwrap();
     let refname = "v1.0.3";

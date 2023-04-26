@@ -1,14 +1,14 @@
-use std::fs::{File, OpenOptions};
+use std::fs::{File};
 use std::io::Cursor;
-use std::path::{Path, PathBuf};
+use std::path::{Path};
 use bollard::container::DownloadFromContainerOptions;
 use bollard::Docker;
 use bollard::exec::{CreateExecOptions, StartExecOptions, StartExecResults};
 use elf::ElfBytes;
 use elf::endian::AnyEndian;
-use futures_util::stream;
+
 use tokio_task_manager::Task;
-use futures_util::stream::{select, select_all, StreamExt};
+use futures_util::stream::{StreamExt};
 use tar::{Archive, Builder, EntryType, Header};
 use tee_readwrite::TeeReader;
 use tokio::task;
@@ -70,7 +70,7 @@ pub async fn exec_in_container(docker: Docker, container_id: &str, command: Vec<
         ..StartExecOptions::default()
     });
     let log_output = docker.start_exec(&exec.id, start_exec_options);
-    let mut start_exec_result = log_output.await?;
+    let start_exec_result = log_output.await?;
 
     let mut total_output = String::new();
     match start_exec_result {
@@ -79,10 +79,10 @@ pub async fn exec_in_container(docker: Docker, container_id: &str, command: Vec<
                 .map(|result| {
                     match result {
                         Ok(log_output) => {
-                            println!("{}", log_output.to_string());
+                            println!("{log_output}");
                             total_output.push_str(log_output.to_string().as_str());
                         },
-                        Err(error) => eprintln!("Error while reading log output: {}", error),
+                        Err(error) => eprintln!("Error while reading log output: {error}"),
                     }
                 })
                 .fuse();
@@ -109,7 +109,7 @@ pub async fn copy_from_container_into_package(docker: Docker, container_id: &str
 
     // In this function, we open and work with .tar only, then we finalize the package with a .gz in a separate call
     let package_path = format!("{package_path}/{extension_name}-{extension_version}.tar");
-    println!("Creating package at: {}", package_path);
+    println!("Creating package at: {package_path}");
     let file = File::create(&package_path)?;
 
     // Stream used to pass information from docker to tar
@@ -145,7 +145,7 @@ pub async fn copy_from_container_into_package(docker: Docker, container_id: &str
                     // Then we will handle packaging the file
                     let path = entry.path()?.to_path_buf();
                     // Check if we found a file to package in pkglibdir
-                    let full_path = format!("/{}", path.to_str().unwrap_or_else(|| ""));
+                    let full_path = format!("/{}", path.to_str().unwrap_or(""));
                     let trimmed = full_path.trim_start_matches(&format!("{}/", pkglibdir.clone())).trim_start_matches(&format!("{}/", sharedir.clone())).to_string();
                     let pkglibdir_match = pkglibdir_list.contains(&trimmed);
                     let sharedir_match = sharedir_list.contains(&trimmed);
@@ -153,7 +153,7 @@ pub async fn copy_from_container_into_package(docker: Docker, container_id: &str
                     if !( sharedir_match || pkglibdir_match ){
                         continue
                     }
-                    println!("Detected file to package: {}", trimmed);
+                    println!("Detected file to package: {trimmed}");
                     if path.to_str() == Some("manifest.json") {
                         println!("Found manifest.json, merging additions with existing manifest");
                         manifest.merge(serde_json::from_reader(entry)?);
@@ -206,7 +206,7 @@ pub async fn copy_from_container_into_package(docker: Docker, container_id: &str
                                             _ => "unknown",
                                         }
                                             .to_string();
-                                        println!("Detected architecture: {}", target_arch);
+                                        println!("Detected architecture: {target_arch}");
                                         architecture.replace(target_arch);
                                     }
                                     _ => {}
@@ -234,5 +234,5 @@ pub async fn copy_from_container_into_package(docker: Docker, container_id: &str
 
     println!("Packaged to {package_path}");
 
-    return Ok(());
+    Ok(())
 }
