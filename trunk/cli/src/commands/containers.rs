@@ -343,7 +343,7 @@ pub async fn package_installed_extension_files(
     let sharedir = sharedir.to_owned();
 
     // In this function, we open and work with .tar only, then we finalize the package with a .gz in a separate call
-    let package_path = format!("{package_path}/{extension_name}-{extension_version}.tar");
+    let package_path = format!("{package_path}/{extension_name}-{extension_version}.tar.gz");
     println!("Creating package at: {package_path}");
     let file = File::create(&package_path)?;
 
@@ -361,7 +361,10 @@ pub async fn package_installed_extension_files(
     // Create a sync task within the tokio runtime to copy the file from docker to tar
     let tar_handle = task::spawn_blocking(move || {
         let mut archive = Archive::new(receiver);
-        let mut new_archive = Builder::new(file);
+        let mut new_archive = Builder::new(flate2::write::GzEncoder::new(
+            file,
+            flate2::Compression::default(),
+        ));
         let mut manifest = Manifest {
             extension_name,
             extension_version,
