@@ -12,6 +12,7 @@ use aws_config::SdkConfig;
 use aws_sdk_s3;
 use aws_sdk_s3::primitives::ByteStream;
 use futures::TryStreamExt;
+use log::error;
 use sqlx::{Pool, Postgres};
 
 const MAX_SIZE: usize = 262_144; // max payload size is 256k
@@ -34,7 +35,8 @@ pub async fn publish(
         let headers = field.headers();
         let auth = headers.get(AUTHORIZATION).unwrap();
         if auth != cfg.auth_token {
-            return Err(AuthorizationError());
+            error!("Authorization error");
+            return Err(AuthorizationError);
         }
         // Field is stream of Bytes
         while let Some(chunk) = field.try_next().await? {
