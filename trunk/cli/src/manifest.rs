@@ -8,7 +8,7 @@ use std::path::{Path, PathBuf};
 pub enum PackagedFile {
     ControlFile {},
     SqlFile {},
-    SharedObject { architecture: Option<String> },
+    SharedObject {},
     Bitcode {},
     Extra {},
 }
@@ -20,7 +20,7 @@ impl PackagedFile {
             match ext.to_str() {
                 Some("control") => PackagedFile::ControlFile {},
                 Some("sql") => PackagedFile::SqlFile {},
-                Some("so") => PackagedFile::SharedObject { architecture: None },
+                Some("so") => PackagedFile::SharedObject {},
                 Some("bc") => PackagedFile::Bitcode {},
                 Some(_) | None => PackagedFile::Extra {},
             }
@@ -38,6 +38,7 @@ pub struct Manifest {
     #[serde(rename = "version")]
     pub extension_version: String,
     pub sys: String,
+    pub architecture: String,
     pub files: Option<HashMap<PathBuf, PackagedFile>>,
 }
 

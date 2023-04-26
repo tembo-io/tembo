@@ -365,6 +365,7 @@ pub async fn package_installed_extension_files(
         let mut manifest = Manifest {
             extension_name,
             extension_version,
+            architecture: target_arch,
             sys: "linux".to_string(),
             files: None,
         };
@@ -397,14 +398,14 @@ pub async fn package_installed_extension_files(
                         let root_path = Path::new("/");
                         let path = root_path.join(path);
                         let mut path = path.as_path();
-                        println!("Packaging file {:?}", path);
+                        println!("Packaging file {path:?}");
                         // trim pkglibdir or sharedir from start of path
                         if path.to_string_lossy().contains(&pkglibdir) {
                             path = path.strip_prefix(pkglibdir.trim_end_matches("lib"))?;
                         } else if path.to_string_lossy().contains(&sharedir) {
                             path = path.strip_prefix(format!("{}/", sharedir.clone()))?;
                         } else {
-                            println!("WARNING: Skipping file because it's not in sharedir or pkglibdir {:?}", path.clone());
+                            println!("WARNING: Skipping file because it's not in sharedir or pkglibdir {:?}", &path);
                             continue;
                         }
 
@@ -419,8 +420,8 @@ pub async fn package_installed_extension_files(
                             let mut buf = Vec::new();
                             let mut tee = TeeReader::new(entry, &mut buf, true);
 
-                            println!("Adding file {} to package", path.clone().to_string_lossy());
-                            new_archive.append_data(&mut header, &path, &mut tee)?;
+                            println!("Adding file {} to package", &path.to_string_lossy());
+                            new_archive.append_data(&mut header, path, &mut tee)?;
                             println!("Added");
 
                             let (_entry, _buf) = tee.into_inner();
@@ -430,16 +431,7 @@ pub async fn package_installed_extension_files(
                                     "Adding file {} to manifest",
                                     path.to_string_lossy()
                                 );
-                                let file = manifest.add_file(path);
-                                match file {
-                                    PackagedFile::SharedObject {
-                                        ref mut architecture,
-                                        ..
-                                    } => {
-                                        architecture.replace(target_arch.clone());
-                                    }
-                                    _ => {}
-                                }
+                                let _ = manifest.add_file(path);
                             }
                         }
                     }

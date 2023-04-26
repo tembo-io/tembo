@@ -28,7 +28,7 @@ pub struct InstallCommand {
 }
 
 #[derive(thiserror::Error, Debug)]
-pub enum PgxInstallError {
+pub enum InstallError {
     #[error("unknown file type")]
     UnknownFileType,
 
@@ -53,7 +53,7 @@ impl SubCommand for InstallCommand {
             .pg_config
             .as_ref()
             .or_else(|| installed_pg_config.as_ref())
-            .ok_or(PgxInstallError::PgConfigNotFound)?;
+            .ok_or(InstallError::PgConfigNotFound)?;
         println!("Using pg_config: {}", pg_config.to_string_lossy());
 
         let package_lib_dir = std::process::Command::new(pg_config)
@@ -114,7 +114,7 @@ impl SubCommand for InstallCommand {
                     tempfile
                 }
                 Some("tar") => f,
-                _ => return Err(PgxInstallError::UnknownFileType)?,
+                _ => return Err(InstallError::UnknownFileType)?,
             };
             install(input, extension_dir, package_lib_dir, bitcode_dir, sharedir).await?;
         } else {
@@ -185,6 +185,14 @@ async fn install(
         } else {
             "unsupported"
         };
+        if host_arch != manifest.architecture {
+            println!(
+                "This package is not compatible with your architecture: {}, it is compatible with {}",
+                host_arch,
+                manifest.architecture
+            );
+            return Ok(());
+        }
         let entries = archive.entries_with_seek()?;
         for entry in entries {
             let mut entry = entry?;
@@ -199,28 +207,13 @@ async fn install(
                         println!("[+] {} => {}", name.display(), extension_dir.display());
                         entry.unpack_in(&extension_dir)?;
                     }
-                    PackagedFile::SharedObject {
-                        architecture: None, ..
-                    } => {
+                    PackagedFile::SharedObject { .. } => {
                         println!(
-                            "[+] {} (no arch) => {}",
+                            "[+] {} => {}",
                             name.display(),
                             package_lib_dir.display()
                         );
                         entry.unpack_in(&package_lib_dir)?;
-                    }
-                    PackagedFile::SharedObject {
-                        architecture: Some(ref architecture),
-                        ..
-                    } if architecture == host_arch => {
-                        println!("[+] {} => {}", name.display(), package_lib_dir.display());
-                        entry.unpack_in(&package_lib_dir)?;
-                    }
-                    PackagedFile::SharedObject {
-                        architecture: Some(ref architecture),
-                        ..
-                    } => {
-                        println!("[ ] {} (arch) skipped {}", name.display(), architecture);
                     }
                     PackagedFile::Bitcode { .. } => {
                         println!("[+] {} => {}", name.display(), bitcode_dir.display());
@@ -234,7 +227,7 @@ async fn install(
             }
         }
     } else {
-        return Err(PgxInstallError::ManifestNotFound)?;
+        return Err(InstallError::ManifestNotFound)?;
     }
     Ok(())
 }
