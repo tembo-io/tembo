@@ -5,20 +5,21 @@ import numpy as np
 
 from coredb_pgmq_python import Message, PGMQueue
 
-import timeit
+import random
 
 
 def bench() -> None:
-    test_queue = "bench_queue_1"
+    rnd = random.randint(0, 1000)
+    test_queue = f"bench_queue_{rnd}"
     test_message = {"hello": "world"}
 
-    queue = PGMQueue(host="localhost", port=5432, username="postgres", password="postgres", database="postgres")
+    queue = PGMQueue(host="localhost", port=28815, username="adamhendel", password="postgres", database="postgres")
     try:
         queue.create_queue(test_queue)
     except Exception as e:
         print("table exists?")
 
-    num_iters = 1_000
+    num_iters = 10_000
 
     bench_0_start = time.time()
     vt = 30
@@ -72,6 +73,33 @@ def bench() -> None:
     total_delete_time = time.time() - delete_start
     print(f"total delete time: {total_delete_time}")
     summarize("deletes", reads)
+
+    # archives
+    print("Benchmarking: Archiving Messages")
+    writes = []
+    total_write_start = time.time()
+    # publish messages
+    print("Writing Messages")
+    for x in range(num_iters):
+        test_message["hello"] = x
+        start = time.time()
+        msg_id = queue.send(test_queue, test_message)
+        writes.append(time.time() - start)
+    total_write_duration = time.time() - total_write_start
+    print(f"total write time: {total_write_duration}")
+    summarize("writes", writes)
+
+    archives = []
+    archive_start = time.time()
+    print("Archiving Messages")
+    for x in range(num_iters):
+        start = time.time()
+        queue.archive(test_queue, x)
+        archives.append(time.time() - start)
+    total_archive_time = time.time() - archive_start
+    print(f"total archive time: {total_delete_time}")
+    summarize("archives", reads)
+
 
 def summarize(cat: str, timings: list[float]) -> None:
     total = len(timings)
