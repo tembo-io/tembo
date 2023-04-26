@@ -124,8 +124,8 @@ def summarize(cat: str, timings: list[float]) -> None:
     }
 if __name__ == "__main__":
     trials = [
-        ("docker", 5432, "postgres"),
-        ("native", 28815, "username")
+        ("docker", 5432, "postgres"),   # docker
+        ("native", 28815, "username")  # pgrx 
     ]
     all_results = []
     for t in trials:
