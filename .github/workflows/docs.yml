@@ -10,6 +10,7 @@ on:
   push:
     branches:
       - main
+      - fix-doc-ci
     paths:
       - '.github/workflows/docs.yml'
       - 'docs/**'
@@ -24,4 +25,5 @@ jobs:
         with:
           python-version: 3.x
       - run: curl -sSL https://install.python-poetry.org | POETRY_VERSION=1.2.2 python3 -
+      - run: poetry install
       - run: poetry run mkdocs gh-deploy --force
