@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
-use std::path::{Path, StripPrefixError};
-use std::string::FromUtf8Error;
+use std::path::{Path};
+
 use std::{fs, include_str};
 
 use thiserror::Error;
@@ -10,7 +10,7 @@ use bollard::Docker;
 
 use tokio::sync::mpsc;
 
-use tokio::task::JoinError;
+
 
 use tokio_task_manager::Task;
 
@@ -20,29 +20,20 @@ use crate::commands::containers::{
 
 #[derive(Error, Debug)]
 pub enum GenericBuildError {
-    #[error("Produced a file outside of postgres sharedir or pkglibdir: {0}")]
-    InvalidFileInstalled(String),
-
     #[error("IO Error: {0}")]
     IoError(#[from] std::io::Error),
 
     #[error("Docker Error: {0}")]
     DockerError(#[from] bollard::errors::Error),
 
-    #[error("Error converting binary to utf8: {0}")]
-    FromUft8Error(#[from] FromUtf8Error),
-
     #[error("Internal sending error: {0}")]
     InternalSendingError(#[from] mpsc::error::SendError<Vec<u8>>),
-
-    #[error("Async join error: {0}")]
-    JoinError(#[from] JoinError),
 
     #[error("Parsing ELF file error: {0}")]
     ElfError(#[from] elf::ParseError),
 
     #[error("Tar layout error: trunk-output not found")]
-    TarLayoutError(#[from] StripPrefixError),
+    TarLayoutError(#[from] std::path::StripPrefixError),
 
     #[error("JSON parsing error: {0}")]
     JsonError(#[from] serde_json::Error),

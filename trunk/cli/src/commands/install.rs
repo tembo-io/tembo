@@ -196,11 +196,7 @@ async fn install(
                         entry.unpack_in(&sharedir)?;
                     }
                     PackagedFile::SharedObject { .. } => {
-                        println!(
-                            "[+] {} => {}",
-                            name.display(),
-                            package_lib_dir.display()
-                        );
+                        println!("[+] {} => {}", name.display(), package_lib_dir.display());
                         entry.unpack_in(&package_lib_dir)?;
                     }
                     PackagedFile::Bitcode { .. } => {

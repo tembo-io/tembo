@@ -13,7 +13,7 @@ use std::io::Cursor;
 use std::path::Path;
 
 use crate::commands::generic_build::GenericBuildError;
-use crate::manifest::{Manifest, PackagedFile};
+use crate::manifest::Manifest;
 use crate::sync_utils::{ByteStreamSyncReceiver, ByteStreamSyncSender};
 use futures_util::stream::StreamExt;
 use hyper::Body;
@@ -180,13 +180,13 @@ pub async fn find_installed_extension_files(
                 || change.path.ends_with(".sql")
                 || change.path.ends_with(".control"))
         {
-            if change.path.starts_with(pkglibdir.clone()) {
+            if change.path.starts_with(pkglibdir) {
                 let file_in_pkglibdir = change.path;
                 let file_in_pkglibdir = file_in_pkglibdir.strip_prefix(pkglibdir);
                 let file_in_pkglibdir = file_in_pkglibdir.unwrap();
                 let file_in_pkglibdir = file_in_pkglibdir.trim_start_matches('/');
                 pkglibdir_list.push(file_in_pkglibdir.to_owned());
-            } else if change.path.starts_with(sharedir.clone()) {
+            } else if change.path.starts_with(sharedir) {
                 let file_in_sharedir = change.path;
                 let file_in_sharedir = file_in_sharedir.strip_prefix(sharedir);
                 let file_in_sharedir = file_in_sharedir.unwrap();
@@ -371,73 +371,72 @@ pub async fn package_installed_extension_files(
         };
         // If the docker copy command starts to stream data
         println!("Scanning...");
-        if let Ok(entries) = archive.entries() {
-            // For each file from the tar stream returned from docker copy
-            for entry in entries {
-                // If we can get the file from the stream
-                if let Ok(entry) = entry {
-                    // Then we will handle packaging the file
-                    let path = entry.path()?.to_path_buf();
-                    // Check if we found a file to package in pkglibdir
-                    let full_path = format!("/{}", path.to_str().unwrap_or(""));
-                    let trimmed = full_path
-                        .trim_start_matches(&format!("{}/", pkglibdir.clone()))
-                        .trim_start_matches(&format!("{}/", sharedir.clone()))
-                        .to_string();
-                    let pkglibdir_match = pkglibdir_list.contains(&trimmed);
-                    let sharedir_match = sharedir_list.contains(&trimmed);
-                    // Check if we found a file to package
-                    if !(sharedir_match || pkglibdir_match) {
-                        continue;
-                    }
-                    println!("Detected file to package: {trimmed}");
-                    if path.to_str() == Some("manifest.json") {
-                        println!("Found manifest.json, merging additions with existing manifest");
-                        manifest.merge(serde_json::from_reader(entry)?);
-                    } else {
-                        let root_path = Path::new("/");
-                        let path = root_path.join(path);
-                        let mut path = path.as_path();
-                        println!("Packaging file {path:?}");
-                        // trim pkglibdir or sharedir from start of path
-                        if path.to_string_lossy().contains(&pkglibdir) {
-                            path = path.strip_prefix(format!("{}/", pkglibdir.clone()))?;
-                        } else if path.to_string_lossy().contains(&sharedir) {
-                            path = path.strip_prefix(format!("{}/", sharedir.clone()))?;
-                        } else {
-                            println!("WARNING: Skipping file because it's not in sharedir or pkglibdir {:?}", &path);
-                            continue;
-                        }
+        let entries = archive
+            .entries()
+            .expect("Expected to find some files in the /usr directory");
+        for entry in entries.flatten() {
+            // If we can get the file from the stream
+            // Then we will handle packaging the file
+            let path = entry.path()?.to_path_buf();
+            // Check if we found a file to package in pkglibdir
+            let full_path = format!("/{}", path.to_str().unwrap_or(""));
+            let trimmed = full_path
+                .trim_start_matches(&format!("{}/", pkglibdir.clone()))
+                .trim_start_matches(&format!("{}/", sharedir.clone()))
+                .to_string();
+            let pkglibdir_match = pkglibdir_list.contains(&trimmed);
+            let sharedir_match = sharedir_list.contains(&trimmed);
+            // Check if we found a file to package
+            if !(sharedir_match || pkglibdir_match) {
+                continue;
+            }
+            println!("Detected file to package: {trimmed}");
+            if path.to_str() == Some("manifest.json") {
+                println!("Found manifest.json, merging additions with existing manifest");
+                manifest.merge(serde_json::from_reader(entry)?);
+            } else {
+                let root_path = Path::new("/");
+                let path = root_path.join(path);
+                let mut path = path.as_path();
+                println!("Packaging file {path:?}");
+                // trim pkglibdir or sharedir from start of path
+                if path.to_string_lossy().contains(&pkglibdir) {
+                    path = path.strip_prefix(format!("{}/", &pkglibdir))?;
+                } else if path.to_string_lossy().contains(&sharedir) {
+                    path = path.strip_prefix(format!("{}/", &sharedir))?;
+                } else {
+                    println!(
+                        "WARNING: Skipping file because it's not in sharedir or pkglibdir {:?}",
+                        &path
+                    );
+                    continue;
+                }
 
-                        if !path.to_string_lossy().is_empty() {
-                            let mut header = Header::new_gnu();
-                            header.set_mode(entry.header().mode()?);
-                            header.set_mtime(entry.header().mtime()?);
-                            header.set_size(entry.size());
-                            header.set_cksum();
-                            let entry_type = entry.header().entry_type();
+                if !path.to_string_lossy().is_empty() {
+                    let mut header = Header::new_gnu();
+                    header.set_mode(entry.header().mode()?);
+                    header.set_mtime(entry.header().mtime()?);
+                    header.set_size(entry.size());
+                    header.set_cksum();
+                    let entry_type = entry.header().entry_type();
 
-                            let mut buf = Vec::new();
-                            let mut tee = TeeReader::new(entry, &mut buf, true);
+                    let mut buf = Vec::new();
+                    let mut tee = TeeReader::new(entry, &mut buf, true);
 
-                            println!("Adding file {} to package", &path.to_string_lossy());
-                            new_archive.append_data(&mut header, path, &mut tee)?;
-                            println!("Added");
+                    println!("Adding file {} to package", &path.to_string_lossy());
+                    new_archive.append_data(&mut header, path, &mut tee)?;
+                    println!("Added");
 
-                            let (_entry, _buf) = tee.into_inner();
+                    let (_entry, _buf) = tee.into_inner();
 
-                            if entry_type == EntryType::file() {
-                                println!(
-                                    "Adding file {} to manifest",
-                                    path.to_string_lossy()
-                                );
-                                let _ = manifest.add_file(path);
-                            }
-                        }
+                    if entry_type == EntryType::file() {
+                        println!("Adding file {} to manifest", path.to_string_lossy());
+                        let _ = manifest.add_file(path);
                     }
                 }
             }
         }
+
         let manifest = serde_json::to_string_pretty(&manifest).unwrap_or_default();
         let mut header = Header::new_gnu();
         header.set_size(manifest.as_bytes().len() as u64);
