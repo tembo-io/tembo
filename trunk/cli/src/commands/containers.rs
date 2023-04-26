@@ -102,6 +102,11 @@ pub async fn exec_in_container(docker: Docker, container_id: &str, command: Vec<
 // Package these files into a Trunk package.
 pub async fn copy_from_container_into_package(docker: Docker, container_id: &str, package_path: &str, sharedir: &str, pkglibdir: &str, sharedir_list: Vec<String>, pkglibdir_list: Vec<String>, extension_name: &str, extension_version: &str) -> Result<(), anyhow::Error> {
 
+    let extension_name = extension_name.to_owned();
+    let extension_version = extension_version.to_owned();
+    let pkglibdir = pkglibdir.to_owned();
+    let sharedir = sharedir.to_owned();
+
     // In this function, we open and work with .tar only, then we finalize the package with a .gz in a separate call
     let package_path = format!("{package_path}/{extension_name}-{extension_version}.tar");
     println!("Creating package at: {}", package_path);
@@ -112,15 +117,11 @@ pub async fn copy_from_container_into_package(docker: Docker, container_id: &str
     let receiver_sender = receiver.sender();
 
     // Open stream to docker for copying files
-    let options_sharedir = Some(DownloadFromContainerOptions { path: format!("{}/extension", sharedir) });
-    let file_stream_sharedir = docker.download_from_container(container_id, options_sharedir);
-    let options_pkglibdir = Some(DownloadFromContainerOptions { path: pkglibdir });
-    let file_stream_pkglibdir = docker.download_from_container(container_id, options_pkglibdir);
-
-    let combined_stream = select(file_stream_sharedir, file_stream_pkglibdir);
-
-    let extension_name = extension_name.to_owned();
-    let extension_version = extension_version.to_owned();
+    // Is there some way to copy from both sharedir and pkglibdir,
+    // then combine the steams instead of scanning the whole /usr directory?
+    // Looping over everything in that directory makes this way slower.
+    let options_usrdir = Some(DownloadFromContainerOptions { path: "/usr" });
+    let file_stream = docker.download_from_container(container_id, options_usrdir);
 
     // Create a sync task within the tokio runtime to copy the file from docker to tar
     let tar_handle = task::spawn_blocking(move || {
@@ -135,6 +136,7 @@ pub async fn copy_from_container_into_package(docker: Docker, container_id: &str
             files: None,
         };
         // If the docker copy command starts to stream data
+        println!("Scanning...");
         if let Ok(entries) = archive.entries() {
             // For each file from the tar stream returned from docker copy
             for entry in entries {
@@ -142,22 +144,16 @@ pub async fn copy_from_container_into_package(docker: Docker, container_id: &str
                 if let Ok(entry) = entry {
                     // Then we will handle packaging the file
                     let path = entry.path()?.to_path_buf();
-                    println!("Scanning... {:?}", path);
                     // Check if we found a file to package in pkglibdir
-                    let pkglibdir_match = pkglibdir_list.contains(
-                        &path.to_str()
-                            .and_then(|s| s.strip_prefix("lib/").map(|s| s.to_string()))
-                            .unwrap_or_else(|| "".to_string()),
-                    );
-                    // Check if we found a file to package in sharedir
-                    let sharedir_match = path
-                        .to_str()
-                        .map(|s| sharedir_list.contains(&s.to_string()))
-                        .unwrap_or(false);
+                    let full_path = format!("/{}", path.to_str().unwrap_or_else(|| ""));
+                    let trimmed = full_path.trim_start_matches(&format!("{}/", pkglibdir)).trim_start_matches(&format!("{}/", sharedir)).to_string();
+                    let pkglibdir_match = pkglibdir_list.contains(&trimmed);
+                    let sharedir_match = sharedir_list.contains(&trimmed);
+                    // Check if we found a file to package
                     if !( sharedir_match || pkglibdir_match ){
                         continue
                     }
-                    println!("We should package this file!");
+                    println!("Detected file to package: {}", trimmed);
                     if path.to_str() == Some("manifest.json") {
                         println!("Found manifest.json, merging additions with existing manifest");
                         manifest.merge(serde_json::from_reader(entry)?);
@@ -221,7 +217,7 @@ pub async fn copy_from_container_into_package(docker: Docker, container_id: &str
 
     // Wait until completion of streaming, but ignore its error as it would only error out
     // if tar_handle errors out.
-    let _ = receiver_sender.stream_to_end(combined_stream).await;
+    let _ = receiver_sender.stream_to_end(file_stream).await;
     // Handle the error
     tar_handle.await??;
 
