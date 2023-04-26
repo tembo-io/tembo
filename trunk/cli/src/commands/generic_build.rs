@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use std::path::{Path};
+use std::path::Path;
 
 use std::{fs, include_str};
 
@@ -9,8 +9,6 @@ use thiserror::Error;
 use bollard::Docker;
 
 use tokio::sync::mpsc;
-
-
 
 use tokio_task_manager::Task;
 
