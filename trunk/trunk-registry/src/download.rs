@@ -3,6 +3,7 @@ use crate::config::Config;
 use crate::errors::ExtensionRegistryError;
 use crate::uploader::extension_location;
 use actix_web::{get, web, HttpResponse, Responder};
+use log::info;
 use sqlx::{Pool, Postgres};
 
 /// Handles the `GET /extensions/:extension_name/:version/download` route.
@@ -13,6 +14,8 @@ pub async fn download(cfg: web::Data<Config>, path: web::Path<(String, String)>)
     // TODO(ianstanton) Increment download count for extension
     // TODO(ianstanton) Use latest version if none provided
     let url = extension_location(&cfg.bucket_name, &name, &version);
+    info!("Download requested for {} version {}", name, version);
+    info!("URL: {}", url);
     HttpResponse::Ok().body(url)
 }
 
