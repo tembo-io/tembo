@@ -22,7 +22,7 @@ on account of its’ rich ecosystem of add-ons and extensions.
 We just got started, but here's what we're working on:
 
 * [Trunk CLI](https://github.com/CoreDB-io/coredb/tree/main/trunk/cli) that users can use to publish and install Postgres extensions
-* [pgtrunk.io](https://github.com/CoreDB-io/coredb/tree/main/trunk/registry) that serves as a backend for Trunk, and also provides discovery and metrics
+* [Trunk Registry](https://github.com/CoreDB-io/coredb/tree/main/trunk/trunk-registry) that serves as a backend for [pgtrunk.io](https://pgtrunk.io), and also provides discovery and metrics
 * A [Kubernetes Operator](https://github.com/CoreDB-io/coredb/tree/main/coredb-operator) built with Rust
 * pgmq - an easy message queue built with Rust, that we use in our managed service, which is available as 
   [a crate](https://github.com/CoreDB-io/coredb/tree/main/pgmq/core) or as 
