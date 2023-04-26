@@ -10,7 +10,6 @@ on:
   push:
     branches:
       - main
-      - fix-doc-ci
     paths:
       - '.github/workflows/docs.yml'
       - 'docs/**'
