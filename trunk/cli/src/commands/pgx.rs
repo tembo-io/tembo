@@ -5,8 +5,6 @@ use std::path::{Path, StripPrefixError};
 use std::string::FromUtf8Error;
 use std::{fs, include_str};
 
-use futures_util::stream::StreamExt;
-
 use thiserror::Error;
 
 use bollard::Docker;

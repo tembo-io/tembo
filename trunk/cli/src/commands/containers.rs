@@ -397,10 +397,10 @@ pub async fn package_installed_extension_files(
                         let root_path = Path::new("/");
                         let path = root_path.join(path);
                         let mut path = path.as_path();
-                        println!("Packaging file {:?}", path.clone());
+                        println!("Packaging file {:?}", path);
                         // trim pkglibdir or sharedir from start of path
                         if path.to_string_lossy().contains(&pkglibdir) {
-                            path = path.strip_prefix(pkglibdir.trim_end_matches("lib").clone())?;
+                            path = path.strip_prefix(pkglibdir.trim_end_matches("lib"))?;
                         } else if path.to_string_lossy().contains(&sharedir) {
                             path = path.strip_prefix(format!("{}/", sharedir.clone()))?;
                         } else {
@@ -420,7 +420,7 @@ pub async fn package_installed_extension_files(
                             let mut tee = TeeReader::new(entry, &mut buf, true);
 
                             println!("Adding file {} to package", path.clone().to_string_lossy());
-                            new_archive.append_data(&mut header, path.clone(), &mut tee)?;
+                            new_archive.append_data(&mut header, &path, &mut tee)?;
                             println!("Added");
 
                             let (_entry, _buf) = tee.into_inner();
@@ -428,7 +428,7 @@ pub async fn package_installed_extension_files(
                             if entry_type == EntryType::file() {
                                 println!(
                                     "Adding file {} to manifest",
-                                    path.clone().to_string_lossy()
+                                    path.to_string_lossy()
                                 );
                                 let file = manifest.add_file(path);
                                 match file {
