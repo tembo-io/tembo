@@ -1,6 +1,6 @@
 # Trunk CLI
 
-The [Trunk PostgreSQL Extension Registry](https://pgtrunk.io), henceforth Trunk, offers a companion CLI (command line interface) to facilitate a user-friendly programmatic interface. This toolset, written in Rust, leverages the package manager, Cargo, and lowers the barriers to building, sharing, and using PostgreSQL extensions.
+The [Trunk PostgreSQL Extension Registry](https://pgtrunk.io), henceforth Trunk, offers a companion CLI to facilitate a user-friendly programmatic interface. This toolset lowers the barriers to building, sharing, and using PostgreSQL extensions.
 
 ## Installation
 
