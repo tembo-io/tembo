@@ -366,6 +366,7 @@ pub async fn package_installed_extension_files(
         let mut manifest = Manifest {
             extension_name,
             extension_version,
+            manifest_version: 2,
             architecture: target_arch,
             sys: "linux".to_string(),
             files: None,

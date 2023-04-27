@@ -138,6 +138,14 @@ async fn install(
     package_lib_dir: PathBuf,
     sharedir: PathBuf,
 ) -> Result<(), anyhow::Error> {
+    // Handle symlinks
+    let sharedir = std::fs::canonicalize(&sharedir)?;
+    let package_lib_dir = std::fs::canonicalize(&package_lib_dir)?;
+
+    // Set up path used in manifest file version 1
+    let extension_dir_path = sharedir.join("extension");
+    let extension_dir = std::fs::canonicalize(extension_dir_path)?;
+
     // First pass: get to the manifest
     // Because we're going over entries with `Seek` enabled, we're not reading everything.
     let mut archive = Archive::new(&input);
@@ -148,7 +156,31 @@ async fn install(
         let entry = entry?;
         let name = entry.path()?;
         if entry.header().entry_type() == EntryType::file() && name == Path::new("manifest.json") {
-            manifest.replace(serde_json::from_reader(entry)?);
+            let manifest_json = serde_json::from_reader(entry)?;
+            // if the manifest_version key does not exist, then create it with a value of 1
+            let manifest_json = match manifest_json {
+                serde_json::Value::Object(mut map) => {
+                    if !map.contains_key("manifest_version") {
+                        map.insert(
+                            "manifest_version".to_string(),
+                            serde_json::Value::Number(1.into()),
+                        );
+                    }
+                    // For version 1 just assume x86 architecture
+                    if !map.contains_key("architecture")
+                        && map["manifest_version"].as_i64() < Some(2)
+                    {
+                        map.insert(
+                            "architecture".to_string(),
+                            serde_json::Value::String("x86".to_string()),
+                        );
+                    }
+                    serde_json::Value::Object(map)
+                }
+                _ => manifest_json,
+            };
+            let manifest_result = serde_json::from_value(manifest_json);
+            manifest.replace(manifest_result?);
         }
     }
 
@@ -173,7 +205,7 @@ async fn install(
         } else {
             "unsupported"
         };
-        if host_arch != manifest.architecture {
+        if manifest.manifest_version > 1 && host_arch != manifest.architecture {
             println!(
                 "This package is not compatible with your architecture: {}, it is compatible with {}",
                 host_arch,
@@ -188,12 +220,28 @@ async fn install(
             if let Some(file) = manifest_files.get(name.as_ref()) {
                 match file {
                     PackagedFile::ControlFile { .. } => {
-                        println!("[+] {} => {}", name.display(), sharedir.display());
-                        entry.unpack_in(&sharedir)?;
+                        if manifest.manifest_version > 1 {
+                            println!("[+] {} => {}", name.display(), sharedir.display());
+                            entry.unpack_in(&sharedir)?;
+                        } else {
+                            // In manifest v1, the control file is in the root of the archive
+                            // and in following versions, it will be prefixed by its path under
+                            // pg_config --sharedir
+                            println!("[+] {} => {}", name.display(), extension_dir.display());
+                            entry.unpack_in(&extension_dir)?;
+                        }
                     }
                     PackagedFile::SqlFile { .. } => {
-                        println!("[+] {} => {}", name.display(), sharedir.display());
-                        entry.unpack_in(&sharedir)?;
+                        if manifest.manifest_version > 1 {
+                            println!("[+] {} => {}", name.display(), sharedir.display());
+                            entry.unpack_in(&sharedir)?;
+                        } else {
+                            // In manifest v1, sql files are in the root of the archive
+                            // and in following versions, they will be prefixed by path under
+                            // pg_config --sharedir
+                            println!("[+] {} => {}", name.display(), extension_dir.display());
+                            entry.unpack_in(&extension_dir)?;
+                        }
                     }
                     PackagedFile::SharedObject { .. } => {
                         println!("[+] {} => {}", name.display(), package_lib_dir.display());

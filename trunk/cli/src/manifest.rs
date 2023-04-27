@@ -37,6 +37,7 @@ pub struct Manifest {
     pub extension_name: String,
     #[serde(rename = "version")]
     pub extension_version: String,
+    pub manifest_version: i32,
     pub sys: String,
     pub architecture: String,
     pub files: Option<HashMap<PathBuf, PackagedFile>>,

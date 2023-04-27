@@ -60,7 +60,10 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y pkg-config libssl-dev
+          sudo apt-get install -y pkg-config libssl-dev postgresql
       - name: Run functional tests
         run: |
+          USER=$(whoami)
+          sudo chown -R $USER $(pg_config --sharedir)
+          sudo chown -R $USER $(pg_config --pkglibdir)
           cargo test -- --nocapture
