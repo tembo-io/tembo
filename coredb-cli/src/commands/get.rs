@@ -4,7 +4,7 @@ use std::process::Command;
 
 #[derive(Args)]
 pub struct GetCommand {
-    #[arg(value_enum)]
+    #[arg(long = "resource-type", short = 'r')]
     resource_type: ResourceType,
 }
 
