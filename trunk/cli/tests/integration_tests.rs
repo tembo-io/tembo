@@ -19,6 +19,53 @@ fn help() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
+fn install_manifest_v1_extension() -> Result<(), Box<dyn std::error::Error>> {
+    // Construct a path relative to the current file's directory
+    let mut extension_path = std::path::PathBuf::from(file!());
+    extension_path.pop(); // Remove the file name from the path
+    extension_path.push("artifact-v1/my_extension-0.0.0.tar.gz");
+
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("install");
+    cmd.arg("--file");
+    cmd.arg(extension_path.as_os_str());
+    cmd.arg("--version");
+    cmd.arg("0.0.0");
+    cmd.arg("my_extension");
+    cmd.assert().code(0);
+
+    // Get output of 'pg_config --sharedir'
+    let output = Command::new("pg_config")
+        .arg("--sharedir")
+        .output()
+        .expect("failed to find sharedir, is pg_config in path?");
+    let sharedir= String::from_utf8(output.stdout)?;
+    let sharedir= sharedir.trim();
+
+    let output = Command::new("pg_config")
+        .arg("--pkglibdir")
+        .output()
+        .expect("failed to find pkglibdir, is pg_config in path?");
+    let pkglibdir = String::from_utf8(output.stdout)?;
+    let pkglibdir = pkglibdir.trim();
+
+
+    assert!(
+        std::path::Path::new(format!("{sharedir}/extension/my_extension.control").as_str())
+            .exists()
+    );
+    assert!(
+        std::path::Path::new(format!("{sharedir}/extension/my_extension--0.0.0.sql").as_str())
+            .exists()
+    );
+    assert!(
+        std::path::Path::new(format!("{pkglibdir}/my_extension.so").as_str())
+            .exists()
+    );
+    Ok(())
+}
+
+#[test]
 fn build_pgx_extension() -> Result<(), Box<dyn std::error::Error>> {
     let mut rng = rand::thread_rng();
     let output_dir = format!("/tmp/pgmq_test_{}", rng.gen_range(0..1000000));
