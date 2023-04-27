@@ -7,9 +7,7 @@ use std::process::{Command, Stdio};
 
 #[derive(Args)]
 pub struct CreateCommand {
-    #[arg(long = "resource-type", short = 'r')]
     resource_type: ResourceType,
-    #[arg(long = "name", short = 'n')]
     name: String,
     #[arg(long = "dry-run")]
     dry_run: bool,

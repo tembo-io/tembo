@@ -18,10 +18,8 @@ fn help() -> Result<(), Box<dyn std::error::Error>> {
 fn create_dry_run() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
     cmd.arg("create")
-        .arg("--resource-type")
         .arg("db")
         .arg("--dry-run")
-        .arg("--name")
         .arg("sample-db");
     cmd.assert()
         .stdout(predicate::str::contains("kind: CoreDB"));
@@ -29,18 +27,14 @@ fn create_dry_run() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
     cmd.arg("create")
         .arg("--dry-run")
-        .arg("--resource-type")
         .arg("db")
-        .arg("--name")
         .arg("sample-db");
     cmd.assert()
         .stdout(predicate::str::contains("kind: CoreDB"));
 
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
     cmd.arg("create")
-        .arg("--resource-type")
         .arg("db")
-        .arg("--name")
         .arg("sample-db")
         .arg("--dry-run");
     cmd.assert()
