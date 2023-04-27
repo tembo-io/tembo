@@ -138,7 +138,6 @@ async fn install(
     package_lib_dir: PathBuf,
     sharedir: PathBuf,
 ) -> Result<(), anyhow::Error> {
-
     // Handle symlinks
     let sharedir = std::fs::canonicalize(&sharedir)?;
     let package_lib_dir = std::fs::canonicalize(&package_lib_dir)?;
@@ -162,11 +161,19 @@ async fn install(
             let manifest_json = match manifest_json {
                 serde_json::Value::Object(mut map) => {
                     if !map.contains_key("manifest_version") {
-                        map.insert("manifest_version".to_string(), serde_json::Value::Number(1.into()));
+                        map.insert(
+                            "manifest_version".to_string(),
+                            serde_json::Value::Number(1.into()),
+                        );
                     }
                     // For version 1 just assume x86 architecture
-                    if !map.contains_key("architecture") && map["manifest_version"].as_i64() < Some(2) {
-                        map.insert("architecture".to_string(), serde_json::Value::String("x86".to_string()));
+                    if !map.contains_key("architecture")
+                        && map["manifest_version"].as_i64() < Some(2)
+                    {
+                        map.insert(
+                            "architecture".to_string(),
+                            serde_json::Value::String("x86".to_string()),
+                        );
                     }
                     serde_json::Value::Object(map)
                 }

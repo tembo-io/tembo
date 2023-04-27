@@ -39,8 +39,8 @@ fn install_manifest_v1_extension() -> Result<(), Box<dyn std::error::Error>> {
         .arg("--sharedir")
         .output()
         .expect("failed to find sharedir, is pg_config in path?");
-    let sharedir= String::from_utf8(output.stdout)?;
-    let sharedir= sharedir.trim();
+    let sharedir = String::from_utf8(output.stdout)?;
+    let sharedir = sharedir.trim();
 
     let output = Command::new("pg_config")
         .arg("--pkglibdir")
@@ -48,7 +48,6 @@ fn install_manifest_v1_extension() -> Result<(), Box<dyn std::error::Error>> {
         .expect("failed to find pkglibdir, is pg_config in path?");
     let pkglibdir = String::from_utf8(output.stdout)?;
     let pkglibdir = pkglibdir.trim();
-
 
     assert!(
         std::path::Path::new(format!("{sharedir}/extension/my_extension.control").as_str())
@@ -58,10 +57,7 @@ fn install_manifest_v1_extension() -> Result<(), Box<dyn std::error::Error>> {
         std::path::Path::new(format!("{sharedir}/extension/my_extension--0.0.0.sql").as_str())
             .exists()
     );
-    assert!(
-        std::path::Path::new(format!("{pkglibdir}/my_extension.so").as_str())
-            .exists()
-    );
+    assert!(std::path::Path::new(format!("{pkglibdir}/my_extension.so").as_str()).exists());
     Ok(())
 }
 

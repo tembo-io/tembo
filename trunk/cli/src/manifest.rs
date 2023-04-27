@@ -44,7 +44,6 @@ pub struct Manifest {
 }
 
 impl Manifest {
-
     pub fn merge(&mut self, other: Self) {
         if let Some(files) = other.files {
             self.files.replace(files);
