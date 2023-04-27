@@ -12,22 +12,21 @@ By default, the files are stored (). To confirm its proper installation, invoke 
 
 `trunk --version`
 
-## Commands
+## Commands - Brief
 
 The CLI toolkit will abstract away many complexities in extension development and installation by using the following commands:
-
-- `trunk init` - setup your environment to build a new Postrgres extension.
-- `trunk test` - facilitate the automated unit and integration testing Postgres extensions.
 - `trunk build` - compiles extensions and supports nested dependencies.
 - `trunk publish` - publishes an extension to the registry, making it available for discovery and installation.
 - `trunk install` - download and install the extension distribution, in whichever environment trunk is run.
 
-### 1. `trunk init`
+On the Horizon:
+- `trunk init` - setup your environment to build a new Postrgres extension.
+- `trunk test` - facilitate the automated unit and integration testing Postgres extensions.
 
-### 2. `trunk test`
+## Commands - Detailed
+### 1. `trunk build`
 
-### 3. `trunk build`
-e.g. installing extension_a will automatically install extension_b if required
+This command leverages [pgrx](https://github.com/tcdi/pgrx) to help you build compiled Postgres extensions. 
 
 Usage: trunk build [OPTIONS]
 
@@ -36,7 +35,9 @@ Options:
 - -o, --output-path <OUTPUT_PATH>  [default: ./.trunk]
 - -h, --help                       Print help
 
-### 4. `trunk publish`
+### 2. `trunk publish`
+
+This command allows you to publish your newly-minted Postgres extension to the Trunk registry.
 
 Usage: trunk publish [OPTIONS] --version <VERSION> <NAME>
 
@@ -55,9 +56,11 @@ Options:
 -  -h, --help                           Print help
 
 
-### 5. `trunk install`
+### 3. `trunk install`
 
-Usage: trunk install [OPTIONS] --version <VERSION> <NAME>
+This command allows you to install Postgres extensions from the Trunk registry.
+
+Usage: trunk install [OPTIONS]< --version <VERSION> <NAME>
 
 Arguments:
   <NAME>
@@ -70,12 +73,18 @@ Options:
 -  -h, --help                   Print help
 
 ## Use Case Example
-
+Soon to come.
 
 
 # Community Involvement
 
+## Quick and easy:
+- Consider starring the repo :star:
+- Join our [Trunk discord channel](https://discord.com/channels/1060568981725003789/1089363774357647370)
 
+## More developed:
+- Enagage with the [Trunk discord channel](https://discord.com/channels/1060568981725003789/1089363774357647370) community, we're eager to meet you!
+- Consider forking the repo and creating pull requests!
 
 # Further Reading
 
