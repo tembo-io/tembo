@@ -1,6 +1,6 @@
 [package]
 name = "coredb-cli"
-version = "0.2.2"
+version = "0.2.3"
 edition = "2021"
 authors = ["CoreDB.io"]
 description = "The CLI for CoreDB"
@@ -12,7 +12,7 @@ repository = "https://github.com/CoreDB-io/coredb/tree/main/coredb-cli"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-clap = { version = "4.1.1", features = ["derive"] }
+clap = { version = "4.2.4", features = ["derive"] }
 serde_json = "1.0.91"
 serde_yaml = "0.9.17"
 
