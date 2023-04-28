@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - main
+  # Upload images on PR to main so they can be tested if we need to in dev cluster pre-merge
+  pull_request:
+    branches:
+      - main
 
 jobs:
   push_to_registry:
@@ -22,7 +26,7 @@ jobs:
         with:
           repository: coredb-io/coredb
           path: ./coredb
-          ref: a0034703ad57d5179c0217beb39b88ca23417f43
+          ref: f39690e38f48be5b17cf0a9080e15ce589ecf240
       - name: Set version strings
         id: versions
         run: |

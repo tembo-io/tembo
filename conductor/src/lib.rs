@@ -13,7 +13,7 @@ use errors::ConductorError;
 use ingress_route_tcp_crd::IngressRouteTCP;
 use k8s_openapi::api::apps::v1::StatefulSet;
 use k8s_openapi::api::core::v1::{Namespace, Secret};
-use k8s_openapi::api::networking::v1::Ingress;
+use k8s_openapi::api::networking::v1::{Ingress, NetworkPolicy};
 use kube::api::{DeleteParams, ListParams, Patch, PatchParams};
 use kube::runtime::wait::{await_condition, Condition};
 use kube::{Api, Client};
@@ -193,6 +193,73 @@ pub async fn create_namespace(client: Client, name: &str) -> Result<(), Conducto
         .patch(name, &params, &Patch::Apply(&ns))
         .await
         .map_err(ConductorError::KubeError)?;
+    Ok(())
+}
+
+pub async fn create_networkpolicy(client: Client, name: &str) -> Result<(), ConductorError> {
+    let np_api: Api<NetworkPolicy> = Api::namespaced(client, name);
+    let params: PatchParams = PatchParams::apply("conductor").force();
+    let np = serde_json::json!({
+            "apiVersion": "networking.k8s.io/v1",
+            "kind": "NetworkPolicy",
+            "metadata": {
+                    "name": format!("{name}"),
+                    "namespace": format!("{name}"),
+            },
+            "spec": {
+                    "podSelector": {},
+                    "policyTypes": [
+                            "Egress"
+                    ],
+                    "egress": [
+                            {
+                                    "to": [
+                                            {
+                                                    "namespaceSelector": {
+                                                            "matchLabels": {
+                                                                    "kubernetes.io/metadata.name": "kube-system"
+                                                            }
+                                                    }
+                                            },
+                                            {
+                                                    "podSelector": {
+                                                            "matchLabels": {
+                                                                    "k8s-app": "kube-dns"
+                                                            }
+                                                    }
+                                            }
+                                    ],
+                                    "ports": [
+                                            {
+                                                    "protocol": "UDP",
+                                                    "port": 53
+                                            }
+                                    ]
+                            },
+                            {
+                                    "to": [
+                                            {
+                                                    "ipBlock": {
+                                                            "cidr": "0.0.0.0/0",
+                                                            "except": [
+                                                                    "10.0.0.0/8",
+                                                                    "172.16.0.0/12",
+                                                                    "192.168.0.0/16"
+                                                            ]
+                                                    }
+                                            }
+                                    ]
+                            }
+                    ]
+            }
+    });
+
+    info!("\nCreating Network Policy {} if it does not exist", name);
+    let _o: NetworkPolicy = np_api
+        .patch(name, &params, &Patch::Apply(&np))
+        .await
+        .map_err(ConductorError::KubeError)?;
+
     Ok(())
 }
 
