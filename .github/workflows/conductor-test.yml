@@ -5,6 +5,12 @@ defaults:
     shell: bash
     working-directory: ./conductor/
 
+permissions:
+  pull-requests: write
+  deployments: write
+  id-token: write
+  contents: read
+
 on:
   pull_request:
     branches:
@@ -57,7 +63,11 @@ jobs:
 
   functional_test:
     name: Run functional testing
-    runs-on: ubuntu-20.04
+    runs-on:
+      - self-hosted
+      - dind
+      - core-auto
+      - large-8x8
     strategy:
       # fail-fast means to cancel all jobs if one fails
       fail-fast: false
@@ -80,6 +90,11 @@ jobs:
           prefix-key: "conductor-functional-test"
           workspaces: |
             conductor
+      - uses: aws-actions/configure-aws-credentials@v2
+        with:
+          aws-region: "us-east-1"
+          role-to-assume: "arn:aws:iam::484221059514:role/cdb-plat-use1-dev-data-1-conductor-gha"
+      - uses: unfor19/install-aws-cli-action@v1
       - name: Run functional / integration tests
         run: |
           set -xe
@@ -91,6 +106,8 @@ jobs:
           make setup.traefik
 
           # Install the CoreDB operator
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev
           cargo install coredb-cli
           coredb-cli install --branch main
           kubectl get crds
@@ -101,8 +118,18 @@ jobs:
           # Start conductor with test configuration
           make run.test &
 
+          # sleep to fix race condition
+          sleep 5
+
           # Run the tests
           cargo test -- --ignored --nocapture
+      - name: Delete test cloudformation stacks
+        run: |
+          stacks=$(aws cloudformation list-stacks --stack-status-filter CREATE_COMPLETE --query "StackSummaries[].StackName" --output json)
+          stack_names=$(echo "$stacks" | jq -r '.[]' | grep -E '.*-test-org-inst-test-coredb-.*-cf')
+          for stack in $stack_names; do
+            aws cloudformation delete-stack --stack-name ${stack} --region us-east-1
+          done
       - name: Debugging information
         if: always()
         run: |

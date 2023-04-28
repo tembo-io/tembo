@@ -1,6 +1,7 @@
 use conductor::{
-    create_ing_route_tcp, create_namespace, create_or_update, delete, delete_namespace,
-    generate_spec, get_all, get_coredb_status, get_pg_conn, restart_statefulset, types,
+    create_cloudformation, create_ing_route_tcp, create_namespace, create_or_update, delete,
+    delete_cloudformation, delete_namespace, generate_spec, get_all, get_coredb_status,
+    get_pg_conn, restart_statefulset, types,
 };
 use kube::{Client, ResourceExt};
 use log::{debug, error, info, warn};
@@ -21,6 +22,10 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         env::var("DATA_PLANE_EVENTS_QUEUE").expect("DATA_PLANE_EVENTS_QUEUE must be set");
     let data_plane_basedomain =
         env::var("DATA_PLANE_BASEDOMAIN").expect("DATA_PLANE_BASEDOMAIN must be set");
+    let backup_archive_bucket =
+        env::var("BACKUP_ARCHIVE_BUCKET").expect("BACKUP_ARCHIVE_BUCKET must be set");
+    let cf_template_bucket =
+        env::var("CF_TEMPLATE_BUCKET").expect("CF_TEMPLATE_BUCKET must be set");
 
     // Connect to pgmq
     let queue: PGMQueue = PGMQueue::new(pg_conn_url).await?;
@@ -68,6 +73,19 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         let event_msg: types::StateToControlPlane = match read_msg.message.event_type {
             // every event is for a single namespace
             Event::Create | Event::Update => {
+                // (todo: nhudson) in teh future move this to be more specific
+                // to the event taht we are taking action on.  For now just create
+                // the stack without checking.
+                create_cloudformation(
+                    String::from("us-east-1"),
+                    backup_archive_bucket.clone(),
+                    &read_msg.message.organization_name,
+                    &read_msg.message.dbname,
+                    &cf_template_bucket,
+                )
+                .await?;
+
+                // create Namespace
                 create_namespace(client.clone(), &namespace)
                     .await
                     .expect("error creating namespace");
@@ -184,6 +202,13 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 delete_namespace(client.clone(), &namespace)
                     .await
                     .expect("error deleting namespace");
+
+                delete_cloudformation(
+                    String::from("us-east-1"),
+                    &read_msg.message.organization_name,
+                    &read_msg.message.dbname,
+                )
+                .await?;
 
                 // report state
                 types::StateToControlPlane {

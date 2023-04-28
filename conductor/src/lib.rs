@@ -1,8 +1,11 @@
+pub mod aws;
 pub mod coredb_crd;
 pub mod errors;
 mod ingress_route_tcp_crd;
 pub mod types;
 
+use crate::aws::cloudformation::{AWSConfigState, CloudFormationParams};
+use aws_sdk_cloudformation::config::Region;
 use base64::{engine::general_purpose, Engine as _};
 use coredb_crd as crd;
 use coredb_crd::CoreDB;
@@ -272,6 +275,66 @@ pub async fn restart_statefulset(
 ) -> Result<(), ConductorError> {
     let sts: Api<StatefulSet> = Api::namespaced(client, namespace);
     sts.restart(statefulset_name).await?;
+    Ok(())
+}
+
+// Create a cloudformation stack for the database.
+// This will create an IAM role for the database to use to access the backup archive bucket
+pub async fn create_cloudformation(
+    aws_region: String,
+    backup_archive_bucket: String,
+    org_name: &str,
+    db_name: &str,
+    cf_template_bucket: &str,
+) -> Result<(), ConductorError> {
+    // (todo: nhudson) - Create Cloudformation Stack only for Create event
+    // Create new function that returns 3 enums of SUCCESS, ERROR, WAITING
+    // If status is something other than SUCCESS we would need to requeue the message
+    // back to the queue.
+    // If there is an error we will need to alert on it
+    // If we are still waiting for the stack to be created we will need to requeue the message
+    let region = Region::new(aws_region);
+    let aws_config_state = AWSConfigState::new(region).await;
+    let stack_name = format!("org-{}-inst-{}-cf", org_name, db_name);
+    //let s3_bucket_path = format!("org-{}/inst-{}", org_name, db_name);
+    let iam_role_name = format!("org-{}-inst-{}-iam", org_name, db_name);
+    let cf_template_params = CloudFormationParams::new(
+        // Database Backup Bucket Name
+        String::from(&backup_archive_bucket),
+        // Customer Org Name
+        String::from(org_name),
+        // Customer Database Name
+        String::from(db_name),
+        // AWS IAM Role Name to create
+        String::from(&iam_role_name),
+        // The AWS S3 Bucket where the CF Template is placed
+        String::from(cf_template_bucket),
+    );
+    aws_config_state
+        .create_cloudformation_stack(&stack_name, &cf_template_params)
+        .await
+        .map_err(ConductorError::from)?;
+    Ok(())
+
+    // We will need to setup a requeuing system at somepoint to query for status
+    // of the stack state.  If the stack is still in a CREATE_IN_PROGRESS or UPDATE_IN_PROGRESS
+    // or DELETE_IN_PROGRESS we will need to requeue the message back to the queue.
+    // We will also need to bubble up errors as an alert if there is a failure.
+}
+
+// Delete a cloudformation stack.
+pub async fn delete_cloudformation(
+    aws_region: String,
+    org_name: &str,
+    db_name: &str,
+) -> Result<(), ConductorError> {
+    let region = Region::new(aws_region);
+    let aws_config_state = AWSConfigState::new(region).await;
+    let stack_name = format!("org-{}-inst-{}-cf", org_name, db_name);
+    aws_config_state
+        .delete_cloudformation_stack(&stack_name)
+        .await
+        .map_err(ConductorError::from)?;
     Ok(())
 }
 

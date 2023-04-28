@@ -1,3 +1,4 @@
+use aws_sdk_cloudformation::Error as CFError;
 use kube;
 use thiserror::Error;
 
@@ -14,4 +15,8 @@ pub enum ConductorError {
     // No status reported
     #[error("no status reported")]
     NoStatusReported,
+
+    /// a aws error
+    #[error("aws sdk error {0}")]
+    AwsError(#[from] CFError),
 }
