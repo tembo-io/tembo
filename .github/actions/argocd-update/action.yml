@@ -38,10 +38,6 @@ runs:
       git config --global user.name "coredb-service-user"
       git config --global user.email "admin+github@coredb.io"
       git fetch origin ${{ inputs.branch }} && git checkout ${{ inputs.branch }} || git checkout -b ${{ inputs.branch }}
-  - name: Update trunk registry
-    uses: mikefarah/yq@v4.33.3
-    with:
-      cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/pgtrunkio-backend.yaml
   - name: Update coredb operator helm chart
     uses: mikefarah/yq@v4.33.3
     with:

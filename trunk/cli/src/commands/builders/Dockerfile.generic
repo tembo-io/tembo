@@ -1,7 +1,0 @@
-FROM quay.io/coredb/c-builder:d62b2a2
-
-COPY --chown=postgres:postgres . .
-
-USER root
-
-RUN make
