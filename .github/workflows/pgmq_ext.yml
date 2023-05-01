@@ -107,7 +107,7 @@ jobs:
          mv stoml_linux_amd64 stoml
          chmod +x stoml
          sudo mv stoml /usr/local/bin/
-         cargo install pg-trunk
+         cargo install pg-trunk --version 0.4.0
 
       - name: publish-to-trunk
         env:
