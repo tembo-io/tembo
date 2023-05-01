@@ -26,7 +26,6 @@
   "fiscalYearStartMonth": 0,
   "gnetId": 9628,
   "graphTooltip": 0,
-  "id": 300,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -126,7 +125,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum ((sum by (namespace) (max_over_time(pg_stat_activity_count{}[24h]))) > bool 2)\n",
+          "expr": "sum ((sum by (namespace) (max_over_time(pg_stat_activity_count{}[24h]))) > bool ($min_sessions_to_consider_active - 1))\n",
           "legendFormat": "24 hour",
           "range": true,
           "refId": "A"
@@ -137,7 +136,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum ((sum by (namespace) (max_over_time(pg_stat_activity_count{}[12h]))) > bool 2)",
+          "expr": "sum ((sum by (namespace) (max_over_time(pg_stat_activity_count{}[12h]))) > bool ($min_sessions_to_consider_active - 1))",
           "hide": false,
           "legendFormat": "12 hour",
           "range": true,
@@ -149,7 +148,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum ((sum by (namespace) (max_over_time(pg_stat_activity_count{}[4h]))) > bool 2)",
+          "expr": "sum ((sum by (namespace) (max_over_time(pg_stat_activity_count{}[4h]))) > bool ($min_sessions_to_consider_active - 1))",
           "hide": false,
           "legendFormat": "4 hour",
           "range": true,
@@ -161,7 +160,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum ((sum by (namespace) (max_over_time(pg_stat_activity_count{}[1h]))) > bool 2)",
+          "expr": "sum ((sum by (namespace) (max_over_time(pg_stat_activity_count{}[1h]))) > bool ($min_sessions_to_consider_active - 1))",
           "hide": false,
           "legendFormat": "1 hour",
           "range": true,
@@ -254,7 +253,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum ((sum by (namespace) (max_over_time(pg_stat_activity_count{}[24h]))) < bool 3)\n",
+          "expr": "sum ((sum by (namespace) (max_over_time(pg_stat_activity_count{}[24h]))) < bool ($min_sessions_to_consider_active - 1))\n",
           "legendFormat": "24 hour",
           "range": true,
           "refId": "A"
@@ -265,7 +264,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum ((sum by (namespace) (max_over_time(pg_stat_activity_count{}[12h]))) < bool 3)",
+          "expr": "sum ((sum by (namespace) (max_over_time(pg_stat_activity_count{}[12h]))) < bool ($min_sessions_to_consider_active - 1))",
           "hide": false,
           "legendFormat": "12 hour",
           "range": true,
@@ -277,7 +276,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum ((sum by (namespace) (max_over_time(pg_stat_activity_count{}[4h]))) < bool 3)",
+          "expr": "sum ((sum by (namespace) (max_over_time(pg_stat_activity_count{}[4h]))) < bool ($min_sessions_to_consider_active - 1))",
           "hide": false,
           "legendFormat": "4 hour",
           "range": true,
@@ -289,7 +288,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum ((sum by (namespace) (max_over_time(pg_stat_activity_count{}[1h]))) < bool 3)",
+          "expr": "sum ((sum by (namespace) (max_over_time(pg_stat_activity_count{}[1h]))) < bool ($min_sessions_to_consider_active - 1))",
           "hide": false,
           "legendFormat": "1 hour",
           "range": true,
@@ -893,6 +892,53 @@
         "refresh": 2,
         "skipUrlSync": false,
         "type": "interval"
+      },
+      {
+        "current": {
+          "selected": true,
+          "text": "4",
+          "value": "4"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "min_sessions_to_consider_active",
+        "options": [
+          {
+            "selected": false,
+            "text": "1",
+            "value": "1"
+          },
+          {
+            "selected": false,
+            "text": "2",
+            "value": "2"
+          },
+          {
+            "selected": false,
+            "text": "3",
+            "value": "3"
+          },
+          {
+            "selected": true,
+            "text": "4",
+            "value": "4"
+          },
+          {
+            "selected": false,
+            "text": "5",
+            "value": "5"
+          },
+          {
+            "selected": false,
+            "text": "6",
+            "value": "6"
+          }
+        ],
+        "query": "1, 2, 3, 4, 5, 6",
+        "queryValue": "",
+        "skipUrlSync": false,
+        "type": "custom"
       }
     ]
   },
@@ -928,6 +974,6 @@
   "timezone": "",
   "title": "Cloud Tracker",
   "uid": "bE7Y7zEVz",
-  "version": 2,
+  "version": 1,
   "weekStart": ""
 }
