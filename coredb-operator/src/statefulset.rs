@@ -216,16 +216,16 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
                             
                             # set permissions to the places that trunk writes
                             # sharedir
-                            chown :postgres $(pg_config --sharedir)
+                            chown postgres:postgres $(pg_config --sharedir)
                             chmod 2775 $(pg_config --sharedir)
                             # sharedir/extension
-                            chown :postgres $(pg_config --sharedir)/extension 
+                            chown postgres:postgres $(pg_config --sharedir)/extension 
                             chmod 2775 $(pg_config --sharedir)/extension
                             # sharedir/bitcode
-                            chown :postgres $(pg_config --sharedir)/bitcode || :
-                            chmod 2775 $(pg_config --sharedir)/bitcode || :
+                            chown postgres:postgres $(pg_config --pkglibdir)/bitcode || :
+                            chmod 2775 $(pg_config --pkglibdir)/bitcode || :
                             # pkglibdir
-                            chown :postgres $(pg_config --pkglibdir)
+                            chown postgres:postgres $(pg_config --pkglibdir)
                             chmod 2775 $(pg_config --pkglibdir)
 
                             # https://www.postgresql.org/docs/current/ssl-tcp.html
