@@ -1,6 +1,7 @@
 pub mod aws;
 pub mod coredb_crd;
 pub mod errors;
+pub mod extensions;
 mod ingress_route_tcp_crd;
 pub mod types;
 

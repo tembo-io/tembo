@@ -1,7 +1,7 @@
 use conductor::{
     create_cloudformation, create_ing_route_tcp, create_namespace, create_networkpolicy,
-    create_or_update, delete, delete_cloudformation, delete_namespace, generate_spec, get_all,
-    get_coredb_status, get_pg_conn, restart_statefulset, types,
+    create_or_update, delete, delete_cloudformation, delete_namespace, extensions::extension_plan,
+    generate_spec, get_all, get_coredb_status, get_pg_conn, restart_statefulset, types,
 };
 use kube::{Client, ResourceExt};
 use log::{debug, error, info, warn};
@@ -111,8 +111,6 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 // generate CoreDB spec based on values in body
                 let spec = generate_spec(&namespace, &read_msg.message.spec).await;
 
-                let spec_js = serde_json::to_string(&spec).unwrap();
-                debug!("spec: {}", spec_js);
                 // create or update CoreDB
                 create_or_update(client.clone(), &namespace, spec)
                     .await
@@ -124,28 +122,54 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
 
                 let result = get_coredb_status(client.clone(), &namespace).await;
 
-                // requeue if no status, no extensions, or if extensions are currently being updated
-                let num_desired_extensions = match read_msg.message.spec.extensions {
-                    Some(extensions) => extensions.len(),
-                    None => 0,
-                };
+                // determine if we should requeue the message
                 let requeue: bool = match &result {
                     Ok(current_spec) => {
                         // if the coredb is still updating the extensions, requeue this task and try again in a few seconds
                         let status = current_spec.clone().status.expect("no status present");
                         let updating_extension = status.extensions_updating;
-                        let no_extensions = match status.extensions {
-                            Some(extensions) => {
+
+                        // requeue when extensions are "out of sync"
+                        // this happens when:
+                        // 1. no extensions reported on the crd status
+                        // 2. number of desired extensions != actual extensions
+                        // 3. there is a difference in hashes between desired and actual extensions
+                        let extensions_out_of_sync: bool = match status.extensions {
+                            Some(actual_extensions) => {
                                 // requeue if there are less extensions than desired
                                 // likely means that the extensions are still being updated
-                                extensions.len() < num_desired_extensions
+                                // or there is an issue changing an extension
+                                let desired_extensions = match read_msg.message.spec.extensions {
+                                    Some(extensions) => extensions,
+                                    None => {
+                                        vec![]
+                                    } // no extensions in the request
+                                };
+                                // if no extensions in request, then exit
+                                if desired_extensions.is_empty() {
+                                    info!("No extensions in request");
+                                    false
+                                } else {
+                                    let (changed, to_install) =
+                                        extension_plan(&desired_extensions, &actual_extensions);
+                                    // requeue if extensions need to be installed or updated
+                                    if !changed.is_empty() || !to_install.is_empty() {
+                                        warn!(
+                                            "changed: {:?}, to_install: {:?}",
+                                            changed, to_install
+                                        );
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                }
                             }
                             None => true,
                         };
-                        if updating_extension || no_extensions {
+                        if updating_extension || extensions_out_of_sync {
                             warn!(
-                                "extensions updating: {}, no extensions: {}",
-                                updating_extension, no_extensions
+                                "extensions updating: {}, extensions_out_of_sync: {}",
+                                updating_extension, extensions_out_of_sync
                             );
                             true
                         } else {

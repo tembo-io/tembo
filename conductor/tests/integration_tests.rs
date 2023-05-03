@@ -19,7 +19,7 @@ mod test {
         runtime::wait::{await_condition, conditions},
         Api, Client, Config,
     };
-    use pgmq::PGMQueue;
+    use pgmq::{Message, PGMQueue};
 
     use conductor::{
         coredb_crd as crd, restart_statefulset,
@@ -28,6 +28,38 @@ mod test {
     use rand::Rng;
     use std::collections::BTreeMap;
     use std::{thread, time};
+
+    // helper to poll for messages from data plane queue with retries
+    async fn get_dataplane_message(
+        retries: u64,
+        retry_delay_seconds: u64,
+        queue: &PGMQueue,
+    ) -> Message<StateToControlPlane> {
+        // wait for conductor to send message to data_plane_events queue
+        let mut attempt = 0;
+
+        let msg: Option<Message<StateToControlPlane>> = loop {
+            attempt += 1;
+            if attempt > retries {
+                panic!(
+                    "No message found in data plane queue after - {} - retries",
+                    retries
+                );
+            } else {
+                // read message from data_plane_events queue
+                let msg = queue
+                    .read::<StateToControlPlane>("myqueue_data_plane", Some(&30_i32))
+                    .await
+                    .expect("database error");
+                if msg.is_some() {
+                    break msg;
+                } else {
+                    thread::sleep(time::Duration::from_secs(retry_delay_seconds));
+                }
+            };
+        };
+        msg.expect("no message found")
+    }
 
     #[tokio::test]
     #[ignore]
@@ -102,14 +134,10 @@ mod test {
         .unwrap_or_else(|_| panic!("Did not find the pod {pod_name} to be running after waiting {timeout_seconds_start_pod} seconds"));
 
         // wait for conductor to send message to data_plane_events queue
-        thread::sleep(time::Duration::from_secs(60));
+        let retries = 90;
+        let retry_delay = 2;
+        let msg = get_dataplane_message(retries, retry_delay, &queue).await;
 
-        // read message from data_plane_events queue
-        let msg = queue
-            .read::<StateToControlPlane>("myqueue_data_plane", Some(&30_i32))
-            .await
-            .unwrap()
-            .expect("no message");
         queue
             .archive("myqueue_data_plane", &msg.msg_id)
             .await
@@ -183,15 +211,8 @@ mod test {
         let msg_id = queue.send(&myqueue, &msg).await;
         println!("msg_id: {msg_id:?}");
 
-        // ADD SOME DELAY
-        thread::sleep(time::Duration::from_secs(30));
-
         // read message from data_plane_events queue
-        let msg = queue
-            .read::<StateToControlPlane>("myqueue_data_plane", Some(&30_i32))
-            .await
-            .unwrap()
-            .expect("no message received from queue");
+        let msg = get_dataplane_message(retries, retry_delay, &queue).await;
         queue
             .archive("myqueue_data_plane", &msg.msg_id)
             .await
