@@ -26,6 +26,10 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         env::var("BACKUP_ARCHIVE_BUCKET").expect("BACKUP_ARCHIVE_BUCKET must be set");
     let cf_template_bucket =
         env::var("CF_TEMPLATE_BUCKET").expect("CF_TEMPLATE_BUCKET must be set");
+    let max_read_ct: i32 = env::var("MAX_READ_CT")
+        .unwrap_or_else(|_| "100".to_owned())
+        .parse()
+        .expect("error parsing MAX_READ_CT");
 
     // Connect to pgmq
     let queue: PGMQueue = PGMQueue::new(pg_conn_url).await?;
@@ -57,14 +61,28 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             }
         };
 
-        // TODO(chuckhend): recycled messages should get archived, logged, alerted
-        // note: messages are recycled on purpose, so alerting probably needs to be
-        // at some recycle count >= 20
-        // if read_msg.read_ct >= 2 {
-        //     warn!("recycled message: {:?}", read_msg);
-        //     queue.archive(queue_name, &read_msg.msg_id).await?;
-        //     continue;
-        // }
+        // note: messages are recycled on purpose
+        // but absurdly high read_ct means its probably never going to get processed
+        if read_msg.read_ct >= max_read_ct {
+            error!(
+                "archived message with read_count >= `{}`: {:?}",
+                max_read_ct, read_msg
+            );
+            queue
+                .archive(&control_plane_events_queue, &read_msg.msg_id)
+                .await?;
+            // this is what we'll send back to control-plane
+            let error_event = types::StateToControlPlane {
+                data_plane_id: read_msg.message.data_plane_id,
+                event_id: read_msg.message.event_id,
+                event_type: Event::Error,
+                spec: None,
+                connection: None,
+            };
+            let msg_id = queue.send(&data_plane_events_queue, &error_event).await?;
+            error!("sent error event to control-plane, msg_id: {:?}", msg_id);
+            continue;
+        }
         let namespace = format!(
             "org-{}-inst-{}",
             read_msg.message.organization_name, read_msg.message.dbname
