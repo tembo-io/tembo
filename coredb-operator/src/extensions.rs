@@ -220,7 +220,7 @@ pub async fn toggle_extensions(
                     }
                     false => {
                         info!("Dropping extension: {}, database {}", ext_name, database_name);
-                        format!("DROP EXTENSION IF EXISTS \"{ext_name}\";")
+                        format!("DROP EXTENSION IF EXISTS \"{ext_name}\" CASCADE;")
                     }
                 };
 
