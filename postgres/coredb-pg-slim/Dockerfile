@@ -79,7 +79,7 @@ RUN set -xe; \
 WORKDIR / 
 RUN rm -rf /git
   
-RUN trunk install --version ${PG_PARTMAN_VER} pg_partman && trunk install --version ${PGMQ_VER} pgmq
+RUN trunk install --version ${PG_PARTMAN_VER} pg_partman
 
 # cache extensions and shared libraries
 RUN mkdir /tmp/pg_sharedir && \
