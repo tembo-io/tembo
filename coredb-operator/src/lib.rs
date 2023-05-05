@@ -15,6 +15,7 @@ mod extensions;
 #[cfg(test)] pub mod fixtures;
 mod postgres_exporter_role;
 mod psql;
+mod rbac;
 mod secret;
 mod service;
 mod statefulset;

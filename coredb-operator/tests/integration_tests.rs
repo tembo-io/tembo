@@ -119,6 +119,13 @@ mod test {
             },
             "spec": {
                 "replicas": replicas,
+                "serviceAccountTemplate": {
+                    "metadata": {
+                        "annotations": {
+                            "eks.amazonaws.com/role-arn": "arn:aws:iam::012345678901:role/cdb-test-iam"
+                        }
+                    }
+                },
                 "extensions": [
                     {
                         "name": "postgis",
@@ -285,6 +292,13 @@ mod test {
             },
             "spec": {
                 "replicas": replicas,
+                "serviceAccountTemplate": {
+                    "metadata": {
+                        "annotations": {
+                            "eks.amazonaws.com/role-arn": "arn:aws:iam::012345678901:role/cdb-test-iam"
+                        }
+                    }
+                },
                 "extensions": [
                     {
                         "name": "postgis",
@@ -340,8 +354,14 @@ mod test {
             },
             "spec": {
                 "pkglibdirStorage": "2Gi",
-                "sharedirStorage" : "2Gi"
-
+                "sharedirStorage" : "2Gi",
+                "serviceAccountTemplate": {
+                    "metadata": {
+                        "annotations": {
+                            "eks.amazonaws.com/role-arn": "arn:aws:iam::012345678901:role/cdb-test-iam"
+                        }
+                    }
+                }
             }
         });
         let params = PatchParams::apply("coredb-integration-test");
@@ -391,6 +411,13 @@ mod test {
             },
             "spec": {
                 "replicas": 1,
+                "serviceAccountTemplate": {
+                    "metadata": {
+                        "annotations": {
+                            "eks.amazonaws.com/role-arn": "arn:aws:iam::012345678901:role/cdb-test-iam"
+                        }
+                    }
+                },
                 "extensions": [
                     {
                         "name": "postgis",
