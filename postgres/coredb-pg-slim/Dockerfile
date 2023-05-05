@@ -1,12 +1,23 @@
 FROM quay.io/coredb/ubuntu:22.04 as builder
 
+ARG WALG_VER=2.0.1
+ARG TRUNK_VER=0.4.6
+
 RUN apt-get update && apt-get install -y curl pkg-config libssl-dev build-essential libclang-dev clang software-properties-common
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
-RUN /root/.cargo/bin/cargo install --version 0.4.0-alpha.2 pg-trunk
+RUN /root/.cargo/bin/cargo install --version $TRUNK_VER pg-trunk
+
+# Grab wal-g binary
+RUN curl -L -o /tmp/wal-g "https://github.com/wal-g/wal-g/releases/download/v$WALG_VER/wal-g-pg-ubuntu-20.04-amd64"
 
 FROM quay.io/coredb/ubuntu:22.04
 
+ARG PG_PARTMAN_VER=4.7.4
+ARG PGMQ_VER=0.4.2
+ARG PG_VECTOR_VER=0.4.1
+
 COPY --from=builder /root/.cargo/bin/trunk /usr/bin/trunk
+COPY --from=builder /tmp/wal-g /usr/bin/wal-g
 
 ARG DEBIAN_FRONTEND=noninteractive
 ENV TZ=Etc/UTC
@@ -44,33 +55,30 @@ RUN apt-get update && apt-get install -y \
         # build deps for pg_partman
         build-essential \
         git \
-        postgresql-server-dev-15 \
+        postgresql-server-dev-${PG_MAJOR} \
         # pg_stat_statement's package
         postgresql-contrib \
         # postgresql server
-        postgresql-15 \
+        postgresql-${PG_MAJOR} \
         # extensions
-        postgresql-15-postgis-3 \
-        postgresql-15-cron \
-        postgresql-15-repack \
-        postgresql-15-pgaudit \
+        postgresql-${PG_MAJOR}-postgis-3 \
+        postgresql-${PG_MAJOR}-cron \
+        postgresql-${PG_MAJOR}-repack \
+        postgresql-${PG_MAJOR}-pgaudit \
         && rm -rf /var/lib/apt/lists/*
 
 COPY ./postgresql.conf /usr/share/postgresql/${PG_MAJOR}/postgresql.conf.sample
 
-# install pg_partman
-RUN git clone https://github.com/pgpartman/pg_partman.git && \
-        cd pg_partman && \
-        make install && \
-        cd ../ && \
-        rm -rf pg_partman
-
-RUN git clone --branch v0.4.1 https://github.com/pgvector/pgvector.git && \
-        cd pgvector && \
-        make && \
-        make install && \
-        cd ../ && rm -rf pgvector
-
+  WORKDIR /git
+  RUN git clone --branch "v${PG_VECTOR_VER}" https://github.com/pgvector/pgvector.git
+  WORKDIR /git/pgvector
+  RUN set -xe; \
+        make; \
+        make install;
+  
+  WORKDIR / 
+  RUN rm -rf /git
+  
 # cache extensions and shared libraries
 RUN mkdir /tmp/pg_sharedir && \
         mkdir /tmp/pg_pkglibdir && \
