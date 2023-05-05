@@ -79,14 +79,6 @@ COPY ./postgresql.conf /usr/share/postgresql/${PG_MAJOR}/postgresql.conf.sample
   WORKDIR / 
   RUN rm -rf /git
   
-  RUN trunk install --version ${PG_PARTMAN_VER} pg_partman && trunk install --version ${PGMQ_VER} pgmq
-
-RUN git clone --branch v0.4.1 https://github.com/pgvector/pgvector.git && \
-        cd pgvector && \
-        make && \
-        make install && \
-        cd ../ && rm -rf pgvector
-
 # cache extensions and shared libraries
 RUN mkdir /tmp/pg_sharedir && \
         mkdir /tmp/pg_pkglibdir && \
