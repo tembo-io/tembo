@@ -31,6 +31,7 @@ thiserror = "1.0.38"
 
 [dev-dependencies]
 pgx-tests = "0.7.1"
+chrono = { version = "0.4.23", features = [ "serde" ] }
 rand = "0.8.5"
 sqlx = { version = "0.6", features = [ "runtime-tokio-native-tls" , "postgres", "chrono" ] }
 tokio = { version = "1", features = ["macros"] }
