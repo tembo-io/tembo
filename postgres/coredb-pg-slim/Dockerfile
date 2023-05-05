@@ -69,16 +69,18 @@ RUN apt-get update && apt-get install -y \
 
 COPY ./postgresql.conf /usr/share/postgresql/${PG_MAJOR}/postgresql.conf.sample
 
-  WORKDIR /git
-  RUN git clone --branch "v${PG_VECTOR_VER}" https://github.com/pgvector/pgvector.git
-  WORKDIR /git/pgvector
-  RUN set -xe; \
-        make; \
-        make install;
+WORKDIR /git
+RUN git clone --branch "v${PG_VECTOR_VER}" https://github.com/pgvector/pgvector.git
+WORKDIR /git/pgvector
+RUN set -xe; \
+      make; \
+      make install;
+
+WORKDIR / 
+RUN rm -rf /git
   
-  WORKDIR / 
-  RUN rm -rf /git
-  
+RUN trunk install --version ${PG_PARTMAN_VER} pg_partman
+
 # cache extensions and shared libraries
 RUN mkdir /tmp/pg_sharedir && \
         mkdir /tmp/pg_pkglibdir && \
