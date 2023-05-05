@@ -1,12 +1,18 @@
 FROM quay.io/coredb/ubuntu:22.04 as builder
 
+ARG WALG_VER=2.0.1
+
 RUN apt-get update && apt-get install -y curl pkg-config libssl-dev build-essential libclang-dev clang software-properties-common
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 RUN /root/.cargo/bin/cargo install --version 0.4.0-alpha.2 pg-trunk
 
+# Grab wal-g binary
+RUN curl -L -o /tmp/wal-g "https://github.com/wal-g/wal-g/releases/download/v$WALG_VER/wal-g-pg-ubuntu-20.04-amd64"
+
 FROM quay.io/coredb/ubuntu:22.04
 
 COPY --from=builder /root/.cargo/bin/trunk /usr/bin/trunk
+COPY --from=builder /tmp/wal-g /usr/bin/wal-g
 
 ARG DEBIAN_FRONTEND=noninteractive
 ENV TZ=Etc/UTC
