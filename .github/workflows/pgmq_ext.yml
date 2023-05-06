@@ -17,7 +17,6 @@ on:
   push:
     branches:
       - main
-      - 'release/[0-9]+.[0-9]+'
 
 jobs:
   lint:
@@ -107,7 +106,7 @@ jobs:
          mv stoml_linux_amd64 stoml
          chmod +x stoml
          sudo mv stoml /usr/local/bin/
-         cargo install pg-trunk --version 0.4.0
+         cargo install pg-trunk --version 0.4.6
 
       - name: publish-to-trunk
         env:
@@ -117,4 +116,4 @@ jobs:
           pgmq_ver=$(stoml Cargo.toml package.version)
           pgmq_descr=$(stoml Cargo.toml package.description)
           pgmq_repo=$(stoml Cargo.toml package.repository)
-          trunk publish pgmq --version 0.4.2 --file .trunk/pgmq-0.4.2.tar.gz --description "Message Queue for postgres" --homepage "https://github.com/CoreDB-io/coredb" --repository "https://github.com/CoreDB-io/coredb" --license "Apache-2.0"
+          trunk publish pgmq --version 0.5.0 --file .trunk/pgmq-0.5.0.tar.gz --description "Message Queue for postgres" --homepage "https://github.com/CoreDB-io/coredb" --repository "https://github.com/CoreDB-io/coredb" --license "Apache-2.0"
