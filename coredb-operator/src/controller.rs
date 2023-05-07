@@ -91,7 +91,7 @@ impl CoreDB {
         // reconcile service account, role, and role binding
         reconcile_rbac(self, ctx.clone()).await.map_err(|e| {
             error!("Error reconciling service account: {:?}", e);
-            Action::requeue(Duration::from_secs(10))
+            Action::requeue(Duration::from_secs(300))
         })?;
 
         // reconcile secret
