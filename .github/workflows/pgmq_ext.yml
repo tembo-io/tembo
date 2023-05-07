@@ -11,7 +11,7 @@ on:
       - main
     paths:
       - '.github/workflows/pgmq_ext.yml'
-      - '.github/actions/pgrx-init/**'
+      - '.github/actions/pgx-init/**'
       - './pgmq/extension/**'
   # Always run tests on main or release branches
   push:
@@ -38,7 +38,7 @@ jobs:
           # Additional directories to cache
           cache-directories: |
             /home/runner/.pgrx
-      - uses: ./.github/actions/pgrx-init
+      - uses: ./.github/actions/pgx-init
         with:
           working-directory: pgmq/extension
       - name: Cargo format
@@ -63,7 +63,7 @@ jobs:
           # Additional directories to cache
           cache-directories: |
             /home/runner/.pgrx
-      - uses: ./.github/actions/pgrx-init
+      - uses: ./.github/actions/pgx-init
         with:
           working-directory: pgmq/extension
       - name: test
