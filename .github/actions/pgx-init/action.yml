@@ -1,8 +1,8 @@
-name: 'pgx initialization'
-description: 'Initialize PGX if it is a dependency, otherwise do nothing.'
+name: 'pgrx initialization'
+description: 'Initialize PGRX if it is a dependency, otherwise do nothing.'
 inputs:
   working-directory:
-    description: 'The directory in which there is a pgx extension project'
+    description: 'The directory in which there is a pgrx extension project'
     required: true
 outputs: {}
 runs:
@@ -16,31 +16,31 @@ runs:
          mv stoml_linux_amd64 stoml
          chmod +x stoml
          sudo mv stoml /usr/local/bin/
-      - name: setup pgx
+      - name: setup pgrx
         shell: bash
-        id: pgx_install
+        id: pgrx_install
         working-directory: ${{ inputs.working-directory }}
         run: |
-          pgx_version=$(stoml Cargo.toml dependencies.pgx)
-          if [ -z "${pgx_version}" ]; then
-            echo "pgx is not a dependency: skipping"
+          pgrx_version=$(stoml Cargo.toml dependencies.pgrx)
+          if [ -z "${pgrx_version}" ]; then
+            echo "pgrx is not a dependency: skipping"
             echo "skip=true" >> $GITHUB_OUTPUT
           else
-            cargo install --version ${pgx_version} cargo-pgx
+            cargo install --version ${pgrx_version} cargo-pgrx
             echo "skip=false" >> $GITHUB_OUTPUT
           fi
-      - name: pgx init
+      - name: pgrx init
         shell: bash
-        if: steps.pgx_install.outputs.skip == 'false'
+        if: steps.pgrx_install.outputs.skip == 'false'
         working-directory: ${{ inputs.working-directory }}
         run: |
           set -x
           pg_version=$(stoml Cargo.toml features.default)
-          # pgx init can take a long time, and it re-compiles postgres even when there
+          # pgrx init can take a long time, and it re-compiles postgres even when there
           # is a cached version. So, we can just check for the directory and
-          cat /home/runner/.pgx/config.toml || true
-          if find /home/runner/.pgx | grep $(awk -F "=" '/${pg_version}/ {print $2}' /home/runner/.pgx/config.toml | tr -d '"'); then
-            echo "Already found pgx is initialized. Skipping 'cargo pgx init' command."
+          cat /home/runner/.pgrx/config.toml || true
+          if find /home/runner/.pgrx | grep $(awk -F "=" '/${pg_version}/ {print $2}' /home/runner/.pgrx/config.toml | tr -d '"'); then
+            echo "Already found pgrx is initialized. Skipping 'cargo pgrx init' command."
           else
-            cargo pgx init --${pg_version} download || true
+            cargo pgrx init --${pg_version} download || true
           fi
