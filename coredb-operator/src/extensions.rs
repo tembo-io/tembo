@@ -176,7 +176,6 @@ pub async fn install_extension(
     Ok(())
 }
 
-
 /// handles create/drop extensions
 pub async fn toggle_extensions(
     cdb: &CoreDB,
@@ -452,7 +451,6 @@ pub async fn reconcile_extensions(
     // return final state of extensions
     get_all_extensions(coredb, ctx.clone()).await
 }
-
 
 #[cfg(test)]
 mod tests {

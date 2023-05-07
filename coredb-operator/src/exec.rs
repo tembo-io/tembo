@@ -58,7 +58,6 @@ impl ExecCommand {
         let mut result_stderr = String::new();
         stderr_reader.read_to_string(&mut result_stderr).await.unwrap();
 
-
         let status = attached_process.take_status().unwrap().await.unwrap();
         // https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
         let response = ExecOutput::new(Some(result_stdout), Some(result_stderr), Some(status.clone()));

@@ -18,12 +18,14 @@ mod test {
         is_pod_ready,
     };
     use k8s_openapi::{
-        api::apps::v1::StatefulSet,
-        api::core::v1::{
-            Container, Namespace, PersistentVolumeClaim, Pod, PodSpec, ResourceRequirements, Secret,
-            ServiceAccount,
+        api::{
+            apps::v1::StatefulSet,
+            core::v1::{
+                Container, Namespace, PersistentVolumeClaim, Pod, PodSpec, ResourceRequirements, Secret,
+                ServiceAccount,
+            },
+            rbac::v1::{Role, RoleBinding},
         },
-        api::rbac::v1::{Role, RoleBinding},
         apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
         apimachinery::pkg::{api::resource::Quantity, apis::meta::v1::ObjectMeta},
     };
@@ -33,8 +35,7 @@ mod test {
         Api, Client, Config,
     };
     use rand::Rng;
-    use std::collections::BTreeMap;
-    use std::{str, thread, time::Duration};
+    use std::{collections::BTreeMap, str, thread, time::Duration};
     use tokio::io::AsyncReadExt;
 
     const API_VERSION: &str = "coredb.io/v1alpha1";
