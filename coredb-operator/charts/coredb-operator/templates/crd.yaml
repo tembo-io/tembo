@@ -58,7 +58,7 @@ spec:
                   type: object
                 type: array
               image:
-                default: quay.io/coredb/coredb-pg-slim:b5c86b2
+                default: quay.io/coredb/coredb-pg-slim:0a1db4d
                 type: string
               pkglibdirStorage:
                 default: 1Gi
