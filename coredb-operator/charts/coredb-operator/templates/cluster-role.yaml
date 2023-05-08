@@ -17,7 +17,7 @@ rules:
     resources: ["statefulsets"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: [""]
-    resources: ["services", "secrets", "pods", "pods/exec", "namespaces/status", "serviceaccounts"]
+    resources: ["services", "secrets", "pods", "pods/exec", "namespaces/status", "serviceaccounts", "secrets", "configmaps"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: ["rbac.authorization.k8s.io"]
     resources: ["roles", "rolebindings"]
