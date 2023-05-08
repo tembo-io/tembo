@@ -11,25 +11,31 @@
 
 #[cfg(test)]
 mod test {
+    use chrono::{DateTime, SecondsFormat, Utc};
     use controller::{
         apis::coredb_types::CoreDB,
         defaults::{default_resources, default_storage},
         is_pod_ready,
     };
     use k8s_openapi::{
-        api::core::v1::{
-            Container, Namespace, PersistentVolumeClaim, Pod, PodSpec, ResourceRequirements, Secret,
+        api::{
+            apps::v1::StatefulSet,
+            core::v1::{
+                Container, Namespace, PersistentVolumeClaim, Pod, PodSpec, ResourceRequirements, Secret,
+                ServiceAccount,
+            },
+            rbac::v1::{Role, RoleBinding},
         },
         apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
         apimachinery::pkg::{api::resource::Quantity, apis::meta::v1::ObjectMeta},
     };
     use kube::{
-        api::{AttachParams, Patch, PatchParams, PostParams},
+        api::{AttachParams, ListParams, Patch, PatchParams, PostParams},
         runtime::wait::{await_condition, conditions, Condition},
         Api, Client, Config,
     };
     use rand::Rng;
-    use std::{str, thread, time::Duration};
+    use std::{collections::BTreeMap, str, thread, time::Duration};
     use tokio::io::AsyncReadExt;
 
     const API_VERSION: &str = "coredb.io/v1alpha1";
@@ -285,6 +291,7 @@ mod test {
             },
             "spec": {
                 "replicas": replicas,
+
                 "extensions": [
                     {
                         "name": "postgis",
@@ -340,8 +347,7 @@ mod test {
             },
             "spec": {
                 "pkglibdirStorage": "2Gi",
-                "sharedirStorage" : "2Gi"
-
+                "sharedirStorage" : "2Gi",
             }
         });
         let params = PatchParams::apply("coredb-integration-test");
@@ -354,6 +360,156 @@ mod test {
         let storage = pvc.spec.unwrap().resources.unwrap().requests.unwrap();
         let s = storage.get("storage").unwrap().to_owned();
         assert_eq!(Quantity("2Gi".to_owned()), s);
+
+        // Update the coredb resource to add rbac
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "serviceAccountTemplate": {
+                    "metadata": {
+                        "annotations": {
+                            "eks.amazonaws.com/role-arn": "arn:aws:iam::012345678901:role/cdb-test-iam"
+                        }
+                    }
+                }
+            }
+        });
+
+        // apply CRD with serviceAccountTemplate set
+        let params = PatchParams::apply("coredb-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        // give it some time 500ms
+        thread::sleep(Duration::from_millis(5000));
+
+        // Assert that the service account exists
+        let sa_api: Api<ServiceAccount> = Api::namespaced(client.clone(), namespace);
+        let sa_name = format!("{}-sa", name);
+        let sa = sa_api.get(&sa_name).await.unwrap();
+
+        // Check if the service account is set correctly
+        assert_eq!(sa.metadata.name.unwrap(), sa_name);
+
+        // Check if the annotation is set correctly
+        assert_eq!(
+            sa.metadata.annotations.unwrap().get("eks.amazonaws.com/role-arn"),
+            Some(&"arn:aws:iam::012345678901:role/cdb-test-iam".to_string())
+        );
+
+        // Assert that the role exists
+        let role_api: Api<Role> = Api::namespaced(client.clone(), namespace);
+        let role_name = format!("{}-role", name);
+        let role = role_api.get(&role_name).await.unwrap();
+        assert_eq!(role.metadata.name.unwrap(), role_name);
+
+        // Assert that the role binding exists
+        let rb_api: Api<RoleBinding> = Api::namespaced(client.clone(), namespace);
+        let rb_name = format!("{}-role-binding", name);
+        let role_binding = rb_api.get(&rb_name).await.unwrap();
+        assert_eq!(role_binding.metadata.name.unwrap(), rb_name);
+
+        // Get the StatefulSet
+        let stateful_sets_api: Api<StatefulSet> = Api::namespaced(client.clone(), namespace);
+        let stateful_set_name = format!("{}", name);
+        let stateful_set = stateful_sets_api.get(&stateful_set_name).await.unwrap();
+
+        //println!("stateful_set: {:#?}", stateful_set_name);
+
+        // Assert that the StatefulSet has the correct service account
+        let stateful_set_service_account_name = stateful_set
+            .spec
+            .as_ref()
+            .unwrap()
+            .template
+            .spec
+            .as_ref()
+            .unwrap()
+            .service_account_name
+            .as_ref();
+        assert_eq!(stateful_set_service_account_name, Some(&sa_name));
+
+        // Restart the StatefulSet to apply updates to the running pod
+        let mut stateful_set_updated = stateful_set.clone();
+        stateful_set_updated
+            .spec
+            .as_mut()
+            .unwrap()
+            .template
+            .metadata
+            .as_mut()
+            .unwrap()
+            .annotations
+            .get_or_insert_with(BTreeMap::new)
+            .insert(
+                "kubectl.kubernetes.io/restartedAt".to_string(),
+                Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true),
+            );
+
+        let params = PatchParams::default();
+        let patch = Patch::Merge(&stateful_set_updated);
+        let _stateful_set_patched = stateful_sets_api
+            .patch(&stateful_set_name, &params, &patch)
+            .await
+            .unwrap();
+
+        // Wait for the pod to restart
+        let pods_api: Api<Pod> = Api::namespaced(client.clone(), namespace);
+        let lp = ListParams::default().labels(format!("statefulset={}", stateful_set_name).as_str());
+
+        //let restart_time = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true);
+        let restart_time = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true).to_string();
+
+        loop {
+            let pods = pods_api.list(&lp).await.unwrap();
+
+            let all_pods_ready_and_restarted = pods.iter().all(|pod| {
+                let pod_restart_time = pod
+                    .metadata
+                    .annotations
+                    .as_ref()
+                    .and_then(|annotations| annotations.get("kubectl.kubernetes.io/restartedAt"))
+                    .and_then(|s| DateTime::parse_from_rfc3339(s).ok())
+                    .map(|dt| dt.with_timezone(&Utc)) // Convert to DateTime<Utc>
+                    .unwrap_or_else(|| Utc::now());
+                let restart_time_as_datetime = DateTime::parse_from_rfc3339(&restart_time)
+                    .unwrap()
+                    .with_timezone(&Utc);
+                pod_restart_time > restart_time_as_datetime
+                    && pod
+                        .status
+                        .as_ref()
+                        .and_then(|status| status.container_statuses.as_ref())
+                        .map(|container_statuses| container_statuses.iter().all(|cs| cs.ready))
+                        .unwrap_or(false)
+            });
+
+            if all_pods_ready_and_restarted {
+                break;
+            }
+
+            thread::sleep(Duration::from_secs(15));
+        }
+
+        // Check the pods service account
+        //let all_pods = pods_api.list(&ListParams::default()).await.unwrap();
+        //println!("All pods in the namespace: {:?}", all_pods);
+
+        let pods = pods_api.list(&lp).await.unwrap();
+        let pod = match pods.iter().next() {
+            Some(pod) => pod,
+            None => {
+                println!("Expected label: {}", format!("statefulset={}", stateful_set_name));
+                panic!("No matching pods found")
+            }
+        };
+
+        let pod_service_account_name = pod.spec.as_ref().unwrap().service_account_name.as_ref();
+        assert_eq!(pod_service_account_name, Some(&sa_name));
     }
 
     #[tokio::test]

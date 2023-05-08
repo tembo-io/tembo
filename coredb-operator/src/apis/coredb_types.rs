@@ -1,11 +1,19 @@
 use crate::extensions::Extension;
-use k8s_openapi::{api::core::v1::ResourceRequirements, apimachinery::pkg::api::resource::Quantity};
+use k8s_openapi::{
+    api::core::v1::ResourceRequirements,
+    apimachinery::pkg::{api::resource::Quantity, apis::meta::v1::ObjectMeta},
+};
 
 use crate::defaults;
 use kube::CustomResource;
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+#[derive(Deserialize, Serialize, Clone, Debug, JsonSchema, Default)]
+pub struct ServiceAccountTemplate {
+    pub metadata: Option<ObjectMeta>,
+}
 
 /// Generate the Kubernetes wrapper struct `CoreDB` from our Spec and Status struct
 ///
@@ -40,6 +48,8 @@ pub struct CoreDBSpec {
     pub extensions: Vec<Extension>,
     #[serde(default = "defaults::default_stop")]
     pub stop: bool,
+    #[serde(default = "defaults::default_service_account_template")]
+    pub serviceAccountTemplate: ServiceAccountTemplate,
 }
 
 /// The status object of `CoreDB`
