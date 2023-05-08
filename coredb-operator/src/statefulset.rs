@@ -31,7 +31,6 @@ const PKGLIBDIR: &str = "/usr/lib/postgresql/15/lib";
 const SHAREDIR: &str = "/usr/share/postgresql/15";
 const DATADIR: &str = "/var/lib/postgresql/data";
 
-
 pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
     let ns = cdb.namespace().unwrap();
     let name = cdb.name_any();
@@ -176,6 +175,7 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
             },
             template: PodTemplateSpec {
                 spec: Some(PodSpec {
+                    service_account_name: Some(format!("{}-sa", cdb.name_any())),
                     containers,
                     init_containers: Option::from(vec![Container {
                         env: postgres_env,

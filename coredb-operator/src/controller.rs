@@ -8,6 +8,7 @@ use futures::{
 use crate::{
     exec::{ExecCommand, ExecOutput},
     psql::{PsqlCommand, PsqlOutput},
+    rbac::reconcile_rbac,
     service::reconcile_svc,
     statefulset::{reconcile_sts, stateful_set_from_cdb},
 };
@@ -86,6 +87,12 @@ impl CoreDB {
         let ns = self.namespace().unwrap();
         let name = self.name_any();
         let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &ns);
+
+        // reconcile service account, role, and role binding
+        reconcile_rbac(self, ctx.clone()).await.map_err(|e| {
+            error!("Error reconciling service account: {:?}", e);
+            Action::requeue(Duration::from_secs(300))
+        })?;
 
         // reconcile secret
         reconcile_secret(self, ctx.clone()).await.map_err(|e| {

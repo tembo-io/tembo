@@ -1,7 +1,7 @@
 use k8s_openapi::{api::core::v1::ResourceRequirements, apimachinery::pkg::api::resource::Quantity};
 use std::collections::BTreeMap;
 
-use crate::extensions::Extension;
+use crate::{apis::coredb_types::ServiceAccountTemplate, extensions::Extension};
 
 pub fn default_replicas() -> i32 {
     1
@@ -35,23 +35,20 @@ pub fn default_port() -> i32 {
 }
 
 pub fn default_image() -> String {
-    "quay.io/coredb/coredb-pg-slim:4116deb".to_owned()
+    "quay.io/coredb/coredb-pg-slim:b5c86b2".to_owned()
 }
 
 pub fn default_storage() -> Quantity {
     Quantity("8Gi".to_string())
 }
 
-
 pub fn default_sharedir_storage() -> Quantity {
     Quantity("1Gi".to_string())
 }
 
-
 pub fn default_pkglibdir_storage() -> Quantity {
     Quantity("1Gi".to_string())
 }
-
 
 pub fn default_postgres_exporter_image() -> String {
     "quay.io/prometheuscommunity/postgres-exporter:v0.11.1".to_owned()
@@ -79,4 +76,8 @@ pub fn default_stop() -> bool {
 
 pub fn default_extensions_updating() -> bool {
     false
+}
+
+pub fn default_service_account_template() -> ServiceAccountTemplate {
+    ServiceAccountTemplate { metadata: None }
 }
