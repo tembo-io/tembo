@@ -8,7 +8,8 @@ RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 RUN /root/.cargo/bin/cargo install --version $TRUNK_VER pg-trunk
 
 # Grab wal-g binary
-RUN curl -L -o /tmp/wal-g "https://github.com/wal-g/wal-g/releases/download/v$WALG_VER/wal-g-pg-ubuntu-20.04-amd64"
+RUN curl -L -o /tmp/wal-g "https://github.com/wal-g/wal-g/releases/download/v$WALG_VER/wal-g-pg-ubuntu-20.04-amd64" \
+    && chmod +x /tmp/wal-g
 
 FROM quay.io/coredb/ubuntu:22.04
 

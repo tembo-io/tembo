@@ -1,6 +1,6 @@
 [package]
 name = "coredb-pg-slim"
-version = "15.2.0-coredb-pg-slim.7"
+version = "15.2.0-coredb-pg-slim.8"
 edition = "2021"
 authors = ["CoreDB.io"]
 description = "CoreDB distribution of postgres"
