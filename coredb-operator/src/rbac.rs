@@ -153,7 +153,7 @@ async fn create_policy_rules(cdb: &CoreDB) -> Vec<PolicyRule> {
         PolicyRule {
             api_groups: Some(vec!["coredb.io".to_owned()]),
             resource_names: Some(vec![cdb.name_any()]),
-            resources: Some(vec!["coredb".to_owned()]),
+            resources: Some(vec!["coredbs".to_owned()]),
             verbs: vec!["get".to_string(), "list".to_string(), "watch".to_string()],
             ..PolicyRule::default()
         },
@@ -161,7 +161,7 @@ async fn create_policy_rules(cdb: &CoreDB) -> Vec<PolicyRule> {
         PolicyRule {
             api_groups: Some(vec!["coredb.io".to_owned()]),
             resource_names: Some(vec![cdb.name_any()]),
-            resources: Some(vec!["coredb/status".to_owned()]),
+            resources: Some(vec!["status".to_owned()]),
             verbs: vec![
                 "get".to_string(),
                 "patch".to_string(),
