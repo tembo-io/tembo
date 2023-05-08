@@ -6,7 +6,7 @@ metadata:
 rules:
   - apiGroups: ["coredb.io"]
     resources: ["coredbs", "coredbs/status"]
-    verbs: ["get", "list", "watch", "patch"]
+    verbs: ["create", "delete", "get", "list", "watch", "patch", "update"]
   - apiGroups: ["events.k8s.io"]
     resources: ["events"]
     verbs: ["create"]

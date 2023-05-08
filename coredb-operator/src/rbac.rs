@@ -151,7 +151,7 @@ async fn create_policy_rules(cdb: &CoreDB) -> Vec<PolicyRule> {
     vec![
         // This policy allows get, list, watch access to the coredb resource
         PolicyRule {
-            api_groups: Some(vec!["coredbs.coredb.io".to_owned()]),
+            api_groups: Some(vec!["coredb.io".to_owned()]),
             resource_names: Some(vec![cdb.name_any()]),
             resources: Some(vec!["coredb".to_owned()]),
             verbs: vec!["get".to_string(), "list".to_string(), "watch".to_string()],
@@ -159,7 +159,7 @@ async fn create_policy_rules(cdb: &CoreDB) -> Vec<PolicyRule> {
         },
         // This policy allows get, patch, update, watch access to the coredb/status resource
         PolicyRule {
-            api_groups: Some(vec!["coredbs.coredb.io".to_owned()]),
+            api_groups: Some(vec!["coredb.io".to_owned()]),
             resource_names: Some(vec![cdb.name_any()]),
             resources: Some(vec!["coredb/status".to_owned()]),
             verbs: vec![
