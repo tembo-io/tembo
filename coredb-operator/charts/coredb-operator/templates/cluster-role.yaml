@@ -5,7 +5,7 @@ metadata:
   name: control-cdb
 rules:
   - apiGroups: ["coredb.io"]
-    resources: ["coredbs", "status"]
+    resources: ["coredbs", "coredbs/status"]
     verbs: ["get", "list", "watch", "patch", "update"]
   - apiGroups: ["events.k8s.io"]
     resources: ["events"]
