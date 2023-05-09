@@ -24,7 +24,7 @@ metadata:
 rules:
   - apiGroups: ["coredb.io"]
     resources: ["coredbs", "coredbs/status"]
-    verbs: ["get", "list", "watch", "patch"]
+    verbs: ["get", "list", "watch", "patch", "update"]
   - apiGroups: ["events.k8s.io"]
     resources: ["events"]
     verbs: ["create"]
@@ -35,8 +35,11 @@ rules:
     resources: ["statefulsets"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: [""]
-    resources: ["services", "secrets", "pods", "pods/exec", "namespaces/status"]
+    resources: ["services", "secrets", "pods", "pods/exec", "namespaces/status", "serviceaccounts", "secrets", "configmaps"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles", "rolebindings"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
 ---
 # Binding the role to the account in coredb-operator ns
 kind: ClusterRoleBinding
