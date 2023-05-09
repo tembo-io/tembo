@@ -41,24 +41,37 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
     pvc_requests_sharedir.insert("storage".to_string(), cdb.spec.sharedirStorage.clone());
     let mut pvc_requests_pkglibdir: BTreeMap<String, Quantity> = BTreeMap::new();
     pvc_requests_pkglibdir.insert("storage".to_string(), cdb.spec.pkglibdirStorage.clone());
+    let backup = &cdb.spec.backup;
 
     let mut labels: BTreeMap<String, String> = BTreeMap::new();
     labels.insert("app".to_owned(), "coredb".to_string());
     labels.insert("coredb.io/name".to_owned(), cdb.name_any());
     labels.insert("statefulset".to_owned(), name.to_owned());
 
-    let postgres_env = Some(vec![EnvVar {
-        name: "POSTGRES_PASSWORD".to_owned(),
-        value: None,
-        value_from: Some(EnvVarSource {
-            secret_key_ref: Some(SecretKeySelector {
-                key: "password".to_string(),
-                name: Some(format!("{}-connection", &name)),
-                optional: None,
+    let postgres_env = Some(vec![
+        EnvVar {
+            name: "POSTGRES_PASSWORD".to_owned(),
+            value: None,
+            value_from: Some(EnvVarSource {
+                secret_key_ref: Some(SecretKeySelector {
+                    key: "password".to_string(),
+                    name: Some(format!("{}-connection", &name)),
+                    optional: None,
+                }),
+                ..EnvVarSource::default()
             }),
-            ..EnvVarSource::default()
-        }),
-    }]);
+        },
+        EnvVar {
+            name: "WALG_S3_PREFIX".to_owned(),
+            value: backup.as_ref().and_then(|b| b.destination_path.clone()),
+            value_from: None,
+        },
+        EnvVar {
+            name: "WALG_S3_SSE".to_owned(),
+            value: backup.as_ref().and_then(|b| b.encryption.clone()),
+            value_from: None,
+        },
+    ]);
 
     let postgres_volume_mounts = Some(vec![
         VolumeMount {

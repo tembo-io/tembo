@@ -1,7 +1,10 @@
 use k8s_openapi::{api::core::v1::ResourceRequirements, apimachinery::pkg::api::resource::Quantity};
 use std::collections::BTreeMap;
 
-use crate::{apis::coredb_types::ServiceAccountTemplate, extensions::Extension};
+use crate::{
+    apis::coredb_types::{Backup, ServiceAccountTemplate},
+    extensions::Extension,
+};
 
 pub fn default_replicas() -> i32 {
     1
@@ -80,4 +83,21 @@ pub fn default_extensions_updating() -> bool {
 
 pub fn default_service_account_template() -> ServiceAccountTemplate {
     ServiceAccountTemplate { metadata: None }
+}
+
+pub fn default_backup() -> Option<Backup> {
+    None
+}
+
+pub fn default_encryption() -> Option<String> {
+    Some("AES256".to_owned())
+}
+
+pub fn default_retention_policy() -> Option<String> {
+    Some("30d".to_owned())
+}
+
+pub fn default_backup_schedule() -> Option<String> {
+    // Every day at midnight
+    Some("0 0 * * *".to_owned())
 }
