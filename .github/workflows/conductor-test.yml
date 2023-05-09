@@ -102,18 +102,26 @@ jobs:
           # Install Helm
           curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 
+          # Install the CoreDB cli
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev
+          cargo install coredb-cli
+
+          # Label the default namespace as safe to run tests
+          kubectl label namespace default safe-to-run-coredb-tests=true
+
           # Install Traefik
           make setup.traefik
 
           # Install the CoreDB operator
-          sudo apt-get update
-          sudo apt-get install -y pkg-config libssl-dev
-          cargo install coredb-cli
           coredb-cli install --branch main
           kubectl get crds
 
           # Start local postgres for the Nile queues
           docker run -d --name pgmq -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres
+
+          # Wait for the coredb operator to come online
+          kubectl wait --timeout=60s --for=condition=ready pod -l app=coredb-controller -n coredb-operator
 
           # Start conductor with test configuration
           make run.test &

@@ -16,6 +16,8 @@ pub struct CloudFormationParams {
     pub db_name: String,
     pub iam_role_name: String,
     pub cf_template_bucket: String,
+    pub namespace: String,
+    pub service_account_name: String,
 }
 
 pub struct AWSConfigState {
@@ -30,6 +32,8 @@ impl CloudFormationParams {
         db_name: String,
         iam_role_name: String,
         cf_template_bucket: String,
+        namespace: String,
+        service_account_name: String,
     ) -> Self {
         Self {
             backup_archive_bucket,
@@ -37,6 +41,8 @@ impl CloudFormationParams {
             db_name,
             iam_role_name,
             cf_template_bucket,
+            namespace,
+            service_account_name,
         }
     }
 
@@ -55,6 +61,12 @@ impl CloudFormationParams {
         }
         if self.cf_template_bucket.is_empty() {
             return Err("Cloudformation Bucket Name cannot be empty".to_string());
+        }
+        if self.namespace.is_empty() {
+            return Err("Namespace cannot be empty".to_string());
+        }
+        if self.service_account_name.is_empty() {
+            return Err("Kubernetes Service Account Name cannot be empty".to_string());
         }
         Ok(())
     }
@@ -106,12 +118,16 @@ impl AWSConfigState {
                 .parameter_value(params.org_name.clone())
                 .build(),
             Parameter::builder()
-                .parameter_key("BucketPath")
-                .parameter_value(params.db_name.clone())
-                .build(),
-            Parameter::builder()
                 .parameter_key("RoleName")
                 .parameter_value(params.iam_role_name.clone())
+                .build(),
+            Parameter::builder()
+                .parameter_key("Namespace")
+                .parameter_value(params.namespace.clone())
+                .build(),
+            Parameter::builder()
+                .parameter_key("ServiceAccountName")
+                .parameter_value(params.service_account_name.clone())
                 .build(),
         ];
         if !self.does_stack_exist(stack_name).await {
