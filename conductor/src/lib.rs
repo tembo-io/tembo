@@ -364,8 +364,8 @@ pub async fn create_cloudformation(
     // If we are still waiting for the stack to be created we will need to requeue the message
     let region = Region::new(aws_region);
     let aws_config_state = AWSConfigState::new(region).await;
+    let namespace = format!("org-{}-inst-{}", org_name, db_name);
     let stack_name = format!("org-{}-inst-{}-cf", org_name, db_name);
-    //let s3_bucket_path = format!("org-{}/inst-{}", org_name, db_name);
     let iam_role_name = format!("org-{}-inst-{}-iam", org_name, db_name);
     let service_account_name = format!("org-{}-inst-{}-sa", org_name, db_name);
     let cf_template_params = CloudFormationParams::new(
@@ -380,7 +380,7 @@ pub async fn create_cloudformation(
         // The AWS S3 Bucket where the CF Template is placed
         String::from(cf_template_bucket),
         // The Kubernetes Namespace where the database is deployed
-        String::from(org_name),
+        String::from(namespace),
         // The Kubernetes Service Account to use for the database
         String::from(&service_account_name),
     );

@@ -139,8 +139,9 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 // Format Backup spec in CoreDBSpec
                 let backup = Backup {
                     destinationPath: Some(format!(
-                        "s3://{}/coredb/{}/{}",
+                        "s3://{}/coredb/{}/org-{}-inst-{}",
                         backup_archive_bucket,
+                        &read_msg.message.organization_name,
                         &read_msg.message.organization_name,
                         &read_msg.message.dbname
                     )),
