@@ -1,6 +1,23 @@
 use kube::CustomResource;
 use serde::{Deserialize, Serialize};
+use serde_json::Value as JsonValue;
 use std::collections::BTreeMap;
+
+// This isn't ideal, but it should only be for a short time
+// until we can switch operators
+#[derive(Deserialize, Serialize, Clone, Debug)]
+pub struct ServiceAccountTemplate {
+    pub metadata: Option<JsonValue>,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug)]
+#[allow(non_snake_case)]
+pub struct Backup {
+    pub destinationPath: Option<String>,
+    pub encryption: Option<String>,
+    pub retentionPolicy: Option<String>,
+    pub schedule: Option<String>,
+}
 
 #[derive(CustomResource, Serialize, Deserialize, Clone, Debug)]
 #[kube(
@@ -41,6 +58,14 @@ pub struct CoreDBSpec {
     pub storage: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub uid: Option<i32>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "serviceAccountTemplate"
+    )]
+    pub service_account_template: Option<ServiceAccountTemplate>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub backup: Option<Backup>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, Hash, PartialEq)]

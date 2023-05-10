@@ -21,6 +21,7 @@ base64 = "0.21.0"
 tokio-retry = "0.3.0"
 aws-config = "0.55.1"
 aws-sdk-cloudformation = "0.26.0"
+rand = "0.8"
 # coredb-controller = "0.0.1-alpha.1"
 
 [dependencies.kube]

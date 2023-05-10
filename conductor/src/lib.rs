@@ -19,6 +19,7 @@ use kube::api::{DeleteParams, ListParams, Patch, PatchParams};
 use kube::runtime::wait::{await_condition, Condition};
 use kube::{Api, Client};
 use log::info;
+use rand::Rng;
 use serde_json::{from_str, to_string, Value};
 
 pub type Result<T, E = ConductorError> = std::result::Result<T, E>;
@@ -409,6 +410,52 @@ pub async fn delete_cloudformation(
         .await
         .map_err(ConductorError::from)?;
     Ok(())
+}
+
+pub struct StackOutputs {
+    pub role_name: Option<String>,
+    pub role_arn: Option<String>,
+}
+
+pub async fn lookup_role_arn(
+    aws_region: String,
+    organization_name: &str,
+    dbname: &str,
+) -> Result<String, ConductorError> {
+    let stack_outputs = get_stack_outputs(aws_region, organization_name, dbname).await?;
+    let role_arn = stack_outputs
+        .role_arn
+        .ok_or_else(|| ConductorError::NoOutputsFound)?;
+    Ok(role_arn)
+}
+
+// Get Cloudformation Stack Outputs RoleName and RoleArn
+async fn get_stack_outputs(
+    aws_region: String,
+    org_name: &str,
+    db_name: &str,
+) -> Result<StackOutputs, ConductorError> {
+    let region = Region::new(aws_region);
+    let aws_config_state = AWSConfigState::new(region).await;
+    let stack_name = format!("org-{}-inst-{}-cf", org_name, db_name);
+    let (role_name, role_arn) = aws_config_state
+        .lookup_cloudformation_stack(&stack_name)
+        .await
+        .map_err(ConductorError::from)?;
+    let stack_outputs = StackOutputs {
+        role_name,
+        role_arn,
+    };
+    Ok(stack_outputs)
+}
+
+pub async fn generate_rand_schedule() -> String {
+    // Generate a random minute and hour between 4am and 10am UTC
+    let mut rng = rand::thread_rng();
+    let minute: u8 = rng.gen_range(0..60);
+    let hour: u8 = rng.gen_range(4..10);
+
+    format!("{} {} * * *", minute, hour)
 }
 
 #[test]

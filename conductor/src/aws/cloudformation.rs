@@ -2,7 +2,7 @@
 use aws_config::SdkConfig;
 use aws_sdk_cloudformation::{
     config::Region,
-    types::{Capability, Parameter},
+    types::{Capability, Parameter, StackStatus},
     Client,
 };
 use log::{error, info};
@@ -185,6 +185,51 @@ impl AWSConfigState {
         } else {
             info!("Stack {:?} doesn't exist, no-op", stack_name);
             Ok(())
+        }
+    }
+
+    // Function to lookup outputs from a specific stack
+    pub async fn lookup_cloudformation_stack(
+        &self,
+        stack_name: &str,
+    ) -> Result<(Option<String>, Option<String>), ConductorError> {
+        let describe_stacks_result = self
+            .cf_client
+            .describe_stacks()
+            .stack_name(stack_name)
+            .send()
+            .await;
+
+        match describe_stacks_result {
+            Ok(response) => {
+                if let Some(stacks) = response.stacks {
+                    for stack in stacks {
+                        if let Some(stack_status) = stack.stack_status {
+                            if stack_status == StackStatus::CreateComplete
+                                || stack_status == StackStatus::UpdateComplete
+                            {
+                                if let Some(outputs) = stack.outputs {
+                                    let mut role_name: Option<String> = None;
+                                    let mut role_arn: Option<String> = None;
+                                    for output in outputs {
+                                        match output.output_key.as_deref() {
+                                            Some("RoleName") => role_name = output.output_value,
+                                            Some("RoleArn") => role_arn = output.output_value,
+                                            _ => (),
+                                        }
+                                    }
+                                    return Ok((role_name, role_arn));
+                                }
+                            }
+                        }
+                    }
+                }
+                Err(ConductorError::NoOutputsFound)
+            }
+            Err(err) => {
+                error!("Error describing stack: {:?}", err);
+                Err(ConductorError::AwsError(err.into()))
+            }
         }
     }
 }

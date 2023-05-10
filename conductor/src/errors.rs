@@ -19,4 +19,8 @@ pub enum ConductorError {
     /// a aws error
     #[error("aws sdk error {0}")]
     AwsError(#[from] CFError),
+
+    // No outputs found for the stack
+    #[error("no outputs found for the stack")]
+    NoOutputsFound,
 }

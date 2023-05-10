@@ -15,7 +15,10 @@ kubectl label namespace default safe-to-run-coredb-tests=true
 # patch storageclass to allow volume expansion
 kubectl patch storageclass standard -p '{"allowVolumeExpansion": true}'
 
-sleep 20
+# Wait for kind cluster to be running
+kubectl wait pods --for=condition=Ready --timeout=300s --all --all-namespaces
+
+sleep 10
 
 # Install CoreDB CRDs
 cd $SCRIPT_DIR
