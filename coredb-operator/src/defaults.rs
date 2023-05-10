@@ -38,7 +38,7 @@ pub fn default_port() -> i32 {
 }
 
 pub fn default_image() -> String {
-    "quay.io/coredb/coredb-pg-slim:0a1db4d".to_owned()
+    "quay.io/coredb/coredb-pg-slim:7f0983b".to_owned()
 }
 
 pub fn default_storage() -> Quantity {
