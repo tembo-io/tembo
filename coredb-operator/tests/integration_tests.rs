@@ -567,10 +567,10 @@ mod test {
                 );
                 assert_eq!(walg_s3_sse_env, Some(String::from("AES256")));
             } else {
-                println!("No environment variables found in the StatefulSet's container");
+                panic!("No environment variables found in the StatefulSet's container");
             }
         } else {
-            println!("No container found in the StatefulSet's template spec");
+            panic!("No container found in the StatefulSet's template spec");
         }
     }
 
