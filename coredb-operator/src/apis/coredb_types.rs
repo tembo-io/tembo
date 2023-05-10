@@ -16,12 +16,13 @@ pub struct ServiceAccountTemplate {
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema, Default)]
+#[allow(non_snake_case)]
 pub struct Backup {
-    pub destination_path: Option<String>,
+    pub destinationPath: Option<String>,
     #[serde(default = "defaults::default_encryption")]
     pub encryption: Option<String>,
     #[serde(default = "defaults::default_retention_policy")]
-    pub retention_policy: Option<String>,
+    pub retentionPolicy: Option<String>,
     #[serde(default = "defaults::default_backup_schedule")]
     pub schedule: Option<String>,
 }

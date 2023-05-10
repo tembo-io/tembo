@@ -63,7 +63,7 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
         },
         EnvVar {
             name: "WALG_S3_PREFIX".to_owned(),
-            value: backup.as_ref().and_then(|b| b.destination_path.clone()),
+            value: backup.as_ref().and_then(|b| b.destinationPath.clone()),
             value_from: None,
         },
         EnvVar {
