@@ -25,6 +25,25 @@ spec:
 
               This provides a hook for generating the CRD yaml (in crdgen.rs)
             properties:
+              backup:
+                nullable: true
+                properties:
+                  destinationPath:
+                    nullable: true
+                    type: string
+                  encryption:
+                    default: AES256
+                    nullable: true
+                    type: string
+                  retentionPolicy:
+                    default: 30d
+                    nullable: true
+                    type: string
+                  schedule:
+                    default: 0 0 * * *
+                    nullable: true
+                    type: string
+                type: object
               extensions:
                 default: []
                 items:
@@ -58,7 +77,7 @@ spec:
                   type: object
                 type: array
               image:
-                default: quay.io/coredb/coredb-pg-slim:0a1db4d
+                default: quay.io/coredb/coredb-pg-slim:7f0983b
                 type: string
               pkglibdirStorage:
                 default: 1Gi
