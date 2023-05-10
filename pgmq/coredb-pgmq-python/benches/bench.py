@@ -6,7 +6,7 @@ import numpy as np
 from coredb_pgmq_python import Message, PGMQueue
 
 
-def bench_summary(host: str, port: str, username: str, num_iters: int = 1000, vt= 10) -> list[dict]:
+def bench(host: str, port: str, username: str, num_iters: int = 1000, vt= 10) -> list[dict]:
     rnd = random.randint(0, 100)
     test_queue = f"bench_queue_{rnd}"
     test_message = {"hello": "world"}
@@ -231,13 +231,14 @@ def bench_line_item(host: str, port: str, username: str, num_iters: int = 1000, 
     return total_results
 
 if __name__ == "__main__":
+    n_messages = 100
     trials = [
-        ("docker", 5432, "postgres"),     # docker
+        ("localhost", 5432, "postgres", n_messages),     # docker
         # ("local", 28815, "username")    # pgrx 
     ]
     all_results = []
     for t in trials:
         all_results.append(
-            bench(t[0], t[1], t[2])
+            bench(t[0], t[1], t[2], t[3])
         )
     print(all_results)
