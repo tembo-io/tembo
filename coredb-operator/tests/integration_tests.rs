@@ -510,6 +510,68 @@ mod test {
 
         let pod_service_account_name = pod.spec.as_ref().unwrap().service_account_name.as_ref();
         assert_eq!(pod_service_account_name, Some(&sa_name));
+
+        // Update the coredb resource to add backups
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "backup": {
+                    "destinationPath": "s3://test-bucket/coredb/test-org/test-db",
+                    "encryption": "AES256",
+                    "retentionPolicy": "30d",
+                    "schedule": "0 0 * * *",
+                }
+            }
+        });
+
+        // apply CRD with serviceAccountTemplate set
+        let params = PatchParams::apply("coredb-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        // give it some time 500ms
+        thread::sleep(Duration::from_millis(5000));
+
+        // assert that the destinationPath is set in the sts env
+        let stateful_sets_api: Api<StatefulSet> = Api::namespaced(client.clone(), namespace);
+        let stateful_set_name = format!("{}", name);
+        let stateful_set = stateful_sets_api.get(&stateful_set_name).await.unwrap();
+
+        // Extract the environment variables from the StatefulSet
+        if let Some(container) = stateful_set
+            .spec
+            .as_ref()
+            .unwrap()
+            .template
+            .spec
+            .as_ref()
+            .and_then(|s| s.containers.get(0))
+        {
+            if let Some(env) = container.env.as_ref() {
+                let destination_path_env = env
+                    .iter()
+                    .find(|e| e.name == "WALG_S3_PREFIX")
+                    .and_then(|e| e.value.clone());
+                let walg_s3_sse_env = env
+                    .iter()
+                    .find(|e| e.name == "WALG_S3_SSE")
+                    .and_then(|e| e.value.clone());
+
+                assert_eq!(
+                    destination_path_env,
+                    Some(String::from("s3://test-bucket/coredb/test-org/test-db"))
+                );
+                assert_eq!(walg_s3_sse_env, Some(String::from("AES256")));
+            } else {
+                println!("No environment variables found in the StatefulSet's container");
+            }
+        } else {
+            println!("No container found in the StatefulSet's template spec");
+        }
     }
 
     #[tokio::test]
