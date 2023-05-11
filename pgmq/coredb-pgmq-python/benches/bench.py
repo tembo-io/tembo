@@ -185,7 +185,7 @@ def consume(queue_name: str, csv_name: str, connection_info: dict):
     no_message_timeout = 0
     while no_message_timeout < 5:
         read_start = time.time()
-        message: Message = queue.read(queue_name, vt=10)
+        message: Optional[Message] = queue.read(queue_name, vt=10)
         if message is None:
             no_message_timeout += 1
             print(f"No message -- {no_message_timeout}, sleeping 1 second")
@@ -250,7 +250,7 @@ if __name__ == "__main__":
     rnd = random.randint(0, 1000)
     test_queue = f"bench_queue_{rnd}"
     connection_info = dict(host="localhost", port=28815, username="postgres", password="postgres", database="postgres")
-    queue = PGMQueue(**connection_info)
+    queue = PGMQueue(**connection_info)  # type: ignore
     print(f"Creating queue: {test_queue}")
     queue.create_queue(test_queue, partition_interval=10000, retention_interval=100000)
 
