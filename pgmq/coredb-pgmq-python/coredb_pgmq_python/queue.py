@@ -47,17 +47,23 @@ class PGMQueue:
         with self.pool.connection() as conn:
             conn.execute("create extension if not exists pgmq cascade;")
 
-    def create_queue(self, queue: str) -> None:
-        """Create a queue"""
-        with self.pool.connection() as conn:
-            conn.execute("select pgmq_create(%s);", [queue])
+    def create_queue(self, queue: str, partition_interval: int = 10000, retention_interval: int = 100000) -> None:
+        """Create a new queue
 
-    def create_(
-        self, queue: str, partition_interval: Optional[str] = "daily", retention_interval: Optional[str] = "5 days"
-    ) -> None:
-        """Create a partitioned queue"""
+        Note: Partitions are created pg_partman which must be configured in postgresql.conf
+            Set `pg_partman_bgw.interval` to set the interval for partition creation and deletion.
+            A value of 10 will create new/delete partitions every 10 seconds. This value should be tuned
+            according to the volume of messages being sent to the queue.
+
+        Args:
+            queue: The name of the queue.
+            partition_interval: The number of messages per partition. Defaults to 10,000.
+            retention_interval: The number of messages to retain. Messages exceeding this number will be dropped.
+                Defaults to 100,000.
+        """
+
         with self.pool.connection() as conn:
-            conn.execute("select pgmq_create_non_partitioned(%s, %s);", [queue, partition_interval, retention_interval])
+            conn.execute("select pgmq_create(%s, %s::text, %s::text);", [queue, partition_interval, retention_interval])
 
     def send(self, queue: str, message: dict, delay: Optional[int] = None) -> int:
         """Send a message to a queue"""
@@ -78,7 +84,7 @@ class PGMQueue:
             rows = conn.execute("select * from pgmq_read(%s, %s, %s);", [queue, vt or self.vt, limit]).fetchall()
 
         messages = [Message(msg_id=x[0], read_ct=x[1], enqueued_at=x[2], vt=x[3], message=x[4]) for x in rows]
-        return messages[0] if len(messages) == 1 else messages
+        return messages[0] if limit == 1 else messages
 
     def pop(self, queue: str) -> Message:
         """Read a message from a queue"""
