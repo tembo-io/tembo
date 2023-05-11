@@ -249,9 +249,7 @@ if __name__ == "__main__":
 
     rnd = random.randint(0, 1000)
     test_queue = f"bench_queue_{rnd}"
-    connection_info = dict(
-        host="localhost", port=28815, username="postgres", password="postgres", database="postgres"
-    )
+    connection_info = dict(host="localhost", port=28815, username="postgres", password="postgres", database="postgres")
     queue = PGMQueue(**connection_info)
     print(f"Creating queue: {test_queue}")
     queue.create_queue(test_queue, partition_interval=10000, retention_interval=100000)
@@ -260,7 +258,7 @@ if __name__ == "__main__":
     consume_csv = f"consume_{test_queue}.csv"
 
     # run producing and consuming in parallel, separate processes
-    duration_seconds = 60*60  # 1 hour
+    duration_seconds = 60 * 60  # 1 hour
     tps = 550  # max transactions per second (producing)
     proc_produce = Process(target=produce, args=(test_queue, produce_csv, connection_info, duration_seconds, tps))
     proc_produce.start()
