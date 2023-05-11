@@ -249,6 +249,14 @@ pub async fn create_networkpolicy(client: Client, name: &str) -> Result<(), Cond
                                                                     "192.168.0.0/16"
                                                             ]
                                                     }
+                                            },
+                                            {
+                                                    "podSelector": {
+                                                            "matchLabels": {
+                                                                    "app": "coredb",
+                                                                    "statefulset": format!("{name}")
+                                                            }
+                                                    }
                                             }
                                     ]
                             }

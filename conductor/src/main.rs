@@ -146,7 +146,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                         &read_msg.message.dbname
                     )),
                     encryption: Some(String::from("AES256")),
-                    retentionPolicy: Some(String::from("30d")),
+                    retentionPolicy: Some(String::from("30")),
                     schedule: Some(generate_rand_schedule().await),
                 };
 
