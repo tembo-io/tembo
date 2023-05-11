@@ -20,6 +20,7 @@ mod test {
     use k8s_openapi::{
         api::{
             apps::v1::StatefulSet,
+            batch::v1::CronJob,
             core::v1::{
                 Container, Namespace, PersistentVolumeClaim, Pod, PodSpec, ResourceRequirements, Secret,
                 ServiceAccount,
@@ -522,7 +523,7 @@ mod test {
                 "backup": {
                     "destinationPath": "s3://test-bucket/coredb/test-org/test-db",
                     "encryption": "AES256",
-                    "retentionPolicy": "30d",
+                    "retentionPolicy": "30",
                     "schedule": "0 0 * * *",
                 }
             }
@@ -572,6 +573,16 @@ mod test {
         } else {
             panic!("No container found in the StatefulSet's template spec");
         }
+
+        // Assert that the CronJob was created and the schedule is set
+        let cron_jobs_api: Api<CronJob> = Api::namespaced(client.clone(), namespace);
+        let cron_job_name = format!("{}-daily", name);
+        let cron_job = cron_jobs_api.get(&cron_job_name).await.unwrap();
+
+        assert_eq!(
+            cron_job.spec.as_ref().unwrap().schedule,
+            String::from("0 0 * * *")
+        );
     }
 
     #[tokio::test]
@@ -834,7 +845,7 @@ mod test {
         let coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
 
         // give it time to stop
-        thread::sleep(Duration::from_millis(5000));
+        thread::sleep(Duration::from_millis(8000));
 
         // pod must not be ready
         let res = coredb_resource.primary_pod(client.clone()).await;

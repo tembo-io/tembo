@@ -6,6 +6,7 @@ use futures::{
 };
 
 use crate::{
+    cronjob::reconcile_cronjob,
     exec::{ExecCommand, ExecOutput},
     psql::{PsqlCommand, PsqlOutput},
     rbac::reconcile_rbac,
@@ -97,6 +98,12 @@ impl CoreDB {
         // reconcile secret
         reconcile_secret(self, ctx.clone()).await.map_err(|e| {
             error!("Error reconciling secret: {:?}", e);
+            Action::requeue(Duration::from_secs(10))
+        })?;
+
+        // reconcile cronjob for backups
+        reconcile_cronjob(self, ctx.clone()).await.map_err(|e| {
+            error!("Error reconciling cronjob: {:?}", e);
             Action::requeue(Duration::from_secs(10))
         })?;
 

@@ -63,12 +63,12 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
         },
         EnvVar {
             name: "WALG_S3_PREFIX".to_owned(),
-            value: backup.as_ref().and_then(|b| b.destinationPath.clone()),
+            value: backup.destinationPath.clone(),
             value_from: None,
         },
         EnvVar {
             name: "WALG_S3_SSE".to_owned(),
-            value: backup.as_ref().and_then(|b| b.encryption.clone()),
+            value: backup.encryption.clone(),
             value_from: None,
         },
     ]);

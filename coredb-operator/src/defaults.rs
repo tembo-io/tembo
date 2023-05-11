@@ -85,8 +85,17 @@ pub fn default_service_account_template() -> ServiceAccountTemplate {
     ServiceAccountTemplate { metadata: None }
 }
 
-pub fn default_backup() -> Option<Backup> {
-    None
+pub fn default_backup() -> Backup {
+    Backup {
+        destinationPath: default_destination_path(),
+        encryption: default_encryption(),
+        retentionPolicy: default_retention_policy(),
+        schedule: default_backup_schedule(),
+    }
+}
+
+pub fn default_destination_path() -> Option<String> {
+    Some("s3://".to_string())
 }
 
 pub fn default_encryption() -> Option<String> {
@@ -94,7 +103,7 @@ pub fn default_encryption() -> Option<String> {
 }
 
 pub fn default_retention_policy() -> Option<String> {
-    Some("30d".to_owned())
+    Some("30".to_owned())
 }
 
 pub fn default_backup_schedule() -> Option<String> {
