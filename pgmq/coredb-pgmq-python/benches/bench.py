@@ -2,6 +2,8 @@ import random
 import time
 from typing import Optional
 
+import pandas as pd
+
 from coredb_pgmq_python import Message, PGMQueue
 
 
@@ -125,3 +127,145 @@ def bench_line_item(
         total_results.append({"operation": "delete", "duration": time.time() - start, "msg_id": x})
 
     return total_results
+
+
+def produce(
+    queue_name: str,
+    csv_name: str,
+    connection_info: dict,
+    duration_seconds: int = 60,
+    tps: int = 500,
+):
+    """Publishes messages at a given rate for a given duration
+    Assumes queue_name already exists. Writes results to csv.
+
+    Args:
+        queue_name: The name of the queue to publish to
+        csv_name: The name of the csv to write results to
+        duration_seconds: The number of seconds to publish messages
+        tps: The number of messages to publish per second
+    """
+    queue = PGMQueue(**connection_info)
+
+    msg = {"hello": "world"}
+    # delay between messages, assuming instantaneous send
+    delay = 1.0 / tps
+
+    total_messages = tps * duration_seconds
+
+    start_time = time.time()
+
+    all_results = []
+    for _ in range(int(total_messages)):
+        send_start = time.time()
+        msg_id: int = queue.send(queue_name, msg)
+        send_duration = time.time() - send_start
+        all_results.append(
+            {
+                "operation": "write",
+                "duration": round(send_duration, 4),
+                "msg_id": msg_id,
+            }
+        )
+        # Sleep to maintain the desired tps
+        time.sleep(delay - ((time.time() - start_time) % delay))
+
+    df = pd.DataFrame(all_results)
+    df.to_csv(csv_name, index=False)
+
+
+def consume(queue_name: str, csv_name: str, connection_info: dict):
+    """Consumes messages from a queue and archives them. Writes results to csv.
+
+    Halts consumption after 10 seconds of no messages.
+    """
+    queue = PGMQueue(**connection_info)
+
+    results = []
+    no_message_timeout = 0
+    while no_message_timeout < 10:
+        read_start = time.time()
+        message: Message = queue.read(queue_name, vt=10)
+        if message is None:
+            no_message_timeout += 1
+            print(f"No message -- {no_message_timeout}, sleeping 1 second")
+            time.sleep(1)
+            continue
+        else:
+            no_message_timeout = 0
+        read_duration = time.time() - read_start
+        results.append({"operation": "read", "duration": read_duration, "msg_id": message.msg_id})
+
+        archive_start = time.time()
+        queue.archive(queue_name, message.msg_id)
+        archive_duration = time.time() - archive_start
+        results.append({"operation": "archive", "duration": archive_duration, "msg_id": message.msg_id})
+
+    print(f"Consumed {len(results)} messages")
+    df = pd.DataFrame(results)
+    print(f"Writing results to {csv_name}")
+    df.to_csv(csv_name, index=False)
+
+
+def summarize(csv_1: str, csv_2: str, results_file: str):
+    """summarizes results from two csvs into pdf"""
+    df1 = pd.read_csv(csv_1)
+    df2 = pd.read_csv(csv_2)
+
+    df = pd.concat([df1, df2])
+
+    _num_df = df[df["operation"] == "archive"]
+    num_messages = _num_df.shape[0]
+    # convert seconds to milliseconds
+    df["duration"] = df["duration"] * 1000
+
+    for op in ["read", "archive", "write"]:
+        _df = df[df["operation"] == op]
+        bbplot = _df.boxplot(
+            column="duration", by="operation", fontsize=12, layout=(2, 1), rot=90, figsize=(25, 20), return_type="axes"
+        )
+
+        bbplot[0].set_ylabel("Milliseconds")
+        bbplot[0].set_title(f"N = {num_messages}")
+
+        filename = f"{op}_{results_file}"
+        bbplot[0].get_figure().savefig(filename)
+        print("Saved: ", filename)
+
+
+if __name__ == "__main__":
+    # run the multiproc benchmark
+    # 1 process publishing messages
+    # another process reading and archiving messages
+    # both write results to csv
+    # script merges csvs and summarizes results
+    from multiprocessing import Process
+
+    rnd = random.randint(0, 1000)
+    test_queue = f"bench_queue_{rnd}"
+    connection_info = dict(
+        host="localhost", port=28815, username="postgres", password="postgres", database="postgres"
+    )
+    queue = PGMQueue(**connection_info)
+    print(f"Creating queue: {test_queue}")
+    queue.create_queue(test_queue, partition_interval=10000, retention_interval=100000)
+
+    produce_csv = f"produce_{test_queue}.csv"
+    consume_csv = f"consume_{test_queue}.csv"
+
+    # run producing and consuming in parallel, separate processes
+    duration_seconds = 600
+    tps = 500  # max transactions per second
+    proc_produce = Process(target=produce, args=(test_queue, produce_csv, connection_info, duration_seconds, tps))
+    proc_produce.start()
+
+    proc_consume = Process(target=consume, args=(test_queue, consume_csv, connection_info))
+    proc_consume.start()
+
+    print("Waiting for processes to finish")
+    proc_consume.join()
+
+    # once consuming finishes, summarize
+    results_file = f"results_{test_queue}.jpg"
+    # TODO: organize results in a directory or something, log all the params
+    summarize(csv_1=produce_csv, csv_2=consume_csv, results_file=results_file)

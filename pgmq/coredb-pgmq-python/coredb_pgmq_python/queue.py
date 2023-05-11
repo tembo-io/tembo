@@ -78,13 +78,20 @@ class PGMQueue:
             ).fetchall()
         return message[0][0]
 
-    def read(self, queue: str, vt: Optional[int] = None, limit: int = 1) -> Union[Message, list[Message]]:
+    def read(self, queue: str, vt: Optional[int] = None) -> Union[Message, list[Message]]:
         """Read a message from a queue"""
         with self.pool.connection() as conn:
-            rows = conn.execute("select * from pgmq_read(%s, %s, %s);", [queue, vt or self.vt, limit]).fetchall()
+            rows = conn.execute("select * from pgmq_read(%s, %s, %s);", [queue, vt or self.vt, 1]).fetchall()
 
         messages = [Message(msg_id=x[0], read_ct=x[1], enqueued_at=x[2], vt=x[3], message=x[4]) for x in rows]
-        return messages[0] if limit == 1 else messages
+        return messages[0] if len(messages) == 1 else None
+
+    def read_batch(self, queue: str, vt: Optional[int] = None, batch_size=1) -> Union[Message, list[Message]]:
+        """Read abatch of messages from a queue"""
+        with self.pool.connection() as conn:
+            rows = conn.execute("select * from pgmq_read(%s, %s, %s);", [queue, vt or self.vt, batch_size]).fetchall()
+
+        return [Message(msg_id=x[0], read_ct=x[1], enqueued_at=x[2], vt=x[3], message=x[4]) for x in rows]
 
     def pop(self, queue: str) -> Message:
         """Read a message from a queue"""
