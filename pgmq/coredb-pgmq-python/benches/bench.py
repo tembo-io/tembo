@@ -177,13 +177,13 @@ def produce(
 def consume(queue_name: str, csv_name: str, connection_info: dict):
     """Consumes messages from a queue and archives them. Writes results to csv.
 
-    Halts consumption after 10 seconds of no messages.
+    Halts consumption after 5 seconds of no messages.
     """
     queue = PGMQueue(**connection_info)
 
     results = []
     no_message_timeout = 0
-    while no_message_timeout < 10:
+    while no_message_timeout < 5:
         read_start = time.time()
         message: Message = queue.read(queue_name, vt=10)
         if message is None:
@@ -207,7 +207,7 @@ def consume(queue_name: str, csv_name: str, connection_info: dict):
     df.to_csv(csv_name, index=False)
 
 
-def summarize(csv_1: str, csv_2: str, results_file: str):
+def summarize(csv_1: str, csv_2: str, results_file: str, duration_seconds: int, tps: int):
     """summarizes results from two csvs into pdf"""
     df1 = pd.read_csv(csv_1)
     df2 = pd.read_csv(csv_2)
@@ -226,7 +226,13 @@ def summarize(csv_1: str, csv_2: str, results_file: str):
         )
 
         bbplot[0].set_ylabel("Milliseconds")
-        bbplot[0].set_title(f"N = {num_messages}")
+
+        title = f"""
+        num_messages = {num_messages}
+        duration = {duration_seconds}
+        tps = {tps}
+        """
+        bbplot[0].set_title(title)
 
         filename = f"{op}_{results_file}"
         bbplot[0].get_figure().savefig(filename)
@@ -244,7 +250,7 @@ if __name__ == "__main__":
     rnd = random.randint(0, 1000)
     test_queue = f"bench_queue_{rnd}"
     connection_info = dict(
-        host="localhost", port=28815, username="postgres", password="postgres", database="postgres"
+        host="localhost", port=28815, username="adamhendel", password="postgres", database="postgres"
     )
     queue = PGMQueue(**connection_info)
     print(f"Creating queue: {test_queue}")
@@ -254,7 +260,7 @@ if __name__ == "__main__":
     consume_csv = f"consume_{test_queue}.csv"
 
     # run producing and consuming in parallel, separate processes
-    duration_seconds = 600
+    duration_seconds = 10
     tps = 500  # max transactions per second
     proc_produce = Process(target=produce, args=(test_queue, produce_csv, connection_info, duration_seconds, tps))
     proc_produce.start()
@@ -268,4 +274,6 @@ if __name__ == "__main__":
     # once consuming finishes, summarize
     results_file = f"results_{test_queue}.jpg"
     # TODO: organize results in a directory or something, log all the params
-    summarize(csv_1=produce_csv, csv_2=consume_csv, results_file=results_file)
+    summarize(
+        csv_1=produce_csv, csv_2=consume_csv, results_file=results_file, duration_seconds=duration_seconds, tps=tps
+    )
