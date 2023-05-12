@@ -3,6 +3,7 @@ import time
 from typing import Optional
 
 import pandas as pd
+from matplotlib import pyplot as plt  # type: ignore
 
 from coredb_pgmq_python import Message, PGMQueue
 
@@ -161,11 +162,7 @@ def produce(
         msg_id: int = queue.send(queue_name, msg)
         send_duration = time.time() - send_start
         all_results.append(
-            {
-                "operation": "write",
-                "duration": round(send_duration, 4),
-                "msg_id": msg_id,
-            }
+            {"operation": "write", "duration": round(send_duration, 4), "msg_id": msg_id, "epoch": send_start}
         )
         # Sleep to maintain the desired tps
         time.sleep(delay - ((time.time() - start_time) % delay))
@@ -198,14 +195,18 @@ def consume(queue_name: str, csv_name: str, connection_info: dict):
             no_message_timeout = 0
 
         read_duration = time.time() - read_start
-        results.append({"operation": "read", "duration": read_duration, "msg_id": message.msg_id})
+        results.append({"operation": "read", "duration": read_duration, "msg_id": message.msg_id, "epoch": read_start})
 
         archive_start = time.time()
         queue.archive(queue_name, message.msg_id)
         archive_duration = time.time() - archive_start
-        results.append({"operation": "archive", "duration": archive_duration, "msg_id": message.msg_id})
+        results.append(
+            {"operation": "archive", "duration": archive_duration, "msg_id": message.msg_id, "epoch": archive_start}
+        )
 
-    print(f"Consumed {len(results)} messages")
+    # divide by 2 because we're appending two results (read/archive) per message
+    num_consumed = len(results) / 2
+    print(f"Consumed {num_consumed} messages")
     df = pd.DataFrame(results)
     print(f"Writing results to {csv_name}")
     df.to_csv(csv_name, index=False)
@@ -221,7 +222,8 @@ def summarize(csv_1: str, csv_2: str, results_file: str, duration_seconds: int, 
     # iteration
     trial = csv_1.replace(".csv", "").split("_")[-1]
 
-    df.to_csv(f"all_results_{trial}_duration_{duration_seconds}_tps_{tps}.csv", index=False)
+    all_results_csv = f"all_results_{trial}_duration_{duration_seconds}_tps_{tps}.csv"
+    df.to_csv(all_results_csv, index=False)
 
     _num_df = df[df["operation"] == "archive"]
     num_messages = _num_df.shape[0]
@@ -246,6 +248,21 @@ def summarize(csv_1: str, csv_2: str, results_file: str, duration_seconds: int, 
         filename = f"{op}_{results_file}"
         bbplot[0].get_figure().savefig(filename)
         print("Saved: ", filename)
+    return all_results_csv
+
+
+def generate_plot(csv_name: str, bench_name: str, duration: int, tps: int, window: int = 10_000) -> None:
+    alldf = pd.read_csv(csv_name)
+    alldf["duration_ms"] = alldf["duration"] * 1000
+    wide_df = pd.pivot(alldf, index="msg_id", columns="operation", values="duration_ms")
+    ax = wide_df.rolling(window).mean().plot(figsize=(20, 10))
+    ax.set_xlabel("Message Number")
+    ax.set_ylabel("Duration (ms)")
+    plt.suptitle(f"Rolling Average Operation Duration ({window} message window)")
+    plt.title(f"Duration_seconds: {duration}, TPS: {tps}")
+    output_plot = f"rolling_avg_{duration}_{tps}_{bench_name}.png"
+    plt.savefig(output_plot)
+    print(f"Saved plot to: {output_plot}")
 
 
 if __name__ == "__main__":
@@ -254,17 +271,41 @@ if __name__ == "__main__":
     # another process reading and archiving messages
     # both write results to csv
     # script merges csvs and summarizes results
+    import argparse
     from multiprocessing import Process
 
-    duration_seconds = 60 * 60 * 3  # 3 hour
-    tps = 600  # max transactions per second (producing)
+    parser = argparse.ArgumentParser(description="PGMQ Benchmarking")
+    parser.add_argument(
+        "--duration_seconds", type=int, required=True, help="how long the benchmark should run, in seconds"
+    )
+    parser.add_argument("--tps", type=int, default=400, help="number of messages to produce per second")
+    parser.add_argument(
+        "--agg_window", type=int, default=10_000, help="number of messages to aggregate for rolling average"
+    )
+    parser.add_argument("--partition_interval", type=int, default=10_000, help="number of messages per partition")
+    parser.add_argument("--message_retention", type=int, default=1_000_000, help="number of messages per partition")
+    parser.add_argument("--read_concurrency", type=int, default=1, help="number of concurrent consumers")
+    parser.add_argument("--bench_name", type=str, required=False, help="the name of the benchmark")
 
-    rnd = random.randint(0, 1000)
-    test_queue = f"bench_queue_{rnd}"
+    args = parser.parse_args()
+    print(args)
+
+    duration_seconds = args.duration_seconds
+    tps = args.tps
+    agg_window = args.agg_window
+    partition_interval = args.partition_interval
+    retention_interval = args.message_retention
+    bench_name = args.bench_name
+
+    if bench_name is None:
+        bench_name = random.randint(0, 1000)
+
+    test_queue = f"bench_queue_{bench_name}"
     connection_info = dict(host="localhost", port=28815, username="postgres", password="postgres", database="postgres")
     queue = PGMQueue(**connection_info)  # type: ignore
     print(f"Creating queue: {test_queue}")
-    queue.create_queue(test_queue, partition_interval=10000, retention_interval=100000)
+
+    queue.create_queue(test_queue, partition_interval=partition_interval, retention_interval=retention_interval)
 
     produce_csv = f"produce_{test_queue}.csv"
     consume_csv = f"consume_{test_queue}.csv"
@@ -274,15 +315,22 @@ if __name__ == "__main__":
     proc_produce = Process(target=produce, args=(test_queue, produce_csv, connection_info, duration_seconds, tps))
     proc_produce.start()
 
-    proc_consume = Process(target=consume, args=(test_queue, consume_csv, connection_info))
-    proc_consume.start()
+    consume_procs = {}
+    for i in range(args.read_concurrency):
+        conumser = f"consumer_{i}"
+        consume_procs[conumser] = Process(target=consume, args=(test_queue, consume_csv, connection_info))
+        consume_procs[conumser].start()
 
-    print("Waiting for processes to finish")
-    proc_consume.join()
+    for consumer, proc in consume_procs.items():
+        print(f"Waiting for {consumer} to finish")
+        proc.join()
+        print(f"{consumer} finished")
 
     # once consuming finishes, summarize
     results_file = f"results_{test_queue}.jpg"
     # TODO: organize results in a directory or something, log all the params
-    summarize(
+    filename = summarize(
         csv_1=produce_csv, csv_2=consume_csv, results_file=results_file, duration_seconds=duration_seconds, tps=tps
     )
+
+    generate_plot(filename, bench_name, duration_seconds, tps, window=agg_window)
