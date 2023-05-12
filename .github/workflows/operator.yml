@@ -101,7 +101,7 @@ jobs:
           cargo run --bin crdgen | kubectl apply -f -
           kubectl get crds
           # Start the operator in the background
-          cargo run &
+          ENABLE_INITIAL_BACKUP=false  cargo run &
           # Run the tests
           cargo test -- --ignored --nocapture
       - name: Debugging information
