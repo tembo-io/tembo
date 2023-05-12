@@ -18,6 +18,7 @@ pub struct ServiceAccountTemplate {
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema, Default)]
 #[allow(non_snake_case)]
 pub struct Backup {
+    #[serde(default = "defaults::default_destination_path")]
     pub destinationPath: Option<String>,
     #[serde(default = "defaults::default_encryption")]
     pub encryption: Option<String>,
@@ -76,7 +77,7 @@ pub struct CoreDBSpec {
     pub serviceAccountTemplate: ServiceAccountTemplate,
 
     #[serde(default = "defaults::default_backup")]
-    pub backup: Option<Backup>,
+    pub backup: Backup,
 }
 
 /// The status object of `CoreDB`
