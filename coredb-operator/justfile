@@ -34,7 +34,7 @@ run-telemetry:
 
 # run without opentelemetry
 run:
-  RUST_LOG=info,kube=debug,controller=debug cargo run
+  RUST_LOG=debug,kube=debug,controller=debug cargo run
 
 # annotate namespace to allow for tests
 annotate:
@@ -42,11 +42,11 @@ annotate:
 
 # run tests
 test:
-	cargo test
+	cargo test -- --ignored --nocapture
 
 # run cargo watch
 watch:
-	cargo watch -x 'run'
+	ENABLE_INITIAL_BACKUP=false RUST_LOG=debug cargo watch -x 'run'
 
 # format with nightly rustfmt
 fmt:

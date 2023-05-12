@@ -6,6 +6,7 @@ use futures::{
 };
 
 use crate::{
+    config::Config,
     cronjob::reconcile_cronjob,
     exec::{ExecCommand, ExecOutput},
     psql::{PsqlCommand, PsqlOutput},
@@ -20,6 +21,7 @@ use kube::{
         controller::{Action, Controller},
         events::{Event, EventType, Recorder, Reporter},
         finalizer::{finalizer, Event as Finalizer},
+        watcher,
     },
     Resource,
 };
@@ -53,6 +55,7 @@ pub struct Context {
 
 #[instrument(skip(ctx, cdb), fields(trace_id))]
 async fn reconcile(cdb: Arc<CoreDB>, ctx: Arc<Context>) -> Result<Action> {
+    let cfg = Config::default();
     let trace_id = telemetry::get_trace_id();
     Span::current().record("trace_id", &field::display(&trace_id));
     let _timer = ctx.metrics.count_and_measure();
@@ -63,7 +66,7 @@ async fn reconcile(cdb: Arc<CoreDB>, ctx: Arc<Context>) -> Result<Action> {
     info!("Reconciling CoreDB \"{}\" in {}", cdb.name_any(), ns);
     finalizer(&coredbs, COREDB_FINALIZER, cdb, |event| async {
         match event {
-            Finalizer::Apply(cdb) => match cdb.reconcile(ctx.clone()).await {
+            Finalizer::Apply(cdb) => match cdb.reconcile(ctx.clone(), &cfg).await {
                 Ok(action) => Ok(action),
                 Err(requeue_action) => Ok(requeue_action),
             },
@@ -82,7 +85,7 @@ fn error_policy(cdb: Arc<CoreDB>, error: &Error, ctx: Arc<Context>) -> Action {
 
 impl CoreDB {
     // Reconcile (for non-finalizer related changes)
-    async fn reconcile(&self, ctx: Arc<Context>) -> Result<Action, Action> {
+    async fn reconcile(&self, ctx: Arc<Context>, cfg: &Config) -> Result<Action, Action> {
         let client = ctx.client.clone();
         let _recorder = ctx.diagnostics.read().await.recorder(client.clone(), self);
         let ns = self.namespace().unwrap();
@@ -155,6 +158,24 @@ impl CoreDB {
                         error!("Error reconciling extensions: {:?}", e);
                         Action::requeue(Duration::from_secs(10))
                     })?;
+
+                // Check cfg.enable_initial_backup to make sure we should run the initial backup
+                // if it's true, run the backup
+                if cfg.enable_initial_backup {
+                    let backup_command = vec![
+                        "/bin/sh".to_string(),
+                        "-c".to_string(),
+                        "/usr/bin/wal-g backup-push /var/lib/postgresql/data --full --verify".to_string(),
+                    ];
+
+                    let _backup_result = self
+                        .exec(primary_pod.name_any(), client, &backup_command)
+                        .await
+                        .map_err(|e| {
+                            error!("Error running backup: {:?}", e);
+                            Action::requeue(Duration::from_secs(10))
+                        })?;
+                }
 
                 CoreDBStatus {
                     running: true,
@@ -403,7 +424,8 @@ pub async fn init(client: Client) -> (BoxFuture<'static, ()>, State) {
         info!("Installation: cargo run --bin crdgen | kubectl apply -f -");
         std::process::exit(1);
     }
-    let controller = Controller::new(cdb, ListParams::default())
+    let controller = Controller::new(cdb, watcher::Config::default())
+        .shutdown_on_signal()
         .run(reconcile, error_policy, state.create_context(client))
         .filter_map(|x| async move { Result::ok(x) })
         .for_each(|_| futures::future::ready(()))
