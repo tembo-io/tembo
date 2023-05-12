@@ -41,9 +41,6 @@ pub async fn reconcile_cronjob(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Er
 
     let sa_name = sa.metadata.name;
 
-    // print spec for backup
-    println!("backup spec: {:?}", cdb.spec.backup);
-
     // create spec for cronjob
     let cj_spec = CronJobSpec {
     schedule: cdb.spec.backup.schedule.as_ref().unwrap().to_string(),
@@ -60,7 +57,7 @@ pub async fn reconcile_cronjob(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Er
                             "sh".to_string(),
                             "-c".to_string(),
                             format!(
-                                "kubectl exec -it {}-0 -- /usr/bin/wal-g backup-push /var/lib/postgresql/data --full --verify && /usr/bin/wal-g delete retain {} --confirm",
+                                "kubectl exec -it {}-0 -- /bin/sh -c \"/usr/bin/wal-g backup-push /var/lib/postgresql/data --full --verify && /usr/bin/wal-g delete retain {} --confirm\"",
                                 cdb.name_any(), cdb.spec.backup.retentionPolicy.as_ref().unwrap()
                             ),
                         ]),
