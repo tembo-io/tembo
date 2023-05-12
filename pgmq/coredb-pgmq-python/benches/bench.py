@@ -301,9 +301,7 @@ if __name__ == "__main__":
         bench_name = random.randint(0, 1000)
 
     test_queue = f"bench_queue_{bench_name}"
-    connection_info = dict(
-        host="localhost", port=28815, username="postgres", password="postgres", database="postgres"
-    )
+    connection_info = dict(host="localhost", port=28815, username="postgres", password="postgres", database="postgres")
     queue = PGMQueue(**connection_info)  # type: ignore
     print(f"Creating queue: {test_queue}")
 
