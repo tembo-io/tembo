@@ -26,9 +26,14 @@ spec:
               This provides a hook for generating the CRD yaml (in crdgen.rs)
             properties:
               backup:
-                nullable: true
+                default:
+                  destinationPath: s3://
+                  encryption: AES256
+                  retentionPolicy: '30'
+                  schedule: 0 0 * * *
                 properties:
                   destinationPath:
+                    default: s3://
                     nullable: true
                     type: string
                   encryption:
@@ -36,7 +41,7 @@ spec:
                     nullable: true
                     type: string
                   retentionPolicy:
-                    default: 30d
+                    default: '30'
                     nullable: true
                     type: string
                   schedule:
