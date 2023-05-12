@@ -13,11 +13,14 @@ on:
       - '.github/workflows/pgmq_ext.yml'
       - '.github/actions/pgx-init/**'
       - './pgmq/extension/**'
-  # Always run tests on main or release branches
+
   push:
     branches:
       - main
-
+    paths:
+      - '.github/workflows/pgmq_ext.yml'
+      - '.github/actions/pgx-init/**'
+      - './pgmq/extension/**'
 jobs:
   lint:
     name: Run linters
