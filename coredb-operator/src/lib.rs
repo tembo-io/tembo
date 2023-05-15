@@ -10,6 +10,7 @@ mod exec;
 /// Metrics
 mod metrics;
 pub use metrics::Metrics;
+mod config;
 mod cronjob;
 pub mod defaults;
 mod extensions;
