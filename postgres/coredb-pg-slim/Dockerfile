@@ -58,29 +58,29 @@ RUN apt-get update && apt-get install -y \
         git \
         postgresql-server-dev-${PG_MAJOR} \
         # pg_stat_statement's package
-        postgresql-contrib \
+#        postgresql-contrib \
         # postgresql server
         postgresql-${PG_MAJOR} \
         # extensions
-        postgresql-${PG_MAJOR}-postgis-3 \
-        postgresql-${PG_MAJOR}-cron \
-        postgresql-${PG_MAJOR}-repack \
-        postgresql-${PG_MAJOR}-pgaudit \
+#        postgresql-${PG_MAJOR}-postgis-3 \
+#        postgresql-${PG_MAJOR}-cron \
+#        postgresql-${PG_MAJOR}-repack \
+#        postgresql-${PG_MAJOR}-pgaudit \
         && rm -rf /var/lib/apt/lists/*
 
 COPY ./postgresql.conf /usr/share/postgresql/${PG_MAJOR}/postgresql.conf.sample
 
-WORKDIR /git
-RUN git clone --branch "v${PG_VECTOR_VER}" https://github.com/pgvector/pgvector.git
-WORKDIR /git/pgvector
-RUN set -xe; \
-      make; \
-      make install;
-
-WORKDIR / 
-RUN rm -rf /git
+#WORKDIR /git
+#RUN git clone --branch "v${PG_VECTOR_VER}" https://github.com/pgvector/pgvector.git
+#WORKDIR /git/pgvector
+#RUN set -xe; \
+#      make; \
+#      make install;
+#
+#WORKDIR /
+#RUN rm -rf /git
   
-RUN trunk install --version ${PG_PARTMAN_VER} pg_partman
+#RUN trunk install --version ${PG_PARTMAN_VER} pg_partman
 
 # cache extensions and shared libraries
 RUN mkdir /tmp/pg_sharedir && \
