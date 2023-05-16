@@ -248,12 +248,22 @@ pg_setup_hba_conf() {
 
 # Make sure we always copy the correct postgresql.conf, even if it already exists
 # If postgresql.conf.replace is newer, we copy that to $PGDATA/postgresql.conf
-pg_conf_copy() {
-	local srcConf="/postgresql.conf.replace"
-	local dstConf="$PGDATA/postgresql.conf"
-	if [ ! -s "$dstConf" ] || [ "$srcConf" -nt "$dstConf" ]; then
-	  cp "$srcConf" "$dstConf"
-	fi
+update_postgresql_conf() {
+    # Define the path to the replacement file
+    local replace_file="/postgresql.conf.replace"
+
+    # Check if the replacement file exists
+    if [ -f "$replace_file" ]; then
+        # If the replacement file and the current postgresql.conf file are different, replace postgresql.conf
+        if ! cmp -s "$PGDATA/postgresql.conf" "$replace_file"; then
+            echo "postgresql.conf is different from the replacement, updating..."
+            cp "$replace_file" "$PGDATA/postgresql.conf"
+        else
+            echo "postgresql.conf is the same as the replacement, no update needed."
+        fi
+    else
+        echo "No replacement file found, skipping update."
+    fi
 }
 
 # start socket-only postgresql server for setting up or running scripts
@@ -297,9 +307,6 @@ _pg_want_help() {
 }
 
 _main() {
-	# Copy postgresql.conf if PGDATA is a new volume or postgresql.conf.replace is updated
-	pg_conf_copy
-
 	# if first arg looks like a flag, assume we want to run postgres server
 	if [ "${1:0:1}" = '-' ]; then
 		set -- postgres "$@"
@@ -331,6 +338,8 @@ _main() {
 
 			docker_setup_db
 			docker_process_init_files /docker-entrypoint-initdb.d/*
+			# ensure we copy the lastes configuration over
+                        update_postgresql_conf
 
 			docker_temp_server_stop
 			unset PGPASSWORD
