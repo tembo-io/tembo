@@ -246,6 +246,16 @@ pg_setup_hba_conf() {
 	} >> "$PGDATA/pg_hba.conf"
 }
 
+# Make sure we always copy the correct postgresql.conf, even if it already exists
+# If postgresql.conf.replace is newer, we copy that to $PGDATA/postgresql.conf
+pg_conf_copy() {
+	local srcConf="/postgresql.conf.replace"
+	local dstConf="$PGDATA/postgresql.conf"
+	if [ ! -s "$dstConf" ] || [ "$srcConf" -nt "$dstConf" ]; then
+	  cp "$srcConf" "$dstConf"
+	fi
+}
+
 # start socket-only postgresql server for setting up or running scripts
 # all arguments will be passed along as arguments to `postgres` (via pg_ctl)
 docker_temp_server_start() {
@@ -287,6 +297,9 @@ _pg_want_help() {
 }
 
 _main() {
+	# Copy postgresql.conf if PGDATA is a new volume or postgresql.conf.replace is updated
+	pg_conf_copy
+
 	# if first arg looks like a flag, assume we want to run postgres server
 	if [ "${1:0:1}" = '-' ]; then
 		set -- postgres "$@"
