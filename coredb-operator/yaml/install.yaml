@@ -120,6 +120,8 @@ spec:
           value: "https://10.96.239.210:8080"
         - name: RUST_LOG
           value: "info,kube=debug,controller=debug"
+        - name: ENABLE_INITIAL_BACKUP
+          value: "false"
         readinessProbe:
           httpGet:
             path: /health
