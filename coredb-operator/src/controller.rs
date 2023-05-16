@@ -21,7 +21,6 @@ use kube::{
         controller::{Action, Controller},
         events::{Event, EventType, Recorder, Reporter},
         finalizer::{finalizer, Event as Finalizer},
-        watcher,
     },
     Resource,
 };
@@ -424,7 +423,7 @@ pub async fn init(client: Client) -> (BoxFuture<'static, ()>, State) {
         info!("Installation: cargo run --bin crdgen | kubectl apply -f -");
         std::process::exit(1);
     }
-    let controller = Controller::new(cdb, watcher::Config::default())
+    let controller = Controller::new(cdb, ListParams::default())
         .shutdown_on_signal()
         .run(reconcile, error_policy, state.create_context(client))
         .filter_map(|x| async move { Result::ok(x) })
