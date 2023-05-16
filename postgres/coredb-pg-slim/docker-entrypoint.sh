@@ -316,8 +316,6 @@ _main() {
 		docker_setup_env
 		# setup data directories and permissions (when run as root)
 		docker_create_db_directories
-		# ensure we copy the latest configuration over
-		update_postgresql_conf
 		if [ "$(id -u)" = '0' ]; then
 			# then restart script as postgres user
 			exec gosu postgres "$BASH_SOURCE" "$@"
@@ -340,6 +338,8 @@ _main() {
 
 			docker_setup_db
 			docker_process_init_files /docker-entrypoint-initdb.d/*
+      # ensure we copy the latest configuration over
+      update_postgresql_conf
 
 			docker_temp_server_stop
 			unset PGPASSWORD
