@@ -247,12 +247,12 @@ pg_setup_hba_conf() {
 }
 
 # Make sure we always copy the correct postgresql.conf, even if it already exists
-# If postgresql.conf.sample is newer, we copy that to $PGDATA/postgresql.conf
+# If postgresql.conf.replace is newer, we copy that to $PGDATA/postgresql.conf
 pg_conf_copy() {
 	local srcConf="/postgresql.conf.replace"
-	local dstConf="${PGDATA}/postgresql.conf"
+	local dstConf="$PGDATA/postgresql.conf"
 	if [ ! -s "$dstConf" ] || [ "$srcConf" -nt "$dstConf" ]; then
-		mv "$srcConf" "$dstConf"
+	  cp "$srcConf" "$dstConf"
 	fi
 }
 
@@ -297,7 +297,7 @@ _pg_want_help() {
 }
 
 _main() {
-	# Copy postgresql.conf if PGDATA is a new volume or postgresql.conf.sample is updated
+	# Copy postgresql.conf if PGDATA is a new volume or postgresql.conf.replace is updated
 	pg_conf_copy
 
 	# if first arg looks like a flag, assume we want to run postgres server
