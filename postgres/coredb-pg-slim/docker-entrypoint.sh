@@ -338,8 +338,10 @@ _main() {
 
 			docker_setup_db
 			docker_process_init_files /docker-entrypoint-initdb.d/*
-			# ensure we copy the lastes configuration over
-                        update_postgresql_conf
+
+			# ensure we copy the lastest configuration over
+			update_postgresql_conf
+
 
 			docker_temp_server_stop
 			unset PGPASSWORD
@@ -348,6 +350,8 @@ _main() {
 				PostgreSQL init process complete; ready for start up.
 			EOM
 		else
+			# ensure we copy the lastest configuration over
+			update_postgresql_conf
 			cat <<-'EOM'
 				PostgreSQL Database directory appears to contain a database; Skipping initialization
 			EOM
