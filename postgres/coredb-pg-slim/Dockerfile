@@ -3,7 +3,15 @@ FROM quay.io/coredb/ubuntu:22.04 as builder
 ARG WALG_VER=2.0.1
 ARG TRUNK_VER=0.4.6
 
-RUN apt-get update && apt-get install -y curl pkg-config libssl-dev build-essential libclang-dev clang software-properties-common
+RUN apt-get update && apt-get install -y \
+    curl \
+    pkg-config \
+    libssl-dev \
+    build-essential \
+    libclang-dev \
+    clang \
+    software-properties-common \
+    libreadline8
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 RUN /root/.cargo/bin/cargo install --version $TRUNK_VER pg-trunk
 
@@ -12,10 +20,6 @@ RUN curl -L -o /tmp/wal-g "https://github.com/wal-g/wal-g/releases/download/v$WA
     && chmod +x /tmp/wal-g
 
 FROM quay.io/coredb/ubuntu:22.04
-
-ARG PG_PARTMAN_VER=4.7.4
-ARG PGMQ_VER=0.4.2
-ARG PG_VECTOR_VER=0.4.1
 
 COPY --from=builder /root/.cargo/bin/trunk /usr/bin/trunk
 COPY --from=builder /tmp/wal-g /usr/bin/wal-g
@@ -33,16 +37,21 @@ RUN set -eux; \
 # Installs the postgres APT repository
 # https://wiki.postgresql.org/wiki/Apt
 RUN apt-get update && apt-get install -y \
-        curl ca-certificates gnupg lsb-release \
-        && rm -rf /var/lib/apt/lists/*
-RUN curl https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor | tee /etc/apt/trusted.gpg.d/apt.postgresql.org.gpg > /dev/null
-RUN echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list
+    curl \
+    ca-certificates \
+    gnupg \
+    lsb-release \
+    libreadline-dev \
+    zlib1g-dev \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 STOPSIGNAL SIGINT
 
 ENV PGDATA /var/lib/postgresql/data
+ENV PG_VERSION 15.3
 ENV PG_MAJOR 15
-ENV PATH $PATH:/usr/lib/postgresql/$PG_MAJOR/bin
+ENV PATH $PATH:/usr/local/pgsql/bin
 
 RUN set -eux; \
 	apt-get update; apt-get install -y --no-install-recommends locales; rm -rf /var/lib/apt/lists/*; \
@@ -53,40 +62,26 @@ RUN mkdir /docker-entrypoint-initdb.d
 
 # Install postgres and some extensions
 RUN apt-get update && apt-get install -y \
-        # build deps for pg_partman
         build-essential \
         git \
-        postgresql-server-dev-${PG_MAJOR} \
-        # pg_stat_statement's package
-#        postgresql-contrib \
-        # postgresql server
-        postgresql-${PG_MAJOR} \
-        # extensions
-#        postgresql-${PG_MAJOR}-postgis-3 \
-#        postgresql-${PG_MAJOR}-cron \
-#        postgresql-${PG_MAJOR}-repack \
-#        postgresql-${PG_MAJOR}-pgaudit \
         && rm -rf /var/lib/apt/lists/*
+
+# Build Postgres from source
+RUN curl https://ftp.postgresql.org/pub/source/v15.3/postgresql-15.3.tar.bz2 -o postgresql-15.3.tar.bz2
+RUN tar xf postgresql-${PG_VERSION}.tar.bz2
+WORKDIR postgresql-${PG_VERSION}
+RUN ./configure
+RUN make
+RUN make install
 
 COPY ./postgresql.conf /usr/share/postgresql/${PG_MAJOR}/postgresql.conf.sample
 
-#WORKDIR /git
-#RUN git clone --branch "v${PG_VECTOR_VER}" https://github.com/pgvector/pgvector.git
-#WORKDIR /git/pgvector
-#RUN set -xe; \
-#      make; \
-#      make install;
-#
-#WORKDIR /
-#RUN rm -rf /git
-  
-#RUN trunk install --version ${PG_PARTMAN_VER} pg_partman
-
 # cache extensions and shared libraries
-RUN mkdir /tmp/pg_sharedir && \
-        mkdir /tmp/pg_pkglibdir && \
-        cp -r $(pg_config --sharedir)/* /tmp/pg_sharedir && \
-        cp -r $(pg_config --pkglibdir)/* /tmp/pg_pkglibdir
+#RUN mkdir /tmp/pg_sharedir && \
+#        mkdir /tmp/pg_pkglibdir && \
+#        cp -r $(pg_config --sharedir)/* /tmp/pg_sharedir && \
+#        cp -r $(pg_config --pkglibdir)/* /tmp/pg_pkglibdir
+RUN mkdir -p /var/run/postgresql && chmod 775 /var/run/postgresql
 
 COPY docker-entrypoint.sh /usr/local/bin/
 ENTRYPOINT ["docker-entrypoint.sh"]
