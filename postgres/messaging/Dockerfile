@@ -1,4 +1,4 @@
-FROM quay.io/coredb/coredb-pg-slim:3da285f
+FROM quay.io/coredb/coredb-pg-slim:370c253
 
 USER root
 
