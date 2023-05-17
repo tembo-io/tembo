@@ -7,7 +7,7 @@ use pgrx::warning;
 use crate::api::listit;
 use pgmq_crate::query::TABLE_PREFIX;
 
-type MetricResult = Vec<(i64, Option<i32>, Option<i32>)>;
+type MetricResult = Vec<(String, i64, Option<i32>, Option<i32>)>;
 
 #[pg_extern]
 fn pgmq_metrics(
@@ -16,6 +16,7 @@ fn pgmq_metrics(
     TableIterator<
         'static,
         (
+            name!(queue_name, String),
             name!(queue_length, i64),
             name!(newest_msg_age_sec, Option<i32>),
             name!(oldest_msg_age_sec, Option<i32>),
@@ -32,6 +33,7 @@ fn pgmq_metrics_all() -> Result<
     TableIterator<
         'static,
         (
+            name!(queue_name, String),
             name!(queue_length, i64),
             name!(newest_msg_age_sec, Option<i32>),
             name!(oldest_msg_age_sec, Option<i32>),
@@ -57,10 +59,11 @@ fn query_summary(queue_name: &str) -> Result<MetricResult, crate::PgmqExtError> 
         log!("NUM ROWS: {}", tup_table.len());
 
         while let Some(row) = tup_table.next() {
+            let queue_name = queue_name.to_owned();
             let queue_length = row["queue_length"].value::<i64>()?.expect("no msg_id");
             let newest_msg_sec = row["newest_msg_age_sec"].value::<i32>()?;
             let oldest_msg_sec = row["oldest_msg_age_sec"].value::<i32>()?;
-            results.push((queue_length, newest_msg_sec, oldest_msg_sec));
+            results.push((queue_name, queue_length, newest_msg_sec, oldest_msg_sec));
         }
         Ok(results)
     });
