@@ -55,13 +55,11 @@ fn query_summary(queue_name: &str) -> Result<MetricResult, crate::PgmqExtError> 
         let mut results: MetricResult = Vec::new();
         let mut tup_table: SpiTupleTable = client.select(&query, None, None)?;
         log!("NUM ROWS: {}", tup_table.len());
-        
+
         while let Some(row) = tup_table.next() {
             let queue_length = row["queue_length"].value::<i64>()?.expect("no msg_id");
-            let newest_msg_sec = row["newest_msg_age_sec"]
-                .value::<i32>()?;
-            let oldest_msg_sec = row["oldest_msg_age_sec"]
-                .value::<i32>()?;
+            let newest_msg_sec = row["newest_msg_age_sec"].value::<i32>()?;
+            let oldest_msg_sec = row["oldest_msg_age_sec"].value::<i32>()?;
             results.push((queue_length, newest_msg_sec, oldest_msg_sec));
         }
         Ok(results)
