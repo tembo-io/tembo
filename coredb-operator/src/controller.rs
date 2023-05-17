@@ -40,6 +40,7 @@ use tokio::{sync::RwLock, time::Duration};
 use tracing::*;
 
 pub static COREDB_FINALIZER: &str = "coredbs.coredb.io";
+pub static COREDB_ANNOTATION: &str = "coredbs.coredb.io/watch";
 
 // Context for our reconciler
 #[derive(Clone)]
@@ -61,6 +62,23 @@ async fn reconcile(cdb: Arc<CoreDB>, ctx: Arc<Context>) -> Result<Action> {
     ctx.diagnostics.write().await.last_event = Utc::now();
     let ns = cdb.namespace().unwrap(); // cdb is namespace scoped
     let coredbs: Api<CoreDB> = Api::namespaced(ctx.client.clone(), &ns);
+    // Get metadata for the CoreDB object
+    let metadata = cdb.meta().clone();
+    // Get annotations from the metadata
+    let annotations = metadata.annotations.clone().unwrap_or_default();
+
+    // Check the annotations to see if it exists and check it's value
+    if let Some(value) = annotations.get(COREDB_ANNOTATION) {
+        // If the value is false, then we should skip reconciling
+        if value == "false" {
+            info!(
+                "Skipping reconciliation for CoreDB \"{}\" in {}",
+                cdb.name_any(),
+                ns
+            );
+            return Ok(Action::await_change());
+        }
+    }
 
     info!("Reconciling CoreDB \"{}\" in {}", cdb.name_any(), ns);
     finalizer(&coredbs, COREDB_FINALIZER, cdb, |event| async {
