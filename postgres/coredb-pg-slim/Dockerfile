@@ -1,7 +1,7 @@
 FROM quay.io/coredb/ubuntu:22.04 as builder
 
 ARG WALG_VER=2.0.1
-ARG TRUNK_VER=0.4.6
+ARG TRUNK_VER=0.4.8
 
 RUN apt-get update && apt-get install -y curl pkg-config libssl-dev build-essential libclang-dev clang software-properties-common
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
@@ -9,7 +9,7 @@ RUN /root/.cargo/bin/cargo install --version $TRUNK_VER pg-trunk
 
 # Grab wal-g binary
 RUN curl -L -o /tmp/wal-g "https://github.com/wal-g/wal-g/releases/download/v$WALG_VER/wal-g-pg-ubuntu-20.04-amd64" \
-    && chmod +x /tmp/wal-g
+        && chmod +x /tmp/wal-g
 
 FROM quay.io/coredb/ubuntu:22.04
 
@@ -25,16 +25,14 @@ ENV TZ=Etc/UTC
 
 # Set the postgres user's permissions
 RUN set -eux; \
-	groupadd -r postgres --gid=999; \
-	useradd -r -g postgres --uid=999 --home-dir=/var/lib/postgresql --shell=/bin/bash postgres; \
-	mkdir -p /var/lib/postgresql; \
-	chown -R postgres:postgres /var/lib/postgresql
+    groupadd -r postgres --gid=999; \
+    useradd -r -g postgres --uid=999 --home-dir=/var/lib/postgresql --shell=/bin/bash postgres; \
+    mkdir -p /var/lib/postgresql; \
+    chown -R postgres:postgres /var/lib/postgresql
 
 # Installs the postgres APT repository
 # https://wiki.postgresql.org/wiki/Apt
-RUN apt-get update && apt-get install -y \
-        curl ca-certificates gnupg lsb-release \
-        && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get upgrade -y && apt-get install -y curl ca-certificates gnupg lsb-release && rm -rf /var/lib/apt/lists/*
 RUN curl https://www.postgresql.org/media/keys/ACCC4CF8.asc | gpg --dearmor | tee /etc/apt/trusted.gpg.d/apt.postgresql.org.gpg > /dev/null
 RUN echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list
 
@@ -45,8 +43,8 @@ ENV PG_MAJOR 15
 ENV PATH $PATH:/usr/lib/postgresql/$PG_MAJOR/bin
 
 RUN set -eux; \
-	apt-get update; apt-get install -y --no-install-recommends locales; rm -rf /var/lib/apt/lists/*; \
-	localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8
+    apt-get update; apt-get install -y --no-install-recommends locales; rm -rf /var/lib/apt/lists/*; \
+    localedef -i en_US -c -f UTF-8 -A /usr/share/locale/locale.alias en_US.UTF-8
 ENV LANG en_US.utf8
 
 RUN mkdir /docker-entrypoint-initdb.d
@@ -69,17 +67,18 @@ RUN apt-get update && apt-get install -y \
         && rm -rf /var/lib/apt/lists/*
 
 COPY ./postgresql.conf /usr/share/postgresql/${PG_MAJOR}/postgresql.conf.sample
+COPY ./postgresql.conf /postgresql.conf.replace
 
 WORKDIR /git
 RUN git clone --branch "v${PG_VECTOR_VER}" https://github.com/pgvector/pgvector.git
 WORKDIR /git/pgvector
 RUN set -xe; \
-      make; \
-      make install;
+        make; \
+        make install;
 
 WORKDIR / 
 RUN rm -rf /git
-  
+
 RUN trunk install --version ${PG_PARTMAN_VER} pg_partman
 
 # cache extensions and shared libraries

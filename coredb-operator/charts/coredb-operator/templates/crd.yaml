@@ -82,7 +82,7 @@ spec:
                   type: object
                 type: array
               image:
-                default: quay.io/coredb/coredb-pg-slim:7f0983b
+                default: quay.io/coredb/coredb-pg-slim:370c253
                 type: string
               pkglibdirStorage:
                 default: 1Gi
@@ -96,7 +96,7 @@ spec:
                 default: true
                 type: boolean
               postgresExporterImage:
-                default: quay.io/prometheuscommunity/postgres-exporter:v0.11.1
+                default: quay.io/prometheuscommunity/postgres-exporter:v0.12.0
                 type: string
               replicas:
                 default: 1
