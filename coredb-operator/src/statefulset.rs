@@ -42,6 +42,7 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
     let mut pvc_requests_pkglibdir: BTreeMap<String, Quantity> = BTreeMap::new();
     pvc_requests_pkglibdir.insert("storage".to_string(), cdb.spec.pkglibdirStorage.clone());
     let backup = &cdb.spec.backup;
+    let image = &cdb.spec.image;
 
     let mut labels: BTreeMap<String, String> = BTreeMap::new();
     labels.insert("app".to_owned(), "coredb".to_string());
@@ -113,7 +114,11 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
                 ..SecurityContext::default()
             }),
             name: "postgres".to_string(),
-            image: Some(default_image()),
+            image: if image.is_empty() {
+                Some(default_image())
+            } else {
+                Some(image.clone())
+            },
             resources: Some(cdb.spec.resources.clone()),
             ports: Some(vec![ContainerPort {
                 container_port: 5432,
@@ -193,7 +198,11 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
                     init_containers: Option::from(vec![Container {
                         env: postgres_env,
                         name: "pg-directory-init".to_string(),
-                        image: Some(default_image()),
+                        image: if image.is_empty() {
+                            Some(default_image())
+                        } else {
+                            Some(image.clone())
+                        },
                         volume_mounts: postgres_volume_mounts,
                         security_context: Some(SecurityContext {
                             // Run the init container as root
