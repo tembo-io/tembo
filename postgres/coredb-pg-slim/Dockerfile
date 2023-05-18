@@ -76,7 +76,7 @@ RUN set -xe; \
         make; \
         make install;
 
-WORKDIR /
+WORKDIR / 
 RUN rm -rf /git
 
 RUN trunk install --version ${PG_PARTMAN_VER} pg_partman
