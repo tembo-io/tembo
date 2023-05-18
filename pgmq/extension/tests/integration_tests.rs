@@ -128,5 +128,12 @@ async fn test_lifecycle() {
     .fetch_all(&conn)
     .await
     .expect("failed creating numeric interval queue");
-    assert!(rows.len() > 0);
+    assert_eq!(rows.len(), 1);
+
+    // get metrics
+    let rows = sqlx::query_as::<_, MetricsRow>(&format!("SELECT * from pgmq_metrics_all();"))
+        .fetch_all(&conn)
+        .await
+        .expect("failed creating numeric interval queue");
+    assert!(rows.len() > 1);
 }
