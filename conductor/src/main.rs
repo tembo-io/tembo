@@ -324,9 +324,13 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 // Restart and Update events share a lot of the same code.
                 // move some operations after the Event match
                 info!("handling instance restart");
-                restart_statefulset(client.clone(), &namespace, &namespace)
-                    .await
-                    .expect("error restarting statefulset");
+                match restart_statefulset(client.clone(), &namespace, &namespace).await {
+                    Ok(_) => {}
+                    Err(err) => {
+                        error!("error restarting statefulset: {:?}", err);
+                        continue;
+                    }
+                }
                 let retry_strategy = FixedInterval::from_millis(5000).take(20);
                 let result = Retry::spawn(retry_strategy.clone(), || {
                     get_coredb_status(client.clone(), &namespace)
