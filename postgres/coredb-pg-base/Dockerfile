@@ -1,6 +1,5 @@
 FROM quay.io/coredb/ubuntu:22.04 as builder
 
-ARG WALG_VER=2.0.1
 ARG TRUNK_VER=0.4.8
 
 RUN apt-get update && apt-get install -y \
@@ -14,14 +13,9 @@ RUN apt-get update && apt-get install -y \
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 RUN /root/.cargo/bin/cargo install --version $TRUNK_VER pg-trunk
 
-# Grab wal-g binary
-RUN curl -L -o /tmp/wal-g "https://github.com/wal-g/wal-g/releases/download/v$WALG_VER/wal-g-pg-ubuntu-20.04-amd64" \
-    && chmod +x /tmp/wal-g
-
 FROM quay.io/coredb/ubuntu:22.04
 
 COPY --from=builder /root/.cargo/bin/trunk /usr/bin/trunk
-COPY --from=builder /tmp/wal-g /usr/bin/wal-g
 
 ARG DEBIAN_FRONTEND=noninteractive
 ENV TZ=Etc/UTC
@@ -62,8 +56,6 @@ RUN mkdir /docker-entrypoint-initdb.d
 # Install postgres and some extensions
 RUN apt-get update && apt-get install -y \
         build-essential \
-        git \
-        jq \
         && rm -rf /var/lib/apt/lists/*
 
 # Build Postgres from source
@@ -73,6 +65,7 @@ WORKDIR postgresql-${PG_VERSION}
 RUN ./configure --prefix=/usr/lib/postgresql/${PG_MAJOR} --datarootdir=/usr/share
 RUN make
 RUN make install
+RUN cd .. && rm postgresql-${PG_VERSION}.tar.bz2
 
 COPY ./postgresql.conf /usr/share/postgresql/${PG_MAJOR}/postgresql.conf.sample
 
