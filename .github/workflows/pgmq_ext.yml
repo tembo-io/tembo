@@ -115,7 +115,7 @@ jobs:
       - name: trunk publish
         env:
           TRUNK_AUTH_TOKEN: ${{ secrets.TRUNK_AUTH_TOKEN }}
-        run: 
+        run: |
           pgmq_ver=$(stoml Cargo.toml package.version)
           pgmq_descr=$(stoml Cargo.toml package.description)
           pgmq_repo=$(stoml Cargo.toml package.repository)
