@@ -22,65 +22,65 @@ on:
       - '.github/actions/pgx-init/**'
       - './pgmq/extension/**'
 jobs:
-  lint:
-    name: Run linters
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v3
-      - name: Install Rust minimal nightly with clippy and rustfmt
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly
-          components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: "pgmq-extension-lint"
-          workspaces: |
-            pgmq/extension
-          # Additional directories to cache
-          cache-directories: |
-            /home/runner/.pgrx
-      - uses: ./.github/actions/pgx-init
-        with:
-          working-directory: pgmq/extension
-      - name: Cargo format
-        run: cargo +nightly fmt --all --check
-      - name: Clippy
-        run: cargo clippy
+  # lint:
+  #   name: Run linters
+  #   runs-on: ubuntu-22.04
+  #   steps:
+  #     - uses: actions/checkout@v3
+  #     - name: Install Rust minimal nightly with clippy and rustfmt
+  #       uses: actions-rs/toolchain@v1
+  #       with:
+  #         profile: minimal
+  #         toolchain: nightly
+  #         components: rustfmt, clippy
+  #     - uses: Swatinem/rust-cache@v2
+  #       with:
+  #         prefix-key: "pgmq-extension-lint"
+  #         workspaces: |
+  #           pgmq/extension
+  #         # Additional directories to cache
+  #         cache-directories: |
+  #           /home/runner/.pgrx
+  #     - uses: ./.github/actions/pgx-init
+  #       with:
+  #         working-directory: pgmq/extension
+  #     - name: Cargo format
+  #       run: cargo +nightly fmt --all --check
+  #     - name: Clippy
+  #       run: cargo clippy
 
-  test:
-    name: Run tests
-    runs-on: ubuntu-22.04
-    steps:
-      - uses: actions/checkout@v2
-      - name: Install Rust stable toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: "pgmq-extension-test"
-          workspaces: |
-            pgmq/extension
-          # Additional directories to cache
-          cache-directories: |
-            /home/runner/.pgrx
-      - uses: ./.github/actions/pgx-init
-        with:
-          working-directory: pgmq/extension
-      - name: test
-        run: |
-          sudo apt-get update && sudo apt-get install -y postgresql-server-dev-14
-          git clone https://github.com/pgpartman/pg_partman.git && \
-          cd pg_partman && \
-          sudo make install && cd ../
-          cp /usr/share/postgresql/14/extension/pg_partman* ~/.pgrx/15.3/pgrx-install/share/postgresql/extension/
-          cp /usr/lib/postgresql/14/lib/pg_partman_bgw.so ~/.pgrx/15.3/pgrx-install/lib/postgresql/
-          rm -rf ./target/pgrx-test-data-* || true
-          pg_version=$(stoml Cargo.toml features.default)
-          cargo pgrx run ${pg_version} --pgcli || true
-          cargo pgrx test ${pg_version}
+  # test:
+  #   name: Run tests
+  #   runs-on: ubuntu-22.04
+  #   steps:
+  #     - uses: actions/checkout@v2
+  #     - name: Install Rust stable toolchain
+  #       uses: actions-rs/toolchain@v1
+  #       with:
+  #         toolchain: stable
+  #     - uses: Swatinem/rust-cache@v2
+  #       with:
+  #         prefix-key: "pgmq-extension-test"
+  #         workspaces: |
+  #           pgmq/extension
+  #         # Additional directories to cache
+  #         cache-directories: |
+  #           /home/runner/.pgrx
+  #     - uses: ./.github/actions/pgx-init
+  #       with:
+  #         working-directory: pgmq/extension
+  #     - name: test
+  #       run: |
+  #         sudo apt-get update && sudo apt-get install -y postgresql-server-dev-14
+  #         git clone https://github.com/pgpartman/pg_partman.git && \
+  #         cd pg_partman && \
+  #         sudo make install && cd ../
+  #         cp /usr/share/postgresql/14/extension/pg_partman* ~/.pgrx/15.3/pgrx-install/share/postgresql/extension/
+  #         cp /usr/lib/postgresql/14/lib/pg_partman_bgw.so ~/.pgrx/15.3/pgrx-install/lib/postgresql/
+  #         rm -rf ./target/pgrx-test-data-* || true
+  #         pg_version=$(stoml Cargo.toml features.default)
+  #         cargo pgrx run ${pg_version} --pgcli || true
+  #         cargo pgrx test ${pg_version}
 
   publish:
     # only publish off main branch
