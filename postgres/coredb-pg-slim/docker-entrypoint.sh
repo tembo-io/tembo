@@ -40,6 +40,10 @@ docker_create_db_directories() {
 	# ignore failure since there are cases where we can't chmod (and PostgreSQL might fail later anyhow - it's picky about permissions of this directory)
 	chmod 700 "$PGDATA" || :
 
+	# ignore failure since it will be fine when using the image provided directory; see also https://github.com/docker-library/postgres/pull/289
+	mkdir -p /var/run/postgresql || :
+	chmod 775 /var/run/postgresql || :
+
 	# Create the transaction log directory before initdb is run so the directory is owned by the correct user
 	if [ -n "${POSTGRES_INITDB_WALDIR:-}" ]; then
 		mkdir -p "$POSTGRES_INITDB_WALDIR"
@@ -242,6 +246,26 @@ pg_setup_hba_conf() {
 	} >> "$PGDATA/pg_hba.conf"
 }
 
+# Make sure we always copy the correct postgresql.conf, even if it already exists
+# If postgresql.conf.replace is newer, we copy that to $PGDATA/postgresql.conf
+update_postgresql_conf() {
+    # Define the path to the replacement file
+    local replace_file="/postgresql.conf.replace"
+
+    # Check if the replacement file exists
+    if [ -f "$replace_file" ]; then
+        # If the replacement file and the current postgresql.conf file are different, replace postgresql.conf
+        if ! cmp -s "$PGDATA/postgresql.conf" "$replace_file"; then
+            echo "postgresql.conf is different from the replacement, updating..."
+            cp "$replace_file" "$PGDATA/postgresql.conf"
+        else
+            echo "postgresql.conf is the same as the replacement, no update needed."
+        fi
+    else
+        echo "No replacement file found, skipping update."
+    fi
+}
+
 # start socket-only postgresql server for setting up or running scripts
 # all arguments will be passed along as arguments to `postgres` (via pg_ctl)
 docker_temp_server_start() {
@@ -315,6 +339,10 @@ _main() {
 			docker_setup_db
 			docker_process_init_files /docker-entrypoint-initdb.d/*
 
+			# ensure we copy the lastest configuration over
+			update_postgresql_conf
+
+
 			docker_temp_server_stop
 			unset PGPASSWORD
 
@@ -322,6 +350,8 @@ _main() {
 				PostgreSQL init process complete; ready for start up.
 			EOM
 		else
+			# ensure we copy the lastest configuration over
+			update_postgresql_conf
 			cat <<-'EOM'
 				PostgreSQL Database directory appears to contain a database; Skipping initialization
 			EOM
