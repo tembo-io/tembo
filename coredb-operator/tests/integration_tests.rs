@@ -587,6 +587,59 @@ mod test {
 
     #[tokio::test]
     #[ignore]
+    async fn function_test_skip_reconciliation() {
+        // Initialize the Kubernetes client
+        let client = kube_client().await;
+
+        // Configurations
+        let mut rng = rand::thread_rng();
+        let name = &format!("test-coredb-{}", rng.gen_range(0..100000));
+        let namespace = "default";
+        let kind = "CoreDB";
+        let replicas = 1;
+
+        // Create a pod we can use to run commands in the cluster
+        let pods: Api<Pod> = Api::namespaced(client.clone(), namespace);
+
+        // Apply a basic configuration of CoreDB
+        println!("Creating CoreDB resource {}", name);
+        let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), namespace);
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name,
+                "annotations": {
+                    "coredbs.coredb.io/watch": "false"
+                }
+            },
+            "spec": {
+                "replicas": replicas,
+            }
+        });
+        let params = PatchParams::apply("coredb-integration-test-skip-reconciliation");
+        let patch = Patch::Apply(&coredb_json);
+        let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        // Wait for the pod to be created (it shouldn't be created)
+        thread::sleep(Duration::from_millis(5000));
+
+        // Assert that the CoreDB object contains the correct annotation
+        let coredb = coredbs.get(name).await.unwrap();
+        let annotations = coredb.metadata.annotations.as_ref().unwrap();
+        assert_eq!(
+            annotations.get("coredbs.coredb.io/watch"),
+            Some(&String::from("false"))
+        );
+
+        // Assert that the pod was not created
+        let expected_pod_name = format!("{}-{}", name, 0);
+        let pod = pods.get(&expected_pod_name).await;
+        assert!(pod.is_err());
+    }
+
+    #[tokio::test]
+    #[ignore]
     async fn functional_test_delete_namespace() {
         // Initialize the Kubernetes client
         let client = kube_client().await;
