@@ -76,11 +76,14 @@ RUN make install
 
 COPY ./postgresql.conf /usr/share/postgresql/${PG_MAJOR}/postgresql.conf.sample
 
+# Remove pre-installed pg_config
+RUN rm /usr/bin/pg_config
+
 # cache extensions and shared libraries
 RUN mkdir /tmp/pg_sharedir && \
         mkdir /tmp/pg_pkglibdir && \
-        cp -r $(/usr/lib/postgresql/${PG_MAJOR}/bin/pg_config --sharedir)/* /tmp/pg_sharedir && \
-        cp -r $(/usr/lib/postgresql/${PG_MAJOR}/bin/pg_config --pkglibdir)/* /tmp/pg_pkglibdir
+        cp -r $(pg_config --sharedir)/* /tmp/pg_sharedir && \
+        cp -r $(pg_config --pkglibdir)/* /tmp/pg_pkglibdir
 RUN mkdir -p /var/run/postgresql && chmod 775 /var/run/postgresql
 RUN mkdir -p /usr/share/postgresql/${PG_MAJOR}/extension && chmod 775 /usr/share/postgresql/${PG_MAJOR}/extension
 RUN chown -R postgres:postgres /usr/lib/postgresql/${PG_MAJOR} /usr/share/postgresql/extension
