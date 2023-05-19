@@ -4,7 +4,7 @@ use k8s_openapi::{
     apimachinery::pkg::{api::resource::Quantity, apis::meta::v1::ObjectMeta},
 };
 
-use crate::defaults;
+use crate::{defaults, postgres_exporter::PostgresMetrics};
 use kube::CustomResource;
 
 use schemars::JsonSchema;
@@ -78,6 +78,8 @@ pub struct CoreDBSpec {
 
     #[serde(default = "defaults::default_backup")]
     pub backup: Backup,
+
+    pub metrics: Option<PostgresMetrics>,
 }
 
 /// The status object of `CoreDB`

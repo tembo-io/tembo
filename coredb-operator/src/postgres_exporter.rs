@@ -1,0 +1,208 @@
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+use std::{collections::BTreeMap, sync::Arc};
+use tracing::debug;
+
+use crate::{apis::coredb_types::CoreDB, defaults, Context, Error};
+
+
+#[derive(Deserialize, Serialize, Clone, Debug, JsonSchema, Default)]
+#[allow(non_snake_case)]
+pub struct PostgresMetrics {
+    #[serde(default = "defaults::default_postgres_exporter_image")]
+    pub image: String,
+    #[serde(default = "defaults::default_postgres_exporter_enabled")]
+    pub ExporterEnabled: bool,
+
+    #[serde(flatten)]
+    pub queries: Option<QueryConfig>,
+}
+
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize)]
+pub struct Metric {
+    pub usage: Usage,
+    pub description: String,
+}
+
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize)]
+pub struct Metrics {
+    #[serde(flatten)]
+    pub metrics: BTreeMap<String, Metric>,
+}
+
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize)]
+pub struct QueryItem {
+    pub query: String,
+    pub master: bool,
+    pub metrics: Vec<Metrics>,
+}
+
+#[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize)]
+pub struct QueryConfig {
+    #[serde(flatten)]
+    pub queries: BTreeMap<String, QueryItem>,
+}
+
+use std::str::FromStr;
+
+#[derive(Clone, Debug, JsonSchema, Serialize, Deserialize, PartialEq)]
+pub enum Usage {
+    Counter,
+    Gauge,
+    Histogram,
+    Label,
+}
+
+impl FromStr for Usage {
+    type Err = ();
+
+    fn from_str(input: &str) -> Result<Usage, Self::Err> {
+        match input {
+            "Counter" => Ok(Usage::Counter),
+            "Gauge" => Ok(Usage::Gauge),
+            "Histogram" => Ok(Usage::Histogram),
+            "Label" => Ok(Usage::Label),
+            _ => Err(()),
+        }
+    }
+}
+
+
+pub async fn create_postgres_exporter_role(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
+    let client = ctx.client.clone();
+    if !(cdb.spec.postgresExporterEnabled) {
+        return Ok(());
+    }
+    debug!(
+        "Creating postgres_exporter role for database {} in namespace {}",
+        cdb.metadata.name.clone().unwrap(),
+        cdb.metadata.namespace.clone().unwrap()
+    );
+    // https://github.com/prometheus-community/postgres_exporter#running-as-non-superuser
+    let _ = cdb
+        .psql(
+            "
+            CREATE OR REPLACE FUNCTION __tmp_create_user() returns void as $$
+            BEGIN
+              IF NOT EXISTS (
+                      SELECT
+                      FROM   pg_catalog.pg_user
+                      WHERE  usename = 'postgres_exporter') THEN
+                CREATE USER postgres_exporter;
+              END IF;
+            END;
+            $$ language plpgsql;
+
+            SELECT __tmp_create_user();
+            DROP FUNCTION __tmp_create_user();
+
+            ALTER USER postgres_exporter SET SEARCH_PATH TO postgres_exporter,pg_catalog;
+            GRANT CONNECT ON DATABASE postgres TO postgres_exporter;
+            GRANT pg_monitor to postgres_exporter;
+            GRANT pg_read_all_stats to postgres_exporter;
+            "
+            .to_string(),
+            "postgres".to_owned(),
+            client.clone(),
+        )
+        .await?;
+    Ok(())
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_yaml;
+
+    #[test]
+    fn query_deserialize_serialize() {
+        // query data received as json. map to struct.
+        // serialize struct to yaml
+        let incoming_data = serde_json::json!(
+            {
+                "pg_postmaster": {
+                  "query": "SELECT pg_postmaster_start_time as start_time_seconds from pg_postmaster_start_time()",
+                  "master": true,
+                  "metrics": [
+                    {
+                      "start_time_seconds": {
+                        "usage": "Gauge",
+                        "description": "Time at which postmaster started"
+                      }
+                    }
+                  ]
+                },
+                "extensions": {
+                  "query": "select count(*) as num_ext from pg_available_extensions",
+                  "master": true,
+                  "metrics": [
+                    {
+                      "num_ext": {
+                        "usage": "Gauge",
+                        "description": "Num extensions"
+                      }
+                    }
+                  ]
+                }
+              }
+        );
+
+        let query_config: QueryConfig = serde_json::from_value(incoming_data).expect("failed to deserialize");
+
+        assert!(query_config.queries.contains_key("pg_postmaster"));
+        assert!(query_config.queries.contains_key("extensions"));
+
+        let pg_postmaster = query_config.queries.get("pg_postmaster").unwrap();
+        assert_eq!(
+            pg_postmaster.query,
+            "SELECT pg_postmaster_start_time as start_time_seconds from pg_postmaster_start_time()"
+        );
+        assert!(pg_postmaster.master);
+        assert!(pg_postmaster.metrics[0]
+            .metrics
+            .contains_key("start_time_seconds"));
+
+        let start_time_seconds_metric = pg_postmaster.metrics[0]
+            .metrics
+            .get("start_time_seconds")
+            .unwrap();
+        assert_eq!(
+            start_time_seconds_metric.description,
+            "Time at which postmaster started"
+        );
+
+        let extensions = query_config
+            .queries
+            .get("extensions")
+            .expect("extensions not found");
+        assert_eq!(
+            extensions.query,
+            "select count(*) as num_ext from pg_available_extensions"
+        );
+        assert!(extensions.master);
+        assert!(extensions.metrics[0].metrics.contains_key("num_ext"));
+
+        // yaml to yaml
+
+        let yaml = serde_yaml::to_string(&query_config).expect("failed to serialize to yaml");
+
+        let data = r#"extensions:
+  query: select count(*) as num_ext from pg_available_extensions
+  master: true
+  metrics:
+  - num_ext:
+      usage: Gauge
+      description: Num extensions
+pg_postmaster:
+  query: SELECT pg_postmaster_start_time as start_time_seconds from pg_postmaster_start_time()
+  master: true
+  metrics:
+  - start_time_seconds:
+      usage: Gauge
+      description: Time at which postmaster started
+"#;
+        // formmatted correctly as yaml (for configmap)
+        assert_eq!(yaml, data);
+    }
+}
