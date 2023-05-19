@@ -1,11 +1,53 @@
+use crate::{apis::coredb_types::CoreDB, defaults, patch_cdb_status_merge, Context, Error};
+use k8s_openapi::api::core::v1::ConfigMap;
+use kube::api::{Api, ObjectMeta, Resource};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, sync::Arc};
-use tracing::debug;
-
-use crate::{apis::coredb_types::CoreDB, defaults, Context, Error};
+use tracing::{debug, error, info, warn};
 
 
+pub async fn set_queries(
+    coredb: &CoreDB,
+    query_config: &QueryConfig,
+    ctx: Arc<Context>,
+    cdb_api: &Api<CoreDB>,
+    name: &str,
+) -> Result<(), Error> {
+    let mut data: BTreeMap<String, String> = BTreeMap::new();
+    data.insert(
+        "data".to_owned(),
+        serde_yaml::to_string(&query_config).expect("failed to serialize to yaml"),
+    );
+
+    let oref = coredb.controller_owner_ref(&()).unwrap();
+    let cm = ConfigMap {
+        metadata: ObjectMeta {
+            name: Some(name.to_owned()),
+            owner_references: Some(vec![oref]),
+            ..ObjectMeta::default()
+        },
+        data: Some(data),
+        ..Default::default()
+    };
+    let cm_api = Api::<ConfigMap>::namespaced(ctx.client.clone(), name);
+    // cm_api
+    //     .patch(name)
+    //         &PatchParams::apply("postgres-exporter-queries"),
+    //         &Patch::Apply(&cm),
+    //     );
+
+    // let cm = ConfigMap {
+    //     metadata: ObjectMeta {
+    //         name: Some("postgres-exporter-queries".to_string()),
+    //         owner_references: Some(vec![oref]),
+    //         ..ObjectMeta::default()
+    //     },
+    //     data: Some(data),
+    //     ..Default::default()
+    // };
+    Ok(())
+}
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema, Default)]
 #[allow(non_snake_case)]
 pub struct PostgresMetrics {
