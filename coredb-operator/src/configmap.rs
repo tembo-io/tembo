@@ -65,20 +65,10 @@ pub async fn set_configmap(
         ..Default::default()
     };
 
-    let patch_params = PatchParams::apply("myapp");
+    let patch_params = PatchParams::apply("cntrlr");
     let patch = Patch::Apply(&cm);
 
     match cm_api.patch(cm_name, &patch_params, &patch).await {
-        Ok(o) => {
-            println!("Updated configmap: {}", o.metadata.name.unwrap());
-        }
-        Err(e) => {
-            eprintln!("Failed to update configmap: {}", e);
-        }
-    };
-
-    let pp = PostParams::default();
-    match cm_api.create(&pp, &cm).await {
         Ok(o) => {
             info!("Created empty configmap: {}", o.metadata.name.unwrap());
         }
