@@ -9,7 +9,7 @@ use crate::{apis::coredb_types::CoreDB, defaults, Context, Error};
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema, Default)]
 #[allow(non_snake_case)]
 pub struct PostgresMetrics {
-    #[serde(default = "defaults::default_image")]
+    #[serde(default = "defaults::default_postgres_exporter_image")]
     pub image: String,
     #[serde(default = "defaults::default_postgres_exporter_enabled")]
     pub ExporterEnabled: bool,

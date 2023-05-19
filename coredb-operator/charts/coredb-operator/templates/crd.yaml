@@ -91,7 +91,7 @@ spec:
                     default: true
                     type: boolean
                   image:
-                    default: quay.io/coredb/coredb-pg-slim:370c253
+                    default: quay.io/prometheuscommunity/postgres-exporter:v0.12.0
                     type: string
                 type: object
               pkglibdirStorage:
