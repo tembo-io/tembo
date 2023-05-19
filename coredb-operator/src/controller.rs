@@ -27,6 +27,7 @@ use kube::{
 
 use crate::{
     apis::coredb_types::{CoreDB, CoreDBStatus},
+    configmap::{create_configmap_ifnotexist, set_configmap},
     extensions::{reconcile_extensions, Extension},
     postgres_exporter::create_postgres_exporter_role,
     secret::reconcile_secret,
@@ -35,7 +36,7 @@ use k8s_openapi::api::core::v1::{Namespace, Pod};
 use kube::runtime::wait::Condition;
 use serde::Serialize;
 use serde_json::json;
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 use tokio::{sync::RwLock, time::Duration};
 use tracing::*;
 
@@ -108,6 +109,29 @@ impl CoreDB {
         let ns = self.namespace().unwrap();
         let name = self.name_any();
         let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &ns);
+
+        // create configmap if postgres exporter enabled
+        if self.spec.postgresExporterEnabled {
+            let cm = create_configmap_ifnotexist(client.clone(), &ns, "postgres-exporter").await;
+            // set configmap values if they are specified
+            match self.spec.metrics.clone().and_then(|m| m.queries) {
+                Some(queries) => {
+                    let qdata = serde_yaml::to_string(&queries).unwrap();
+                    let d: BTreeMap<String, String> = BTreeMap::from([("queries.yaml".to_string(), qdata)]);
+                    match set_configmap(client.clone(), &ns, "postgres-exporter", d).await {
+                        Ok(_) => {
+                            debug!("Successfully set configmap values");
+                        }
+                        Err(e) => {
+                            error!("Error setting configmap values: {:?}", e);
+                        }
+                    }
+                }
+                None => {
+                    debug!("No queries specified in CoreDB spec");
+                }
+            }
+        }
 
         // reconcile service account, role, and role binding
         reconcile_rbac(self, ctx.clone()).await.map_err(|e| {
