@@ -287,9 +287,6 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
                                 ..ConfigMapVolumeSource::default()
                             }),
                             name: "prom-pg-queries".to_owned(),
-                            empty_dir: Some(EmptyDirVolumeSource {
-                                ..EmptyDirVolumeSource::default()
-                            }),
                             ..Volume::default()
                         },
                     ]),
