@@ -93,6 +93,10 @@ spec:
                   image:
                     default: quay.io/prometheuscommunity/postgres-exporter:v0.12.0
                     type: string
+                  queries:
+                    x-kubernetes-preserve-unknown-fields: true
+                required:
+                - queries
                 type: object
               pkglibdirStorage:
                 default: 1Gi

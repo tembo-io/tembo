@@ -1,53 +1,10 @@
-use crate::{apis::coredb_types::CoreDB, defaults, patch_cdb_status_merge, Context, Error};
-use k8s_openapi::api::core::v1::ConfigMap;
-use kube::api::{Api, ObjectMeta, Resource};
+use crate::{apis::coredb_types::CoreDB, defaults, Context, Error};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, sync::Arc};
-use tracing::{debug, error, info, warn};
+use tracing::debug;
 
 
-pub async fn set_queries(
-    coredb: &CoreDB,
-    query_config: &QueryConfig,
-    ctx: Arc<Context>,
-    cdb_api: &Api<CoreDB>,
-    name: &str,
-) -> Result<(), Error> {
-    let mut data: BTreeMap<String, String> = BTreeMap::new();
-    data.insert(
-        "data".to_owned(),
-        serde_yaml::to_string(&query_config).expect("failed to serialize to yaml"),
-    );
-
-    let oref = coredb.controller_owner_ref(&()).unwrap();
-    let cm = ConfigMap {
-        metadata: ObjectMeta {
-            name: Some(name.to_owned()),
-            owner_references: Some(vec![oref]),
-            ..ObjectMeta::default()
-        },
-        data: Some(data),
-        ..Default::default()
-    };
-    let cm_api = Api::<ConfigMap>::namespaced(ctx.client.clone(), name);
-    // cm_api
-    //     .patch(name)
-    //         &PatchParams::apply("postgres-exporter-queries"),
-    //         &Patch::Apply(&cm),
-    //     );
-
-    // let cm = ConfigMap {
-    //     metadata: ObjectMeta {
-    //         name: Some("postgres-exporter-queries".to_string()),
-    //         owner_references: Some(vec![oref]),
-    //         ..ObjectMeta::default()
-    //     },
-    //     data: Some(data),
-    //     ..Default::default()
-    // };
-    Ok(())
-}
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema, Default)]
 #[allow(non_snake_case)]
 pub struct PostgresMetrics {
@@ -56,7 +13,7 @@ pub struct PostgresMetrics {
     #[serde(default = "defaults::default_postgres_exporter_enabled")]
     pub ExporterEnabled: bool,
 
-    #[serde(flatten)]
+    #[schemars(schema_with = "preserve_arbitrary")]
     pub queries: Option<QueryConfig>,
 }
 
@@ -85,6 +42,14 @@ pub struct QueryConfig {
     pub queries: BTreeMap<String, QueryItem>,
 }
 
+
+fn preserve_arbitrary(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+    let mut obj = schemars::schema::SchemaObject::default();
+    obj.extensions
+        .insert("x-kubernetes-preserve-unknown-fields".into(), true.into());
+    schemars::schema::Schema::Object(obj)
+}
+
 use std::str::FromStr;
 
 #[derive(Clone, Debug, JsonSchema, Serialize, Deserialize, PartialEq)]
@@ -108,7 +73,6 @@ impl FromStr for Usage {
         }
     }
 }
-
 
 pub async fn create_postgres_exporter_role(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
     let client = ctx.client.clone();
