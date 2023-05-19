@@ -27,9 +27,8 @@ use kube::{
 
 use crate::{
     apis::coredb_types::{CoreDB, CoreDBStatus},
-    configmap::{create_configmap_ifnotexist, set_configmap},
     extensions::{reconcile_extensions, Extension},
-    postgres_exporter::create_postgres_exporter_role,
+    postgres_exporter::{create_postgres_exporter_role, reconcile_prom_configmap},
     secret::reconcile_secret,
 };
 use k8s_openapi::api::core::v1::{Namespace, Pod};
@@ -112,25 +111,12 @@ impl CoreDB {
 
         // create configmap if postgres exporter enabled
         if self.spec.postgresExporterEnabled {
-            let cm = create_configmap_ifnotexist(client.clone(), &ns, "postgres-exporter").await;
-            // set configmap values if they are specified
-            match self.spec.metrics.clone().and_then(|m| m.queries) {
-                Some(queries) => {
-                    let qdata = serde_yaml::to_string(&queries).unwrap();
-                    let d: BTreeMap<String, String> = BTreeMap::from([("queries.yaml".to_string(), qdata)]);
-                    match set_configmap(client.clone(), &ns, "postgres-exporter", d).await {
-                        Ok(_) => {
-                            debug!("Successfully set configmap values");
-                        }
-                        Err(e) => {
-                            error!("Error setting configmap values: {:?}", e);
-                        }
-                    }
-                }
-                None => {
-                    debug!("No queries specified in CoreDB spec");
-                }
-            }
+            reconcile_prom_configmap(self, client.clone(), &ns)
+                .await
+                .map_err(|e| {
+                    error!("Error reconciling prometheus configmap: {:?}", e);
+                    Action::requeue(Duration::from_secs(10))
+                })?;
         }
 
         // reconcile service account, role, and role binding

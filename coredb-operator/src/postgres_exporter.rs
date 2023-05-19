@@ -1,8 +1,9 @@
 use crate::{apis::coredb_types::CoreDB, defaults, Context, Error};
+use kube::Client;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, sync::Arc};
-use tracing::debug;
+use tracing::{debug, error, info, warn};
 
 
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema, Default)]
@@ -42,7 +43,7 @@ pub struct QueryConfig {
     pub queries: BTreeMap<String, QueryItem>,
 }
 
-
+// source: https://github.com/kube-rs/kube/issues/844
 fn preserve_arbitrary(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
     let mut obj = schemars::schema::SchemaObject::default();
     obj.extensions
@@ -112,6 +113,26 @@ pub async fn create_postgres_exporter_role(cdb: &CoreDB, ctx: Arc<Context>) -> R
             client.clone(),
         )
         .await?;
+    Ok(())
+}
+
+use crate::configmap::{create_configmap_ifnotexist, set_configmap};
+
+const QUERIES_YAML: &str = "queries.yaml";
+
+pub async fn reconcile_prom_configmap(cdb: &CoreDB, client: Client, ns: &str) -> Result<(), Error> {
+    create_configmap_ifnotexist(client.clone(), &ns, "postgres-exporter").await?;
+    // set custom pg-prom metrics in configmap values if they are specified
+    match cdb.spec.metrics.clone().and_then(|m| m.queries) {
+        Some(queries) => {
+            let qdata = serde_yaml::to_string(&queries).unwrap();
+            let d: BTreeMap<String, String> = BTreeMap::from([(QUERIES_YAML.to_string(), qdata)]);
+            set_configmap(client.clone(), &ns, "postgres-exporter", d).await?
+        }
+        None => {
+            debug!("No queries specified in CoreDB spec");
+        }
+    }
     Ok(())
 }
 
