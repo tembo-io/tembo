@@ -1,9 +1,15 @@
-use crate::{apis::coredb_types::CoreDB, defaults, Context, Error};
+use crate::{
+    apis::coredb_types::CoreDB,
+    configmap::{create_configmap_ifnotexist, set_configmap},
+    defaults, Context, Error,
+};
 use kube::Client;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, sync::Arc};
-use tracing::{debug};
+use tracing::debug;
+
+pub const QUERIES_YAML: &str = "queries.yaml";
 
 
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema, Default)]
@@ -116,9 +122,6 @@ pub async fn create_postgres_exporter_role(cdb: &CoreDB, ctx: Arc<Context>) -> R
     Ok(())
 }
 
-use crate::configmap::{create_configmap_ifnotexist, set_configmap};
-
-const QUERIES_YAML: &str = "queries.yaml";
 
 pub async fn reconcile_prom_configmap(cdb: &CoreDB, client: Client, ns: &str) -> Result<(), Error> {
     create_configmap_ifnotexist(client.clone(), ns, "postgres-exporter").await?;

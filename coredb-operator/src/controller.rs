@@ -35,7 +35,7 @@ use k8s_openapi::api::core::v1::{Namespace, Pod};
 use kube::runtime::wait::Condition;
 use serde::Serialize;
 use serde_json::json;
-use std::{sync::Arc};
+use std::sync::Arc;
 use tokio::{sync::RwLock, time::Duration};
 use tracing::*;
 

@@ -27,9 +27,11 @@ use k8s_openapi::{
 use std::{collections::BTreeMap, sync::Arc};
 use tracing::{debug, error, info, warn};
 
+use crate::postgres_exporter::QUERIES_YAML;
 const PKGLIBDIR: &str = "/usr/lib/postgresql/15/lib";
 const SHAREDIR: &str = "/usr/share/postgresql/15";
 const DATADIR: &str = "/var/lib/postgresql/data";
+const PROM_CFG_DIR: &str = "/prometheus";
 
 pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
     let ns = cdb.namespace().unwrap();
@@ -136,6 +138,7 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
         },
     ];
 
+
     if cdb.spec.postgresExporterEnabled {
         containers.push(Container {
             name: "postgres-exporter".to_string(),
@@ -149,7 +152,7 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
                 },
                 EnvVar {
                     name: "PG_EXPORTER_EXTEND_QUERY_PATH".to_string(),
-                    value: Some("/prometheus/queries.yaml".to_string()),
+                    value: Some(format!("{PROM_CFG_DIR}/{QUERIES_YAML}")),
                     ..EnvVar::default()
                 },
             ]),
@@ -175,7 +178,7 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
             }),
             volume_mounts: Some(vec![VolumeMount {
                 name: "postgres-exporters".to_owned(),
-                mount_path: "/prometheus".to_owned(),
+                mount_path: PROM_CFG_DIR.to_string(),
                 ..VolumeMount::default()
             }]),
             ..Container::default()
