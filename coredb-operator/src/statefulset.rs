@@ -149,7 +149,7 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
                 },
                 EnvVar {
                     name: "PG_EXPORTER_EXTEND_QUERY_PATH".to_string(),
-                    value: Some("/app/prometheus/queries.yaml".to_string()),
+                    value: Some("/prometheus/queries.yaml".to_string()),
                     ..EnvVar::default()
                 },
             ]),
@@ -174,8 +174,8 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
                 ..Probe::default()
             }),
             volume_mounts: Some(vec![VolumeMount {
-                name: "prom-pg-queries".to_owned(),
-                mount_path: "/app/prometheus/queries.yaml".to_owned(),
+                name: "postgres-exporters".to_owned(),
+                mount_path: "/prometheus".to_owned(),
                 ..VolumeMount::default()
             }]),
             ..Container::default()
@@ -283,10 +283,10 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
                         },
                         Volume {
                             config_map: Some(ConfigMapVolumeSource {
-                                name: Some("prom-pg-queries".to_owned()),
+                                name: Some("postgres-exporter".to_owned()),
                                 ..ConfigMapVolumeSource::default()
                             }),
-                            name: "prom-pg-queries".to_owned(),
+                            name: "postgres-exporter".to_owned(),
                             ..Volume::default()
                         },
                     ]),
