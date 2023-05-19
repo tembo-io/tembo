@@ -6,7 +6,7 @@ use kube::{
 };
 use std::collections::BTreeMap;
 
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
 
 pub async fn create_configmap_ifnotexist(
@@ -19,13 +19,13 @@ pub async fn create_configmap_ifnotexist(
     match cm_api.get(cm_name).await {
         Ok(o) => {
             debug!("Configmap {} already exists", o.metadata.name.unwrap());
-            return Ok(());
         }
         Err(e) => {
+            warn!("{e}  -- creating configmap");
             create_configmap(cm_api, cm_name).await?;
-            return Ok(());
         }
     };
+    Ok(())
 }
 
 pub async fn create_configmap(cm_api: Api<ConfigMap>, cm_name: &str) -> Result<(), Error> {
