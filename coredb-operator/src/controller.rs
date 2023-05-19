@@ -28,7 +28,7 @@ use kube::{
 use crate::{
     apis::coredb_types::{CoreDB, CoreDBStatus},
     extensions::{reconcile_extensions, Extension},
-    postgres_exporter_role::create_postgres_exporter_role,
+    postgres_exporter::create_postgres_exporter_role,
     secret::reconcile_secret,
 };
 use k8s_openapi::api::core::v1::{Namespace, Pod};
