@@ -152,8 +152,7 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
                     value: Some("/app/prometheus/queries.yaml".to_string()),
                     ..EnvVar::default()
                 },
-                
-                ]),
+            ]),
             security_context: Some(SecurityContext {
                 run_as_user: Some(65534),
                 allow_privilege_escalation: Some(false),
@@ -174,13 +173,11 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
                 initial_delay_seconds: Some(3),
                 ..Probe::default()
             }),
-            volume_mounts: Some(vec![
-                VolumeMount {
-                    name: "prom-pg-queries".to_owned(),
-                    mount_path: "/app/prometheus/queries.yaml".to_owned(),
-                    ..VolumeMount::default()
-                },
-            ]),
+            volume_mounts: Some(vec![VolumeMount {
+                name: "prom-pg-queries".to_owned(),
+                mount_path: "/app/prometheus/queries.yaml".to_owned(),
+                ..VolumeMount::default()
+            }]),
             ..Container::default()
         });
     }
@@ -276,14 +273,13 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
                         ]),
                         ..Container::default()
                     }]),
-                    volumes: Some(
-                        vec![
-                            Volume {
-                                name: "certs".to_owned(),
-                                empty_dir: Some(EmptyDirVolumeSource {
-                                    ..EmptyDirVolumeSource::default()
+                    volumes: Some(vec![
+                        Volume {
+                            name: "certs".to_owned(),
+                            empty_dir: Some(EmptyDirVolumeSource {
+                                ..EmptyDirVolumeSource::default()
                             }),
-                        ..Volume::default()
+                            ..Volume::default()
                         },
                         Volume {
                             config_map: Some(ConfigMapVolumeSource {
@@ -293,11 +289,10 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
                             name: "prom-pg-queries".to_owned(),
                             empty_dir: Some(EmptyDirVolumeSource {
                                 ..EmptyDirVolumeSource::default()
-                             }),
+                            }),
                             ..Volume::default()
-                    },
-                        
-                        ]),
+                        },
+                    ]),
                     ..PodSpec::default()
                 }),
                 metadata: Some(ObjectMeta {
