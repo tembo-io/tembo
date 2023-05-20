@@ -117,6 +117,7 @@ mod test {
 
         // Apply a basic configuration of CoreDB
         println!("Creating CoreDB resource {}", name);
+        let test_metric_decr = format!("coredb_integration_test_{}", rng.gen_range(0..100000));
         let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), namespace);
         let coredb_json = serde_json::json!({
             "apiVersion": API_VERSION,
@@ -136,7 +137,24 @@ mod test {
                             "database": "postgres",
                             "schema": "public"}
                         ]
-                    }]
+                    }],
+                "metrics": {
+                    "enabled": true,
+                    "queries": {
+                        "test_ns": {
+                            "query": "SELECT pg_postmaster_start_time as start_time_seconds from pg_postmaster_start_time()",
+                            "master": true,
+                            "metrics": [
+                              {
+                                "start_time_seconds": {
+                                  "usage": "Gauge",
+                                  "description": test_metric_decr
+                                }
+                              }
+                            ]
+                        },
+                    }
+                }
             }
         });
         let params = PatchParams::apply("coredb-integration-test");
@@ -583,6 +601,16 @@ mod test {
             cron_job.spec.as_ref().unwrap().schedule,
             String::from("0 0 * * *")
         );
+
+        let pod_api: Api<Pod> = Api::namespaced(client.clone(), namespace);
+        let cmd = vec![
+            "wget".to_owned(),
+            "-qO-".to_owned(),
+            "http://localhost:9187/metrics".to_owned(),
+        ];
+        let result_stdout = run_command_in_container(pod_api.clone(), test_pod_name.clone(), cmd).await;
+        assert!(result_stdout.contains(&test_metric_decr));
+        println!("Found metrics when curling the metrics service");
     }
 
     #[tokio::test]
