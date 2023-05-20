@@ -19,7 +19,7 @@ pub struct PostgresMetrics {
     #[serde(default = "defaults::default_postgres_exporter_image")]
     pub image: String,
     #[serde(default = "defaults::default_postgres_exporter_enabled")]
-    pub ExporterEnabled: bool,
+    pub enabled: bool,
 
     #[schemars(schema_with = "preserve_arbitrary")]
     pub queries: Option<QueryConfig>,
