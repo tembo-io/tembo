@@ -27,7 +27,7 @@ use k8s_openapi::{
 use std::{collections::BTreeMap, sync::Arc};
 use tracing::{debug, error, info, warn};
 
-use crate::postgres_exporter::QUERIES_YAML;
+use crate::postgres_exporter::{EXPORTER_CONFIGMAP, EXPORTER_VOLUME, QUERIES_YAML};
 const PKGLIBDIR: &str = "/usr/lib/postgresql/15/lib";
 const SHAREDIR: &str = "/usr/share/postgresql/15";
 const DATADIR: &str = "/var/lib/postgresql/data";
@@ -177,7 +177,7 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
                 ..Probe::default()
             }),
             volume_mounts: Some(vec![VolumeMount {
-                name: "postgres-exporters".to_owned(),
+                name: EXPORTER_VOLUME.to_owned(),
                 mount_path: PROM_CFG_DIR.to_string(),
                 ..VolumeMount::default()
             }]),
@@ -286,10 +286,10 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
                         },
                         Volume {
                             config_map: Some(ConfigMapVolumeSource {
-                                name: Some("postgres-exporter".to_owned()),
+                                name: Some(EXPORTER_VOLUME.to_owned()),
                                 ..ConfigMapVolumeSource::default()
                             }),
-                            name: "postgres-exporter".to_owned(),
+                            name: EXPORTER_CONFIGMAP.to_owned(),
                             ..Volume::default()
                         },
                     ]),

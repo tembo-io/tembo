@@ -70,10 +70,10 @@ pub async fn set_configmap(
 
     match cm_api.patch(cm_name, &patch_params, &patch).await {
         Ok(o) => {
-            info!("Created empty configmap: {}", o.metadata.name.unwrap());
+            debug!("Set configmap: {}", o.metadata.name.unwrap());
         }
         Err(e) => {
-            error!("Failed to create empty configmap: {}", e);
+            error!("Failed to set configmap: {}", e);
         }
     };
     Ok(())

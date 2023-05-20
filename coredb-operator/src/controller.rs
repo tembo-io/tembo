@@ -109,7 +109,7 @@ impl CoreDB {
         let name = self.name_any();
         let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &ns);
 
-        // create configmap if postgres exporter enabled
+        // create/update configmap when postgres exporter enabled
         if self.spec.postgresExporterEnabled {
             reconcile_prom_configmap(self, client.clone(), &ns)
                 .await
