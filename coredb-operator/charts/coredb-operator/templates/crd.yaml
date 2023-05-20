@@ -87,7 +87,7 @@ spec:
               metrics:
                 nullable: true
                 properties:
-                  ExporterEnabled:
+                  enabled:
                     default: true
                     type: boolean
                   image:
