@@ -22,16 +22,21 @@ pub async fn create_configmap_ifnotexist(
         }
         Err(e) => {
             warn!("{e}  -- creating configmap");
-            create_configmap(cm_api, cm_name).await?;
+            create_configmap(cm_api, cm_name, namespace).await?;
         }
     };
     Ok(())
 }
 
-pub async fn create_configmap(cm_api: Api<ConfigMap>, cm_name: &str) -> Result<(), Error> {
+pub async fn create_configmap(
+    cm_api: Api<ConfigMap>,
+    cm_name: &str,
+    pg_postmaster: &str,
+) -> Result<(), Error> {
     let cm = ConfigMap {
         metadata: ObjectMeta {
             name: Some(cm_name.to_string()),
+            namespace: Some(pg_postmaster.to_owned()),
             ..Default::default()
         },
         ..Default::default()
