@@ -75,9 +75,14 @@ mod test {
         test_pod_name
     }
 
-    async fn run_command_in_container(pods_api: Api<Pod>, pod_name: String, command: Vec<String>) -> String {
+    async fn run_command_in_container(
+        pods_api: Api<Pod>,
+        pod_name: String,
+        command: Vec<String>,
+        container: Option<String>,
+    ) -> String {
         let attach_params = AttachParams {
-            container: None,
+            container,
             tty: false,
             stdin: true,
             stdout: true,
@@ -303,7 +308,8 @@ mod test {
             String::from("curl"),
             format!("http://{metrics_service_name}/metrics"),
         ];
-        let result_stdout = run_command_in_container(pods.clone(), test_pod_name.clone(), command).await;
+        let result_stdout =
+            run_command_in_container(pods.clone(), test_pod_name.clone(), command, None).await;
         assert!(result_stdout.contains("pg_up 1"));
         println!("Found metrics when curling the metrics service");
 
@@ -613,7 +619,13 @@ mod test {
             "wget -qO- http://localhost:9187/metrics".to_owned(),
             format!("| grep -i {test_metric_decr}"),
         ];
-        let result_stdout = run_command_in_container(pod_api.clone(), test_pod_name.clone(), cmd).await;
+        let result_stdout = run_command_in_container(
+            pod_api.clone(),
+            test_pod_name.clone(),
+            cmd,
+            Some("postgres-exporter".to_string()),
+        )
+        .await;
         println!("result_stdout: {}", result_stdout);
         assert!(result_stdout.contains(&test_metric_decr));
         println!("Found metrics when curling the metrics service");
