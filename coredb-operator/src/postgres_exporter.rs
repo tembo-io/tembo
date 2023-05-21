@@ -61,6 +61,7 @@ fn preserve_arbitrary(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::sc
 use std::str::FromStr;
 
 #[derive(Clone, Debug, JsonSchema, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "UPPERCASE")]
 pub enum Usage {
     Counter,
     Gauge,
@@ -73,10 +74,10 @@ impl FromStr for Usage {
 
     fn from_str(input: &str) -> Result<Usage, Self::Err> {
         match input {
-            "Counter" => Ok(Usage::Counter),
-            "Gauge" => Ok(Usage::Gauge),
-            "Histogram" => Ok(Usage::Histogram),
-            "Label" => Ok(Usage::Label),
+            "COUNTER" => Ok(Usage::Counter),
+            "GAUGE" => Ok(Usage::Gauge),
+            "HISTOGRAM" => Ok(Usage::Histogram),
+            "LABEL" => Ok(Usage::Label),
             _ => Err(()),
         }
     }

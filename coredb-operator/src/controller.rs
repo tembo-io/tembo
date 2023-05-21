@@ -219,10 +219,7 @@ impl CoreDB {
                 storage: self.spec.storage.clone(),
                 sharedirStorage: self.spec.sharedirStorage.clone(),
                 pkglibdirStorage: self.spec.pkglibdirStorage.clone(),
-                extensions: self
-                    .status
-                    .clone()
-                    .and_then(|f| f.extensions).clone()
+                extensions: self.status.clone().and_then(|f| f.extensions).clone(),
             },
         };
 
