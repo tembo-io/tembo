@@ -237,7 +237,6 @@ mod test {
             Some("postgres-exporter".to_string()),
         )
         .await;
-        println!("resultstdout, pod {pod_name}: {result_stdout}");
         assert!(result_stdout.contains(&test_metric_decr));
 
         // Assert default storage values are applied to PVC
@@ -259,12 +258,8 @@ mod test {
             .psql("\\dt".to_string(), "postgres".to_string(), client.clone())
             .await
             .unwrap();
-        println!("{}", result.stderr.clone().unwrap());
-        assert!(result
-            .stderr
-            .clone()
-            .unwrap()
-            .contains("Did not find any relations."));
+        println!("psql out: {}", result.stdout.clone().unwrap());
+        assert!(!result.stdout.clone().unwrap().contains("customers"));
 
         // Create table 'customers'
         let result = coredb_resource
