@@ -82,7 +82,7 @@ mod test {
         container: Option<String>,
     ) -> String {
         let attach_params = AttachParams {
-            container,
+            container: container.clone(),
             tty: false,
             stdin: true,
             stdout: true,
@@ -96,7 +96,10 @@ mod test {
         let mut attached_process = match attach_res {
             Ok(ap) => ap,
             Err(e) => {
-                panic!("Error attaching to pod: {}", e)
+                panic!(
+                    "Error attaching to pod: {}, container: {:?}, error: {}",
+                    pod_name, container, e
+                )
             }
         };
         let mut stdout_reader = attached_process.stdout().unwrap();
