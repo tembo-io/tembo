@@ -147,13 +147,13 @@ mod test {
                             "metrics": [
                               {
                                 "my_metric": {
-                                  "usage": "Gauge",
+                                  "usage": "GAUGE",
                                   "description": test_metric_decr
                                 }
                               },
                               {
                                 "animal": {
-                                    "usage": "Label",
+                                    "usage": "LABEL",
                                     "description": "Animal type"
                                 }
                               }
@@ -357,8 +357,8 @@ mod test {
         );
 
         // assert extensions made it into the status
-        let spec = coredbs.get(name).await.unwrap();
-        let status = spec.status.unwrap();
+        let spec = coredbs.get(name).await.expect("spec not found");
+        let status = spec.status.expect("no status on coredb");
         let extensions = status.extensions;
         assert!(extensions.clone().expect("expected extensions").len() > 0);
         assert!(extensions.expect("expected extensions")[0].description.len() > 0);
