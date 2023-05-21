@@ -224,14 +224,14 @@ mod tests {
   master: true
   metrics:
   - num_ext:
-      usage: Gauge
+      usage: GAUGE
       description: Num extensions
 pg_postmaster:
   query: SELECT pg_postmaster_start_time as start_time_seconds from pg_postmaster_start_time()
   master: true
   metrics:
   - start_time_seconds:
-      usage: Gauge
+      usage: GAUGE
       description: Time at which postmaster started
 "#;
         // formmatted correctly as yaml (for configmap)

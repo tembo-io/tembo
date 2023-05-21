@@ -610,11 +610,11 @@ mod test {
 
         let pod_api: Api<Pod> = Api::namespaced(client.clone(), namespace);
         let cmd = vec![
-            "wget".to_owned(),
-            "-qO-".to_owned(),
-            "http://localhost:9187/metrics".to_owned(),
+            "wget -qO- http://localhost:9187/metrics".to_owned(),
+            format!("| grep -i {test_metric_decr}"),
         ];
         let result_stdout = run_command_in_container(pod_api.clone(), test_pod_name.clone(), cmd).await;
+        println!("result_stdout: {}", result_stdout);
         assert!(result_stdout.contains(&test_metric_decr));
         println!("Found metrics when curling the metrics service");
     }
