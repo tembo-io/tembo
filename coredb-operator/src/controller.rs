@@ -221,10 +221,8 @@ impl CoreDB {
                 pkglibdirStorage: self.spec.pkglibdirStorage.clone(),
                 extensions: self
                     .status
-                    .as_ref()
-                    .expect("no extensions in `status`")
-                    .extensions
-                    .clone(),
+                    .clone()
+                    .and_then(|f| f.extensions).clone()
             },
         };
 
