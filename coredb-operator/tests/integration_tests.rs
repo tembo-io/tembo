@@ -219,6 +219,21 @@ mod test {
         });
         println!("Found pod ready: {}", pod_name);
 
+        // assert custom queries made it to metric server
+        let c = vec![
+            "wget".to_owned(),
+            "-qO-".to_owned(),
+            "http://localhost:9187/metrics".to_owned(),
+        ];
+        let result_stdout = run_command_in_container(
+            pods.clone(),
+            test_pod_name.clone(),
+            c,
+            Some("postgres-exporter".to_string()),
+        )
+        .await;
+        assert!(result_stdout.contains(&test_metric_decr));
+
         // Assert default storage values are applied to PVC
         let pvc_api: Api<PersistentVolumeClaim> = Api::namespaced(client.clone(), namespace);
         let default_storage: Quantity = default_storage();
@@ -616,23 +631,6 @@ mod test {
             cron_job.spec.as_ref().unwrap().schedule,
             String::from("0 0 * * *")
         );
-
-        let pod_api: Api<Pod> = Api::namespaced(client.clone(), namespace);
-
-        let c = vec![
-            "wget".to_owned(),
-            "-qO-".to_owned(),
-            "http://localhost:9187/metrics".to_owned(),
-        ];
-        let result_stdout = run_command_in_container(
-            pod_api.clone(),
-            test_pod_name.clone(),
-            c,
-            Some("postgres-exporter".to_string()),
-        )
-        .await;
-        assert!(result_stdout.contains(&test_metric_decr));
-        println!("Found metrics when curling the metrics service");
     }
 
     #[tokio::test]
