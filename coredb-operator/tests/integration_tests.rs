@@ -142,13 +142,19 @@ mod test {
                     "enabled": true,
                     "queries": {
                         "test_ns": {
-                            "query": "SELECT pg_postmaster_start_time as start_time_seconds from pg_postmaster_start_time()",
+                            "query": "SELECT 10 as my_metric, 'cat' as animal",
                             "master": true,
                             "metrics": [
                               {
-                                "start_time_seconds": {
+                                "my_metric": {
                                   "usage": "Gauge",
                                   "description": test_metric_decr
+                                }
+                              },
+                              {
+                                "animal": {
+                                    "usage": "Label",
+                                    "description": "Animal type"
                                 }
                               }
                             ]
