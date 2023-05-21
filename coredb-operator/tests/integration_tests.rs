@@ -92,10 +92,13 @@ mod test {
             max_stderr_buf_size: Some(1024),
         };
 
-        let mut attached_process = pods_api
-            .exec(pod_name.as_str(), &command, &attach_params)
-            .await
-            .unwrap();
+        let attach_res = pods_api.exec(pod_name.as_str(), &command, &attach_params).await;
+        let mut attached_process = match attach_res {
+            Ok(ap) => ap,
+            Err(e) => {
+                panic!("Error attaching to pod: {}", e)
+            }
+        };
         let mut stdout_reader = attached_process.stdout().unwrap();
         let mut result_stdout = String::new();
         stdout_reader.read_to_string(&mut result_stdout).await.unwrap();
@@ -615,18 +618,19 @@ mod test {
         );
 
         let pod_api: Api<Pod> = Api::namespaced(client.clone(), namespace);
-        let cmd = vec![
-            "wget -qO- http://localhost:9187/metrics".to_owned(),
-            format!("| grep -i {test_metric_decr}"),
+
+        let c = vec![
+            "wget".to_owned(),
+            "-qO-".to_owned(),
+            "http://localhost:9187/metrics".to_owned(),
         ];
         let result_stdout = run_command_in_container(
             pod_api.clone(),
             test_pod_name.clone(),
-            cmd,
+            c,
             Some("postgres-exporter".to_string()),
         )
         .await;
-        println!("result_stdout: {}", result_stdout);
         assert!(result_stdout.contains(&test_metric_decr));
         println!("Found metrics when curling the metrics service");
     }
