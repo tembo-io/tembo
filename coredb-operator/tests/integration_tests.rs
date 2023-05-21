@@ -223,18 +223,21 @@ mod test {
         println!("Found pod ready: {}", pod_name);
 
         // assert custom queries made it to metric server
+        let pods: Api<Pod> = Api::namespaced(client.clone(), namespace);
         let c = vec![
             "wget".to_owned(),
             "-qO-".to_owned(),
             "http://localhost:9187/metrics".to_owned(),
         ];
+        thread::sleep(Duration::from_millis(10000));
         let result_stdout = run_command_in_container(
             pods.clone(),
-            test_pod_name.clone(),
+            pod_name.clone(),
             c,
             Some("postgres-exporter".to_string()),
         )
         .await;
+        println!("resultstdout, pod {pod_name}: {result_stdout}");
         assert!(result_stdout.contains(&test_metric_decr));
 
         // Assert default storage values are applied to PVC
@@ -329,8 +332,13 @@ mod test {
             String::from("curl"),
             format!("http://{metrics_service_name}/metrics"),
         ];
-        let result_stdout =
-            run_command_in_container(pods.clone(), test_pod_name.clone(), command, None).await;
+        let result_stdout = run_command_in_container(
+            pods.clone(),
+            test_pod_name.clone(),
+            command,
+            Some("postgres".to_string()),
+        )
+        .await;
         assert!(result_stdout.contains("pg_up 1"));
         println!("Found metrics when curling the metrics service");
 
