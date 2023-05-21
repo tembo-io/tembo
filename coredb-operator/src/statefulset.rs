@@ -143,10 +143,7 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
         containers.push(Container {
             name: "postgres-exporter".to_string(),
             image: Some(default_postgres_exporter_image()),
-            args: Some(vec![
-                "--auto-discover-databases".to_string(),
-                // "--log.level=debug".to_string(),
-            ]),
+            args: Some(vec!["--auto-discover-databases".to_string()]),
             env: Some(vec![
                 EnvVar {
                     name: "DATA_SOURCE_NAME".to_string(),
