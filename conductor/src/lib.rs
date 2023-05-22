@@ -386,7 +386,7 @@ pub async fn create_cloudformation(
         // The AWS S3 Bucket where the CF Template is placed
         String::from(cf_template_bucket),
         // The Kubernetes Namespace where the database is deployed
-        String::from(namespace),
+        namespace,
         // The Kubernetes Service Account to use for the database
         String::from(&service_account_name),
     );

@@ -1,3 +1,4 @@
+use controller::postgres_exporter::PostgresMetrics;
 use kube::CustomResource;
 use serde::{Deserialize, Serialize};
 use serde_json::Value as JsonValue;
@@ -66,6 +67,7 @@ pub struct CoreDBSpec {
     pub service_account_template: Option<ServiceAccountTemplate>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub backup: Option<Backup>,
+    pub metrics: Option<PostgresMetrics>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Eq, Hash, PartialEq)]

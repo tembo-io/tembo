@@ -75,7 +75,7 @@ jobs:
         # Go here for a list of versions:
         # https://github.com/kubernetes-sigs/kind/releases
         node_image:
-          - 'kindest/node:v1.25.3'
+          - 'kindest/node:v1.25.8'
     steps:
       - uses: actions/checkout@v2
       - name: Create k8s Kind Cluster

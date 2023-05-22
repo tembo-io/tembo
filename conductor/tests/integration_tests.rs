@@ -25,6 +25,7 @@ mod test {
         coredb_crd as crd, restart_statefulset,
         types::{self, StateToControlPlane},
     };
+    use controller::postgres_exporter::{PostgresMetrics, QueryConfig};
     use rand::Rng;
     use std::collections::BTreeMap;
     use std::{thread, time};
@@ -82,6 +83,35 @@ mod test {
             ("memory".to_owned(), "1Gi".to_string()),
         ]);
 
+        let custom_metrics = serde_json::json!({
+          "pg_postmaster": {
+            "query": "SELECT pg_postmaster_start_time as start_time_seconds from pg_postmaster_start_time()",
+            "master": true,
+            "metrics": [
+              {
+                "start_time_seconds": {
+                  "usage": "GAUGE",
+                  "description": "Time at which postmaster started"
+                }
+              }
+            ]
+          },
+          "extensions": {
+            "query": "select count(*) as num_ext from pg_available_extensions",
+            "master": true,
+            "metrics": [
+              {
+                "num_ext": {
+                  "usage": "GAUGE",
+                  "description": "Num extensions"
+                }
+              }
+            ]
+          }
+        });
+        let query_config: QueryConfig =
+            serde_json::from_value(custom_metrics).expect("failed to deserialize");
+
         // conductor receives a CRUDevent from control plane
         let spec_js = serde_json::json!({
             "extensions": Some(vec![crd::CoreDBExtensions {
@@ -100,6 +130,11 @@ mod test {
                 limits: Some(limits),
                 requests: None,
             }),
+            "metrics": Some(PostgresMetrics{
+                queries: Some(query_config),
+                enabled: true,
+                image: "default-image-value".to_string()
+            })
         });
         let spec: crd::CoreDBSpec = serde_json::from_value(spec_js).unwrap();
 
@@ -144,6 +179,16 @@ mod test {
             .expect("error deleting message");
 
         let spec = msg.message.spec.expect("No spec found in message");
+
+        // assert that the message returned by Conductor includes the new metrics values in the spec
+        assert!(spec
+            .metrics
+            .expect("no metrics in data-plane-event message")
+            .queries
+            .expect("queries missing")
+            .queries
+            .contains_key("pg_postmaster"));
+
         assert!(
             spec.extensions.is_some(),
             "Extension object missing from spec"
