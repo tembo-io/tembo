@@ -1,10 +1,17 @@
+use crate::{
+    apis::coredb_types::CoreDB,
+    configmap::{create_configmap_ifnotexist, set_configmap},
+    defaults, Context, Error,
+};
+use kube::Client;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, sync::Arc};
 use tracing::debug;
 
-use crate::{apis::coredb_types::CoreDB, defaults, Context, Error};
-
+pub const QUERIES_YAML: &str = "queries.yaml";
+pub const EXPORTER_VOLUME: &str = "postgres-exporter";
+pub const EXPORTER_CONFIGMAP: &str = "postgres-exporter";
 
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema, Default)]
 #[allow(non_snake_case)]
@@ -12,9 +19,9 @@ pub struct PostgresMetrics {
     #[serde(default = "defaults::default_postgres_exporter_image")]
     pub image: String,
     #[serde(default = "defaults::default_postgres_exporter_enabled")]
-    pub ExporterEnabled: bool,
+    pub enabled: bool,
 
-    #[serde(flatten)]
+    #[schemars(schema_with = "preserve_arbitrary")]
     pub queries: Option<QueryConfig>,
 }
 
@@ -43,9 +50,18 @@ pub struct QueryConfig {
     pub queries: BTreeMap<String, QueryItem>,
 }
 
+// source: https://github.com/kube-rs/kube/issues/844
+fn preserve_arbitrary(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+    let mut obj = schemars::schema::SchemaObject::default();
+    obj.extensions
+        .insert("x-kubernetes-preserve-unknown-fields".into(), true.into());
+    schemars::schema::Schema::Object(obj)
+}
+
 use std::str::FromStr;
 
 #[derive(Clone, Debug, JsonSchema, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "UPPERCASE")]
 pub enum Usage {
     Counter,
     Gauge,
@@ -58,15 +74,14 @@ impl FromStr for Usage {
 
     fn from_str(input: &str) -> Result<Usage, Self::Err> {
         match input {
-            "Counter" => Ok(Usage::Counter),
-            "Gauge" => Ok(Usage::Gauge),
-            "Histogram" => Ok(Usage::Histogram),
-            "Label" => Ok(Usage::Label),
+            "COUNTER" => Ok(Usage::Counter),
+            "GAUGE" => Ok(Usage::Gauge),
+            "HISTOGRAM" => Ok(Usage::Histogram),
+            "LABEL" => Ok(Usage::Label),
             _ => Err(()),
         }
     }
 }
-
 
 pub async fn create_postgres_exporter_role(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
     let client = ctx.client.clone();
@@ -110,6 +125,23 @@ pub async fn create_postgres_exporter_role(cdb: &CoreDB, ctx: Arc<Context>) -> R
 }
 
 
+pub async fn reconcile_prom_configmap(cdb: &CoreDB, client: Client, ns: &str) -> Result<(), Error> {
+    create_configmap_ifnotexist(client.clone(), ns, EXPORTER_CONFIGMAP).await?;
+    // set custom pg-prom metrics in configmap values if they are specified
+    match cdb.spec.metrics.clone().and_then(|m| m.queries) {
+        Some(queries) => {
+            let qdata = serde_yaml::to_string(&queries).unwrap();
+            let d: BTreeMap<String, String> = BTreeMap::from([(QUERIES_YAML.to_string(), qdata)]);
+            set_configmap(client.clone(), ns, EXPORTER_CONFIGMAP, d).await?
+        }
+        None => {
+            debug!("No queries specified in CoreDB spec");
+        }
+    }
+    Ok(())
+}
+
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -127,7 +159,7 @@ mod tests {
                   "metrics": [
                     {
                       "start_time_seconds": {
-                        "usage": "Gauge",
+                        "usage": "GAUGE",
                         "description": "Time at which postmaster started"
                       }
                     }
@@ -139,7 +171,7 @@ mod tests {
                   "metrics": [
                     {
                       "num_ext": {
-                        "usage": "Gauge",
+                        "usage": "GAUGE",
                         "description": "Num extensions"
                       }
                     }
@@ -192,14 +224,14 @@ mod tests {
   master: true
   metrics:
   - num_ext:
-      usage: Gauge
+      usage: GAUGE
       description: Num extensions
 pg_postmaster:
   query: SELECT pg_postmaster_start_time as start_time_seconds from pg_postmaster_start_time()
   master: true
   metrics:
   - start_time_seconds:
-      usage: Gauge
+      usage: GAUGE
       description: Time at which postmaster started
 "#;
         // formmatted correctly as yaml (for configmap)
