@@ -3,6 +3,7 @@ pub mod controller;
 pub use crate::controller::*;
 pub mod apis;
 
+pub mod configmap;
 pub mod postgres_exporter;
 /// Log and trace integrations
 pub mod telemetry;

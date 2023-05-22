@@ -75,9 +75,14 @@ mod test {
         test_pod_name
     }
 
-    async fn run_command_in_container(pods_api: Api<Pod>, pod_name: String, command: Vec<String>) -> String {
+    async fn run_command_in_container(
+        pods_api: Api<Pod>,
+        pod_name: String,
+        command: Vec<String>,
+        container: Option<String>,
+    ) -> String {
         let attach_params = AttachParams {
-            container: None,
+            container: container.clone(),
             tty: false,
             stdin: true,
             stdout: true,
@@ -87,10 +92,16 @@ mod test {
             max_stderr_buf_size: Some(1024),
         };
 
-        let mut attached_process = pods_api
-            .exec(pod_name.as_str(), &command, &attach_params)
-            .await
-            .unwrap();
+        let attach_res = pods_api.exec(pod_name.as_str(), &command, &attach_params).await;
+        let mut attached_process = match attach_res {
+            Ok(ap) => ap,
+            Err(e) => {
+                panic!(
+                    "Error attaching to pod: {}, container: {:?}, error: {}",
+                    pod_name, container, e
+                )
+            }
+        };
         let mut stdout_reader = attached_process.stdout().unwrap();
         let mut result_stdout = String::new();
         stdout_reader.read_to_string(&mut result_stdout).await.unwrap();
@@ -117,6 +128,7 @@ mod test {
 
         // Apply a basic configuration of CoreDB
         println!("Creating CoreDB resource {}", name);
+        let test_metric_decr = format!("coredb_integration_test_{}", rng.gen_range(0..100000));
         let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), namespace);
         let coredb_json = serde_json::json!({
             "apiVersion": API_VERSION,
@@ -136,7 +148,30 @@ mod test {
                             "database": "postgres",
                             "schema": "public"}
                         ]
-                    }]
+                    }],
+                "metrics": {
+                    "enabled": true,
+                    "queries": {
+                        "test_ns": {
+                            "query": "SELECT 10 as my_metric, 'cat' as animal",
+                            "master": true,
+                            "metrics": [
+                              {
+                                "my_metric": {
+                                  "usage": "GAUGE",
+                                  "description": test_metric_decr
+                                }
+                              },
+                              {
+                                "animal": {
+                                    "usage": "LABEL",
+                                    "description": "Animal type"
+                                }
+                              }
+                            ]
+                        },
+                    }
+                }
             }
         });
         let params = PatchParams::apply("coredb-integration-test");
@@ -187,6 +222,23 @@ mod test {
         });
         println!("Found pod ready: {}", pod_name);
 
+        // assert custom queries made it to metric server
+        let pods: Api<Pod> = Api::namespaced(client.clone(), namespace);
+        let c = vec![
+            "wget".to_owned(),
+            "-qO-".to_owned(),
+            "http://localhost:9187/metrics".to_owned(),
+        ];
+        thread::sleep(Duration::from_millis(10000));
+        let result_stdout = run_command_in_container(
+            pods.clone(),
+            pod_name.clone(),
+            c,
+            Some("postgres-exporter".to_string()),
+        )
+        .await;
+        assert!(result_stdout.contains(&test_metric_decr));
+
         // Assert default storage values are applied to PVC
         let pvc_api: Api<PersistentVolumeClaim> = Api::namespaced(client.clone(), namespace);
         let default_storage: Quantity = default_storage();
@@ -206,12 +258,8 @@ mod test {
             .psql("\\dt".to_string(), "postgres".to_string(), client.clone())
             .await
             .unwrap();
-        println!("{}", result.stderr.clone().unwrap());
-        assert!(result
-            .stderr
-            .clone()
-            .unwrap()
-            .contains("Did not find any relations."));
+        println!("psql out: {}", result.stdout.clone().unwrap());
+        assert!(!result.stdout.clone().unwrap().contains("customers"));
 
         // Create table 'customers'
         let result = coredb_resource
@@ -279,7 +327,8 @@ mod test {
             String::from("curl"),
             format!("http://{metrics_service_name}/metrics"),
         ];
-        let result_stdout = run_command_in_container(pods.clone(), test_pod_name.clone(), command).await;
+        let result_stdout =
+            run_command_in_container(pods.clone(), test_pod_name.clone(), command, None).await;
         assert!(result_stdout.contains("pg_up 1"));
         println!("Found metrics when curling the metrics service");
 
@@ -333,8 +382,8 @@ mod test {
         );
 
         // assert extensions made it into the status
-        let spec = coredbs.get(name).await.unwrap();
-        let status = spec.status.unwrap();
+        let spec = coredbs.get(name).await.expect("spec not found");
+        let status = spec.status.expect("no status on coredb");
         let extensions = status.extensions;
         assert!(extensions.clone().expect("expected extensions").len() > 0);
         assert!(extensions.expect("expected extensions")[0].description.len() > 0);

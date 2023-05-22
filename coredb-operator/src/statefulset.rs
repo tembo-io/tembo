@@ -21,15 +21,17 @@ use kube::{
 use std::{str, thread, time::Duration};
 
 use k8s_openapi::{
-    api::core::v1::{EmptyDirVolumeSource, HTTPGetAction, Volume},
+    api::core::v1::{ConfigMapVolumeSource, EmptyDirVolumeSource, HTTPGetAction, Volume},
     apimachinery::pkg::util::intstr::IntOrString,
 };
 use std::{collections::BTreeMap, sync::Arc};
 use tracing::{debug, error, info, warn};
 
+use crate::postgres_exporter::{EXPORTER_CONFIGMAP, EXPORTER_VOLUME, QUERIES_YAML};
 const PKGLIBDIR: &str = "/usr/lib/postgresql/15/lib";
 const SHAREDIR: &str = "/usr/share/postgresql/15";
 const DATADIR: &str = "/var/lib/postgresql/data";
+const PROM_CFG_DIR: &str = "/prometheus";
 
 pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
     let ns = cdb.namespace().unwrap();
@@ -136,16 +138,24 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
         },
     ];
 
+
     if cdb.spec.postgresExporterEnabled {
         containers.push(Container {
             name: "postgres-exporter".to_string(),
             image: Some(default_postgres_exporter_image()),
             args: Some(vec!["--auto-discover-databases".to_string()]),
-            env: Some(vec![EnvVar {
-                name: "DATA_SOURCE_NAME".to_string(),
-                value: Some("postgresql://postgres_exporter@localhost:5432/postgres".to_string()),
-                ..EnvVar::default()
-            }]),
+            env: Some(vec![
+                EnvVar {
+                    name: "DATA_SOURCE_NAME".to_string(),
+                    value: Some("postgresql://postgres_exporter@localhost:5432/postgres".to_string()),
+                    ..EnvVar::default()
+                },
+                EnvVar {
+                    name: "PG_EXPORTER_EXTEND_QUERY_PATH".to_string(),
+                    value: Some(format!("{PROM_CFG_DIR}/{QUERIES_YAML}")),
+                    ..EnvVar::default()
+                },
+            ]),
             security_context: Some(SecurityContext {
                 run_as_user: Some(65534),
                 allow_privilege_escalation: Some(false),
@@ -166,6 +176,11 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
                 initial_delay_seconds: Some(3),
                 ..Probe::default()
             }),
+            volume_mounts: Some(vec![VolumeMount {
+                name: EXPORTER_VOLUME.to_owned(),
+                mount_path: PROM_CFG_DIR.to_string(),
+                ..VolumeMount::default()
+            }]),
             ..Container::default()
         });
     }
@@ -261,13 +276,23 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
                         ]),
                         ..Container::default()
                     }]),
-                    volumes: Some(vec![Volume {
-                        name: "certs".to_owned(),
-                        empty_dir: Some(EmptyDirVolumeSource {
-                            ..EmptyDirVolumeSource::default()
-                        }),
-                        ..Volume::default()
-                    }]),
+                    volumes: Some(vec![
+                        Volume {
+                            name: "certs".to_owned(),
+                            empty_dir: Some(EmptyDirVolumeSource {
+                                ..EmptyDirVolumeSource::default()
+                            }),
+                            ..Volume::default()
+                        },
+                        Volume {
+                            config_map: Some(ConfigMapVolumeSource {
+                                name: Some(EXPORTER_VOLUME.to_owned()),
+                                ..ConfigMapVolumeSource::default()
+                            }),
+                            name: EXPORTER_CONFIGMAP.to_owned(),
+                            ..Volume::default()
+                        },
+                    ]),
                     ..PodSpec::default()
                 }),
                 metadata: Some(ObjectMeta {
