@@ -1,6 +1,6 @@
-# Postgres Docker image
+# Postgres Docker Base Image
 
-Contains a Dockerfile with a set of standard set of community Postgres extensions, and utilities for managing Postgres with the coredb-operator. Over time, this image will be pruned down to the bare minimum required for the coredb-operator.
+Contains a Dockerfile with Postgres 15.3, no extensions and no additional tools.
 
 ## Versioning
 
