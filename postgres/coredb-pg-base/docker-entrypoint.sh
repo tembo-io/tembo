@@ -242,6 +242,26 @@ pg_setup_hba_conf() {
 	} >> "$PGDATA/pg_hba.conf"
 }
 
+# Make sure we always copy the correct postgresql.conf, even if it already exists
+# If postgresql.conf.replace is newer, we copy that to $PGDATA/postgresql.conf
+update_postgresql_conf() {
+    # Define the path to the replacement file
+    local replace_file="/postgresql.conf.replace"
+
+    # Check if the replacement file exists
+    if [ -f "$replace_file" ]; then
+        # If the replacement file and the current postgresql.conf file are different, replace postgresql.conf
+        if ! cmp -s "$PGDATA/postgresql.conf" "$replace_file"; then
+            echo "postgresql.conf is different from the replacement, updating..."
+            cp "$replace_file" "$PGDATA/postgresql.conf"
+        else
+            echo "postgresql.conf is the same as the replacement, no update needed."
+        fi
+    else
+        echo "No replacement file found, skipping update."
+    fi
+}
+
 # start socket-only postgresql server for setting up or running scripts
 # all arguments will be passed along as arguments to `postgres` (via pg_ctl)
 docker_temp_server_start() {
