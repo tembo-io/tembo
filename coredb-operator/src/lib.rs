@@ -3,6 +3,8 @@ pub mod controller;
 pub use crate::controller::*;
 pub mod apis;
 
+pub mod configmap;
+pub mod postgres_exporter;
 /// Log and trace integrations
 pub mod telemetry;
 
@@ -15,7 +17,6 @@ mod cronjob;
 pub mod defaults;
 mod extensions;
 #[cfg(test)] pub mod fixtures;
-mod postgres_exporter_role;
 mod psql;
 mod rbac;
 mod secret;

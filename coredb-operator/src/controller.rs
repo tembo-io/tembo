@@ -28,7 +28,7 @@ use kube::{
 use crate::{
     apis::coredb_types::{CoreDB, CoreDBStatus},
     extensions::{reconcile_extensions, Extension},
-    postgres_exporter_role::create_postgres_exporter_role,
+    postgres_exporter::{create_postgres_exporter_role, reconcile_prom_configmap},
     secret::reconcile_secret,
 };
 use k8s_openapi::api::core::v1::{Namespace, Pod};
@@ -108,6 +108,16 @@ impl CoreDB {
         let ns = self.namespace().unwrap();
         let name = self.name_any();
         let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &ns);
+
+        // create/update configmap when postgres exporter enabled
+        if self.spec.postgresExporterEnabled {
+            reconcile_prom_configmap(self, client.clone(), &ns)
+                .await
+                .map_err(|e| {
+                    error!("Error reconciling prometheus configmap: {:?}", e);
+                    Action::requeue(Duration::from_secs(10))
+                })?;
+        }
 
         // reconcile service account, role, and role binding
         reconcile_rbac(self, ctx.clone()).await.map_err(|e| {
@@ -209,12 +219,7 @@ impl CoreDB {
                 storage: self.spec.storage.clone(),
                 sharedirStorage: self.spec.sharedirStorage.clone(),
                 pkglibdirStorage: self.spec.pkglibdirStorage.clone(),
-                extensions: self
-                    .status
-                    .as_ref()
-                    .expect("no extensions in `status`")
-                    .extensions
-                    .clone(),
+                extensions: self.status.clone().and_then(|f| f.extensions),
             },
         };
 
