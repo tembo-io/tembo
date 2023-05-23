@@ -1,21 +1,4 @@
-FROM quay.io/coredb/ubuntu:22.04 as builder
-
-ARG TRUNK_VER=0.4.8
-
-RUN apt-get update && apt-get install -y \
-    curl \
-    pkg-config \
-    libssl-dev \
-    build-essential \
-    libclang-dev \
-    clang \
-    software-properties-common
-RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
-RUN /root/.cargo/bin/cargo install --version $TRUNK_VER pg-trunk
-
 FROM quay.io/coredb/ubuntu:22.04
-
-COPY --from=builder /root/.cargo/bin/trunk /usr/bin/trunk
 
 ARG DEBIAN_FRONTEND=noninteractive
 ENV TZ=Etc/UTC
@@ -27,8 +10,6 @@ RUN set -eux; \
 	mkdir -p /var/lib/postgresql; \
 	chown -R postgres:postgres /var/lib/postgresql
 
-# Installs the postgres APT repository
-# https://wiki.postgresql.org/wiki/Apt
 RUN apt-get update && apt-get install -y \
     curl \
     ca-certificates \
