@@ -1,11 +1,11 @@
 [package]
-name = "coredb-pg-slim"
-version = "15.2.0-coredb-pg-slim.9"
+name = "coredb-pg-base"
+version = "15.3.0-coredb-pg-base.1"
 edition = "2021"
 authors = ["CoreDB.io"]
-description = "CoreDB distribution of postgres"
+description = "Base image for CoreDB's distribution of postgres"
 homepage = "https://www.coredb.io"
-license = "MIT"
+license = "Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/CoreDB-io/coredb/tree/main/postgres"
 
