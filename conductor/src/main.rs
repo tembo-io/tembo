@@ -157,19 +157,13 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                     ..read_msg.message.spec.clone()
                 };
                 // create Namespace
-                create_namespace(client.clone(), &namespace)
-                    .await
-                    .expect("error creating namespace");
+                create_namespace(client.clone(), &namespace).await?;
 
                 // create NetworkPolicy to allow internet access only
-                create_networkpolicy(client.clone(), &namespace)
-                    .await
-                    .expect("error creating networkpolicy");
+                create_networkpolicy(client.clone(), &namespace).await?;
 
                 // create IngressRouteTCP
-                create_ing_route_tcp(client.clone(), &namespace, &data_plane_basedomain)
-                    .await
-                    .expect("error creating IngressRouteTCP");
+                create_ing_route_tcp(client.clone(), &namespace, &data_plane_basedomain).await?;
 
                 // create /metrics ingress
                 //
@@ -183,13 +177,10 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 let spec = generate_spec(&namespace, &coredb_spec).await;
 
                 // create or update CoreDB
-                create_or_update(client.clone(), &namespace, spec)
-                    .await
-                    .expect("error creating or updating CoreDB");
+                create_or_update(client.clone(), &namespace, spec).await?;
                 // get connection string values from secret
-                let conn_info = get_pg_conn(client.clone(), &namespace, &data_plane_basedomain)
-                    .await
-                    .expect("error getting secret");
+                let conn_info =
+                    get_pg_conn(client.clone(), &namespace, &data_plane_basedomain).await?;
 
                 let result = get_coredb_status(client.clone(), &namespace).await;
 
@@ -294,14 +285,10 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             }
             Event::Delete => {
                 // delete CoreDB
-                delete(client.clone(), &namespace, &namespace)
-                    .await
-                    .expect("error deleting CoreDB");
+                delete(client.clone(), &namespace, &namespace).await?;
 
                 // delete namespace
-                delete_namespace(client.clone(), &namespace)
-                    .await
-                    .expect("error deleting namespace");
+                delete_namespace(client.clone(), &namespace).await?;
 
                 delete_cloudformation(
                     String::from("us-east-1"),
@@ -396,5 +383,12 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
 fn main() {
     env_logger::init();
     info!("starting");
-    run().unwrap();
+    loop {
+        match run() {
+            Ok(_) => {}
+            Err(err) => {
+                error!("error: {:?}", err);
+            }
+        }
+    }
 }
