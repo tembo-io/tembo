@@ -21,7 +21,7 @@ pub struct PostgresMetrics {
     #[serde(default = "defaults::default_postgres_exporter_enabled")]
     pub enabled: bool,
 
-    #[schemars(schema_with = "preserve_arbitrary", required = "false")]
+    #[schemars(schema_with = "preserve_arbitrary")]
     pub queries: Option<QueryConfig>,
 }
 
@@ -51,7 +51,7 @@ pub struct QueryConfig {
 }
 
 // source: https://github.com/kube-rs/kube/issues/844
-fn preserve_arbitrary(gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+fn preserve_arbitrary(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
     let mut obj = schemars::schema::SchemaObject::default();
     obj.extensions
         .insert("x-kubernetes-preserve-unknown-fields".into(), true.into());
