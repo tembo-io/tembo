@@ -95,8 +95,7 @@ spec:
                     type: string
                   queries:
                     x-kubernetes-preserve-unknown-fields: true
-                required:
-                - queries
+                
                 type: object
               pkglibdirStorage:
                 default: 1Gi
