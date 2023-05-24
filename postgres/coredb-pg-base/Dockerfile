@@ -37,13 +37,16 @@ RUN mkdir /docker-entrypoint-initdb.d
 # Install postgres and some extensions
 RUN apt-get update && apt-get install -y \
         build-essential \
+        zlib1g-dev \
+        libreadline-dev \
+        libssl-dev \
         && rm -rf /var/lib/apt/lists/*
 
 # Build Postgres from source
 RUN curl https://ftp.postgresql.org/pub/source/v15.3/postgresql-15.3.tar.bz2 -o postgresql-15.3.tar.bz2
 RUN tar xf postgresql-${PG_VERSION}.tar.bz2
 WORKDIR postgresql-${PG_VERSION}
-RUN ./configure --prefix=/usr/lib/postgresql/${PG_MAJOR} --datarootdir=/usr/share
+RUN ./configure --prefix=/usr/lib/postgresql/${PG_MAJOR} --datarootdir=/usr/share --with-openssl
 RUN make
 RUN make install
 RUN cd .. && rm postgresql-${PG_VERSION}.tar.bz2
