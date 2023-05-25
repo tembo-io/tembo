@@ -11,7 +11,7 @@ pub struct CRUDevent {
     pub event_id: String,
     pub event_type: Event,
     pub dbname: String,
-    pub spec: crd::CoreDBSpec,
+    pub spec: Option<crd::CoreDBSpec>,
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]

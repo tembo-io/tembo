@@ -164,7 +164,7 @@ impl AWSConfigState {
         &self,
         stack_name: &str,
     ) -> Result<(), ConductorError> {
-        if !self.does_stack_exist(stack_name).await {
+        if self.does_stack_exist(stack_name).await {
             let delete_stack_result = self
                 .cf_client
                 .delete_stack()
@@ -178,7 +178,7 @@ impl AWSConfigState {
                     Ok(())
                 }
                 Err(err) => {
-                    error!("Error creating stack: {:?}", err);
+                    error!("Error deleting stack: {:?}", err);
                     Err(ConductorError::AwsError(err.into()))
                 }
             }

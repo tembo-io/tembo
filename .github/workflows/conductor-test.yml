@@ -131,13 +131,13 @@ jobs:
 
           # Run the tests
           cargo test -- --ignored --nocapture
-      - name: Delete test cloudformation stacks
-        run: |
-          stacks=$(aws cloudformation list-stacks --stack-status-filter CREATE_COMPLETE --query "StackSummaries[].StackName" --output json)
-          stack_names=$(echo "$stacks" | jq -r '.[]' | grep -E '.*-test-org-inst-test-coredb-.*-cf')
-          for stack in $stack_names; do
-            aws cloudformation delete-stack --stack-name ${stack} --region us-east-1
-          done
+#       - name: Delete test cloudformation stacks
+#         run: |
+#           stacks=$(aws cloudformation list-stacks --stack-status-filter CREATE_COMPLETE --query "StackSummaries[].StackName" --output json)
+#           stack_names=$(echo "$stacks" | jq -r '.[]' | grep -E '.*-test-org-inst-test-coredb-.*-cf')
+#           for stack in $stack_names; do
+#             aws cloudformation delete-stack --stack-name ${stack} --region us-east-1
+#           done
       - name: Debugging information
         if: always()
         run: |

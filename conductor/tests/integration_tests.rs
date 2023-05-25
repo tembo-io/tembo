@@ -12,10 +12,15 @@
 #[cfg(test)]
 mod test {
     use k8s_openapi::{
-        api::{apps::v1::StatefulSet, core::v1::Pod},
+        api::{
+            apps::v1::StatefulSet, core::v1::Namespace, core::v1::PersistentVolumeClaim,
+            core::v1::Pod,
+        },
         apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
     };
+
     use kube::{
+        api::ListParams,
         runtime::wait::{await_condition, conditions},
         Api, Client, Config,
     };
@@ -147,7 +152,7 @@ mod test {
             ),
             event_type: types::Event::Create,
             dbname: dbname.clone(),
-            spec: spec,
+            spec: Some(spec),
         };
 
         let msg_id = queue.send(&myqueue, &msg).await;
@@ -251,7 +256,7 @@ mod test {
             event_id: "test-install-extension".to_owned(),
             event_type: types::Event::Update,
             dbname: dbname.clone(),
-            spec: spec,
+            spec: Some(spec),
         };
         let msg_id = queue.send(&myqueue, &msg).await;
         println!("msg_id: {msg_id:?}");
@@ -271,6 +276,52 @@ mod test {
             .expect("no extensions found");
         // we added an extension, so it should be +1 now
         assert_eq!(num_expected_extensions, extensions.len());
+
+        // delete the instance
+        let msg = types::CRUDevent {
+            organization_name: org_name.clone(),
+            data_plane_id: "org_02s3owPQskuGXHE8vYsGSY".to_owned(),
+            event_id: "test-install-extension".to_owned(),
+            event_type: types::Event::Delete,
+            dbname: dbname.clone(),
+            spec: None,
+        };
+        let msg_id = queue.send(&myqueue, &msg).await;
+        println!("msg_id: {msg_id:?}");
+
+        // wait for it to delete
+        let wait_for_delete = 60;
+        println!("Waiting {} seconds for delete operation", wait_for_delete);
+        thread::sleep(time::Duration::from_secs(wait_for_delete));
+
+        // assert namespace is gone
+        let ns_api: Api<Namespace> = Api::all(client.clone());
+        let ns_dne = ns_api.get(&namespace).await;
+        assert!(ns_dne.is_err(), "Namespace was not deleted");
+        // assert pvcs is gone
+        let pvcs: Api<PersistentVolumeClaim> = Api::all(client.clone());
+        let lp = ListParams::default().fields(&format!("metadata.name=data-{}-0", namespace));
+        let pvc_list = pvcs.list(&lp).await.expect("failed to list pvcs");
+        assert!(
+            pvc_list.items.is_empty(),
+            "PVCs were not deleted: {:?}",
+            pvc_list
+        );
+
+        use conductor::coredb_crd::CoreDB;
+        let cdb_api: Api<CoreDB> = Api::all(client.clone());
+        let cdb_dne = cdb_api.get(&namespace).await;
+        assert!(cdb_dne.is_err(), "CoreDB was not deleted");
+
+        // call aws api and verify CF stack was deleted
+        use aws_sdk_cloudformation::config::Region;
+        use conductor::aws::cloudformation::AWSConfigState;
+        let aws_region = "us-east-1".to_owned();
+        let region = Region::new(aws_region);
+        let aws_config_state = AWSConfigState::new(region).await;
+        let stack_name = format!("org-{}-inst-{}-cf", org_name, dbname);
+        let exists = aws_config_state.does_stack_exist(&stack_name).await;
+        assert!(!exists, "CF stack was not deleted");
     }
 
     async fn kube_client() -> kube::Client {
