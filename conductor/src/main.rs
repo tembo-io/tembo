@@ -361,15 +361,6 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
         let msg_id = queue.send(&data_plane_events_queue, &event_msg).await?;
         debug!("sent msg_id: {:?}", msg_id);
 
-        // TODO (ianstanton) This is here as an example for now. We want to use
-        //  this to ensure a CoreDB exists before we attempt to delete it.
-        // Get all existing CoreDB
-        let vec = get_all(client.clone(), "default");
-        for pg in vec.await.iter() {
-            info!("found CoreDB {}", pg.name_any());
-        }
-        thread::sleep(time::Duration::from_secs(1));
-
         // archive message from queue
         let archived = queue
             .archive(&control_plane_events_queue, &read_msg.msg_id)
