@@ -1,4 +1,4 @@
-name: PGMQ Extension (pg14)
+name: PGMQ Extension
 
 defaults:
   run:
@@ -12,7 +12,7 @@ on:
     paths:
       - '.github/workflows/pgmq_ext.yml'
       - '.github/actions/pgx-init/**'
-      - './pgmq/extension/**'
+      - 'pgmq/extension/**'
 
   push:
     branches:
@@ -20,7 +20,7 @@ on:
     paths:
       - '.github/workflows/pgmq_ext.yml'
       - '.github/actions/pgx-init/**'
-      - './pgmq/extension/**'
+      - 'pgmq/extension/**'
 jobs:
   lint:
     name: Run linters
