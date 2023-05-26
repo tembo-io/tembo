@@ -384,8 +384,7 @@ fn extension_plan(have_changed: &[Extension], actual: &[Extension]) -> (Vec<Exte
                 'loc: for loc_desired in extension_desired.locations.clone() {
                     for loc_actual in extension_actual.locations.clone() {
                         if loc_desired.database == loc_actual.database {
-                            // TODO: when we want to support version changes, this is where we would do it
-                            if loc_desired.enabled != loc_actual.enabled {
+                            if loc_desired.enabled != loc_actual.enabled || loc_desired.version != loc_actual.version {
                                 debug!("desired: {:?}, actual: {:?}", extension_desired, extension_actual);
                                 changed.push(extension_desired.clone());
                                 break 'loc;
