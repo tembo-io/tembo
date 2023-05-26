@@ -384,11 +384,14 @@ fn extension_plan(have_changed: &[Extension], actual: &[Extension]) -> (Vec<Exte
                 'loc: for loc_desired in extension_desired.locations.clone() {
                     for loc_actual in extension_actual.locations.clone() {
                         if loc_desired.database == loc_actual.database {
-                            if loc_desired.enabled != loc_actual.enabled
-                                || loc_desired.version != loc_actual.version
-                            {
+                            if loc_desired.enabled != loc_actual.enabled {
                                 debug!("desired: {:?}, actual: {:?}", extension_desired, extension_actual);
                                 changed.push(extension_desired.clone());
+                                break 'loc;
+                            }
+                            if loc_desired.version != loc_actual.version {
+                                debug!("desired: {:?}, actual: {:?}", extension_desired, extension_actual);
+                                to_install.push(extension_desired.clone());
                                 break 'loc;
                             }
                         }
@@ -590,18 +593,28 @@ mod tests {
             name: "pgmq".to_owned(),
             description: "my description".to_owned(),
             locations: vec![ExtensionInstallLocation {
-                enabled: false,
+                enabled: true,
                 database: "postgres".to_owned(),
                 schema: "public".to_owned(),
                 version: Some("0.6.0".to_owned()),
             }],
         };
         let desired = vec![pgmq_06.clone()];
-        let actual = vec![pgmq_05];
+        let actual = vec![pgmq_05.clone()];
         // diff should be that we need to upgrade pgmq
         let diff = diff_extensions(&desired, &actual);
         assert_eq!(diff.len(), 1);
         assert_eq!(diff[0], pgmq_06);
+
+        // validate extension plan, should also be pgmq06
+        let (changed, to_install) = extension_plan(&diff, &actual);
+        assert_eq!(
+            changed.len(),
+            0,
+            "expected no changed extensions, found {:?}",
+            changed
+        );
+        assert_eq!(to_install.len(), 1);
     }
 
     #[test]
