@@ -614,7 +614,7 @@ mod tests {
             "expected no changed extensions, found {:?}",
             changed
         );
-        assert_eq!(to_install.len(), 1);
+        assert_eq!(to_install.len(), 1, "expected 1 install, found {:?}", to_install);
     }
 
     #[test]
