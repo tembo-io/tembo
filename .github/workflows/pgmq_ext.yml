@@ -1,4 +1,4 @@
-name: PGMQ Extension (pg14)
+name: PGMQ Extension
 
 defaults:
   run:
