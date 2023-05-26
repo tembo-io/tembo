@@ -384,7 +384,9 @@ fn extension_plan(have_changed: &[Extension], actual: &[Extension]) -> (Vec<Exte
                 'loc: for loc_desired in extension_desired.locations.clone() {
                     for loc_actual in extension_actual.locations.clone() {
                         if loc_desired.database == loc_actual.database {
-                            if loc_desired.enabled != loc_actual.enabled || loc_desired.version != loc_actual.version {
+                            if loc_desired.enabled != loc_actual.enabled
+                                || loc_desired.version != loc_actual.version
+                            {
                                 debug!("desired: {:?}, actual: {:?}", extension_desired, extension_actual);
                                 changed.push(extension_desired.clone());
                                 break 'loc;
@@ -568,6 +570,38 @@ mod tests {
             "expected pg_stat to install, found {:?}",
             to_install[0]
         );
+    }
+
+
+    #[test]
+    fn test_upgrade_ext_vers() {
+        let pgmq_05 = Extension {
+            name: "pgmq".to_owned(),
+            description: "my description".to_owned(),
+            locations: vec![ExtensionInstallLocation {
+                enabled: true,
+                database: "postgres".to_owned(),
+                schema: "public".to_owned(),
+                version: Some("0.5.0".to_owned()),
+            }],
+        };
+
+        let pgmq_06 = Extension {
+            name: "pgmq".to_owned(),
+            description: "my description".to_owned(),
+            locations: vec![ExtensionInstallLocation {
+                enabled: false,
+                database: "postgres".to_owned(),
+                schema: "public".to_owned(),
+                version: Some("0.6.0".to_owned()),
+            }],
+        };
+        let desired = vec![pgmq_06.clone()];
+        let actual = vec![pgmq_05];
+        // diff should be that we need to upgrade pgmq
+        let diff = diff_extensions(&desired, &actual);
+        assert_eq!(diff.len(), 1);
+        assert_eq!(diff[0], pgmq_06);
     }
 
     #[test]
