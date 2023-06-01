@@ -1,6 +1,8 @@
 use crate::errors::PgmqError;
+use crate::query::{check_input, TABLE_PREFIX};
 use crate::util::connect;
 use crate::Message;
+use log::info;
 use serde::{Deserialize, Serialize};
 use sqlx::types::chrono::Utc;
 use sqlx::{Pool, Postgres};
@@ -25,16 +27,49 @@ impl PGMQueueExt {
         })
     }
 
-    /// Create a new partitioned queue.
-    pub async fn create(&self, queue_name: &str) -> Result<(), PgmqError> {
-        sqlx::query!("SELECT * from pgmq_create($1::text);", queue_name)
+    pub async fn init(&self) -> Result<bool, PgmqError> {
+        match sqlx::query!("CREATE EXTENSION IF NOT EXISTS pgmq CASCADE;")
             .execute(&self.connection)
-            .await?;
-        Ok(())
+            .await
+        {
+            Ok(_) => Ok(true),
+            Err(e) => Err(PgmqError::from(e)),
+        }
+    }
+
+    /// Create a new partitioned queue.
+    /// Errors when there is any database error and Result<false> when the queue already exists.
+    pub async fn create(&self, queue_name: &str) -> Result<bool, PgmqError> {
+        check_input(queue_name)?;
+        let queue_table = format!("public.{TABLE_PREFIX}_{queue_name}");
+        // we need to check whether the queue exists first
+        // pg_partman create operations are currently unable to be idempotent
+        let exists = match sqlx::query!(
+            "SELECT * from part_config where parent_table = $1::text;",
+            queue_table
+        )
+        .fetch_one(&self.connection)
+        .await
+        {
+            Ok(_) => {
+                info!("queue: {} already exists", queue_name);
+                true
+            }
+            Err(_) => false,
+        };
+        if exists {
+            Ok(false)
+        } else {
+            sqlx::query!("SELECT * from pgmq_create($1::text);", queue_name)
+                .execute(&self.connection)
+                .await?;
+            Ok(true)
+        }
     }
 
     /// Drop an existing queue table.
     pub async fn drop_queue(&self, queue_name: &str) -> Result<(), PgmqError> {
+        check_input(queue_name)?;
         sqlx::query!("SELECT * from pgmq_drop_queue($1::text);", queue_name)
             .fetch_optional(&self.connection)
             .await?;
@@ -56,10 +91,11 @@ impl PGMQueueExt {
     // Set the visibility time on an existing message.
     pub async fn set_vt(
         &self,
-        queue_name: String,
+        queue_name: &str,
         msg_id: i64,
         vt: i32,
     ) -> Result<Message, PgmqError> {
+        check_input(queue_name)?;
         let updated = sqlx::query!(
             "SELECT * from pgmq_set_vt($1::text, $2, $3);",
             queue_name,
@@ -83,6 +119,7 @@ impl PGMQueueExt {
         queue_name: &str,
         message: &T,
     ) -> Result<i64, PgmqError> {
+        check_input(queue_name)?;
         let msg = serde_json::json!(&message);
         let sent = sqlx::query!(
             "SELECT pgmq_send as msg_id from pgmq_send($1::text, $2::jsonb);",
@@ -99,6 +136,7 @@ impl PGMQueueExt {
         queue_name: &str,
         vt: i32,
     ) -> Result<Option<Message<T>>, PgmqError> {
+        check_input(queue_name)?;
         let row = sqlx::query!(
             "SELECT * from pgmq_read($1::text, $2, $3)",
             queue_name,
@@ -131,6 +169,7 @@ impl PGMQueueExt {
 
     /// Move a message to the archive table.
     pub async fn archive(&self, queue_name: &str, msg_id: i64) -> Result<bool, PgmqError> {
+        check_input(queue_name)?;
         let arch = sqlx::query!(
             "SELECT * from pgmq_archive($1::text, $2)",
             queue_name,
@@ -146,6 +185,7 @@ impl PGMQueueExt {
         &self,
         queue_name: &str,
     ) -> Result<Option<Message<T>>, PgmqError> {
+        check_input(queue_name)?;
         let row = sqlx::query!("SELECT * from pgmq_pop($1::text)", queue_name,)
             .fetch_optional(&self.connection)
             .await?;
