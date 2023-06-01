@@ -148,20 +148,20 @@
 #![doc(html_root_url = "https://docs.rs/pgmq/")]
 
 use errors::PgmqError;
-use log::LevelFilter;
 use serde::{Deserialize, Serialize};
 use sqlx::error::Error;
-use sqlx::postgres::{PgConnectOptions, PgPoolOptions, PgRow};
+use sqlx::postgres::PgRow;
 use sqlx::types::chrono::Utc;
-use sqlx::{ConnectOptions, FromRow};
+use sqlx::FromRow;
 use sqlx::{Pool, Postgres, Row};
-use url::{ParseError, Url};
 
 pub mod errors;
 pub mod pg_ext;
 pub mod query;
 pub mod util;
 use chrono::serde::ts_seconds::deserialize as from_ts;
+
+use util::fetch_one_message;
 
 const VT_DEFAULT: i32 = 30;
 const READ_LIMIT_DEFAULT: i32 = 1;
@@ -866,36 +866,6 @@ impl PGMQueue {
         let query = &query::set_vt(queue_name, msg_id, vt)?;
         let updated_message = fetch_one_message::<T>(query, &self.connection).await?;
         Ok(updated_message)
-    }
-}
-
-// Executes a query and returns a single row
-// If the query returns no rows, None is returned
-// This function is intended for internal use.
-pub async fn fetch_one_message<T: for<'de> Deserialize<'de>>(
-    query: &str,
-    connection: &Pool<Postgres>,
-) -> Result<Option<Message<T>>, errors::PgmqError> {
-    // explore: .fetch_optional()
-    let row: Result<PgRow, Error> = sqlx::query(query).fetch_one(connection).await;
-    match row {
-        Ok(row) => {
-            // happy path - successfully read a message
-            let raw_msg = row.get("message");
-            let parsed_msg = serde_json::from_value::<T>(raw_msg);
-            match parsed_msg {
-                Ok(parsed_msg) => Ok(Some(Message {
-                    msg_id: row.get("msg_id"),
-                    vt: row.get("vt"),
-                    read_ct: row.get("read_ct"),
-                    enqueued_at: row.get("enqueued_at"),
-                    message: parsed_msg,
-                })),
-                Err(e) => Err(errors::PgmqError::JsonParsingError(e)),
-            }
-        }
-        Err(sqlx::error::Error::RowNotFound) => Ok(None),
-        Err(e) => Err(e)?,
     }
 }
 
