@@ -1,7 +1,7 @@
 POSTGRES_PASSWORD:=postgres
 
 format:
-	cargo sqlx prepare --merged
+	cargo sqlx prepare
 	cargo +nightly fmt --all
 	cargo clippy
 
