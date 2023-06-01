@@ -147,6 +147,7 @@
 
 #![doc(html_root_url = "https://docs.rs/pgmq/")]
 
+use chrono::serde::ts_seconds::deserialize as from_ts;
 use errors::PgmqError;
 use serde::{Deserialize, Serialize};
 use sqlx::error::Error;
@@ -158,8 +159,8 @@ pub mod errors;
 pub mod pg_ext;
 pub mod query;
 pub mod util;
-use chrono::serde::ts_seconds::deserialize as from_ts;
 
+pub use pg_ext::PGMQueueExt;
 use util::fetch_one_message;
 
 const VT_DEFAULT: i32 = 30;

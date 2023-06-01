@@ -21,10 +21,10 @@ async fn init_queue(qname: &str) -> pgmq::PGMQueue {
     queue
 }
 
-async fn init_queue_ext(qname: &str) -> pgmq::pg_ext::PGMQueueExt {
+async fn init_queue_ext(qname: &str) -> pgmq::PGMQueueExt {
     let db_url = env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgres://postgres:postgres@localhost:5432/pgmq".to_owned());
-    let queue = pgmq::pg_ext::PGMQueueExt::new(db_url, 2)
+    let queue = pgmq::PGMQueueExt::new(db_url, 2)
         .await
         .expect("failed to connect to postgres");
     queue.init().await.expect("failed to init pgmq");
@@ -799,7 +799,7 @@ async fn test_extension_api() {
 async fn test_pgmq_init() {
     let db_url = env::var("DATABASE_URL")
         .unwrap_or_else(|_| "postgres://postgres:postgres@localhost:5432/pgmq".to_owned());
-    let queue = pgmq::pg_ext::PGMQueueExt::new(db_url.clone(), 2)
+    let queue = pgmq::PGMQueueExt::new(db_url.clone(), 2)
         .await
         .expect("failed to connect to postgres");
     let init = queue.init().await.expect("failed to create extension");
