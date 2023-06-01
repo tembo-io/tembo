@@ -7,8 +7,9 @@ use sqlx::{Pool, Postgres, Row};
 use std::env;
 
 async fn init_queue(qname: &str) -> pgmq::PGMQueue {
-    let pgpass = env::var("POSTGRES_PASSWORD").unwrap_or_else(|_| "postgres".to_owned());
-    let queue = pgmq::PGMQueue::new(format!("postgres://postgres:{}@0.0.0.0:5432", pgpass))
+    let db_url = env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "postgres://postgres:postgres@localhost:5432/postgres".to_owned());
+    let queue = pgmq::PGMQueue::new(db_url)
         .await
         .expect("failed to connect to postgres");
     // make sure queue doesn't exist before the test
@@ -21,13 +22,11 @@ async fn init_queue(qname: &str) -> pgmq::PGMQueue {
 }
 
 async fn init_queue_ext(qname: &str) -> pgmq::pg_ext::PGMQueueExt {
-    let pgpass = env::var("POSTGRES_PASSWORD").unwrap_or_else(|_| "postgres".to_owned());
-    let queue = pgmq::pg_ext::PGMQueueExt::new(
-        format!("postgres://adamhendel:{}@0.0.0.0:28815/pgmq", pgpass),
-        2,
-    )
-    .await
-    .expect("failed to connect to postgres");
+    let db_url = env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "postgres://postgres:postgres@localhost:5432/pgmq".to_owned());
+    let queue = pgmq::pg_ext::PGMQueueExt::new(db_url, 2)
+        .await
+        .expect("failed to connect to postgres");
     // make sure queue doesn't exist before the test
     let _ = queue.drop_queue(qname).await;
     // CREATE QUEUE
@@ -536,8 +535,9 @@ async fn test_archive() {
 /// test db operations that should produce errors
 #[tokio::test]
 async fn test_database_error_modes() {
-    let pgpass = env::var("POSTGRES_PASSWORD").unwrap_or_else(|_| "postgres".to_owned());
-    let queue = pgmq::PGMQueue::new(format!("postgres://postgres:{}@0.0.0.0:5432", pgpass))
+    let db_url = env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "postgres://postgres:postgres@localhost:5432/postgres".to_owned());
+    let queue = pgmq::PGMQueue::new(db_url)
         .await
         .expect("failed to connect to postgres");
     // let's not create the queues and make sure we get an error
@@ -780,4 +780,30 @@ async fn test_extension_api() {
         .await
         .expect("failed to delete");
     assert!(!deleted);
+}
+
+#[tokio::test]
+async fn test_pgmq_init() {
+    let db_url = env::var("DATABASE_URL")
+        .unwrap_or_else(|_| "postgres://postgres:postgres@localhost:5432/pgmq".to_owned());
+    let queue = pgmq::pg_ext::PGMQueueExt::new(db_url.clone(), 2)
+        .await
+        .expect("failed to connect to postgres");
+    let init = queue.init().await.expect("failed to create extension");
+    assert!(init);
+
+    // error mode on queue create but already exists
+    let qname = format!("test_dup_{}", rand::thread_rng().gen_range(0..100));
+    println!("db_url: {}, qname: {:?}", db_url, qname);
+    let created = queue
+        .create(&qname)
+        .await
+        .expect("failed attempting to create queue");
+    assert!(created, "did not create queue");
+    // create again
+    let created = queue
+        .create(&qname)
+        .await
+        .expect("failed attempting to create the duplicate queue");
+    assert!(!created)
 }

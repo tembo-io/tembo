@@ -24,6 +24,7 @@ url = "2.3.1"
 [dev-dependencies]
 cargo-readme = "3.2.0"
 criterion = "0.4"
+env_logger = "0.10.0"
 rand = "0.8.5"
 regex = "1.5.4"
 lazy_static = "1.4.0"
