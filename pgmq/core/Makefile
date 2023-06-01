@@ -1,7 +1,8 @@
 POSTGRES_PASSWORD:=postgres
 
 format:
-	cargo fmt
+	cargo sqlx prepare --merged
+	cargo +nightly fmt --all
 	cargo clippy
 
 update.readme:
@@ -10,13 +11,17 @@ update.readme:
 		--no-indent-headings \
 		> README.md
 
-run.docker:
-	docker run --rm -d --name postgres -e POSTGRES_PASSWORD=${POSTGRES_PASSWORD} -p 5432:5432 postgres:15.1
+run.postgres:
+	docker run --rm -d --name pgmq-pg -e POSTGRES_PASSWORD=${POSTGRES_PASSWORD} -p 5432:5432 quay.io/coredb/pgmq-pg:d03d768
 
-test: run.docker
+test: run.postgres
 	sleep 2;
 	echo "Running all tests..."
 	cargo test
 
 test.cleanup:
 	docker stop postgres
+
+# sets up 
+setup.env:
+	sqlx migrate run
