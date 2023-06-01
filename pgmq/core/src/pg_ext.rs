@@ -89,12 +89,12 @@ impl PGMQueueExt {
     }
 
     // Set the visibility time on an existing message.
-    pub async fn set_vt(
+    pub async fn set_vt<T: for<'de> Deserialize<'de>>(
         &self,
         queue_name: &str,
         msg_id: i64,
         vt: i32,
-    ) -> Result<Message, PgmqError> {
+    ) -> Result<Message<T>, PgmqError> {
         check_input(queue_name)?;
         let updated = sqlx::query!(
             "SELECT * from pgmq_set_vt($1::text, $2, $3);",
@@ -104,13 +104,15 @@ impl PGMQueueExt {
         )
         .fetch_one(&self.connection)
         .await?;
+        let raw_msg = updated.message.expect("no message");
+        let parsed_msg = serde_json::from_value::<T>(raw_msg)?;
+
         Ok(Message {
             msg_id: updated.msg_id.expect("msg_id missing"),
             vt: updated.vt.expect("vt missing"),
             read_ct: updated.read_ct.expect("read_ct missing"),
             enqueued_at: updated.enqueued_at.expect("enqueued_at missing"),
-            message: serde_json::from_value(updated.message.expect("no message"))
-                .expect("message missing"),
+            message: parsed_msg,
         })
     }
 

@@ -726,7 +726,7 @@ async fn test_extension_api() {
     assert!(msg_id >= 1);
 
     let read_message = queue
-        .read::<MyMessage>(&test_queue, 10)
+        .read::<MyMessage>(&test_queue, 100)
         .await
         .expect("error reading message");
     assert!(read_message.is_some());
@@ -734,12 +734,24 @@ async fn test_extension_api() {
     assert_eq!(read_message.msg_id, msg_id);
     assert_eq!(read_message.message, msg);
 
-    // read again, assert no messages
+    // read again, assert no messages visible
     let read_message = queue
         .read::<MyMessage>(&test_queue, 2)
         .await
         .expect("error reading message");
     assert!(read_message.is_none());
+
+    // change the VT to now
+    let _vt_set = queue
+        .set_vt::<MyMessage>(&test_queue, msg_id, 0)
+        .await
+        .expect("failed to set VT");
+    let read_message = queue
+        .read::<MyMessage>(&test_queue, 1)
+        .await
+        .expect("error reading message")
+        .expect("expected a message");
+    assert_eq!(read_message.msg_id, msg_id);
 
     // archive message
     let archived = queue
