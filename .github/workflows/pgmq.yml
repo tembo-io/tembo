@@ -40,6 +40,8 @@ jobs:
     name: Run tests
     runs-on: ubuntu-22.04
     needs: lint
+    env:
+      DATABASE_URL: "postgresql://postgres:postgres@0.0.0.0:5432/postgres"
     steps:
       - uses: actions/checkout@v2
       - name: Install Rust stable toolchain
@@ -49,10 +51,10 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: install dependencies
         run: cargo install sqlx-cli
-      - name: Migrations
-        # ensure migration cache is up to date
-        run: cargo sqlx prepare --merged --check
       - name: run all tests
         run: make test
       - name: teardown
         run: make test.cleanup
+      - name: Migrations
+        # ensure migration cache is up to date
+        run: cargo sqlx prepare --merged --check
