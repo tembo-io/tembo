@@ -53,8 +53,8 @@ jobs:
         run: cargo install sqlx-cli
       - name: run all tests
         run: make test
-      - name: teardown
-        run: make test.cleanup
       - name: Migrations
         # ensure migration cache is up to date
-        run: cargo sqlx prepare --merged --check
+        run: cargo sqlx prepare --check
+      - name: teardown
+        run: make test.cleanup
