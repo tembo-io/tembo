@@ -20,12 +20,14 @@ async fn init_queue(qname: &str) -> pgmq::PGMQueue {
     queue
 }
 
-
 async fn init_queue_ext(qname: &str) -> pgmq::pg_ext::PGMQueueExt {
     let pgpass = env::var("POSTGRES_PASSWORD").unwrap_or_else(|_| "postgres".to_owned());
-    let queue = pgmq::pg_ext::PGMQueueExt::new(format!("postgres://adamhendel:{}@0.0.0.0:28815/pgmq", pgpass), 2)
-        .await
-        .expect("failed to connect to postgres");
+    let queue = pgmq::pg_ext::PGMQueueExt::new(
+        format!("postgres://adamhendel:{}@0.0.0.0:28815/pgmq", pgpass),
+        2,
+    )
+    .await
+    .expect("failed to connect to postgres");
     // make sure queue doesn't exist before the test
     let _ = queue.drop_queue(qname).await;
     // CREATE QUEUE
@@ -34,7 +36,6 @@ async fn init_queue_ext(qname: &str) -> pgmq::pg_ext::PGMQueueExt {
     assert!(q_success.is_ok());
     queue
 }
-
 
 #[derive(Serialize, Debug, Deserialize)]
 struct MyMessage {
@@ -700,7 +701,6 @@ async fn test_set_vt() {
     assert_eq!(num_rows_queue, 1);
 }
 
-
 #[tokio::test]
 async fn test_extension_api() {
     let test_queue = "test_ext_api".to_owned();
@@ -711,7 +711,14 @@ async fn test_extension_api() {
     println!("num_rows_queue: {:?}", num_rows_queue);
     assert_eq!(num_rows_queue, 0);
 
-    let qs = queue.list_queues().await.expect("error listing queues").expect("test queue was not created");
-    let q_names = qs.iter().map(|q| q.queue_name.clone()).collect::<Vec<String>>();
+    let qs = queue
+        .list_queues()
+        .await
+        .expect("error listing queues")
+        .expect("test queue was not created");
+    let q_names = qs
+        .iter()
+        .map(|q| q.queue_name.clone())
+        .collect::<Vec<String>>();
     assert!(q_names.contains(&test_queue));
 }
