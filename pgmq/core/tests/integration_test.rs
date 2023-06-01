@@ -726,11 +726,58 @@ async fn test_extension_api() {
     assert!(msg_id >= 1);
 
     let read_message = queue
-        .read::<MyMessage>(&test_queue, 2)
+        .read::<MyMessage>(&test_queue, 10)
         .await
         .expect("error reading message");
     assert!(read_message.is_some());
     let read_message = read_message.unwrap();
     assert_eq!(read_message.msg_id, msg_id);
     assert_eq!(read_message.message, msg);
+
+    // read again, assert no messages
+    let read_message = queue
+        .read::<MyMessage>(&test_queue, 2)
+        .await
+        .expect("error reading message");
+    assert!(read_message.is_none());
+
+    // archive message
+    let archived = queue
+        .archive(&test_queue, msg_id)
+        .await
+        .expect("failed to archive");
+    assert!(archived);
+
+    // pop message
+    let pmsg = MyMessage {
+        foo: "pop".to_owned(),
+        num: 123,
+    };
+    let msg_id_pop = queue.send(&test_queue, &pmsg).await.unwrap();
+    assert!(msg_id_pop > msg_id);
+    let popped = queue
+        .pop::<MyMessage>(&test_queue)
+        .await
+        .expect("failed to pop")
+        .expect("no message to pop");
+    assert_eq!(popped.message, pmsg);
+
+    // delete message
+    let del_msg = MyMessage {
+        foo: "delete".to_owned(),
+        num: 123,
+    };
+    let msg_id_del = queue.send(&test_queue, &del_msg).await.unwrap();
+    assert!(msg_id_del > msg_id_pop);
+    let deleted = queue
+        .delete(&test_queue, msg_id_del)
+        .await
+        .expect("failed to delete");
+    assert!(deleted);
+    // try delete a message that doesnt exist
+    let deleted = queue
+        .delete(&test_queue, msg_id_del)
+        .await
+        .expect("failed to delete");
+    assert!(!deleted);
 }

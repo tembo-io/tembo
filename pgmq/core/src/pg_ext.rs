@@ -1,5 +1,5 @@
 use crate::errors::PgmqError;
-use crate::util::{connect, fetch_one_message};
+use crate::util::{connect};
 use crate::Message;
 use serde::{Deserialize, Serialize};
 use sqlx::types::chrono::Utc;
@@ -128,15 +128,60 @@ impl PGMQueueExt {
             }
         }
     }
-    pub async fn pop(queue_name: &str) -> String {
-        String::from("")
+
+    /// Move a message to the archive table.
+    pub async fn archive(&self, queue_name: &str, msg_id: i64) -> Result<bool, PgmqError> {
+        let arch = sqlx::query!(
+            "SELECT * from pgmq_archive($1::text, $2)",
+            queue_name,
+            msg_id
+        )
+        .fetch_one(&self.connection)
+        .await?;
+        Ok(arch.pgmq_archive.expect("no archive result"))
     }
-    pub async fn delete(queue_name: &str, msg_id: u32) -> bool {
-        true
+
+    // Read and message and immediately delete it.
+    pub async fn pop<T: for<'de> Deserialize<'de>>(
+        &self,
+        queue_name: &str,
+    ) -> Result<Option<Message<T>>, PgmqError> {
+        let row = sqlx::query!("SELECT * from pgmq_pop($1::text)", queue_name,)
+            .fetch_optional(&self.connection)
+            .await?;
+        match row {
+            Some(row) => {
+                // happy path - successfully read a message
+                let raw_msg = row.message.expect("no message");
+                let parsed_msg = serde_json::from_value::<T>(raw_msg)?;
+                Ok(Some(Message {
+                    msg_id: row.msg_id.expect("msg_id missing from queue table"),
+                    vt: row.vt.expect("vt missing from queue table"),
+                    read_ct: row.read_ct.expect("read_ct missing from queue table"),
+                    enqueued_at: row
+                        .enqueued_at
+                        .expect("enqueued_at missing from queue table"),
+                    message: parsed_msg,
+                }))
+            }
+            None => {
+                // no message found
+                Ok(None)
+            }
+        }
+    }
+
+    // Delete a message by message id.
+    pub async fn delete(&self, queue_name: &str, msg_id: i64) -> Result<bool, PgmqError> {
+        let row = sqlx::query!(
+            "SELECT * from pgmq_delete($1::text, $2)",
+            queue_name,
+            msg_id
+        )
+        .fetch_one(&self.connection)
+        .await?;
+        Ok(row.pgmq_delete.expect("no delete result"))
     }
 
     //
-    pub async fn archive(queue_name: &str, msg_id: u32) -> bool {
-        true
-    }
 }
