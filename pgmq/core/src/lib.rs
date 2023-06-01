@@ -158,7 +158,9 @@ use sqlx::{Pool, Postgres, Row};
 use url::{ParseError, Url};
 
 pub mod errors;
+pub mod pg_ext;
 pub mod query;
+pub mod util;
 use chrono::serde::ts_seconds::deserialize as from_ts;
 
 const VT_DEFAULT: i32 = 30;
@@ -192,22 +194,11 @@ pub struct PGMQueue {
 
 impl PGMQueue {
     pub async fn new(url: String) -> Result<PGMQueue, errors::PgmqError> {
-        let con = PGMQueue::connect(&url).await?;
+        let con = util::connect(&url, 5).await?;
         Ok(PGMQueue {
             url,
             connection: con,
         })
-    }
-
-    /// Connect to the database
-    async fn connect(url: &str) -> Result<Pool<Postgres>, errors::PgmqError> {
-        let options = conn_options(url)?;
-        let pgp = PgPoolOptions::new()
-            .acquire_timeout(std::time::Duration::from_secs(10))
-            .max_connections(5)
-            .connect_with(options)
-            .await?;
-        Ok(pgp)
     }
 
     /// Create a queue. This sets up the queue's tables, indexes, and metadata.
@@ -940,18 +931,4 @@ async fn fetch_messages<T: for<'de> Deserialize<'de>>(
         }
     }
     Ok(Some(messages))
-}
-
-// Configure connection options
-pub fn conn_options(url: &str) -> Result<PgConnectOptions, ParseError> {
-    // Parse url
-    let parsed = Url::parse(url)?;
-    let mut options = PgConnectOptions::new()
-        .host(parsed.host_str().ok_or(ParseError::EmptyHost)?)
-        .port(parsed.port().ok_or(ParseError::InvalidPort)?)
-        .username(parsed.username())
-        .password(parsed.password().ok_or(ParseError::IdnaError)?)
-        .database(parsed.path().trim_start_matches('/'));
-    options.log_statements(LevelFilter::Debug);
-    Ok(options)
 }
