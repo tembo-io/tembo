@@ -1,5 +1,5 @@
 use crate::errors::PgmqError;
-use crate::util::{connect};
+use crate::util::connect;
 use crate::Message;
 use serde::{Deserialize, Serialize};
 use sqlx::types::chrono::Utc;
@@ -46,7 +46,7 @@ impl PGMQueueExt {
         let queues = sqlx::query_as!(PGMQueueMeta, "SELECT * from pgmq_meta;")
             .fetch_all(&self.connection)
             .await?;
-        if queues.len() == 0 {
+        if queues.is_empty() {
             Ok(None)
         } else {
             Ok(Some(queues))
