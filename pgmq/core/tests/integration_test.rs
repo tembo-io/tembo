@@ -704,7 +704,7 @@ async fn test_set_vt() {
 
 #[tokio::test]
 async fn test_extension_api() {
-    let test_queue = "test_ext_api".to_owned();
+    let test_queue = format!("test_ext_api_{}", rand::thread_rng().gen_range(0..100000));
 
     let queue = init_queue_ext(&test_queue).await;
     let msg = MyMessage::default();

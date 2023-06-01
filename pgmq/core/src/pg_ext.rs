@@ -78,12 +78,19 @@ impl PGMQueueExt {
 
     /// List all queues in the Postgres instance.
     pub async fn list_queues(&self) -> Result<Option<Vec<PGMQueueMeta>>, PgmqError> {
-        let queues = sqlx::query_as!(PGMQueueMeta, "SELECT * from pgmq_meta;")
+        let queues = sqlx::query!("SELECT * from pgmq_list_queues();")
             .fetch_all(&self.connection)
             .await?;
         if queues.is_empty() {
             Ok(None)
         } else {
+            let queues = queues
+                .into_iter()
+                .map(|q| PGMQueueMeta {
+                    queue_name: q.queue_name.expect("queue_name missing"),
+                    created_at: q.created_at.expect("created_at missing"),
+                })
+                .collect();
             Ok(Some(queues))
         }
     }
@@ -97,7 +104,7 @@ impl PGMQueueExt {
     ) -> Result<Message<T>, PgmqError> {
         check_input(queue_name)?;
         let updated = sqlx::query!(
-            "SELECT * from pgmq_set_vt($1::text, $2, $3);",
+            "SELECT * from pgmq_set_vt($1::text, $2::bigint, $3::integer);",
             queue_name,
             msg_id,
             vt

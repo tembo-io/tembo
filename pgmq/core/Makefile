@@ -17,7 +17,8 @@ run.postgres:
 test: run.postgres
 	sleep 2;
 	echo "Running all tests..."
-	cargo test
+	sqlx migrate run
+	DATABASE_URL=postgres://postgres:postgres@0.0.0.0:5432 cargo test
 
 test.cleanup:
 	docker stop postgres

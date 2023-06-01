@@ -44,6 +44,30 @@
     },
     "query": "SELECT * from pgmq_pop($1::text)"
   },
+  "10ea79c92326fbee074db2d9629f60abb320be01d069b12b2360816267a64e3a": {
+    "describe": {
+      "columns": [
+        {
+          "name": "queue_name",
+          "ordinal": 0,
+          "type_info": "Text"
+        },
+        {
+          "name": "created_at",
+          "ordinal": 1,
+          "type_info": "Timestamptz"
+        }
+      ],
+      "nullable": [
+        null,
+        null
+      ],
+      "parameters": {
+        "Left": []
+      }
+    },
+    "query": "SELECT * from pgmq_list_queues();"
+  },
   "164457cb5001029f73e5c691c3722215f2377e6415f8189ba4e724b38d4ead0a": {
     "describe": {
       "columns": [
@@ -309,7 +333,7 @@
     },
     "query": "SELECT * from pgmq_drop_queue($1::text);"
   },
-  "b6ca753c3f8094eb0bddc790308e72a11f7e53b28cafc2d1928ea3366bb6ee2c": {
+  "b42aa546a8e1f83b4da63a6a20aaa51778e01d8525b4b9b307576b2921eec305": {
     "describe": {
       "columns": [
         {
@@ -353,7 +377,7 @@
         ]
       }
     },
-    "query": "SELECT * from pgmq_set_vt($1::text, $2, $3);"
+    "query": "SELECT * from pgmq_set_vt($1::text, $2::bigint, $3::integer);"
   },
   "c38b0cc48a6744bdb28ad1fa637223b6427eda19c0a52dc8881750d6a50ac0ef": {
     "describe": {
@@ -442,29 +466,5 @@
       }
     },
     "query": "SELECT pgmq_send as msg_id from pgmq_send($1::text, $2::jsonb);"
-  },
-  "ce17f647248220fd833e478316c55c654a2de7b304e63eebb65277fc81cfd936": {
-    "describe": {
-      "columns": [
-        {
-          "name": "queue_name",
-          "ordinal": 0,
-          "type_info": "Varchar"
-        },
-        {
-          "name": "created_at",
-          "ordinal": 1,
-          "type_info": "Timestamptz"
-        }
-      ],
-      "nullable": [
-        false,
-        false
-      ],
-      "parameters": {
-        "Left": []
-      }
-    },
-    "query": "SELECT * from pgmq_meta;"
   }
 }
