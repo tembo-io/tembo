@@ -21,8 +21,7 @@ test: run.postgres
 	DATABASE_URL=postgres://postgres:postgres@0.0.0.0:5432 cargo test
 
 test.cleanup:
-	docker stop postgres
+	docker stop pgmq-pg
 
-# sets up 
 setup.env:
 	sqlx migrate run
