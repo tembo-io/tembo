@@ -27,6 +27,7 @@ async fn init_queue_ext(qname: &str) -> pgmq::pg_ext::PGMQueueExt {
     let queue = pgmq::pg_ext::PGMQueueExt::new(db_url, 2)
         .await
         .expect("failed to connect to postgres");
+    queue.init().await.expect("failed to init pgmq");
     // make sure queue doesn't exist before the test
     let _ = queue.drop_queue(qname).await;
     // CREATE QUEUE

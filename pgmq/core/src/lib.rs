@@ -152,8 +152,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::error::Error;
 use sqlx::postgres::PgRow;
 use sqlx::types::chrono::Utc;
-use sqlx::FromRow;
-use sqlx::{Pool, Postgres, Row};
+use sqlx::{FromRow, Pool, Postgres, Row};
 
 pub mod errors;
 pub mod pg_ext;
