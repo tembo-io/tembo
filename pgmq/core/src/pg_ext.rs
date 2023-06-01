@@ -1,5 +1,5 @@
 use crate::errors::PgmqError;
-use crate::util::connect;
+use crate::util::{connect, fetch_one_message};
 use crate::Message;
 use serde::{Deserialize, Serialize};
 use sqlx::types::chrono::Utc;
@@ -80,11 +80,10 @@ impl PGMQueueExt {
 
     pub async fn send<T: Serialize>(
         &self,
-        queue_name: String,
+        queue_name: &str,
         message: &T,
     ) -> Result<i64, PgmqError> {
         let msg = serde_json::json!(&message);
-        // let msgs: [serde_json::Value; 1] = [msg];
         let sent = sqlx::query!(
             "SELECT pgmq_send as msg_id from pgmq_send($1::text, $2::jsonb);",
             queue_name,
@@ -95,18 +94,49 @@ impl PGMQueueExt {
         Ok(sent.msg_id.expect("no message id"))
     }
 
-    pub async fn read(queue_name: String) -> String {
+    pub async fn read<T: for<'de> Deserialize<'de>>(
+        &self,
+        queue_name: &str,
+        vt: i32,
+    ) -> Result<Option<Message<T>>, PgmqError> {
+        let row = sqlx::query!(
+            "SELECT * from pgmq_read($1::text, $2, $3)",
+            queue_name,
+            vt,
+            1
+        )
+        .fetch_optional(&self.connection)
+        .await?;
+        match row {
+            Some(row) => {
+                // happy path - successfully read a message
+                let raw_msg = row.message.expect("no message");
+                let parsed_msg = serde_json::from_value::<T>(raw_msg)?;
+                Ok(Some(Message {
+                    msg_id: row.msg_id.expect("msg_id missing from queue table"),
+                    vt: row.vt.expect("vt missing from queue table"),
+                    read_ct: row.read_ct.expect("read_ct missing from queue table"),
+                    enqueued_at: row
+                        .enqueued_at
+                        .expect("enqueued_at missing from queue table"),
+                    message: parsed_msg,
+                }))
+            }
+            None => {
+                // no message found
+                Ok(None)
+            }
+        }
+    }
+    pub async fn pop(queue_name: &str) -> String {
         String::from("")
     }
-    pub async fn pop(queue_name: String) -> String {
-        String::from("")
-    }
-    pub async fn delete(queue_name: String, msg_id: u32) -> bool {
+    pub async fn delete(queue_name: &str, msg_id: u32) -> bool {
         true
     }
 
     //
-    pub async fn archive(queue_name: String, msg_id: u32) -> bool {
+    pub async fn archive(queue_name: &str, msg_id: u32) -> bool {
         true
     }
 }

@@ -37,7 +37,7 @@ async fn init_queue_ext(qname: &str) -> pgmq::pg_ext::PGMQueueExt {
     queue
 }
 
-#[derive(Serialize, Debug, Deserialize)]
+#[derive(Serialize, Debug, Deserialize, Eq, PartialEq)]
 struct MyMessage {
     foo: String,
     num: u64,
@@ -721,4 +721,16 @@ async fn test_extension_api() {
         .map(|q| q.queue_name.clone())
         .collect::<Vec<String>>();
     assert!(q_names.contains(&test_queue));
+
+    let msg_id = queue.send(&test_queue, &msg).await.unwrap();
+    assert!(msg_id >= 1);
+
+    let read_message = queue
+        .read::<MyMessage>(&test_queue, 2)
+        .await
+        .expect("error reading message");
+    assert!(read_message.is_some());
+    let read_message = read_message.unwrap();
+    assert_eq!(read_message.msg_id, msg_id);
+    assert_eq!(read_message.message, msg);
 }
