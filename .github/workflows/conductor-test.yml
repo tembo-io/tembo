@@ -118,7 +118,7 @@ jobs:
           kubectl get crds
 
           # Start local postgres for the Nile queues
-          docker run -d --name pgmq -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres
+          docker run -d --name pgmq -e POSTGRES_PASSWORD=postgres -p 5432:5432 quay.io/coredb/pgmq-pg:latest
 
           # Wait for the coredb operator to come online
           kubectl wait --timeout=60s --for=condition=ready pod -l app=coredb-controller -n coredb-operator

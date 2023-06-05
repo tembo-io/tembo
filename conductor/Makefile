@@ -4,8 +4,11 @@ fmt:
 	cargo +nightly fmt
 	cargo clippy
 
+run.pgmq-postgres:
+	docker run -d --name pgmq-pg -e POSTGRES_PASSWORD=postgres -p 5432:5432 quay.io/coredb/pgmq-pg:latest
+
 run.local:
-	PG_CONN_URL=postgresql://postgres:postgres@0.0.0.0:5432/postgres \
+	POSTGRES_QUEUE_CONNECTION=postgresql://postgres:postgres@0.0.0.0:5432/postgres \
 	RUST_BACKTRACE=1 \
 	RUST_LOG=${RUST_LOG} \
 	CONTROL_PLANE_EVENTS_QUEUE=saas_queue \
@@ -24,7 +27,7 @@ cluster.reset:
 
 run.test:
 	echo "Running conductor with test configuration"
-	PG_CONN_URL=postgresql://postgres:postgres@0.0.0.0:5432/postgres \
+	POSTGRES_QUEUE_CONNECTION=postgresql://postgres:postgres@0.0.0.0:5432/postgres \
 	RUST_BACKTRACE=1 \
 	RUST_LOG=${RUST_LOG} \
 	CONTROL_PLANE_EVENTS_QUEUE=myqueue_control_plane \

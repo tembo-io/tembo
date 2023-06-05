@@ -1085,6 +1085,9 @@ name = "either"
 version = "1.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7fcaabb2fef8c910e7f4c7ce9f67a1283a1715879a7c230ca9d6d1ae31f16d91"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "encoding_rs"
@@ -2305,9 +2308,9 @@ checksum = "478c572c3d73181ff3c2539045f6eb99e5491218eae919370993b890cdbdd98e"
 
 [[package]]
 name = "pgmq"
-version = "0.11.2"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ba89bc022bef6d0d770824a2475b6ab22f62be91ea7bbc6417906a8dfe9a0210"
+checksum = "4755c0f0fc55fccac7c669389946b74a90d674d4d5a47677c277cd6b4eed7fac"
 dependencies = [
  "chrono",
  "log",
@@ -2938,9 +2941,12 @@ dependencies = [
  "dotenvy",
  "either",
  "heck",
+ "hex",
  "once_cell",
  "proc-macro2",
  "quote",
+ "serde",
+ "serde_json",
  "sha2",
  "sqlx-core",
  "sqlx-rt",

@@ -24,7 +24,7 @@ mod test {
         runtime::wait::{await_condition, conditions},
         Api, Client, Config,
     };
-    use pgmq::{Message, PGMQueue};
+    use pgmq::{Message, PGMQueueExt};
 
     use conductor::{
         coredb_crd as crd, restart_statefulset,
@@ -39,7 +39,7 @@ mod test {
     async fn get_dataplane_message(
         retries: u64,
         retry_delay_seconds: u64,
-        queue: &PGMQueue,
+        queue: &PGMQueueExt,
     ) -> Message<StateToControlPlane> {
         // wait for conductor to send message to data_plane_events queue
         let mut attempt = 0;
@@ -54,7 +54,7 @@ mod test {
             } else {
                 // read message from data_plane_events queue
                 let msg = queue
-                    .read::<StateToControlPlane>("myqueue_data_plane", Some(&30_i32))
+                    .read::<StateToControlPlane>("myqueue_data_plane", 30_i32)
                     .await
                     .expect("database error");
                 if msg.is_some() {
@@ -70,9 +70,10 @@ mod test {
     #[tokio::test]
     #[ignore]
     async fn functional_test_basic_create() {
-        let queue: PGMQueue = PGMQueue::new("postgres://postgres:postgres@0.0.0.0:5432".to_owned())
+        let queue = PGMQueueExt::new("postgres://postgres:postgres@0.0.0.0:5432".to_owned(), 1)
             .await
             .unwrap();
+        queue.init().await.expect("failed creating extension");
 
         let myqueue = "myqueue_control_plane".to_owned();
         let _ = queue.create(&myqueue).await;
@@ -179,7 +180,7 @@ mod test {
         let msg = get_dataplane_message(retries, retry_delay, &queue).await;
 
         queue
-            .archive("myqueue_data_plane", &msg.msg_id)
+            .archive("myqueue_data_plane", msg.msg_id)
             .await
             .expect("error deleting message");
 
@@ -264,7 +265,7 @@ mod test {
         // read message from data_plane_events queue
         let msg = get_dataplane_message(retries, retry_delay, &queue).await;
         queue
-            .archive("myqueue_data_plane", &msg.msg_id)
+            .archive("myqueue_data_plane", msg.msg_id)
             .await
             .expect("error deleting message");
 
