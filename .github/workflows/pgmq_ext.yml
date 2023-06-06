@@ -46,7 +46,7 @@ jobs:
             /home/runner/.pgrx
       - uses: ./.github/actions/pgx-init
         with:
-          working-directory: pgmq/
+          working-directory: pgmq/extension
       - name: Cargo format
         run: cargo +nightly fmt --all --check
       - name: Clippy
