@@ -26,6 +26,7 @@
   "fiscalYearStartMonth": 0,
   "gnetId": 9628,
   "graphTooltip": 0,
+  "id": 853,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -671,8 +672,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "green",
-                "value": null
+                "color": "green"
               },
               {
                 "color": "dark-red",
@@ -754,8 +754,7 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "semi-dark-red",
-                "value": null
+                "color": "semi-dark-red"
               },
               {
                 "color": "red",
@@ -896,8 +895,8 @@
       {
         "current": {
           "selected": true,
-          "text": "4",
-          "value": "4"
+          "text": "10",
+          "value": "10"
         },
         "hide": 0,
         "includeAll": false,
@@ -906,36 +905,61 @@
         "options": [
           {
             "selected": false,
-            "text": "1",
-            "value": "1"
+            "text": "7",
+            "value": "7"
           },
           {
             "selected": false,
-            "text": "2",
-            "value": "2"
+            "text": "8",
+            "value": "8"
           },
           {
             "selected": false,
-            "text": "3",
-            "value": "3"
+            "text": "9",
+            "value": "9"
           },
           {
             "selected": true,
-            "text": "4",
-            "value": "4"
+            "text": "10",
+            "value": "10"
           },
           {
             "selected": false,
-            "text": "5",
-            "value": "5"
+            "text": "11",
+            "value": "11"
           },
           {
             "selected": false,
-            "text": "6",
-            "value": "6"
+            "text": "12",
+            "value": "12"
+          },
+          {
+            "selected": false,
+            "text": "13",
+            "value": "13"
+          },
+          {
+            "selected": false,
+            "text": "14",
+            "value": "14"
+          },
+          {
+            "selected": false,
+            "text": "15",
+            "value": "15"
+          },
+          {
+            "selected": false,
+            "text": "16",
+            "value": "16"
+          },
+          {
+            "selected": false,
+            "text": "17",
+            "value": "17"
           }
         ],
-        "query": "1, 2, 3, 4, 5, 6",
+        "query": "7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17",
         "queryValue": "",
         "skipUrlSync": false,
         "type": "custom"
@@ -974,6 +998,6 @@
   "timezone": "",
   "title": "Cloud Tracker",
   "uid": "bE7Y7zEVz",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }
