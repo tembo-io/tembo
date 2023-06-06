@@ -3,7 +3,7 @@ name: PGMQ Extension
 defaults:
   run:
     shell: bash
-    working-directory: ./pgmq/
+    working-directory: ./pgmq/extension
 
 on:
   pull_request:
@@ -40,7 +40,7 @@ jobs:
         with:
           prefix-key: "pgmq-extension-lint"
           workspaces: |
-            pgmq/
+            pgmq/extension
           # Additional directories to cache
           cache-directories: |
             /home/runner/.pgrx
@@ -100,7 +100,7 @@ jobs:
         with:
           prefix-key: "pgmq-extension-test"
           workspaces: |
-            pgmq/
+              pgmq/extension
           # Additional directories to cache
           cache-directories: |
             /home/runner/.pgrx
@@ -114,10 +114,12 @@ jobs:
          sudo mv stoml /usr/local/bin/
          cargo install pg-trunk
       - name: trunk build
+        working-directory: pgmq/
         run: |
           pgmq_ver=$(stoml extension/Cargo.toml package.version)
           trunk build --path . --dockerfile ./Dockerfile.build --install-command "cd extension && cargo pgrx install" --name pgmq --version ${pgmq_ver}
       - name: trunk publish
+        working-directory: pgmq/
         env:
           TRUNK_API_TOKEN: ${{ secrets.TRUNK_AUTH_TOKEN }}
         run: |
