@@ -1,0 +1,24 @@
+[package]
+name = "tembo-pod-init"
+version = "0.1.0"
+edition = "2021"
+
+[registries.crates-io]
+protocol = "sparse"
+
+[dependencies]
+actix-web = { version = "4.3", features = ["openssl"] }
+tokio = { version = "1.28", features = ["rt"] }
+serde = { version = "1.0", features = ["derive"]}
+k8s-openapi = { version = "0.18", features = ["v1_26", "schemars"], default-features = false}
+serde_json = "1.0"
+parking_lot = "0.12"
+futures = "0.3"
+tracing = "0.1"
+tracing-log = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"]}
+openssl = { version = "0.10", features = ["vendored"] } 
+
+[dependencies.kube]
+features = ["admission","runtime", "client", "derive", "ws"]
+version = "0.83"

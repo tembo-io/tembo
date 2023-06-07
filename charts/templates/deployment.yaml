@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "tembo-pod-init.fullname" . }}
+  namespace: {{ template "tembo-pod-init.namespace" . }}
+  labels:
+{{ include "tembo-pod-init-helm.labels" . | nindent 4 }}
+  {{- if .Values.annotations }}
+  annotations: {{ toYaml .Values.annotations | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: 1
+  strategy:
+    type: {{ .Values.upgradeStrategy }}
+  selector:
+    matchLabels:
+      app: {{ include "tembo-pod-init.fullname" . }}
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+{{ include "tembo-pod-init-helm.labels" . | indent 8 }}
+      annotations:
+        {{- if .Values.podAnnotations }}
+        {{- range $key, $value := .Values.podAnnotations }}
+        {{ $key }}: {{ $value | quote }}
+        {{- end }}
+        {{- end }}
+    spec:
+      containers:
+        - image: {{ .Values.image.repository }}:{{ tpl .Values.image.tag . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          name: tembo-pod-init
+          env:
+            - name: LOG_LEVEL
+              value: "{{ .Values.logLevel}}"
+            - name: "CONTAINER_IMAGE"
+              value: "{{ .Values.initContainerImage.repository }}:{{ tpl .Values.initContainerImage.tag . }}"
+            - name: "TLS_CERT"
+              value: /etc/tls/tls.crt
+            - name: "TLS_KEY"
+              value: /etc/tls/tls.key
+          {{- if .Values.extraEnv }}
+            {{- range $.Values.extraEnv }}
+            - name: {{ .name }}
+              value: {{ tpl (.value | quote) $ }}
+            {{- end }}
+          {{- end }}
+          {{- if .Values.resources }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          {{- end }}
+          ports:
+            - containerPort: 8443
+              name: https
+              protocol: TCP
+          readinessProbe:
+          {{- toYaml .Values.readinessProbe | nindent 12 }}
+          livenessProbe:
+          {{- toYaml .Values.livenessProbe | nindent 12 }}
+          volumeMounts:
+            - name: tls-certs
+              mountPath: /etc/tls
+              readOnly: true
+      volumes:
+        - name: tls-certs
+          secret:
+            secretName: {{ printf "%s-tls" (include "tembo-pod-init.fullname" .) }}
+            items:
+              - key: tls.crt
+                value: tls.crt
+              - key: tls.key
+                value: tls.key
+      serviceAccountName: {{ include "tembo-pod-init.fullname" . }}
+      automountServiceAccountToken: true
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+      {{ toYaml . | indent 2 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity: {{ toYaml . | nindent 8 }}
+      {{- end }}
