@@ -5,7 +5,7 @@ initContainerImage:
   repository: quay.io/coredb/coredb-pg-cnpg
   tag: latest
 image:
-  repository: quay.io/coredb/tembo-pod-init
+  repository: 
   tag: "{{ .Chart.AppVersion }}"
   pullPolicy: Always
   tag: latest

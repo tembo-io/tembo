@@ -1,6 +1,7 @@
 FROM rust:1.70-buster as builder
 WORKDIR /tembo-pod-init
-COPY . .
+COPY Cargo.toml .
+COPY src/ ./src/
 RUN cargo build --release
 
 FROM debian:buster-slim

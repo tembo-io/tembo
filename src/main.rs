@@ -2,17 +2,17 @@ use actix_web::{dev::ServerHandle, middleware, web, App, HttpServer};
 use kube::Client;
 use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 use parking_lot::Mutex;
-use tembo_pod_init::{
-    config::Config, health::*, log::init as logger, mutate::mutate, watcher::NamespaceWatcher,
-};
-use tracing::{debug, error, info};
+use tembo_pod_init::{config::Config, health::*, log, mutate::mutate, watcher::NamespaceWatcher};
+
+#[macro_use]
+extern crate tracing;
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let config = Config::default();
 
     // Initialize logging
-    if let Err(e) = logger(&config) {
+    if let Err(e) = log::init(&config) {
         error!("Failed to initialize logging: {}", e);
         return Err(std::io::Error::new(
             std::io::ErrorKind::Other,

@@ -17,7 +17,7 @@ delete-kind:
 # start kind
 start-kind:
   delete-kind
-  kind create cluster
+  kind create cluster --config testdata/kind-cluster.yaml
   sleep 10
   kubectl wait pods --for=condition=Ready --timeout=300s --all --all-namespaces
 

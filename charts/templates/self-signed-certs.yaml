@@ -4,6 +4,8 @@ kind: Issuer
 metadata:
   name: {{ printf "%s-issuer" (include "tembo-pod-init.fullname" .) }}
   namespace: {{ template "tembo-pod-init.namespace" . }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
   labels:
 {{ include "tembo-pod-init-helm.labels" . | indent 4 }}
 spec:
@@ -14,6 +16,8 @@ kind: Certificate
 metadata:
   name: {{ printf "%s-certificate" (include "tembo-pod-init.fullname" .) }}
   namespace: {{ template "tembo-pod-init.namespace" . }}
+  annotations:
+    "helm.sh/hook": pre-install
   labels:
 {{ include "tembo-pod-init-helm.labels" . | indent 4 }}
 spec:

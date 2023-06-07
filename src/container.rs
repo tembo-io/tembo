@@ -39,7 +39,7 @@ pub fn create_init_container(config: &Config) -> Container {
     // Create the initContainer
     Container {
         name: "tembo-bootstrap".to_string(),
-        image: Some(format!("{}", config.container_image)),
+        image: Some(config.container_image.to_string()),
         image_pull_policy: Some("IfNotPresent".to_string()),
         command: Some(vec![
             "/bin/bash".to_string(),

@@ -4,7 +4,8 @@ metadata:
   name: {{ include "tembo-pod-init.fullname" . }}
   namespace: {{ template "tembo-pod-init.namespace" . }}
   annotations:
-    cert-manager.io/inject-ca-from: {{ printf "%s/%s-tls" (include "tembo-pod-init.namespace" .) (include "tembo-pod-init.fullname" .) }}
+    "helm.sh/hook": post-install,post-upgrade
+    cert-manager.io/inject-ca-from: {{ printf "%s/%s-certificate" (include "tembo-pod-init.namespace" .) (include "tembo-pod-init.fullname" .)}}
   labels:
 {{ include "tembo-pod-init-helm.labels" . | indent 4 }}
 webhooks:
@@ -14,7 +15,6 @@ webhooks:
         name: {{ include "tembo-pod-init.fullname" . }}
         namespace: {{ template "tembo-pod-init.namespace" . }}
         path: "/mutate"
-      caBundle: ""
     rules:
       - operations: ["CREATE", "UPDATE"]
         apiGroups: [""]
@@ -28,7 +28,6 @@ webhooks:
         name: {{ include "tembo-pod-init.fullname" . }}
         namespace: {{ template "tembo-pod-init.namespace" . }}
         path: "/mutate"
-      caBundle: ""
     rules:
       - operations: ["CREATE", "UPDATE"]
         apiGroups: [""]
