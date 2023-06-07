@@ -12,7 +12,7 @@ on:
     paths:
     - '.github/workflows/prom_exporter_ext.yml'
     - 'extensions/pgx_prometheus_exporter/**'
-  # Always run tests on main or release branches
+  # Always run tests on main
   push:
     branches:
       - main
@@ -64,7 +64,7 @@ jobs:
             extensions/pgx_prometheus_exporter
           # Additional directories to cache
           cache-directories: |
-            /home/runner/.pgx
+            /home/runner/.pgrx
       - uses: ./.github/actions/pgx-init
         with:
           working-directory: extensions/pgx_prometheus_exporter
