@@ -3,11 +3,13 @@
 use crate::errors::PgmqError;
 use sqlx::types::chrono::Utc;
 pub const TABLE_PREFIX: &str = r#"pgmq"#;
+pub const PGMQ_SCHEMA: &str = "public";
 
 pub fn init_queue(name: &str) -> Result<Vec<String>, PgmqError> {
     check_input(name)?;
     Ok(vec![
         create_meta(),
+        grant_pgmon_meta(),
         create_queue(name)?,
         create_index(name)?,
         create_archive(name)?,
@@ -65,6 +67,15 @@ pub fn create_meta() -> String {
         );
         "
     )
+}
+
+// so that pg_monitor can see the queues
+pub fn grant_pgmon_meta() -> String {
+    format!(
+        "
+        GRANT SELECT ON {PGMQ_SCHEMA}.{TABLE_PREFIX}_meta to pg_monitor;
+        "
+    )  
 }
 
 pub fn drop_queue(name: &str) -> Result<String, PgmqError> {
