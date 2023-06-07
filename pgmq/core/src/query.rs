@@ -14,6 +14,7 @@ pub fn init_queue(name: &str) -> Result<Vec<String>, PgmqError> {
         create_index(name)?,
         create_archive(name)?,
         insert_meta(name)?,
+        grant_pgmon_queue(name)?,
     ])
 }
 
@@ -69,13 +70,23 @@ pub fn create_meta() -> String {
     )
 }
 
-// so that pg_monitor can see the queues
+// pg_monitor needs to query queue metadata
 pub fn grant_pgmon_meta() -> String {
     format!(
         "
         GRANT SELECT ON {PGMQ_SCHEMA}.{TABLE_PREFIX}_meta to pg_monitor;
         "
-    )  
+    )
+}
+
+// pg_monitor needs to query queue tables
+pub fn grant_pgmon_queue(name: &str) -> Result<String, PgmqError> {
+    check_input(name)?;
+    Ok(format!(
+        "
+        GRANT SELECT ON {PGMQ_SCHEMA}.{TABLE_PREFIX}_{name} to pg_monitor;
+        "
+    ))
 }
 
 pub fn drop_queue(name: &str) -> Result<String, PgmqError> {
