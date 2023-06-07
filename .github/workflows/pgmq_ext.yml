@@ -87,7 +87,7 @@ jobs:
 
   publish:
     # only publish off main branch
-    # if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main'
     name: trunk publish
     runs-on: ubuntu-22.04
     steps:
