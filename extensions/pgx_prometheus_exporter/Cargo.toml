@@ -8,17 +8,18 @@ homepage = "https://www.coredb.io"
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/CoreDB-io/coredb"
+publish = false
 
 [lib]
 crate-type = ["cdylib"]
 
 [features]
 default = ["pg14"]
-pg11 = ["pgrx/pg11", "pgx-tests/pg11" ]
-pg12 = ["pgrx/pg12", "pgx-tests/pg12" ]
-pg13 = ["pgrx/pg13", "pgx-tests/pg13" ]
-pg14 = ["pgrx/pg14", "pgx-tests/pg14" ]
-pg15 = ["pgrx/pg15", "pgx-tests/pg15" ]
+pg11 = ["pgrx/pg11", "pgrx-tests/pg11" ]
+pg12 = ["pgrx/pg12", "pgrx-tests/pg12" ]
+pg13 = ["pgrx/pg13", "pgrx-tests/pg13" ]
+pg14 = ["pgrx/pg14", "pgrx-tests/pg14" ]
+pg15 = ["pgrx/pg15", "pgrx-tests/pg15" ]
 pg_test = []
 
 [dependencies]
@@ -30,7 +31,7 @@ tokio = {version = "1.23.0", features = ["macros"] }
 
 
 [dev-dependencies]
-pgx-tests = "0.8.4"
+pgrx-tests = "0.8.4"
 
 [profile.dev]
 panic = "unwind"
