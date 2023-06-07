@@ -1,7 +1,7 @@
 use std::sync::{Arc, Mutex};
 
-use pgx::bgworkers::*;
-use pgx::prelude::*;
+use pgrx::bgworkers::*;
+use pgrx::prelude::*;
 
 pub const UPTIME_QUERY: &str =
     "SELECT FLOOR(EXTRACT(EPOCH FROM now() - pg_postmaster_start_time))::bigint
@@ -22,14 +22,14 @@ pub fn handle_query(query: &str) -> Option<i64> {
 }
 
 fn query_exec(query: &str) -> Option<i64> {
-    Spi::get_one(&query)
+    Spi::get_one(&query).expect("Failed to execute query")
 }
 
 #[cfg(any(test, feature = "pg_test"))]
 #[pg_schema]
 mod tests {
     use crate::metrics::query;
-    use pgx::prelude::*;
+    use pgrx::prelude::*;
 
     #[pg_test]
     fn test_query_exec() {

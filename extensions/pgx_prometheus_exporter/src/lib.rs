@@ -1,11 +1,11 @@
-use pgx::bgworkers::*;
-use pgx::log;
-use pgx::prelude::*;
+use pgrx::bgworkers::*;
+use pgrx::log;
+use pgrx::prelude::*;
 
 mod metrics;
 mod webserver;
 
-pgx::pg_module_magic!();
+pgrx::pg_module_magic!();
 
 #[allow(non_snake_case)]
 #[pg_guard]
