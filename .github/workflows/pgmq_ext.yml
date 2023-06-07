@@ -3,7 +3,7 @@ name: PGMQ Extension
 defaults:
   run:
     shell: bash
-    working-directory: ./pgmq/extension/
+    working-directory: ./pgmq/extension
 
 on:
   pull_request:
@@ -13,6 +13,7 @@ on:
       - '.github/workflows/pgmq_ext.yml'
       - '.github/actions/pgx-init/**'
       - 'pgmq/extension/**'
+      - 'pgmq/core/**'
 
   push:
     branches:
@@ -21,6 +22,8 @@ on:
       - '.github/workflows/pgmq_ext.yml'
       - '.github/actions/pgx-init/**'
       - 'pgmq/extension/**'
+      - 'pgmq/core/**'
+
 jobs:
   lint:
     name: Run linters
@@ -62,7 +65,7 @@ jobs:
         with:
           prefix-key: "pgmq-extension-test"
           workspaces: |
-            pgmq/extension
+            pgmq
           # Additional directories to cache
           cache-directories: |
             /home/runner/.pgrx
@@ -97,7 +100,7 @@ jobs:
         with:
           prefix-key: "pgmq-extension-test"
           workspaces: |
-            pgmq/extension
+              pgmq/extension
           # Additional directories to cache
           cache-directories: |
             /home/runner/.pgrx
@@ -109,14 +112,18 @@ jobs:
          mv stoml_linux_amd64 stoml
          chmod +x stoml
          sudo mv stoml /usr/local/bin/
-         cargo install pg-trunk --version 0.4.9
+         cargo install pg-trunk
       - name: trunk build
-        run: trunk build
+        working-directory: pgmq/
+        run: |
+          pgmq_ver=$(stoml extension/Cargo.toml package.version)
+          trunk build --path . --dockerfile ./Dockerfile.build --install-command "cd extension && cargo pgrx install" --name pgmq --version ${pgmq_ver}
       - name: trunk publish
+        working-directory: pgmq/
         env:
           TRUNK_API_TOKEN: ${{ secrets.TRUNK_AUTH_TOKEN }}
         run: |
-          pgmq_ver=$(stoml Cargo.toml package.version)
-          pgmq_descr=$(stoml Cargo.toml package.description)
-          pgmq_repo=$(stoml Cargo.toml package.repository)
+          pgmq_ver=$(stoml extension/Cargo.toml package.version)
+          pgmq_descr=$(stoml extension/Cargo.toml package.description)
+          pgmq_repo=$(stoml extension/Cargo.toml package.repository)
           trunk publish pgmq --version ${pgmq_ver} --file .trunk/pgmq-${pgmq_ver}.tar.gz --description "Message Queue for postgres" --homepage "https://github.com/CoreDB-io/coredb/pgmq" --repository "https://github.com/CoreDB-io/coredb/pgmq" --license "Apache-2.0"
