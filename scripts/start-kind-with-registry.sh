@@ -25,6 +25,8 @@ apiVersion: kind.x-k8s.io/v1alpha4
 nodes:
 - role: control-plane
   image: kindest/node:${kind_version}@sha256:b7d12ed662b873bd8510879c1846e87c7e676a79fefc93e17b2a52989d3ff42b
+runtimeConfig:
+  "admissionregistration.k8s.io/v1": "true"
 containerdConfigPatches:
 - |-
   [plugins."io.containerd.grpc.v1.cri".registry]
