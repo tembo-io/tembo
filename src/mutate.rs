@@ -6,6 +6,9 @@ use kube::core::{
     TypeMeta,
 };
 use serde_json::json;
+use std::collections::HashSet;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 use tracing::{debug, error};
 
 use crate::{config::Config, container::create_init_container};
@@ -14,9 +17,28 @@ use crate::{config::Config, container::create_init_container};
 async fn mutate(
     body: web::Json<AdmissionReview<Pod>>,
     config: web::Data<Config>,
+    namespaces: web::Data<Arc<RwLock<HashSet<String>>>>,
 ) -> impl Responder {
     // Extract the AdmissionRequest from the AdmissionReview
     let admission_request: AdmissionRequest<Pod> = body.clone().request.unwrap();
+
+    // Check if the namespace is in the list of namespaces to watch
+    let namespace = admission_request.namespace.as_ref().unwrap();
+
+    if !namespaces.read().await.contains(namespace) {
+        debug!(
+            "Namespace {} is not in the list of namespaces to watch",
+            namespace
+        );
+        return HttpResponse::Ok().json(AdmissionReview {
+            response: Some(mk_allow_response(&admission_request, None)),
+            request: Some(admission_request),
+            types: TypeMeta {
+                api_version: "admission.k8s.io/v1".to_string(),
+                kind: "AdmissionReview".to_string(),
+            },
+        });
+    }
 
     // Check for the kind of resource in the AdmissionRequest, we only
     // care about Pod resources
@@ -78,8 +100,10 @@ async fn mutate(
             "Pod spec does not contain all required volumes, will not mutate: {:?}",
             pod
         );
+        // set message to say that the pod does not have all required volumes
+        let message = "Pod spec does not contain all required volumes, will not mutate";
         return HttpResponse::Ok().json(AdmissionReview {
-            response: Some(mk_allow_response(&admission_request, None)),
+            response: Some(mk_deny_response(&admission_request, &message)),
             request: Some(admission_request),
             types: TypeMeta {
                 api_version: "admission.k8s.io/v1".to_string(),

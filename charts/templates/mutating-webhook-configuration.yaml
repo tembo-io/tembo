@@ -4,7 +4,7 @@ metadata:
   name: {{ include "tembo-pod-init.fullname" . }}
   namespace: {{ template "tembo-pod-init.namespace" . }}
   annotations:
-    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook": post-install,post-upgrade,post-delete
     cert-manager.io/inject-ca-from: {{ printf "%s/%s-certificate" (include "tembo-pod-init.namespace" .) (include "tembo-pod-init.fullname" .)}}
   labels:
 {{ include "tembo-pod-init-helm.labels" . | indent 4 }}

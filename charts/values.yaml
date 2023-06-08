@@ -1,6 +1,7 @@
 nameOverride:
 namespaceOverride:
 logLevel: info
+replicas: 1
 initContainerImage:
   repository: quay.io/coredb/coredb-pg-cnpg
   tag: latest

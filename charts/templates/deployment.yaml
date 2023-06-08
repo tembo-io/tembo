@@ -9,7 +9,7 @@ metadata:
   annotations: {{ toYaml .Values.annotations | nindent 4 }}
   {{- end }}
 spec:
-  replicas: 1
+  replicas: {{ .Values.replicas }}
   strategy:
     type: {{ .Values.upgradeStrategy }}
   selector:
