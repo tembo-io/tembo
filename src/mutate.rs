@@ -222,7 +222,7 @@ fn mk_allow_response(ar: &AdmissionRequest<Pod>, patch: Option<Patch>) -> Admiss
     response
 }
 
-pub fn mk_deny_response(ar: &AdmissionRequest<Pod>, message: &str) -> AdmissionResponse {
+fn mk_deny_response(ar: &AdmissionRequest<Pod>, message: &str) -> AdmissionResponse {
     AdmissionResponse::from(ar).deny(message)
 }
 
