@@ -1,0 +1,42 @@
+name: Build and deploy
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build_and_push:
+    name: Build and push images
+    runs-on:
+      - self-hosted
+      - dind
+      - large-8x8
+    outputs:
+      short_sha: ${{ steps.versions.outputs.SHORT_SHA }}
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v3
+      - name: Set version strings
+        id: versions
+        run: |
+          echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+      - name: Check out the coredb repo to reuse some actions
+        uses: actions/checkout@v3
+        with:
+          repository: coredb-io/coredb
+          path: ./coredb
+          ref: d62b2a2be30c0f70b34ad5283c4679361dedf852
+      - name: Build and upload image
+        uses: ./coredb/.github/actions/build-and-push-to-quay
+        with:
+          image_name: tembo-pod-init
+          publish_latest: true
+          publish_calver: true
+          docker_directory: .
+          quay_user: ${{ secrets.QUAY_USER }}
+          quay_password: ${{ secrets.QUAY_PASSWORD }}

@@ -240,3 +240,39 @@ fn generate_pod_patch(pod: &Pod, new_pod: &Pod) -> Option<Patch> {
         Some(Patch(patch.to_vec()))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::mutate::has_required_volumes;
+    use k8s_openapi::api::core::v1::{Pod, PodSpec, Volume};
+
+    #[test]
+    fn test_has_required_volumes() {
+        let pod = Pod {
+            spec: Some(PodSpec {
+                volumes: Some(vec![
+                    Volume {
+                        name: "pgdata".to_string(),
+                        ..Default::default()
+                    },
+                    Volume {
+                        name: "scratch-data".to_string(),
+                        ..Default::default()
+                    },
+                ]),
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let rv = vec!["pgdata", "scratch-data"];
+
+        let result = has_required_volumes(&pod, &rv);
+
+        assert!(result, "Pod should have all required volumes");
+    }
+
+    // It's almost impossible to test the other functions here since the the
+    // types like AdmissionRequest, AdmissionResponse, PodSpec, etc all have
+    // private fields.  We would need to mock the entire Kubernetes API to test
+    // them.  For now we are not going to test them.
+}
