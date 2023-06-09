@@ -2,7 +2,6 @@
 set -o errexit
 
 # 1. Create registry container unless it already exists
-kind_version='v1.27.1'
 reg_name='kind-registry'
 reg_port='5001'
 if [ "$(docker inspect -f '{{.State.Running}}' "${reg_name}" 2>/dev/null || true)" != 'true' ]; then
@@ -22,9 +21,6 @@ fi
 cat <<EOF | kind create cluster --config=-
 kind: Cluster
 apiVersion: kind.x-k8s.io/v1alpha4
-nodes:
-- role: control-plane
-  image: kindest/node:${kind_version}@sha256:b7d12ed662b873bd8510879c1846e87c7e676a79fefc93e17b2a52989d3ff42b
 runtimeConfig:
   "admissionregistration.k8s.io/v1": "true"
 containerdConfigPatches:

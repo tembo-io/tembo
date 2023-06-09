@@ -2,6 +2,7 @@ use actix_web::{dev::ServerHandle, middleware, web, App, HttpServer};
 use kube::Client;
 use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 use parking_lot::Mutex;
+//use std::sync::Arc;
 use tembo_pod_init::{config::Config, health::*, log, mutate::mutate, watcher::NamespaceWatcher};
 
 #[macro_use]
@@ -34,8 +35,31 @@ async fn main() -> std::io::Result<()> {
     let watcher = NamespaceWatcher::new(kube_client.clone(), config.clone());
     let namespaces = watcher.get_namespaces();
     tokio::spawn(async move {
-        watcher.watch().await.unwrap();
+        loop {
+            match watcher.watch().await {
+                Ok(_) => break,
+                Err(e) => {
+                    error!("Namespace watcher failed: {}", e);
+                    tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+                }
+            }
+        }
     });
+
+    // Print out the namespaces we are currently watching every 10 seconds
+    //if tracing::Level::DEBUG >= *tracing::level_filters::RECORDED_LEVEL {
+    //    let debug_namespaces = Arc::clone(&namespaces);
+    //    tokio::spawn(async move {
+    //        loop {
+    //            let stored_namespaces = debug_namespaces.read().await;
+    //            debug!(
+    //                "Namespaces currently being tracked: {:?}",
+    //                *stored_namespaces
+    //            );
+    //            tokio::time::sleep(tokio::time::Duration::from_secs(5)).await; // adjust the delay as needed
+    //        }
+    //    });
+    //}
 
     // Load the TLS certificate and key
     let mut tls_config = SslAcceptor::mozilla_intermediate(SslMethod::tls()).unwrap();

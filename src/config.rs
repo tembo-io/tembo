@@ -8,6 +8,7 @@ pub struct Config {
     pub server_port: u16,
     pub log_level: String,
     pub container_image: String,
+    pub init_container_name: String,
     pub tls_cert: String,
     pub tls_key: String,
 }
@@ -34,6 +35,9 @@ impl Default for Config {
             )
             .parse()
             .unwrap(),
+            init_container_name: from_env_or_default("INIT_CONTAINER_NAME", "tembo-bootstrap")
+                .parse()
+                .unwrap(),
             tls_cert: from_env_or_default("TLS_CERT", "/certs/tls.crt")
                 .parse()
                 .unwrap(),

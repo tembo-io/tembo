@@ -16,7 +16,7 @@ annotations: {}
 podAnnotations: {}
 resources: {}
 
-upgradeStrategy: Recreate
+upgradeStrategy: RollingUpdate
 
 service:
   type: "ClusterIP"

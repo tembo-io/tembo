@@ -1,4 +1,5 @@
 use k8s_openapi::api::core::v1::{Capabilities, Container, SecurityContext, VolumeMount};
+use tracing::debug;
 
 use crate::config::Config;
 
@@ -38,7 +39,7 @@ pub fn create_init_container(config: &Config) -> Container {
 
     // Create the initContainer
     Container {
-        name: "tembo-bootstrap".to_string(),
+        name: config.init_container_name.to_string(),
         image: Some(config.container_image.to_string()),
         image_pull_policy: Some("IfNotPresent".to_string()),
         command: Some(vec![
@@ -51,5 +52,29 @@ pub fn create_init_container(config: &Config) -> Container {
         termination_message_path: Some("/dev/termination-log".to_string()),
         termination_message_policy: Some("File".to_string()),
         ..Default::default()
+    }
+}
+
+pub fn add_volume_mounts(container: &mut Container, volume_mount: VolumeMount) {
+    // Check to make sure we only add the volume once
+    if container
+        .volume_mounts
+        .as_ref()
+        .map_or(false, |volume_mounts| {
+            volume_mounts
+                .iter()
+                .any(|v| v.name == volume_mount.name && v.mount_path == volume_mount.mount_path)
+        })
+    {
+        debug!(
+            "Container already has volume mount {:?}, skipping",
+            volume_mount
+        );
+    } else {
+        // Push the new volume mount to the list of volume mounts in the container
+        container
+            .volume_mounts
+            .get_or_insert_with(Vec::new)
+            .push(volume_mount);
     }
 }

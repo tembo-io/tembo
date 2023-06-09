@@ -1,6 +1,6 @@
 use actix_web::{post, web, HttpResponse, Responder};
 use json_patch::{diff, Patch};
-use k8s_openapi::api::core::v1::Pod;
+use k8s_openapi::api::core::v1::{Pod, VolumeMount};
 use kube::core::{
     admission::{AdmissionRequest, AdmissionResponse, AdmissionReview},
     TypeMeta,
@@ -11,7 +11,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 use tracing::{debug, error};
 
-use crate::{config::Config, container::create_init_container};
+use crate::{config::Config, container::*};
 
 #[post("/mutate")]
 async fn mutate(
@@ -46,6 +46,12 @@ async fn mutate(
         || admission_request.kind.version != "v1"
         || admission_request.kind.kind != "Pod"
     {
+        debug!(
+            "Skipping resource with group: {}, version: {}, kind: {}",
+            admission_request.kind.group,
+            admission_request.kind.version,
+            admission_request.kind.kind
+        );
         return HttpResponse::Ok().json(AdmissionReview {
             response: Some(mk_allow_response(&admission_request, None)),
             request: Some(admission_request),
@@ -59,14 +65,20 @@ async fn mutate(
     // Extract the Pod from the AdmissionRequest
     let ar: AdmissionReview<Pod> = body.into_inner();
     let pod: Option<&Pod> = match &ar.request {
-        Some(request) => request.object.as_ref(),
+        Some(request) => {
+            debug!("Got AdmissionRequest: {:?}", ar.request);
+            request.object.as_ref()
+        }
         None => {
             return HttpResponse::BadRequest().body("expected AdmissionRequest");
         }
     };
 
     let pod = match pod {
-        Some(pod) => pod,
+        Some(pod) => {
+            debug!("Got Pod: {:?}", pod);
+            pod
+        }
         None => {
             return HttpResponse::BadRequest().body("expected pod object");
         }
@@ -103,7 +115,7 @@ async fn mutate(
         // set message to say that the pod does not have all required volumes
         let message = "Pod spec does not contain all required volumes, will not mutate";
         return HttpResponse::Ok().json(AdmissionReview {
-            response: Some(mk_deny_response(&admission_request, &message)),
+            response: Some(mk_deny_response(&admission_request, message)),
             request: Some(admission_request),
             types: TypeMeta {
                 api_version: "admission.k8s.io/v1".to_string(),
@@ -116,16 +128,55 @@ async fn mutate(
     // So we can inject or patch the initContainer into it.
     let mut new_pod = pod.clone();
     if let Some(spec) = &mut new_pod.spec {
-        let init_container = create_init_container(&config);
-        spec.init_containers
-            .get_or_insert_with(Vec::new)
-            .push(init_container);
+        // Check to make sure we don't add the initContainer more than once
+        if spec
+            .init_containers
+            .as_ref()
+            .map_or(false, |init_containers| {
+                init_containers
+                    .iter()
+                    .any(|c| c.name == config.init_container_name)
+            })
+        {
+            debug!(
+                "Pod already has initContainer, skipping: {:?}",
+                config.init_container_name.to_string()
+            );
+        } else {
+            let init_container = create_init_container(&config);
+            let init_containers = spec.init_containers.take().unwrap_or_default();
+            let mut new_init_containers = vec![init_container];
+            new_init_containers.extend(init_containers);
+            spec.init_containers = Some(new_init_containers);
+        }
     } else {
         error!(
             "Pod spec is missing, cannot inject initContainer: {:?}",
             pod.clone()
         );
     };
+
+    // Mutate a Pod when the container name is Postgres and add a scratch
+    // volume mounted to /tmp
+    if let Some(spec) = &mut new_pod.spec {
+        // Iterate over containers to find the 'postgres' container.
+        if let Some(postgres_container) = spec.containers.iter_mut().find(|c| c.name == "postgres")
+        {
+            let volume_mount = VolumeMount {
+                mount_path: "/tmp".to_string(),
+                mount_propagation: None,
+                name: "scratch-data".to_string(),
+                // You can leave the other fields as None if you don't need them.
+                sub_path: None,
+                read_only: None,
+                sub_path_expr: None,
+            };
+
+            add_volume_mounts(postgres_container, volume_mount);
+        } else {
+            error!("Postgres container not found");
+        }
+    }
 
     // Calculate patch and add it to the AdmissionResponse
     let patch = generate_pod_patch(pod, &new_pod);
@@ -150,11 +201,10 @@ async fn mutate(
 // Check to make sure pods have all required volumes
 fn has_required_volumes(pod: &Pod, required_volumes: &[&str]) -> bool {
     if let Some(volumes) = &pod.spec.as_ref().unwrap().volumes {
-        for volume in volumes {
-            if required_volumes.contains(&volume.name.as_str()) {
-                return true;
-            }
-        }
+        let existing_volumes: HashSet<_> = volumes.iter().map(|v| v.name.as_str()).collect();
+        return required_volumes
+            .iter()
+            .all(|required_volume| existing_volumes.contains(*required_volume));
     }
     false
 }
