@@ -40,3 +40,35 @@ jobs:
           docker_directory: .
           quay_user: ${{ secrets.QUAY_USER }}
           quay_password: ${{ secrets.QUAY_PASSWORD }}
+
+  argocd_update:
+    name: ArgoCD update automation
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-20.04
+    strategy:
+      # fail-fast means to cancel all jobs if one fails
+      fail-fast: false
+      matrix:
+        include:
+          - repository: coredb-io/app-deploy-dev
+            subdirectory: dev
+            branch: main
+          # - repository: coredb-io/app-deploy
+          #   subdirectory: staging
+          #   branch: staging-updates
+          # - repository: coredb-io/app-deploy
+          #   subdirectory: prod
+          #   branch: prod-updates
+    needs:
+      - build_and_push
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v3
+      - name: Check out the repo
+        uses: ./.github/actions/argocd-update
+        with:
+          repository: ${{ matrix.repository }}
+          ssh_key: ${{ secrets.SERVICE_USER_GITHUB_SSH_KEY }}
+          branch: ${{ matrix.branch }}
+          version: ${{ needs.build_and_push.outputs.short_sha }}
+          subdirectory: ${{ matrix.subdirectory }}
