@@ -115,15 +115,17 @@ jobs:
          cargo install pg-trunk
       - name: trunk build
         working-directory: pgmq/
-        run: |
-          pgmq_ver=$(stoml extension/Cargo.toml package.version)
-          trunk build --path . --dockerfile ./Dockerfile.build --install-command "cd extension && cargo pgrx install" --name pgmq --version ${pgmq_ver}
+        run: trunk build
+        # use below when trunk build supports --dockerfile for pgrx
+        # run: |
+        #   pgmq_ver=$(stoml extension/Cargo.toml package.version)
+        #   trunk build --path . --dockerfile ./Dockerfile.build --install-command "cd extension && cargo pgrx install" --name pgmq --version ${pgmq_ver}
       - name: trunk publish
         working-directory: pgmq/
         env:
           TRUNK_API_TOKEN: ${{ secrets.TRUNK_AUTH_TOKEN }}
         run: |
-          pgmq_ver=$(stoml extension/Cargo.toml package.version)
-          pgmq_descr=$(stoml extension/Cargo.toml package.description)
-          pgmq_repo=$(stoml extension/Cargo.toml package.repository)
+          pgmq_ver=$(stoml Cargo.toml package.version)
+          pgmq_descr=$(stoml Cargo.toml package.description)
+          pgmq_repo=$(stoml Cargo.toml package.repository)
           trunk publish pgmq --version ${pgmq_ver} --file .trunk/pgmq-${pgmq_ver}.tar.gz --description "Message Queue for postgres" --homepage "https://github.com/CoreDB-io/coredb/pgmq" --repository "https://github.com/CoreDB-io/coredb/pgmq" --license "Apache-2.0"
