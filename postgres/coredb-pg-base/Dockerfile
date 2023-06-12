@@ -46,7 +46,6 @@ RUN set -eux; \
           libpam0g-dev \
           libreadline-dev \
           libssl-dev \
-          zstd \
           xz-utils \
           libnss-wrapper \
           llvm \
