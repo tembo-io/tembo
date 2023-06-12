@@ -3,7 +3,7 @@ name: PGMQ Extension
 defaults:
   run:
     shell: bash
-    working-directory: ./pgmq/extension
+    working-directory: ./pgmq
 
 on:
   pull_request:
@@ -12,8 +12,7 @@ on:
     paths:
       - '.github/workflows/pgmq_ext.yml'
       - '.github/actions/pgx-init/**'
-      - 'pgmq/extension/**'
-      # - 'pgmq/core/**'
+      - 'pgmq/**'
 
   push:
     branches:
@@ -21,8 +20,7 @@ on:
     paths:
       - '.github/workflows/pgmq_ext.yml'
       - '.github/actions/pgx-init/**'
-      - 'pgmq/extension/**'
-      # - 'pgmq/core/**'
+      - 'pgmq/**'
 
 jobs:
   lint:
@@ -40,13 +38,13 @@ jobs:
         with:
           prefix-key: "pgmq-extension-lint"
           workspaces: |
-            pgmq/extension
+            pgmq/
           # Additional directories to cache
           cache-directories: |
             /home/runner/.pgrx
       - uses: ./.github/actions/pgx-init
         with:
-          working-directory: pgmq/extension
+          working-directory: pgmq/
       - name: Cargo format
         run: cargo +nightly fmt --all --check
       - name: Clippy
@@ -71,7 +69,7 @@ jobs:
             /home/runner/.pgrx
       - uses: ./.github/actions/pgx-init
         with:
-          working-directory: pgmq/extension
+          working-directory: pgmq/
       - name: test
         run: |
           sudo apt-get update && sudo apt-get install -y postgresql-server-dev-14
