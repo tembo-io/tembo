@@ -1,0 +1,26 @@
+name: Test Helm Chart
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'charts/**'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'charts/**'
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Helm init
+        uses: azure/setup-helm@v3
+        with:
+          version: v3.4.0
+
+      - name: Helm lint
+        run: helm lint charts/

@@ -1,0 +1,62 @@
+name: 'Argo CD update'
+description: 'Push changes to a branch in ArgoCD'
+inputs:
+  repository:
+    description: 'The ArgoCD repository'
+    required: true
+  ssh_key:
+    description: 'The SSH key for the repository'
+    required: true
+  branch:
+    description: 'The branch to update'
+    required: true
+  version:
+    description: 'The version to use for updating'
+    required: true
+  subdirectory:
+    description: 'The subdirectory to update'
+    required: true
+  clone_into:
+    description: 'The directory to clone the argocd repo into'
+    default: 'argocd-repo'
+    required: false
+outputs: {}
+runs:
+  using: "composite"
+  steps:
+  - name: Check out the repo
+    uses: actions/checkout@v3
+    with:
+      repository: ${{ inputs.repository }}
+      ssh-key: ${{ inputs.ssh_key }}
+      path: ${{ inputs.clone_into }}
+  - name: Git commit and push to remote
+    shell: bash
+    run: |
+      set -xe
+      cd ${{ inputs.clone_into }}
+      git config --global user.name "coredb-service-user"
+      git config --global user.email "admin+github@coredb.io"
+      git fetch origin ${{ inputs.branch }} && git checkout ${{ inputs.branch }} || git checkout -b ${{ inputs.branch }}
+  - name: webserve image version
+    uses: mikefarah/yq@v4.33.3
+    with:
+      cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/control-plane-webserver.yaml
+  - name: tembo-pod-init image version
+    uses: mikefarah/yq@v4.33.3
+    with:
+      cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/control-plane-service.yaml
+  - name: control-plane-monitoring helm chart
+    uses: mikefarah/yq@v4.33.3
+    with:
+      cmd: yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/control-plane-monitoring.yaml
+  - name: Git commit and push to remote
+    shell: bash
+    run: |
+      set -xe
+      cd ${{ inputs.clone_into }}
+      git add --all
+      # debugging
+      git diff HEAD
+      git commit -m "Update from coredb-io/control-plane: ${{ inputs.version }}"
+      git push origin ${{ inputs.branch }}
