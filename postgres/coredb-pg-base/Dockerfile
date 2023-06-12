@@ -39,7 +39,11 @@ RUN set -eux; \
           zlib1g-dev \
           libpq-dev \
           build-essential \
-          zlib1g-dev \
+          python3-dev \
+          tcl-dev \
+          libxslt1-dev \
+          libperl-dev \
+          libpam0g-dev \
           libreadline-dev \
           libssl-dev \
           zstd \
@@ -53,6 +57,10 @@ RUN set -eux; \
           libkrb5-dev \
           uuid-dev \
           gettext \
+          liblz4-dev \
+          libsystemd-dev \
+          libselinux1-dev \
+          libzstd-dev \
       ; \
       apt-get autoremove -y; \
       apt-get clean -y; \
@@ -63,6 +71,12 @@ ENV LDFLAGS "-Wl,-z,relro -Wl,-z,now"
 RUN ./configure --prefix=/usr/lib/postgresql/${PG_MAJOR} \
         --datarootdir=${ALTDIR} \
         --libdir=${ALTDIR}/${PG_MAJOR}/lib \
+        --with-perl \
+        --with-python \
+        --with-tcl \
+        --with-pam \
+        --with-libxml \
+        --with-libxslt \
         --with-openssl \
         --enable-nls \
         --enable-thread-safety \
@@ -74,7 +88,11 @@ RUN ./configure --prefix=/usr/lib/postgresql/${PG_MAJOR} \
         --with-pgport=5432 \
         --with-system-tzdata=/usr/share/zoneinfo \
         --with-icu \
-        --with-llvm
+        --with-llvm \
+        --with-lz4 \
+        --with-zstd \
+        --with-systemd \
+        --with-selinux 
 
 RUN make -j$(nproc)
 RUN make install
