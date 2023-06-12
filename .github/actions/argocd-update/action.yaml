@@ -39,15 +39,15 @@ runs:
       git config --global user.email "admin+github@coredb.io"
       git fetch origin ${{ inputs.branch }} && git checkout ${{ inputs.branch }} || git checkout -b ${{ inputs.branch }}
   - name: webserve image version
-    uses: mikefarah/yq@v4.33.3
+    uses: mikefarah/yq@v4.34.1
     with:
       cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/control-plane-webserver.yaml
   - name: tembo-pod-init image version
-    uses: mikefarah/yq@v4.33.3
+    uses: mikefarah/yq@v4.34.1
     with:
       cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/control-plane-service.yaml
   - name: control-plane-monitoring helm chart
-    uses: mikefarah/yq@v4.33.3
+    uses: mikefarah/yq@v4.34.1
     with:
       cmd: yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/control-plane-monitoring.yaml
   - name: Git commit and push to remote
