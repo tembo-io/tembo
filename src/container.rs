@@ -41,7 +41,7 @@ pub fn create_init_container(config: &Config) -> Container {
     Container {
         name: config.init_container_name.to_string(),
         image: Some(config.container_image.to_string()),
-        image_pull_policy: Some("IfNotPresent".to_string()),
+        image_pull_policy: Some("Always".to_string()),
         command: Some(vec![
             "/bin/bash".to_string(),
             "-c".to_string(),
