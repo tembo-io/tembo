@@ -26,7 +26,6 @@
   "fiscalYearStartMonth": 0,
   "gnetId": 9628,
   "graphTooltip": 0,
-  "id": 853,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -667,12 +666,14 @@
           "color": {
             "mode": "thresholds"
           },
+          "decimals": 2,
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
             "steps": [
               {
-                "color": "green"
+                "color": "green",
+                "value": null
               },
               {
                 "color": "dark-red",
@@ -754,7 +755,8 @@
             "mode": "absolute",
             "steps": [
               {
-                "color": "semi-dark-red"
+                "color": "semi-dark-red",
+                "value": null
               },
               {
                 "color": "red",
@@ -998,6 +1000,6 @@
   "timezone": "",
   "title": "Cloud Tracker",
   "uid": "bE7Y7zEVz",
-  "version": 2,
+  "version": 1,
   "weekStart": ""
 }
