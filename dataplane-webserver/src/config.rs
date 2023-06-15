@@ -1,3 +1,4 @@
+use log::error;
 use std::env;
 
 #[derive(Clone, Debug)]
@@ -18,7 +19,13 @@ impl Default for Config {
                 .parse::<i32>()
             {
                 Ok(n) => n,
-                Err(_e) => 100,
+                Err(e) => {
+                    error!(
+                        "Environment variable PROMETHEUS_TIMEOUT_MS must convert into i32: {}",
+                        e
+                    );
+                    100
+                }
             },
         }
     }

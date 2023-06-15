@@ -245,11 +245,7 @@ pub async fn query_range(
                 HttpResponse::BadRequest().json("Prometheus reported the query is malformed")
             );
         }
-        StatusCode::GATEWAY_TIMEOUT => {
-            warn!("{:?}", &json_response);
-            return Ok(HttpResponse::GatewayTimeout().json("Prometheus timeout"));
-        }
-        StatusCode::SERVICE_UNAVAILABLE => {
+        StatusCode::GATEWAY_TIMEOUT | StatusCode::SERVICE_UNAVAILABLE => {
             warn!("{:?}", &json_response);
             return Ok(HttpResponse::GatewayTimeout().json("Prometheus timeout"));
         }

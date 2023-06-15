@@ -12,7 +12,7 @@ Public Routes:
 - Connect to VPN
 - Export prometheus URL
 ```
-PROMETHEUS_URL=https://prometheus-data-1.use1.dev.plat.cdb-svc.com
+export PROMETHEUS_URL=https://prometheus-data-1.use1.dev.plat.cdb-svc.com
 ```
 - Use cargo to test
 ```
