@@ -3,13 +3,12 @@ namespaceOverride:
 logLevel: info
 replicas: 1
 initContainerImage:
-  repository: quay.io/coredb/coredb-pg-cnpg
+  repository: quay.io/tembo/tembo-pg-cnpg
   tag: latest
 image:
-  repository: quay.io/coredb/tembo-pod-init 
+  repository: quay.io/tembo/tembo-pod-init 
   tag: "{{ .Chart.AppVersion }}"
   pullPolicy: Always
-  tag: latest
 
 extraEnv: {}
 annotations: {}
