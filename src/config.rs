@@ -16,13 +16,10 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
-            pod_annotation: from_env_or_default(
-                "POD_ANNOTATION",
-                "tembo-pod-init.coredb.io/inject",
-            ),
+            pod_annotation: from_env_or_default("POD_ANNOTATION", "tembo-pod-init.tembo.io/inject"),
             namespace_label: from_env_or_default(
                 "NAMESPACE_LABEL",
-                "tembo-pod-init.coredb.io/watch",
+                "tembo-pod-init.tembo.io/watch",
             ),
             server_host: from_env_or_default("SERVER_HOST", "0.0.0.0")
                 .parse()
@@ -31,7 +28,7 @@ impl Default for Config {
             log_level: from_env_or_default("LOG_LEVEL", "info").parse().unwrap(),
             container_image: from_env_or_default(
                 "CONTAINER_IMAGE",
-                "quay.io/coredb/coredb-pg-cnpg:latest",
+                "quay.io/tembo/tembo-pg-cnpg:latest",
             )
             .parse()
             .unwrap(),

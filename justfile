@@ -16,9 +16,7 @@ delete-kind:
 
 # start kind
 start-kind:
-  delete-kind
-  kind create cluster --config testdata/kind-cluster.yaml
-  sleep 10
+  scripts/start-kind-with-registry.sh
   kubectl wait pods --for=condition=Ready --timeout=300s --all --all-namespaces
 
 # install cert-manager
@@ -26,6 +24,14 @@ cert-manager:
   kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/{{CERT_MANAGER_VERSION}}/cert-manager.yaml
   sleep 7
   kubectl wait pods --for=condition=Ready --timeout=300s --all --all-namespaces
+
+# install cnpg
+cnpg:
+  kubectl apply -f https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.20/releases/cnpg-1.20.0.yaml
+  kubectl apply -f testdata/cnpg-cm.yaml 
+  sleep 7
+  kubectl wait pods --for=condition=Ready --timeout=300s --all --all-namespaces
+  kubectl rollout restart -n cnpg-system deployment cnpg-controller-manager
 
 # run
 run:
