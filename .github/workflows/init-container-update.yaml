@@ -2,7 +2,12 @@ name: Update tembo-pg-cnpg in ArgoCD
 
 on:
   schedule:
-    - cron: "0 * * * *"  # Runs every hour
+    - cron: "0 * * * *"
+  workflow_dispatch:
+    inputs:
+      manual_trigger:
+        description: 'Manually trigger the workflow'
+        default: ''
 
 permissions:
   id-token: write
