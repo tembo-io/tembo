@@ -47,5 +47,5 @@ jobs:
           repository: ${{ matrix.repository }}
           ssh_key: ${{ secrets.SERVICE_USER_GITHUB_SSH_KEY }}
           branch: ${{ matrix.branch }}
-          version: ${{ needs.update_argocd_deployment.steps.get_latest_version.outputs.latest_version }}
+          version: ${{ needs.update_argocd_deployment.outputs.latest_version }}
           subdirectory: ${{ matrix.subdirectory }}
