@@ -24,7 +24,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 1008,
+  "id": 1203,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -183,7 +183,7 @@
         "x": 12,
         "y": 0
       },
-      "id": 9,
+      "id": 8,
       "options": {
         "legend": {
           "calcs": [],
@@ -196,6 +196,7 @@
           "sort": "none"
         }
       },
+      "pluginVersion": "9.3.6",
       "targets": [
         {
           "datasource": {
@@ -203,13 +204,13 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "pgmq_num_archived{job=~\"org-coredb-inst-cp-queue-.*-metrics\"} -  pgmq_num_archived{job=~\"org-coredb-inst-cp-queue-.*-metrics\"} offset 24h",
+          "expr": "pgmq_total_messages{job=~\"org-coredb-inst-cp-queue-.*-metrics\"}",
           "legendFormat": "{{queue_name}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Num Messages Archived past 24hr",
+      "title": "Total Messages Created",
       "type": "timeseries"
     },
     {
@@ -275,7 +276,7 @@
         "x": 0,
         "y": 8
       },
-      "id": 7,
+      "id": 9,
       "options": {
         "legend": {
           "calcs": [],
@@ -295,13 +296,13 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "pgmq_num_archived{job=~\"org-coredb-inst-cp-queue-.*-metrics\"} -  pgmq_num_archived{job=~\"org-coredb-inst-cp-queue-.*-metrics\"} offset 1m",
+          "expr": "pgmq_total_messages{job=~\"org-coredb-inst-cp-queue-.*-metrics\"} -  pgmq_total_messages{job=~\"org-coredb-inst-cp-queue-.*-metrics\"} offset 24h",
           "legendFormat": "{{queue_name}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Num Messages Archived per Minute",
+      "title": "Num Messages past 24hr",
       "type": "timeseries"
     },
     {
@@ -367,7 +368,7 @@
         "x": 12,
         "y": 8
       },
-      "id": 8,
+      "id": 7,
       "options": {
         "legend": {
           "calcs": [],
@@ -380,7 +381,6 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "9.3.6",
       "targets": [
         {
           "datasource": {
@@ -388,13 +388,13 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "pgmq_num_archived{job=~\"org-coredb-inst-cp-queue-.*-metrics\"}",
+          "expr": "pgmq_total_messages{job=~\"org-coredb-inst-cp-queue-.*-metrics\"} -  pgmq_total_messages{job=~\"org-coredb-inst-cp-queue-.*-metrics\"} offset 1m",
           "legendFormat": "{{queue_name}}",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Total Archived Messages",
+      "title": "Num Messages per Minute",
       "type": "timeseries"
     },
     {
@@ -531,13 +531,13 @@
     "list": []
   },
   "time": {
-    "from": "now-5m",
+    "from": "now-1h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "Control Plane Queues",
   "uid": "3XmQBAl4z",
-  "version": 2,
+  "version": 3,
   "weekStart": ""
 }
