@@ -15,7 +15,7 @@ impl Default for Config {
                 "PROMETHEUS_URL",
                 "http://monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090",
             ),
-            prometheus_timeout_ms: match from_env_default("PROMETHEUS_TIMEOUT_MS", "100")
+            prometheus_timeout_ms: match from_env_default("PROMETHEUS_TIMEOUT_MS", "500")
                 .parse::<i32>()
             {
                 Ok(n) => n,
@@ -24,7 +24,7 @@ impl Default for Config {
                         "Environment variable PROMETHEUS_TIMEOUT_MS must convert into i32: {}",
                         e
                     );
-                    100
+                    500
                 }
             },
         }

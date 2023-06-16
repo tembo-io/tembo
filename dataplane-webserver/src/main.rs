@@ -9,7 +9,9 @@ use dataplane_webserver::{
 use log::info;
 
 use dataplane_webserver::routes::metrics;
-use utoipa::OpenApi;
+use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
+use utoipa::{Modify, OpenApi};
+
 use utoipa_swagger_ui::{SwaggerUi, Url};
 
 #[actix_web::main]
@@ -27,8 +29,33 @@ async fn main() -> std::io::Result<()> {
         .expect("Failed to create HTTP client");
 
     #[derive(OpenApi)]
-    #[openapi(paths(), components(schemas()))]
+    #[openapi(
+        paths(metrics::query_range),
+        components(schemas()),
+        modifiers(&SecurityAddon),
+        security(("jwt_token" = [])),
+    )]
     struct ApiDoc;
+
+    struct SecurityAddon;
+
+    impl Modify for SecurityAddon {
+        fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
+            openapi.components = Some(
+                utoipa::openapi::ComponentsBuilder::new()
+                    .security_scheme(
+                        "jwt_token",
+                        SecurityScheme::Http(
+                            HttpBuilder::new()
+                                .scheme(HttpAuthScheme::Bearer)
+                                .bearer_format("JWT")
+                                .build(),
+                        ),
+                    )
+                    .build(),
+            )
+        }
+    }
 
     HttpServer::new(move || {
         let mut doc = ApiDoc::openapi();

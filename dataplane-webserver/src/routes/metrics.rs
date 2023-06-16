@@ -84,18 +84,20 @@ impl ExprVisitor for NamespaceVisitor {
 #[utoipa::path(
     context_path = "/{namespace}/metrics",
     params(
-        ("namespace", example="org-tembo-inst-sample", description = "Instance namespace"),
-        ("query", example="standard", description = "PromQL range query"),
-        ("start", example="1686780828", description = "Range start, unix timestamp"),
-        ("end", example="1686780828", description = "Range end, unix timestamp. Default is now."),
-        ("step", example="60s", description = "Step size, defaults to 60s"),
+        ("namespace", example="org-coredb-inst-control-plane-dev", description = "Instance namespace"),
+        ("query" = inline(String), Query, example="(sum by (namespace) (max_over_time(pg_stat_activity_count{namespace=\"org-coredb-inst-control-plane-dev\"}[1h])))", description = "PromQL range query"),
+        ("start" = inline(u64), Query, example="1686780828", description = "Range start, unix timestamp"),
+        ("end" = inline(Option<u64>), Query, example="1686862041", description = "Range end, unix timestamp. Default is now."),
+        ("step" = inline(Option<String>), Query, example="60s", description = "Step size duration string, defaults to 60s"),
     ),
     responses(
-        (status = 200, description = "Metrics queries over a range", body = Value),
-        (status = 400, description = "Parameters are missing or incorrect", body = Value),
-        (status = 403, description = "Not authorized for query", body = Value),
-        (status = 422, description = "Incorrectly formatted query", body = Value),
-        (status = 504, description = "Request timed out on metrics backend", body = Value),
+        (status = 200, description = "https://prometheus.io/docs/prometheus/latest/querying/api/#range-queries", body = Value,
+        example = json!({"status":"success","data":{"resultType":"matrix","result":[{"metric":{"__name__":"up","job":"prometheus","instance":"localhost:9090"},"values":[[1435781430.781,"1"],[1435781445.781,"1"],[1435781460.781,"1"]]},{"metric":{"__name__":"up","job":"node","instance":"localhost:9091"},"values":[[1435781430.781,"0"],[1435781445.781,"0"],[1435781460.781,"1"]]}]}})
+        ),
+        (status = 400, description = "Parameters are missing or incorrect"),
+        (status = 403, description = "Not authorized for query"),
+        (status = 422, description = "Incorrectly formatted query"),
+        (status = 504, description = "Request timed out on metrics backend"),
     )
 )]
 #[get("/query_range")]
