@@ -40,7 +40,7 @@ jobs:
         id: get_latest_version
         run: |
           LATEST_VERSION=$(curl -s "https://quay.io/api/v1/repository/coredb/tembo-pg-cnpg/tag/?onlyActiveTags=true" | jq -r '.tags[0].name')
-          echo "$LATEST_VERSION" >> $GITHUB_OUTPUT
+          echo "latest_version=$LATEST_VERSION" >> $GITHUB_OUTPUT
       - name: ArgoCD Update tembo-pg-cnpg
         uses: ./.github/actions/argocd-update-initcontainer
         with:
