@@ -27,7 +27,7 @@ fn pgmq_metrics(
             name!(queue_length, i64),
             name!(newest_msg_age_sec, Option<i32>),
             name!(oldest_msg_age_sec, Option<i32>),
-            name!(num_archived, i64),
+            name!(total_messages, i64),
             name!(scrape_time, TimestampWithTimeZone),
         ),
     >,
@@ -46,7 +46,7 @@ fn pgmq_metrics_all() -> Result<
             name!(queue_length, i64),
             name!(newest_msg_age_sec, Option<i32>),
             name!(oldest_msg_age_sec, Option<i32>),
-            name!(num_archived, i64),
+            name!(total_messages, i64),
             name!(scrape_time, TimestampWithTimeZone),
         ),
     >,
@@ -71,9 +71,9 @@ fn query_summary(queue_name: &str) -> Result<MetricResult, crate::PgmqExtError> 
             let queue_length = row["queue_length"].value::<i64>()?.expect("no msg_id");
             let newest_msg_sec = row["newest_msg_age_sec"].value::<i32>()?;
             let oldest_msg_sec = row["oldest_msg_age_sec"].value::<i32>()?;
-            let num_archived = row["num_archived"]
+            let total_messages = row["total_messages"]
                 .value::<i64>()?
-                .expect("failed to get num_archived");
+                .expect("failed to get total_messages");
             let scrape_time = row["scrape_time"]
                 .value::<TimestampWithTimeZone>()?
                 .expect("scrape timestamp missing");
@@ -82,7 +82,7 @@ fn query_summary(queue_name: &str) -> Result<MetricResult, crate::PgmqExtError> 
                 queue_length,
                 newest_msg_sec,
                 oldest_msg_sec,
-                num_archived,
+                total_messages,
                 scrape_time,
             ));
         }
@@ -109,7 +109,7 @@ fn build_summary_query(queue_name: &str) -> String {
             FROM {fq_table}) as q_summary
         CROSS JOIN
             (SELECT
-                last_val as total_messages
+                last_value as total_messages
             from {fq_table}_msg_id_seq) as q_sent_summary
         "
     )
