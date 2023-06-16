@@ -116,7 +116,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 )
                 .await?;
 
-                // Lookup the stack's role ARN
+                // Lookup the CloudFormation stack's role ARN
                 let role_arn = match lookup_role_arn(
                     String::from("us-east-1"),
                     &read_msg.message.organization_name,
@@ -126,7 +126,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 {
                     Ok(arn) => arn,
                     Err(err) => {
-                        error!("Error getting stack outputs: {}", err);
+                        error!("Error getting CloudFormation stack outputs: {}", err);
                         // Requeue the message
                         let _ = queue
                             .set_vt::<CRUDevent>(
@@ -251,7 +251,11 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     }
                     Err(err) => {
-                        error!("error getting CoreDB status: {:?}", err);
+                        error!(
+                            "error getting CoreDB status in {}: {:?}",
+                            namespace.clone(),
+                            err
+                        );
                         true
                     }
                 };
@@ -338,7 +342,11 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 })
                 .await;
                 if result.is_err() {
-                    error!("error getting CoreDB status: {:?}", result);
+                    error!(
+                        "error getting CoreDB status in {}: {:?}",
+                        namespace.clone(),
+                        result
+                    );
                     continue;
                 }
                 let mut current_spec = result?;
