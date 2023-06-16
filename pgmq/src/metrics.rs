@@ -98,6 +98,7 @@ fn query_summary(queue_name: &str) -> Result<MetricResult, crate::PgmqExtError> 
 }
 
 fn build_summary_query(queue_name: &str) -> String {
+    let fq_table = format!("{PGMQ_SCHEMA}.{TABLE_PREFIX}_{queue_name}");
     format!(
         "SELECT * FROM
             (SELECT
@@ -105,11 +106,11 @@ fn build_summary_query(queue_name: &str) -> String {
                 (EXTRACT(epoch FROM (SELECT (NOW() at time zone 'utc' -  max(enqueued_at)))))::int as newest_msg_age_sec,
                 (EXTRACT(epoch FROM (SELECT (NOW() at time zone 'utc' -  min(enqueued_at)))))::int as oldest_msg_age_sec,
                 (NOW() at time zone 'utc')::timestamp at time zone 'utc' as scrape_time
-            FROM {PGMQ_SCHEMA}.{TABLE_PREFIX}_{queue_name}) as q_summary
+            FROM {fq_table}) as q_summary
         CROSS JOIN
             (SELECT
-                count(*) as num_archived
-            from {PGMQ_SCHEMA}.{TABLE_PREFIX}_{queue_name}_archive) as q_archive_summary
+                last_val as total_messages
+            from {fq_table}_msg_id_seq) as q_sent_summary
         "
     )
 }
