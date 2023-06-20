@@ -1,9 +1,9 @@
-name: coredb-pgmq-python CI workflow
+name: tembo-pgmq-python CI workflow
 
 defaults:
   run:
     shell: bash
-    working-directory: pgmq/coredb-pgmq-python
+    working-directory: pgmq/tembo-pgmq-python
 
 on:
   pull_request:
@@ -11,13 +11,13 @@ on:
      - main
     paths:
       - '.github/workflows/pgmq-python.yml'
-      - 'pgmq/coredb-pgmq-python/**'
+      - 'pgmq/tembo-pgmq-python/**'
   push:
     branches:
       - main
     paths:
       - '.github/workflows/pgmq-python.yml'
-      - 'pgmq/coredb-pgmq-python/**'
+      - 'pgmq/tembo-pgmq-python/**'
 
 jobs:
   lints:
