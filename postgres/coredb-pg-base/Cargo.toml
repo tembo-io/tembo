@@ -1,13 +1,14 @@
 [package]
 name = "coredb-pg-base"
-version = "15.3.0-coredb-pg-base.3"
+version = "15.3.0-coredb-pg-base.4"
 edition = "2021"
-authors = ["CoreDB.io"]
+authors = ["tembo.io"]
 description = "Base image for CoreDB's distribution of postgres"
-homepage = "https://www.coredb.io"
+homepage = "https://www.tembo.io"
 license = "Apache-2.0"
 readme = "README.md"
-repository = "https://github.com/CoreDB-io/coredb/tree/main/postgres"
+repository = "https://github.com/tembo-io/tembo/tree/main/postgres"
+publish = false
 
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
