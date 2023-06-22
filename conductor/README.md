@@ -1,5 +1,6 @@
 # Conductor
 
+
 The conductor is responsible for creating, updating, deleting database instances (custom resource) on a kubernetes cluster.
 It runs in each data plane and performs these actions based on messages written to a queue in the control plane.
 Upon connecting to this queue, it will continuously poll for new messages posted by the `cp-service` component.
@@ -38,7 +39,7 @@ Prerequisites:
    `> coredb-cli install --branch main`
 
 2. Install Traefik in the cluster
-   
+
    `> make setup.traefik`
 
 3. Set up local postgres queue

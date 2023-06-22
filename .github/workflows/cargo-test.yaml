@@ -1,0 +1,96 @@
+name: Cargo lint and test
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  find_directories:
+    name: Find changed Cargo projects
+    runs-on: ubuntu-20.04
+    outputs:
+      directories: ${{ steps.find_directories.outputs.build_matrix }}
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v3
+      - name: Check out the coredb repo to reuse some actions
+        uses: actions/checkout@v3
+        with:
+          repository: coredb-io/coredb
+          path: ./.coredb
+          ref: 84664df742ce9774a3029e08111940f9f1fb345e
+      - name: Find directories with Dockerfiles that changed
+        id: find_directories
+        uses: ./.coredb/.github/actions/find-changed-directories
+        with:
+          contains_the_file: Cargo.toml
+          changed_relative_to_branch: ${{ github.base_ref || 'not-a-branch' }}
+          ignore_dirs: ".coredb"
+
+  lint:
+    name: Run linters
+    runs-on:
+      - self-hosted
+      - dind
+      - small
+    needs:
+      - find_directories
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.find_directories.outputs.directories) }}
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install system dependencies
+        run: |
+          set -xe
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev
+      - name: Install minimal nightly with clippy and rustfmt
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: "${{ matrix.name }}-lint"
+          workspaces: |
+            ${{ matrix.path }}
+      - name: Cargo format
+        run: cd ${{ matrix.path }} && cargo +nightly fmt --all --check
+      - name: Clippy
+        run: cd ${{ matrix.path }} && cargo clippy
+
+  test:
+    name: Run tests
+    runs-on:
+      - self-hosted
+      - dind
+      - small
+    needs:
+      - find_directories
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.find_directories.outputs.directories) }}
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - name: Install system dependencies
+        run: |
+          set -xe
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: "${{ matrix.name }}-test"
+          workspaces: |
+            ${{ matrix.path }}
+      - name: Unit tests
+        run: |
+          set -xe
+          export PROMETHEUS_URL=https://prometheus-data-1.use1.dev.plat.cdb-svc.com
+          cd ${{ matrix.path }} && cargo test
