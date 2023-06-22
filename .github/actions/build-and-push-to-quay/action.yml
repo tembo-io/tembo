@@ -61,7 +61,7 @@ runs:
 
         cd ${{ inputs.docker_directory }}
 
-        if [ "${{ inputs.tag_cargo_version_if_present }}" == "true" ] && [ test -f "Cargo.toml" ]; then
+        if [ "${{ inputs.tag_cargo_version_if_present }}" == "true" ] && test -f "Cargo.toml"; then
             echo "Cargo file detected, adding to tags"
             VERSION=$(stoml Cargo.toml package.version)
             TAGS="$TAGS $VERSION"
