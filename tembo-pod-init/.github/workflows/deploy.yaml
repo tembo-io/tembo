@@ -1,0 +1,84 @@
+name: Build and deploy
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  build_and_push:
+    name: Build and push images
+    runs-on:
+      - self-hosted
+      - dind
+      - large-8x8
+    outputs:
+      short_sha: ${{ steps.versions.outputs.SHORT_SHA }}
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v3
+      - name: Determine which tags to publish
+        id: tags
+        run: |
+          BRANCH_NAME="${{ needs.find_directories.outputs.branch_name }}"
+          if [ "${BRANCH_NAME}" == "main" ]; then
+            echo "tag_latest=true" >> $GITHUB_OUTPUT
+            echo "tag_cargo=true" >> $GITHUB_OUTPUT
+          elif [[ "${BRANCH_NAME}" == release/* ]]; then
+            echo "tag_cargo=true" >> $GITHUB_OUTPUT
+            echo "tag_latest=false" >> $GITHUB_OUTPUT
+          else
+            echo "tag_latest=false" >> $GITHUB_OUTPUT
+            echo "tag_cargo=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Set version strings
+        id: versions
+        run: |
+          echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+      - name: Build and upload image
+        uses: ./.github/actions/build-and-push-to-quay
+        with:
+          image_name: tembo-pod-init
+          docker_directory: .
+          tag_cargo_version_if_present: ${{ steps.tags.outputs.tag_cargo }}
+          publish_latest: ${{ steps.tags.outputs.tag_latest }}
+          publish_calver: ${{ steps.tags_outputs.tag_latest }}
+          quay_user: ${{ secrets.QUAY_USER_TEMBO }}
+          quay_password: ${{ secrets.QUAY_PASSWORD_TEMBO }}
+
+  argocd_update:
+    name: ArgoCD update automation
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-20.04
+    strategy:
+      # fail-fast means to cancel all jobs if one fails
+      fail-fast: false
+      matrix:
+        include:
+          - repository: tembo-io/app-deploy-dev
+            subdirectory: dev
+            branch: main
+          # - repository: tembo-io/app-deploy
+          #   subdirectory: staging
+          #   branch: staging-updates
+          # - repository: tembo-io/app-deploy
+          #   subdirectory: prod
+          #   branch: prod-updates
+    needs:
+      - build_and_push
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v3
+      - name: Check out the repo
+        uses: ./.github/actions/argocd-update
+        with:
+          repository: ${{ matrix.repository }}
+          ssh_key: ${{ secrets.SERVICE_USER_GITHUB_SSH_KEY }}
+          branch: ${{ matrix.branch }}
+          version: ${{ needs.build_and_push.outputs.short_sha }}
+          subdirectory: ${{ matrix.subdirectory }}

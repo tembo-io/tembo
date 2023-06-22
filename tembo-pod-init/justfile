@@ -1,0 +1,50 @@
+NAME := "tembo-pod-init"
+#VERSION := `git rev-parse HEAD`
+CERT_MANAGER_VERSION := "v1.12.1"
+SEMVER_VERSION := `grep version Cargo.toml | awk -F"\"" '{print $2}' | head -n 1`
+NAMESPACE := "default"
+KUBE_VERSION := "1.26"
+RUST_LOG := "debug"
+LOG_LEVEL := "debug"
+
+default:
+  @just --list --unsorted --color=always | rg -v "    default"
+
+# delete kind
+delete-kind:
+	kind delete cluster && sleep 5
+
+# start kind
+start-kind:
+  scripts/start-kind-with-registry.sh
+  kubectl wait pods --for=condition=Ready --timeout=300s --all --all-namespaces
+
+# install cert-manager
+cert-manager:
+  kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/{{CERT_MANAGER_VERSION}}/cert-manager.yaml
+  sleep 7
+  kubectl wait pods --for=condition=Ready --timeout=300s --all --all-namespaces
+
+# install cnpg
+cnpg:
+  kubectl apply -f https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.20/releases/cnpg-1.20.0.yaml
+  kubectl apply -f testdata/cnpg-cm.yaml 
+  sleep 7
+  kubectl wait pods --for=condition=Ready --timeout=300s --all --all-namespaces
+  kubectl rollout restart -n cnpg-system deployment cnpg-controller-manager
+
+# run
+run:
+  LOG_LEVEL={{LOG_LEVEL}} cargo run
+
+# run cargo watch
+watch:
+  LOG_LEVEL={{LOG_LEVEL}} cargo watch -x 'run'
+
+# format with nightly rustfmt
+fmt:
+  cargo +nightly fmt
+
+# run integration testing
+test:
+  RUST_LOG={{RUST_LOG}} cargo test -- --ignored --nocapture
