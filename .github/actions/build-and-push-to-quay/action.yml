@@ -124,6 +124,7 @@ runs:
         username: ${{ inputs.quay_user }}
         password: ${{ inputs.quay_password }}
     - name: Push to Quay
+      if: inputs.image_name != 'tembo-pg-cnpg'
       shell: bash
       run: |
         set -xe
@@ -140,6 +141,7 @@ runs:
         username: ${{ inputs.quay_user }}
         password: ${{ inputs.quay_password }}
     - name: Push to Quay
+      if: inputs.image_name == 'tembo-pg-cnpg'
       shell: bash
       run: |
         set -xe
