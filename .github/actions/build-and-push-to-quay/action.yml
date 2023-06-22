@@ -138,8 +138,8 @@ runs:
       uses: docker/login-action@v2
       with:
         registry: ${{ inputs.registry_tembo }}
-        username: ${{ inputs.quay_user }}
-        password: ${{ inputs.quay_password }}
+        username: ${{ inputs.quay_user_tembo}}
+        password: ${{ inputs.quay_password_tembo }}
     - name: Push to Quay
       if: inputs.image_name == 'tembo-pg-cnpg'
       shell: bash
