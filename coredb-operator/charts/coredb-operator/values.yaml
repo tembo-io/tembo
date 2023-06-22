@@ -1,4 +1,0 @@
-image:
-  repository: quay.io/coredb/coredb-operator
-  pullPolicy: Always
-  tag: latest
