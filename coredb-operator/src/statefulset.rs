@@ -27,7 +27,10 @@ use k8s_openapi::{
 use std::{collections::BTreeMap, sync::Arc};
 use tracing::{debug, error, info, warn};
 
-use crate::postgres_exporter::{EXPORTER_CONFIGMAP, EXPORTER_VOLUME, QUERIES_YAML};
+use crate::{
+    apis::postgres_parameters::{TEMBO_POSTGRESQL_CONFIGMAP, TEMBO_POSTGRESQL_CONF_VOLUME_PATH},
+    postgres_exporter::{EXPORTER_CONFIGMAP, EXPORTER_VOLUME, QUERIES_YAML},
+};
 const PKGLIBDIR: &str = "/usr/lib/postgresql/15/lib";
 const SHAREDIR: &str = "/usr/share/postgresql/15";
 const DATADIR: &str = "/var/lib/postgresql/data";
@@ -95,6 +98,11 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
         VolumeMount {
             name: "sharedir".to_owned(),
             mount_path: SHAREDIR.to_owned(),
+            ..VolumeMount::default()
+        },
+        VolumeMount {
+            name: TEMBO_POSTGRESQL_CONFIGMAP.to_owned(),
+            mount_path: TEMBO_POSTGRESQL_CONF_VOLUME_PATH.to_string(),
             ..VolumeMount::default()
         },
     ]);
@@ -290,6 +298,14 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
                                 ..ConfigMapVolumeSource::default()
                             }),
                             name: EXPORTER_CONFIGMAP.to_owned(),
+                            ..Volume::default()
+                        },
+                        Volume {
+                            config_map: Some(ConfigMapVolumeSource {
+                                name: Some(TEMBO_POSTGRESQL_CONFIGMAP.to_owned()),
+                                ..ConfigMapVolumeSource::default()
+                            }),
+                            name: TEMBO_POSTGRESQL_CONFIGMAP.to_owned(),
                             ..Volume::default()
                         },
                     ]),

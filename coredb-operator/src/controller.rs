@@ -26,7 +26,10 @@ use kube::{
 };
 
 use crate::{
-    apis::coredb_types::{CoreDB, CoreDBStatus},
+    apis::{
+        coredb_types::{CoreDB, CoreDBStatus},
+        postgres_parameters::reconcile_pg_parameters_configmap,
+    },
     extensions::{reconcile_extensions, Extension},
     postgres_exporter::{create_postgres_exporter_role, reconcile_prom_configmap},
     secret::reconcile_secret,
@@ -138,17 +141,13 @@ impl CoreDB {
         })?;
 
 
-        match self.spec.get_pg_configs() {
-            Ok(Some(cfg)) => {
-                debug!("Found pg configs: {:?}", cfg);
-            }
-            Ok(None) => {
-                info!("No pg configs to apply");
-            }
-            Err(error) => {
-                error!("Error getting pg configs: {error}");
-            }
-        }
+        // handle postgres configs
+        reconcile_pg_parameters_configmap(self, client.clone(), &ns)
+            .await
+            .map_err(|e| {
+                error!("Error reconciling postgres configmap: {:?}", e);
+                Action::requeue(Duration::from_secs(300))
+            })?;
 
         // reconcile statefulset
         reconcile_sts(self, ctx.clone()).await.map_err(|e| {

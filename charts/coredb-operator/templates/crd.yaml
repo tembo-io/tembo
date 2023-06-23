@@ -82,7 +82,7 @@ spec:
                   type: object
                 type: array
               image:
-                default: quay.io/coredb/coredb-pg-slim:370c253
+                default: quay.io/coredb/coredb-pg-slim:32478b8
                 type: string
               metrics:
                 nullable: true
