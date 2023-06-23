@@ -1,7 +1,7 @@
 FROM quay.io/coredb/ubuntu:22.04 as builder
 
 ARG WALG_VER=2.0.1
-ARG TRUNK_VER=0.4.8
+ARG TRUNK_VER=0.6.1
 
 RUN apt-get update && apt-get install -y curl pkg-config libssl-dev build-essential libclang-dev clang software-properties-common
 RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
