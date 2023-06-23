@@ -90,7 +90,5 @@ RUN mkdir /tmp/pg_sharedir && \
 COPY docker-entrypoint.sh /usr/local/bin/
 ENTRYPOINT ["docker-entrypoint.sh"]
 
-COPY tembo.postgresql.conf /tembo/tembo-postgresql.conf
-
 USER postgres
 CMD ["postgres"]
