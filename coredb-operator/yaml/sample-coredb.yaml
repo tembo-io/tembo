@@ -10,4 +10,15 @@ spec:
         - enabled: true
           database: postgres
           schema: public
-          version: "1.9"
+          version: "1.10.0"
+    - name: pg_cron
+      locations: 
+        - enabled: true
+          database: postgres
+          schema: public
+          version: "1.5.2"
+  runtime_config:
+    - name: shared_preload_libraries
+      value: 'pg_cron,pg_stat_statements'
+    - name: pg_stat_statements.track
+      value: top

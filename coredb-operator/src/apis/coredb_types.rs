@@ -4,11 +4,18 @@ use k8s_openapi::{
     apimachinery::pkg::{api::resource::Quantity, apis::meta::v1::ObjectMeta},
 };
 
-use crate::{defaults, postgres_exporter::PostgresMetrics};
+use crate::{
+    apis::postgres_parameters::{
+        merge_pg_configs, MergeError, PgConfig, DISALLOWED_CONFIGS, MULTI_VAL_CONFIGS,
+    },
+    defaults,
+    postgres_exporter::PostgresMetrics,
+};
 use kube::CustomResource;
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema, Default)]
 pub struct ServiceAccountTemplate {
@@ -80,6 +87,75 @@ pub struct CoreDBSpec {
     pub backup: Backup,
 
     pub metrics: Option<PostgresMetrics>,
+
+    pub stack: Option<Stack>,
+    // dynamic runtime configs
+    pub runtime_config: Option<Vec<PgConfig>>,
+    // configuration overrides, typically defined by the user
+    pub override_configs: Option<Vec<PgConfig>>,
+}
+
+impl CoreDBSpec {
+    // extracts all postgres configurations
+    // configs can be defined in several different places (from a stack, user override, from an extension installation, user overrides, etc)
+    pub fn get_pg_configs(&self) -> Result<Option<Vec<PgConfig>>, MergeError> {
+        let stack_configs = self
+            .stack
+            .as_ref()
+            .and_then(|s| s.postgres_config.clone())
+            .unwrap_or_default();
+        let runtime_configs = self.runtime_config.clone().unwrap_or_default();
+        // TODO: configs that come with extension installation
+        // e.g. let extension_configs = ...
+        // these extensions could be set by the operator, or trunk + operator
+        // trunk install pg_partman could come with something like `pg_partman_bgw.dbname = xxx`
+
+
+        // handle merge of any of the settings that are multi-value.
+        // e.g. stack defines shared_preload_libraries = pg_cron, then operator installs pg_stat_statements at runtime
+        // we need to merge the two configs into one,  shared_preload_libraries = pg_cron, pg_stat_statements
+        let mut merged_multival_configs: Vec<PgConfig> = Vec::new();
+        for cfg_name in MULTI_VAL_CONFIGS {
+            let merged_config = merge_pg_configs(&stack_configs, &runtime_configs, cfg_name)?;
+            if let Some(merged_config) = merged_config {
+                merged_multival_configs.push(merged_config);
+            }
+        }
+
+        // Order matters - to ensure anything down stream does not have to worry about ordering,
+        // set these into a BTreeSet now
+        // 1. stack configs
+        // 2. runtime configs
+        // 3. merged multivals
+        // 4. overrides
+        let mut pg_configs: BTreeMap<String, PgConfig> = BTreeMap::new();
+
+        for p in stack_configs {
+            pg_configs.insert(p.name.clone(), p);
+        }
+        for p in runtime_configs {
+            pg_configs.insert(p.name.clone(), p);
+        }
+        for p in merged_multival_configs {
+            pg_configs.insert(p.name.clone(), p);
+        }
+        if let Some(override_configs) = &self.override_configs {
+            for p in override_configs {
+                pg_configs.insert(p.name.clone(), p.clone());
+            }
+        }
+
+        // remove any configs that are not allowed
+        for key in DISALLOWED_CONFIGS {
+            pg_configs.remove(key);
+        }
+
+        if pg_configs.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(pg_configs.values().cloned().collect()))
+        }
+    }
 }
 
 /// The status object of `CoreDB`
@@ -96,4 +172,12 @@ pub struct CoreDBStatus {
     pub sharedirStorage: Quantity,
     #[serde(default = "defaults::default_pkglibdir_storage")]
     pub pkglibdirStorage: Quantity,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
+pub struct Stack {
+    pub name: String,
+    // static configs defined in the tembo stack
+    pub postgres_config: Option<Vec<PgConfig>>,
+    // TODO: add other stack attributes as they are supported
 }

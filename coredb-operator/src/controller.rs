@@ -137,6 +137,19 @@ impl CoreDB {
             Action::requeue(Duration::from_secs(10))
         })?;
 
+
+        match self.spec.get_pg_configs() {
+            Ok(Some(cfg)) => {
+                debug!("Found pg configs: {:?}", cfg);
+            }
+            Ok(None) => {
+                info!("No pg configs to apply");
+            }
+            Err(error) => {
+                error!("Error getting pg configs: {error}");
+            }
+        }
+
         // reconcile statefulset
         reconcile_sts(self, ctx.clone()).await.map_err(|e| {
             error!("Error reconciling statefulset: {:?}", e);
