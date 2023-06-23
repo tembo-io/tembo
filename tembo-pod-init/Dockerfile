@@ -11,6 +11,7 @@ RUN set -eux; \
     apt-get autoremove -y; \
     apt-get clean; \
     rm -rf /var/lib/apt/lists/*
+
 COPY --from=builder /tembo-pod-init/target/release/tembo-pod-init /usr/bin/tembo-pod-init
 
 CMD ["tembo-pod-init"]

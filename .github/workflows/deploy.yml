@@ -58,9 +58,9 @@ jobs:
       - name: Check out the coredb repo to reuse some actions
         uses: actions/checkout@v3
         with:
-          repository: coredb-io/coredb
-          path: ./.coredb
-          ref: 84664df742ce9774a3029e08111940f9f1fb345e
+          repository: tembo-io/tembo
+          path: ./.tembo
+          ref: 3714d336a0efdfc82234db7ccb708ecf80346e84
       - name: Determine which tags to publish
         id: tags
         run: |
@@ -73,7 +73,7 @@ jobs:
             echo "tag_cargo=false" >> $GITHUB_OUTPUT
           fi
       - name: Build and upload image
-        uses: ./.coredb/.github/actions/build-and-push-to-quay
+        uses: ./.tembo/.github/actions/build-and-push-to-quay
         with:
           image_name: ${{ matrix.name }}
           docker_directory: ${{ matrix.path }}
@@ -86,25 +86,26 @@ jobs:
           publish_latest: ${{ steps.tags.outputs.tag_latest }}
           # If we are publishing latest, also tag it with calver
           publish_calver: ${{ steps.tags_outputs.tag_latest }}
-          quay_user: ${{ secrets.QUAY_USER }}
-          quay_password: ${{ secrets.QUAY_PASSWORD }}
+          registry: "quay.io/tembo"
+          quay_user: ${{ secrets.QUAY_USER_TEMBO }}
+          quay_password: ${{ secrets.QUAY_PASSWORD_TEMBO }}
 
   argocd_update:
     name: ArgoCD update automation
     if: ${{ github.ref == 'refs/heads/main' }}
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     strategy:
       # fail-fast means to cancel all jobs if one fails
       fail-fast: false
       matrix:
         include:
-          - repository: coredb-io/app-deploy-dev
+          - repository: tembo-io/app-deploy-dev
             subdirectory: dev
             branch: main
-          - repository: coredb-io/app-deploy
+          - repository: tembo-io/app-deploy
             subdirectory: staging
             branch: staging-updates
-          - repository: coredb-io/app-deploy
+          - repository: tembo-io/app-deploy
             subdirectory: prod
             branch: prod-updates
     needs:
