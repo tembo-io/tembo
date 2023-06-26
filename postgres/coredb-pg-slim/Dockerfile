@@ -68,6 +68,8 @@ RUN apt-get update && apt-get install -y \
 
 COPY ./postgresql.conf /usr/share/postgresql/${PG_MAJOR}/postgresql.conf.sample
 COPY ./postgresql.conf /postgresql.conf.replace
+COPY ./pg_hba.conf /usr/share/postgresql/${PG_MAJOR}/pg_hba.conf.sample
+COPY ./pg_hba.conf /pg_hba.conf.replace
 
 WORKDIR /git
 RUN git clone --branch "v${PG_VECTOR_VER}" https://github.com/pgvector/pgvector.git
