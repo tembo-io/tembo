@@ -361,7 +361,7 @@ _main() {
 
 			# ensure we copy the lastest configuration over
 			update_postgresql_conf
-      update_hba_conf
+			update_hba_conf
 
 
 			docker_temp_server_stop
@@ -373,7 +373,7 @@ _main() {
 		else
 			# ensure we copy the lastest configuration over
 			update_postgresql_conf
-      update_hba_conf
+			update_hba_conf
 			cat <<-'EOM'
 				PostgreSQL Database directory appears to contain a database; Skipping initialization
 			EOM
