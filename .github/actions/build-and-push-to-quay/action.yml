@@ -68,12 +68,13 @@ runs:
 
         # input tags
         TAGS='${{ inputs.tags }}'
+        SHORT_SHA=$(git rev-parse --short HEAD)
 
         cd ${{ inputs.docker_directory }}
 
         if [ "${{ inputs.tag_cargo_version_if_present }}" == "true" ] && test -f "Cargo.toml"; then
             echo "Cargo file detected, adding to tags"
-            VERSION=$(stoml Cargo.toml package.version)
+            VERSION=$(stoml Cargo.toml package.version)-${SHORT_SHA}
             TAGS="$TAGS $VERSION"
         fi
 
@@ -91,7 +92,6 @@ runs:
         fi
 
         # Short Git hash
-        SHORT_SHA=$(git rev-parse --short HEAD)
         TAGS="$TAGS ${SHORT_SHA}"
 
         echo "TAGS=$TAGS" >> $GITHUB_OUTPUT
