@@ -31,10 +31,14 @@ use crate::{
         postgres_parameters::reconcile_pg_parameters_configmap,
     },
     extensions::{reconcile_extensions, Extension},
+    ingress::reconcile_postgres_ing_route_tcp,
     postgres_exporter::{create_postgres_exporter_role, reconcile_prom_configmap},
     secret::reconcile_secret,
 };
-use k8s_openapi::api::core::v1::{Namespace, Pod};
+use k8s_openapi::{
+    api::core::v1::{Namespace, Pod},
+    apimachinery::pkg::util::intstr::IntOrString,
+};
 use kube::runtime::wait::Condition;
 use serde::Serialize;
 use serde_json::json;
@@ -112,13 +116,38 @@ impl CoreDB {
         let name = self.name_any();
         let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &ns);
 
+        match std::env::var("DATA_PLANE_BASEDOMAIN") {
+            Ok(basedomain) => {
+                reconcile_postgres_ing_route_tcp(
+                    self,
+                    ctx.clone(),
+                    self.name_any().as_str(),
+                    basedomain.as_str(),
+                    ns.as_str(),
+                    self.name_any().as_str(),
+                    IntOrString::Int(5432),
+                )
+                .await
+                .map_err(|e| {
+                    error!("Error reconciling postgres ingress route: {:?}", e);
+                    // For unexpected errors, we should requeue for several minutes at least,
+                    // for expected, "waiting" type of requeuing, those should be shorter, just a few seconds.
+                    // IngressRouteTCP does not have expected errors during reconciliation.
+                    Action::requeue(Duration::from_secs(300))
+                })?;
+            }
+            Err(_e) => {
+                warn!("DATA_PLANE_BASEDOMAIN is not set, skipping reconciliation of IngressRouteTCP");
+            }
+        };
+
         // create/update configmap when postgres exporter enabled
         if self.spec.postgresExporterEnabled {
             reconcile_prom_configmap(self, client.clone(), &ns)
                 .await
                 .map_err(|e| {
                     error!("Error reconciling prometheus configmap: {:?}", e);
-                    Action::requeue(Duration::from_secs(10))
+                    Action::requeue(Duration::from_secs(300))
                 })?;
         }
 
@@ -131,15 +160,14 @@ impl CoreDB {
         // reconcile secret
         reconcile_secret(self, ctx.clone()).await.map_err(|e| {
             error!("Error reconciling secret: {:?}", e);
-            Action::requeue(Duration::from_secs(10))
+            Action::requeue(Duration::from_secs(300))
         })?;
 
         // reconcile cronjob for backups
         reconcile_cronjob(self, ctx.clone()).await.map_err(|e| {
             error!("Error reconciling cronjob: {:?}", e);
-            Action::requeue(Duration::from_secs(10))
+            Action::requeue(Duration::from_secs(300))
         })?;
-
 
         // handle postgres configs
         reconcile_pg_parameters_configmap(self, client.clone(), &ns)
@@ -152,28 +180,35 @@ impl CoreDB {
         // reconcile statefulset
         reconcile_sts(self, ctx.clone()).await.map_err(|e| {
             error!("Error reconciling statefulset: {:?}", e);
-            Action::requeue(Duration::from_secs(10))
+            Action::requeue(Duration::from_secs(300))
         })?;
 
         // reconcile service
         reconcile_svc(self, ctx.clone()).await.map_err(|e| {
             error!("Error reconciling service: {:?}", e);
-            Action::requeue(Duration::from_secs(10))
+            Action::requeue(Duration::from_secs(300))
         })?;
 
         let new_status = match self.spec.stop {
             false => {
                 let primary_pod = self.primary_pod(ctx.client.clone()).await;
                 if primary_pod.is_err() {
-                    debug!("Did not find primary pod");
+                    info!(
+                        "Did not find primary pod of {}, waiting a short period",
+                        self.name_any()
+                    );
                     return Ok(Action::requeue(Duration::from_secs(1)));
                 }
                 let primary_pod = primary_pod.unwrap();
 
                 if !is_postgres_ready().matches_object(Some(&primary_pod)) {
-                    debug!("Postgres is not ready");
+                    info!(
+                        "Did not find postgres ready {}, waiting a short period",
+                        self.name_any()
+                    );
                     return Ok(Action::requeue(Duration::from_secs(1)));
                 }
+
                 // creating exporter role is pre-requisite to the postgres pod becoming "ready"
                 create_postgres_exporter_role(self, ctx.clone())
                     .await
@@ -183,11 +218,11 @@ impl CoreDB {
                             self.metadata.name.clone().unwrap(),
                             e
                         );
-                        Action::requeue(Duration::from_secs(5))
+                        Action::requeue(Duration::from_secs(300))
                     })?;
 
                 if !is_pod_ready().matches_object(Some(&primary_pod)) {
-                    debug!("Did not find primary pod");
+                    info!("Did not pod ready {}, waiting a short period", self.name_any());
                     return Ok(Action::requeue(Duration::from_secs(1)));
                 }
 
@@ -195,7 +230,7 @@ impl CoreDB {
                     .await
                     .map_err(|e| {
                         error!("Error reconciling extensions: {:?}", e);
-                        Action::requeue(Duration::from_secs(10))
+                        Action::requeue(Duration::from_secs(300))
                     })?;
 
                 // Check cfg.enable_initial_backup to make sure we should run the initial backup
@@ -212,7 +247,7 @@ impl CoreDB {
                         .await
                         .map_err(|e| {
                             error!("Error running backup: {:?}", e);
-                            Action::requeue(Duration::from_secs(10))
+                            Action::requeue(Duration::from_secs(300))
                         })?;
                 }
 
@@ -243,8 +278,8 @@ impl CoreDB {
 
         patch_cdb_status_force(&coredbs, &name, patch_status).await?;
 
-        // If no events were received, check back every minute
-        Ok(Action::requeue(Duration::from_secs(60)))
+        // Check back every 5 minutes
+        Ok(Action::requeue(Duration::from_secs(300)))
     }
 
     // Finalizer cleanup (the object was deleted, ensure nothing is orphaned)

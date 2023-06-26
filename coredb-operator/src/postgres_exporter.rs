@@ -124,7 +124,6 @@ pub async fn create_postgres_exporter_role(cdb: &CoreDB, ctx: Arc<Context>) -> R
     Ok(())
 }
 
-
 pub async fn reconcile_prom_configmap(cdb: &CoreDB, client: Client, ns: &str) -> Result<(), Error> {
     create_configmap_ifnotexist(client.clone(), ns, EXPORTER_CONFIGMAP).await?;
     // set custom pg-prom metrics in configmap values if they are specified
@@ -140,7 +139,6 @@ pub async fn reconcile_prom_configmap(cdb: &CoreDB, client: Client, ns: &str) ->
     }
     Ok(())
 }
-
 
 #[cfg(test)]
 mod tests {

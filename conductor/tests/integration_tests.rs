@@ -203,7 +203,7 @@ mod test {
             .extensions
             .expect("No extensions found in message spec");
         assert!(
-            extensions.len() > 0,
+            !extensions.is_empty(),
             "Expected at least one extension: {:?}",
             extensions
         );

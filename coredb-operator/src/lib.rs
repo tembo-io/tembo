@@ -15,13 +15,17 @@ pub use metrics::Metrics;
 mod config;
 mod cronjob;
 pub mod defaults;
+mod errors;
 mod extensions;
 #[cfg(test)] pub mod fixtures;
+mod ingress;
+pub mod ingress_route_tcp_crd;
 mod psql;
 mod rbac;
 mod secret;
 mod service;
 mod statefulset;
+
 use thiserror::Error;
 
 #[derive(Error, Debug)]

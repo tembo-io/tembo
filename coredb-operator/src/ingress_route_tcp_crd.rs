@@ -16,11 +16,7 @@ use serde::{Deserialize, Serialize};
 #[kube(namespaced)]
 #[kube(schema = "disabled")]
 pub struct IngressRouteTCPSpec {
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        rename = "entryPoints"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "entryPoints")]
     pub entry_points: Option<Vec<String>>,
     pub routes: Vec<IngressRouteTCPRoutes>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -52,17 +48,9 @@ pub struct IngressRouteTCPRoutesServices {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub namespace: Option<String>,
     pub port: IntOrString,
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        rename = "proxyProtocol"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "proxyProtocol")]
     pub proxy_protocol: Option<IngressRouteTCPRoutesServicesProxyProtocol>,
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        rename = "terminationDelay"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "terminationDelay")]
     pub termination_delay: Option<i64>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub weight: Option<i64>,
@@ -76,11 +64,7 @@ pub struct IngressRouteTCPRoutesServicesProxyProtocol {
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub struct IngressRouteTCPTls {
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        rename = "certResolver"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "certResolver")]
     pub cert_resolver: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub domains: Option<Vec<IngressRouteTCPTlsDomains>>,
@@ -88,11 +72,7 @@ pub struct IngressRouteTCPTls {
     pub options: Option<IngressRouteTCPTlsOptions>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub passthrough: Option<bool>,
-    #[serde(
-        default,
-        skip_serializing_if = "Option::is_none",
-        rename = "secretName"
-    )]
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "secretName")]
     pub secret_name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub store: Option<IngressRouteTCPTlsStore>,

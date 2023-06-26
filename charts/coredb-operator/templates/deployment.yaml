@@ -35,12 +35,10 @@ spec:
         - name: http
           containerPort: 8080
           protocol: TCP
+        {{- with .Values.env }}
         env:
-        # We are pointing to tempo or grafana tracing agent's otlp grpc receiver port
-        - name: OPENTELEMETRY_ENDPOINT_URL
-          value: "https://10.96.239.210:8080"
-        - name: RUST_LOG
-          value: "info,kube=debug,controller=debug"
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
         readinessProbe:
           httpGet:
             path: /health

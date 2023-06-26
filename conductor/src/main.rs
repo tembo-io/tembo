@@ -1,9 +1,8 @@
 use conductor::{
     coredb_crd::Backup, coredb_crd::CoreDBSpec, coredb_crd::ServiceAccountTemplate,
-    create_cloudformation, create_ing_route_tcp, create_namespace, create_networkpolicy,
-    create_or_update, delete, delete_cloudformation, delete_namespace, extensions::extension_plan,
-    generate_rand_schedule, generate_spec, get_coredb_status, get_pg_conn, lookup_role_arn,
-    restart_statefulset, types,
+    create_cloudformation, create_namespace, create_networkpolicy, create_or_update, delete,
+    delete_cloudformation, delete_namespace, extensions::extension_plan, generate_rand_schedule,
+    generate_spec, get_coredb_status, get_pg_conn, lookup_role_arn, restart_statefulset, types,
 };
 use kube::Client;
 use log::{debug, error, info, warn};
@@ -173,17 +172,6 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
 
                 // create NetworkPolicy to allow internet access only
                 create_networkpolicy(client.clone(), &namespace).await?;
-
-                // create IngressRouteTCP
-                create_ing_route_tcp(client.clone(), &namespace, &data_plane_basedomain).await?;
-
-                // create /metrics ingress
-                //
-                // Disable this feature until IP allow list
-                //
-                // create_metrics_ingress(client.clone(), &namespace, &data_plane_basedomain)
-                //     .await
-                //     .expect("error creating ingress for /metrics");
 
                 // generate CoreDB spec based on values in body
                 let spec = generate_spec(&namespace, &coredb_spec).await;

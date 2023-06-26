@@ -3,7 +3,7 @@ ORG := "localhost:5001"
 VERSION := `git rev-parse HEAD`
 SEMVER_VERSION := `grep version Cargo.toml | awk -F"\"" '{print $2}' | head -n 1`
 NAMESPACE := "default"
-KUBE_VERSION := "1.25"
+KUBE_VERSION := env_var_or_default('KUBE_VERSION', '1.25.8')
 
 default:
   @just --list --unsorted --color=always | rg -v "    default"
@@ -11,6 +11,12 @@ default:
 # generate crd
 generate-crd:
   cargo run --bin crdgen > ../charts/coredb-operator/templates/crd.yaml
+
+install-traefik:
+	helm repo add traefik https://traefik.github.io/charts
+	helm repo update
+	kubectl create namespace traefik || true
+	helm upgrade --install --namespace=traefik --values=./testdata/traefik-values.yaml traefik traefik/traefik
 
 # generate and install crd into the cluster
 install-crd: generate-crd
@@ -22,9 +28,11 @@ delete-kind:
 
 # start kind
 start-kind:
-	kind create cluster --config testdata/kind-{{KUBE_VERSION}}.yaml
+	kind delete cluster || true
+	kind create cluster --image=kindest/node:v{{KUBE_VERSION}} --config testdata/kind-config.yaml
 	sleep 10
 	kubectl wait pods --for=condition=Ready --timeout=300s --all --all-namespaces
+	just install-traefik
 	just install-crd
 	just annotate
 
@@ -39,6 +47,7 @@ run:
 # annotate namespace to allow for tests
 annotate:
 	kubectl label namespace {{NAMESPACE}} safe-to-run-coredb-tests=true
+	kubectl patch storageclass standard -p '{"allowVolumeExpansion": true}'
 
 # run tests
 test:

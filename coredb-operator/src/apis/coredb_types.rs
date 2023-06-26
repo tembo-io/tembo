@@ -110,7 +110,6 @@ impl CoreDBSpec {
         // these extensions could be set by the operator, or trunk + operator
         // trunk install pg_partman could come with something like `pg_partman_bgw.dbname = xxx`
 
-
         // handle merge of any of the settings that are multi-value.
         // e.g. stack defines shared_preload_libraries = pg_cron, then operator installs pg_stat_statements at runtime
         // we need to merge the two configs into one,  shared_preload_libraries = pg_cron, pg_stat_statements

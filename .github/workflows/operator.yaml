@@ -1,5 +1,11 @@
 name: Operator workflow
 
+permissions:
+  pull-requests: write
+  deployments: write
+  id-token: write
+  contents: read
+
 defaults:
   run:
     shell: bash
@@ -12,7 +18,6 @@ on:
     paths:
     - '.github/workflows/operator.yaml'
     - 'coredb-operator/**'
-  # Always run tests on main or release branches
   push:
     branches:
       - main
@@ -26,30 +31,28 @@ jobs:
     runs-on:
       - self-hosted
       - dind
-      - large-8x8
+      - xlarge-16x16
     strategy:
       # fail-fast means to cancel all jobs if one fails
       fail-fast: false
       matrix:
         # Go here for a list of versions:
         # https://github.com/kubernetes-sigs/kind/releases
-        node_image:
-          - 'kindest/node:v1.25.8'
+        kube_version:
+          - '1.25.8'
     steps:
       - uses: actions/checkout@v2
       - name: Install system dependencies
         run: |
           set -xe
           sudo apt-get update
-          sudo apt-get install -y pkg-config libssl-dev
-      - name: Create k8s Kind Cluster
-        uses: helm/kind-action@v1.5.0
+          sudo apt-get install -y pkg-config libssl-dev git
+      - uses: azure/setup-helm@v3
+      - uses: extractions/setup-just@v1
+      - name: Install kind
+        uses: helm/kind-action@v1.7.0
         with:
-          node_image: ${{ matrix.node_image }}
-      - name: Apply safety check label to namespace
-        run: |
-          kubectl label namespace default safe-to-run-coredb-tests=true
-          kubectl get -o yaml namespaces
+          install_only: true
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
@@ -63,15 +66,18 @@ jobs:
           set -xe
           cargo run --bin crdgen > ../charts/coredb-operator/templates/crd.yaml
           git diff --exit-code ../charts/coredb-operator/templates/crd.yaml
+      - name: Setup local test cluster
+        run: |
+          set -xe
+          export KUBE_VERSION=${{ matrix.kube_version }}
+          just start-kind
       - name: Run functional / integration tests
         run: |
           set -xe
-          # Install the CRD
-          kubectl patch storageclass standard -p '{"allowVolumeExpansion": true}'
-          cargo run --bin crdgen | kubectl apply -f -
-          kubectl get crds
+          export ENABLE_INITIAL_BACKUP=false
+          export DATA_PLANE_BASEDOMAIN=localhost
           # Start the operator in the background
-          ENABLE_INITIAL_BACKUP=false  cargo run &
+          cargo run &
           # Run the tests
           cargo test -- --ignored --nocapture
       - name: Debugging information

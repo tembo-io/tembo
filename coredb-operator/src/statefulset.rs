@@ -146,7 +146,6 @@ pub fn stateful_set_from_cdb(cdb: &CoreDB) -> StatefulSet {
         },
     ];
 
-
     if cdb.spec.postgresExporterEnabled {
         containers.push(Container {
             name: "postgres-exporter".to_string(),

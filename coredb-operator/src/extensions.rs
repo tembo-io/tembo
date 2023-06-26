@@ -544,7 +544,7 @@ mod tests {
             pg_stat_enabled.clone(),
         ];
         // two currently installed
-        let actual = vec![postgis_enabled.clone(), pgmq_disabled.clone()];
+        let actual = vec![postgis_enabled, pgmq_disabled];
         // postgis changed from enabled to disabled, and pg_stat is added
         // no change to pgmq
 
@@ -575,7 +575,6 @@ mod tests {
         );
     }
 
-
     #[test]
     fn test_upgrade_ext_vers() {
         let pgmq_05 = Extension {
@@ -600,7 +599,7 @@ mod tests {
             }],
         };
         let desired = vec![pgmq_06.clone()];
-        let actual = vec![pgmq_05.clone()];
+        let actual = vec![pgmq_05];
         // diff should be that we need to upgrade pgmq
         let diff = diff_extensions(&desired, &actual);
         assert_eq!(diff.len(), 1);
@@ -676,7 +675,7 @@ mod tests {
         assert_eq!(diff[0], pgmq_enabled);
 
         let desired = vec![postgis_disabled.clone(), pgmq_enabled.clone()];
-        let actual = vec![postgis_disabled.clone(), pgmq_disabled.clone()];
+        let actual = vec![postgis_disabled.clone(), pgmq_disabled];
         // diff should be that we need to enable pgmq
         let diff = diff_extensions(&desired, &actual);
         assert_eq!(diff.len(), 1);
@@ -689,7 +688,7 @@ mod tests {
         assert_eq!(diff.len(), 0);
 
         let desired = vec![postgis_disabled.clone()];
-        let actual = vec![postgis_disabled.clone(), pgmq_enabled.clone()];
+        let actual = vec![postgis_disabled, pgmq_enabled];
         // less extensions desired than exist - should be a no op
         let diff = diff_extensions(&desired, &actual);
         assert_eq!(diff.len(), 0);
@@ -744,7 +743,7 @@ mod tests {
         let ext = parse_extensions(ext_psql);
         assert_eq!(ext.len(), 9);
         assert_eq!(ext[0].name, "adminpack");
-        assert_eq!(ext[0].enabled, false);
+        assert!(!ext[0].enabled);
         assert_eq!(ext[0].version, "2.1".to_owned());
         assert_eq!(ext[0].schema, "public".to_owned());
         assert_eq!(
@@ -753,7 +752,7 @@ mod tests {
         );
 
         assert_eq!(ext[8].name, "dblink");
-        assert_eq!(ext[8].enabled, false);
+        assert!(!ext[8].enabled);
         assert_eq!(ext[8].version, "1.2".to_owned());
         assert_eq!(ext[8].schema, "public".to_owned());
         assert_eq!(

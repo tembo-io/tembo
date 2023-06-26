@@ -2,7 +2,6 @@ pub mod aws;
 pub mod coredb_crd;
 pub mod errors;
 pub mod extensions;
-mod ingress_route_tcp_crd;
 pub mod types;
 
 use crate::aws::cloudformation::{AWSConfigState, CloudFormationParams};
@@ -11,10 +10,9 @@ use base64::{engine::general_purpose, Engine as _};
 use coredb_crd as crd;
 use coredb_crd::CoreDB;
 use errors::ConductorError;
-use ingress_route_tcp_crd::IngressRouteTCP;
 use k8s_openapi::api::apps::v1::StatefulSet;
 use k8s_openapi::api::core::v1::{Namespace, Secret};
-use k8s_openapi::api::networking::v1::{Ingress, NetworkPolicy};
+use k8s_openapi::api::networking::v1::NetworkPolicy;
 use kube::api::{DeleteParams, ListParams, Patch, PatchParams};
 use kube::runtime::wait::{await_condition, Condition};
 use kube::{Api, Client};
@@ -34,94 +32,6 @@ pub async fn generate_spec(namespace: &str, spec: &crd::CoreDBSpec) -> Value {
         "spec": spec,
     });
     spec
-}
-
-pub async fn create_ing_route_tcp(
-    client: Client,
-    name: &str,
-    basedomain: &str,
-) -> Result<(), ConductorError> {
-    let ing_api: Api<IngressRouteTCP> = Api::namespaced(client, name);
-    let params = PatchParams::apply("conductor").force();
-    let ing = serde_json::json!({
-        "apiVersion": "traefik.containo.us/v1alpha1",
-        "kind": "IngressRouteTCP",
-        "metadata": {
-            "name": format!("{name}"),
-            "namespace": format!("{name}"),
-        },
-        "spec": {
-            "entryPoints": ["postgresql"],
-            "routes": [
-                {
-                    "match": format!("HostSNI(`{name}.{basedomain}`)"),
-                    "services": [
-                        {
-                            "name": format!("{name}"),
-                            "port": 5432,
-                        },
-                    ],
-                },
-            ],
-            "tls": {
-                "passthrough": true,
-            },
-        },
-    });
-    info!("\nCreating or updating IngressRouteTCP: {}", name);
-    let _o = ing_api
-        .patch(name, &params, &Patch::Apply(&ing))
-        .await
-        .map_err(ConductorError::KubeError)?;
-    Ok(())
-}
-
-pub async fn create_metrics_ingress(
-    client: Client,
-    name: &str,
-    basedomain: &str,
-) -> Result<(), ConductorError> {
-    let ing_api: Api<Ingress> = Api::namespaced(client, name);
-    let params = PatchParams::apply("conductor").force();
-    let ingress = serde_json::json!({
-        "apiVersion": "networking.k8s.io/v1",
-        "kind": "Ingress",
-        "metadata": {
-            "name": format!("{name}"),
-            "namespace": format!("{name}"),
-        },
-        "spec": {
-            "ingressClassName": "traefik",
-            "rules": [
-                {
-                    "host": format!("{name}.{basedomain}"),
-                    "http": {
-                        "paths": [
-                            {
-                                "path": "/metrics",
-                                "pathType": "Prefix",
-                                "backend": {
-                                    "service": {
-                                        "name": format!("{name}-metrics"),
-                                        "port": {
-                                            "number": 80,
-                                        },
-                                    },
-                                },
-                            },
-                        ],
-                    },
-                },
-            ],
-        },
-    });
-
-    info!("\nCreating or updating Ingress: {}", name);
-    let _o = ing_api
-        .patch(name, &params, &Patch::Apply(&ingress))
-        .await
-        .map_err(ConductorError::KubeError)?;
-    Ok(())
 }
 
 pub async fn get_all(client: Client, namespace: &str) -> Vec<CoreDB> {

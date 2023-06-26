@@ -8,7 +8,6 @@ use std::collections::BTreeMap;
 
 use tracing::{debug, error, info, warn};
 
-
 pub async fn create_configmap_ifnotexist(
     client: Client,
     namespace: &str,

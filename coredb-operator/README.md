@@ -79,7 +79,12 @@ Or, you can follow the below steps.
 NAMESPACE=<namespace> just annotate
 ```
 
-- Start or install the controller you want to test (see the following sections)
+- Start or install the controller you want to test (see the following sections), do this in a separate shell from where you will run the tests
+```
+export DATA_PLANE_BASEDOMAIN=localhost
+cargo run
+```
+
 - Run the integration tests
 
 ```bash
