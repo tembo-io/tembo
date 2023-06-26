@@ -266,6 +266,26 @@ update_postgresql_conf() {
     fi
 }
 
+# Make sure we always copy the correct pg_hba.conf, even if it already exists
+# If pg_hba.conf.replace is newer, we copy that to $PGDATA/pg_hba.conf
+update_hba_conf() {
+    # Define the path to the replacement file
+    local replace_file="/pg_hba.conf.replace"
+
+    # Check if the replacement file exists
+    if [ -f "$replace_file" ]; then
+        # If the replacement file and the current postgresql.conf file are different, replace postgresql.conf
+        if ! cmp -s "$PGDATA/pg_hba.conf" "$replace_file"; then
+            echo "pg_hba.conf is different from the replacement, updating..."
+            cp "$replace_file" "$PGDATA/pg_hba.conf"
+        else
+            echo "pg_hba.conf is the same as the replacement, no update needed."
+        fi
+    else
+        echo "No replacement file found, skipping update."
+    fi
+}
+
 # start socket-only postgresql server for setting up or running scripts
 # all arguments will be passed along as arguments to `postgres` (via pg_ctl)
 docker_temp_server_start() {
@@ -341,6 +361,7 @@ _main() {
 
 			# ensure we copy the lastest configuration over
 			update_postgresql_conf
+			update_hba_conf
 
 
 			docker_temp_server_stop
@@ -352,6 +373,7 @@ _main() {
 		else
 			# ensure we copy the lastest configuration over
 			update_postgresql_conf
+			update_hba_conf
 			cat <<-'EOM'
 				PostgreSQL Database directory appears to contain a database; Skipping initialization
 			EOM
