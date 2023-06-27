@@ -1,5 +1,5 @@
 image:
-  repository: quay.io/coredb/coredb-operator
+  repository: quay.io/tembo/coredb-operator
   pullPolicy: Always
   tag: latest
 
