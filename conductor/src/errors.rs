@@ -23,4 +23,10 @@ pub enum ConductorError {
     // No outputs found for the stack
     #[error("no outputs found for the stack")]
     NoOutputsFound,
+
+    #[error("Didn't find Postgres connection information")]
+    PostgresConnectionInfoNotFound,
+
+    #[error("Failed to parse postgres connection information")]
+    ParsingPostgresConnectionError,
 }

@@ -1,3 +1,4 @@
+use conductor::errors::ConductorError;
 use conductor::{
     create_cloudformation, create_namespace, create_networkpolicy, create_or_update, delete,
     delete_cloudformation, delete_namespace, extensions::extension_plan, generate_rand_schedule,
@@ -44,8 +45,14 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
     // Infer the runtime environment and try to create a Kubernetes Client
     let client = Client::try_default().await?;
 
-    // amount of time to wait after requeueing a message
-    const REQUEUE_VT_SEC: i32 = 5;
+    // Amount of time to wait after requeueing a message for an expected failure,
+    // where we will want to check often until it's ready.
+    const REQUEUE_VT_SEC_SHORT: i32 = 5;
+
+    // Amount of time to wait after requeueing a message for an unexpected failure
+    // that we would want to try again after awhile.
+    const REQUEUE_VT_SEC_LONG: i32 = 300;
+
     loop {
         // Read from queue (check for new message)
         // messages that dont fit a CRUDevent will error
@@ -86,10 +93,12 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             error!("sent error event to control-plane, msg_id: {:?}", msg_id);
             continue;
         }
+
         let namespace = format!(
             "org-{}-inst-{}",
             read_msg.message.organization_name, read_msg.message.dbname
         );
+
         // Based on message_type in message, create, update, delete CoreDB
         let event_msg: types::StateToControlPlane = match read_msg.message.event_type {
             // every event is for a single namespace
@@ -99,7 +108,14 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 // the stack without checking.
 
                 if read_msg.message.spec.is_none() {
-                    error!("spec is required on create and update events");
+                    error!(
+                        "spec is required on create and update events, archiving message {}",
+                        read_msg.msg_id
+                    );
+                    let _archived = queue
+                        .archive(&control_plane_events_queue, read_msg.msg_id)
+                        .await
+                        .expect("error archiving message from queue");
                     continue;
                 }
                 // spec.expect() should be safe here - since above we continue in loop when it is None
@@ -123,18 +139,34 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 .await
                 {
                     Ok(arn) => arn,
-                    Err(err) => {
-                        error!("Error getting CloudFormation stack outputs: {}", err);
-                        // Requeue the message
-                        let _ = queue
-                            .set_vt::<CRUDevent>(
-                                &control_plane_events_queue,
-                                read_msg.msg_id,
-                                REQUEUE_VT_SEC,
-                            )
-                            .await?;
-                        continue;
-                    }
+                    Err(err) => match err {
+                        ConductorError::NoOutputsFound => {
+                            info!("CloudFormation stack outputs not ready, requeuing with short duration. message id {}", read_msg.msg_id);
+                            // Requeue the message for a short duration
+                            let _ = queue
+                                .set_vt::<CRUDevent>(
+                                    &control_plane_events_queue,
+                                    read_msg.msg_id,
+                                    REQUEUE_VT_SEC_SHORT,
+                                )
+                                .await?;
+                            continue;
+                        }
+                        _ => {
+                            error!(
+                                "Failed to get stack outputs for message id {}: {}",
+                                read_msg.msg_id, err
+                            );
+                            let _ = queue
+                                .set_vt::<CRUDevent>(
+                                    &control_plane_events_queue,
+                                    read_msg.msg_id,
+                                    REQUEUE_VT_SEC_LONG,
+                                )
+                                .await?;
+                            continue;
+                        }
+                    },
                 };
 
                 // Format ServiceAccountTemplate spec in CoreDBSpec
@@ -179,9 +211,48 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
 
                 // create or update CoreDB
                 create_or_update(client.clone(), &namespace, spec).await?;
+
                 // get connection string values from secret
-                let conn_info =
-                    get_pg_conn(client.clone(), &namespace, &data_plane_basedomain).await?;
+
+                let conn_info = match get_pg_conn(
+                    client.clone(),
+                    &namespace,
+                    &data_plane_basedomain,
+                )
+                .await
+                {
+                    Ok(conn_info) => conn_info,
+                    Err(err) => {
+                        match err {
+                            ConductorError::PostgresConnectionInfoNotFound => {
+                                info!("Secret not ready, requeuing with short duration. message id {}", read_msg.msg_id);
+                                // Requeue the message for a short duration
+                                let _ = queue
+                                    .set_vt::<CRUDevent>(
+                                        &control_plane_events_queue,
+                                        read_msg.msg_id,
+                                        REQUEUE_VT_SEC_SHORT,
+                                    )
+                                    .await?;
+                                continue;
+                            }
+                            _ => {
+                                error!(
+                                    "Error getting Postgres connection information from secret for message id {}: {}",
+                                    read_msg.msg_id, err
+                                );
+                                let _ = queue
+                                    .set_vt::<CRUDevent>(
+                                        &control_plane_events_queue,
+                                        read_msg.msg_id,
+                                        REQUEUE_VT_SEC_LONG,
+                                    )
+                                    .await?;
+                                continue;
+                            }
+                        }
+                    }
+                };
 
                 let result = get_coredb_status(client.clone(), &namespace).await;
 
@@ -250,7 +321,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                         .set_vt::<CRUDevent>(
                             &control_plane_events_queue,
                             read_msg.msg_id,
-                            REQUEUE_VT_SEC,
+                            REQUEUE_VT_SEC_SHORT,
                         )
                         .await?;
                     continue;

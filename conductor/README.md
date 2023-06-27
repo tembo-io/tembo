@@ -1,79 +1,35 @@
 # Conductor
 
+Dataplanes receive the desired state of databases from the control plane. The dataplanes report back the actual status of database to the control plane.
 
-The conductor is responsible for creating, updating, deleting database instances (custom resource) on a kubernetes cluster.
-It runs in each data plane and performs these actions based on messages written to a queue in the control plane.
-Upon connecting to this queue, it will continuously poll for new messages posted by the `cp-service` component.
+Conductor is responsible for:
 
-The conductor will perform the following actions based on `message_type`:
-- `Create` or `Update`
-  - Create a namespace if it does not already exist.
-  - Create an `IngressRouteTCP` object if it does not already exist.
-  - Create or update `CoreDB` object.
-- `Delete`
-  - Delete `CoreDB`.
-  - Delete namespace.
-
-Once the conductor performs these actions, it will send the following information back to a queue from which
-`cp-service` will read and flow back up to the UI.
-
-Try running the functional tests locally and then connect into the database to view the structure of these messages.
+- Dequeuing desired state from control plane, and applying into Kubernetes
+- Enqueuing back to the control plane the actual state of resources
 
 ## Local development
 
-Look in the CI workflow `conductor-test.yaml` for details on the following.
+Local development involves running Kubernetes and a Postgres container locally inside Docker. Conductor runs with 'cargo run' connected to both the local cluster and database while in development and for functional testing.
 
 Prerequisites:
 - rust / cargo
 - docker
-- kind
+- [kind](https://kind.sigs.k8s.io/)
+- [just](https://github.com/casey/just)
+- [cargo-watch](https://crates.io/crates/cargo-watch)
 
 1. Start a local `kind` cluster
 
-   `❯ kind create cluster`
+   `❯ just start-kind`
 
-1. Install CoreDB operator in the cluster
+3. Set up local postgres instance for the queue
 
-   `> cargo install coredb-cli`
+   `❯ just run-postgres`
 
-   `> coredb-cli install --branch main`
+4. Run Conductor
 
-2. Install Traefik in the cluster
+   `❯ just run-local`
 
-   `> make setup.traefik`
+6. Run unit and functional tests
 
-3. Set up local postgres queue
-
-   `❯ docker run -d --name pgmq -e POSTGRES_PASSWORD=postgres -p 5432:5432 postgres`
-
-4. Run the conductor
-
-   `❯ make run.local`
-
-5. Or, run the conductor with the test configuration:
-
-   `❯ make run.test`
-
-6. Next, you'll need to post some messages to the queue for the conductor to pick up. That can be performed in functional testing like this `cargo test -- --ignored`.
-
-## Codegen
-
-This project requires generated client side types for the coredb-operator. To update:
-
-Install `kopium` if you don't have it already.
-
-   `> cargo install kopium`
-
-Download the specified CoreDB spec.
-
-   `> wget https://raw.githubusercontent.com/CoreDB-io/coredb/release/main/coredb-operator/yaml/crd.yaml`
-
-Generate the Rust code. Note: there are several overrides. Inspect the git diff and adjust accordingly.
-
-   `> kopium -f crd.yaml > src/coredb_crd.rs`
-
-## Integration Testing
-
-1. Ensure operator is running locally (see instructions above)
-2. Start the conductor using test configuration: `make run.test`
-3. In another terminal session, `cargo test -- --ignored`
+   `❯ just run-tests`

@@ -72,7 +72,7 @@ mod test {
     #[tokio::test]
     #[ignore]
     async fn functional_test_basic_create() {
-        let queue = PGMQueueExt::new("postgres://postgres:postgres@0.0.0.0:5432".to_owned(), 1)
+        let queue = PGMQueueExt::new("postgres://postgres:postgres@0.0.0.0:5431".to_owned(), 1)
             .await
             .unwrap();
         queue.init().await.expect("failed creating extension");
@@ -198,7 +198,7 @@ mod test {
             .contains_key("pg_postmaster"));
 
         assert!(
-            spec.extensions.len() > 0,
+            !spec.extensions.is_empty(),
             "Extension object missing from spec"
         );
         let extensions = spec.extensions;

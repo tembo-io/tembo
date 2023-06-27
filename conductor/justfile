@@ -1,0 +1,53 @@
+VERSION := `git rev-parse HEAD`
+SEMVER_VERSION := `grep version Cargo.toml | awk -F"\"" '{print $2}' | head -n 1`
+NAMESPACE := "default"
+KUBE_VERSION := env_var_or_default('KUBE_VERSION', '1.25.8')
+RUST_LOG := "debug"
+
+default:
+  @just --list --unsorted --color=always | rg -v "    default"
+
+install-traefik:
+	helm repo add traefik https://traefik.github.io/charts
+	helm repo update
+	kubectl create namespace traefik || true
+	helm upgrade --install --namespace=traefik --values=../coredb-operator/testdata/traefik-values.yaml traefik traefik/traefik
+
+install-operator:
+	helm upgrade --install --create-namespace --namespace=coredb-operator --values=./tests/operator-values.yaml coredb-operator ../charts/coredb-operator
+
+start-kind:
+	kind delete cluster || true
+	kind create cluster --image=kindest/node:v{{KUBE_VERSION}} --config ../coredb-operator/testdata/kind-config.yaml
+	just install-traefik
+	just annotate
+	just install-operator
+	kubectl wait pods --for=condition=Ready --timeout=300s --all --all-namespaces
+
+annotate:
+	kubectl label namespace {{NAMESPACE}} safe-to-run-coredb-tests=true
+	kubectl patch storageclass standard -p '{"allowVolumeExpansion": true}'
+
+fmt:
+	cargo clippy --fix
+	cargo +nightly fmt
+
+run-local:
+	POSTGRES_QUEUE_CONNECTION=postgresql://postgres:postgres@0.0.0.0:5431/postgres \
+	RUST_BACKTRACE=1 \
+	RUST_LOG={{RUST_LOG}} \
+	CONTROL_PLANE_EVENTS_QUEUE=myqueue_control_plane \
+	DATA_PLANE_EVENTS_QUEUE=myqueue_data_plane \
+	DATA_PLANE_BASEDOMAIN=coredb-development.com \
+	CF_TEMPLATE_BUCKET=cdb-plat-use1-dev-eks-data-1-conductor-cf-templates \
+	BACKUP_ARCHIVE_BUCKET=cdb-plat-use1-dev-instance-backups \
+	cargo watch -x run
+
+run-postgres:
+	docker run -d --name pgmq-pg -e POSTGRES_PASSWORD=postgres -p 5431:5432 quay.io/coredb/pgmq-pg:latest
+
+run-tests:
+	echo "Running unit tests"
+	cargo test -- --nocapture
+	echo "Running functional tests"
+	cargo test -- --nocapture --ignored
