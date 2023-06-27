@@ -55,6 +55,7 @@ spec:
                   properties:
                     description:
                       default: No description provided
+                      nullable: true
                       type: string
                     locations:
                       items:
@@ -351,6 +352,7 @@ spec:
                   properties:
                     description:
                       default: No description provided
+                      nullable: true
                       type: string
                     locations:
                       items:

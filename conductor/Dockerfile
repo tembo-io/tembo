@@ -1,7 +1,9 @@
 FROM quay.io/coredb/rust:1.66.1 as builder
+COPY coredb-operator ./coredb-operator
+WORKDIR /build
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src
-RUN cargo build && \
+RUN cargo build --release && \
     cargo clean -p conductor
 RUN cargo install --path .
 

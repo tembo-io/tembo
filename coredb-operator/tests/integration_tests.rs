@@ -141,11 +141,11 @@ mod test {
                 "replicas": replicas,
                 "extensions": [
                     {
-                        "name": "postgis",
-                        "description": "PostGIS extension",
+                        "name": "aggs_for_vecs",
+                        "description": "aggs_for_vecs extension",
                         "locations": [{
                             "enabled": true,
-                            "version": "1.1.1",
+                            "version": "1.3.0",
                             "database": "postgres",
                             "schema": "public"}
                         ]
@@ -290,10 +290,10 @@ mod test {
         println!("{}", result.stdout.clone().unwrap());
         assert!(result.stdout.clone().unwrap().contains("customers"));
 
-        // TODO(ianstanton) we need to properly wait for 'postgis' extension to be created
+        // TODO(ianstanton) we need to properly wait for 'aggs_for_vecs' extension to be created
         thread::sleep(Duration::from_millis(10000));
 
-        // Assert extension 'postgis' was created
+        // Assert extension 'aggs_for_vecs' was created
         let result = coredb_resource
             .psql(
                 "select extname from pg_catalog.pg_extension;".to_string(),
@@ -304,7 +304,7 @@ mod test {
             .unwrap();
 
         println!("{}", result.stdout.clone().unwrap());
-        assert!(result.stdout.clone().unwrap().contains("postgis"));
+        assert!(result.stdout.clone().unwrap().contains("aggs_for_vecs"));
 
         // Assert role 'postgres_exporter' was created
         let result = coredb_resource
@@ -344,11 +344,11 @@ mod test {
                 "replicas": replicas,
                 "extensions": [
                     {
-                        "name": "postgis",
-                        "description": "PostGIS extension",
+                        "name": "aggs_for_vecs",
+                        "description": "aggs_for_vecs extension",
                         "locations": [{
                             "enabled": false,
-                            "version": "1.1.1",
+                            "version": "1.3.0",
                             "database": "postgres",
                             "schema": "public"}
                         ]
@@ -374,10 +374,10 @@ mod test {
             .await
             .unwrap();
 
-        // assert does not contain postgis
+        // assert does not contain aggs_for_vecs
         assert!(
-            !result.stdout.clone().unwrap().contains("postgis"),
-            "results should not contain postgis: {}",
+            !result.stdout.clone().unwrap().contains("aggs_for_vecs"),
+            "results should not contain aggs_for_vecs: {}",
             result.stdout.clone().unwrap()
         );
 
@@ -386,7 +386,11 @@ mod test {
         let status = spec.status.expect("no status on coredb");
         let extensions = status.extensions;
         assert!(!extensions.clone().expect("expected extensions").is_empty());
-        assert!(!extensions.expect("expected extensions")[0].description.is_empty());
+        assert!(!extensions.expect("expected extensions")[0]
+            .description
+            .clone()
+            .expect("expected a description")
+            .is_empty());
 
         // Change size of a PVC
         let coredb_json = serde_json::json!({
@@ -724,11 +728,11 @@ mod test {
                 "replicas": 1,
                 "extensions": [
                     {
-                        "name": "postgis",
-                        "description": "PostGIS extension",
+                        "name": "aggs_for_vecs",
+                        "description": "aggs_for_vecs extension",
                         "locations": [{
                             "enabled": false,
-                            "version": "1.1.1",
+                            "version": "1.3.0",
                             "database": "postgres",
                             "schema": "public"}
                         ]

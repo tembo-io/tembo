@@ -18,7 +18,7 @@ lazy_static! {
 pub struct Extension {
     pub name: String,
     #[serde(default = "defaults::default_description")]
-    pub description: String,
+    pub description: Option<String>,
     pub locations: Vec<ExtensionInstallLocation>,
 }
 
@@ -26,7 +26,9 @@ impl Default for Extension {
     fn default() -> Self {
         Extension {
             name: "pg_stat_statements".to_owned(),
-            description: " track planning and execution statistics of all SQL statements executed".to_owned(),
+            description: Some(
+                " track planning and execution statistics of all SQL statements executed".to_owned(),
+            ),
             locations: vec![ExtensionInstallLocation::default()],
         }
     }
@@ -344,7 +346,7 @@ pub async fn get_all_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<E
     for ((extname, extdescr), ext_locations) in &ext_hashmap {
         ext_spec.push(Extension {
             name: extname.clone(),
-            description: extdescr.clone(),
+            description: Some(extdescr.clone()),
             locations: ext_locations.clone(),
         });
     }
@@ -462,29 +464,29 @@ mod tests {
 
     #[test]
     fn test_extension_plan() {
-        let postgis_disabled = Extension {
-            name: "postgis".to_owned(),
-            description: "my description".to_owned(),
+        let aggs_for_vecs_disabled = Extension {
+            name: "aggs_for_vecs".to_owned(),
+            description: Some("my description".to_owned()),
             locations: vec![ExtensionInstallLocation {
                 enabled: false,
                 database: "postgres".to_owned(),
                 schema: "public".to_owned(),
-                version: Some("1.1.1".to_owned()),
+                version: Some("1.3.0".to_owned()),
             }],
         };
 
         let pgmq_disabled = Extension {
             name: "pgmq".to_owned(),
-            description: "my description".to_owned(),
+            description: Some("my description".to_owned()),
             locations: vec![ExtensionInstallLocation {
                 enabled: false,
                 database: "postgres".to_owned(),
                 schema: "public".to_owned(),
-                version: Some("1.1.1".to_owned()),
+                version: Some("0.9.0".to_owned()),
             }],
         };
         let diff = vec![pgmq_disabled.clone()];
-        let actual = vec![postgis_disabled];
+        let actual = vec![aggs_for_vecs_disabled];
         let (changed, to_install) = extension_plan(&diff, &actual);
         assert!(changed.is_empty());
         assert!(to_install.len() == 1);
@@ -499,7 +501,7 @@ mod tests {
     fn test_diff_and_plan() {
         let postgis_disabled = Extension {
             name: "postgis".to_owned(),
-            description: "my description".to_owned(),
+            description: Some("my description".to_owned()),
             locations: vec![ExtensionInstallLocation {
                 enabled: false,
                 database: "postgres".to_owned(),
@@ -509,7 +511,7 @@ mod tests {
         };
         let postgis_enabled = Extension {
             name: "postgis".to_owned(),
-            description: "my description".to_owned(),
+            description: Some("my description".to_owned()),
             locations: vec![ExtensionInstallLocation {
                 enabled: true,
                 database: "postgres".to_owned(),
@@ -519,7 +521,7 @@ mod tests {
         };
         let pgmq_disabled = Extension {
             name: "pgmq".to_owned(),
-            description: "my description".to_owned(),
+            description: Some("my description".to_owned()),
             locations: vec![ExtensionInstallLocation {
                 enabled: false,
                 database: "postgres".to_owned(),
@@ -529,7 +531,7 @@ mod tests {
         };
         let pg_stat_enabled = Extension {
             name: "pg_stat_statements".to_owned(),
-            description: "my description".to_owned(),
+            description: Some("my description".to_owned()),
             locations: vec![ExtensionInstallLocation {
                 enabled: true,
                 database: "postgres".to_owned(),
@@ -579,7 +581,7 @@ mod tests {
     fn test_upgrade_ext_vers() {
         let pgmq_05 = Extension {
             name: "pgmq".to_owned(),
-            description: "my description".to_owned(),
+            description: Some("my description".to_owned()),
             locations: vec![ExtensionInstallLocation {
                 enabled: true,
                 database: "postgres".to_owned(),
@@ -590,7 +592,7 @@ mod tests {
 
         let pgmq_06 = Extension {
             name: "pgmq".to_owned(),
-            description: "my description".to_owned(),
+            description: Some("my description".to_owned()),
             locations: vec![ExtensionInstallLocation {
                 enabled: true,
                 database: "postgres".to_owned(),
@@ -618,77 +620,77 @@ mod tests {
 
     #[test]
     fn test_diff() {
-        let postgis_disabled = Extension {
-            name: "postgis".to_owned(),
-            description: "my description".to_owned(),
+        let aggs_for_vecs_disabled = Extension {
+            name: "aggs_for_vecs".to_owned(),
+            description: Some("my description".to_owned()),
             locations: vec![ExtensionInstallLocation {
                 enabled: false,
                 database: "postgres".to_owned(),
                 schema: "public".to_owned(),
-                version: Some("1.1.1".to_owned()),
+                version: Some("1.5.2".to_owned()),
             }],
         };
 
         let pgmq_enabled = Extension {
             name: "pgmq".to_owned(),
-            description: "my description".to_owned(),
+            description: Some("my description".to_owned()),
             locations: vec![ExtensionInstallLocation {
                 enabled: true,
                 database: "postgres".to_owned(),
                 schema: "public".to_owned(),
-                version: Some("1.1.1".to_owned()),
+                version: Some("0.9.0".to_owned()),
             }],
         };
 
         let pgmq_disabled = Extension {
             name: "pgmq".to_owned(),
-            description: "my description".to_owned(),
+            description: Some("my description".to_owned()),
             locations: vec![ExtensionInstallLocation {
                 enabled: false,
                 database: "postgres".to_owned(),
                 schema: "public".to_owned(),
-                version: Some("1.1.1".to_owned()),
+                version: Some("0.9.0".to_owned()),
             }],
         };
 
         // case where there are extensions in db but not on spec
         // happens on startup, for example
         let desired = vec![];
-        let actual = vec![postgis_disabled.clone(), pgmq_enabled.clone()];
+        let actual = vec![aggs_for_vecs_disabled.clone(), pgmq_enabled.clone()];
         // diff should be that we need to enable pgmq
         let diff = diff_extensions(&desired, &actual);
         assert!(diff.is_empty());
 
-        let desired = vec![postgis_disabled.clone(), pgmq_enabled.clone()];
-        let actual = vec![postgis_disabled.clone(), pgmq_disabled.clone()];
+        let desired = vec![aggs_for_vecs_disabled.clone(), pgmq_enabled.clone()];
+        let actual = vec![aggs_for_vecs_disabled.clone(), pgmq_disabled.clone()];
         // diff should be that we need to enable pgmq
         let diff = diff_extensions(&desired, &actual);
         assert_eq!(diff.len(), 1);
         assert_eq!(diff[0], pgmq_enabled);
 
         // order does not matter
-        let desired = vec![pgmq_enabled.clone(), postgis_disabled.clone()];
-        let actual = vec![postgis_disabled.clone(), pgmq_disabled.clone()];
+        let desired = vec![pgmq_enabled.clone(), aggs_for_vecs_disabled.clone()];
+        let actual = vec![aggs_for_vecs_disabled.clone(), pgmq_disabled.clone()];
         // diff will still be to enable pgmq
         let diff = diff_extensions(&desired, &actual);
         assert_eq!(diff.len(), 1);
         assert_eq!(diff[0], pgmq_enabled);
 
-        let desired = vec![postgis_disabled.clone(), pgmq_enabled.clone()];
-        let actual = vec![postgis_disabled.clone(), pgmq_disabled];
+        let desired = vec![aggs_for_vecs_disabled.clone(), pgmq_enabled.clone()];
+        let actual = vec![aggs_for_vecs_disabled.clone(), pgmq_disabled];
         // diff should be that we need to enable pgmq
         let diff = diff_extensions(&desired, &actual);
         assert_eq!(diff.len(), 1);
         assert_eq!(diff[0], pgmq_enabled);
 
-        let desired = vec![postgis_disabled.clone(), pgmq_enabled.clone()];
-        let actual = vec![postgis_disabled.clone(), pgmq_enabled.clone()];
+        let desired = vec![aggs_for_vecs_disabled.clone(), pgmq_enabled.clone()];
+        let actual = vec![aggs_for_vecs_disabled.clone(), pgmq_enabled.clone()];
         // diff == actual, so diff should be empty
         let diff = diff_extensions(&desired, &actual);
         assert_eq!(diff.len(), 0);
 
-        let desired = vec![postgis_disabled.clone()];
-        let actual = vec![postgis_disabled, pgmq_enabled];
+        let desired = vec![aggs_for_vecs_disabled.clone()];
+        let actual = vec![aggs_for_vecs_disabled, pgmq_enabled];
         // less extensions desired than exist - should be a no op
         let diff = diff_extensions(&desired, &actual);
         assert_eq!(diff.len(), 0);

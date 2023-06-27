@@ -4,6 +4,7 @@ pub use crate::controller::*;
 pub mod apis;
 
 pub mod configmap;
+pub mod extensions;
 pub mod postgres_exporter;
 /// Log and trace integrations
 pub mod telemetry;
@@ -16,7 +17,7 @@ mod config;
 mod cronjob;
 pub mod defaults;
 mod errors;
-mod extensions;
+
 #[cfg(test)] pub mod fixtures;
 mod ingress;
 pub mod ingress_route_tcp_crd;

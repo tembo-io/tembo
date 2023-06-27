@@ -1,10 +1,10 @@
-use crate::coredb_crd::CoreDBExtensions;
+use controller::extensions::Extension;
 use log::debug;
 
 pub fn extension_plan(
-    have_changed: &[CoreDBExtensions],
-    actual: &[CoreDBExtensions],
-) -> (Vec<CoreDBExtensions>, Vec<CoreDBExtensions>) {
+    have_changed: &[Extension],
+    actual: &[Extension],
+) -> (Vec<Extension>, Vec<Extension>) {
     let mut changed = Vec::new();
     let mut to_install = Vec::new();
 

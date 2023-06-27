@@ -27,9 +27,11 @@ mod test {
     use pgmq::{Message, PGMQueueExt};
 
     use conductor::{
-        coredb_crd as crd, restart_statefulset,
+        restart_statefulset,
         types::{self, StateToControlPlane},
     };
+    use controller::apis::coredb_types::{CoreDB, CoreDBSpec};
+    use controller::extensions::{Extension, ExtensionInstallLocation};
     use controller::postgres_exporter::{PostgresMetrics, QueryConfig};
     use rand::Rng;
     use std::collections::BTreeMap;
@@ -120,29 +122,29 @@ mod test {
 
         // conductor receives a CRUDevent from control plane
         let spec_js = serde_json::json!({
-            "extensions": Some(vec![crd::CoreDBExtensions {
-                name: "postgis".to_owned(),
-                description: Some("PostGIS extension".to_owned()),
-                locations: vec![crd::CoreDBExtensionsLocations {
+            "extensions": Some(vec![Extension {
+                name: "aggs_for_vecs".to_owned(),
+                description: Some("aggs_for_vecs extension".to_owned()),
+                locations: vec![ExtensionInstallLocation {
                     enabled: true,
-                    version: Some("1.1.1".to_owned()),
-                    schema: Some("public".to_owned()),
-                    database: Some("postgres".to_owned()),
+                    version: Some("1.3.0".to_owned()),
+                    schema: "public".to_owned(),
+                    database: "postgres".to_owned(),
                 }],
             }]),
             "storage": Some("1Gi".to_owned()),
             "replicas": Some(1),
-            "resources": Some(crd::CoreDBResources {
-                limits: Some(limits),
-                requests: None,
-            }),
+            "resources":
+                serde_json::json!({
+                    "limits": limits,
+                }),
             "metrics": Some(PostgresMetrics{
                 queries: Some(query_config),
                 enabled: true,
                 image: "default-image-value".to_string()
             })
         });
-        let spec: crd::CoreDBSpec = serde_json::from_value(spec_js).unwrap();
+        let spec: CoreDBSpec = serde_json::from_value(spec_js).unwrap();
 
         let msg = types::CRUDevent {
             organization_name: org_name.clone(),
@@ -196,12 +198,10 @@ mod test {
             .contains_key("pg_postmaster"));
 
         assert!(
-            spec.extensions.is_some(),
+            spec.extensions.len() > 0,
             "Extension object missing from spec"
         );
-        let extensions = spec
-            .extensions
-            .expect("No extensions found in message spec");
+        let extensions = spec.extensions;
         assert!(
             !extensions.is_empty(),
             "Expected at least one extension: {:?}",
@@ -236,21 +236,21 @@ mod test {
         // conductor receives a CRUDevent from control plane
         // take note of number of extensions at this point in time
         let mut extensions_add = extensions.clone();
-        extensions_add.push(crd::CoreDBExtensions {
+        extensions_add.push(Extension {
             name: "pgmq".to_owned(),
-            description: Some("pgmq description".to_owned()),
-            locations: vec![crd::CoreDBExtensionsLocations {
+            description: Some("pgmq description".to_string()),
+            locations: vec![ExtensionInstallLocation {
                 enabled: false,
                 version: Some("0.2.1".to_owned()),
-                schema: Some("public".to_owned()),
-                database: Some("postgres".to_owned()),
+                schema: "public".to_owned(),
+                database: "postgres".to_owned(),
             }],
         });
         let num_expected_extensions = extensions_add.len();
         let spec_js = serde_json::json!({
             "extensions": extensions_add,
         });
-        let spec: crd::CoreDBSpec = serde_json::from_value(spec_js).unwrap();
+        let spec: CoreDBSpec = serde_json::from_value(spec_js).unwrap();
         let msg = types::CRUDevent {
             organization_name: org_name.clone(),
             data_plane_id: "org_02s3owPQskuGXHE8vYsGSY".to_owned(),
@@ -273,8 +273,7 @@ mod test {
             .message
             .spec
             .expect("No spec found in message")
-            .extensions
-            .expect("no extensions found");
+            .extensions;
         // we added an extension, so it should be +1 now
         assert_eq!(num_expected_extensions, extensions.len());
 
@@ -309,7 +308,6 @@ mod test {
             pvc_list
         );
 
-        use conductor::coredb_crd::CoreDB;
         let cdb_api: Api<CoreDB> = Api::all(client.clone());
         let cdb_dne = cdb_api.get(&namespace).await;
         assert!(cdb_dne.is_err(), "CoreDB was not deleted");

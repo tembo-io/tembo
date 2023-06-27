@@ -1,5 +1,4 @@
 pub mod aws;
-pub mod coredb_crd;
 pub mod errors;
 pub mod extensions;
 pub mod types;
@@ -7,8 +6,8 @@ pub mod types;
 use crate::aws::cloudformation::{AWSConfigState, CloudFormationParams};
 use aws_sdk_cloudformation::config::Region;
 use base64::{engine::general_purpose, Engine as _};
-use coredb_crd as crd;
-use coredb_crd::CoreDB;
+use controller::apis::coredb_types::{CoreDB, CoreDBSpec};
+
 use errors::ConductorError;
 use k8s_openapi::api::apps::v1::StatefulSet;
 use k8s_openapi::api::core::v1::{Namespace, Secret};
@@ -22,7 +21,7 @@ use serde_json::{from_str, to_string, Value};
 
 pub type Result<T, E = ConductorError> = std::result::Result<T, E>;
 
-pub async fn generate_spec(namespace: &str, spec: &crd::CoreDBSpec) -> Value {
+pub async fn generate_spec(namespace: &str, spec: &CoreDBSpec) -> Value {
     let spec = serde_json::json!({
         "apiVersion": "coredb.io/v1alpha1",
         "kind": "CoreDB",
@@ -50,10 +49,7 @@ pub async fn get_one(client: Client, namespace: &str) -> Result<CoreDB, Conducto
 }
 
 // returns CoreDB when status is present, otherwise returns an error
-pub async fn get_coredb_status(
-    client: Client,
-    namespace: &str,
-) -> Result<crd::CoreDB, ConductorError> {
+pub async fn get_coredb_status(client: Client, namespace: &str) -> Result<CoreDB, ConductorError> {
     let coredb = get_one(client, namespace).await?;
 
     if coredb.status.is_none() {
