@@ -18,6 +18,7 @@ mod cronjob;
 pub mod defaults;
 mod errors;
 
+#[allow(unused_imports)] mod cnpg;
 #[cfg(test)] pub mod fixtures;
 mod ingress;
 pub mod ingress_route_tcp_crd;
