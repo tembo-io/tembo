@@ -53,6 +53,12 @@ jobs:
           profile: minimal
           toolchain: nightly
           components: rustfmt, clippy
+      - name: Install minimal stable with clippy and rustfmt
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
         with:
           prefix-key: "${{ matrix.name }}-lint"
@@ -61,7 +67,7 @@ jobs:
       - name: Cargo format
         run: cd ${{ matrix.path }} && cargo +nightly fmt --all --check
       - name: Clippy
-        run: cd ${{ matrix.path }} && cargo clippy
+        run: cd ${{ matrix.path }} && cargo +stable clippy
 
   test:
     name: Run tests
