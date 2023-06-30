@@ -22,6 +22,9 @@ webhooks:
         resources: ["pods"]
     sideEffects: None
     admissionReviewVersions: ["v1"]
+    namespaceSelector:
+      matchLabels:
+        tembo-pod-init.tembo.io/watch: "true"
   - name: {{ printf "%s.%s.svc.cluster.local" (include "tembo-pod-init.fullname" .) (include "tembo-pod-init.namespace" .) }}
     clientConfig:
       service:
