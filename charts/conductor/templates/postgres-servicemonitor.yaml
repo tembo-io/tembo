@@ -12,6 +12,6 @@ spec:
     any: true
   selector:
     matchLabels:
-      app: coredb
+      app: postgres-exporter
       component: metrics
 {{- end }}

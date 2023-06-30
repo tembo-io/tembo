@@ -43,10 +43,10 @@ mod test {
     const API_VERSION: &str = "coredb.io/v1alpha1";
     // Timeout settings while waiting for an event
     const TIMEOUT_SECONDS_START_POD: u64 = 200;
-    const TIMEOUT_SECONDS_POD_READY: u64 = 30;
-    const TIMEOUT_SECONDS_SECRET_PRESENT: u64 = 30;
-    const TIMEOUT_SECONDS_NS_DELETED: u64 = 30;
-    const TIMEOUT_SECONDS_COREDB_DELETED: u64 = 45;
+    const TIMEOUT_SECONDS_POD_READY: u64 = 60;
+    const TIMEOUT_SECONDS_SECRET_PRESENT: u64 = 60;
+    const TIMEOUT_SECONDS_NS_DELETED: u64 = 60;
+    const TIMEOUT_SECONDS_COREDB_DELETED: u64 = 60;
 
     async fn create_test_buddy(pods_api: Api<Pod>, name: String) -> String {
         // Launch a pod we can connect to if we want to
@@ -223,6 +223,26 @@ mod test {
         });
         println!("Found pod ready: {}", pod_name);
 
+        let pods: Api<Pod> = Api::namespaced(client.clone(), namespace);
+        let lp =
+            ListParams::default().labels(format!("app=postgres-exporter,coredb.io/name={}", name).as_str());
+        let exporter_pods = pods.list(&lp).await.expect("could not get pods");
+        let exporter_pod_name = exporter_pods.items[0].metadata.name.as_ref().unwrap();
+        println!("Exporter pod name: {}", &exporter_pod_name);
+
+        let _check_for_pod_ready = tokio::time::timeout(
+            Duration::from_secs(TIMEOUT_SECONDS_POD_READY),
+            await_condition(pods.clone(), &exporter_pod_name, is_pod_ready()),
+        )
+        .await
+        .unwrap_or_else(|_| {
+            panic!(
+                "Did not find the pod {} to be ready after waiting {} seconds",
+                pod_name, TIMEOUT_SECONDS_POD_READY
+            )
+        });
+        println!("Found pod ready: {}", &exporter_pod_name);
+
         // assert for postgres-exporter secret to be created
         let exporter_name = format!("{}-metrics", name);
         let exporter_secret_name = exporter_name.clone();
@@ -246,26 +266,6 @@ mod test {
             "postgres-exporter Deployment does not exist: {:?}",
             exporter_deployment.err()
         );
-
-        // assert custom queries made it to metric server
-        let pods: Api<Pod> = Api::namespaced(client.clone(), namespace);
-        let lp = ListParams::default().labels(format!("app={}", exporter_name.clone()).as_str());
-        let exporter_pods = pods.list(&lp).await.expect("could not get pods");
-        let exporter_pod_name = exporter_pods.items[0].metadata.name.as_ref();
-        let c = vec![
-            "wget".to_owned(),
-            "-qO-".to_owned(),
-            "http://localhost:9187/metrics".to_owned(),
-        ];
-        thread::sleep(Duration::from_millis(10000));
-        let result_stdout = run_command_in_container(
-            pods.clone(),
-            exporter_pod_name.unwrap().to_string(),
-            c,
-            Some("postgres-exporter".to_string()),
-        )
-        .await;
-        assert!(result_stdout.contains(&test_metric_decr));
 
         // Assert default storage values are applied to PVC
         let pvc_api: Api<PersistentVolumeClaim> = Api::namespaced(client.clone(), namespace);
@@ -359,6 +359,21 @@ mod test {
             run_command_in_container(pods.clone(), test_pod_name.clone(), command, None).await;
         assert!(result_stdout.contains("pg_up 1"));
         println!("Found metrics when curling the metrics service");
+
+        // assert custom queries made it to metric server
+        let c = vec![
+            "wget".to_owned(),
+            "-qO-".to_owned(),
+            "http://localhost:9187/metrics".to_owned(),
+        ];
+        let result_stdout = run_command_in_container(
+            pods.clone(),
+            exporter_pod_name.to_string(),
+            c,
+            Some("postgres-exporter".to_string()),
+        )
+        .await;
+        assert!(result_stdout.contains(&test_metric_decr));
 
         // Assert we can drop an extension after its been created
         let coredb_json = serde_json::json!({

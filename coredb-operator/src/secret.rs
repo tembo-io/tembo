@@ -24,7 +24,7 @@ pub async fn reconcile_secret(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Err
     labels.insert("coredb.io/name".to_owned(), cdb.name_any());
 
     // check for existing secret
-    let lp = ListParams::default().labels("app=coredb");
+    let lp = ListParams::default().labels(format!("app=coredb,coredb.io/name={}", cdb.name_any()).as_str());
     let secrets = secret_api.list(&lp).await.expect("could not get Secrets");
 
     // if the secret has already been created, return (avoids overwriting password value)
@@ -102,12 +102,13 @@ pub async fn reconcile_postgres_exporter_secret(
     let mut labels: BTreeMap<String, String> = BTreeMap::new();
     let secret_api: Api<Secret> = Api::namespaced(client.clone(), &ns);
     let oref = cdb.controller_owner_ref(&()).unwrap();
-    labels.insert("app".to_owned(), name.to_string());
+    labels.insert("app".to_owned(), "postgres-exporter".to_string());
     labels.insert("component".to_owned(), "metrics".to_string());
     labels.insert("coredb.io/name".to_owned(), cdb.name_any());
 
     // check for existing secret
-    let lp = ListParams::default().labels(format!("app={}", &name).as_str());
+    let lp = ListParams::default()
+        .labels(format!("coredb.io/name={},app=postgres-exporter", &cdb.name_any()).as_str());
     let secrets = secret_api.list(&lp).await.expect("could not get Secrets");
 
     // if the secret has already been created, return (avoids overwriting password value)
@@ -164,7 +165,7 @@ async fn fetch_secret_data(
     ns: &str,
 ) -> Result<PrometheusExporterSecretData, Error> {
     let secret_api: Api<Secret> = Api::namespaced(client, ns);
-    let secret_name = format!("{}", name);
+    let secret_name = name.to_string();
 
     match secret_api.get(&secret_name).await {
         Ok(secret) => {

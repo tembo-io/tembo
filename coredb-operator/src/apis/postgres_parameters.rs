@@ -490,7 +490,7 @@ mod pg_param_tests {
             value: "x,y,z".parse().unwrap(),
         };
 
-        let merged = merge_pg_configs(&vec![pgc_0], &vec![pgc_1], "test_configuration")
+        let merged = merge_pg_configs(&[pgc_0], &[pgc_1], "test_configuration")
             .expect("failed to merge pg configs")
             .expect("expected configs");
         assert_eq!(merged.value.to_string(), "a,b,c,x,y,z");
@@ -504,7 +504,7 @@ mod pg_param_tests {
             name: "test_configuration".to_string(),
             value: "b".parse().unwrap(),
         };
-        let merged = merge_pg_configs(&vec![pgc_0], &vec![pgc_1], "test_configuration");
+        let merged = merge_pg_configs(&[pgc_0], &[pgc_1], "test_configuration");
         assert!(merged.is_err())
     }
 

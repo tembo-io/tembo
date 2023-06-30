@@ -57,7 +57,7 @@ pub async fn reconcile_svc(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
     }
 
     let mut selector_labels: BTreeMap<String, String> = BTreeMap::new();
-    selector_labels.insert("app".to_owned(), format!("{}-metrics", cdb.name_any()));
+    selector_labels.insert("app".to_owned(), "postgres-exporter".to_string());
     selector_labels.insert("coredb.io/name".to_owned(), cdb.name_any());
     selector_labels.insert("component".to_owned(), "metrics".to_string());
 
