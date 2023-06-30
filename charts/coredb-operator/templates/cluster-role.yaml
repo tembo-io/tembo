@@ -14,7 +14,7 @@ rules:
     resources: ["persistentvolumeclaims"]
     verbs: ["get", "list", "patch"]
   - apiGroups: ["apps"]
-    resources: ["statefulsets"]
+    resources: ["statefulsets", "deployments"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: [""]
     resources: ["services", "secrets", "pods", "pods/exec", "namespaces/status", "serviceaccounts", "secrets", "configmaps"]
