@@ -38,3 +38,6 @@ webhooks:
         resources: ["pods"]
     sideEffects: None
     admissionReviewVersions: ["v1"]
+    namespaceSelector:
+      matchLabels:
+        tembo-pod-init.tembo.io/watch: "true"
