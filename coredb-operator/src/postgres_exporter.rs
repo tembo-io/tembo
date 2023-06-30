@@ -1,13 +1,15 @@
 use crate::{
     apis::coredb_types::CoreDB,
     configmap::{create_configmap_ifnotexist, set_configmap},
-    defaults, Context, Error,
+    defaults,
+    secret::PrometheusExporterSecretData,
+    Context, Error,
 };
 use kube::Client;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, sync::Arc};
-use tracing::debug;
+use tracing::{debug, error};
 
 pub const QUERIES_YAML: &str = "queries.yaml";
 pub const EXPORTER_VOLUME: &str = "postgres-exporter";
@@ -83,7 +85,11 @@ impl FromStr for Usage {
     }
 }
 
-pub async fn create_postgres_exporter_role(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
+pub async fn create_postgres_exporter_role(
+    cdb: &CoreDB,
+    ctx: Arc<Context>,
+    secret: Option<PrometheusExporterSecretData>,
+) -> Result<(), Error> {
     let client = ctx.client.clone();
     if !(cdb.spec.postgresExporterEnabled) {
         return Ok(());
@@ -93,34 +99,43 @@ pub async fn create_postgres_exporter_role(cdb: &CoreDB, ctx: Arc<Context>) -> R
         cdb.metadata.name.clone().unwrap(),
         cdb.metadata.namespace.clone().unwrap()
     );
+
+    // Check if secret data is available
+    let password = match &secret {
+        Some(data) => data.password.clone(),
+        None => {
+            error!("No secret data available for postgres_exporter");
+            return Err(Error::MissingSecretError(
+                "No secret data available for postgres_exporter".to_owned(),
+            ));
+        }
+    };
     // https://github.com/prometheus-community/postgres_exporter#running-as-non-superuser
-    let _ = cdb
-        .psql(
-            "
-            CREATE OR REPLACE FUNCTION __tmp_create_user() returns void as $$
-            BEGIN
-              IF NOT EXISTS (
-                      SELECT
-                      FROM   pg_catalog.pg_user
-                      WHERE  usename = 'postgres_exporter') THEN
-                CREATE USER postgres_exporter;
-              END IF;
-            END;
-            $$ language plpgsql;
+    let query = format!(
+        "
+        CREATE OR REPLACE FUNCTION __tmp_create_user() returns void as $$
+        BEGIN
+          IF NOT EXISTS (
+                  SELECT
+                  FROM   pg_catalog.pg_user
+                  WHERE  usename = 'postgres_exporter') THEN
+            CREATE USER postgres_exporter;
+          END IF;
+        END;
+        $$ language plpgsql;
 
-            SELECT __tmp_create_user();
-            DROP FUNCTION __tmp_create_user();
+        SELECT __tmp_create_user();
+        DROP FUNCTION __tmp_create_user();
 
-            ALTER USER postgres_exporter SET SEARCH_PATH TO postgres_exporter,pg_catalog;
-            GRANT CONNECT ON DATABASE postgres TO postgres_exporter;
-            GRANT pg_monitor to postgres_exporter;
-            GRANT pg_read_all_stats to postgres_exporter;
-            "
-            .to_string(),
-            "postgres".to_owned(),
-            client.clone(),
-        )
-        .await?;
+        ALTER USER postgres_exporter SET SEARCH_PATH TO postgres_exporter,pg_catalog;
+        ALTER USER postgres_exporter WITH PASSWORD '{}';
+        GRANT CONNECT ON DATABASE postgres TO postgres_exporter;
+        GRANT pg_monitor to postgres_exporter;
+        GRANT pg_read_all_stats to postgres_exporter;
+        ",
+        password
+    );
+    let _ = cdb.psql(query, "postgres".to_owned(), client.clone()).await?;
     Ok(())
 }
 

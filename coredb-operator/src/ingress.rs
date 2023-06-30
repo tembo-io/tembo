@@ -116,7 +116,7 @@ pub async fn reconcile_postgres_ing_route_tcp(
                     "IngressRouteTCP {}.{}, does not have a name.",
                     subdomain, basedomain
                 );
-                return Err(OperatorError::IngressRouteTCPNameError);
+                return Err(OperatorError::IngressRouteTCPName);
             }
         };
         debug!(
@@ -188,7 +188,7 @@ pub async fn reconcile_postgres_ing_route_tcp(
                         "Failed to update postgres read and write IngressRouteTCP {}.{}: {}",
                         ingress_route_tcp_name, namespace, e
                     );
-                    return Err(OperatorError::IngressRouteTCPUpdateError);
+                    return Err(OperatorError::IngressRouteTCPUpdate);
                 }
             }
         }
@@ -239,7 +239,7 @@ pub async fn reconcile_postgres_ing_route_tcp(
                     "Failed to create new postgres read and write IngressRouteTCP {}.{}: {}",
                     ingress_route_tcp_name_new, namespace, e
                 );
-                return Err(OperatorError::IngressRouteTCPCreateError);
+                return Err(OperatorError::IngressRouteTCPCreate);
             }
         }
     } else {

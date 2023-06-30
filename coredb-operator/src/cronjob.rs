@@ -1,9 +1,9 @@
-use crate::{apis::coredb_types::CoreDB, Context, Error};
+use crate::{apis::coredb_types::CoreDB, rbac::reconcile_rbac, Context, Error};
 use k8s_openapi::{
     api::{
         batch::v1::{CronJob, CronJobSpec, JobSpec, JobTemplateSpec},
-        core::v1::{Container, PodSpec, PodTemplateSpec, ServiceAccount},
-        rbac::v1::{PolicyRule, Role, RoleBinding, RoleRef, Subject},
+        core::v1::{Container, PodSpec, PodTemplateSpec},
+        rbac::v1::PolicyRule,
     },
     apimachinery::pkg::apis::meta::v1::ObjectMeta,
 };
@@ -23,12 +23,7 @@ pub async fn reconcile_cronjob(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Er
     labels.insert("app".to_owned(), "coredb".to_string());
     labels.insert("coredb.io/name".to_owned(), cdb.name_any());
 
-    // create service account for cronjob
-    let sa = reconcile_service_account(cdb, ctx.clone()).await?;
-    // create role for cronjob
-    let role = reconcile_role(cdb, ctx.clone()).await?;
-    // create role binding for cronjob
-    reconcile_role_binding(cdb, ctx.clone(), &sa, role).await?;
+    let rbac = reconcile_rbac(cdb, ctx.clone(), Some("backup"), create_policy_rules().await).await?;
 
     // reconcile cronjob
     let cronjob_metadata = ObjectMeta {
@@ -39,7 +34,7 @@ pub async fn reconcile_cronjob(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Er
         ..ObjectMeta::default()
     };
 
-    let sa_name = sa.metadata.name;
+    let sa_name = rbac.service_account.metadata.name;
 
     // create spec for cronjob
     let cj_spec = CronJobSpec {
@@ -85,128 +80,6 @@ pub async fn reconcile_cronjob(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Er
     let ps = PatchParams::apply("cntrlr").force();
     let _o = cj_api
         .patch(&name, &ps, &Patch::Apply(&cj))
-        .await
-        .map_err(Error::KubeError)?;
-
-    Ok(())
-}
-
-// reconcile a kubernetes role
-async fn reconcile_service_account(cdb: &CoreDB, ctx: Arc<Context>) -> Result<ServiceAccount, Error> {
-    let client = ctx.client.clone();
-    let ns = cdb.namespace().unwrap();
-    let name = format!("{}-backup", cdb.name_any());
-    let sa_api: Api<ServiceAccount> = Api::namespaced(client.clone(), &ns);
-
-    let mut labels: BTreeMap<String, String> = BTreeMap::new();
-    labels.insert("app".to_owned(), "coredb".to_string());
-    labels.insert("coredb.io/name".to_owned(), cdb.name_any());
-
-    let mut sa_metadata = ObjectMeta {
-        name: Some(name.to_owned()),
-        namespace: Some(ns.to_owned()),
-        labels: Some(labels.clone()),
-        ..ObjectMeta::default()
-    };
-
-    if let Some(ref template_metadata) = cdb.spec.serviceAccountTemplate.metadata {
-        if let Some(ref annotations) = template_metadata.annotations {
-            sa_metadata.annotations = Some(annotations.clone());
-        }
-    }
-
-    let sa = ServiceAccount {
-        metadata: sa_metadata,
-        ..ServiceAccount::default()
-    };
-
-    let ps = PatchParams::apply("cntrlr").force();
-    let _o = sa_api
-        .patch(&name, &ps, &Patch::Apply(&sa))
-        .await
-        .map_err(Error::KubeError)?;
-
-    Ok(sa)
-}
-
-// reconcile a kubernetes role
-async fn reconcile_role(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Role, Error> {
-    let client = ctx.client.clone();
-    let ns = cdb.namespace().unwrap();
-    let name = format!("{}-backup", cdb.name_any());
-    let role_api: Api<Role> = Api::namespaced(client.clone(), &ns);
-
-    let mut labels: BTreeMap<String, String> = BTreeMap::new();
-    labels.insert("app".to_owned(), "coredb".to_string());
-    labels.insert("coredb.io/name".to_owned(), cdb.name_any());
-
-    let rules = create_policy_rules();
-
-    let role = Role {
-        metadata: ObjectMeta {
-            name: Some(name.to_owned()),
-            namespace: Some(ns.to_owned()),
-            labels: Some(labels.clone()),
-            ..ObjectMeta::default()
-        },
-        rules: Some(rules.await),
-    };
-
-    let ps = PatchParams::apply("cntrlr").force();
-    let _o = role_api
-        .patch(&name, &ps, &Patch::Apply(&role))
-        .await
-        .map_err(Error::KubeError)?;
-
-    Ok(role)
-}
-
-async fn reconcile_role_binding(
-    cdb: &CoreDB,
-    ctx: Arc<Context>,
-    sa: &ServiceAccount,
-    role: Role,
-) -> Result<(), Error> {
-    let client = ctx.client.clone();
-    let ns = cdb.namespace().unwrap();
-    let name = format!("{}-backup", cdb.name_any());
-    let role_binding_api: Api<RoleBinding> = Api::namespaced(client.clone(), &ns);
-    let sa_name = sa.name_any();
-    let role_name = role.name_any();
-
-    let mut labels: BTreeMap<String, String> = BTreeMap::new();
-    labels.insert("app".to_owned(), "coredb".to_string());
-    labels.insert("coredb.io/name".to_owned(), cdb.name_any());
-
-    let role_ref = RoleRef {
-        api_group: "rbac.authorization.k8s.io".to_string(),
-        kind: "Role".to_string(),
-        name: role_name.to_string(),
-    };
-
-    let subject = Subject {
-        kind: "ServiceAccount".to_string(),
-        name: sa_name.to_string(),
-        namespace: Some(ns.to_owned()),
-        ..Subject::default()
-    };
-
-    let metadata = ObjectMeta {
-        name: Some(name.to_owned()),
-        namespace: Some(ns.to_owned()),
-        labels: Some(labels.clone()),
-        ..ObjectMeta::default()
-    };
-
-    let rb = RoleBinding {
-        metadata,
-        role_ref,
-        subjects: Some(vec![subject]),
-    };
-
-    let ps = PatchParams::apply("cntrlr").force();
-    let _o = role_binding_api
-        .patch(&name, &ps, &Patch::Apply(&rb))
         .await
         .map_err(Error::KubeError)?;
 

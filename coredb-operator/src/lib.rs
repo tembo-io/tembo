@@ -19,6 +19,7 @@ pub mod defaults;
 mod errors;
 
 #[allow(unused_imports)] mod cnpg;
+mod deployment_postgres_exporter;
 #[cfg(test)] pub mod fixtures;
 mod ingress;
 pub mod ingress_route_tcp_crd;
@@ -48,6 +49,9 @@ pub enum Error {
 
     #[error("Pod Error: {0}")]
     PodError(String),
+
+    #[error("Missing Secret Error: {0}")]
+    MissingSecretError(String),
 }
 pub type Result<T, E = Error> = std::result::Result<T, E>;
 

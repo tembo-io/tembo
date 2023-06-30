@@ -57,8 +57,9 @@ pub async fn reconcile_svc(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
     }
 
     let mut selector_labels: BTreeMap<String, String> = BTreeMap::new();
-    selector_labels.insert("app".to_owned(), "coredb".to_string());
+    selector_labels.insert("app".to_owned(), format!("{}-metrics", cdb.name_any()));
     selector_labels.insert("coredb.io/name".to_owned(), cdb.name_any());
+    selector_labels.insert("component".to_owned(), "metrics".to_string());
 
     let mut labels = selector_labels.clone();
     labels.insert("component".to_owned(), "metrics".to_owned());

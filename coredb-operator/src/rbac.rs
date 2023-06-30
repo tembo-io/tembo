@@ -11,25 +11,52 @@ use kube::{
     Api, ResourceExt,
 };
 use std::{collections::BTreeMap, sync::Arc, vec};
-//use tracing::debug;
+
+pub struct Rbac {
+    pub service_account: ServiceAccount,
+    pub role: Role,
+    pub rolebinding: RoleBinding,
+}
 
 // reconcile kubernetes rbac resources
-pub async fn reconcile_rbac(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
+pub async fn reconcile_rbac(
+    cdb: &CoreDB,
+    ctx: Arc<Context>,
+    suffix: Option<&str>,
+    policy_rules: Vec<PolicyRule>,
+) -> Result<Rbac, Error> {
     // reconcile service account
-    let sa = reconcile_service_account(cdb, ctx.clone()).await?;
+    let service_account = reconcile_service_account(cdb, ctx.clone(), suffix).await?;
+    let sa = service_account.clone();
     // reconcile role
-    let role = reconcile_role(cdb, ctx.clone()).await?;
+    let role = reconcile_role(cdb, ctx.clone(), suffix, policy_rules).await?;
+    let rle = role.clone();
     // reconcile role binding
-    reconcile_role_binding(cdb, ctx.clone(), sa, role).await?;
+    let role_binding = reconcile_role_binding(cdb, ctx.clone(), service_account, rle.clone(), suffix).await?;
 
-    Ok(())
+    Ok(Rbac {
+        service_account: sa,
+        role: rle,
+        rolebinding: role_binding,
+    })
 }
 
 // reconcile a kubernetes service account
-async fn reconcile_service_account(cdb: &CoreDB, ctx: Arc<Context>) -> Result<ServiceAccount, Error> {
+async fn reconcile_service_account(
+    cdb: &CoreDB,
+    ctx: Arc<Context>,
+    suffix: Option<&str>,
+) -> Result<ServiceAccount, Error> {
+    let suffix = suffix.map_or("sa".to_owned(), |s| {
+        if s.is_empty() {
+            "sa".to_owned()
+        } else {
+            s.to_owned()
+        }
+    });
     let client = ctx.client.clone();
     let ns = cdb.namespace().unwrap();
-    let name = format!("{}-sa", cdb.name_any());
+    let name = format!("{}-{}", cdb.name_any(), suffix);
     let sa_api: Api<ServiceAccount> = Api::namespaced(client.clone(), &ns);
 
     let mut labels: BTreeMap<String, String> = BTreeMap::new();
@@ -63,17 +90,27 @@ async fn reconcile_service_account(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Se
     Ok(sa)
 }
 
-async fn reconcile_role(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Role, Error> {
+async fn reconcile_role(
+    cdb: &CoreDB,
+    ctx: Arc<Context>,
+    suffix: Option<&str>,
+    policy_rules: Vec<PolicyRule>,
+) -> Result<Role, Error> {
+    let suffix = suffix.map_or("role".to_owned(), |s| {
+        if s.is_empty() {
+            "role".to_owned()
+        } else {
+            s.to_owned()
+        }
+    });
     let client = ctx.client.clone();
     let ns = cdb.namespace().unwrap();
-    let name = format!("{}-role", cdb.name_any());
+    let name = format!("{}-{}", cdb.name_any(), suffix);
     let role_api: Api<Role> = Api::namespaced(client.clone(), &ns);
 
     let mut labels: BTreeMap<String, String> = BTreeMap::new();
     labels.insert("app".to_owned(), "coredb".to_string());
     labels.insert("coredb.io/name".to_owned(), cdb.name_any());
-
-    let rules = create_policy_rules(cdb);
 
     let role = Role {
         metadata: ObjectMeta {
@@ -82,7 +119,7 @@ async fn reconcile_role(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Role, Error> 
             labels: Some(labels.clone()),
             ..ObjectMeta::default()
         },
-        rules: Some(rules.await),
+        rules: Some(policy_rules.to_vec()),
     };
 
     let ps = PatchParams::apply("cntrlr").force();
@@ -99,10 +136,18 @@ async fn reconcile_role_binding(
     ctx: Arc<Context>,
     sa: ServiceAccount,
     role: Role,
-) -> Result<(), Error> {
+    suffix: Option<&str>,
+) -> Result<RoleBinding, Error> {
+    let suffix = suffix.map_or("role-binding".to_owned(), |s| {
+        if s.is_empty() {
+            "role-binding".to_owned()
+        } else {
+            s.to_owned()
+        }
+    });
     let client = ctx.client.clone();
     let ns = cdb.namespace().unwrap();
-    let name = format!("{}-role-binding", cdb.name_any());
+    let name = format!("{}-{}", cdb.name_any(), suffix);
     let role_binding_api: Api<RoleBinding> = Api::namespaced(client.clone(), &ns);
     let sa_name = sa.name_any();
     let role_name = role.name_any();
@@ -143,48 +188,5 @@ async fn reconcile_role_binding(
         .await
         .map_err(Error::KubeError)?;
 
-    Ok(())
-}
-
-// Create role policy rulesets
-async fn create_policy_rules(cdb: &CoreDB) -> Vec<PolicyRule> {
-    vec![
-        // This policy allows get, list, watch access to the coredb resource
-        PolicyRule {
-            api_groups: Some(vec!["coredb.io".to_owned()]),
-            resource_names: Some(vec![cdb.name_any()]),
-            resources: Some(vec!["coredbs".to_owned()]),
-            verbs: vec!["get".to_string(), "list".to_string(), "watch".to_string()],
-            ..PolicyRule::default()
-        },
-        // This policy allows get, patch, update, watch access to the coredb/status resource
-        PolicyRule {
-            api_groups: Some(vec!["coredb.io".to_owned()]),
-            resource_names: Some(vec![cdb.name_any()]),
-            resources: Some(vec!["coredbs/status".to_owned()]),
-            verbs: vec![
-                "get".to_string(),
-                "patch".to_string(),
-                "update".to_string(),
-                "watch".to_string(),
-            ],
-            ..PolicyRule::default()
-        },
-        // This policy allows get, watch access to a secret in the namespace
-        PolicyRule {
-            api_groups: Some(vec!["".to_owned()]),
-            resource_names: Some(vec![format!("{}-connection", cdb.name_any())]),
-            resources: Some(vec!["secrets".to_owned()]),
-            verbs: vec!["get".to_string(), "watch".to_string()],
-            ..PolicyRule::default()
-        },
-        // This policy for now is specifically open for all configmaps in the namespace
-        // We currently do not have any configmaps
-        PolicyRule {
-            api_groups: Some(vec!["".to_owned()]),
-            resources: Some(vec!["configmaps".to_owned()]),
-            verbs: vec!["get".to_string(), "watch".to_string()],
-            ..PolicyRule::default()
-        },
-    ]
+    Ok(rb)
 }

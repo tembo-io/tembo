@@ -140,12 +140,12 @@ impl ConfigValue {
 }
 
 pub fn merge_pg_configs(
-    vec1: &Vec<PgConfig>,
-    vec2: &Vec<PgConfig>,
+    vec1: &[PgConfig],
+    vec2: &[PgConfig],
     name: &str,
 ) -> Result<Option<PgConfig>, MergeError> {
-    let config1 = vec1.clone().into_iter().find(|config| config.name == name);
-    let config2 = vec2.clone().into_iter().find(|config| config.name == name);
+    let config1 = vec1.iter().cloned().find(|config| config.name == name);
+    let config2 = vec2.iter().cloned().find(|config| config.name == name);
     match (config1, config2) {
         (Some(mut c1), Some(c2)) => match c1.value.combine(c2.value) {
             Ok(combined_value) => {

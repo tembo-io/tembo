@@ -20,7 +20,7 @@ mod test {
     };
     use k8s_openapi::{
         api::{
-            apps::v1::StatefulSet,
+            apps::v1::{Deployment, StatefulSet},
             batch::v1::CronJob,
             core::v1::{
                 Container, Namespace, PersistentVolumeClaim, Pod, PodSpec, ResourceRequirements, Secret,
@@ -223,8 +223,35 @@ mod test {
         });
         println!("Found pod ready: {}", pod_name);
 
+        // assert for postgres-exporter secret to be created
+        let exporter_name = format!("{}-metrics", name);
+        let exporter_secret_name = exporter_name.clone();
+        let exporter_secret = secret_api.get(&exporter_secret_name).await;
+        match exporter_secret {
+            Ok(secret) => {
+                // assert for non-empty data in the secret
+                assert!(
+                    secret.data.map_or(false, |data| !data.is_empty()),
+                    "postgres-exporter secret is empty!"
+                );
+            }
+            Err(e) => panic!("Error getting postgres-exporter secret: {}", e),
+        }
+
+        // assert that the postgres-exporter deployment was created
+        let deploy_api: Api<Deployment> = Api::namespaced(client.clone(), namespace);
+        let exporter_deployment = deploy_api.get(exporter_name.clone().as_str()).await;
+        assert!(
+            exporter_deployment.is_ok(),
+            "postgres-exporter Deployment does not exist: {:?}",
+            exporter_deployment.err()
+        );
+
         // assert custom queries made it to metric server
         let pods: Api<Pod> = Api::namespaced(client.clone(), namespace);
+        let lp = ListParams::default().labels(format!("app={}", exporter_name.clone()).as_str());
+        let exporter_pods = pods.list(&lp).await.expect("could not get pods");
+        let exporter_pod_name = exporter_pods.items[0].metadata.name.as_ref();
         let c = vec![
             "wget".to_owned(),
             "-qO-".to_owned(),
@@ -233,7 +260,7 @@ mod test {
         thread::sleep(Duration::from_millis(10000));
         let result_stdout = run_command_in_container(
             pods.clone(),
-            pod_name.clone(),
+            exporter_pod_name.unwrap().to_string(),
             c,
             Some("postgres-exporter".to_string()),
         )
@@ -951,7 +978,7 @@ mod test {
         let coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
 
         // give it time to stop
-        thread::sleep(Duration::from_millis(8000));
+        thread::sleep(Duration::from_millis(30000));
 
         // pod must not be ready
         let res = coredb_resource.primary_pod(client.clone()).await;

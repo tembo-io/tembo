@@ -3,14 +3,14 @@ use thiserror::Error;
 #[derive(Error, Debug)]
 pub enum OperatorError {
     #[error("An IngressRouteTCP did not have a name")]
-    IngressRouteTCPNameError,
+    IngressRouteTCPName,
 
     #[error("An IngressRouteTCP failed to update")]
-    IngressRouteTCPUpdateError,
+    IngressRouteTCPUpdate,
 
     #[error("An IngressRouteTCP failed to create")]
-    IngressRouteTCPCreateError,
+    IngressRouteTCPCreate,
 
-    #[error("KubeError: {0}")]
-    KubeError(#[from] kube::Error),
+    #[error("KubeErr: {0}")]
+    KubeErr(#[from] kube::Error),
 }
