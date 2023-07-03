@@ -29,7 +29,7 @@ jobs:
           # This allows for filtering out unchanged directories
           # in a pull request, and using all directories on the release
           # or main branches.
-          changed_relative_to_branch: ${{ github.base_ref || 'not-a-branch' }}
+          changed_relative_to_ref: origin/${{ github.base_ref || 'not-a-branch' }}
 
 
   cargo_publish:
