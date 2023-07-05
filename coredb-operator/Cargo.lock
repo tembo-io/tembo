@@ -30,7 +30,7 @@ dependencies = [
  "actix-service",
  "actix-utils",
  "ahash 0.8.2",
- "base64 0.21.0",
+ "base64 0.21.2",
  "bitflags",
  "brotli",
  "bytes",
@@ -369,9 +369,9 @@ checksum = "0ea22880d78093b0cbe17c89f64a7d457941e65759157ec6cb31a31d652b05e5"
 
 [[package]]
 name = "base64"
-version = "0.21.0"
+version = "0.21.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4a4ddaa51a5bc52a6948f74c06d20aaaddb71924eab79b8c97a8c556e942d6a"
+checksum = "604178f6c5c21f02dc555784810edfb88d34ac2c73b2eae109655649ee73ce3d"
 
 [[package]]
 name = "bitflags"
@@ -483,6 +483,7 @@ version = "0.0.1"
 dependencies = [
  "actix-web",
  "assert-json-diff",
+ "base64 0.21.2",
  "chrono",
  "futures",
  "http",
@@ -2495,7 +2496,7 @@ checksum = "3082666a3a6433f7f511c7192923fa1fe07c69332d3c6a2e6bb040b569199d5a"
 dependencies = [
  "async-trait",
  "axum",
- "base64 0.21.0",
+ "base64 0.21.2",
  "bytes",
  "futures-core",
  "futures-util",
