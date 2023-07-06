@@ -30,6 +30,36 @@ pub fn pg_later_exec(query: &str) -> Result<i64, spi::Error> {
     Ok(msg_id)
 }
 
+// get the resultset of a previously submitted query
+#[pg_extern]
+fn pg_later_results(job_id: i64) -> Result<Option<pgrx::JsonB>, spi::Error> {
+    let query = format!(
+        "select * from pgmq_pg_later_results
+        where message->>'job_id' = '{job_id}'
+        "
+    );
+    let results: Result<Option<pgrx::JsonB>, spi::Error> = Spi::connect(|mut client| {
+        let mut tup_table: SpiTupleTable = client.update(&query, None, None)?;
+        if let Some(row) = tup_table.next() {
+            let message = row["message"].value::<pgrx::JsonB>()?.expect("no message");
+            return Ok(Some(message));
+        }
+        Ok(None)
+    });
+    let query_resultset = match results {
+        Ok(Some(r)) => r,
+        Ok(None) => {
+            return Ok(None);
+        }
+        _ => {
+            return Err(spi::Error::CursorNotFound(
+                "failed to execute query".to_owned(),
+            ));
+        }
+    };
+    Ok(Some(query_resultset))
+}
+
 // gets a job query from the queue
 pub fn get_job(timeout: i64) -> Option<(i64, String)> {
     let job = poll_queue(timeout).expect("failed");
@@ -66,18 +96,18 @@ fn poll_queue(timeout: i64) -> Result<Option<Vec<(i64, pgrx::JsonB)>>, spi::Erro
 }
 
 // #[pg_extern]
-pub fn exec_to_table(
-    query: &str,
-) -> Result<TableIterator<'static, (name!(query, String), name!(results, pgrx::JsonB))>, spi::Error>
-{
-    let resultset = query_to_json(query)?;
-    Ok(TableIterator::new(resultset.into_iter()))
-}
+// pub fn exec_to_table(
+//     query: &str,
+// ) -> Result<TableIterator<'static, (name!(query, String), name!(results, pgrx::JsonB))>, spi::Error>
+// {
+//     let resultset = query_to_json(query)?;
+//     Ok(TableIterator::new(resultset.into_iter()))
+// }
 
 use std::panic::{self};
 
-pub fn query_to_json(query: &str) -> Result<Vec<(String, pgrx::JsonB)>, spi::Error> {
-    let mut results: Vec<(String, pgrx::JsonB)> = Vec::new();
+pub fn query_to_json(query: &str) -> Result<Vec<pgrx::JsonB>, spi::Error> {
+    let mut results: Vec<pgrx::JsonB> = Vec::new();
     log!("executing query: {query}");
     let queried = panic::catch_unwind(panic::AssertUnwindSafe(|| {
         let queried: Result<(), spi::Error> = Spi::connect(|mut client| {
@@ -88,7 +118,7 @@ pub fn query_to_json(query: &str) -> Result<Vec<(String, pgrx::JsonB)>, spi::Err
                     .value::<pgrx::JsonB>()
                     .expect("failed parsing as json")
                     .expect("no results from query");
-                results.push(("query".to_owned(), r));
+                results.push(r);
             }
             Ok(())
         });
