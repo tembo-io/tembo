@@ -3,6 +3,7 @@ use pgrx::prelude::*;
 pgrx::pg_module_magic!();
 
 mod api;
+mod bgw;
 
 #[cfg(any(test, feature = "pg_test"))]
 #[pg_schema]
