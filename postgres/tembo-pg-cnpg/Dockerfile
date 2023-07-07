@@ -1,6 +1,6 @@
 FROM rust:1.70-bookworm as builder
 
-ARG TRUNK_VER=0.6.1
+ARG TRUNK_VER=0.8.0
 
 ENV CARGO_REGISTRIES_CRATES_IO_PROTOCOL sparse 
 RUN cargo install --version $TRUNK_VER pg-trunk
@@ -26,6 +26,9 @@ RUN set -xe; \
   apt-get autoremove -y; \
   apt-get clean; \
 	rm -rf /var/lib/apt/lists/*;
+
+# Install pg_stat_statements
+RUN trunk install pg_stat_statements
 
 # Revert the postgres user to id 26
 RUN usermod -u 26 postgres
