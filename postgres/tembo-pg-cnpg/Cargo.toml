@@ -1,6 +1,6 @@
 [package]
 name = "tembo-pg-cnpg"
-version = "15.3.0-2"
+version = "15.3.0-3"
 edition = "2021"
 authors = ["tembo.io"]
 description = "Container image for Tembo's distribution of postgres"
