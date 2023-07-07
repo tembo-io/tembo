@@ -46,6 +46,7 @@ pub fn create_init_container(config: &Config) -> Container {
             "/bin/bash".to_string(),
             "-c".to_string(),
             "if [ -d /var/lib/postgresql/data/tembo ]; then if [ -z \"$(ls -A /var/lib/postgresql/data/tembo)\" ]; then cp -Rp /tmp/pg_sharedir/. /var/lib/postgresql/data/tembo; fi; else mkdir -p /var/lib/postgresql/data/tembo && cp -Rp /tmp/pg_sharedir/. /var/lib/postgresql/data/tembo; fi".to_string(),
+            "if [-d /var/lib/postgresql/data/lost+found ]; then rmdir /var/lib/postgresql/data/lost+found; fi".to_string(),
         ]),
         security_context: Some(security_context),
         volume_mounts: Some(volume_mounts),
