@@ -65,20 +65,23 @@ impl ExecCommand {
         match status.status.expect("no status reported").as_str() {
             "Success" => Ok(response),
             "Failure" => {
-                error!("Error executing command: {:?}. response: {:?}", command, response);
+                error!(
+                    "Error executing command: {:?} on pod: {:?}. response: {:?}",
+                    command, self.pod_name, response
+                );
                 Err(Error::KubeExecError(format!(
-                    "Error executing command: {:?}. response: {:?}",
-                    command, response
+                    "Error executing command: {:?} on pod: {:?}. response: {:?}",
+                    command, self.pod_name, response
                 )))
             }
             _ => {
                 error!(
-                    "Undefined response from kube API {:?}, command: {:?}",
-                    response, command
+                    "Undefined response from kube API {:?}, pod: {:?}, command: {:?}",
+                    response, self.pod_name, command
                 );
                 Err(Error::KubeExecError(format!(
-                    "Error executing command: {:?}. response: {:?}",
-                    command, response
+                    "Error executing command: {:?} on pod: {:?}. response: {:?}",
+                    command, self.pod_name, response
                 )))
             }
         }

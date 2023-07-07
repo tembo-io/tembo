@@ -1,5 +1,7 @@
+use crate::Context;
 use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::Status};
-use kube::{api::Api, client::Client, core::subresource::AttachParams};
+use kube::{api::Api, core::subresource::AttachParams};
+use std::sync::Arc;
 use tokio::io::AsyncReadExt;
 
 pub struct PsqlOutput {
@@ -32,9 +34,9 @@ impl PsqlCommand {
         namespace: String,
         command: String,
         database: String,
-        client: Client,
+        context: Arc<Context>,
     ) -> Self {
-        let pods_api: Api<Pod> = Api::namespaced(client, &namespace);
+        let pods_api: Api<Pod> = Api::namespaced(context.client.clone(), &namespace);
         Self {
             pod_name,
             pods_api,

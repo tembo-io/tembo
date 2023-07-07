@@ -18,7 +18,7 @@ mod cronjob;
 pub mod defaults;
 mod errors;
 
-#[allow(unused_imports)] mod cnpg;
+pub mod cloudnativepg;
 mod deployment_postgres_exporter;
 #[cfg(test)] pub mod fixtures;
 mod ingress;

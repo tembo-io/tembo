@@ -24,7 +24,11 @@ use std::{collections::BTreeMap, sync::Arc};
 
 const PROM_CFG_DIR: &str = "/prometheus";
 
-pub async fn reconcile_prometheus_exporter(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
+pub async fn reconcile_prometheus_exporter(
+    cdb: &CoreDB,
+    ctx: Arc<Context>,
+    cnpg_enabled: bool,
+) -> Result<(), Error> {
     let client = ctx.client.clone();
     let ns = cdb.namespace().unwrap();
     let name = format!("{}-metrics", cdb.name_any());
@@ -34,6 +38,15 @@ pub async fn reconcile_prometheus_exporter(cdb: &CoreDB, ctx: Arc<Context>) -> R
     labels.insert("app".to_owned(), "postgres-exporter".to_string());
     labels.insert("component".to_owned(), "metrics".to_string());
     labels.insert("coredb.io/name".to_owned(), cdb.name_any());
+
+    // Format the postgres-exporter connection URI
+    // Check if cnpg is enabled, if so then set the URI to the cnpg service
+    // Otherwise, use the old coredb service
+    let psql_uri: String = if !cnpg_enabled {
+        format!("{}.{}.svc.cluster.local:5432/postgres", cdb.name_any(), ns)
+    } else {
+        format!("{}-rw.{}.svc.cluster.local:5432/postgres", cdb.name_any(), ns)
+    };
 
     // reconcile rbac(service account, role, role binding) for the postgres-exporter
     let rbac = reconcile_rbac(
@@ -90,11 +103,7 @@ pub async fn reconcile_prometheus_exporter(cdb: &CoreDB, ctx: Arc<Context>) -> R
     let env_vars = vec![
         EnvVar {
             name: "DATA_SOURCE_URI".to_string(),
-            value: Some(format!(
-                "{}.{}.svc.cluster.local:5432/postgres",
-                cdb.name_any(),
-                ns
-            )),
+            value: Some(psql_uri.clone()),
             ..EnvVar::default()
         },
         EnvVar {
@@ -144,7 +153,7 @@ pub async fn reconcile_prometheus_exporter(cdb: &CoreDB, ctx: Arc<Context>) -> R
         containers: vec![Container {
             args: Some(vec!["--auto-discover-databases".to_string()]),
             env: Some(env_vars),
-            image: Some(default_postgres_exporter_image()),
+            image: Some(get_exporter_image(&cdb.clone())),
             name: "postgres-exporter".to_string(),
             ports: Some(container_port),
             readiness_probe: Some(readiness_probe),
@@ -203,4 +212,15 @@ async fn create_policy_rules(name: String) -> Vec<PolicyRule> {
             ..PolicyRule::default()
         },
     ]
+}
+
+fn get_exporter_image(cdb: &CoreDB) -> String {
+    // Check if cdb.spec.postgresExporterImage is set
+    // If so, use that image; otherwise, use the default
+    // image from default_postgres_exporter_image() function
+    if cdb.spec.postgresExporterImage.is_empty() {
+        default_postgres_exporter_image()
+    } else {
+        cdb.spec.postgresExporterImage.clone()
+    }
 }

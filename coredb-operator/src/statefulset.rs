@@ -1,4 +1,4 @@
-use crate::{apis::coredb_types::CoreDB, defaults::default_image, Context, Error, Result};
+use crate::{apis::coredb_types::CoreDB, defaults::default_image, Context, Result};
 use k8s_openapi::{
     api::{
         apps::v1::{StatefulSet, StatefulSetSpec},
@@ -17,6 +17,7 @@ use kube::{
 use std::{str, thread, time::Duration};
 
 use k8s_openapi::api::core::v1::{ConfigMapVolumeSource, EmptyDirVolumeSource, Volume};
+use kube::runtime::controller::Action;
 use std::{collections::BTreeMap, sync::Arc};
 use tracing::{debug, error, info, warn};
 
@@ -314,13 +315,17 @@ fn diff_pvcs(expected: &[String], actual: &[String]) -> Vec<String> {
     to_create
 }
 
-async fn list_pvcs(ctx: Arc<Context>, sts_name: &str, sts_namespace: &str) -> Result<Vec<String>, Error> {
+async fn list_pvcs(ctx: Arc<Context>, sts_name: &str, sts_namespace: &str) -> Result<Vec<String>, Action> {
     let label_selector = format!("statefulset={sts_name}");
     let list_params = ListParams::default().labels(&label_selector);
     let pvc_api: Api<PersistentVolumeClaim> = Api::namespaced(ctx.client.clone(), sts_namespace);
 
     // list all PVCs in namespace
-    let all_pvcs = pvc_api.list(&list_params).await?;
+    let all_pvcs = pvc_api.list(&list_params).await.map_err(|_e| {
+        error!("Failed to list pvcs of sts {}", &sts_name);
+        Action::requeue(Duration::from_secs(300))
+    })?;
+
     Ok(all_pvcs
         .into_iter()
         .map(|pvc| pvc.metadata.name.unwrap())
@@ -335,7 +340,7 @@ pub async fn handle_create_update(
     ctx: Arc<Context>,
     sts_namespace: &str,
     sts_name: &str,
-) -> Result<(), Error> {
+) -> Result<(), Action> {
     let client = ctx.client.clone();
     if !pvcs_to_update.is_empty() {
         delete_sts_no_cascade(&sts_api, sts_name).await?;
@@ -347,19 +352,22 @@ pub async fn handle_create_update(
 
     if !pvcs_to_create.is_empty() {
         delete_sts_no_cascade(&sts_api, sts_name).await?;
-        let primary_pod = cdb.primary_pod(client.clone()).await?;
+        let primary_pod = cdb.primary_pod_coredb(client.clone()).await?;
         let pod_api: Api<Pod> = Api::namespaced(client.clone(), sts_namespace);
-        let prim_pod_name = primary_pod
-            .metadata
-            .name
-            .ok_or(Error::PodError("pod missing".to_owned()))?;
+        let prim_pod_name = primary_pod.metadata.name.expect("Pod should always have a name");
         warn!("deleting pod to attach pvc: {}", prim_pod_name);
-        pod_api.delete(&prim_pod_name, &DeleteParams::default()).await?;
+        pod_api
+            .delete(&prim_pod_name, &DeleteParams::default())
+            .await
+            .map_err(|_e| {
+                error!("Failed to delete pod {}", &prim_pod_name);
+                Action::requeue(Duration::from_secs(30))
+            })?;
     }
     Ok(())
 }
 
-pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
+pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {
     let client = ctx.client.clone();
 
     let sts: StatefulSet = stateful_set_from_cdb(cdb);
@@ -436,11 +444,14 @@ pub async fn reconcile_sts(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error>
     let _o = sts_api
         .patch(&sts.clone().metadata.name.unwrap(), &ps, &Patch::Apply(&sts))
         .await
-        .map_err(Error::KubeError)?;
+        .map_err(|_e| {
+            error!("Failed to patch sts");
+            Action::requeue(Duration::from_secs(30))
+        })?;
     Ok(())
 }
 
-async fn delete_sts_no_cascade(sts_api: &Api<StatefulSet>, sts_name: &str) -> Result<(), Error> {
+async fn delete_sts_no_cascade(sts_api: &Api<StatefulSet>, sts_name: &str) -> Result<(), Action> {
     let delete_params: DeleteParams = DeleteParams {
         dry_run: false,
         grace_period_seconds: None,
@@ -448,10 +459,11 @@ async fn delete_sts_no_cascade(sts_api: &Api<StatefulSet>, sts_name: &str) -> Re
         preconditions: None,
     };
     info!("deleting_sts_no_cascade: {}", sts_name);
-    let _ = sts_api
-        .delete(sts_name, &delete_params)
-        .await
-        .map_err(Error::KubeError)?;
+    let _ = sts_api.delete(sts_name, &delete_params).await.map_err(|_e| {
+        // It is not expected to fail the query to the pods API
+        error!("Failed to delete --no-cascade sts {}", sts_name);
+        Action::requeue(Duration::from_secs(30))
+    })?;
     thread::sleep(Duration::from_millis(3000));
     Ok(())
 }
@@ -464,12 +476,15 @@ async fn update_pvc(
     pvc_api: &Api<PersistentVolumeClaim>,
     pvc_full_name: &str,
     value: Quantity,
-) -> Result<(), Error> {
+) -> Result<(), Action> {
     info!("Updating PVC {}, Value: {:?}", pvc_full_name, value);
     let mut pvc_requests: BTreeMap<String, Quantity> = BTreeMap::new();
     pvc_requests.insert("storage".to_string(), value);
 
-    let mut pvc = pvc_api.get(pvc_full_name).await?;
+    let mut pvc = pvc_api.get(pvc_full_name).await.map_err(|_e| {
+        error!("Failed to get pvc {}", pvc_full_name);
+        Action::requeue(Duration::from_secs(30))
+    })?;
 
     pvc.metadata.managed_fields = None;
 
@@ -492,7 +507,10 @@ async fn update_pvc(
     let _o = pvc_api
         .patch(pvc_full_name, &patch_params, &Patch::Apply(pvc))
         .await
-        .map_err(Error::KubeError);
+        .map_err(|_e| {
+            error!("Failed to patch pvc {}", pvc_full_name);
+            Action::requeue(Duration::from_secs(60))
+        })?;
     Ok(())
 }
 

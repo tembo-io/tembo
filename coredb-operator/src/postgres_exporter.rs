@@ -60,7 +60,9 @@ fn preserve_arbitrary(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::sc
     schemars::schema::Schema::Object(obj)
 }
 
+use kube::runtime::controller::Action;
 use std::str::FromStr;
+use tokio::time::Duration;
 
 #[derive(Clone, Debug, JsonSchema, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "UPPERCASE")]
@@ -89,25 +91,35 @@ pub async fn create_postgres_exporter_role(
     cdb: &CoreDB,
     ctx: Arc<Context>,
     secret: Option<PrometheusExporterSecretData>,
-) -> Result<(), Error> {
-    let client = ctx.client.clone();
+) -> Result<(), Action> {
     if !(cdb.spec.postgresExporterEnabled) {
         return Ok(());
     }
+
     debug!(
         "Creating postgres_exporter role for database {} in namespace {}",
-        cdb.metadata.name.clone().unwrap(),
-        cdb.metadata.namespace.clone().unwrap()
+        cdb.metadata
+            .name
+            .clone()
+            .expect("instance should always have a name"),
+        cdb.metadata
+            .namespace
+            .clone()
+            .expect("instance should always have a namespace")
     );
 
     // Check if secret data is available
     let password = match &secret {
         Some(data) => data.password.clone(),
         None => {
-            error!("No secret data available for postgres_exporter");
-            return Err(Error::MissingSecretError(
-                "No secret data available for postgres_exporter".to_owned(),
-            ));
+            error!(
+                "No secret data available for postgres_exporter in instance {}",
+                cdb.metadata
+                    .name
+                    .clone()
+                    .expect("instance should always have a name")
+            );
+            return Err(Action::requeue(Duration::from_secs(300)));
         }
     };
     // https://github.com/prometheus-community/postgres_exporter#running-as-non-superuser
@@ -135,8 +147,11 @@ pub async fn create_postgres_exporter_role(
         ",
         password
     );
-    let _ = cdb.psql(query, "postgres".to_owned(), client.clone()).await?;
-    Ok(())
+    let query_result = cdb.psql(query, "postgres".to_owned(), ctx.clone()).await;
+    match query_result {
+        Ok(_) => Ok(()),
+        Err(e) => Err(e),
+    }
 }
 
 pub async fn reconcile_prom_configmap(cdb: &CoreDB, client: Client, ns: &str) -> Result<(), Error> {

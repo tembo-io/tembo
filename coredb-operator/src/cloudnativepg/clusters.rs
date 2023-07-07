@@ -2,7 +2,7 @@
 // kopium command: kopium -D Default clusters.postgresql.cnpg.io
 // kopium version: 0.15.0
 
-use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
+use k8s_openapi::apimachinery::pkg::{api::resource::Quantity, util::intstr::IntOrString};
 use kube::CustomResource;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -1665,9 +1665,9 @@ pub struct ClusterResources {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub claims: Option<Vec<ClusterResourcesClaims>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub limits: Option<BTreeMap<String, IntOrString>>,
+    pub limits: Option<BTreeMap<String, Quantity>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub requests: Option<BTreeMap<String, IntOrString>>,
+    pub requests: Option<BTreeMap<String, Quantity>>,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
@@ -1978,7 +1978,7 @@ pub struct ClusterStatus {
     )]
     pub instances_reported_state: Option<BTreeMap<String, ClusterStatusInstancesReportedState>>,
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "instancesStatus")]
-    pub instances_status: Option<BTreeMap<String, String>>,
+    pub instances_status: Option<BTreeMap<String, Vec<String>>>,
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "jobCount")]
     pub job_count: Option<i32>,
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "lastFailedBackup")]
@@ -2041,6 +2041,8 @@ pub struct ClusterStatus {
     pub target_primary_timestamp: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "timelineID")]
     pub timeline_id: Option<i64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub topology: Option<ClusterStatusTopology>,
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "unusablePVC")]
     pub unusable_pvc: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "writeService")]
@@ -2194,3 +2196,18 @@ pub struct ClusterStatusSecretsResourceVersion {
     )]
     pub superuser_secret_version: Option<String>,
 }
+
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub struct ClusterStatusTopology {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub instances: Option<BTreeMap<String, ClusterStatusTopologyInstances>>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "successfullyExtracted"
+    )]
+    pub successfully_extracted: Option<bool>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default)]
+pub struct ClusterStatusTopologyInstances {}

@@ -13,10 +13,45 @@ generate-crd:
   cargo run --bin crdgen > ../charts/coredb-operator/templates/crd.yaml
 
 install-traefik:
-	helm repo add traefik https://traefik.github.io/charts
-	helm repo update
 	kubectl create namespace traefik || true
 	helm upgrade --install --namespace=traefik --values=./testdata/traefik-values.yaml traefik traefik/traefik
+
+install-kube-prometheus-stack:
+	kubectl create namespace monitoring || true
+	helm upgrade --install --namespace=monitoring monitoring prometheus-community/kube-prometheus-stack
+
+install-tembo-pod-init:
+	kubectl create namespace tembo-pod-init || true
+	helm upgrade --install \
+	  cert-manager jetstack/cert-manager \
+	  --namespace cert-manager \
+	  --create-namespace \
+	  --set installCRDs=true && \
+	helm upgrade --install --namespace=tembo-pod-init --set logLevel=debug --set image.tag=latest tembo-pod-init ../charts/tembo-pod-init
+
+install-cnpg:
+	helm upgrade --install cnpg \
+	  --namespace cnpg-system \
+	  --create-namespace \
+	  --set config.data.INHERITED_ANNOTATIONS="tembo-pod-init.tembo.io/*"  \
+	  cnpg/cloudnative-pg
+
+enable-cnpg-default-namespace:
+	kubectl label namespace default "tembo-pod-init.tembo.io/watch"="true"
+	kubectl delete pods -n tembo-pod-init --all
+
+connect-test-db:
+	echo "Please include a line in your /etc/hosts file: "
+	echo "127.0.0.1 test-coredb.localhost"
+	psql "postgres://postgres:$(kubectl get secrets -o json test-coredb-connection | jq -r '.data.password' | base64 --decode)@test-coredb.localhost:5432"
+
+
+update-helm-repos:
+	helm repo add cnpg https://cloudnative-pg.github.io/charts
+	helm repo add jetstack https://charts.jetstack.io
+	helm repo add traefik https://traefik.github.io/charts
+	helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+	helm repo update
 
 # generate and install crd into the cluster
 install-crd: generate-crd
@@ -30,24 +65,32 @@ delete-kind:
 start-kind:
 	kind delete cluster || true
 	kind create cluster --image=kindest/node:v{{KUBE_VERSION}} --config testdata/kind-config.yaml
-	sleep 10
-	kubectl wait pods --for=condition=Ready --timeout=300s --all --all-namespaces
+	just update-helm-repos
+	just install-kube-prometheus-stack
 	just install-traefik
 	just install-crd
+	just install-cnpg
+	just install-tembo-pod-init
 	just annotate
+	kubectl wait pods --for=condition=Ready --timeout=300s --all --all-namespaces
 
 # run with opentelemetry
 run-telemetry:
-  OPENTELEMETRY_ENDPOINT_URL=https://0.0.0.0:55680 RUST_LOG=info,kube=debug,controller=debug cargo run --features=telemetry
+  OPENTELEMETRY_ENDPOINT_URL=https://0.0.0.0:55680 RUST_LOG=info,kube=info,controller=info cargo run --features=telemetry
 
 # run without opentelemetry
 run:
-  RUST_LOG=debug,kube=debug,controller=debug cargo run
+  DATA_PLANE_BASEDOMAIN=localhost ENABLE_INITIAL_BACKUP=false RUST_LOG=info,kube=info,controller=info cargo run
 
 # annotate namespace to allow for tests
 annotate:
 	kubectl label namespace {{NAMESPACE}} safe-to-run-coredb-tests=true
+	kubectl create namespace cnpg-test || true
+	kubectl label namespace cnpg-test safe-to-run-coredb-tests=true
+	kubectl label namespace cnpg-test "tembo-pod-init.tembo.io/watch"="true"
+	kubectl delete pods -n tembo-pod-init --all
 	kubectl patch storageclass standard -p '{"allowVolumeExpansion": true}'
+
 
 # run tests
 test:
@@ -55,7 +98,7 @@ test:
 
 # run cargo watch
 watch:
-	ENABLE_INITIAL_BACKUP=false RUST_LOG=debug cargo watch -x 'run'
+	DATA_PLANE_BASEDOMAIN=localhost ENABLE_INITIAL_BACKUP=false RUST_LOG=debug,kube=debug,controller=debug cargo watch -x 'run'
 
 # format with nightly rustfmt
 fmt:
