@@ -1,4 +1,3 @@
-use crate::{telemetry, Error, Metrics, Result};
 use chrono::{DateTime, Utc};
 use futures::{
     future::{BoxFuture, FutureExt},
@@ -10,7 +9,7 @@ use crate::{
         coredb_types::{CoreDB, CoreDBStatus},
         postgres_parameters::reconcile_pg_parameters_configmap,
     },
-    cloudnativepg::cnpg::{cnpg_cluster_from_cdb, reconcile_cnpg},
+    cloudnativepg::cnpg::{cnpg_cluster_from_cdb, reconcile_cnpg, reconcile_cnpg_scheduled_backup},
     config::Config,
     cronjob::reconcile_cronjob,
     deployment_postgres_exporter::reconcile_prometheus_exporter,
@@ -23,6 +22,7 @@ use crate::{
     secret::{reconcile_postgres_exporter_secret, reconcile_secret, PrometheusExporterSecretData},
     service::reconcile_svc,
     statefulset::{reconcile_sts, stateful_set_from_cdb},
+    telemetry, Error, Metrics, Result,
 };
 use k8s_openapi::{
     api::{
@@ -319,6 +319,9 @@ impl CoreDB {
 
                 if cnpg_enabled {
                     reconcile_cnpg(self, ctx.clone()).await?;
+                    if cfg.enable_initial_backup {
+                        reconcile_cnpg_scheduled_backup(self, ctx.clone()).await?;
+                    }
                 }
 
                 let extensions: Vec<Extension> =
