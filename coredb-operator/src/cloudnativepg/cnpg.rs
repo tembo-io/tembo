@@ -255,7 +255,7 @@ pub fn cnpg_cluster_from_cdb(cdb: &CoreDB) -> Cluster {
             external_clusters,
             enable_superuser_access: Some(true),
             failover_delay: Some(0),
-            image_name: Some("quay.io/tembo/tembo-pg-cnpg:15.3.0-2-48fd1ce".to_string()),
+            image_name: Some("quay.io/tembo/tembo-pg-cnpg:15.3.0-3-f857ab0".to_string()),
             instances: 1,
             log_level: Some(ClusterLogLevel::Info),
             max_sync_replicas: Some(0),
@@ -460,7 +460,6 @@ pub async fn reconcile_cnpg_scheduled_backup(cdb: &CoreDB, ctx: Arc<Context>) ->
         .clone()
         .expect("ScheduledBackup should always have a namespace");
     let backup_api: Api<ScheduledBackup> = Api::namespaced(client.clone(), namespace.as_str());
-
 
     debug!("Patching ScheduledBackup");
     let ps = PatchParams::apply("cntrlr");
