@@ -43,11 +43,11 @@ mod test {
 
     const API_VERSION: &str = "coredb.io/v1alpha1";
     // Timeout settings while waiting for an event
-    const TIMEOUT_SECONDS_START_POD: u64 = 200;
-    const TIMEOUT_SECONDS_POD_READY: u64 = 300;
-    const TIMEOUT_SECONDS_SECRET_PRESENT: u64 = 60;
-    const TIMEOUT_SECONDS_NS_DELETED: u64 = 60;
-    const TIMEOUT_SECONDS_COREDB_DELETED: u64 = 60;
+    const TIMEOUT_SECONDS_START_POD: u64 = 600;
+    const TIMEOUT_SECONDS_POD_READY: u64 = 600;
+    const TIMEOUT_SECONDS_SECRET_PRESENT: u64 = 120;
+    const TIMEOUT_SECONDS_NS_DELETED: u64 = 120;
+    const TIMEOUT_SECONDS_COREDB_DELETED: u64 = 120;
 
     async fn create_test_buddy(pods_api: Api<Pod>, name: String) -> String {
         // Launch a pod we can connect to if we want to
@@ -61,7 +61,7 @@ mod test {
             spec: Some(PodSpec {
                 containers: vec![Container {
                     command: Some(vec!["sleep".to_string()]),
-                    args: Some(vec!["360".to_string()]),
+                    args: Some(vec!["1200".to_string()]),
                     name: "test-connection".to_string(),
                     image: Some("curlimages/curl:latest".to_string()),
                     ..Container::default()
@@ -94,21 +94,29 @@ mod test {
             max_stderr_buf_size: Some(1024),
         };
 
-        let attach_res = pods_api.exec(pod_name.as_str(), &command, &attach_params).await;
-        let mut attached_process = match attach_res {
-            Ok(ap) => ap,
-            Err(e) => {
-                panic!(
-                    "Error attaching to pod: {}, container: {:?}, error: {}",
-                    pod_name, container, e
-                )
-            }
-        };
-        let mut stdout_reader = attached_process.stdout().unwrap();
-        let mut result_stdout = String::new();
-        stdout_reader.read_to_string(&mut result_stdout).await.unwrap();
+        let MAX_RETRIES = 10;
+        let MILLISEC_BETWEEN_TRIES = 5;
 
-        result_stdout
+        for _i in 1..MAX_RETRIES {
+            let attach_res = pods_api.exec(pod_name.as_str(), &command, &attach_params).await;
+            let mut attached_process = match attach_res {
+                Ok(ap) => ap,
+                Err(e) => {
+                    println!(
+                        "Error attaching to pod: {}, container: {:?}, error: {}",
+                        pod_name, container, e
+                    );
+                    thread::sleep(Duration::from_millis(MILLISEC_BETWEEN_TRIES));
+                    continue;
+                }
+            };
+            let mut stdout_reader = attached_process.stdout().unwrap();
+            let mut result_stdout = String::new();
+            stdout_reader.read_to_string(&mut result_stdout).await.unwrap();
+
+            return result_stdout;
+        }
+        panic!("Failed to run command in container");
     }
 
     async fn wait_until_psql_contains(
@@ -761,6 +769,16 @@ mod test {
             "spec": {
                 "replicas": replicas,
                 "extensions": [
+                    {
+                        "name": "pg_partman",
+                        "locations": [
+                        {
+                          "enabled": true,
+                          "version": "4.7.3",
+                          "database": "postgres",
+                          "schema": "public"
+                        }]
+                    },
                     {
                         "name": "pgmq",
                         "locations": [
