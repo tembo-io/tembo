@@ -94,10 +94,10 @@ mod test {
             max_stderr_buf_size: Some(1024),
         };
 
-        let MAX_RETRIES = 10;
-        let MILLISEC_BETWEEN_TRIES = 5;
+        let max_retries = 10;
+        let millisec_between_tries = 5;
 
-        for _i in 1..MAX_RETRIES {
+        for _i in 1..max_retries {
             let attach_res = pods_api.exec(pod_name.as_str(), &command, &attach_params).await;
             let mut attached_process = match attach_res {
                 Ok(ap) => ap,
@@ -106,7 +106,7 @@ mod test {
                         "Error attaching to pod: {}, container: {:?}, error: {}",
                         pod_name, container, e
                     );
-                    thread::sleep(Duration::from_millis(MILLISEC_BETWEEN_TRIES));
+                    thread::sleep(Duration::from_millis(millisec_between_tries));
                     continue;
                 }
             };

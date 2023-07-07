@@ -869,32 +869,20 @@ mod tests {
         let (backup, service_account_template) = cnpg_backup_configuration(&cdb);
 
         // Assert to make sure that backup schedule is set
-        assert_eq!(
-            scheduled_backup.spec.to_owned().schedule,
-            "55 7 * * *".to_string()
-        );
+        assert_eq!(scheduled_backup.spec.schedule, "55 7 * * *".to_string());
 
         // Assert to make sure that backup destination path is set
         assert_eq!(
-            backup
-                .to_owned()
-                .unwrap()
-                .barman_object_store
-                .to_owned()
-                .unwrap()
-                .destination_path,
+            backup.unwrap().barman_object_store.unwrap().destination_path,
             "s3://aws-s3-bucket/tembo/backup".to_string()
         );
 
         // Assert to make sure that service account template is set
         assert_eq!(
             service_account_template
-                .to_owned()
                 .unwrap()
                 .metadata
-                .to_owned()
                 .annotations
-                .to_owned()
                 .unwrap()
                 .get("eks.amazonaws.com/role-arn")
                 .unwrap(),
