@@ -30,6 +30,11 @@ RUN set -xe; \
 # Install pg_stat_statements
 RUN trunk install pg_stat_statements
 
+# cache pg_stat_statements to temp directory
+RUN set -eux; \
+      cp -r $(pg_config --pkglibdir)/* /tmp/pg_pkglibdir; \
+      cp -r $(pg_config --sharedir)/* /tmp/pg_sharedir
+
 # Revert the postgres user to id 26
 RUN usermod -u 26 postgres
 USER 26
