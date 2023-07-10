@@ -82,6 +82,7 @@ WORKDIR /
 RUN rm -rf /git
 
 RUN trunk install --version ${PG_PARTMAN_VER} pg_partman
+RUN trunk install --version 2.2.1 pg_stat_kcache
 
 # cache extensions and shared libraries
 RUN mkdir /tmp/pg_sharedir && \
