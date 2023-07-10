@@ -29,6 +29,7 @@ RUN set -xe; \
 
 # Install pg_stat_statements
 RUN trunk install pg_stat_statements
+RUN trunk install auto_explain
 
 # cache pg_stat_statements to temp directory
 RUN set -eux; \
