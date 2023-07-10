@@ -255,7 +255,7 @@ pub fn cnpg_cluster_from_cdb(cdb: &CoreDB) -> Cluster {
             external_clusters,
             enable_superuser_access: Some(true),
             failover_delay: Some(0),
-            image_name: Some("quay.io/tembo/tembo-pg-cnpg:15.3.0-4-878d4ce".to_string()),
+            image_name: Some("quay.io/tembo/tembo-pg-cnpg:15.3.0-5-76a65c3".to_string()),
             instances: 1,
             log_level: Some(ClusterLogLevel::Info),
             max_sync_replicas: Some(0),
