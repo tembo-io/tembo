@@ -46,15 +46,25 @@ impl NamespaceWatcher {
         while let Some(status) = stream.try_next().await? {
             debug!("Got event: {:?}", status);
             match status {
-                WatchEvent::Added(ns) => {
+                WatchEvent::Added(ns) | WatchEvent::Modified(ns) => {
                     let name = ns.metadata.name.clone().unwrap();
-                    namespaces.write().await.insert(name.clone());
-                    debug!("Added namespace: {}", name);
-                }
-                WatchEvent::Modified(ns) => {
-                    let name = ns.metadata.name.clone().unwrap();
-                    namespaces.write().await.remove(&name.clone());
-                    debug!("Modified namespace: {}", name);
+                    if ns.metadata.labels.is_some()
+                        && ns
+                            .metadata
+                            .labels
+                            .clone()
+                            .expect("expected to find labels")
+                            .contains_key(&self.config.namespace_label)
+                        && ns.metadata.labels.expect("expected to find labels")
+                            [&self.config.namespace_label]
+                            == "true"
+                    {
+                        debug!("Added namespace: {}", name.clone());
+                        namespaces.write().await.insert(name.clone());
+                    } else {
+                        debug!("Deleted namespace: {}", name.clone());
+                        namespaces.write().await.remove(&name.clone());
+                    }
                 }
                 WatchEvent::Deleted(ns) => {
                     let name = ns.metadata.name.clone().unwrap();
