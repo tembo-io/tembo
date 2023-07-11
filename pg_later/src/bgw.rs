@@ -21,7 +21,6 @@ pub extern "C" fn _PG_init() {
 #[pg_guard]
 #[no_mangle]
 pub extern "C" fn background_worker_main(_arg: pg_sys::Datum) {
-    // let arg = unsafe { i32::from_polymorphic_datum(arg, false, pg_sys::INT4OID) };
 
     BackgroundWorker::attach_signal_handlers(SignalWakeFlags::SIGHUP | SignalWakeFlags::SIGTERM);
 
