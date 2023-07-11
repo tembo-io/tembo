@@ -13,7 +13,6 @@ pub extern "C" fn _PG_init() {
     BackgroundWorkerBuilder::new("PG Later Background Worker")
         .set_function("background_worker_main")
         .set_library("pg_later")
-        // .set_argument(42i32.into_datum())
         .enable_spi_access()
         .load();
 }
