@@ -21,3 +21,6 @@ rules:
   - apiGroups: ["networking.k8s.io"]
     resources: ["ingresses", "networkpolicies"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["postgresql.cnpg.io"]
+    resources: ["backups", "clusters", "poolers", "scheduledbackups"]
+    verbs: ["get", "list", "watch", "update", "patch"]
