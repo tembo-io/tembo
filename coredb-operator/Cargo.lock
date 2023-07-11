@@ -499,6 +499,7 @@ dependencies = [
  "rand",
  "regex",
  "schemars",
+ "semver",
  "serde",
  "serde_json",
  "serde_yaml 0.9.19",

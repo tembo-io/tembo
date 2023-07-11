@@ -4,6 +4,7 @@ use kube::{api::Api, runtime::controller::Action};
 use lazy_static::lazy_static;
 use regex::Regex;
 use schemars::JsonSchema;
+use semver::Comparator;
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{HashMap, HashSet},
@@ -423,11 +424,56 @@ fn extension_plan(have_changed: &[Extension], actual: &[Extension]) -> (Vec<Exte
                                 changed.push(extension_desired.clone());
                                 break 'loc;
                             }
-                            if loc_desired.version != loc_actual.version {
+
+                            // Never need to install disabled extensions
+                            if !loc_desired.enabled {
                                 debug!("desired: {:?}, actual: {:?}", extension_desired, extension_actual);
-                                to_install.push(extension_desired.clone());
                                 break 'loc;
                             }
+
+                            if loc_desired.version.is_some() {
+                                let desired_version = Comparator::parse(
+                                    &loc_desired
+                                        .version
+                                        .clone()
+                                        .expect("Expected to find desired version"),
+                                )
+                                .expect("Failed to parse version into semver");
+                                if loc_actual.version.is_some() {
+                                    let actual_version = Comparator::parse(
+                                        &loc_actual
+                                            .version
+                                            .clone()
+                                            .expect("Expected to find desired version"),
+                                    )
+                                    .expect("Failed to parse version into semver");
+                                    // If the major and minor versions do not match, then we need to install the extension
+                                    if desired_version.major != actual_version.major
+                                        || desired_version.minor != actual_version.minor
+                                    {
+                                        debug!(
+                                            "desired: {:?}, actual: {:?}",
+                                            extension_desired, extension_actual
+                                        );
+                                        to_install.push(extension_desired.clone());
+                                        break 'loc;
+                                    }
+                                    // If the patch version exists on both and does not match, then we need to install the extension
+                                    if desired_version.patch.is_some()
+                                        && actual_version.patch.is_some()
+                                        && desired_version.patch != actual_version.patch
+                                    {
+                                        debug!(
+                                            "desired: {:?}, actual: {:?}",
+                                            extension_desired, extension_actual
+                                        );
+                                        to_install.push(extension_desired.clone());
+                                        break 'loc;
+                                    }
+                                } else {
+                                    warn!("We desire a specific version of an extension {}, but the actual extension is not versioned. Skipping.", extension_desired.name);
+                                }
+                            } // Else, if the desired does not have a version and we already detected matching name, then do nothing
                         }
                     }
                 }
@@ -529,6 +575,37 @@ mod tests {
         assert!(changed.is_empty());
         assert!(to_install.is_empty());
     }
+
+    #[test]
+    fn test_extension_version_compare() {
+        let pg_stat_statements_no_patch = Extension {
+            name: "pg_stat_statements".to_owned(),
+            description: Some("my description".to_owned()),
+            locations: vec![ExtensionInstallLocation {
+                enabled: true,
+                database: "postgres".to_owned(),
+                schema: "public".to_owned(),
+                version: Some("1.10".to_owned()),
+            }],
+        };
+
+        let pg_stat_statements_with_patch = Extension {
+            name: "pg_stat_statements".to_owned(),
+            description: Some("my description".to_owned()),
+            locations: vec![ExtensionInstallLocation {
+                enabled: true,
+                database: "postgres".to_owned(),
+                schema: "public".to_owned(),
+                version: Some("1.10.0".to_owned()),
+            }],
+        };
+        let diff = vec![pg_stat_statements_with_patch];
+        let actual = vec![pg_stat_statements_no_patch];
+        let (changed, to_install) = extension_plan(&diff, &actual);
+        assert!(changed.is_empty());
+        assert!(to_install.is_empty());
+    }
+
     #[test]
     fn test_diff_and_plan() {
         let postgis_disabled = Extension {

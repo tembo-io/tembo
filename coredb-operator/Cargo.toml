@@ -47,6 +47,7 @@ regex = "1.7.1"
 lazy_static = "1.4.0"
 itertools = "0.11.0"
 base64 = "0.21.2"
+semver = "1.0.17"
 
 [dev-dependencies]
 assert-json-diff = "2.0.2"
