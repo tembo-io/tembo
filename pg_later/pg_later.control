@@ -1,0 +1,6 @@
+comment = 'pg_later:  Run queries now and get results later'
+default_version = '@CARGO_VERSION@'
+module_pathname = '$libdir/pg_later'
+relocatable = false
+superuser = true
+requires = 'pgmq'
