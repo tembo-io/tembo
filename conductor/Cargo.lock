@@ -30,7 +30,7 @@ dependencies = [
  "actix-service",
  "actix-utils",
  "ahash 0.8.3",
- "base64 0.21.0",
+ "base64 0.21.2",
  "bitflags",
  "brotli",
  "bytes",
@@ -616,9 +616,9 @@ checksum = "0ea22880d78093b0cbe17c89f64a7d457941e65759157ec6cb31a31d652b05e5"
 
 [[package]]
 name = "base64"
-version = "0.21.0"
+version = "0.21.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4a4ddaa51a5bc52a6948f74c06d20aaaddb71924eab79b8c97a8c556e942d6a"
+checksum = "604178f6c5c21f02dc555784810edfb88d34ac2c73b2eae109655649ee73ce3d"
 
 [[package]]
 name = "base64-simd"
@@ -750,7 +750,7 @@ version = "0.1.0"
 dependencies = [
  "aws-config",
  "aws-sdk-cloudformation",
- "base64 0.21.0",
+ "base64 0.21.2",
  "chrono",
  "controller",
  "env_logger",
@@ -773,6 +773,7 @@ name = "controller"
 version = "0.0.1"
 dependencies = [
  "actix-web",
+ "base64 0.21.2",
  "chrono",
  "futures",
  "itertools 0.11.0",
@@ -784,6 +785,7 @@ dependencies = [
  "prometheus",
  "regex",
  "schemars",
+ "semver",
  "serde",
  "serde_json",
  "serde_yaml 0.9.21",
@@ -2473,7 +2475,7 @@ version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d194b56d58803a43635bdc398cd17e383d6f71f9182b9a192c127ca42494a59b"
 dependencies = [
- "base64 0.21.0",
+ "base64 0.21.2",
 ]
 
 [[package]]

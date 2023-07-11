@@ -1,0 +1,6 @@
+env:
+  - name: ENABLE_INITIAL_BACKUP
+    value: "false"
+  - name: RUST_LOG
+    value: debug,kube=debug,controller=debug
+

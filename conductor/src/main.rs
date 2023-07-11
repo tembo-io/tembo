@@ -2,7 +2,8 @@ use conductor::errors::ConductorError;
 use conductor::{
     create_cloudformation, create_namespace, create_networkpolicy, create_or_update, delete,
     delete_cloudformation, delete_namespace, extensions::extension_plan, generate_rand_schedule,
-    generate_spec, get_coredb_status, get_pg_conn, lookup_role_arn, restart_statefulset, types,
+    generate_spec, get_coredb_status, get_pg_conn, lookup_role_arn, restart_cnpg,
+    restart_statefulset, types,
 };
 use controller::apis::coredb_types::{Backup, CoreDBSpec, ServiceAccountTemplate};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
@@ -384,6 +385,13 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                     Ok(_) => {}
                     Err(err) => {
                         error!("error restarting statefulset: {:?}", err);
+                        continue;
+                    }
+                }
+                match restart_cnpg(client.clone(), &namespace, &namespace).await {
+                    Ok(_) => {}
+                    Err(err) => {
+                        error!("error restarting cnpg: {:?}", err);
                         continue;
                     }
                 }

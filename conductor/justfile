@@ -1,3 +1,4 @@
+NAME := "conductor"
 VERSION := `git rev-parse HEAD`
 SEMVER_VERSION := `grep version Cargo.toml | awk -F"\"" '{print $2}' | head -n 1`
 NAMESPACE := "default"
@@ -8,21 +9,60 @@ default:
   @just --list --unsorted --color=always | rg -v "    default"
 
 install-traefik:
-	helm repo add traefik https://traefik.github.io/charts
-	helm repo update
 	kubectl create namespace traefik || true
-	helm upgrade --install --namespace=traefik --values=../coredb-operator/testdata/traefik-values.yaml traefik traefik/traefik
+	helm upgrade --install --namespace=traefik --values=./testdata/traefik-values.yaml traefik traefik/traefik
 
 install-operator:
-	helm upgrade --install --create-namespace --namespace=coredb-operator --values=./tests/operator-values.yaml coredb-operator ../charts/coredb-operator
+	helm upgrade --install --create-namespace --namespace=coredb-operator --values=./testdata/operator-values.yaml coredb-operator ../charts/coredb-operator
 
+install-kube-prometheus-stack:
+	kubectl create namespace monitoring || true
+	helm upgrade --install --namespace=monitoring monitoring prometheus-community/kube-prometheus-stack
+
+install-tembo-pod-init:
+	kubectl create namespace tembo-pod-init || true
+	helm upgrade --install \
+	  cert-manager jetstack/cert-manager \
+	  --namespace cert-manager \
+	  --create-namespace \
+	  --set installCRDs=true && \
+	helm upgrade --install --namespace=tembo-pod-init --set logLevel=debug --set image.tag=latest tembo-pod-init ../charts/tembo-pod-init
+
+install-cnpg:
+	helm upgrade --install cnpg \
+	  --namespace cnpg-system \
+	  --create-namespace \
+	  --set config.data.INHERITED_ANNOTATIONS="tembo-pod-init.tembo.io/*"  \
+	  cnpg/cloudnative-pg
+
+enable-cnpg-default-namespace:
+	kubectl label namespace default "tembo-pod-init.tembo.io/watch"="true"
+	kubectl delete pods -n tembo-pod-init --all
+
+update-helm-repos:
+	helm repo add cnpg https://cloudnative-pg.github.io/charts
+	helm repo add jetstack https://charts.jetstack.io
+	helm repo add traefik https://traefik.github.io/charts
+	helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+	helm repo update
+
+# delete kind
+delete-kind:
+	kind delete cluster && sleep 5
+
+# start kind
 start-kind:
 	kind delete cluster || true
-	kind create cluster --image=kindest/node:v{{KUBE_VERSION}} --config ../coredb-operator/testdata/kind-config.yaml
+	kind create cluster --image=kindest/node:v{{KUBE_VERSION}} --config testdata/kind-config.yaml
+	just update-helm-repos
+	just install-kube-prometheus-stack
 	just install-traefik
-	just annotate
+	just install-cnpg
 	just install-operator
+	just install-tembo-pod-init
+	just annotate
 	kubectl wait pods --for=condition=Ready --timeout=300s --all --all-namespaces
+
 
 annotate:
 	kubectl label namespace {{NAMESPACE}} safe-to-run-coredb-tests=true

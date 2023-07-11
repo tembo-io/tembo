@@ -5,13 +5,17 @@ pub mod types;
 
 use crate::aws::cloudformation::{AWSConfigState, CloudFormationParams};
 use aws_sdk_cloudformation::config::Region;
-use controller::apis::coredb_types::{CoreDB, CoreDBSpec};
+use controller::{
+    apis::coredb_types::{CoreDB, CoreDBSpec},
+    cloudnativepg::clusters::Cluster,
+};
 use errors::ConductorError;
 use k8s_openapi::api::apps::v1::StatefulSet;
 use k8s_openapi::api::core::v1::{Namespace, Secret};
 use k8s_openapi::api::networking::v1::NetworkPolicy;
 use kube::api::{DeleteParams, ListParams, Patch, PatchParams};
 
+use chrono::{SecondsFormat, Utc};
 use kube::{Api, Client};
 use log::{debug, info};
 use rand::Rng;
@@ -245,6 +249,35 @@ pub async fn restart_statefulset(
 ) -> Result<(), ConductorError> {
     let sts: Api<StatefulSet> = Api::namespaced(client, namespace);
     sts.restart(statefulset_name).await?;
+    Ok(())
+}
+
+pub async fn restart_cnpg(
+    client: Client,
+    namespace: &str,
+    cluster_name: &str,
+) -> Result<(), ConductorError> {
+    let cluster: Api<Cluster> = Api::namespaced(client, namespace);
+    let restart = Utc::now()
+        .to_rfc3339_opts(SecondsFormat::Secs, true)
+        .to_string();
+
+    // To restart the CNPG pod we need to annotate the Cluster resource with
+    // kubectl.kubernetes.io/restartedAt: <timestamp>
+    let patch_json = serde_json::json!({
+        "metadata": {
+            "annotations": {
+                "kubectl.kubernetes.io/restartedAt": restart
+            }
+        }
+    });
+
+    // Use the patch method to update the Cluster resource
+    let params = PatchParams::default();
+    let _patch = cluster
+        .patch(cluster_name, &params, &Patch::Merge(patch_json))
+        .await
+        .map_err(ConductorError::KubeError)?;
     Ok(())
 }
 

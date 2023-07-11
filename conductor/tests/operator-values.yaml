@@ -1,3 +1,0 @@
-env:
-  - name: ENABLE_INITIAL_BACKUP
-    value: "false"
