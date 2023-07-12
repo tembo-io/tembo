@@ -234,6 +234,16 @@ pub fn cnpg_cluster_from_cdb(cdb: &CoreDB) -> Cluster {
         }
     };
 
+    // set the container image
+    // this is temporary - since platform starts cnpg by migrating from coredb to cnpg
+    let image = match cdb.spec.stack.clone() {
+        Some(stack) => match stack.name.to_lowercase().as_ref() {
+            "machinelearning" => "quay.io/tembo/ml-cnpg:15.3.0-1-fd1772f".to_string(),
+            _ => "quay.io/tembo/tembo-pg-cnpg:15.3.0-5-76a65c3".to_string(),
+        },
+        None => "quay.io/tembo/tembo-pg-cnpg:15.3.0-5-76a65c3".to_string(),
+    };
+
     Cluster {
         metadata: ObjectMeta {
             name: Some(name),
@@ -255,7 +265,7 @@ pub fn cnpg_cluster_from_cdb(cdb: &CoreDB) -> Cluster {
             external_clusters,
             enable_superuser_access: Some(true),
             failover_delay: Some(0),
-            image_name: Some("quay.io/tembo/tembo-pg-cnpg:15.3.0-5-76a65c3".to_string()),
+            image_name: Some(image),
             instances: 1,
             log_level: Some(ClusterLogLevel::Info),
             max_sync_replicas: Some(0),
