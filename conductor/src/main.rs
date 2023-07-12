@@ -385,14 +385,12 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                     Ok(_) => {}
                     Err(err) => {
                         error!("error restarting statefulset: {:?}", err);
-                        continue;
                     }
                 }
                 match restart_cnpg(client.clone(), &namespace, &namespace).await {
                     Ok(_) => {}
                     Err(err) => {
                         error!("error restarting cnpg: {:?}", err);
-                        continue;
                     }
                 }
                 let retry_strategy = FixedInterval::from_millis(5000).take(20);
