@@ -90,15 +90,28 @@ pub async fn delete(client: Client, namespace: &str, name: &str) -> Result<(), C
 
 pub async fn create_namespace(client: Client, name: &str) -> Result<(), ConductorError> {
     let ns_api: Api<Namespace> = Api::all(client);
-    let params = PatchParams::apply("conductor").force();
+    // check if the namespace already exists
+    let params = ListParams::default().fields(&format!("metadata.name={}", name));
+    let ns_list = ns_api.list(&params).await?;
+    if !ns_list.items.is_empty() {
+        return Ok(());
+    }
+
+    info!("\nCreating new namespace {}", name);
+    let params = PatchParams::apply("conductor");
+    // If the namespace already exists, do not include the label "tembo-pod-init.tembo.io/watch"
+    // If it's a new namespace, include the label
     let ns = serde_json::json!({
         "apiVersion": "v1",
         "kind": "Namespace",
         "metadata": {
             "name": format!("{name}"),
+            "labels": {
+                "tembo-pod-init.tembo.io/watch": "true"
+            }
         }
     });
-    info!("\nCreating namespace {} if it does not exist", name);
+    info!("\nCreating namespace {}", name);
     let _o = ns_api
         .patch(name, &params, &Patch::Apply(&ns))
         .await
