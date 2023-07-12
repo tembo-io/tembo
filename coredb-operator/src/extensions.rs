@@ -178,6 +178,10 @@ pub async fn install_extensions(
     let num_to_install = extensions.len();
     for ext in extensions.iter() {
         let version = ext.locations[0].version.clone().unwrap();
+        if !ext.locations[0].enabled {
+            // If the extension is not enabled, don't bother trying to install it
+            continue;
+        }
 
         let cmd = vec![
             "trunk".to_owned(),
