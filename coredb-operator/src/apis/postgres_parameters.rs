@@ -129,7 +129,7 @@ pub enum MergeError {
     SingleValueNotAllowed,
 }
 
-fn sort_multivalue_configs(values: &mut Vec<String>, priorities: &[&str]) {
+fn sort_multivalue_configs(values: &mut [String], priorities: &[&str]) {
     values.sort_unstable_by(|a, b| {
         let a_index = priorities.iter().position(|x| x == a);
         let b_index = priorities.iter().position(|x| x == b);

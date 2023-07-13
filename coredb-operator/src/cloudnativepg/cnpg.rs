@@ -85,6 +85,7 @@ pub fn cnpg_backup_configuration(
             }),
             ..ClusterBackupBarmanObjectStore::default()
         }),
+        retention_policy: Some("80d".to_string()),
         ..ClusterBackup::default()
     });
 
