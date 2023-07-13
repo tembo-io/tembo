@@ -87,7 +87,7 @@ def bench_line_item(
         if retention_interval is None:
             print("Defaulting to retaining all messages: {}")
             retention_interval = num_messages
-        queue.create_queue(test_queue, partition_interval=partition_interval, retention_interval=retention_interval)
+        queue.create_partitioned_queue(test_queue, partition_interval=partition_interval, retention_interval=retention_interval)
     except Exception as e:
         print(f"{e}")
 
