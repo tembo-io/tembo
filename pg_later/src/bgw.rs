@@ -20,7 +20,6 @@ pub extern "C" fn _PG_init() {
 #[pg_guard]
 #[no_mangle]
 pub extern "C" fn background_worker_main(_arg: pg_sys::Datum) {
-
     BackgroundWorker::attach_signal_handlers(SignalWakeFlags::SIGHUP | SignalWakeFlags::SIGTERM);
 
     // specify database

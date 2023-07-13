@@ -1,8 +1,6 @@
 use pgrx::prelude::*;
 use pgrx::spi::SpiTupleTable;
 
-const QUERY_TIMEOUT_SEC: i64 = 600;
-
 #[pg_extern]
 fn pg_later_init() -> Result<bool, spi::Error> {
     let setup_queries = vec![

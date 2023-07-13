@@ -1,0 +1,11 @@
+[extension]
+repository = "https://github.com/tembo-io/tembo/tree/main/pg_later"
+license = "Apache 2.0"
+description = "Message queue for PostgreSQL"
+homepage = "https://github.com/tembo-io/tembo/tree/main/pg_later"
+documentation = "https://github.com/tembo-io/tembo/tree/main/pg_later"
+categories = ["orchestration"]
+
+[build]
+postgres_version = "15"
+platform = "linux/amd64"
