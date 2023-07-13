@@ -105,4 +105,4 @@ jobs:
         working-directory: pg_later/
         env:
           TRUNK_API_TOKEN: ${{ secrets.TRUNK_AUTH_TOKEN }}
-        run: trunk publish
+        run: trunk publish pg_later --version 0.0.1
