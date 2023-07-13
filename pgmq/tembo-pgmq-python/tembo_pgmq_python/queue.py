@@ -47,23 +47,14 @@ class PGMQueue:
         with self.pool.connection() as conn:
             conn.execute("create extension if not exists pgmq cascade;")
 
-    def create_queue(self, queue: str, partition_interval: int = 10000, retention_interval: int = 100000) -> None:
+    def create_queue(self, queue: str) -> None:
         """Create a new queue
-
-        Note: Partitions are created pg_partman which must be configured in postgresql.conf
-            Set `pg_partman_bgw.interval` to set the interval for partition creation and deletion.
-            A value of 10 will create new/delete partitions every 10 seconds. This value should be tuned
-            according to the volume of messages being sent to the queue.
-
         Args:
             queue: The name of the queue.
-            partition_interval: The number of messages per partition. Defaults to 10,000.
-            retention_interval: The number of messages to retain. Messages exceeding this number will be dropped.
-                Defaults to 100,000.
         """
 
         with self.pool.connection() as conn:
-            conn.execute("select pgmq_create(%s, %s::text, %s::text);", [queue, partition_interval, retention_interval])
+            conn.execute("select pgmq_create(%s);", [queue])
 
     def send(self, queue: str, message: dict, delay: Optional[int] = None) -> int:
         """Send a message to a queue"""
