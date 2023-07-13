@@ -1,7 +1,6 @@
 use pgrx::prelude::*;
 use pgrx::spi::SpiTupleTable;
 
-
 #[pg_extern]
 fn pg_later_init() -> Result<bool, spi::Error> {
     let setup_queries = vec![
