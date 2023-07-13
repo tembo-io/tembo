@@ -1,0 +1,108 @@
+name: PG Later Extension
+
+defaults:
+  run:
+    shell: bash
+    working-directory: ./pg_later
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/pg_later.yml'
+      - '.github/actions/pgx-init/**'
+      - 'pg_later/**'
+
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/pg_later.yml'
+      - '.github/actions/pgx-init/**'
+      - 'pg_later/**'
+
+jobs:
+  lint:
+    name: Run linters
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install Rust minimal nightly with clippy and rustfmt
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: "pg_later-extension-lint"
+          workspaces: |
+            pg_later/
+          # Additional directories to cache
+          cache-directories: |
+            /home/runner/.pgrx
+      - uses: ./.github/actions/pgx-init
+        with:
+          working-directory: pg_later/
+      - name: Cargo format
+        run: cargo +nightly fmt --all --check
+      - name: Clippy
+        run: cargo clippy
+
+  test:
+    name: Run tests
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Rust stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: "pg_later-extension-test"
+          workspaces: |
+            pg_later
+          # Additional directories to cache
+          cache-directories: |
+            /home/runner/.pgrx
+      - uses: ./.github/actions/pgx-init
+        with:
+          working-directory: pg_later/
+      - name: test
+        run: |
+          pg_version=$(stoml Cargo.toml features.default)
+          cargo pgrx run ${pg_version} --pgcli || true
+          cargo pgrx test ${pg_version}
+
+  publish:
+    # only publish off main branch
+    if: github.ref == 'refs/heads/main'
+    name: trunk publish
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Rust stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: "pg_later-extension-test"
+          workspaces: |
+              pg_later/extension
+          # Additional directories to cache
+          cache-directories: |
+            /home/runner/.pgrx
+      - name: Install pg-trunk
+        shell: bash
+        run: cargo install pg-trunk
+      - name: trunk build
+        working-directory: pg_later/
+        run: trunk build
+      - name: trunk publish
+        working-directory: pg_later/
+        env:
+          TRUNK_API_TOKEN: ${{ secrets.TRUNK_AUTH_TOKEN }}
+        run: trunk publish
