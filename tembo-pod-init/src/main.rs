@@ -2,7 +2,7 @@ use actix_web::{dev::ServerHandle, middleware, web, App, HttpServer};
 use kube::Client;
 use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 use parking_lot::Mutex;
-//use std::sync::Arc;
+use std::sync::Arc;
 use tembo_pod_init::{config::Config, health::*, log, mutate::mutate, watcher::NamespaceWatcher};
 
 #[macro_use]
@@ -75,7 +75,7 @@ async fn main() -> std::io::Result<()> {
 
     let server = HttpServer::new({
         let config_data = web::Data::new(config.clone());
-        let kube_data = web::Data::new(kube_client.clone());
+        let kube_data = web::Data::new(Arc::new(kube_client.clone()));
         let namespace_watcher_data = web::Data::new(namespaces.clone());
         let stop_handle = stop_handle.clone();
         move || {
