@@ -34,8 +34,6 @@ spec:
           env:
             - name: LOG_LEVEL
               value: "{{ .Values.logLevel}}"
-            - name: "CONTAINER_IMAGE"
-              value: "{{ .Values.initContainerImage.repository }}:{{ tpl .Values.initContainerImage.tag . }}"
             - name: "TLS_CERT"
               value: /etc/tls/tls.crt
             - name: "TLS_KEY"

@@ -1,10 +1,27 @@
+use controller::cloudnativepg::clusters::Cluster;
 use k8s_openapi::api::core::v1::{Capabilities, Container, SecurityContext, VolumeMount};
+use kube::{Api, Client};
 use tracing::debug;
 
 use crate::config::Config;
 
 // Create a Container object that will be injected into the Pod
-pub fn create_init_container(config: &Config) -> Container {
+pub async fn create_init_container(
+    config: &Config,
+    client: &Client,
+    namespace: &str,
+    cluster_name: &str,
+) -> Container {
+    // Get the correct container image to use from Cluster
+    let cluster_api: Api<Cluster> = Api::namespaced(client.clone(), namespace);
+    let cluster = cluster_api.get(cluster_name).await.unwrap();
+
+    // Extract the image we need to use
+    let image = cluster
+        .spec
+        .image_name
+        .unwrap_or_else(|| config.container_image.clone());
+
     // Add in mounted volumes
     let volume_mounts = vec![
         VolumeMount {
@@ -40,8 +57,8 @@ pub fn create_init_container(config: &Config) -> Container {
     // Create the initContainer
     Container {
         name: config.init_container_name.to_string(),
-        image: Some(config.container_image.to_string()),
-        image_pull_policy: Some("Always".to_string()),
+        image: Some(image),
+        image_pull_policy: Some("IfNotPresent".to_string()),
         command: Some(vec![
             "/bin/bash".to_string(),
             "-c".to_string(),

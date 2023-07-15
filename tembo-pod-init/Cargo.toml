@@ -19,16 +19,17 @@ path = "src/lib.rs"
 actix-web = { version = "4.3", features = ["openssl"] }
 tokio = { version = "1.28", features = ["rt"] }
 serde = { version = "1.0", features = ["derive"]}
-k8s-openapi = { version = "0.18", features = ["v1_26", "schemars"], default-features = false}
+k8s-openapi = { version = "0.17", features = ["v1_25", "schemars"], default-features = false } # 0.18 not compatible with kube-rs <= 0.82
 serde_json = "1.0"
-json-patch = "1"
+json-patch = "0.3" # 1.0 not compatible with k8s-openapi 0.17 & kube-rs 0.80
 parking_lot = "0.12"
 futures = "0.3"
 tracing = "0.1"
 tracing-log = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"]}
 openssl = { version = "0.10", features = ["vendored"] } 
+controller = {path = "../coredb-operator", package = "controller"}
 
 [dependencies.kube]
 features = ["admission","runtime", "client", "derive", "ws"]
-version = "0.83"
+version = "0.80" # needed for k8s-openapi <= 0.17

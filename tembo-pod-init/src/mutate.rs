@@ -5,6 +5,7 @@ use kube::core::{
     admission::{AdmissionRequest, AdmissionResponse, AdmissionReview},
     TypeMeta,
 };
+use kube::Client;
 use serde_json::json;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -18,6 +19,7 @@ async fn mutate(
     body: web::Json<AdmissionReview<Pod>>,
     config: web::Data<Config>,
     namespaces: web::Data<Arc<RwLock<HashSet<String>>>>,
+    client: web::Data<Arc<Client>>,
 ) -> impl Responder {
     // Extract the AdmissionRequest from the AdmissionReview
     let admission_request: AdmissionRequest<Pod> = body.clone().request.unwrap();
@@ -84,6 +86,14 @@ async fn mutate(
         }
     };
 
+    // Extract cluster name from the pod labels
+    let cluster_name = pod
+        .metadata
+        .labels
+        .as_ref()
+        .and_then(|labels| labels.get("cnpg.io/cluster"))
+        .map(|s| s.to_string());
+
     if !pod
         .metadata
         .annotations
@@ -143,7 +153,8 @@ async fn mutate(
                 config.init_container_name.to_string()
             );
         } else {
-            let init_container = create_init_container(&config);
+            let init_container =
+                create_init_container(&config, &client, namespace, &cluster_name.unwrap()).await;
             let init_containers = spec.init_containers.take().unwrap_or_default();
             let mut new_init_containers = vec![init_container];
             new_init_containers.extend(init_containers);

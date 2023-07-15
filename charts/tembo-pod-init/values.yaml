@@ -2,9 +2,6 @@ nameOverride:
 namespaceOverride:
 logLevel: info
 replicas: 1
-initContainerImage:
-  repository: quay.io/tembo/tembo-pg-cnpg
-  tag: latest
 image:
   repository: quay.io/tembo/tembo-pod-init 
   tag: "{{ .Chart.AppVersion }}"
