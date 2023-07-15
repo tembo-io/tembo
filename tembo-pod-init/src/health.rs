@@ -4,6 +4,7 @@ use kube::{
     error::{Error as KubeError, ErrorResponse},
     Api, Client,
 };
+use std::sync::Arc;
 
 #[get("/health/liveness")]
 pub async fn liveness(_: HttpRequest) -> impl Responder {
@@ -11,8 +12,12 @@ pub async fn liveness(_: HttpRequest) -> impl Responder {
 }
 
 #[get("/health/readiness")]
-pub async fn readiness(_: HttpRequest, client: web::Data<Client>) -> impl Responder {
-    let pods: Api<Pod> = Api::all(client.as_ref().clone());
+pub async fn readiness(_: HttpRequest, client: web::Data<Arc<Client>>) -> impl Responder {
+    let ca = client.get_ref();
+    let cc = Arc::clone(ca);
+    let c = cc.as_ref();
+
+    let pods: Api<Pod> = Api::all(c.clone());
     let result = pods.list(&Default::default()).await;
 
     match result {

@@ -11,12 +11,12 @@ use crate::config::Config;
 
 pub struct NamespaceWatcher {
     namespaces: Arc<RwLock<HashSet<String>>>,
-    client: Client,
+    client: Arc<Client>,
     config: Config,
 }
 
 impl NamespaceWatcher {
-    pub fn new(client: Client, config: Config) -> Self {
+    pub fn new(client: Arc<Client>, config: Config) -> Self {
         Self {
             namespaces: Arc::new(RwLock::new(HashSet::new())),
             client,
@@ -28,8 +28,9 @@ impl NamespaceWatcher {
         let namespaces = self.namespaces.clone();
         let client = self.client.clone();
         let lp = ListParams::default().labels(&self.config.namespace_label);
+        let c = Arc::clone(&client);
 
-        let api: Api<Namespace> = Api::all(client.clone());
+        let api: Api<Namespace> = Api::all((*c).clone());
 
         // Get all the namespaces and add the ones with the correct label
         let ns_list = api.list(&lp).await?;

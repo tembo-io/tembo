@@ -32,7 +32,7 @@ async fn main() -> std::io::Result<()> {
     };
 
     // Start watching namespaces in a seperate tokio task thread
-    let watcher = NamespaceWatcher::new(kube_client.clone(), config.clone());
+    let watcher = NamespaceWatcher::new(Arc::new(kube_client.clone()), config.clone());
     let namespaces = watcher.get_namespaces();
     tokio::spawn(async move {
         loop {
