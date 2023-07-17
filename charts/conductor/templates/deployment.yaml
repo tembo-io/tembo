@@ -34,6 +34,10 @@ spec:
         - name: {{ .Chart.Name }}
           command:
           - ./usr/local/bin/conductor
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
           env:
           - name: PG_CONN_URL
             valueFrom:

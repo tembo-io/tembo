@@ -1,4 +1,7 @@
+use actix_web::{web, App, HttpServer};
+use actix_web_opentelemetry::{PrometheusMetricsHandler, RequestTracing};
 use conductor::errors::ConductorError;
+use conductor::monitoring::CustomMetrics;
 use conductor::{
     create_cloudformation, create_namespace, create_networkpolicy, create_or_update, delete,
     delete_cloudformation, delete_namespace, extensions::extension_plan, generate_rand_schedule,
@@ -9,14 +12,17 @@ use controller::apis::coredb_types::{Backup, CoreDBSpec, ServiceAccountTemplate}
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use kube::Client;
 use log::{debug, error, info, warn};
+use opentelemetry::sdk::export::metrics::aggregation;
+use opentelemetry::sdk::metrics::{controllers, processors, selectors};
+use opentelemetry::{global, KeyValue};
 use pgmq::{Message, PGMQueueExt};
 use std::env;
 use std::{thread, time};
 use tokio_retry::strategy::FixedInterval;
 use tokio_retry::Retry;
 use types::{CRUDevent, Event};
-#[tokio::main]
-async fn run() -> Result<(), Box<dyn std::error::Error>> {
+
+async fn run(metrics: CustomMetrics) -> Result<(), Box<dyn std::error::Error>> {
     // Read connection info from environment variable
     let pg_conn_url =
         env::var("POSTGRES_QUEUE_CONNECTION").expect("POSTGRES_QUEUE_CONNECTION must be set");
@@ -67,21 +73,29 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 message
             }
             None => {
+                debug!("no messages in queue");
                 thread::sleep(time::Duration::from_secs(1));
                 continue;
             }
         };
 
+        metrics
+            .conductor_total
+            .add(&opentelemetry::Context::current(), 1, &[]);
+
         // note: messages are recycled on purpose
         // but absurdly high read_ct means its probably never going to get processed
         if read_msg.read_ct >= max_read_ct {
             error!(
-                "archived message with read_count >= `{}`: {:?}",
-                max_read_ct, read_msg
+                "{}: archived message with read_count >= `{}`: {:?}",
+                read_msg.msg_id, max_read_ct, read_msg
             );
             queue
                 .archive(&control_plane_events_queue, read_msg.msg_id)
                 .await?;
+            metrics
+                .conductor_errors
+                .add(&opentelemetry::Context::current(), 1, &[]);
             // this is what we'll send back to control-plane
             let error_event = types::StateToControlPlane {
                 data_plane_id: read_msg.message.data_plane_id,
@@ -91,7 +105,10 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 connection: None,
             };
             let msg_id = queue.send(&data_plane_events_queue, &error_event).await?;
-            error!("sent error event to control-plane, msg_id: {:?}", msg_id);
+            error!(
+                "{}: sent error event to control-plane: {}",
+                read_msg.msg_id, msg_id
+            );
             continue;
         }
 
@@ -99,29 +116,36 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             "org-{}-inst-{}",
             read_msg.message.organization_name, read_msg.message.dbname
         );
+        info!("{}: Using namespace {}", read_msg.msg_id, &namespace);
 
         // Based on message_type in message, create, update, delete CoreDB
         let event_msg: types::StateToControlPlane = match read_msg.message.event_type {
             // every event is for a single namespace
             Event::Create | Event::Update => {
+                info!("{}: Got create or update event", read_msg.msg_id);
+
                 // (todo: nhudson) in thr future move this to be more specific
                 // to the event that we are taking action on.  For now just create
                 // the stack without checking.
 
                 if read_msg.message.spec.is_none() {
                     error!(
-                        "spec is required on create and update events, archiving message {}",
+                        "{}: spec is required on create and update events, archiving message",
                         read_msg.msg_id
                     );
                     let _archived = queue
                         .archive(&control_plane_events_queue, read_msg.msg_id)
                         .await
                         .expect("error archiving message from queue");
+                    metrics
+                        .conductor_errors
+                        .add(&opentelemetry::Context::current(), 1, &[]);
                     continue;
                 }
                 // spec.expect() should be safe here - since above we continue in loop when it is None
                 let msg_spec = read_msg.message.spec.clone().expect("message spec");
 
+                info!("{}: Creating cloudformation template", read_msg.msg_id);
                 create_cloudformation(
                     String::from("us-east-1"),
                     backup_archive_bucket.clone(),
@@ -139,10 +163,16 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 )
                 .await
                 {
-                    Ok(arn) => arn,
+                    Ok(arn) => {
+                        info!(
+                            "{}: CloudFormation stack outputs ready, got outputs.",
+                            read_msg.msg_id
+                        );
+                        arn
+                    }
                     Err(err) => match err {
                         ConductorError::NoOutputsFound => {
-                            info!("CloudFormation stack outputs not ready, requeuing with short duration. message id {}", read_msg.msg_id);
+                            info!("{}: CloudFormation stack outputs not ready, requeuing with short duration.", read_msg.msg_id);
                             // Requeue the message for a short duration
                             let _ = queue
                                 .set_vt::<CRUDevent>(
@@ -151,11 +181,16 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                                     REQUEUE_VT_SEC_SHORT,
                                 )
                                 .await?;
+                            metrics.conductor_requeues.add(
+                                &opentelemetry::Context::current(),
+                                1,
+                                &[KeyValue::new("queue_duration", "short")],
+                            );
                             continue;
                         }
                         _ => {
                             error!(
-                                "Failed to get stack outputs for message id {}: {}",
+                                "{}: Failed to get stack outputs with error: {}",
                                 read_msg.msg_id, err
                             );
                             let _ = queue
@@ -165,11 +200,17 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                                     REQUEUE_VT_SEC_LONG,
                                 )
                                 .await?;
+                            metrics.conductor_requeues.add(
+                                &opentelemetry::Context::current(),
+                                1,
+                                &[KeyValue::new("queue_duration", "long")],
+                            );
                             continue;
                         }
                     },
                 };
 
+                info!("{}: Adding backup configuration to spec", read_msg.msg_id);
                 // Format ServiceAccountTemplate spec in CoreDBSpec
                 use std::collections::BTreeMap;
                 let mut annotations: BTreeMap<String, String> = BTreeMap::new();
@@ -201,20 +242,26 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                     backup,
                     ..msg_spec.clone()
                 };
+
+                info!("{}: Creating namespace", read_msg.msg_id);
                 // create Namespace
                 create_namespace(client.clone(), &namespace).await?;
 
+                info!("{}: Creating network policy", read_msg.msg_id);
                 // create NetworkPolicy to allow internet access only
                 create_networkpolicy(client.clone(), &namespace).await?;
 
+                info!("{}: Generating spec", read_msg.msg_id);
                 // generate CoreDB spec based on values in body
                 let spec = generate_spec(&namespace, &coredb_spec).await;
 
+                info!("{}: Creating or updating spec", read_msg.msg_id);
                 // create or update CoreDB
                 create_or_update(client.clone(), &namespace, spec).await?;
 
                 // get connection string values from secret
 
+                info!("{}: Getting connection info", read_msg.msg_id);
                 let conn_info = match get_pg_conn(
                     client.clone(),
                     &namespace,
@@ -226,7 +273,10 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                     Err(err) => {
                         match err {
                             ConductorError::PostgresConnectionInfoNotFound => {
-                                info!("Secret not ready, requeuing with short duration. message id {}", read_msg.msg_id);
+                                info!(
+                                    "{}: Secret not ready, requeuing with short duration.",
+                                    read_msg.msg_id
+                                );
                                 // Requeue the message for a short duration
                                 let _ = queue
                                     .set_vt::<CRUDevent>(
@@ -235,11 +285,16 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                                         REQUEUE_VT_SEC_SHORT,
                                     )
                                     .await?;
+                                metrics.conductor_requeues.add(
+                                    &opentelemetry::Context::current(),
+                                    1,
+                                    &[KeyValue::new("queue_duration", "short")],
+                                );
                                 continue;
                             }
                             _ => {
                                 error!(
-                                    "Error getting Postgres connection information from secret for message id {}: {}",
+                                    "{}: Error getting Postgres connection information from secret: {}",
                                     read_msg.msg_id, err
                                 );
                                 let _ = queue
@@ -249,12 +304,18 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                                         REQUEUE_VT_SEC_LONG,
                                     )
                                     .await?;
+                                metrics.conductor_errors.add(
+                                    &opentelemetry::Context::current(),
+                                    1,
+                                    &[],
+                                );
                                 continue;
                             }
                         }
                     }
                 };
 
+                info!("{}: Getting status", read_msg.msg_id);
                 let result = get_coredb_status(client.clone(), &namespace).await;
 
                 // determine if we should requeue the message
@@ -277,7 +338,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                                 let desired_extensions = msg_spec.extensions;
                                 // if no extensions in request, then exit
                                 if desired_extensions.is_empty() {
-                                    info!("No extensions in request");
+                                    info!("{}: No extensions in request", read_msg.msg_id);
                                     false
                                 } else {
                                     let (changed, to_install) =
@@ -285,8 +346,8 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                                     // requeue if extensions need to be installed or updated
                                     if !changed.is_empty() || !to_install.is_empty() {
                                         warn!(
-                                            "changed: {:?}, to_install: {:?}",
-                                            changed, to_install
+                                            "{}: changed: {:?}, to_install: {:?}",
+                                            read_msg.msg_id, changed, to_install
                                         );
                                         true
                                     } else {
@@ -298,8 +359,8 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                         };
                         if updating_extension || extensions_out_of_sync {
                             warn!(
-                                "extensions updating: {}, extensions_out_of_sync: {}",
-                                updating_extension, extensions_out_of_sync
+                                "{}: extensions updating: {}, extensions_out_of_sync: {}",
+                                read_msg.msg_id, updating_extension, extensions_out_of_sync
                             );
                             true
                         } else {
@@ -308,16 +369,19 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     Err(err) => {
                         error!(
-                            "error getting CoreDB status in {}: {:?}",
+                            "{}: error getting CoreDB status in {}: {:?}",
+                            read_msg.msg_id,
                             namespace.clone(),
                             err
                         );
+                        metrics
+                            .conductor_errors
+                            .add(&opentelemetry::Context::current(), 1, &[]);
                         true
                     }
                 };
 
                 if requeue {
-                    // requeue then continue loop from beginning
                     let _ = queue
                         .set_vt::<CRUDevent>(
                             &control_plane_events_queue,
@@ -325,6 +389,11 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                             REQUEUE_VT_SEC_SHORT,
                         )
                         .await?;
+                    metrics.conductor_requeues.add(
+                        &opentelemetry::Context::current(),
+                        1,
+                        &[KeyValue::new("queue_duration", "short")],
+                    );
                     continue;
                 }
 
@@ -355,11 +424,14 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             }
             Event::Delete => {
                 // delete CoreDB
+                info!("{}: Deleting instance {}", read_msg.msg_id, &namespace);
                 delete(client.clone(), &namespace, &namespace).await?;
 
                 // delete namespace
+                info!("{}: Deleting namespace {}", read_msg.msg_id, &namespace);
                 delete_namespace(client.clone(), &namespace).await?;
 
+                info!("{}: Deleting cloudformation stack", read_msg.msg_id);
                 delete_cloudformation(
                     String::from("us-east-1"),
                     &read_msg.message.organization_name,
@@ -380,7 +452,7 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                 // TODO: refactor to be more DRY
                 // Restart and Update events share a lot of the same code.
                 // move some operations after the Event match
-                info!("handling instance restart");
+                info!("{}: handling instance restart", read_msg.msg_id);
                 match restart_statefulset(client.clone(), &namespace, &namespace).await {
                     Ok(_) => {}
                     Err(err) => {
@@ -404,6 +476,9 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
                         namespace.clone(),
                         result
                     );
+                    metrics
+                        .conductor_errors
+                        .add(&opentelemetry::Context::current(), 1, &[]);
                     continue;
                 }
                 let mut current_spec = result?;
@@ -430,31 +505,80 @@ async fn run() -> Result<(), Box<dyn std::error::Error>> {
             }
             _ => {
                 warn!("Unhandled event_type: {:?}", read_msg.message.event_type);
+                metrics
+                    .conductor_errors
+                    .add(&opentelemetry::Context::current(), 1, &[]);
                 continue;
             }
         };
+
         let msg_id = queue.send(&data_plane_events_queue, &event_msg).await?;
-        debug!("sent msg_id: {:?}", msg_id);
+        info!(
+            "{}: responded to control plane with message {}",
+            read_msg.msg_id, msg_id
+        );
 
         // archive message from queue
         let archived = queue
             .archive(&control_plane_events_queue, read_msg.msg_id)
             .await
             .expect("error archiving message from queue");
-        // TODO(ianstanton) Improve logging everywhere
-        info!("archived: {:?}", archived);
+
+        metrics
+            .conductor_completed
+            .add(&opentelemetry::Context::current(), 1, &[]);
+
+        info!("{}: archived: {:?}", read_msg.msg_id, archived);
     }
 }
 
-fn main() {
+#[actix_web::main]
+async fn main() -> std::io::Result<()> {
     env_logger::init();
-    info!("starting");
-    loop {
-        match run() {
-            Ok(_) => {}
-            Err(err) => {
-                error!("error: {:?}", err);
+
+    let controller = controllers::basic(
+        processors::factory(
+            selectors::simple::histogram([1.0, 2.0, 5.0, 10.0, 20.0, 50.0]),
+            aggregation::cumulative_temporality_selector(),
+        )
+        .with_memory(true),
+    )
+    .build();
+
+    let exporter = opentelemetry_prometheus::exporter(controller).init();
+    let meter = global::meter("actix_web");
+    let custom_metrics = CustomMetrics::new(&meter);
+    let custom_metrics_copy = custom_metrics.clone();
+
+    info!("Starting conductor");
+
+    tokio::spawn(async move {
+        loop {
+            match run(custom_metrics_copy.clone()).await {
+                Ok(_) => {}
+                Err(err) => {
+                    custom_metrics_copy.clone().conductor_errors.add(
+                        &opentelemetry::Context::current(),
+                        1,
+                        &[],
+                    );
+                    error!("error: {:?}", err);
+                }
             }
         }
-    }
+    });
+
+    HttpServer::new(move || {
+        App::new()
+            .app_data(web::Data::new(custom_metrics.clone()))
+            .wrap(RequestTracing::new())
+            .route(
+                "/metrics",
+                web::get().to(PrometheusMetricsHandler::new(exporter.clone())),
+            )
+    })
+    .workers(1)
+    .bind(("0.0.0.0", 8080))?
+    .run()
+    .await
 }

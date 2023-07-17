@@ -74,7 +74,7 @@ jobs:
           cargo install cargo-watch
           cargo build
           # Start conductor in the background
-          just run-local &
+          just run-local > conductor-output.txt 2>&1 &
           # Run the tests
           cargo test -- --ignored --nocapture
       - name: Debugging information
@@ -82,6 +82,8 @@ jobs:
         run: |
           set +e
           set -x
+          echo "=========="
+          cat conductor-output.txt
           echo "=========="
           kubectl get pods --all-namespaces
           echo "=========="

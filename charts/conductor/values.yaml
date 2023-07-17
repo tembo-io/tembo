@@ -2,6 +2,11 @@ logLevel: info
 
 replicas: 2
 
+podMonitor:
+  enabled: true
+  port: http
+  path: /metrics
+
 externalSecrets:
   refreshInterval: "5m"
   parameterStore:
