@@ -811,7 +811,7 @@
       "type": "timeseries"
     }
   ],
-  "refresh": "1m",
+  "refresh": "10m",
   "schemaVersion": 37,
   "style": "dark",
   "tags": [],
