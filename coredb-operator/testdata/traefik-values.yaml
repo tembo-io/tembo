@@ -34,3 +34,10 @@ ports:
     protocol: TCP
 deployment:
   replicas: 1
+resources:
+  requests:
+    cpu: "200m"
+    memory: "100Mi"
+  limits:
+    cpu: "400m"
+    memory: "300Mi"

@@ -14,6 +14,7 @@ mod test {
     use chrono::{DateTime, SecondsFormat, Utc};
     use controller::{
         apis::coredb_types::CoreDB,
+        cloudnativepg::clusters::Cluster,
         defaults::{default_resources, default_storage},
         ingress_route_tcp_crd::IngressRouteTCP,
         is_pod_ready, Context, State,
@@ -784,7 +785,17 @@ mod test {
                         "locations": [
                         {
                           "enabled": true,
-                          "version": "0.9.0",
+                          "version": "0.10.0",
+                          "database": "postgres",
+                          "schema": "public"
+                        }]
+                    },
+                    {
+                        "name": "pg_stat_statements",
+                        "locations": [
+                        {
+                          "enabled": true,
+                          "version": "1.10.0",
                           "database": "postgres",
                           "schema": "public"
                         }]
@@ -793,7 +804,7 @@ mod test {
                 "runtime_config": [
                     {
                         "name": "shared_preload_libraries",
-                        "value": "pg_partman_bgw"
+                        "value": "pg_stat_statements,pg_partman_bgw"
                     },
                     {
                         "name": "pg_partman_bgw.interval",
@@ -839,6 +850,47 @@ mod test {
 
         println!("{}", result.stdout.clone().unwrap());
         assert!(result.stdout.clone().unwrap().contains("pgmq"));
+
+        println!("Restarting CNPG pod");
+        // Restart the CNPG instance
+        let cluster: Api<Cluster> = Api::namespaced(client, namespace);
+        let restart = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true).to_string();
+
+        // To restart the CNPG pod we need to annotate the Cluster resource with
+        // kubectl.kubernetes.io/restartedAt: <timestamp>
+        let patch_json = serde_json::json!({
+            "metadata": {
+                "annotations": {
+                    "kubectl.kubernetes.io/restartedAt": restart
+                }
+            }
+        });
+
+        // Use the patch method to update the Cluster resource
+        let params = PatchParams::default();
+        let patch = Patch::Merge(patch_json);
+        let _patch = cluster.patch(name, &params, &patch);
+
+        thread::sleep(Duration::from_millis(10000));
+
+        pod_ready_and_running(pods.clone(), pod_name.clone()).await;
+
+        // Assert that shared_preload_libraries contains pg_stat_statements
+        // and pg_partman_bgw
+        let result = coredb_resource
+            .psql(
+                "show shared_preload_libraries;".to_string(),
+                "postgres".to_string(),
+                context.clone(),
+            )
+            .await
+            .unwrap();
+        println!("{}", result.stdout.clone().unwrap());
+        assert!(result
+            .stdout
+            .clone()
+            .unwrap()
+            .contains("pg_stat_statements,pg_partman_bgw"));
 
         // CLEANUP TEST
         // Cleanup CoreDB

@@ -368,35 +368,39 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
                         let mut libs_that_are_installed: Vec<String> = vec![];
                         // If we can't find the existing primary pod, returns a requeue
                         let primary_pod_cnpg = cdb.primary_pod_cnpg(ctx.client.clone()).await?;
-                        for new_lib in new_libs {
-                            // Check if the file is already installed
-                            let command = vec![
-                                "/bin/sh".to_string(),
-                                "-c".to_string(),
-                                "ls $(pg_config --pkglibdir)".to_string(),
-                            ];
-                            let result = cdb
-                                .exec(primary_pod_cnpg.name_any(), ctx.client.clone(), &command)
-                                .await
-                                .map_err(|e| {
-                                    error!("Error checking for presence of extension files: {:?}", e);
-                                    Action::requeue(Duration::from_secs(30))
-                                })?;
-                            match result.stdout {
-                                None => {
-                                    error!("Error checking for presence of extension files");
-                                    return Err(Action::requeue(Duration::from_secs(30)));
-                                }
-                                Some(output) => {
-                                    if output.contains(&format!("{}.so", new_lib)) {
-                                        info!("Changing shared_preload_libraries on {}, found {} is installed, so including it", &name, &new_lib);
-                                        libs_that_are_installed.push(new_lib.clone());
-                                        if !current_shared_preload_libraries.contains(&new_lib) {
-                                            _restart_required = true;
-                                        }
-                                    } else {
-                                        info!("Changing shared_preload_libraries on {}, found {} is NOT installed, so dropping it", &name, &new_lib);
+                        // Check if the file is already installed
+                        let command = vec![
+                            "/bin/sh".to_string(),
+                            "-c".to_string(),
+                            "ls $(pg_config --pkglibdir)".to_string(),
+                        ];
+                        let result = cdb
+                            .exec(primary_pod_cnpg.name_any(), ctx.client.clone(), &command)
+                            .await
+                            .map_err(|e| {
+                                error!("Error checking for presence of extension files: {:?}", e);
+                                Action::requeue(Duration::from_secs(30))
+                            })?;
+                        let available_libs = match result.stdout {
+                            None => {
+                                error!("Error checking for presence of extension files");
+                                return Err(Action::requeue(Duration::from_secs(30)));
+                            }
+                            Some(output) => {
+                                output.split('\n').map(|s| s.to_string()).collect::<Vec<String>>()
+                            }
+                        };
+                        for libs in new_libs {
+                            let split_libs = libs.split(',').map(|s| s.to_string()).collect::<Vec<String>>();
+                            for new_lib in split_libs {
+                                if available_libs.contains(&format!("{}.so", new_lib)) {
+                                    info!("Changing shared_preload_libraries on {}, found {} is installed, so including it", &name, &new_lib);
+                                    libs_that_are_installed.push(new_lib.clone());
+                                    if !current_shared_preload_libraries.contains(&new_lib) {
+                                        _restart_required = true;
                                     }
+                                } else {
+                                    info!("Changing shared_preload_libraries on {}, found {} is NOT installed, so dropping it", &name, &new_lib);
                                 }
                             }
                         }

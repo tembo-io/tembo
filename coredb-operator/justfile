@@ -18,7 +18,7 @@ install-traefik:
 
 install-kube-prometheus-stack:
 	kubectl create namespace monitoring || true
-	helm upgrade --install --namespace=monitoring monitoring prometheus-community/kube-prometheus-stack
+	helm upgrade --install --namespace=monitoring --values=./testdata/prometheus-stack.yaml monitoring prometheus-community/kube-prometheus-stack
 
 install-tembo-pod-init:
 	kubectl create namespace tembo-pod-init || true
@@ -26,14 +26,14 @@ install-tembo-pod-init:
 	  cert-manager jetstack/cert-manager \
 	  --namespace cert-manager \
 	  --create-namespace \
-	  --set installCRDs=true && \
-	helm upgrade --install --namespace=tembo-pod-init --set logLevel=debug --set image.tag=latest tembo-pod-init ../charts/tembo-pod-init
+		--values=./testdata/cert-manager.yaml && \
+	helm upgrade --install --namespace=tembo-pod-init --values=./testdata/pod-init.yaml tembo-pod-init ../charts/tembo-pod-init
 
 install-cnpg:
 	helm upgrade --install cnpg \
 	  --namespace cnpg-system \
 	  --create-namespace \
-	  --set config.data.INHERITED_ANNOTATIONS="tembo-pod-init.tembo.io/*"  \
+		--values=./testdata/cnpg.yaml \
 	  cnpg/cloudnative-pg
 
 enable-cnpg-default-namespace:

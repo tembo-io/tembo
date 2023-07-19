@@ -1,0 +1,28 @@
+alertmanager:
+  enabled: false
+grafana:
+  enabled: false
+kubeEtcd:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeProxy:
+  enabled: false
+nodeExporter:
+  enabled: false
+prometheusOperator:
+  resources:
+   limits:
+     cpu: 100m
+     memory: 100Mi
+   requests:
+     cpu: 100m
+     memory: 100Mi
+prometheus:
+  resources:
+    requests:
+      cpu: 300m
+      memory: 400Mi
+    limits:
+      cpu: 1
+      memory: 1024Mi
