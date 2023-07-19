@@ -26,6 +26,7 @@
   "fiscalYearStartMonth": 0,
   "gnetId": 9628,
   "graphTooltip": 0,
+  "id": 1470,
   "links": [],
   "liveNow": false,
   "panels": [
@@ -538,7 +539,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "(sum by (namespace) (max_over_time(pg_stat_activity_count{}[1h])))",
+          "expr": "(sum by (namespace) (max_over_time(pg_stat_activity_count{}[1m])))",
           "hide": false,
           "legendFormat": "{{namespace}}",
           "range": true,
@@ -999,7 +1000,7 @@
   },
   "timezone": "",
   "title": "Cloud Tracker",
-  "uid": "bE7Y7zEVz",
-  "version": 1,
+  "uid": "XW3MOlCVz",
+  "version": 2,
   "weekStart": ""
 }
