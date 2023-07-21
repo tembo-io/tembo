@@ -74,12 +74,12 @@ jobs:
       - name: Run functional / integration tests
         run: |
           set -xe
-          export ENABLE_INITIAL_BACKUP=false
+          export ENABLE_BACKUP=false
           export DATA_PLANE_BASEDOMAIN=localhost
           # Start the operator in the background
           cargo run > operator-output.txt 2>&1 &
           # Run the tests
-          cargo test -- --ignored --nocapture
+          cargo test --jobs 1 -- --ignored --nocapture
       - name: Debugging information
         if: always()
         run: |
@@ -88,15 +88,17 @@ jobs:
           echo "=========="
           cat operator-output.txt
           echo "=========="
-          kubectl get pods --all-namespaces
-          echo "=========="
-          kubectl get -o yaml sts
-          echo "=========="
-          kubectl get -o yaml svc
-          echo "=========="
-          kubectl get -o yaml pods
-          echo "=========="
-          kubectl get -o yaml coredb
-          echo "=========="
-          kubectl get -o yaml clusters
-          echo "=========="
+          # Get list of namespaces that start with 'test-coredb-'
+          namespaces=$(kubectl get ns -o jsonpath='{.items[*].metadata.name}' | tr ' ' '\n' | grep '^test-coredb-')
+
+          for ns in $namespaces; do
+              echo "==== Namespace: $ns ===="
+              kubectl -n $ns get pods $ns-1 -o yaml 
+              echo "=============================="
+              kubectl -n $ns get svc -o yaml
+              echo "=============================="
+              kubectl -n $ns get coredb $ns -o yaml
+              echo "=============================="
+              kubectl -n $ns get clusters $ns -o yaml
+              echo "=============================="
+          done

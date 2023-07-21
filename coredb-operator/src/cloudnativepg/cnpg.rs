@@ -6,7 +6,7 @@ use crate::{
             ClusterBackupBarmanObjectStoreData, ClusterBackupBarmanObjectStoreDataCompression,
             ClusterBackupBarmanObjectStoreDataEncryption, ClusterBackupBarmanObjectStoreS3Credentials,
             ClusterBackupBarmanObjectStoreWal, ClusterBackupBarmanObjectStoreWalCompression,
-            ClusterBackupBarmanObjectStoreWalEncryption, ClusterBootstrap, ClusterBootstrapPgBasebackup,
+            ClusterBackupBarmanObjectStoreWalEncryption, ClusterBootstrap, ClusterBootstrapInitdb,
             ClusterExternalClusters, ClusterExternalClustersPassword, ClusterLogLevel, ClusterMonitoring,
             ClusterMonitoringCustomQueriesConfigMap, ClusterPostgresql,
             ClusterPostgresqlSyncReplicaElectionConstraint, ClusterPrimaryUpdateMethod,
@@ -17,6 +17,7 @@ use crate::{
             ScheduledBackup, ScheduledBackupBackupOwnerReference, ScheduledBackupCluster, ScheduledBackupSpec,
         },
     },
+    config::Config,
     Context,
 };
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
@@ -36,70 +37,81 @@ pub struct PostgresConfig {
 
 pub fn cnpg_backup_configuration(
     cdb: &CoreDB,
+    cfg: &Config,
 ) -> (Option<ClusterBackup>, Option<ClusterServiceAccountTemplate>) {
-    let backup_path = cdb.spec.backup.destinationPath.clone();
-    if backup_path.is_none() {
-        warn!("Backups are disabled because we don't have an S3 backup path");
-        return (None, None);
-    }
-    let service_account_metadata = cdb.spec.serviceAccountTemplate.metadata.clone();
-    if service_account_metadata.is_none() {
-        warn!("Backups are disabled because we don't have a service account template");
-        return (None, None);
-    }
-    let service_account_annotations = service_account_metadata
-        .expect("Expected service account template metadata")
-        .annotations;
-    if service_account_annotations.is_none() {
-        warn!("Backups are disabled because we don't have a service account template with annotations");
-        return (None, None);
-    }
-    let service_account_annotations =
-        service_account_annotations.expect("Expected service account template annotations");
-    let service_account_role_arn = service_account_annotations.get("eks.amazonaws.com/role-arn");
-    if service_account_role_arn.is_none() {
-        warn!("Backups are disabled because we don't have a service account template with an EKS role ARN");
-        return (None, None);
-    }
-    let role_arn = service_account_role_arn
-        .expect("Expected service account template annotations to contain an EKS role ARN")
-        .clone();
+    // Check to make sure that backups are enabled, and return None if it is disabled.
+    if !cfg.enable_backup {
+        warn!("Backups are disabled");
+        (None, None)
+    } else {
+        debug!("Backups are enabled, configuring...");
 
-    let cluster_backup = Some(ClusterBackup {
-        barman_object_store: Some(ClusterBackupBarmanObjectStore {
-            data: Some(ClusterBackupBarmanObjectStoreData {
-                compression: Some(ClusterBackupBarmanObjectStoreDataCompression::Bzip2),
-                encryption: Some(ClusterBackupBarmanObjectStoreDataEncryption::Aes256),
-                immediate_checkpoint: Some(true),
-                ..ClusterBackupBarmanObjectStoreData::default()
-            }),
-            destination_path: backup_path.expect("Expected to find S3 path"),
-            s3_credentials: Some(ClusterBackupBarmanObjectStoreS3Credentials {
-                inherit_from_iam_role: Some(true),
-                ..ClusterBackupBarmanObjectStoreS3Credentials::default()
-            }),
-            wal: Some(ClusterBackupBarmanObjectStoreWal {
-                compression: Some(ClusterBackupBarmanObjectStoreWalCompression::Bzip2),
-                encryption: Some(ClusterBackupBarmanObjectStoreWalEncryption::Aes256),
-                max_parallel: Some(5),
-            }),
-            ..ClusterBackupBarmanObjectStore::default()
-        }),
-        retention_policy: Some("80d".to_string()),
-        ..ClusterBackup::default()
-    });
+        let backup_path = cdb.spec.backup.destinationPath.clone();
+        if backup_path.is_none() {
+            warn!("Backups are disabled because we don't have an S3 backup path");
+            return (None, None);
+        }
+        let service_account_metadata = cdb.spec.serviceAccountTemplate.metadata.clone();
+        if service_account_metadata.is_none() {
+            warn!("Backups are disabled because we don't have a service account template");
+            return (None, None);
+        }
+        let service_account_annotations = service_account_metadata
+            .expect("Expected service account template metadata")
+            .annotations;
+        if service_account_annotations.is_none() {
+            warn!("Backups are disabled because we don't have a service account template with annotations");
+            return (None, None);
+        }
+        let service_account_annotations =
+            service_account_annotations.expect("Expected service account template annotations");
+        let service_account_role_arn = service_account_annotations.get("eks.amazonaws.com/role-arn");
+        if service_account_role_arn.is_none() {
+            warn!(
+                "Backups are disabled because we don't have a service account template with an EKS role ARN"
+            );
+            return (None, None);
+        }
+        let role_arn = service_account_role_arn
+            .expect("Expected service account template annotations to contain an EKS role ARN")
+            .clone();
 
-    let service_account_template = Some(ClusterServiceAccountTemplate {
-        metadata: ClusterServiceAccountTemplateMetadata {
-            annotations: Some(BTreeMap::from([(
-                "eks.amazonaws.com/role-arn".to_string(),
-                role_arn,
-            )])),
-            ..ClusterServiceAccountTemplateMetadata::default()
-        },
-    });
+        let cluster_backup = Some(ClusterBackup {
+            barman_object_store: Some(ClusterBackupBarmanObjectStore {
+                data: Some(ClusterBackupBarmanObjectStoreData {
+                    compression: Some(ClusterBackupBarmanObjectStoreDataCompression::Bzip2),
+                    encryption: Some(ClusterBackupBarmanObjectStoreDataEncryption::Aes256),
+                    immediate_checkpoint: Some(true),
+                    ..ClusterBackupBarmanObjectStoreData::default()
+                }),
+                destination_path: backup_path.expect("Expected to find S3 path"),
+                s3_credentials: Some(ClusterBackupBarmanObjectStoreS3Credentials {
+                    inherit_from_iam_role: Some(true),
+                    ..ClusterBackupBarmanObjectStoreS3Credentials::default()
+                }),
+                wal: Some(ClusterBackupBarmanObjectStoreWal {
+                    compression: Some(ClusterBackupBarmanObjectStoreWalCompression::Bzip2),
+                    encryption: Some(ClusterBackupBarmanObjectStoreWalEncryption::Aes256),
+                    max_parallel: Some(5),
+                }),
+                ..ClusterBackupBarmanObjectStore::default()
+            }),
+            retention_policy: Some("80d".to_string()),
+            ..ClusterBackup::default()
+        });
 
-    (cluster_backup, service_account_template)
+        let service_account_template = Some(ClusterServiceAccountTemplate {
+            metadata: ClusterServiceAccountTemplateMetadata {
+                annotations: Some(BTreeMap::from([(
+                    "eks.amazonaws.com/role-arn".to_string(),
+                    role_arn,
+                )])),
+                ..ClusterServiceAccountTemplateMetadata::default()
+            },
+        });
+
+        (cluster_backup, service_account_template)
+    }
 }
 
 pub fn cnpg_cluster_bootstrap_from_cdb(
@@ -109,10 +121,10 @@ pub fn cnpg_cluster_bootstrap_from_cdb(
     Option<Vec<ClusterExternalClusters>>,
     Option<ClusterSuperuserSecret>,
 ) {
+    // todo: Add logic if restore is needed
     let cluster_bootstrap = ClusterBootstrap {
-        pg_basebackup: Some(ClusterBootstrapPgBasebackup {
-            source: "coredb".to_string(),
-            ..ClusterBootstrapPgBasebackup::default()
+        initdb: Some(ClusterBootstrapInitdb {
+            ..ClusterBootstrapInitdb::default()
         }),
         ..ClusterBootstrap::default()
     };
@@ -208,6 +220,7 @@ fn cnpg_cluster_storage(cdb: &CoreDB) -> Option<ClusterStorage> {
 }
 
 pub fn cnpg_cluster_from_cdb(cdb: &CoreDB) -> Cluster {
+    let cfg = Config::default();
     let name = cdb.name_any();
     let namespace = cdb.namespace().unwrap();
     let owner_reference = cdb.controller_owner_ref(&()).unwrap();
@@ -217,7 +230,7 @@ pub fn cnpg_cluster_from_cdb(cdb: &CoreDB) -> Cluster {
 
     let (bootstrap, external_clusters, superuser_secret) = cnpg_cluster_bootstrap_from_cdb(cdb);
 
-    let (backup, service_account_template) = cnpg_backup_configuration(cdb);
+    let (backup, service_account_template) = cnpg_backup_configuration(cdb, &cfg);
 
     let storage = cnpg_cluster_storage(cdb);
 
@@ -878,9 +891,10 @@ mod tests {
           uid: 999
         "#;
         let cdb: CoreDB = from_str(cdb_yaml).unwrap();
+        let cfg = Config::default();
 
         let scheduled_backup: ScheduledBackup = cnpg_scheduled_backup(&cdb);
-        let (backup, service_account_template) = cnpg_backup_configuration(&cdb);
+        let (backup, service_account_template) = cnpg_backup_configuration(&cdb, &cfg);
 
         // Assert to make sure that backup schedule is set
         assert_eq!(scheduled_backup.spec.schedule, "55 7 * * *".to_string());

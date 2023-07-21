@@ -40,9 +40,6 @@ rules:
   - apiGroups: ["rbac.authorization.k8s.io"]
     resources: ["roles", "rolebindings"]
     verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
-  - apiGroups: ["batch"]
-    resources: ["cronjobs"]
-    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
 ---
 # Binding the role to the account in coredb-operator ns
 kind: ClusterRoleBinding
@@ -120,7 +117,7 @@ spec:
           value: "https://10.96.239.210:8080"
         - name: RUST_LOG
           value: "info,kube=debug,controller=debug"
-        - name: ENABLE_INITIAL_BACKUP
+        - name: ENABLE_BACKUP
           value: "false"
         readinessProbe:
           httpGet:

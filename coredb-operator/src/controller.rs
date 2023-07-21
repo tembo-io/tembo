@@ -11,7 +11,6 @@ use crate::{
     },
     cloudnativepg::cnpg::{cnpg_cluster_from_cdb, reconcile_cnpg, reconcile_cnpg_scheduled_backup},
     config::Config,
-    cronjob::reconcile_cronjob,
     deployment_postgres_exporter::reconcile_prometheus_exporter,
     exec::{ExecCommand, ExecOutput},
     extensions::{reconcile_extensions, Extension},
@@ -267,13 +266,6 @@ impl CoreDB {
             None
         };
 
-        // reconcile cronjob for backups
-        debug!("Reconciling cronjob");
-        reconcile_cronjob(self, ctx.clone()).await.map_err(|e| {
-            error!("Error reconciling cronjob: {:?}", e);
-            Action::requeue(Duration::from_secs(300))
-        })?;
-
         // handle postgres configs
         debug!("Reconciling postgres configmap");
         reconcile_pg_parameters_configmap(self, client.clone(), &ns)
@@ -319,7 +311,7 @@ impl CoreDB {
 
                 if cnpg_enabled {
                     reconcile_cnpg(self, ctx.clone()).await?;
-                    if cfg.enable_initial_backup {
+                    if cfg.enable_backup {
                         reconcile_cnpg_scheduled_backup(self, ctx.clone()).await?;
                     }
                 }
@@ -328,24 +320,6 @@ impl CoreDB {
                     reconcile_extensions(self, ctx.clone(), &coredbs, &name).await?;
 
                 create_postgres_exporter_role(self, ctx.clone(), secret_data).await?;
-
-                // Check cfg.enable_initial_backup to make sure we should run the initial backup
-                // if it's true, run the backup
-                if cfg.enable_initial_backup {
-                    let backup_command = vec![
-                        "/bin/sh".to_string(),
-                        "-c".to_string(),
-                        "/usr/bin/wal-g backup-push /var/lib/postgresql/data --full --verify".to_string(),
-                    ];
-
-                    let _backup_result = self
-                        .exec(primary_pod_coredb.name_any(), client, &backup_command)
-                        .await
-                        .map_err(|e| {
-                            error!("Error running backup: {:?}", e);
-                            Action::requeue(Duration::from_secs(300))
-                        })?;
-                }
 
                 CoreDBStatus {
                     running: true,

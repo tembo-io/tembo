@@ -2,13 +2,13 @@ use std::env;
 
 #[derive(Clone, Debug)]
 pub struct Config {
-    pub enable_initial_backup: bool,
+    pub enable_backup: bool,
 }
 
 impl Default for Config {
     fn default() -> Self {
         Self {
-            enable_initial_backup: from_env_default("ENABLE_INITIAL_BACKUP", "true").parse().unwrap(),
+            enable_backup: from_env_default("ENABLE_BACKUP", "true").parse().unwrap(),
         }
     }
 }
