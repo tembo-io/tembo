@@ -239,7 +239,7 @@ pub fn cnpg_cluster_from_cdb(cdb: &CoreDB) -> Cluster {
     // this is temporary - since platform starts cnpg by migrating from coredb to cnpg
     let image = match cdb.spec.stack.clone() {
         Some(stack) => match stack.name.to_lowercase().as_ref() {
-            "machinelearning" => "quay.io/tembo/ml-cnpg:15.3.0-1-4374ebd".to_string(),
+            "machinelearning" => "quay.io/tembo/ml-cnpg:15.3.0-1-77fcafc".to_string(),
             _ => "quay.io/tembo/tembo-pg-cnpg:15.3.0-5-76a65c3".to_string(),
         },
         None => "quay.io/tembo/tembo-pg-cnpg:15.3.0-5-76a65c3".to_string(),
