@@ -1,6 +1,6 @@
 FROM rust:1.71-bookworm as builder
 
-COPY coredb-operator ./coredb-operator
+COPY tembo-operator ./tembo-operator
 WORKDIR /tembo-pod-init
 COPY Cargo.toml .
 COPY src/ ./src/

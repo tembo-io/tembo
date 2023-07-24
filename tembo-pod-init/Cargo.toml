@@ -27,8 +27,8 @@ futures = "0.3"
 tracing = "0.1"
 tracing-log = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"]}
-openssl = { version = "0.10", features = ["vendored"] } 
-controller = {path = "../coredb-operator", package = "controller"}
+openssl = { version = "0.10", features = ["vendored"] }
+controller = {path = "../tembo-operator", package = "controller"}
 
 [dependencies.kube]
 features = ["admission","runtime", "client", "derive", "ws"]
