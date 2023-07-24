@@ -15,7 +15,7 @@ Goodbye database sprawl, hello Postgres.
 
 ## Try on Tembo Cloud
 
-- Sign up for Tembo Cloud Waitlist at [tembo.io](https://tembo.io)
+You can sign up for Tembo Cloud Waitlist at [tembo.io](https://tembo.io)
 
 Tembo Cloud is a managed service where users can deploy Postgres in various forms. We have a control plane / data plane architecture, where we have a control plane for a centralized UI and API, and data plane(s) where Postgres stacks are hosted. Data planes will be deployable in multiple regions and clouds. 
 
