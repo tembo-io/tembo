@@ -14,7 +14,7 @@ impl SubCommand for GetCommand {
             ResourceType::Db | ResourceType::Dbs => {
                 let output = Command::new("kubectl")
                     .arg("get")
-                    .arg("coredbs")
+                    .arg("tembos")
                     .arg("--all-namespaces")
                     .output()
                     .expect("Failed to execute 'kubectl' command.");

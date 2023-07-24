@@ -1,3 +1,3 @@
-# CoreDB CLI
+# Tembo CLI
 
 Work in progress CLI

@@ -14,7 +14,7 @@ impl SubCommand for InstallCommand {
             .arg("apply")
             .arg("-f")
             .arg(
-                format!("https://raw.githubusercontent.com/CoreDB-io/coredb/{}/coredb-operator/charts/coredb-operator/templates/crd.yaml", self.branch)
+                format!("https://raw.githubusercontent.com/tembo-io/tembo-stacks/{}/charts/tembo-operator/templates/crd.yaml", self.branch)
                 )
             .output()
             .expect("Failed to execute 'kubectl' command.");
@@ -23,7 +23,7 @@ impl SubCommand for InstallCommand {
             .arg("apply")
             .arg("-f")
             .arg(
-                format!("https://raw.githubusercontent.com/CoreDB-io/coredb/{}/coredb-operator/yaml/install.yaml", self.branch)
+                format!("https://raw.githubusercontent.com/tembo-io/tembo-stacks/{}/tembo-operator/yaml/install.yaml", self.branch)
             )
             .output()
             .expect("Failed to execute 'kubectl' command.");

@@ -1,22 +1,18 @@
-name: CoreDB CLI workflow
+name: Tembo CLI workflow
 
 defaults:
   run:
     shell: bash
-    working-directory: ./coredb-cli/
+    working-directory: ./
 
 on:
   pull_request:
     branches:
       - main
-    paths:
-    - '.github/workflows/cli.yml'
-    - 'coredb-cli/**'
   # Always run tests on main or release branches
   push:
     branches:
       - main
-      - 'release/[0-9]+.[0-9]+'
 
 jobs:
   lint:
@@ -32,9 +28,9 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
         with:
-          prefix-key: "coredb-cli-lint"
+          prefix-key: "tembo-cli-lint"
           workspaces: |
-            coredb-cli
+            tembo-cli
       - name: Cargo format
         run: cargo +nightly fmt --check
       - name: Clippy
@@ -49,8 +45,8 @@ jobs:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
         with:
-          prefix-key: "coredb-cli-test"
+          prefix-key: "tembo-cli-test"
           workspaces: |
-            coredb-cli
+            tembo-cli
       - name: Run tests
         run: cargo test

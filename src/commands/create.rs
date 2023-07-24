@@ -17,8 +17,8 @@ fn generate_yaml(resource_type: ResourceType, name: String) -> String {
     match resource_type {
         ResourceType::Db | ResourceType::Dbs => {
             let json_value = json!({
-                "apiVersion": "coredb.io/v1alpha1",
-                "kind": "CoreDB",
+                "apiVersion": "tembo.io/v1alpha1",
+                "kind": "Tembo",
                 "metadata": {
                     "name": name,
                     "namespace": "default",
@@ -67,7 +67,7 @@ impl SubCommand for CreateCommand {
 
                     if !status.success() {
                         eprintln!("kubectl apply failed with status {:?}", status);
-                        eprintln!("\n\nHint: Is CoreDB installed in the cluster?\n\nTry running 'coredb install'");
+                        eprintln!("\n\nHint: Is Tembo installed in the cluster?\n\nTry running 'tembo install'");
                     }
                 }
             }
