@@ -1,0 +1,25 @@
+name: DataWarehouse
+description: A Postgres instance equipped with configuration and extensions for data warehouses.
+image: "quay.io/coredb/coredb-pg-slim:6a892b7"
+stack_version: 0.1.0
+infrastructure:
+  cpu: 1
+  memory: 2Gi
+  storage_size: 10Gi
+  instance_type: GeneralPurpose
+  storage_class: gp3
+postgres_config_engine: olap
+postgres_config:
+  - name: checkpoint_timeout
+    value: 30min
+  - name: pg_stat_statements.track
+    value: all
+  - name: shared_preload_libraries
+    value: pg_stat_statements
+extensions:
+  - name: pg_stat_statements
+    locations:
+      - database: postgres
+        schema: public
+        enabled: true
+        version: 1.10.0

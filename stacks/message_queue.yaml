@@ -1,0 +1,55 @@
+name: MessageQueue
+description: A Tembo Postgres Stack optimized for Message Queue workloads.
+image: quay.io/coredb/messaging:893a930
+stack_version: 0.1.0
+infrastructure:
+  cpu: 1
+  memory: 1Gi
+  storage_size: 10Gi
+  instance_type: GeneralPurpose
+  storage_class: gp3
+extensions:
+  - name: pgmq
+    locations:
+      - database: postgres
+        schema: public
+        enabled: true
+        version: 0.9.0
+  - name: pg_partman
+    locations:
+      - database: postgres
+        schema: public
+        enabled: true
+        version: 4.7.3
+postgres_metrics:
+  pgmq:
+      query: select queue_name, queue_length, oldest_msg_age_sec, newest_msg_age_sec, total_messages from public.pgmq_metrics_all()
+      master: true
+      metrics:
+        - queue_name:
+            usage: LABEL
+            description: Name of the queue
+        - queue_length:
+            usage: GAUGE
+            description: Number of messages in the queue
+        - oldest_msg_age_sec:
+            usage: GAUGE
+            description: Age of the oldest message in the queue, in seconds.
+        - newest_msg_age_sec:
+            usage: GAUGE
+            description: Age of the newest message in the queue, in seconds.
+        - total_messages:
+            usage: GAUGE
+            description: Total number of messages that have passed into the queue.
+postgres_config_engine: standard
+postgres_config:
+  - name: shared_preload_libraries
+    value: pg_stat_statements,pg_cron,pg_partman_bgw
+  - name: pg_partman_bgw.dbname
+    value: postgres
+  - name: pg_partman_bgw.interval
+    value: 60
+  - name: pg_partman_bgw.role
+    value: postgres
+  - name: random_page_cost
+    value: 1.1

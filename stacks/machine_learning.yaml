@@ -1,0 +1,40 @@
+name: MachineLearning
+description: A Postgres instance equipped with machine learning extensions and optimized for machine learning workloads.
+image: "quay.io/tembo/ml:01401f6"
+stack_version: 0.1.0
+infrastructure:
+  cpu: 2
+  memory: 2Gi
+  storage_size: 10Gi
+  instance_type: GeneralPurpose
+  storage_class: gp3
+postgres_config_engine: standard
+postgres_config:
+  - name: pg_stat_statements.track
+    value: all
+  - name: shared_preload_libraries
+    value: pg_stat_statements,pgml
+extensions:
+  # vector, pgml, embedding are all installed in the base image
+  # therefore, we can reference the extension here by the name of the extension, not the name of the trunk project
+  # trunk project pg_vector
+  - name: vector
+    locations:
+      - database: postgres
+        schema: public
+        enabled: true
+        version: 0.4.4
+  # trunk project postgresml
+  - name: pgml
+    locations:
+      - database: postgres
+        schema: public
+        enabled: true
+        version: 2.7.1
+  # trunk project pg_embedding
+  - name: embedding
+    locations:
+      - database: postgres
+        schema: public
+        enabled: true
+        version: 0.1.0
