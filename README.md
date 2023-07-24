@@ -1,4 +1,5 @@
 [![conductor-deploy workflow](https://github.com/tembo-io/data-plane/actions/workflows/deploy.yml/badge.svg?branch=main)](https://github.com/CoreDB-io/data-plane/actions/workflows/deploy.yml)
+[![OSSRank](https://shields.io/endpoint?url=https://ossrank.com/shield/3811)](https://ossrank.com/p/3811)
 
 # Tembo Stacks
 
