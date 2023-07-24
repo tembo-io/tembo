@@ -1,8 +1,5 @@
 # Tembo
 
-[![](https://shields.io/endpoint?url=https://ossrank.com/shield/2103)](https://ossrank.com/p/2103)
-[![Discord Chat](https://img.shields.io/discord/1060568981725003789?label=Discord)][Discord]
-
 Tembo aims to improve the experience developers have with deploying, managing, and scaling
 Postgres.
 
@@ -20,18 +17,21 @@ on account of its’ rich ecosystem of add-ons and extensions.
 ## Roadmap
 
 We just got started, but here's what we're working on:
+
+* A managed service Postgres, which you can get early access to by visiting
+  [our website](https://tembo.io)
+* [Tembo-Stacks](https://github.com/tembo-io/tembo-stacks) - pre-configured Postgres Stacks deployable to Kubernetes
+* [Tembo CLI](https://github.com/tembo-io/tembo-cli) built with Rust
 * [Trunk CLI](https://github.com/tembo-io/trunk/tree/main/cli) that users can use to publish and install Postgres extensions
-* [Trunk Registry](https://github.com/tembo-io/trunk/tree/main/registry) that serves as a backend for [pgtrunk.io](https://pgtrunk.io), and also provides discovery and metrics
-* [Tembo-Stacks](https://github.com/tembo-io/tembo-stacks) - pre-configured Postgres Stacks deployable on Tembo cloud
+* [Trunk Website](https://github.com/tembo-io/trunk/tree/main/registry) that serves as a backend for [pgtrunk.io](https://pgtrunk.io), and also provides discovery and metrics
+
+Extensions:
 * [pgmq](https://github.com/tembo-io/pgmq) - an easy message queue built with Rust and available as a Postgres extension and Rust crate, that we use in our managed service
 * [pg_later](https://github.com/tembo-io/pg_later) - a Postgres extension for completely asynchronous query execution
-* A managed service Postgres, which you can get early access to by signing up for
-  [our mailing list](https://tembo.io)
 
 In the future:
 
-* A [new UI](https://github.com/tembo-io/pgUI) for Postgres and its extensions
-* A [CLI](https://github.com/tembo-io/tembo-cli) built with Rust
+* A [Postgres UI](https://github.com/tembo-io/pgUI) for Postgres and its extensions
 
 ## Tembo Cloud
 
@@ -40,6 +40,3 @@ scalable Postgres service. The managed service will provide a growing ecosystem 
 extensions, allowing you to expand the capabilities of your database.
 
 The service is in private beta, but you can join the waitlist at [https://tembo.io](https://tembo.io).
-
-
-[Discord]: https://discord.gg/7bGYA9NPux
