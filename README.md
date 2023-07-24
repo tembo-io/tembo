@@ -1,11 +1,8 @@
 # Tembo
 
 Tembo aims to improve the experience developers have with deploying, managing, and scaling
-Postgres.
-
-Tembo is under active development that you are free to use, except for some parts which may be
-licensed to prevent you from competing with the managed service that we are building concurrently
-(see [https://tembo.io/tembo-community-license](https://tembo.io/tembo-community-license)).
+Postgres. Tembo is under active development that you are free to use anything that we have 
+open-sourced.
 
 ## Why Postgres?
 
