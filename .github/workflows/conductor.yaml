@@ -18,7 +18,7 @@ on:
     paths:
     - '.github/workflows/conductor.yaml'
     - 'conductor/**'
-    - 'charts/coredb-operator/templates/crd.yaml'
+    - 'charts/tembo-operator/templates/crd.yaml'
 
 jobs:
   functional_test:

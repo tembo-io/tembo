@@ -13,7 +13,7 @@ install-traefik:
 	helm upgrade --install --namespace=traefik --values=./testdata/traefik-values.yaml traefik traefik/traefik
 
 install-operator:
-	helm upgrade --install --create-namespace --namespace=coredb-operator --values=./testdata/operator-values.yaml coredb-operator ../charts/coredb-operator
+	helm upgrade --install --create-namespace --namespace=coredb-operator --values=./testdata/operator-values.yaml tembo-operator ../charts/tembo-operator
 
 install-kube-prometheus-stack:
 	kubectl create namespace monitoring || true

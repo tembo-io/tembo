@@ -1,5 +1,5 @@
 FROM quay.io/coredb/rust:1.66.1 as builder
-COPY coredb-operator ./coredb-operator
+COPY tembo-operator ./tembo-operator
 WORKDIR /build
 COPY Cargo.toml Cargo.lock ./
 COPY src ./src

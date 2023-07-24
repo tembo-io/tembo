@@ -1,0 +1,150 @@
+NAME := "controller"
+ORG := "localhost:5001"
+VERSION := `git rev-parse HEAD`
+SEMVER_VERSION := `grep version Cargo.toml | awk -F"\"" '{print $2}' | head -n 1`
+NAMESPACE := "default"
+KUBE_VERSION := env_var_or_default('KUBE_VERSION', '1.25.8')
+
+default:
+  @just --list --unsorted --color=always | rg -v "    default"
+
+# generate crd
+generate-crd:
+  cargo run --bin crdgen > ../charts/tembo-operator/templates/crd.yaml
+
+install-traefik:
+	kubectl create namespace traefik || true
+	helm upgrade --install --namespace=traefik --values=./testdata/traefik-values.yaml traefik traefik/traefik
+
+install-kube-prometheus-stack:
+	kubectl create namespace monitoring || true
+	helm upgrade --install --namespace=monitoring --values=./testdata/prometheus-stack.yaml monitoring prometheus-community/kube-prometheus-stack
+
+install-tembo-pod-init:
+	kubectl create namespace tembo-pod-init || true
+	helm upgrade --install \
+	  cert-manager jetstack/cert-manager \
+	  --namespace cert-manager \
+	  --create-namespace \
+		--values=./testdata/cert-manager.yaml && \
+	helm upgrade --install --namespace=tembo-pod-init --values=./testdata/pod-init.yaml tembo-pod-init ../charts/tembo-pod-init
+
+install-cnpg:
+	helm upgrade --install cnpg \
+	  --namespace cnpg-system \
+	  --create-namespace \
+		--values=./testdata/cnpg.yaml \
+	  cnpg/cloudnative-pg
+
+enable-cnpg-default-namespace:
+	kubectl label namespace default "tembo-pod-init.tembo.io/watch"="true"
+	kubectl delete pods -n tembo-pod-init --all
+
+connect-test-db:
+	echo "Please include a line in your /etc/hosts file: "
+	echo "127.0.0.1 test-coredb.localhost"
+	psql "postgres://postgres:$(kubectl get secrets -o json test-coredb-connection | jq -r '.data.password' | base64 --decode)@test-coredb.localhost:5432"
+
+
+update-helm-repos:
+	helm repo add cnpg https://cloudnative-pg.github.io/charts
+	helm repo add jetstack https://charts.jetstack.io
+	helm repo add traefik https://traefik.github.io/charts
+	helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+	helm repo update
+
+# generate and install crd into the cluster
+install-crd: generate-crd
+  kubectl apply -f ../charts/tembo-operator/templates/crd.yaml
+
+# delete kind
+delete-kind:
+	kind delete cluster && sleep 5
+
+# start kind
+start-kind:
+	kind delete cluster || true
+	kind create cluster --image=kindest/node:v{{KUBE_VERSION}} --config testdata/kind-config.yaml
+	just update-helm-repos
+	just install-kube-prometheus-stack
+	just install-traefik
+	just install-crd
+	just install-cnpg
+	just install-tembo-pod-init
+	just annotate
+	kubectl wait pods --for=condition=Ready --timeout=300s --all --all-namespaces
+
+# run with opentelemetry
+run-telemetry:
+  OPENTELEMETRY_ENDPOINT_URL=https://0.0.0.0:55680 RUST_LOG=info,kube=info,controller=info cargo run --features=telemetry
+
+# run without opentelemetry
+run:
+  DATA_PLANE_BASEDOMAIN=localhost ENABLE_BACKUP=false RUST_LOG=info,kube=info,controller=info cargo run
+
+# annotate namespace to allow for tests
+annotate:
+	kubectl label namespace {{NAMESPACE}} safe-to-run-coredb-tests=true
+	kubectl create namespace cnpg-test || true
+	kubectl label namespace cnpg-test safe-to-run-coredb-tests=true
+	kubectl label namespace cnpg-test "tembo-pod-init.tembo.io/watch"="true"
+	kubectl delete pods -n tembo-pod-init --all
+	kubectl patch storageclass standard -p '{"allowVolumeExpansion": true}'
+
+
+# run tests
+test:
+	cargo test -- --ignored --nocapture
+
+# run cargo watch
+watch:
+	DATA_PLANE_BASEDOMAIN=localhost ENABLE_BACKUP=false RUST_LOG=debug,kube=debug,controller=debug cargo watch -x 'run'
+
+# format with nightly rustfmt
+fmt:
+  cargo +nightly fmt
+
+# compile for musl (for docker image)
+compile features="":
+  #!/usr/bin/env bash
+  docker run --rm \
+    -v cargo-cache:/root/.cargo \
+    -v $PWD:/volume \
+    -w /volume \
+    -t clux/muslrust:stable \
+    cargo build --release --features={{features}} --bin controller
+  cp target/x86_64-unknown-linux-musl/release/controller .
+
+# docker build (requires compile step first)
+build:
+  docker build -t {{ORG}}/{{NAME}}:{{VERSION}} .
+
+# retag the current git versioned docker tag as latest, and publish both
+tag-latest:
+  docker tag {{ORG}}/{{NAME}}:{{VERSION}} {{ORG}}/{{NAME}}:latest
+  docker push {{ORG}}/{{NAME}}:{{VERSION}}
+  docker push {{ORG}}/{{NAME}}:latest
+
+# retag the current git versioned docker tag as the current semver and publish
+tag-semver:
+  #!/usr/bin/env bash
+  if curl -sSL https://registry.hub.docker.com/v1/ORGsitories/{{ORG}}/{{NAME}}/tags | jq -r ".[].name" | grep -q {{SEMVER_VERSION}}; then
+    echo "Tag {{SEMVER_VERSION}} already exists - not publishing"
+  else
+    docker tag {{ORG}}/{{NAME}}:{{VERSION}} {{ORG}}/{{NAME}}:{{SEMVER_VERSION}} .
+    docker push {{ORG}}/{{NAME}}:{{SEMVER_VERSION}}
+  fi
+
+# local helpers for debugging traces
+
+# forward grpc otel port from svc/promstack-tempo in monitoring
+forward-tempo:
+  kubectl port-forward -n monitoring svc/promstack-tempo 55680:55680
+
+# forward http port from svc/promstack-grafana in monitoring
+forward-grafana:
+  kubectl port-forward -n monitoring svc/promstack-grafana 8000:80
+
+# mode: makefile
+# End:
+# vim: set ft=make :

@@ -1,0 +1,11 @@
+image:
+  repository: quay.io/tembo/tembo-operator
+  pullPolicy: Always
+  tag: latest
+
+podMonitor:
+  enabled: true
+  port: http
+  path: /metrics
+
+env: []

@@ -1,28 +1,34 @@
 [![conductor-deploy workflow](https://github.com/tembo-io/data-plane/actions/workflows/deploy.yml/badge.svg?branch=main)](https://github.com/CoreDB-io/data-plane/actions/workflows/deploy.yml)
 
-# Data Plane
+# Tembo Stacks
 
-Dataplanes are where Postgres runs.
+Deploy any data service on PostgreSQL with Tembo Stacks. We use community and purpose-built extensions to customize PostgreSQL for a variety of use cases. Goodbye database sprawl, hello Postgres!
 
-![dataplane diagram](.static/images/dataplane-diagram.png)
+![diagramstacks ui](.static/images/stacks-ui.png)
 
-## Conductor
+## Currently available stacks
 
-Dataplanes receive the desired state of databases from the control plane. The dataplanes report back the actual status of database to the control plane.
+- OLTP
+- OLAP
+- Messaging
+- Machine Learning
 
-The conductor is responsible for:
-- Dequeuing desired state from control plane, and applying into Kubernetes
-- Enqueuing back to the control plane the actual state of resources
+## Closed Beta
 
+- Sign up for our beta at [tembo.io](https://tembo.io)
 
-## Tembo operator
+## Architecture
 
-The operator is responsible for managing Stacks. The operator depends on [Cloud Native PG](https://cloudnative-pg.io/) for managing postgres. The operator adds additional features such as extension management.
+Tembo cloud is a managed service where users can deploy Postgres in various forms. We have a control plane / data plane architecture, where we have a control plane for a centralized UI and API, and data plane(s) where Postgres stacks are hosted. Data planes may be deployed in several regions, in different clouds, or self-hosted. This code repository is the data plane.
 
-### Tembo pod init
+When deploying a Postgres cluster, we deploy one of the available "Stacks". Stacks are Postgres clusters with different combinations of extensions, configurations, metrics, and hardware.
 
-This worklow is a Kubernetes mutating webhook and is a subcomponent of the operator.
+## Components
 
-## Dataplane webserver
+- **Tembo operator:** the operator is responsible for managing Stacks. The operator depends on [Cloud Native PG](https://cloudnative-pg.io/), and adds capabilities related to Postgres extensions, configuration tuning, and monitoring.
+- **Dataplane API:** the API is for serving metrics.
+- **Conductor:** this workload receives events from the control plane to make changes in the data plane.
 
-The dataplane webserver is an API that runs for each dataplane. Some features of the platform are best served from the dataplane instead of from the control plane in order to avoid centralizing data. For example metrics. The dataplane API is authenticated against the control plane.
+## License
+
+Tembo stacks are made available under the [Tembo license](./LICENSE). It's free to use except for using to host competing managed services. Tembo also started a free and open source project for building and sharing Postgres extensions called [Trunk](https://github.com/tembo-io/trunk), which is made available under the [PostgreSQL license](https://github.com/tembo-io/trunk/blob/main/LICENSE).

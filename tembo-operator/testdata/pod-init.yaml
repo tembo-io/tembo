@@ -1,0 +1,10 @@
+image:
+  tag: latest
+logLevel: debug
+resources:
+  requests:
+    cpu: 50m
+    memory: 100Mi
+  limits:
+    cpu: 200m
+    memory: 300Mi

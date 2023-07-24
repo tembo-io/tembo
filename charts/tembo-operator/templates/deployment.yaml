@@ -1,0 +1,44 @@
+# Main deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: coredb-controller
+  namespace: coredb-operator
+  labels:
+    app: coredb-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: coredb-controller
+  template:
+    metadata:
+      labels:
+        app: coredb-controller
+    spec:
+      serviceAccountName: coredb-controller
+      containers:
+      - name: coredb-controller
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        resources:
+          limits:
+            cpu: 200m
+            memory: 256Mi
+          requests:
+            cpu: 50m
+            memory: 100Mi
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        {{- with .Values.env }}
+        env:
+          {{- toYaml . | nindent 10 }}
+        {{- end }}
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 5
