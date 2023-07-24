@@ -1,1 +1,0 @@
---8<-- "coredb-operator/README.md"

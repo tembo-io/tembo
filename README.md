@@ -20,17 +20,18 @@ on account of its’ rich ecosystem of add-ons and extensions.
 ## Roadmap
 
 We just got started, but here's what we're working on:
-
 * [Trunk CLI](https://github.com/tembo-io/trunk/tree/main/cli) that users can use to publish and install Postgres extensions
 * [Trunk Registry](https://github.com/tembo-io/trunk/tree/main/registry) that serves as a backend for [pgtrunk.io](https://pgtrunk.io), and also provides discovery and metrics
-* [pgmq](https://github.com/tembo-io/tembo/tree/main/pgmq) - an easy message queue built with Rust, that we use in our managed service
+* [Tembo-Stacks](https://github.com/tembo-io/tembo-stacks) - pre-configured Postgres Stacks deployable on Tembo cloud
+* [pgmq](https://github.com/tembo-io/pgmq) - an easy message queue built with Rust and available as a Postgres extension and Rust crate, that we use in our managed service
+* [pg_later](https://github.com/tembo-io/pg_later) - a Postgres extension for completely asynchronous query execution
 * A managed service Postgres, which you can get early access to by signing up for
   [our mailing list](https://tembo.io)
 
 In the future:
 
-* A [new UI](https://github.com/tembo-io/tembo/tree/main/pgUI) for Postgres and its extensions
-* A [CLI](https://github.com/tembo-io/tembo/tree/main/coredb-cli) built with Rust
+* A [new UI](https://github.com/tembo-io/pgUI) for Postgres and its extensions
+* A [CLI](https://github.com/tembo-io/tembo-cli) built with Rust
 
 ## Tembo Cloud
 
