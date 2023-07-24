@@ -31,4 +31,4 @@ When deploying a Postgres cluster, we deploy one of the available "Stacks". Stac
 
 ## License
 
-Tembo stacks are made available under the [Tembo license](./LICENSE). It's free to use except for using to host competing managed services. Tembo also started a free and open source project for building and sharing Postgres extensions called [Trunk](https://github.com/tembo-io/trunk), which is made available under the [PostgreSQL license](https://github.com/tembo-io/trunk/blob/main/LICENSE).
+Tembo stacks are made available under the [PostgreSQL license](./LICENSE). We also started another free and open source project for building and sharing Postgres extensions called [Trunk](https://github.com/tembo-io/trunk), which is also under the [PostgreSQL license](https://github.com/tembo-io/trunk/blob/main/LICENSE).
