@@ -29,6 +29,10 @@ When deploying a Postgres cluster, we deploy one of the available "Stacks". Stac
 - **Dataplane API:** the API is for serving metrics.
 - **Conductor:** this workload receives events from the control plane to make changes in the data plane.
 
+## Security reporting
+
+Please email security issues to security@tembo.io
+
 ## License
 
 Tembo stacks are made available under the [PostgreSQL license](./LICENSE). We also started another free and open source project for building and sharing Postgres extensions called [Trunk](https://github.com/tembo-io/trunk), which is also under the [PostgreSQL license](https://github.com/tembo-io/trunk/blob/main/LICENSE).
