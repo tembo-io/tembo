@@ -6,22 +6,20 @@ Deploy any data service on PostgreSQL with Tembo Stacks and the Tembo Operator f
 
 Goodbye database sprawl, hello Postgres.
 
-![diagramstacks ui](.static/images/stacks-ui.png)
-
-## Currently available stacks
+## Current stacks (all alpha)
 
 - OLTP
 - OLAP
 - Messaging
 - Machine Learning
 
-## Closed Beta
+## Try on Tembo Cloud
 
-- Sign up for our beta at [tembo.io](https://tembo.io)
+- Sign up for Tembo Cloud Waitlist at [tembo.io](https://tembo.io)
 
-## Architecture
+Tembo Cloud is a managed service where users can deploy Postgres in various forms. We have a control plane / data plane architecture, where we have a control plane for a centralized UI and API, and data plane(s) where Postgres stacks are hosted. Data planes will be deployable in multiple regions and clouds. 
 
-Tembo cloud is a managed service where users can deploy Postgres in various forms. We have a control plane / data plane architecture, where we have a control plane for a centralized UI and API, and data plane(s) where Postgres stacks are hosted. Data planes may be deployed in several regions, in different clouds, or self-hosted. This code repository is the data plane.
+This code repository is our entire "data plane" codebase, and you can use it to self-host Tembo Stacks.
 
 When deploying a Postgres cluster, we deploy one of the available "Stacks". Stacks are Postgres clusters with different combinations of extensions, configurations, metrics, and hardware.
 
