@@ -31,7 +31,7 @@ We just got started, but here's what we're working on:
 In the future:
 
 * A [new UI](https://github.com/tembo-io/tembo/tree/main/pgUI) for Postgres and its extensions
-* A [CLI](https://github.com/tembo-io/tembo/tree/main/coredb-cli) built with Rust
+* A [CLI](https://github.com/tembo-io/tembo-cli) built with Rust
 
 ## Tembo Cloud
 
