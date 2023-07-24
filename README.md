@@ -2,7 +2,9 @@
 
 # Tembo Stacks
 
-Deploy any data service on PostgreSQL with Tembo Stacks. We use community and purpose-built extensions to customize PostgreSQL for a variety of use cases. Goodbye database sprawl, hello Postgres!
+Deploy any data service on PostgreSQL with Tembo Stacks and the Tembo Operator for Kubernetes, packaging community and purpose-built extensions to customize PostgreSQL for a variety of use cases. 
+
+Goodbye database sprawl, hello Postgres.
 
 ![diagramstacks ui](.static/images/stacks-ui.png)
 
