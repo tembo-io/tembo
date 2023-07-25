@@ -18,6 +18,7 @@ use crate::{
         },
     },
     config::Config,
+    defaults::{default_image, default_llm_image},
     Context,
 };
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
@@ -249,13 +250,14 @@ pub fn cnpg_cluster_from_cdb(cdb: &CoreDB) -> Cluster {
     };
 
     // set the container image
-    // this is temporary - since platform starts cnpg by migrating from coredb to cnpg
-    let image = match cdb.spec.stack.clone() {
-        Some(stack) => match stack.name.to_lowercase().as_ref() {
-            "machinelearning" => "quay.io/tembo/ml-cnpg:15.3.0-1-77fcafc".to_string(),
-            _ => "quay.io/tembo/tembo-pg-cnpg:15.3.0-5-76a65c3".to_string(),
-        },
-        None => "quay.io/tembo/tembo-pg-cnpg:15.3.0-5-76a65c3".to_string(),
+    // Check if the cdb.spec.image is set, if not then figure out which image to use.
+    let image = if cdb.spec.image.is_empty() {
+        match cdb.spec.stack.as_ref().map(|s| s.name.to_lowercase()) {
+            Some(ref name) if name == "machinelearning" => default_llm_image(),
+            _ => default_image(),
+        }
+    } else {
+        cdb.spec.image.clone()
     };
 
     Cluster {
@@ -872,7 +874,7 @@ mod tests {
             encryption: AES256
             retentionPolicy: "30"
             schedule: 55 7 * * *
-          image: quay.io/coredb/coredb-pg-slim:latest
+          image: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e 
           port: 5432
           postgresExporterEnabled: true
           postgresExporterImage: quay.io/prometheuscommunity/postgres-exporter:v0.12.1

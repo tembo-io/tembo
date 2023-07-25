@@ -1253,7 +1253,7 @@ mod test {
         let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
 
         // Wait for Pod to be created
-        let pod_name = format!("{}-0", name);
+        let pod_name = format!("{}-1", name);
         pod_ready_and_running(pods.clone(), pod_name.clone()).await;
 
         // This TCP route should not exist, because instead we adopted the existing one
@@ -1367,7 +1367,7 @@ mod test {
         let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
 
         // Wait for Pod to be created
-        let pod_name = format!("{}-0", name);
+        let pod_name = format!("{}-1", name);
         pod_ready_and_running(pods.clone(), pod_name.clone()).await;
 
         // This TCP route is the one we adopted

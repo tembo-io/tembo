@@ -1,6 +1,6 @@
 name: MachineLearning
 description: A Postgres instance equipped with machine learning extensions and optimized for machine learning workloads.
-image: "quay.io/tembo/ml:01401f6"
+image: "quay.io/tembo/ml-cnpg:15.3.0-1-77fcafc"
 stack_version: 0.1.0
 infrastructure:
   cpu: 2

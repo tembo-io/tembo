@@ -20,7 +20,6 @@ use crate::{
     rbac::reconcile_rbac,
     secret::{reconcile_postgres_exporter_secret, reconcile_secret, PrometheusExporterSecretData},
     service::reconcile_svc,
-    statefulset::{reconcile_sts, stateful_set_from_cdb},
     telemetry, Error, Metrics, Result,
 };
 use k8s_openapi::{
@@ -275,9 +274,12 @@ impl CoreDB {
                 Action::requeue(Duration::from_secs(300))
             })?;
 
-        // reconcile statefulset
-        debug!("Reconciling statefulset");
-        reconcile_sts(self, ctx.clone()).await?;
+        if cnpg_enabled {
+            reconcile_cnpg(self, ctx.clone()).await?;
+            if cfg.enable_backup {
+                reconcile_cnpg_scheduled_backup(self, ctx.clone()).await?;
+            }
+        }
 
         // reconcile prometheus exporter deployment if enabled
         if self.spec.postgresExporterEnabled {
@@ -299,21 +301,14 @@ impl CoreDB {
 
         let new_status = match self.spec.stop {
             false => {
-                let primary_pod_coredb = self.primary_pod_coredb(ctx.client.clone()).await?;
+                let primary_pod_cnpg = self.primary_pod_cnpg(ctx.client.clone()).await?;
 
-                if !is_postgres_ready().matches_object(Some(&primary_pod_coredb)) {
+                if !is_postgres_ready().matches_object(Some(&primary_pod_cnpg)) {
                     debug!(
                         "Did not find postgres ready {}, waiting a short period",
                         self.name_any()
                     );
                     return Ok(Action::requeue(Duration::from_secs(5)));
-                }
-
-                if cnpg_enabled {
-                    reconcile_cnpg(self, ctx.clone()).await?;
-                    if cfg.enable_backup {
-                        reconcile_cnpg_scheduled_backup(self, ctx.clone()).await?;
-                    }
                 }
 
                 let extensions: Vec<Extension> =
@@ -381,30 +376,6 @@ impl CoreDB {
         Ok(Action::await_change())
     }
 
-    pub async fn primary_pod_coredb(&self, client: Client) -> Result<Pod, Action> {
-        let sts = stateful_set_from_cdb(self);
-        let sts_name = sts.metadata.name.unwrap();
-        let sts_namespace = sts.metadata.namespace.unwrap();
-        let label_selector = format!("statefulset={sts_name}");
-        let list_params = ListParams::default().labels(&label_selector);
-        let pods: Api<Pod> = Api::namespaced(client, &sts_namespace);
-        let pods = pods.list(&list_params);
-        // Return an error if the query fails
-        let pod_list = pods.await.map_err(|_e| {
-            // It is not expected to fail the query to the pods API
-            error!("Failed to query for CoreDB primary pod of {}", &self.name_any());
-            Action::requeue(Duration::from_secs(300))
-        })?;
-        // Return an error if the list is empty
-        if pod_list.items.is_empty() {
-            // It's expected to sometimes be empty, we should retry after a short duration
-            warn!("Failed to find primary pod of {}, this can be expected if the pod is restarting for some reason", &self.name_any());
-            return Err(Action::requeue(Duration::from_secs(5)));
-        }
-        let primary = pod_list.items[0].clone();
-        Ok(primary)
-    }
-
     pub async fn primary_pod_cnpg(&self, client: Client) -> Result<Pod, Action> {
         let cluster = cnpg_cluster_from_cdb(self);
         let cluster_name = cluster
@@ -446,61 +417,7 @@ impl CoreDB {
         context: Arc<Context>,
     ) -> Result<PsqlOutput, Action> {
         let client = context.client.clone();
-        let cnpg_enabled = self.cnpg_enabled(context.clone()).await;
-
-        let pod_coredb = self.primary_pod_coredb(client.clone()).await;
-
-        let coredb_psql_command = match pod_coredb {
-            Ok(pod) => {
-                let pod_name_coredb = pod.metadata.name.expect("All pods should have a name");
-                Some(PsqlCommand::new(
-                    pod_name_coredb,
-                    self.metadata.namespace.clone().unwrap(),
-                    command.clone(),
-                    database.clone(),
-                    context.clone(),
-                ))
-            }
-            Err(e) => {
-                match cnpg_enabled {
-                    true => {
-                        // If CNPG is enabled, we can ignore missing coreDB pod
-                        None
-                    }
-                    false => {
-                        // If CNPG is disabled, we should return the sleep duration
-                        warn!("CoreDB primary pod of {} is not available", &self.name_any());
-                        return Err(e);
-                    }
-                }
-            }
-        };
-
-        match cnpg_enabled {
-            true => {
-                match coredb_psql_command {
-                    None => {
-                        // in case of CNPG, we ignore missing coredb pod
-                    }
-                    Some(command) => {
-                        // In the case of CNPG, we ignore result from coredb pod
-                        let _coredb_psql_result = command.execute().await;
-                    }
-                }
-            }
-            false => {
-                return match coredb_psql_command {
-                    None => {
-                        warn!("Failed executing command in primary pod of {}", &self.name_any());
-                        Err(Action::requeue(Duration::from_secs(300)))
-                    }
-                    Some(command) => command.execute().await.map_err(|_e| {
-                        warn!("Failed executing command in primary pod of {}", &self.name_any());
-                        Action::requeue(Duration::from_secs(30))
-                    }),
-                }
-            }
-        }
+        let _cnpg_enabled = self.cnpg_enabled(context.clone()).await;
 
         let pod_name_cnpg = self
             .primary_pod_cnpg(client.clone())
