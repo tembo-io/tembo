@@ -3,7 +3,7 @@
 {{- $files := .Files -}}
 {{- range $path, $_ := .Files.Glob "dashboards/*" -}}
 {{- $filenameWithExt := base $path -}}
-{{- $filename := trimSuffix ".json" $filenameWithExt -}}
+{{- $filename := trimSuffix ".json" $filenameWithExt }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -16,4 +16,3 @@ data:
 {{ ($files.Get $path) | indent 4 }}
 {{- end }}
 {{- end }}
-
