@@ -4,6 +4,7 @@
 {{- range $path, $_ := .Files.Glob "dashboards/*" -}}
 {{- $filenameWithExt := base $path -}}
 {{- $filename := trimSuffix ".json" $filenameWithExt -}}
+---
 apiVersion: v1
 kind: ConfigMap
 metadata:
