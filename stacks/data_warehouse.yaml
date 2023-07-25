@@ -15,7 +15,7 @@ postgres_config:
   - name: pg_stat_statements.track
     value: all
   - name: shared_preload_libraries
-    value: pg_stat_statements
+    value: pg_stat_statements,pg_later
 extensions:
   - name: pg_stat_statements
     locations:
@@ -23,3 +23,9 @@ extensions:
         schema: public
         enabled: true
         version: 1.10.0
+  - name: pg_later
+    locations:
+      - database: postgres
+        schema: pglater
+        enabled: true
+        version: 0.0.5        

@@ -13,7 +13,7 @@ postgres_config:
   - name: pg_stat_statements.track
     value: all
   - name: shared_preload_libraries
-    value: pg_stat_statements,pgml
+    value: pg_stat_statements,pgml,pg_later
 extensions:
   # vector, pgml, embedding are all installed in the base image
   # therefore, we can reference the extension here by the name of the extension, not the name of the trunk project
@@ -38,3 +38,9 @@ extensions:
         schema: public
         enabled: true
         version: 0.1.0
+  - name: pg_later
+    locations:
+      - database: postgres
+        schema: pglater
+        enabled: true
+        version: 0.0.5
