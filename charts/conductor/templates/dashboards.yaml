@@ -1,18 +1,10 @@
 {{- if .Values.serviceMonitors.coredb.enabled -}}
-{{- $fullName := include "conductor.fullname" . -}}
-{{- $files := .Files -}}
-{{- range $path, $_ := .Files.Glob "dashboards/*" -}}
-{{- $filenameWithExt := base $path -}}
-{{- $filename := trimSuffix ".json" $filenameWithExt }}
----
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: {{ $fullName }}-{{ $filename }}
+  name: {{ include "conductor.fullname" . }}-postgres-dashboard
   labels:
     grafana_dashboard: "1"
 data:
-  {{ $filename }}: |-
-{{ ($files.Get $path) | indent 4 }}
-{{- end }}
+{{ (.Files.Glob "dashboards/*").AsConfig | indent 2 }}
 {{- end }}
