@@ -1,10 +1,16 @@
-FROM quay.io/coredb/rust:1.66.1 as builder
+FROM quay.io/coredb/rust:1.71.0-slim-buster as builder
+
+RUN apt-get update && \
+    apt-get install -y pkg-config libssl-dev && apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+
 COPY tembo-operator ./tembo-operator
 WORKDIR /build
-COPY Cargo.toml Cargo.lock ./
-COPY src ./src
-RUN cargo build --release && \
-    cargo clean -p conductor
+
+COPY Cargo.toml .
+COPY Cargo.lock .
+COPY ./src ./src
+
 RUN cargo install --path .
 
 FROM quay.io/coredb/debian:11.6-slim
