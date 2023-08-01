@@ -47,6 +47,7 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "description": "Active Deployments Under Management just means total count of databases running in this cluster as of 8/1/2023",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -100,8 +101,8 @@
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
-        "w": 12,
+        "h": 9,
+        "w": 24,
         "x": 0,
         "y": 1
       },
@@ -125,177 +126,14 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "sum ((sum by (namespace) (max_over_time(pg_stat_activity_count{}[24h]))) > bool ($min_sessions_to_consider_active - 1))\n",
-          "legendFormat": "24 hour",
-          "range": true,
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "sum ((sum by (namespace) (max_over_time(pg_stat_activity_count{}[12h]))) > bool ($min_sessions_to_consider_active - 1))",
+          "expr": "count(sum by (namespace) (pg_up))",
           "hide": false,
-          "legendFormat": "12 hour",
-          "range": true,
-          "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "sum ((sum by (namespace) (max_over_time(pg_stat_activity_count{}[4h]))) > bool ($min_sessions_to_consider_active - 1))",
-          "hide": false,
-          "legendFormat": "4 hour",
+          "legendFormat": "ADUM",
           "range": true,
           "refId": "C"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "sum ((sum by (namespace) (max_over_time(pg_stat_activity_count{}[1h]))) > bool ($min_sessions_to_consider_active - 1))",
-          "hide": false,
-          "legendFormat": "1 hour",
-          "range": true,
-          "refId": "D"
         }
       ],
       "title": "ADUM",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 8,
-        "w": 12,
-        "x": 12,
-        "y": 1
-      },
-      "id": 75,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "sum ((sum by (namespace) (max_over_time(pg_stat_activity_count{}[24h]))) < bool ($min_sessions_to_consider_active - 1))\n",
-          "legendFormat": "24 hour",
-          "range": true,
-          "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "sum ((sum by (namespace) (max_over_time(pg_stat_activity_count{}[12h]))) < bool ($min_sessions_to_consider_active - 1))",
-          "hide": false,
-          "legendFormat": "12 hour",
-          "range": true,
-          "refId": "B"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "sum ((sum by (namespace) (max_over_time(pg_stat_activity_count{}[4h]))) < bool ($min_sessions_to_consider_active - 1))",
-          "hide": false,
-          "legendFormat": "4 hour",
-          "range": true,
-          "refId": "C"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "expr": "sum ((sum by (namespace) (max_over_time(pg_stat_activity_count{}[1h]))) < bool ($min_sessions_to_consider_active - 1))",
-          "hide": false,
-          "legendFormat": "1 hour",
-          "range": true,
-          "refId": "D"
-        }
-      ],
-      "title": "Idle (inverse of active)",
       "type": "timeseries"
     },
     {
@@ -335,7 +173,7 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 9
+        "y": 10
       },
       "id": 77,
       "options": {
@@ -447,7 +285,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 18
+        "y": 19
       },
       "id": 83,
       "panels": [],
@@ -516,7 +354,7 @@
         "h": 11,
         "w": 12,
         "x": 0,
-        "y": 19
+        "y": 20
       },
       "id": 78,
       "options": {
@@ -610,7 +448,7 @@
         "h": 11,
         "w": 12,
         "x": 12,
-        "y": 19
+        "y": 20
       },
       "id": 79,
       "options": {
@@ -648,7 +486,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 30
+        "y": 31
       },
       "id": 86,
       "panels": [],
@@ -700,7 +538,7 @@
         "h": 5,
         "w": 24,
         "x": 0,
-        "y": 31
+        "y": 32
       },
       "id": 87,
       "options": {
@@ -776,7 +614,7 @@
         "h": 51,
         "w": 24,
         "x": 0,
-        "y": 36
+        "y": 37
       },
       "id": 88,
       "options": {
@@ -970,7 +808,7 @@
     ]
   },
   "time": {
-    "from": "now-2d",
+    "from": "now-7d",
     "to": "now"
   },
   "timepicker": {
@@ -1001,6 +839,6 @@
   "timezone": "",
   "title": "Cloud Tracker",
   "uid": "XW3MOlCVz",
-  "version": 3,
+  "version": 4,
   "weekStart": ""
 }
