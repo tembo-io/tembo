@@ -1,6 +1,6 @@
 use futures::{StreamExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Namespace;
-use kube::api::{Api, ListParams, WatchEvent};
+use kube::api::{Api, ListParams, WatchEvent, WatchParams};
 use kube::Client;
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -41,10 +41,8 @@ impl NamespaceWatcher {
             }
         }
 
-        // Disable the use of WatchParams for now until we can upgrade the kube-rs
-        // crate to >= 0.83
-        // let wp = WatchParams::default().labels(&self.config.namespace_label);
-        let mut stream = api.watch(&lp, "0").await?.boxed();
+        let wp = WatchParams::default().labels(&self.config.namespace_label);
+        let mut stream = api.watch(&wp, "0").await?.boxed();
 
         while let Some(status) = stream.try_next().await? {
             debug!("Got event: {:?}", status);
