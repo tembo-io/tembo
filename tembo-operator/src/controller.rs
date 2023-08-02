@@ -1,8 +1,5 @@
 use chrono::{DateTime, Utc};
-use futures::{
-    future::{BoxFuture, FutureExt},
-    stream::StreamExt,
-};
+use futures::stream::StreamExt;
 
 use crate::{
     apis::{
@@ -37,6 +34,7 @@ use kube::{
         events::{Event, EventType, Recorder, Reporter},
         finalizer::{finalizer, Event as Finalizer},
         wait::Condition,
+        watcher::Config as watcherConfig,
     },
     Resource,
 };
@@ -567,21 +565,26 @@ impl State {
 }
 
 /// Initialize the controller and shared state (given the crd is installed)
-pub async fn init(client: Client) -> (BoxFuture<'static, ()>, State) {
-    let state = State::default();
-    let cdb = Api::<CoreDB>::all(client.clone());
-    if let Err(e) = cdb.list(&ListParams::default().limit(1)).await {
+pub async fn run(state: State) {
+    // Initialize the Kubernetes client
+    let client_future = kube::Client::try_default();
+    let client = match client_future.await {
+        Ok(wrapped_client) => wrapped_client,
+        Err(_) => panic!("Please configure your Kubernetes Context"),
+    };
+
+    let docs = Api::<CoreDB>::all(client.clone());
+    if let Err(e) = docs.list(&ListParams::default().limit(1)).await {
         error!("CRD is not queryable; {e:?}. Is the CRD installed?");
         info!("Installation: cargo run --bin crdgen | kubectl apply -f -");
         std::process::exit(1);
     }
-    let controller = Controller::new(cdb, ListParams::default())
+    Controller::new(docs, watcherConfig::default().any_semantic())
         .shutdown_on_signal()
         .run(reconcile, error_policy, state.create_context(client))
-        .filter_map(|x| async move { Result::ok(x) })
+        .filter_map(|x| async move { std::result::Result::ok(x) })
         .for_each(|_| futures::future::ready(()))
-        .boxed();
-    (controller, state)
+        .await;
 }
 
 // Tests rely on fixtures.rs

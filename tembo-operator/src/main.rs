@@ -1,9 +1,6 @@
-#![allow(unused_imports, unused_variables)]
 use actix_web::{get, middleware, web::Data, App, HttpRequest, HttpResponse, HttpServer, Responder};
-pub use controller::{self, Result, State};
+pub use controller::{self, telemetry, State};
 use prometheus::{Encoder, TextEncoder};
-use tracing::{debug, error, info, trace, warn};
-use tracing_subscriber::{prelude::*, EnvFilter, Registry};
 
 #[get("/metrics")]
 async fn metrics(c: Data<State>, _req: HttpRequest) -> impl Responder {
@@ -26,32 +23,12 @@ async fn index(c: Data<State>, _req: HttpRequest) -> impl Responder {
 }
 
 #[tokio::main]
-async fn main() -> Result<()> {
-    // Setup tracing layers
-    #[cfg(feature = "telemetry")]
-    let telemetry = tracing_opentelemetry::layer().with_tracer(controller::telemetry::init_tracer().await);
-    let logger = tracing_subscriber::fmt::layer();
-    let env_filter = EnvFilter::try_from_default_env()
-        .or_else(|_| EnvFilter::try_new("info"))
-        .unwrap();
+async fn main() -> anyhow::Result<()> {
+    telemetry::init().await;
 
-    // Decide on layers
-    #[cfg(feature = "telemetry")]
-    let collector = Registry::default().with(telemetry).with(logger).with(env_filter);
-    #[cfg(not(feature = "telemetry"))]
-    let collector = Registry::default().with(logger).with(env_filter);
-
-    // Initialize tracing
-    tracing::subscriber::set_global_default(collector).unwrap();
-
-    // Initialize the Kubernetes client
-    let client_future = kube::Client::try_default();
-    let client = match client_future.await {
-        Ok(wrapped_client) => wrapped_client,
-        Err(error) => panic!("Please configure your Kubernetes Context"),
-    };
     // Prepare shared state for the kubernetes controller and web server
-    let (controller, state) = controller::init(client).await;
+    let state = State::default();
+    let controller = controller::run(state.clone());
 
     // Start web server
     let server = HttpServer::new(move || {
@@ -62,14 +39,10 @@ async fn main() -> Result<()> {
             .service(health)
             .service(metrics)
     })
-    .bind("0.0.0.0:8080")
-    .expect("Can not bind to 0.0.0.0:8080")
+    .bind("0.0.0.0:8080")?
     .shutdown_timeout(5);
 
-    // Keep the app alive while both the controller and the server is alive
-    tokio::select! {
-        _ = controller => warn!("controller exited"),
-        _ = server.run() => info!("actix exited"),
-    }
+    // Both runtimes implements graceful shutdown, so poll until both are done
+    tokio::join!(controller, server.run()).1?;
     Ok(())
 }
