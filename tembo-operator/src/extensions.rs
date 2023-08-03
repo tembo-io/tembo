@@ -17,6 +17,30 @@ lazy_static! {
     static ref VALID_INPUT: Regex = Regex::new(r"^[a-zA-Z]([a-zA-Z0-9]*[-_]?)*[a-zA-Z0-9]+$").unwrap();
 }
 
+
+// mapping of extension names to their trunk project names
+lazy_static! {
+    pub static ref TRUNK_MAP: HashMap<&'static str, &'static str> = {
+        let mut m = HashMap::new();
+        m.insert("vector", "pgvector");
+        m.insert("embedding", "pg_embedding");
+        m.insert("pgml", "postgresml");
+        m.insert("columnar", "hydra_columnar");
+        m.insert("currency", "pg_currency");
+        m
+    };
+}
+
+// map the extension name to the trunk project, if a mapping exists
+// otherwise, returns the extension name
+fn get_trunk_project_name(ext_name: &str) -> String {
+    match TRUNK_MAP.get(ext_name) {
+        Some(name) => name.to_string(),
+        None => ext_name.to_string(),
+    }
+}
+
+
 #[derive(Clone, Debug, Deserialize, Eq, Hash, JsonSchema, Serialize, PartialEq)]
 pub struct Extension {
     pub name: String,
@@ -166,11 +190,14 @@ pub async fn install_extensions(
             continue;
         }
 
+        // determine appropriate trunk name
+        let trunk_name = get_trunk_project_name(&ext.name);
+
         let cmd = vec![
             "trunk".to_owned(),
             "install".to_owned(),
             "-r https://registry.pgtrunk.io".to_owned(),
-            ext.name.clone(),
+            trunk_name,
             "--version".to_owned(),
             version,
         ];
@@ -543,6 +570,20 @@ pub async fn reconcile_extensions(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+
+    #[test]
+    fn test_get_trunk_project_name() {
+        let pgvector = get_trunk_project_name("vector");
+        assert_eq!(pgvector, "pgvector");
+        let pgml = get_trunk_project_name("pgml");
+        assert_eq!(pgml, "postgresml");
+        let pgmq = get_trunk_project_name("pgmq");
+        assert_eq!(pgmq, "pgmq");
+        let dne = get_trunk_project_name("does_not_exist");
+        assert_eq!(dne, "does_not_exist");
+    }
+
 
     #[test]
     fn test_generate_extension_enable_cmd() {
