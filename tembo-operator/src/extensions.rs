@@ -27,6 +27,21 @@ lazy_static! {
         m.insert("pgml", "postgresml");
         m.insert("columnar", "hydra_columnar");
         m.insert("currency", "pg_currency");
+        m.insert("emailaddr", "pgemailaddr");
+        m.insert("financial", "pg_financial");
+        m.insert("roaringbitmap", "pg_roaringbitmap");
+        m.insert("semver", "pg_semver");
+        m.insert("http", "pgsql_http");
+        m.insert("ogr_fdw", "pgsql_ogr_fdw");
+        m.insert("timeit", "pg_timeit");
+        m.insert("uint", "pguint");
+        m.insert("uri", "pguri");
+        m.insert("decoderbufs", "postgres_decoderbufs");
+        m.insert("anon", "postgresql_anonymizer");
+        m.insert("hll", "postgresql_hll");
+        m.insert("topn", "postgresql_topn");
+        m.insert("unit", "postgresql_unit");
+        m.insert("uuid-ossp", "uuid_ossp");
         m
     };
 }
