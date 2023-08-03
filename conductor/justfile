@@ -26,7 +26,7 @@ install-tembo-pod-init:
 	  --namespace cert-manager \
 	  --create-namespace \
 	  --set installCRDs=true && \
-	helm upgrade --install --namespace=tembo-pod-init --set logLevel=debug --set image.tag=latest tembo-pod-init ../charts/tembo-pod-init
+	helm upgrade --install --namespace=tembo-pod-init --values=./testdata/pod-init.yaml tembo-pod-init ../charts/tembo-pod-init
 
 install-cnpg:
 	helm upgrade --install cnpg \
@@ -34,6 +34,11 @@ install-cnpg:
 	  --create-namespace \
 	  --set config.data.INHERITED_ANNOTATIONS="tembo-pod-init.tembo.io/*"  \
 	  cnpg/cloudnative-pg
+
+install-tempo:
+	helm upgrade --install \
+		tempo grafana/tempo \
+	  --namespace monitoring
 
 enable-cnpg-default-namespace:
 	kubectl label namespace default "tembo-pod-init.tembo.io/watch"="true"
@@ -44,6 +49,7 @@ update-helm-repos:
 	helm repo add jetstack https://charts.jetstack.io
 	helm repo add traefik https://traefik.github.io/charts
 	helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+	helm repo add grafana https://grafana.github.io/helm-charts
 	helm repo update
 
 # delete kind
@@ -56,6 +62,7 @@ start-kind:
 	kind create cluster --image=kindest/node:v{{KUBE_VERSION}} --config testdata/kind-config.yaml
 	just update-helm-repos
 	just install-kube-prometheus-stack
+	just install-tempo
 	just install-traefik
 	just install-cnpg
 	just install-operator

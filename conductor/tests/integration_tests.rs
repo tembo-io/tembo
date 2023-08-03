@@ -12,10 +12,7 @@
 #[cfg(test)]
 mod test {
     use k8s_openapi::{
-        api::{
-            apps::v1::StatefulSet, core::v1::Namespace, core::v1::PersistentVolumeClaim,
-            core::v1::Pod,
-        },
+        api::{core::v1::Namespace, core::v1::PersistentVolumeClaim, core::v1::Pod},
         apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
     };
 
@@ -27,7 +24,7 @@ mod test {
     use pgmq::{Message, PGMQueueExt};
 
     use conductor::{
-        restart_cnpg, restart_statefulset,
+        restart_cnpg,
         types::{self, StateToControlPlane},
     };
     use controller::{
@@ -41,7 +38,6 @@ mod test {
     use std::collections::BTreeMap;
     use std::{thread, time, time::Duration};
 
-    const API_VERSION: &str = "coredb.io/v1alpha1";
     // Timeout settings while waiting for an event
     const TIMEOUT_SECONDS_START_POD: u64 = 600;
     const TIMEOUT_SECONDS_POD_READY: u64 = 600;
@@ -137,7 +133,7 @@ mod test {
                 locations: vec![ExtensionInstallLocation {
                     enabled: true,
                     version: Some("1.3.0".to_owned()),
-                    schema: "public".to_owned(),
+                    schema: Some("public".to_owned()),
                     database: "postgres".to_owned(),
                 }],
             }]),
@@ -178,7 +174,7 @@ mod test {
 
         let timeout_seconds_start_pod = 120;
 
-        let pod_name = format!("{namespace}-0");
+        let pod_name = format!("{namespace}-1");
 
         let _check_for_pod = tokio::time::timeout(
             std::time::Duration::from_secs(timeout_seconds_start_pod),
@@ -219,30 +215,6 @@ mod test {
             extensions
         );
 
-        restart_statefulset(client.clone(), &namespace, &namespace)
-            .await
-            .expect("failed restarting statefulset");
-        thread::sleep(time::Duration::from_secs(10));
-        // Verify that the statefulSet was updated with the restartedAt annotation
-        let sts: Api<StatefulSet> = Api::namespaced(client.clone(), &namespace);
-        let updated_statefulset = sts
-            .get(&namespace)
-            .await
-            .expect("Failed to get StatefulSet");
-        let annot = updated_statefulset
-            .spec
-            .expect("no spec found")
-            .template
-            .metadata
-            .expect("no metadata")
-            .annotations
-            .expect("no annotations found");
-        let restarted_at_annotation = annot.get("kube.kubernetes.io/restartedAt");
-        assert!(
-            restarted_at_annotation.is_some(),
-            "StatefulSet was not restarted."
-        );
-
         let coredb_api: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
         let coredb_resource = coredb_api.get(&namespace).await.unwrap();
         // Wait for CNPG pod to be running and ready
@@ -260,7 +232,7 @@ mod test {
             locations: vec![ExtensionInstallLocation {
                 enabled: true,
                 version: Some("0.1.4".to_owned()),
-                schema: "public".to_owned(),
+                schema: Some("public".to_owned()),
                 database: "postgres".to_owned(),
             }],
         });
@@ -359,7 +331,7 @@ mod test {
         assert!(ns_dne.is_err(), "Namespace was not deleted");
         // assert pvcs is gone
         let pvcs: Api<PersistentVolumeClaim> = Api::all(client.clone());
-        let lp = ListParams::default().fields(&format!("metadata.name=data-{}-0", namespace));
+        let lp = ListParams::default().fields(&format!("metadata.name={}-1", namespace));
         let pvc_list = pvcs.list(&lp).await.expect("failed to list pvcs");
         assert!(
             pvc_list.items.is_empty(),
