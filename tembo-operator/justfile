@@ -36,6 +36,11 @@ install-cnpg:
 		--values=./testdata/cnpg.yaml \
 	  cnpg/cloudnative-pg
 
+install-tempo:
+	helm upgrade --install \
+		tempo grafana/tempo \
+	  --namespace monitoring
+
 enable-cnpg-default-namespace:
 	kubectl label namespace default "tembo-pod-init.tembo.io/watch"="true"
 	kubectl delete pods -n tembo-pod-init --all
@@ -51,6 +56,7 @@ update-helm-repos:
 	helm repo add jetstack https://charts.jetstack.io
 	helm repo add traefik https://traefik.github.io/charts
 	helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+	helm repo add grafana https://grafana.github.io/helm-charts
 	helm repo update
 
 # generate and install crd into the cluster
@@ -67,6 +73,7 @@ start-kind:
 	kind create cluster --image=kindest/node:v{{KUBE_VERSION}} --config testdata/kind-config.yaml
 	just update-helm-repos
 	just install-kube-prometheus-stack
+	just install-tempo
 	just install-traefik
 	just install-crd
 	just install-cnpg
@@ -76,7 +83,7 @@ start-kind:
 
 # run with opentelemetry
 run-telemetry:
-  OPENTELEMETRY_ENDPOINT_URL=https://0.0.0.0:55680 RUST_LOG=info,kube=info,controller=info cargo run --features=telemetry
+	DATA_PLANE_BASEDOMAIN=localhost OPENTELEMETRY_ENDPOINT_URL=http://localhost:4318 RUST_LOG=debug,kube=debug,controller=debug ENABLE_BACKUP=false cargo run --features=telemetry
 
 # run without opentelemetry
 run:
@@ -99,6 +106,10 @@ test:
 # run cargo watch
 watch:
 	DATA_PLANE_BASEDOMAIN=localhost ENABLE_BACKUP=false RUST_LOG=debug,kube=debug,controller=debug cargo watch -x 'run'
+
+# watch with opentelemetry
+watch-telemetry:
+	DATA_PLANE_BASEDOMAIN=localhost OPENTELEMETRY_ENDPOINT_URL=http://localhost:4318 RUST_LOG=debug,kube=debug,controller=debug ENABLE_BACKUP=false cargo watch -x 'run --features=telemetry'
 
 # format with nightly rustfmt
 fmt:

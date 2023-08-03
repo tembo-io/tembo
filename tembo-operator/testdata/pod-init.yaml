@@ -1,6 +1,9 @@
 image:
   tag: latest
-logLevel: debug
+logLevel: info
+extraEnv:
+  - name: OPENTELEMETRY_ENDPOINT_URL
+    value: http://tempo.monitoring.svc.cluster.local:4318
 resources:
   requests:
     cpu: 50m
