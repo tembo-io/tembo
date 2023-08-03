@@ -11,6 +11,7 @@ pub struct Config {
     pub init_container_name: String,
     pub tls_cert: String,
     pub tls_key: String,
+    pub opentelemetry_endpoint_url: String,
 }
 
 impl Default for Config {
@@ -39,6 +40,9 @@ impl Default for Config {
                 .parse()
                 .unwrap(),
             tls_key: from_env_or_default("TLS_KEY", "/certs/tls.key")
+                .parse()
+                .unwrap(),
+            opentelemetry_endpoint_url: from_env_or_default("OPENTELEMETRY_ENDPOINT_URL", "")
                 .parse()
                 .unwrap(),
         }

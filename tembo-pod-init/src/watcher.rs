@@ -5,7 +5,7 @@ use kube::Client;
 use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::debug;
+use tracing::*;
 
 use crate::config::Config;
 
@@ -24,6 +24,7 @@ impl NamespaceWatcher {
         }
     }
 
+    #[instrument(skip(self), fields(trace_id))]
     pub async fn watch(&self) -> Result<(), kube::Error> {
         let namespaces = self.namespaces.clone();
         let client = self.client.clone();

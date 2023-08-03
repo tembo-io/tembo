@@ -1,11 +1,12 @@
 use controller::cloudnativepg::clusters::Cluster;
 use k8s_openapi::api::core::v1::{Capabilities, Container, SecurityContext, VolumeMount};
 use kube::{Api, Client};
-use tracing::debug;
+use tracing::*;
 
 use crate::config::Config;
 
 // Create a Container object that will be injected into the Pod
+#[instrument(skip(client))]
 pub async fn create_init_container(
     config: &Config,
     client: &Client,

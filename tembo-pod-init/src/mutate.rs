@@ -10,10 +10,11 @@ use serde_json::json;
 use std::collections::HashSet;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use tracing::{debug, error};
+use tracing::*;
 
 use crate::{config::Config, container::*};
 
+#[instrument(skip(client), fields(trace_id))]
 #[post("/mutate")]
 async fn mutate(
     body: web::Json<AdmissionReview<Pod>>,
@@ -185,7 +186,7 @@ async fn mutate(
 
             add_volume_mounts(postgres_container, volume_mount);
         } else {
-            error!("Postgres container not found");
+            warn!("Postgres container not found");
         }
     }
 

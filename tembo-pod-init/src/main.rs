@@ -3,23 +3,22 @@ use kube::Client;
 use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 use parking_lot::Mutex;
 use std::sync::Arc;
-use tembo_pod_init::{config::Config, health::*, log, mutate::mutate, watcher::NamespaceWatcher};
+use tembo_pod_init::{
+    config::Config, health::*, mutate::mutate, telemetry, watcher::NamespaceWatcher,
+};
+use tracing::*;
 
-#[macro_use]
-extern crate tracing;
-
+#[instrument(fields(trace_id))]
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     let config = Config::default();
 
     // Initialize logging
-    if let Err(e) = log::init(&config) {
-        error!("Failed to initialize logging: {}", e);
-        return Err(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            "Logger initialization failed",
-        ));
-    }
+    telemetry::init(&config).await;
+
+    // Set trace_id for logging
+    let trace_id = telemetry::get_trace_id();
+    Span::current().record("trace_id", &field::display(&trace_id));
 
     let stop_handle = web::Data::new(StopHandle::default());
 
@@ -34,34 +33,7 @@ async fn main() -> std::io::Result<()> {
     // Start watching namespaces in a seperate tokio task thread
     let watcher = NamespaceWatcher::new(Arc::new(kube_client.clone()), config.clone());
     let namespaces = watcher.get_namespaces();
-    tokio::spawn(async move {
-        loop {
-            match watcher.watch().await {
-                Ok(_) => {
-                    info!("Namespace watcher finished, restarting.");
-                }
-                Err(e) => {
-                    error!("Namespace watcher failed, restarting: {}", e);
-                    tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
-                }
-            }
-        }
-    });
-
-    // Print out the namespaces we are currently watching every 10 seconds
-    //if tracing::Level::DEBUG >= *tracing::level_filters::RECORDED_LEVEL {
-    //    let debug_namespaces = Arc::clone(&namespaces);
-    //    tokio::spawn(async move {
-    //        loop {
-    //            let stored_namespaces = debug_namespaces.read().await;
-    //            debug!(
-    //                "Namespaces currently being tracked: {:?}",
-    //                *stored_namespaces
-    //            );
-    //            tokio::time::sleep(tokio::time::Duration::from_secs(5)).await; // adjust the delay as needed
-    //        }
-    //    });
-    //}
+    tokio::spawn(watch_namespaces(watcher));
 
     // Load the TLS certificate and key
     let mut tls_config = SslAcceptor::mozilla_intermediate(SslMethod::tls()).unwrap();
@@ -119,5 +91,20 @@ impl StopHandle {
     // Set the ServerHandle to stop
     pub(crate) fn register(&self, handle: ServerHandle) {
         *self.inner.lock() = Some(handle);
+    }
+}
+
+#[instrument(skip(watcher))]
+async fn watch_namespaces(watcher: NamespaceWatcher) {
+    loop {
+        match watcher.watch().await {
+            Ok(_) => {
+                info!("Namespace watcher finished, restarting.");
+            }
+            Err(e) => {
+                error!("Namespace watcher failed, restarting: {}", e);
+                tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+            }
+        }
     }
 }
