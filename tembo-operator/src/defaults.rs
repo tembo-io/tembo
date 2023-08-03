@@ -69,10 +69,6 @@ pub fn default_database() -> String {
     "postrgres".to_owned()
 }
 
-pub fn default_schema() -> String {
-    "public".to_owned()
-}
-
 pub fn default_description() -> Option<String> {
     Some("No description provided".to_owned())
 }

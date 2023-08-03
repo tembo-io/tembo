@@ -43,15 +43,15 @@ pub struct ExtensionInstallLocation {
     // no database or schema when disabled
     #[serde(default = "defaults::default_database")]
     pub database: String,
-    #[serde(default = "defaults::default_schema")]
-    pub schema: String,
+    // schema is optional. Some extensions get installed into their own schema and is handled by the extension
+    pub schema: Option<String>,
     pub version: Option<String>,
 }
 
 impl Default for ExtensionInstallLocation {
     fn default() -> Self {
         ExtensionInstallLocation {
-            schema: "public".to_owned(),
+            schema: Some("public".to_owned()),
             database: "postgres".to_owned(),
             enabled: true,
             version: Some("1.9".to_owned()),
@@ -217,34 +217,15 @@ pub async fn toggle_extensions(
         } else {
             // extensions can be installed in multiple databases but only a single schema
             for ext_loc in ext.locations.iter() {
-                let database_name = ext_loc.database.to_owned();
-
-                if !check_input(&database_name) {
-                    warn!(
-                        "Extension.Database {}.{} is not formatted properly. Skipping operation.",
-                        ext_name, database_name
-                    );
-                    continue;
-                }
-                let command = match ext_loc.enabled {
-                    true => {
-                        info!("Creating extension: {}, database {}", ext_name, database_name);
-                        let schema_name = ext_loc.schema.to_owned();
-                        if !check_input(&schema_name) {
-                            warn!(
-                                "Extension.Database.Schema {}.{}.{} is not formatted properly. Skipping operation.",
-                                ext_name, database_name, schema_name
-                            );
-                            continue;
-                        }
-                        format!(
-                            "CREATE EXTENSION IF NOT EXISTS \"{}\" SCHEMA {} CASCADE;",
-                            ext_name, schema_name
-                        )
-                    }
-                    false => {
-                        info!("Dropping extension: {}, database {}", ext_name, database_name);
-                        format!("DROP EXTENSION IF EXISTS \"{}\" CASCADE;", ext_name)
+                let database_name = ext_loc.database.clone();
+                let command = match generate_extension_enable_cmd(ext_name, ext_loc) {
+                    Ok(cmd) => cmd,
+                    Err(e) => {
+                        warn!(
+                            "Failed to generate command for extension {}. Error: {:?}. Continuing.",
+                            ext_name, e
+                        );
+                        continue;
                     }
                 };
 
@@ -273,6 +254,41 @@ pub async fn toggle_extensions(
         }
     }
     Ok(())
+}
+
+/// generates the CREATE or DROP EXTENSION command for a given extension
+/// handles schema specification in the command
+fn generate_extension_enable_cmd(
+    ext_name: &str,
+    ext_loc: &ExtensionInstallLocation,
+) -> Result<String, Error> {
+    let database_name = ext_loc.database.to_owned();
+    if !check_input(&database_name) {
+        return Err(Error::InvalidErr(format!(
+            "Extension.Database {}.{} is not formatted properly. Skipping operation.",
+            ext_name, database_name
+        )));
+    }
+    // only specify the schema if it provided
+    let command = match ext_loc.enabled {
+        true => {
+            match ext_loc.schema.as_ref() {
+                Some(schema) => {
+                    if !check_input(&schema) {
+                        return Err(Error::InvalidErr( format!("Extension.Database.Schema {}.{}.{} is not formatted properly. Skipping operation.",
+                        ext_name, database_name, schema)));
+                    }
+                    format!(
+                        "CREATE EXTENSION IF NOT EXISTS \"{}\" SCHEMA {} CASCADE;",
+                        ext_name, schema
+                    )
+                }
+                None => format!("CREATE EXTENSION IF NOT EXISTS \"{}\" CASCADE;", ext_name),
+            }
+        }
+        false => format!("DROP EXTENSION IF EXISTS \"{}\" CASCADE;", ext_name),
+    };
+    Ok(command)
 }
 
 pub fn check_input(input: &str) -> bool {
@@ -354,7 +370,7 @@ pub async fn get_all_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<E
                 database: db.clone(),
                 version: Some(ext.version),
                 enabled: ext.enabled,
-                schema: ext.schema,
+                schema: Some(ext.schema),
             };
             ext_hashmap
                 .entry((ext.name, ext.description))
@@ -529,6 +545,62 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_generate_extension_enable_cmd() {
+        // schema not specified
+        let loc1 = ExtensionInstallLocation {
+            database: "postgres".to_string(),
+            enabled: true,
+            schema: None,
+            version: Some("1.0.0".to_string()),
+        };
+        let cmd = generate_extension_enable_cmd("my_ext", &loc1);
+        assert_eq!(cmd.unwrap(), "CREATE EXTENSION IF NOT EXISTS \"my_ext\" CASCADE;");
+
+        // schema specified
+        let loc2 = ExtensionInstallLocation {
+            database: "postgres".to_string(),
+            enabled: true,
+            schema: Some("public".to_string()),
+            version: Some("1.0.0".to_string()),
+        };
+        let cmd = generate_extension_enable_cmd("my_ext", &loc2);
+        assert_eq!(
+            cmd.unwrap(),
+            "CREATE EXTENSION IF NOT EXISTS \"my_ext\" SCHEMA public CASCADE;"
+        );
+
+        // drop extension
+        let loc2 = ExtensionInstallLocation {
+            database: "postgres".to_string(),
+            enabled: false,
+            schema: Some("public".to_string()),
+            version: Some("1.0.0".to_string()),
+        };
+        let cmd = generate_extension_enable_cmd("my_ext", &loc2);
+        assert_eq!(cmd.unwrap(), "DROP EXTENSION IF EXISTS \"my_ext\" CASCADE;");
+
+        // error mode: malformed database name
+        let loc2 = ExtensionInstallLocation {
+            database: "postgres; --".to_string(),
+            enabled: true,
+            schema: Some("public".to_string()),
+            version: Some("1.0.0".to_string()),
+        };
+        let cmd = generate_extension_enable_cmd("my_ext", &loc2);
+        assert!(cmd.is_err());
+
+        // error mode: malformed schema name
+        let loc2 = ExtensionInstallLocation {
+            database: "postgres".to_string(),
+            enabled: true,
+            schema: Some("public; --".to_string()),
+            version: Some("1.0.0".to_string()),
+        };
+        let cmd = generate_extension_enable_cmd("my_ext", &loc2);
+        assert!(cmd.is_err());
+    }
+
+    #[test]
     fn test_extension_plan() {
         let aggs_for_vecs_disabled = Extension {
             name: "aggs_for_vecs".to_owned(),
@@ -536,7 +608,7 @@ mod tests {
             locations: vec![ExtensionInstallLocation {
                 enabled: false,
                 database: "postgres".to_owned(),
-                schema: "public".to_owned(),
+                schema: Some("public".to_owned()),
                 version: Some("1.3.0".to_owned()),
             }],
         };
@@ -547,7 +619,7 @@ mod tests {
             locations: vec![ExtensionInstallLocation {
                 enabled: false,
                 database: "postgres".to_owned(),
-                schema: "public".to_owned(),
+                schema: Some("public".to_owned()),
                 version: Some("0.9.0".to_owned()),
             }],
         };
@@ -572,7 +644,7 @@ mod tests {
             locations: vec![ExtensionInstallLocation {
                 enabled: true,
                 database: "postgres".to_owned(),
-                schema: "public".to_owned(),
+                schema: Some("public".to_owned()),
                 version: Some("1.10".to_owned()),
             }],
         };
@@ -583,7 +655,7 @@ mod tests {
             locations: vec![ExtensionInstallLocation {
                 enabled: true,
                 database: "postgres".to_owned(),
-                schema: "public".to_owned(),
+                schema: Some("public".to_owned()),
                 version: Some("1.10.0".to_owned()),
             }],
         };
@@ -602,7 +674,7 @@ mod tests {
             locations: vec![ExtensionInstallLocation {
                 enabled: false,
                 database: "postgres".to_owned(),
-                schema: "public".to_owned(),
+                schema: Some("public".to_owned()),
                 version: Some("1.1.1".to_owned()),
             }],
         };
@@ -612,7 +684,7 @@ mod tests {
             locations: vec![ExtensionInstallLocation {
                 enabled: true,
                 database: "postgres".to_owned(),
-                schema: "public".to_owned(),
+                schema: Some("public".to_owned()),
                 version: Some("1.1.1".to_owned()),
             }],
         };
@@ -622,7 +694,7 @@ mod tests {
             locations: vec![ExtensionInstallLocation {
                 enabled: false,
                 database: "postgres".to_owned(),
-                schema: "public".to_owned(),
+                schema: Some("public".to_owned()),
                 version: Some("1.1.1".to_owned()),
             }],
         };
@@ -632,7 +704,7 @@ mod tests {
             locations: vec![ExtensionInstallLocation {
                 enabled: true,
                 database: "postgres".to_owned(),
-                schema: "public".to_owned(),
+                schema: Some("public".to_owned()),
                 version: Some("1.1.1".to_owned()),
             }],
         };
@@ -682,7 +754,7 @@ mod tests {
             locations: vec![ExtensionInstallLocation {
                 enabled: true,
                 database: "postgres".to_owned(),
-                schema: "public".to_owned(),
+                schema: Some("public".to_owned()),
                 version: Some("0.5.0".to_owned()),
             }],
         };
@@ -693,7 +765,7 @@ mod tests {
             locations: vec![ExtensionInstallLocation {
                 enabled: true,
                 database: "postgres".to_owned(),
-                schema: "public".to_owned(),
+                schema: Some("public".to_owned()),
                 version: Some("0.6.0".to_owned()),
             }],
         };
@@ -723,7 +795,7 @@ mod tests {
             locations: vec![ExtensionInstallLocation {
                 enabled: false,
                 database: "postgres".to_owned(),
-                schema: "public".to_owned(),
+                schema: Some("public".to_owned()),
                 version: Some("1.5.2".to_owned()),
             }],
         };
@@ -734,7 +806,7 @@ mod tests {
             locations: vec![ExtensionInstallLocation {
                 enabled: true,
                 database: "postgres".to_owned(),
-                schema: "public".to_owned(),
+                schema: Some("public".to_owned()),
                 version: Some("0.9.0".to_owned()),
             }],
         };
@@ -745,7 +817,7 @@ mod tests {
             locations: vec![ExtensionInstallLocation {
                 enabled: false,
                 database: "postgres".to_owned(),
-                schema: "public".to_owned(),
+                schema: Some("public".to_owned()),
                 version: Some("0.9.0".to_owned()),
             }],
         };
