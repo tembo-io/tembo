@@ -443,7 +443,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tembo-cli"
+name = "tembo"
 version = "0.2.3"
 dependencies = [
  "assert_cmd",

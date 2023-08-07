@@ -28,9 +28,9 @@ jobs:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
         with:
-          prefix-key: "tembo-cli-lint"
+          prefix-key: "tembo-lint"
           workspaces: |
-            tembo-cli
+            tembo
       - name: Cargo format
         run: cargo +nightly fmt --check
       - name: Clippy
@@ -45,8 +45,8 @@ jobs:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2
         with:
-          prefix-key: "tembo-cli-test"
+          prefix-key: "tembo-test"
           workspaces: |
-            tembo-cli
+            tembo
       - name: Run tests
         run: cargo test
