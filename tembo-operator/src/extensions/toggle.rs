@@ -63,13 +63,13 @@ async fn toggle_extensions(
                                 schema: location_to_toggle.schema.clone(),
                                 version: None,
                                 enabled: None,
-                                error: true,
+                                error: Some(true),
                                 error_message: None,
                             }
                         }
                         Some(location_status) => location_status,
                     };
-                    location_status.error = true;
+                    location_status.error = Some(true);
                     location_status.error_message = Some(error_message);
                     ext_status_updates = kubernetes_queries::update_extension_location_in_status(
                         cdb,
@@ -106,7 +106,7 @@ fn determine_updated_extensions_status(
                 database: actual_location.database.clone(),
                 schema: actual_location.schema.clone(),
                 version: actual_location.version.clone(),
-                error: false,
+                error: Some(false),
                 error_message: None,
             };
             // If there is a current status, retain the error and error message
@@ -132,7 +132,7 @@ fn determine_updated_extensions_status(
                 None => {}
                 Some(desired_location) => {
                     if actual_location.enabled == desired_location.enabled {
-                        location_status.error = false;
+                        location_status.error = Some(false);
                         location_status.error_message = None;
                     }
                 }
@@ -171,7 +171,7 @@ fn determine_updated_extensions_status(
                     database: desired_location.database.clone(),
                     schema: desired_location.schema.clone(),
                     version: desired_location.version.clone(),
-                    error: true,
+                    error: Some(true),
                     error_message: Some("Extension is not installed".to_string()),
                 };
                 ext_status_updates = merge_location_status_into_extension_status_list(
@@ -205,9 +205,14 @@ fn determine_extension_locations_to_toggle(cdb: &CoreDB) -> Vec<Extension> {
                 }
                 Some(actual_status) => {
                     // If we don't have an error already, the extension exists, and the desired does not match the actual
-                    if !actual_status.error
-                        && actual_status.enabled.is_some()
-                        && actual_status.enabled.unwrap() != desired_location.enabled
+                    // The actual_status.error should not be None because this only exists on old resource versions
+                    // and we update actual_status before calling this function. If we find that for some reason, we just skip.
+                    if actual_status.error.is_some()
+                        && (!actual_status
+                            .error
+                            .expect("We just checked this is not none, so we should be able to unwrap.")
+                            && actual_status.enabled.is_some()
+                            && actual_status.enabled.unwrap() != desired_location.enabled)
                     {
                         needs_toggle = true;
                         extension_to_toggle.locations.push(desired_location.clone());
@@ -348,7 +353,7 @@ mod tests {
                     database: "db_where_its_available_and_disabled".to_string(),
                     schema: "public".to_string(),
                     version: None,
-                    error: false,
+                    error: Some(false),
                     error_message: None,
                 },
                 // Requesting to disable a currently enabled extension
@@ -357,7 +362,7 @@ mod tests {
                     database: "db_where_its_available_and_enabled".to_string(),
                     schema: "public".to_string(),
                     version: None,
-                    error: false,
+                    error: Some(false),
                     error_message: None,
                 },
                 ExtensionInstallLocationStatus {
@@ -366,7 +371,7 @@ mod tests {
                         .to_string(),
                     schema: "public".to_string(),
                     version: None,
-                    error: true,
+                    error: Some(true),
                     error_message: Some("Failed to enable extension".to_string()),
                 },
                 ExtensionInstallLocationStatus {
@@ -376,7 +381,7 @@ mod tests {
                             .to_string(),
                     schema: "public".to_string(),
                     version: None,
-                    error: true,
+                    error: Some(true),
                     error_message: Some("Extension is not installed".to_string()),
                 },
                 ExtensionInstallLocationStatus {
@@ -384,7 +389,7 @@ mod tests {
                     database: "db_where_enable_failed".to_string(),
                     schema: "public".to_string(),
                     version: None,
-                    error: true,
+                    error: Some(true),
                     error_message: Some("Failed to enable extension".to_string()),
                 },
             ],
@@ -509,7 +514,7 @@ mod tests {
         )
         .unwrap();
         assert_eq!(location_status.enabled, Some(false));
-        assert!(!location_status.error);
+        assert!(!location_status.error.unwrap());
         assert!(location_status.error_message.is_none());
         // Toggling and extension back to false because missing, it should remove from status
         assert!(get_location_status(
@@ -522,12 +527,12 @@ mod tests {
         // It should retain error message when it failed on a previous attempt
         let location_status = get_location_status(&cdb, "ext1", "db_where_enable_failed", "public").unwrap();
         assert_eq!(location_status.enabled, Some(false));
-        assert!(location_status.error);
+        assert!(location_status.error.unwrap());
         assert!(location_status.error_message.is_some());
         let location_status =
             get_location_status(&cdb, "ext1", "db_where_its_not_available", "public").unwrap();
         assert_eq!(location_status.enabled, None);
-        assert!(location_status.error);
+        assert!(location_status.error.unwrap());
         assert!(location_status.error_message.is_some());
 
         let extension_locations_to_toggle = determine_extension_locations_to_toggle(&cdb);

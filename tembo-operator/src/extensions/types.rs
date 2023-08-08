@@ -82,7 +82,8 @@ pub struct ExtensionInstallLocationStatus {
     pub version: Option<String>,
     // None means this is not actually installed
     pub enabled: Option<bool>,
-    pub error: bool,
+    // Optional to handle upgrading existing resources
+    pub error: Option<bool>,
     pub error_message: Option<String>,
 }
 
@@ -148,7 +149,7 @@ mod tests {
             schema: location_schema.to_owned(),
             version: Some("1.9".to_owned()),
             enabled: Some(true),
-            error: false,
+            error: Some(false),
             error_message: None,
         };
         let cdb = CoreDB {

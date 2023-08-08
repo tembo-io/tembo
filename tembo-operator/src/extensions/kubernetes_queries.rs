@@ -234,7 +234,7 @@ mod tests {
                 database: "db1".to_string(),
                 schema: "schema1".to_string(),
                 version: None,
-                error: false,
+                error: Some(false),
                 error_message: None,
             }],
         }];
@@ -243,7 +243,7 @@ mod tests {
             database: "db1".to_string(),
             schema: "schema1".to_string(),
             version: None,
-            error: false,
+            error: Some(false),
             error_message: None,
         };
 
@@ -269,7 +269,7 @@ mod tests {
                 database: "db1".to_string(),
                 schema: "schema2".to_string(),
                 version: None,
-                error: false,
+                error: Some(false),
                 error_message: None,
             }],
         }];
@@ -278,7 +278,7 @@ mod tests {
             database: "db1".to_string(),
             schema: "schema1".to_string(),
             version: None,
-            error: false,
+            error: Some(false),
             error_message: None,
         };
 
@@ -308,7 +308,7 @@ mod tests {
                 database: "db1".to_string(),
                 schema: "schema1".to_string(),
                 version: None,
-                error: false,
+                error: Some(false),
                 error_message: None,
             }],
         }];
@@ -317,7 +317,7 @@ mod tests {
             database: "db1".to_string(),
             schema: "schema1".to_string(),
             version: None,
-            error: false,
+            error: Some(false),
             error_message: None,
         };
 

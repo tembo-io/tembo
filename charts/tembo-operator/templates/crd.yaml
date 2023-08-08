@@ -377,6 +377,7 @@ spec:
                             nullable: true
                             type: boolean
                           error:
+                            nullable: true
                             type: boolean
                           error_message:
                             nullable: true
@@ -387,8 +388,6 @@ spec:
                           version:
                             nullable: true
                             type: string
-                        required:
-                        - error
                         type: object
                       type: array
                     name:
