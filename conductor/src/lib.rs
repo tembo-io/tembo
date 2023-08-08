@@ -52,7 +52,10 @@ pub async fn get_one(client: Client, namespace: &str) -> Result<CoreDB, Conducto
 }
 
 // returns CoreDB when status is present, otherwise returns an error
-pub async fn get_coredb_status(client: Client, namespace: &str) -> Result<CoreDB, ConductorError> {
+pub async fn get_coredb_error_without_status(
+    client: Client,
+    namespace: &str,
+) -> Result<CoreDB, ConductorError> {
     let coredb = get_one(client, namespace).await?;
 
     if coredb.status.is_none() {

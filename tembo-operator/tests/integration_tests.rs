@@ -410,6 +410,11 @@ mod test {
                             "schema": "public"}
                         ]
                     }],
+                "trunk_installs": [
+                    {
+                        "name": "aggs_for_vecs",
+                        "version": "1.3.0",
+                    }],
                 "metrics": {
                     "enabled": true,
                     "queries": {
@@ -441,7 +446,7 @@ mod test {
 
         // Wait for secret to be created
         let secret_api: Api<Secret> = Api::namespaced(client.clone(), &namespace);
-        let secret_name = format!("{}-connection", name);
+        let secret_name = format!("{}-metrics", name);
         println!("Waiting for secret to be created: {}", secret_name);
         let establish = await_condition(secret_api.clone(), &secret_name, wait_for_secret());
         let _ = tokio::time::timeout(Duration::from_secs(TIMEOUT_SECONDS_SECRET_PRESENT), establish)
@@ -760,6 +765,20 @@ mod test {
             },
             "spec": {
                 "replicas": replicas,
+                "trunk_installs": [
+                    {
+                        "name": "pg_partman",
+                        "version": "4.7.3",
+                    },
+                    {
+                        "name": "pgmq",
+                        "version": "0.10.0",
+                    },
+                    {
+                        "name": "pg_stat_statements",
+                        "version": "1.10.0",
+                    },
+                ],
                 "extensions": [
                     {
                         "name": "pg_partman",
@@ -1026,6 +1045,12 @@ mod test {
             },
             "spec": {
                 "replicas": replicas,
+                "trunk_installs": [
+                    {
+                        "name": "aggs_for_vecs",
+                        "version": "1.3.0",
+                    },
+                ],
                 "extensions": [
                     {
                         "name": "aggs_for_vecs",

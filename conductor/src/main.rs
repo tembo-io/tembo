@@ -1,11 +1,12 @@
 use actix_web::{web, App, HttpServer};
 use actix_web_opentelemetry::{PrometheusMetricsHandler, RequestTracing};
 use conductor::errors::ConductorError;
+use conductor::extensions::extensions_still_processing;
 use conductor::monitoring::CustomMetrics;
 use conductor::{
     create_cloudformation, create_namespace, create_networkpolicy, create_or_update, delete,
-    delete_cloudformation, delete_namespace, extensions::extension_plan, generate_rand_schedule,
-    generate_spec, get_coredb_status, get_pg_conn, lookup_role_arn, restart_cnpg,
+    delete_cloudformation, delete_namespace, generate_rand_schedule, generate_spec,
+    get_coredb_error_without_status, get_one, get_pg_conn, lookup_role_arn, restart_cnpg,
     restart_statefulset, types,
 };
 use controller::apis::coredb_types::{Backup, CoreDBSpec, ServiceAccountTemplate};
@@ -102,6 +103,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), Box<dyn std::error::Error>> {
                 event_id: read_msg.message.event_id,
                 event_type: Event::Error,
                 spec: None,
+                status: None,
                 connection: None,
             };
             let msg_id = queue.send(&data_plane_events_queue, &error_event).await?;
@@ -316,69 +318,12 @@ async fn run(metrics: CustomMetrics) -> Result<(), Box<dyn std::error::Error>> {
                 };
 
                 info!("{}: Getting status", read_msg.msg_id);
-                let result = get_coredb_status(client.clone(), &namespace).await;
 
-                // determine if we should requeue the message
-                let requeue: bool = match &result {
-                    Ok(current_spec) => {
-                        // if the coredb is still updating the extensions, requeue this task and try again in a few seconds
-                        let status = current_spec.clone().status.expect("no status present");
-                        let updating_extension = status.extensionsUpdating;
+                let result = get_one(client.clone(), &namespace).await;
 
-                        // requeue when extensions are "out of sync"
-                        // this happens when:
-                        // 1. no extensions reported on the crd status
-                        // 2. number of desired extensions != actual extensions
-                        // 3. there is a difference in hashes between desired and actual extensions
-                        let extensions_out_of_sync: bool = match status.extensions {
-                            Some(actual_extensions) => {
-                                // requeue if there are less extensions than desired
-                                // likely means that the extensions are still being updated
-                                // or there is an issue changing an extension
-                                let desired_extensions = msg_spec.extensions;
-                                // if no extensions in request, then exit
-                                if desired_extensions.is_empty() {
-                                    info!("{}: No extensions in request", read_msg.msg_id);
-                                    false
-                                } else {
-                                    let (changed, to_install) =
-                                        extension_plan(&desired_extensions, &actual_extensions);
-                                    // requeue if extensions need to be installed or updated
-                                    if !changed.is_empty() || !to_install.is_empty() {
-                                        warn!(
-                                            "{}: changed: {:?}, to_install: {:?}",
-                                            read_msg.msg_id, changed, to_install
-                                        );
-                                        true
-                                    } else {
-                                        false
-                                    }
-                                }
-                            }
-                            None => true,
-                        };
-                        if updating_extension || extensions_out_of_sync {
-                            warn!(
-                                "{}: extensions updating: {}, extensions_out_of_sync: {}",
-                                read_msg.msg_id, updating_extension, extensions_out_of_sync
-                            );
-                            true
-                        } else {
-                            false
-                        }
-                    }
-                    Err(err) => {
-                        error!(
-                            "{}: error getting CoreDB status in {}: {:?}",
-                            read_msg.msg_id,
-                            namespace.clone(),
-                            err
-                        );
-                        metrics
-                            .conductor_errors
-                            .add(&opentelemetry::Context::current(), 1, &[]);
-                        true
-                    }
+                let requeue = match &result {
+                    Ok(coredb) => extensions_still_processing(coredb),
+                    Err(_) => true,
                 };
 
                 if requeue {
@@ -397,17 +342,10 @@ async fn run(metrics: CustomMetrics) -> Result<(), Box<dyn std::error::Error>> {
                     continue;
                 }
 
-                let mut current_spec = result?;
+                let current_spec = result?;
 
                 let spec_js = serde_json::to_string(&current_spec.spec).unwrap();
                 debug!("dbname: {}, current_spec: {:?}", &namespace, spec_js);
-
-                // get actual extensions from crd status
-                // UPDATE SPEC OBJECT WITH ACTUAL EXTENSIONS
-                current_spec.spec.extensions = current_spec
-                    .status
-                    .and_then(|o| o.extensions)
-                    .unwrap_or_default();
 
                 let report_event = match read_msg.message.event_type {
                     Event::Create => Event::Created,
@@ -419,6 +357,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), Box<dyn std::error::Error>> {
                     event_id: read_msg.message.event_id,
                     event_type: report_event,
                     spec: Some(current_spec.spec),
+                    status: current_spec.status,
                     connection: Some(conn_info),
                 }
             }
@@ -445,6 +384,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), Box<dyn std::error::Error>> {
                     event_id: read_msg.message.event_id,
                     event_type: Event::Deleted,
                     spec: None,
+                    status: None,
                     connection: None,
                 }
             }
@@ -467,7 +407,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), Box<dyn std::error::Error>> {
                 }
                 let retry_strategy = FixedInterval::from_millis(5000).take(20);
                 let result = Retry::spawn(retry_strategy.clone(), || {
-                    get_coredb_status(client.clone(), &namespace)
+                    get_coredb_error_without_status(client.clone(), &namespace)
                 })
                 .await;
                 if result.is_err() {
@@ -481,16 +421,9 @@ async fn run(metrics: CustomMetrics) -> Result<(), Box<dyn std::error::Error>> {
                         .add(&opentelemetry::Context::current(), 1, &[]);
                     continue;
                 }
-                let mut current_spec = result?;
-                let spec_js = serde_json::to_string(&current_spec.spec).unwrap();
-                debug!("dbname: {}, current_spec: {:?}", &namespace, spec_js);
-
-                // get actual extensions from crd status
-                // UPDATE SPEC OBJECT WITH ACTUAL EXTENSIONS
-                current_spec.spec.extensions = current_spec
-                    .status
-                    .and_then(|o| o.extensions)
-                    .unwrap_or_default();
+                let current_resource = result?;
+                let resource_json = serde_json::to_string(&current_resource).unwrap();
+                debug!("dbname: {}, current: {:?}", &namespace, resource_json);
 
                 let conn_info =
                     get_pg_conn(client.clone(), &namespace, &data_plane_basedomain).await;
@@ -499,7 +432,8 @@ async fn run(metrics: CustomMetrics) -> Result<(), Box<dyn std::error::Error>> {
                     data_plane_id: read_msg.message.data_plane_id,
                     event_id: read_msg.message.event_id,
                     event_type: Event::Restarted,
-                    spec: Some(current_spec.spec),
+                    spec: Some(current_resource.spec),
+                    status: current_resource.status,
                     connection: conn_info.ok(),
                 }
             }

@@ -10,7 +10,6 @@ use crate::{
     config::Config,
     deployment_postgres_exporter::reconcile_prometheus_exporter,
     exec::{ExecCommand, ExecOutput},
-    extensions::{reconcile_extensions, Extension},
     ingress::reconcile_postgres_ing_route_tcp,
     postgres_exporter::{create_postgres_exporter_role, reconcile_prom_configmap},
     psql::{PsqlCommand, PsqlOutput},
@@ -39,6 +38,7 @@ use kube::{
     Resource,
 };
 
+use crate::extensions::reconcile_extensions;
 use serde::Serialize;
 use serde_json::json;
 use std::sync::Arc;
@@ -272,11 +272,9 @@ impl CoreDB {
                 Action::requeue(Duration::from_secs(300))
             })?;
 
-        if cnpg_enabled {
-            reconcile_cnpg(self, ctx.clone()).await?;
-            if cfg.enable_backup {
-                reconcile_cnpg_scheduled_backup(self, ctx.clone()).await?;
-            }
+        reconcile_cnpg(self, ctx.clone()).await?;
+        if cfg.enable_backup {
+            reconcile_cnpg_scheduled_backup(self, ctx.clone()).await?;
         }
 
         // reconcile prometheus exporter deployment if enabled
@@ -309,7 +307,16 @@ impl CoreDB {
                     return Ok(Action::requeue(Duration::from_secs(5)));
                 }
 
-                let extensions: Vec<Extension> =
+                let patch_status = json!({
+                    "apiVersion": "coredb.io/v1alpha1",
+                    "kind": "CoreDB",
+                    "status": {
+                        "running": true
+                    }
+                });
+                patch_cdb_status_merge(&coredbs, &name, patch_status).await?;
+
+                let (trunk_installs, extensions) =
                     reconcile_extensions(self, ctx.clone(), &coredbs, &name).await?;
 
                 create_postgres_exporter_role(self, ctx.clone(), secret_data).await?;
@@ -321,6 +328,7 @@ impl CoreDB {
                     sharedirStorage: self.spec.sharedirStorage.clone(),
                     pkglibdirStorage: self.spec.pkglibdirStorage.clone(),
                     extensions: Some(extensions),
+                    trunk_installs: Some(trunk_installs),
                 }
             }
             true => CoreDBStatus {
@@ -330,6 +338,7 @@ impl CoreDB {
                 sharedirStorage: self.spec.sharedirStorage.clone(),
                 pkglibdirStorage: self.spec.pkglibdirStorage.clone(),
                 extensions: self.status.clone().and_then(|f| f.extensions),
+                trunk_installs: self.status.clone().and_then(|f| f.trunk_installs),
             },
         };
 
@@ -339,7 +348,7 @@ impl CoreDB {
             "status": new_status
         });
 
-        patch_cdb_status_force(&coredbs, &name, patch_status).await?;
+        apply_status_force(&coredbs, &name, patch_status).await?;
 
         // Check back every 5 minutes
         Ok(Action::requeue(Duration::from_secs(300)))
@@ -483,7 +492,23 @@ pub fn is_postgres_ready() -> impl Condition<Pod> + 'static {
     }
 }
 
-pub async fn patch_cdb_status_force(
+pub async fn get_current_coredb_resource(cdb: &CoreDB, ctx: Arc<Context>) -> Result<CoreDB, Action> {
+    let coredb_api: Api<CoreDB> = Api::namespaced(
+        ctx.client.clone(),
+        &cdb.metadata
+            .namespace
+            .clone()
+            .expect("CoreDB should have a namespace"),
+    );
+    let coredb_name = cdb.metadata.name.clone().expect("CoreDB should have a name");
+    let coredb = coredb_api.get(&coredb_name).await.map_err(|e| {
+        error!("Error getting CoreDB resource: {:?}", e);
+        Action::requeue(Duration::from_secs(10))
+    })?;
+    Ok(coredb.clone())
+}
+
+pub async fn apply_status_force(
     cdb: &Api<CoreDB>,
     name: &str,
     patch: serde_json::Value,

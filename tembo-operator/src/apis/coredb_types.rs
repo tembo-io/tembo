@@ -1,4 +1,4 @@
-use crate::extensions::Extension;
+use crate::extensions::types::ExtensionStatus;
 use k8s_openapi::{
     api::core::v1::ResourceRequirements,
     apimachinery::pkg::{api::resource::Quantity, apis::meta::v1::ObjectMeta},
@@ -13,6 +13,7 @@ use crate::{
 };
 use kube::CustomResource;
 
+use crate::extensions::types::{Extension, TrunkInstall, TrunkInstallStatus};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -76,6 +77,9 @@ pub struct CoreDBSpec {
 
     #[serde(default = "defaults::default_extensions")]
     pub extensions: Vec<Extension>,
+
+    #[serde(default = "defaults::default_trunk_installs")]
+    pub trunk_installs: Vec<TrunkInstall>,
 
     #[serde(default = "defaults::default_stop")]
     pub stop: bool,
@@ -164,7 +168,8 @@ pub struct CoreDBStatus {
     pub running: bool,
     #[serde(default = "defaults::default_extensions_updating")]
     pub extensionsUpdating: bool,
-    pub extensions: Option<Vec<Extension>>,
+    pub extensions: Option<Vec<ExtensionStatus>>,
+    pub trunk_installs: Option<Vec<TrunkInstallStatus>>,
     #[serde(default = "defaults::default_storage")]
     pub storage: Quantity,
     #[serde(default = "defaults::default_sharedir_storage")]

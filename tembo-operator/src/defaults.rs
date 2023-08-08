@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 
 use crate::{
     apis::coredb_types::{Backup, ServiceAccountTemplate},
-    extensions::Extension,
+    extensions::types::{Extension, TrunkInstall},
 };
 
 pub fn default_replicas() -> i32 {
@@ -65,8 +65,16 @@ pub fn default_extensions() -> Vec<Extension> {
     vec![]
 }
 
+pub fn default_trunk_installs() -> Vec<TrunkInstall> {
+    vec![]
+}
+
 pub fn default_database() -> String {
-    "postrgres".to_owned()
+    "postgres".to_owned()
+}
+
+pub fn default_schema() -> String {
+    "public".to_owned()
 }
 
 pub fn default_description() -> Option<String> {

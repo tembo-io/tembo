@@ -3,7 +3,7 @@
 
 # Tembo Stacks
 
-Deploy any data service on PostgreSQL with Tembo Stacks and the Tembo Operator for Kubernetes, packaging community and purpose-built extensions to customize PostgreSQL for a variety of use cases. 
+Deploy any data service on PostgreSQL with Tembo Stacks and the Tembo Operator for Kubernetes, packaging community and purpose-built extensions to customize PostgreSQL for a variety of use cases.
 
 Goodbye database sprawl, hello Postgres.
 
@@ -18,7 +18,7 @@ Goodbye database sprawl, hello Postgres.
 
 You can sign up for Tembo Cloud Waitlist at [tembo.io](https://tembo.io)
 
-Tembo Cloud is a managed service where users can deploy Postgres in various forms. We have a control plane / data plane architecture, where we have a control plane for a centralized UI and API, and data plane(s) where Postgres stacks are hosted. Data planes will be deployable in multiple regions and clouds. 
+Tembo Cloud is a managed service where users can deploy Postgres in various forms. We have a control plane / data plane architecture, where we have a control plane for a centralized UI and API, and data plane(s) where Postgres stacks are hosted. Data planes will be deployable in multiple regions and clouds.
 
 This code repository is our entire "data plane" codebase, and you can use it to self-host Tembo Stacks.
 

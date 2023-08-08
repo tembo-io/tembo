@@ -1,23 +1,23 @@
-use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::Status};
+use k8s_openapi::api::core::v1::Pod;
 use kube::{api::Api, client::Client, core::subresource::AttachParams};
 use tokio::io::AsyncReadExt;
 
 use crate::Error;
-use tracing::error;
+use tracing::{error, log::warn};
 
 #[derive(Debug)]
 pub struct ExecOutput {
     pub stdout: Option<String>,
     pub stderr: Option<String>,
-    pub status: Option<Status>,
+    pub success: bool,
 }
 
 impl ExecOutput {
-    pub fn new(stdout: Option<String>, stderr: Option<String>, status: Option<Status>) -> Self {
+    pub fn new(stdout: Option<String>, stderr: Option<String>, success: bool) -> Self {
         Self {
             stdout,
             stderr,
-            status,
+            success,
         }
     }
 }
@@ -50,40 +50,74 @@ impl ExecCommand {
             .exec(self.pod_name.as_str(), command, &attach_params)
             .await?;
 
-        let mut stdout_reader = attached_process.stdout().unwrap();
-        let mut result_stdout = String::new();
-        stdout_reader.read_to_string(&mut result_stdout).await.unwrap();
+        let result_stdout = match attached_process.stdout() {
+            None => {
+                warn!("No stdout from exec to pod: {:?}", self.pod_name);
+                String::new()
+            }
+            Some(mut stdout_reader) => {
+                let mut result_stdout = String::new();
+                stdout_reader
+                    .read_to_string(&mut result_stdout)
+                    .await
+                    .unwrap_or_default();
+                result_stdout
+            }
+        };
 
-        let mut stderr_reader = attached_process.stderr().unwrap();
-        let mut result_stderr = String::new();
-        stderr_reader.read_to_string(&mut result_stderr).await.unwrap();
+        let result_stderr = match attached_process.stderr() {
+            None => {
+                warn!("No stderr from exec to pod: {:?}", self.pod_name);
+                String::new()
+            }
+            Some(mut stderr_reader) => {
+                let mut result_stderr = String::new();
+                stderr_reader
+                    .read_to_string(&mut result_stderr)
+                    .await
+                    .unwrap_or_default();
+                result_stderr
+            }
+        };
 
-        let status = attached_process.take_status().unwrap().await.unwrap();
+        let status = match attached_process.take_status() {
+            None => {
+                return Err(Error::KubeExecError(format!(
+                    "Error executing command: {:?} on pod: {:?}. Failed to find command status.",
+                    command, self.pod_name
+                )));
+            }
+            Some(status) => status.await.unwrap_or_default(),
+        };
         // https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-        let response = ExecOutput::new(Some(result_stdout), Some(result_stderr), Some(status.clone()));
 
-        match status.status.expect("no status reported").as_str() {
-            "Success" => Ok(response),
+        let success = match status.status.expect("no status reported").as_str() {
+            "Success" => true,
             "Failure" => {
+                let output = format!(
+                    "stdout:\n{}\nstderr:\n{}",
+                    result_stdout.clone(),
+                    result_stderr.clone()
+                );
                 error!(
                     "Error executing command: {:?} on pod: {:?}. response: {:?}",
-                    command, self.pod_name, response
+                    command, self.pod_name, output
                 );
-                Err(Error::KubeExecError(format!(
-                    "Error executing command: {:?} on pod: {:?}. response: {:?}",
-                    command, self.pod_name, response
-                )))
+                false
             }
+            // This is never supposed to happen because status is supposed to only be
+            // Success or Failure based on how the Kube API works
             _ => {
                 error!(
-                    "Undefined response from kube API {:?}, pod: {:?}, command: {:?}",
-                    response, self.pod_name, command
+                    "Undefined response from kube API when exec to pod: {:?}",
+                    self.pod_name
                 );
-                Err(Error::KubeExecError(format!(
-                    "Error executing command: {:?} on pod: {:?}. response: {:?}",
-                    command, self.pod_name, response
-                )))
+                return Err(Error::KubeExecError(format!(
+                    "Error executing command: {:?} on pod: {:?}.",
+                    command, self.pod_name
+                )));
             }
-        }
+        };
+        Ok(ExecOutput::new(Some(result_stdout), Some(result_stderr), success))
     }
 }

@@ -1,48 +1,56 @@
-use controller::extensions::Extension;
-use log::debug;
+use controller::apis::coredb_types::CoreDB;
+use controller::extensions::types::{ExtensionInstallLocation, ExtensionStatus};
 
-pub fn extension_plan(
-    have_changed: &[Extension],
-    actual: &[Extension],
-) -> (Vec<Extension>, Vec<Extension>) {
-    let mut changed = Vec::new();
-    let mut to_install = Vec::new();
-
-    // have_changed is unlikely to ever be >10s of extensions
-    for extension_desired in have_changed {
-        // check if the extension name exists in the actual list
-        let mut found = false;
-        // actual unlikely to be > 100s of extensions
-        for extension_actual in actual {
-            if extension_desired.name == extension_actual.name {
-                found = true;
-                // extension exists, therefore has been installed
-                // determine if the `enabled` toggle has changed
-                'loc: for loc_desired in extension_desired.locations.clone() {
-                    for loc_actual in extension_actual.locations.clone() {
-                        if loc_desired.database == loc_actual.database {
-                            // TODO: when we want to support version changes, this is where we would do it
-                            if loc_desired.enabled != loc_actual.enabled {
-                                debug!(
-                                    "desired: {:?}, actual: {:?}",
-                                    extension_desired, extension_actual
-                                );
-                                changed.push(extension_desired.clone());
-                                break 'loc;
-                            }
-                        }
-                    }
+fn desired_location_present_in_status(
+    actual_extensions: &[ExtensionStatus],
+    desired_ext_name: &str,
+    desired_location: &ExtensionInstallLocation,
+) -> bool {
+    for actual_extension in actual_extensions {
+        if actual_extension.name == desired_ext_name {
+            for actual_location in &actual_extension.locations {
+                if actual_location.database == desired_location.database
+                    && actual_location.schema == desired_location.schema
+                {
+                    return true;
                 }
             }
-        }
-        // if it doesn't exist, it needs to be installed
-        if !found {
-            to_install.push(extension_desired.clone());
+            return false;
         }
     }
-    debug!(
-        "extension to create/drop: {:?}, extensions to install: {:?}",
-        changed, to_install
-    );
-    (changed, to_install)
+    false
+}
+
+pub fn extensions_still_processing(coredb: &CoreDB) -> bool {
+    let actual_extensions = match &coredb.status {
+        None => {
+            return true;
+        }
+        Some(status) => {
+            if status.extensionsUpdating {
+                return true;
+            }
+            match &status.extensions {
+                None => {
+                    return true;
+                }
+                Some(extensions) => extensions,
+            }
+        }
+    };
+    let desired_extensions = &coredb.spec.extensions;
+    // Return false if every desired location is present in status
+    // Return true if any desired location is not located in status
+    for desired_extension in desired_extensions {
+        for desired_location in &desired_extension.locations {
+            if !desired_location_present_in_status(
+                actual_extensions,
+                &desired_extension.name,
+                desired_location,
+            ) {
+                return true;
+            }
+        }
+    }
+    false
 }

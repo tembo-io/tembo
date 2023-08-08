@@ -27,9 +27,9 @@ mod test {
         restart_cnpg,
         types::{self, StateToControlPlane},
     };
+    use controller::extensions::types::{Extension, ExtensionInstallLocation};
     use controller::{
         apis::coredb_types::{CoreDB, CoreDBSpec},
-        extensions::{Extension, ExtensionInstallLocation},
         is_pod_ready,
         postgres_exporter::{PostgresMetrics, QueryConfig},
         State,
@@ -133,7 +133,7 @@ mod test {
                 locations: vec![ExtensionInstallLocation {
                     enabled: true,
                     version: Some("1.3.0".to_owned()),
-                    schema: Some("public".to_owned()),
+                    schema: "public".to_owned(),
                     database: "postgres".to_owned(),
                 }],
             }]),
@@ -232,7 +232,7 @@ mod test {
             locations: vec![ExtensionInstallLocation {
                 enabled: true,
                 version: Some("0.1.4".to_owned()),
-                schema: Some("public".to_owned()),
+                schema: "public".to_owned(),
                 database: "postgres".to_owned(),
             }],
         });

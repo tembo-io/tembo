@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::types;
-use controller::apis::coredb_types::CoreDBSpec;
+use controller::apis::coredb_types::{CoreDBSpec, CoreDBStatus};
 
 /// incoming message from control plane
 #[derive(Debug, Deserialize, Serialize)]
@@ -39,6 +39,7 @@ pub struct StateToControlPlane {
     pub event_id: String,      // pass through from event that triggered a data plane action
     pub event_type: Event,     // pass through from event that triggered a data plane action
     pub spec: Option<CoreDBSpec>,
+    pub status: Option<CoreDBStatus>,
     pub connection: Option<types::ConnectionInfo>,
 }
 
