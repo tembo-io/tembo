@@ -1,7 +1,7 @@
 use crate::{
     apis::coredb_types::CoreDB,
     extensions::types::{Extension, ExtensionInstallLocation},
-    Context,
+    Context, Error,
 };
 use kube::runtime::controller::Action;
 use lazy_static::lazy_static;
@@ -166,7 +166,7 @@ pub async fn get_all_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<E
                 database: db.clone(),
                 version: Some(ext.version),
                 enabled: ext.enabled,
-                schema: ext.schema,
+                schema: Some(ext.schema),
             };
             ext_hashmap
                 .entry((ext.name, ext.description))
@@ -186,6 +186,29 @@ pub async fn get_all_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<E
     // put them in order
     ext_spec.sort_by_key(|e| e.name.clone());
     Ok(ext_spec)
+}
+
+
+/// generates the CREATE or DROP EXTENSION command for a given extension
+/// handles schema specification in the command
+fn generate_extension_enable_cmd(
+    ext_name: &str,
+    ext_loc: &ExtensionInstallLocation,
+) -> Result<String, Error> {
+    // only specify the schema if it provided
+    let command = match ext_loc.enabled {
+        true => match ext_loc.schema.as_ref() {
+            Some(schema) => {
+                format!(
+                    "CREATE EXTENSION IF NOT EXISTS \"{}\" SCHEMA {} CASCADE;",
+                    ext_name, schema
+                )
+            }
+            None => format!("CREATE EXTENSION IF NOT EXISTS \"{}\" CASCADE;", ext_name),
+        },
+        false => format!("DROP EXTENSION IF EXISTS \"{}\" CASCADE;", ext_name),
+    };
+    Ok(command)
 }
 
 /// Handles create/drop an extension location
@@ -213,31 +236,21 @@ pub async fn toggle_extension(
         return Err("Database name is not formatted properly".to_string());
     }
     let schema_name = ext_loc.schema.to_owned();
-    if !check_input(&schema_name) {
+    if schema_name.is_some() && !check_input(&schema_name.unwrap()) {
         warn!(
-            "Extension.Database.Schema {}.{}.{} is not formatted properly. Skipping operation. {}",
-            ext_name, database_name, schema_name, &coredb_name
+            "Extension.Database.Schema is not formatted properly. Skipping operation. {}",
+            &coredb_name
         );
         return Err("Schema name is not formatted properly".to_string());
     }
-    let command = match ext_loc.enabled {
-        true => {
-            info!(
-                "Creating extension: {}, database {}, instance {}",
-                ext_name, database_name, &coredb_name
-            );
 
-            format!(
-                "CREATE EXTENSION IF NOT EXISTS \"{}\" SCHEMA {} CASCADE;",
-                ext_name, schema_name
-            )
-        }
-        false => {
-            info!(
-                "Dropping extension: {}, database {}, instance {}",
-                ext_name, database_name, &coredb_name
+    let command = match generate_extension_enable_cmd(ext_name, &ext_loc) {
+        Ok(command) => command,
+        Err(_) => {
+            return Err(
+                "Don't know how to enable this extension. You may enable the extension manually instead."
+                    .to_string(),
             );
-            format!("DROP EXTENSION IF EXISTS \"{}\" CASCADE;", ext_name)
         }
     };
 
@@ -285,7 +298,10 @@ pub async fn toggle_extension(
 
 #[cfg(test)]
 mod tests {
-    use crate::extensions::database_queries::{check_input, parse_databases, parse_extensions};
+    use crate::extensions::{
+        database_queries::{check_input, generate_extension_enable_cmd, parse_databases, parse_extensions},
+        types::ExtensionInstallLocation,
+    };
 
     #[test]
     fn test_parse_databases() {
@@ -374,5 +390,42 @@ mod tests {
         for i in valids.iter() {
             assert!(check_input(i), "input {} should be valid", i);
         }
+    }
+
+
+    #[test]
+    fn test_generate_extension_enable_cmd() {
+        // schema not specified
+        let loc1 = ExtensionInstallLocation {
+            database: "postgres".to_string(),
+            enabled: true,
+            schema: None,
+            version: Some("1.0.0".to_string()),
+        };
+        let cmd = generate_extension_enable_cmd("my_ext", &loc1);
+        assert_eq!(cmd.unwrap(), "CREATE EXTENSION IF NOT EXISTS \"my_ext\" CASCADE;");
+
+        // schema specified
+        let loc2 = ExtensionInstallLocation {
+            database: "postgres".to_string(),
+            enabled: true,
+            schema: Some("public".to_string()),
+            version: Some("1.0.0".to_string()),
+        };
+        let cmd = generate_extension_enable_cmd("my_ext", &loc2);
+        assert_eq!(
+            cmd.unwrap(),
+            "CREATE EXTENSION IF NOT EXISTS \"my_ext\" SCHEMA public CASCADE;"
+        );
+
+        // drop extension
+        let loc2 = ExtensionInstallLocation {
+            database: "postgres".to_string(),
+            enabled: false,
+            schema: Some("public".to_string()),
+            version: Some("1.0.0".to_string()),
+        };
+        let cmd = generate_extension_enable_cmd("my_ext", &loc2);
+        assert_eq!(cmd.unwrap(), "DROP EXTENSION IF EXISTS \"my_ext\" CASCADE;");
     }
 }

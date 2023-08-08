@@ -54,7 +54,7 @@ async fn toggle_extensions(
                         cdb,
                         &extension_to_toggle.name,
                         &location_to_toggle.database,
-                        &location_to_toggle.schema,
+                        location_to_toggle.schema.clone(),
                     ) {
                         None => {
                             error!("There should always be an extension status for a location before attempting to toggle an extension for that location");
@@ -114,7 +114,7 @@ fn determine_updated_extensions_status(
                 cdb,
                 &actual_extension.name.clone(),
                 &actual_location.database.clone(),
-                &actual_location.schema.clone(),
+                actual_location.schema.clone(),
             ) {
                 None => {}
                 Some(current_status) => {
@@ -127,7 +127,7 @@ fn determine_updated_extensions_status(
                 cdb,
                 &actual_extension.name,
                 &actual_location.database,
-                &actual_location.schema,
+                actual_location.schema,
             ) {
                 None => {}
                 Some(desired_location) => {
@@ -162,7 +162,7 @@ fn determine_updated_extensions_status(
                     &cdb_with_updated_extensions_status,
                     &desired_extension.name,
                     &desired_location.database,
-                    &desired_location.schema,
+                    desired_location.schema.clone(),
                 )
                 .is_none()
             {
@@ -198,7 +198,7 @@ fn determine_extension_locations_to_toggle(cdb: &CoreDB) -> Vec<Extension> {
                 cdb,
                 &desired_extension.name,
                 &desired_location.database,
-                &desired_location.schema,
+                desired_location.schema.clone(),
             ) {
                 None => {
                     error!("When determining extensions to toggle, there should always be a location status for the desired location, because that should be included by determine_updated_extensions_status.");
@@ -263,7 +263,7 @@ mod tests {
                 locations: vec![ExtensionInstallLocation {
                     enabled: true,
                     database: "db1".to_string(),
-                    schema: "public".to_string(),
+                    schema: Some("public".to_string()),
                     version: None,
                 }],
             },
@@ -275,28 +275,28 @@ mod tests {
                 ExtensionInstallLocation {
                         enabled: true,
                         database: "db_where_its_available_and_disabled".to_string(),
-                        schema: "public".to_string(),
+                        schema: Some("public".to_string()),
                         version: None,
                 },
                 // Requesting to disable a currently enabled extension
                 ExtensionInstallLocation {
                     enabled: false,
                     database: "db_where_its_available_and_enabled".to_string(),
-                    schema: "public".to_string(),
+                    schema: Some("public".to_string()),
                     version: None,
                 },
                 // Requesting to enable a currently disabled extension that is not currently in status
                 ExtensionInstallLocation {
                     enabled: true,
                     database: "db_where_its_available_and_disabled_missing_from_status".to_string(),
-                    schema: "public".to_string(),
+                    schema: Some("public".to_string()),
                     version: None,
                 },
                 // Requesting to disable a currently enabled extension that is not currently in status
                 ExtensionInstallLocation {
                     enabled: false,
                     database: "db_where_its_available_and_enabled_missing_from_status".to_string(),
-                    schema: "public".to_string(),
+                    schema: Some("public".to_string()),
                     version: None,
                 },
                 // This situation is if we toggled an extension to True, but it failed to enable
@@ -304,7 +304,7 @@ mod tests {
                 ExtensionInstallLocation {
                     enabled: false,
                     database: "db_where_it_is_currently_in_error_having_tried_to_enable_and_failed".to_string(),
-                    schema: "public".to_string(),
+                    schema: Some("public".to_string()),
                     version: None,
                 },
                 // This situation is if we toggled an extension to True, but it failed to enable
@@ -312,21 +312,21 @@ mod tests {
                 ExtensionInstallLocation {
                     enabled: false,
                     database: "db_where_it_is_currently_in_error_having_tried_to_enable_and_failed_because_missing".to_string(),
-                    schema: "public".to_string(),
+                    schema: Some("public".to_string()),
                     version: None,
                 },
                 // Requesting to enable an extension that is not installed
                 ExtensionInstallLocation {
                     enabled: true,
                     database: "db_where_its_not_available".to_string(),
-                    schema: "public".to_string(),
+                    schema: Some("public".to_string()),
                     version: None,
                 },
                 // Requesting to enable an extension that previously failed to enable
                 ExtensionInstallLocation {
                     enabled: true,
                     database: "db_where_enable_failed".to_string(),
-                    schema: "public".to_string(),
+                    schema: Some("public".to_string()),
                     version: None,
                 }
                 ],
@@ -337,7 +337,7 @@ mod tests {
                 locations: vec![ExtensionInstallLocation {
                     enabled: false,
                     database: "db1".to_string(),
-                    schema: "public".to_string(),
+                    schema: Some("public".to_string()),
                     version: None,
                 }],
             },
@@ -351,7 +351,7 @@ mod tests {
                 ExtensionInstallLocationStatus {
                     enabled: Some(false),
                     database: "db_where_its_available_and_disabled".to_string(),
-                    schema: "public".to_string(),
+                    schema: Some("public".to_string()),
                     version: None,
                     error: Some(false),
                     error_message: None,
@@ -360,7 +360,7 @@ mod tests {
                 ExtensionInstallLocationStatus {
                     enabled: Some(true),
                     database: "db_where_its_available_and_enabled".to_string(),
-                    schema: "public".to_string(),
+                    schema: Some("public".to_string()),
                     version: None,
                     error: Some(false),
                     error_message: None,
@@ -369,7 +369,7 @@ mod tests {
                     enabled: Some(false),
                     database: "db_where_it_is_currently_in_error_having_tried_to_enable_and_failed"
                         .to_string(),
-                    schema: "public".to_string(),
+                    schema: Some("public".to_string()),
                     version: None,
                     error: Some(true),
                     error_message: Some("Failed to enable extension".to_string()),
@@ -379,7 +379,7 @@ mod tests {
                     database:
                         "db_where_it_is_currently_in_error_having_tried_to_enable_and_failed_because_missing"
                             .to_string(),
-                    schema: "public".to_string(),
+                    schema: Some("public".to_string()),
                     version: None,
                     error: Some(true),
                     error_message: Some("Extension is not installed".to_string()),
@@ -387,7 +387,7 @@ mod tests {
                 ExtensionInstallLocationStatus {
                     enabled: Some(false),
                     database: "db_where_enable_failed".to_string(),
-                    schema: "public".to_string(),
+                    schema: Some("public".to_string()),
                     version: None,
                     error: Some(true),
                     error_message: Some("Failed to enable extension".to_string()),
@@ -415,38 +415,38 @@ mod tests {
                     ExtensionInstallLocation {
                         enabled: false,
                         database: "db_where_its_available_and_disabled".to_string(),
-                        schema: "public".to_string(),
+                        schema: Some("public".to_string()),
                         version: None,
                     },
                     ExtensionInstallLocation {
                         enabled: true,
                         database: "db_where_its_available_and_enabled".to_string(),
-                        schema: "public".to_string(),
+                        schema: Some("public".to_string()),
                         version: None,
                     },
                     ExtensionInstallLocation {
                         enabled: false,
                         database: "db_where_its_available_and_disabled_missing_from_status".to_string(),
-                        schema: "public".to_string(),
+                        schema: Some("public".to_string()),
                         version: None,
                     },
                     ExtensionInstallLocation {
                         enabled: true,
                         database: "db_where_its_available_and_enabled_missing_from_status".to_string(),
-                        schema: "public".to_string(),
+                        schema: Some("public".to_string()),
                         version: None,
                     },
                     ExtensionInstallLocation {
                         enabled: false,
                         database: "db_where_it_is_currently_in_error_having_tried_to_enable_and_failed"
                             .to_string(),
-                        schema: "public".to_string(),
+                        schema: Some("public".to_string()),
                         version: None,
                     },
                     ExtensionInstallLocation {
                         enabled: false,
                         database: "db_where_enable_failed".to_string(),
-                        schema: "public".to_string(),
+                        schema: Some("public".to_string()),
                         version: None,
                     },
                 ],
@@ -458,13 +458,13 @@ mod tests {
                     ExtensionInstallLocation {
                         enabled: true,
                         database: "db2".to_string(),
-                        schema: "public".to_string(),
+                        schema: Some("public".to_string()),
                         version: None,
                     },
                     ExtensionInstallLocation {
                         enabled: true,
                         database: "db1".to_string(),
-                        schema: "public".to_string(),
+                        schema: Some("public".to_string()),
                         version: None,
                     },
                 ],
@@ -483,17 +483,27 @@ mod tests {
         };
 
         // Check that the current status is updated in the expected way from the provided actually_installed_extensions list
-        let location_status =
-            get_location_status(&cdb, "ext1", "db_where_its_available_and_disabled", "public").unwrap();
+        let location_status = get_location_status(
+            &cdb,
+            "ext1",
+            "db_where_its_available_and_disabled",
+            Some("public".to_string()),
+        )
+        .unwrap();
         assert_eq!(location_status.enabled, Some(false));
-        let location_status =
-            get_location_status(&cdb, "ext1", "db_where_its_available_and_enabled", "public").unwrap();
+        let location_status = get_location_status(
+            &cdb,
+            "ext1",
+            "db_where_its_available_and_enabled",
+            Some("public".to_string()),
+        )
+        .unwrap();
         assert_eq!(location_status.enabled, Some(true));
         let location_status = get_location_status(
             &cdb,
             "ext1",
             "db_where_its_available_and_disabled_missing_from_status",
-            "public",
+            Some("public".to_string()),
         )
         .unwrap();
         assert_eq!(location_status.enabled, Some(false));
@@ -501,7 +511,7 @@ mod tests {
             &cdb,
             "ext1",
             "db_where_its_available_and_enabled_missing_from_status",
-            "public",
+            Some("public".to_string()),
         )
         .unwrap();
         assert_eq!(location_status.enabled, Some(true));
@@ -510,7 +520,7 @@ mod tests {
             &cdb,
             "ext1",
             "db_where_it_is_currently_in_error_having_tried_to_enable_and_failed",
-            "public",
+            Some("public".to_string()),
         )
         .unwrap();
         assert_eq!(location_status.enabled, Some(false));
@@ -521,16 +531,22 @@ mod tests {
             &cdb,
             "ext1",
             "db_where_it_is_currently_in_error_having_tried_to_enable_and_failed_because_missing",
-            "public"
+            Some("public".to_string())
         )
         .is_none());
         // It should retain error message when it failed on a previous attempt
-        let location_status = get_location_status(&cdb, "ext1", "db_where_enable_failed", "public").unwrap();
+        let location_status =
+            get_location_status(&cdb, "ext1", "db_where_enable_failed", Some("public".to_string())).unwrap();
         assert_eq!(location_status.enabled, Some(false));
         assert!(location_status.error.unwrap());
         assert!(location_status.error_message.is_some());
-        let location_status =
-            get_location_status(&cdb, "ext1", "db_where_its_not_available", "public").unwrap();
+        let location_status = get_location_status(
+            &cdb,
+            "ext1",
+            "db_where_its_not_available",
+            Some("public".to_string()),
+        )
+        .unwrap();
         assert_eq!(location_status.enabled, None);
         assert!(location_status.error.unwrap());
         assert!(location_status.error_message.is_some());
@@ -551,7 +567,7 @@ mod tests {
             &cdb_spec_check,
             "ext1",
             "db_where_its_available_and_disabled",
-            "public",
+            Some("public".to_string()),
         )
         .unwrap();
         assert!(location.enabled);
@@ -560,7 +576,7 @@ mod tests {
             &cdb_spec_check,
             "ext1",
             "db_where_its_available_and_enabled",
-            "public",
+            Some("public".to_string()),
         )
         .unwrap();
         assert!(!location.enabled);
@@ -569,7 +585,7 @@ mod tests {
             &cdb_spec_check,
             "ext1",
             "db_where_its_available_and_disabled_missing_from_status",
-            "public",
+            Some("public".to_string()),
         )
         .unwrap();
         assert!(location.enabled);
@@ -578,7 +594,7 @@ mod tests {
             &cdb_spec_check,
             "ext1",
             "db_where_its_available_and_enabled_missing_from_status",
-            "public",
+            Some("public".to_string()),
         )
         .unwrap();
         assert!(!location.enabled);
@@ -590,7 +606,7 @@ mod tests {
             &cdb_spec_check,
             "ext1",
             "db_where_it_is_currently_in_error_having_tried_to_enable_and_failed",
-            "public",
+            Some("public".to_string()),
         );
         assert!(location.is_none());
         // If we toggled an extension to True, but it failed to enable because missing
@@ -600,16 +616,26 @@ mod tests {
             &cdb_spec_check,
             "ext1",
             "db_where_it_is_currently_in_error_having_tried_to_enable_and_failed_because_missing",
-            "public",
+            Some("public".to_string()),
         );
         assert!(location.is_none());
         // If we request to enable an extension that is not installed,
         // we should not try to toggle it
-        let location = get_location_spec(&cdb_spec_check, "ext1", "db_where_its_not_available", "public");
+        let location = get_location_spec(
+            &cdb_spec_check,
+            "ext1",
+            "db_where_its_not_available",
+            Some("public".to_string()),
+        );
         assert!(location.is_none());
         // If we request to enable an extension that has previously failed to enable,
         // we should not try to toggle it again
-        let location = get_location_spec(&cdb_spec_check, "ext1", "db_where_enable_failed", "public");
+        let location = get_location_spec(
+            &cdb_spec_check,
+            "ext1",
+            "db_where_enable_failed",
+            Some("public".to_string()),
+        );
         assert!(location.is_none());
     }
 }

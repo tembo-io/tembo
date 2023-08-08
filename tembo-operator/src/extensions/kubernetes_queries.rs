@@ -232,7 +232,7 @@ mod tests {
             locations: vec![ExtensionInstallLocationStatus {
                 enabled: Some(false),
                 database: "db1".to_string(),
-                schema: "schema1".to_string(),
+                schema: Some("schema1".to_string()),
                 version: None,
                 error: Some(false),
                 error_message: None,
@@ -241,7 +241,7 @@ mod tests {
         let new_location_status = ExtensionInstallLocationStatus {
             enabled: Some(true),
             database: "db1".to_string(),
-            schema: "schema1".to_string(),
+            schema: Some("schema1".to_string()),
             version: None,
             error: Some(false),
             error_message: None,
@@ -267,7 +267,7 @@ mod tests {
             locations: vec![ExtensionInstallLocationStatus {
                 enabled: Some(false),
                 database: "db1".to_string(),
-                schema: "schema2".to_string(),
+                schema: Some("schema2".to_string()),
                 version: None,
                 error: Some(false),
                 error_message: None,
@@ -276,7 +276,7 @@ mod tests {
         let new_location_status = ExtensionInstallLocationStatus {
             enabled: Some(true),
             database: "db1".to_string(),
-            schema: "schema1".to_string(),
+            schema: Some("schema1".to_string()),
             version: None,
             error: Some(false),
             error_message: None,
@@ -291,10 +291,10 @@ mod tests {
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].locations.len(), 2);
         assert_eq!(result[0].locations[0].database, "db1".to_string());
-        assert_eq!(result[0].locations[0].schema, "schema1".to_string());
+        assert_eq!(result[0].locations[0].schema, Some("schema1".to_string()));
         assert_eq!(result[0].locations[0].enabled, Some(true));
         assert_eq!(result[0].locations[1].database, "db1".to_string());
-        assert_eq!(result[0].locations[1].schema, "schema2".to_string());
+        assert_eq!(result[0].locations[1].schema, Some("schema2".to_string()));
         assert_eq!(result[0].locations[1].enabled, Some(false));
     }
 
@@ -306,7 +306,7 @@ mod tests {
             locations: vec![ExtensionInstallLocationStatus {
                 enabled: Some(false),
                 database: "db1".to_string(),
-                schema: "schema1".to_string(),
+                schema: Some("schema1".to_string()),
                 version: None,
                 error: Some(false),
                 error_message: None,
@@ -315,7 +315,7 @@ mod tests {
         let new_location_status = ExtensionInstallLocationStatus {
             enabled: Some(true),
             database: "db1".to_string(),
-            schema: "schema1".to_string(),
+            schema: Some("schema1".to_string()),
             version: None,
             error: Some(false),
             error_message: None,
@@ -332,11 +332,11 @@ mod tests {
         assert_eq!(result[1].locations.len(), 1);
         assert_eq!(result[0].name, "ext1".to_string());
         assert_eq!(result[0].locations[0].database, "db1".to_string());
-        assert_eq!(result[0].locations[0].schema, "schema1".to_string());
+        assert_eq!(result[0].locations[0].schema, Some("schema1".to_string()));
         assert_eq!(result[0].locations[0].enabled, Some(true));
         assert_eq!(result[1].name, "ext2".to_string());
         assert_eq!(result[1].locations[0].database, "db1".to_string());
-        assert_eq!(result[1].locations[0].schema, "schema1".to_string());
+        assert_eq!(result[1].locations[0].schema, Some("schema1".to_string()));
         assert_eq!(result[1].locations[0].enabled, Some(false));
     }
 }

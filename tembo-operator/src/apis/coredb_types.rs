@@ -182,3 +182,273 @@ pub struct Stack {
     pub postgres_config: Option<Vec<PgConfig>>,
     // TODO: add other stack attributes as they are supported
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_deserialize_core_db_spec() {
+        let json_str = r#"
+        {
+          "image": "quay.io/tembo/tembo-pg-cnpg:15.3.0-5-cede445",
+          "stack": {
+            "name": "MessageQueue",
+            "image": "quay.io/tembo/tembo-pg-cnpg:15.3.0-5-cede445",
+            "services": null,
+            "extensions": [
+              {
+                "name": "pgmq",
+                "locations": [
+                  {
+                    "schema": null,
+                    "enabled": true,
+                    "version": "0.10.2",
+                    "database": "postgres"
+                  }
+                ],
+                "description": null
+              },
+              {
+                "name": "pg_partman",
+                "locations": [
+                  {
+                    "schema": null,
+                    "enabled": true,
+                    "version": "4.7.3",
+                    "database": "postgres"
+                  }
+                ],
+                "description": null
+              }
+            ],
+            "description": "A Tembo Postgres Stack optimized for Message Queue workloads.",
+            "stack_version": "0.2.0",
+            "infrastructure": {
+              "cpu": "1",
+              "memory": "1Gi",
+              "region": "us-east-1",
+              "provider": "aws",
+              "storage_size": "10Gi",
+              "instance_type": "GeneralPurpose",
+              "storage_class": "gp3"
+            },
+            "trunk_installs": [
+              {
+                "name": "pgmq",
+                "version": "0.10.2"
+              },
+              {
+                "name": "pg_partman",
+                "version": "4.7.3"
+              }
+            ],
+            "postgres_config": [
+              {
+                "name": "shared_preload_libraries",
+                "value": "pg_stat_statements,pg_partman_bgw"
+              },
+              {
+                "name": "pg_partman_bgw.dbname",
+                "value": "postgres"
+              },
+              {
+                "name": "pg_partman_bgw.interval",
+                "value": "60"
+              },
+              {
+                "name": "pg_partman_bgw.role",
+                "value": "postgres"
+              },
+              {
+                "name": "random_page_cost",
+                "value": "1.1"
+              },
+              {
+                "name": "autovacuum_vacuum_cost_limit",
+                "value": "-1"
+              },
+              {
+                "name": "autovacuum_vacuum_scale_factor",
+                "value": "0.05"
+              },
+              {
+                "name": "autovacuum_vacuum_insert_scale_factor",
+                "value": "0.05"
+              },
+              {
+                "name": "autovacuum_analyze_scale_factor",
+                "value": "0.05"
+              },
+              {
+                "name": "checkpoint_timeout",
+                "value": "10min"
+              },
+              {
+                "name": "pg_stat_statements.track",
+                "value": "all"
+              }
+            ],
+            "postgres_metrics": {
+              "pgmq": {
+                "query": "select queue_name, queue_length, oldest_msg_age_sec, newest_msg_age_sec, total_messages from public.pgmq_metrics_all()",
+                "master": true,
+                "metrics": [
+                  {
+                    "queue_name": {
+                      "usage": "LABEL",
+                      "description": "Name of the queue"
+                    }
+                  },
+                  {
+                    "queue_length": {
+                      "usage": "GAUGE",
+                      "description": "Number of messages in the queue"
+                    }
+                  },
+                  {
+                    "oldest_msg_age_sec": {
+                      "usage": "GAUGE",
+                      "description": "Age of the oldest message in the queue, in seconds."
+                    }
+                  },
+                  {
+                    "newest_msg_age_sec": {
+                      "usage": "GAUGE",
+                      "description": "Age of the newest message in the queue, in seconds."
+                    }
+                  },
+                  {
+                    "total_messages": {
+                      "usage": "GAUGE",
+                      "description": "Total number of messages that have passed into the queue."
+                    }
+                  }
+                ]
+              }
+            },
+            "postgres_config_engine": "standard"
+          },
+          "metrics": {
+            "image": "quay.io/prometheuscommunity/postgres-exporter:v0.12.0",
+            "enabled": true,
+            "queries": {
+              "pgmq": {
+                "query": "select queue_name, queue_length, oldest_msg_age_sec, newest_msg_age_sec, total_messages from public.pgmq_metrics_all()",
+                "master": true,
+                "metrics": [
+                  {
+                    "queue_name": {
+                      "usage": "LABEL",
+                      "description": "Name of the queue"
+                    }
+                  },
+                  {
+                    "queue_length": {
+                      "usage": "GAUGE",
+                      "description": "Number of messages in the queue"
+                    }
+                  },
+                  {
+                    "oldest_msg_age_sec": {
+                      "usage": "GAUGE",
+                      "description": "Age of the oldest message in the queue, in seconds."
+                    }
+                  },
+                  {
+                    "newest_msg_age_sec": {
+                      "usage": "GAUGE",
+                      "description": "Age of the newest message in the queue, in seconds."
+                    }
+                  },
+                  {
+                    "total_messages": {
+                      "usage": "GAUGE",
+                      "description": "Total number of messages that have passed into the queue."
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          "storage": "10Gi",
+          "resources": {
+            "limits": {
+              "cpu": "1",
+              "memory": "1Gi"
+            }
+          },
+          "extensions": [
+            {
+              "name": "pgmq",
+              "locations": [
+                {
+                  "schema": null,
+                  "enabled": true,
+                  "version": "0.10.2",
+                  "database": "postgres"
+                }
+              ],
+              "description": null
+            },
+            {
+              "name": "pg_partman",
+              "locations": [
+                {
+                  "schema": null,
+                  "enabled": true,
+                  "version": "4.7.3",
+                  "database": "postgres"
+                }
+              ],
+              "description": null
+            }
+          ],
+          "runtime_config": [
+            {
+              "name": "shared_buffers",
+              "value": "256MB"
+            },
+            {
+              "name": "max_connections",
+              "value": "107"
+            },
+            {
+              "name": "work_mem",
+              "value": "5MB"
+            },
+            {
+              "name": "bgwriter_delay",
+              "value": "200ms"
+            },
+            {
+              "name": "effective_cache_size",
+              "value": "716MB"
+            },
+            {
+              "name": "maintenance_work_mem",
+              "value": "64MB"
+            },
+            {
+              "name": "max_wal_size",
+              "value": "2GB"
+            }
+          ],
+          "trunk_installs": [
+            {
+              "name": "pgmq",
+              "version": "0.10.2"
+            },
+            {
+              "name": "pg_partman",
+              "version": "4.7.3"
+            }
+          ],
+          "postgresExporterEnabled": true
+        }
+        "#;
+
+        let _deserialized_spec: CoreDBSpec = serde_json::from_str(json_str).unwrap();
+    }
+}

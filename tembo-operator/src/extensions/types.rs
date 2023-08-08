@@ -49,15 +49,14 @@ pub struct ExtensionInstallLocation {
     // no database or schema when disabled
     #[serde(default = "defaults::default_database")]
     pub database: String,
-    #[serde(default = "defaults::default_schema")]
-    pub schema: String,
+    pub schema: Option<String>,
     pub version: Option<String>,
 }
 
 impl Default for ExtensionInstallLocation {
     fn default() -> Self {
         ExtensionInstallLocation {
-            schema: "public".to_owned(),
+            schema: Some("public".to_owned()),
             database: "postgres".to_owned(),
             enabled: true,
             version: Some("1.9".to_owned()),
@@ -77,8 +76,7 @@ pub struct ExtensionStatus {
 pub struct ExtensionInstallLocationStatus {
     #[serde(default = "defaults::default_database")]
     pub database: String,
-    #[serde(default = "defaults::default_schema")]
-    pub schema: String,
+    pub schema: Option<String>,
     pub version: Option<String>,
     // None means this is not actually installed
     pub enabled: Option<bool>,
@@ -91,7 +89,7 @@ pub fn get_location_status(
     cdb: &CoreDB,
     extension_name: &str,
     location_database: &str,
-    location_schema: &str,
+    location_schema: Option<String>,
 ) -> Option<ExtensionInstallLocationStatus> {
     match &cdb.status {
         None => None,
@@ -118,7 +116,7 @@ pub fn get_location_spec(
     cdb: &CoreDB,
     extension_name: &str,
     location_database: &str,
-    location_schema: &str,
+    location_schema: Option<String>,
 ) -> Option<ExtensionInstallLocation> {
     for extension in &cdb.spec.extensions {
         if extension.name == extension_name {
@@ -142,7 +140,7 @@ mod tests {
     #[test]
     fn test_get_location_status() {
         let location_database = "postgres";
-        let location_schema = "public";
+        let location_schema = Some("public".to_string());
         let extension_name = "extension1";
         let location = ExtensionInstallLocationStatus {
             database: location_database.to_owned(),
@@ -174,7 +172,7 @@ mod tests {
     #[test]
     fn test_get_location_spec() {
         let location_database = "postgres";
-        let location_schema = "public";
+        let location_schema = Some("public".to_string());
         let extension_name = "extension1";
         let location = ExtensionInstallLocation {
             enabled: true,
