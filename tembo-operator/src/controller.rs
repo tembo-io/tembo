@@ -324,21 +324,21 @@ impl CoreDB {
                 CoreDBStatus {
                     running: true,
                     extensionsUpdating: false,
-                    storage: self.spec.storage.clone(),
-                    sharedirStorage: self.spec.sharedirStorage.clone(),
-                    pkglibdirStorage: self.spec.pkglibdirStorage.clone(),
+                    storage: Some(self.spec.storage.clone()),
                     extensions: Some(extensions),
                     trunk_installs: Some(trunk_installs),
+                    resources: Some(self.spec.resources.clone()),
+                    runtime_config: self.spec.runtime_config.clone(),
                 }
             }
             true => CoreDBStatus {
                 running: false,
                 extensionsUpdating: false,
-                storage: self.spec.storage.clone(),
-                sharedirStorage: self.spec.sharedirStorage.clone(),
-                pkglibdirStorage: self.spec.pkglibdirStorage.clone(),
+                storage: Some(self.spec.storage.clone()),
                 extensions: self.status.clone().and_then(|f| f.extensions),
                 trunk_installs: self.status.clone().and_then(|f| f.trunk_installs),
+                resources: Some(self.spec.resources.clone()),
+                runtime_config: self.spec.runtime_config.clone(),
             },
         };
 

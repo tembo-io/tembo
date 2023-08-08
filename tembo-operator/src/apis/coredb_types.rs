@@ -170,12 +170,9 @@ pub struct CoreDBStatus {
     pub extensionsUpdating: bool,
     pub extensions: Option<Vec<ExtensionStatus>>,
     pub trunk_installs: Option<Vec<TrunkInstallStatus>>,
-    #[serde(default = "defaults::default_storage")]
-    pub storage: Quantity,
-    #[serde(default = "defaults::default_sharedir_storage")]
-    pub sharedirStorage: Quantity,
-    #[serde(default = "defaults::default_pkglibdir_storage")]
-    pub pkglibdirStorage: Quantity,
+    pub storage: Option<Quantity>,
+    pub resources: Option<ResourceRequirements>,
+    pub runtime_config: Option<Vec<PgConfig>>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
