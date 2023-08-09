@@ -1,6 +1,6 @@
 name: Standard
 description: A balanced Postgres instance optimized for OLTP workloads.
-image: "quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e"
+image: "quay.io/tembo/tembo-pg-cnpg:15.3.0-5-cede445"
 stack_version: 0.1.0
 infrastructure:
   cpu: 1
@@ -30,6 +30,9 @@ postgres_config:
     value: all
   - name: shared_preload_libraries
     value: pg_stat_statements
+trunk_installs:
+  - name: pg_stat_statements
+    version: 1.10.0
 extensions:
   - name: pg_stat_statements
     locations:

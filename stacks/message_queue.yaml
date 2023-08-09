@@ -1,24 +1,27 @@
 name: MessageQueue
 description: A Tembo Postgres Stack optimized for Message Queue workloads.
-image: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e
-stack_version: 0.1.0
+image: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-cede445
+stack_version: 0.2.0
 infrastructure:
   cpu: 1
   memory: 1Gi
   storage_size: 10Gi
   instance_type: GeneralPurpose
   storage_class: gp3
+trunk_installs:
+  - name: pgmq
+    version: 0.10.2
+  - name: pg_partman
+    version: 4.7.3
 extensions:
   - name: pgmq
     locations:
       - database: postgres
-        schema: public
         enabled: true
-        version: 0.9.0
+        version: 0.10.2
   - name: pg_partman
     locations:
       - database: postgres
-        schema: public
         enabled: true
         version: 4.7.3
 postgres_metrics:
@@ -44,7 +47,7 @@ postgres_metrics:
 postgres_config_engine: standard
 postgres_config:
   - name: shared_preload_libraries
-    value: pg_stat_statements,pg_cron,pg_partman_bgw
+    value: pg_stat_statements,pg_partman_bgw
   - name: pg_partman_bgw.dbname
     value: postgres
   - name: pg_partman_bgw.interval
@@ -53,3 +56,15 @@ postgres_config:
     value: postgres
   - name: random_page_cost
     value: 1.1
+  - name: autovacuum_vacuum_cost_limit
+    value: -1
+  - name: autovacuum_vacuum_scale_factor
+    value: 0.05
+  - name: autovacuum_vacuum_insert_scale_factor
+    value: 0.05
+  - name: autovacuum_analyze_scale_factor
+    value: 0.05
+  - name: checkpoint_timeout
+    value: 10min
+  - name: pg_stat_statements.track
+    value: all

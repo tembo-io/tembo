@@ -1,7 +1,7 @@
 name: MachineLearning
 description: A Postgres instance equipped with machine learning extensions and optimized for machine learning workloads.
-image: "quay.io/tembo/ml-cnpg:15.3.0-1-77fcafc"
-stack_version: 0.1.0
+image: "quay.io/tembo/ml-cnpg:15.3.0-1-ac943a8"
+stack_version: 0.3.0
 infrastructure:
   cpu: 2
   memory: 2Gi
@@ -12,11 +12,26 @@ postgres_config_engine: standard
 postgres_config:
   - name: pg_stat_statements.track
     value: all
+  - name: cron.host
+    value: /controller/run
   - name: shared_preload_libraries
-    value: pg_stat_statements,pgml,pg_later
+    value: vectorize,pg_stat_statements,pgml,pg_cron,pg_later
+trunk_installs:
+  - name: pg_vector
+    version: 0.4.4
+  - name: pgml
+    version: 2.7.1
+  - name: pg_embedding
+    version: 0.1.0
+  - name: pg_cron
+    version: 1.5.2
+  - name: pgmq
+    version: 0.10.2
+  - name: vectorize
+    version: 0.0.2
+  - name: pg_later
+    version: 0.0.8
 extensions:
-  # vector, pgml, embedding are all installed in the base image
-  # therefore, we can reference the extension here by the name of the extension, not the name of the trunk project
   # trunk project pg_vector
   - name: vector
     locations:
@@ -38,9 +53,27 @@ extensions:
         schema: public
         enabled: true
         version: 0.1.0
-  - name: pg_later
+  - name: pg_cron
+    description: pg_cron
     locations:
-      - database: postgres
-        schema: pglater
-        enabled: true
-        version: 0.0.5
+    - database: postgres
+      enabled: true
+      version: 1.5.2
+  - name: pgmq
+    description: pgmq
+    locations:
+    - database: postgres
+      enabled: true
+      version: 0.10.2
+  - name: vectorize
+    description: simple vector search
+    locations:
+    - database: postgres
+      enabled: true
+      version: 0.0.2
+  - name: pg_later
+    description: async query execution
+    locations:
+    - database: postgres
+      enabled: true
+      version: 0.0.8
