@@ -9,7 +9,7 @@ use kube::{
 };
 use std::{collections::BTreeMap, sync::Arc};
 
-pub async fn reconcile_svc(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
+pub async fn reconcile_prometheus_exporter_service(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
     let client = ctx.client.clone();
     let ns = cdb.namespace().unwrap();
     let name = cdb.name_any() + "-metrics";

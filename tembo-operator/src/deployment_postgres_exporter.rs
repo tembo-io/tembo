@@ -1,7 +1,7 @@
 use crate::{
     apis::coredb_types::CoreDB,
     defaults::default_postgres_exporter_image,
-    postgres_exporter::{EXPORTER_CONFIGMAP, EXPORTER_VOLUME, QUERIES_YAML},
+    postgres_exporter::{EXPORTER_CONFIGMAP_PREFIX, EXPORTER_VOLUME, QUERIES_YAML},
     rbac::reconcile_rbac,
     Context, Error, Result,
 };
@@ -22,14 +22,12 @@ use kube::{
 };
 use std::{collections::BTreeMap, sync::Arc};
 
+
 const PROM_CFG_DIR: &str = "/prometheus";
 
-pub async fn reconcile_prometheus_exporter(
-    cdb: &CoreDB,
-    ctx: Arc<Context>,
-    cnpg_enabled: bool,
-) -> Result<(), Error> {
+pub async fn reconcile_prometheus_exporter_deployment(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
     let client = ctx.client.clone();
+    let coredb_name = cdb.metadata.name.clone().expect("should always have a name");
     let ns = cdb.namespace().unwrap();
     let name = format!("{}-metrics", cdb.name_any());
     let mut labels: BTreeMap<String, String> = BTreeMap::new();
@@ -42,11 +40,7 @@ pub async fn reconcile_prometheus_exporter(
     // Format the postgres-exporter connection URI
     // Check if cnpg is enabled, if so then set the URI to the cnpg service
     // Otherwise, use the old coredb service
-    let psql_uri: String = if !cnpg_enabled {
-        format!("{}.{}.svc.cluster.local:5432/postgres", cdb.name_any(), ns)
-    } else {
-        format!("{}-rw.{}.svc.cluster.local:5432/postgres", cdb.name_any(), ns)
-    };
+    let psql_uri: String = format!("{}-rw.{}.svc.cluster.local:5432/postgres", cdb.name_any(), ns);
 
     // reconcile rbac(service account, role, role binding) for the postgres-exporter
     let rbac = reconcile_rbac(
@@ -132,21 +126,35 @@ pub async fn reconcile_prometheus_exporter(
     ];
 
     // Generate VolumeMounts for the Container
-    let exporter_vol_mounts = vec![VolumeMount {
-        name: EXPORTER_VOLUME.to_owned(),
-        mount_path: PROM_CFG_DIR.to_string(),
-        ..VolumeMount::default()
-    }];
+    let exporter_vol_mounts = match cdb.spec.metrics {
+        None => {
+            vec![]
+        }
+        Some(_) => {
+            vec![VolumeMount {
+                name: EXPORTER_VOLUME.to_owned(),
+                mount_path: PROM_CFG_DIR.to_string(),
+                ..VolumeMount::default()
+            }]
+        }
+    };
 
     // Generate Volumes for the PodSpec
-    let exporter_volumes = vec![Volume {
-        config_map: Some(ConfigMapVolumeSource {
-            name: Some(EXPORTER_VOLUME.to_owned()),
-            ..ConfigMapVolumeSource::default()
-        }),
-        name: EXPORTER_CONFIGMAP.to_owned(),
-        ..Volume::default()
-    }];
+    let exporter_volumes = match cdb.spec.metrics {
+        None => {
+            vec![]
+        }
+        Some(_) => {
+            vec![Volume {
+                config_map: Some(ConfigMapVolumeSource {
+                    name: Some(format!("{}{}", EXPORTER_CONFIGMAP_PREFIX.to_owned(), coredb_name)),
+                    ..ConfigMapVolumeSource::default()
+                }),
+                name: EXPORTER_VOLUME.to_owned(),
+                ..Volume::default()
+            }]
+        }
+    };
 
     // Generate the PodSpec for the PodTemplateSpec
     let pod_spec = PodSpec {

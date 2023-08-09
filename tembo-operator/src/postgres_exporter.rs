@@ -1,10 +1,4 @@
-use crate::{
-    apis::coredb_types::CoreDB,
-    configmap::{create_configmap_ifnotexist, set_configmap},
-    defaults,
-    secret::PrometheusExporterSecretData,
-    Context, Error,
-};
+use crate::{apis::coredb_types::CoreDB, defaults, secret::PrometheusExporterSecretData, Context, Error};
 use kube::Client;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -13,7 +7,7 @@ use tracing::{debug, error};
 
 pub const QUERIES_YAML: &str = "queries.yaml";
 pub const EXPORTER_VOLUME: &str = "postgres-exporter";
-pub const EXPORTER_CONFIGMAP: &str = "postgres-exporter";
+pub const EXPORTER_CONFIGMAP_PREFIX: &str = "metrics-";
 
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema, Default)]
 #[allow(non_snake_case)]
@@ -60,6 +54,7 @@ fn preserve_arbitrary(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::sc
     schemars::schema::Schema::Object(obj)
 }
 
+use crate::configmap::apply_configmap;
 use kube::runtime::controller::Action;
 use std::str::FromStr;
 use tokio::time::Duration;
@@ -155,13 +150,23 @@ pub async fn create_postgres_exporter_role(
 }
 
 pub async fn reconcile_prom_configmap(cdb: &CoreDB, client: Client, ns: &str) -> Result<(), Error> {
-    create_configmap_ifnotexist(client.clone(), ns, EXPORTER_CONFIGMAP).await?;
     // set custom pg-prom metrics in configmap values if they are specified
+    let coredb_name = cdb
+        .metadata
+        .name
+        .clone()
+        .expect("instance should always have a name");
     match cdb.spec.metrics.clone().and_then(|m| m.queries) {
         Some(queries) => {
             let qdata = serde_yaml::to_string(&queries).unwrap();
             let d: BTreeMap<String, String> = BTreeMap::from([(QUERIES_YAML.to_string(), qdata)]);
-            set_configmap(client.clone(), ns, EXPORTER_CONFIGMAP, d).await?
+            apply_configmap(
+                client.clone(),
+                ns,
+                &format!("{}{}", EXPORTER_CONFIGMAP_PREFIX, coredb_name),
+                d,
+            )
+            .await?
         }
         None => {
             debug!("No queries specified in CoreDB spec");

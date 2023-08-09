@@ -105,7 +105,7 @@ test:
 
 # run cargo watch
 watch:
-	DATA_PLANE_BASEDOMAIN=localhost ENABLE_BACKUP=false RUST_LOG=debug,kube=debug,controller=debug cargo watch -x 'run'
+	DATA_PLANE_BASEDOMAIN=localhost ENABLE_BACKUP=false RUST_LOG=info,kube=info,controller=info cargo watch -x 'run'
 
 # watch with opentelemetry
 watch-telemetry:
