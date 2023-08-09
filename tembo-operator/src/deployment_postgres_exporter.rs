@@ -125,17 +125,18 @@ pub async fn reconcile_prometheus_exporter_deployment(cdb: &CoreDB, ctx: Arc<Con
     ];
 
     // Generate VolumeMounts for the Container
-    let exporter_vol_mounts = match cdb.spec.metrics {
-        None => {
-            vec![]
-        }
-        Some(_) => {
+    let exporter_vol_mounts = if let Some(metrics) = &cdb.spec.metrics {
+        if metrics.queries.is_some() {
             vec![VolumeMount {
                 name: EXPORTER_VOLUME.to_owned(),
                 mount_path: PROM_CFG_DIR.to_string(),
                 ..VolumeMount::default()
             }]
+        } else {
+            vec![]
         }
+    } else {
+        vec![]
     };
 
     // Generate Volumes for the PodSpec
