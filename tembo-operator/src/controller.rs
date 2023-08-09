@@ -141,9 +141,15 @@ impl CoreDB {
             }
         };
 
-        if self.spec.postgresExporterEnabled {
+        if self.spec.postgresExporterEnabled
+            && self
+                .spec
+                .metrics
+                .as_ref()
+                .and_then(|m| m.queries.as_ref())
+                .is_some()
+        {
             debug!("Reconciling prometheus configmap");
-            // Configmap for extra prometheus exporter metrics
             reconcile_prom_configmap(self, client.clone(), &ns)
                 .await
                 .map_err(|e| {

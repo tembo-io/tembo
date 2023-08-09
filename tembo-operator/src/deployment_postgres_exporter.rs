@@ -22,7 +22,6 @@ use kube::{
 };
 use std::{collections::BTreeMap, sync::Arc};
 
-
 const PROM_CFG_DIR: &str = "/prometheus";
 
 pub async fn reconcile_prometheus_exporter_deployment(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
@@ -140,11 +139,8 @@ pub async fn reconcile_prometheus_exporter_deployment(cdb: &CoreDB, ctx: Arc<Con
     };
 
     // Generate Volumes for the PodSpec
-    let exporter_volumes = match cdb.spec.metrics {
-        None => {
-            vec![]
-        }
-        Some(_) => {
+    let exporter_volumes = if let Some(metrics) = &cdb.spec.metrics {
+        if metrics.queries.is_some() {
             vec![Volume {
                 config_map: Some(ConfigMapVolumeSource {
                     name: Some(format!("{}{}", EXPORTER_CONFIGMAP_PREFIX.to_owned(), coredb_name)),
@@ -153,7 +149,11 @@ pub async fn reconcile_prometheus_exporter_deployment(cdb: &CoreDB, ctx: Arc<Con
                 name: EXPORTER_VOLUME.to_owned(),
                 ..Volume::default()
             }]
+        } else {
+            vec![]
         }
+    } else {
+        vec![]
     };
 
     // Generate the PodSpec for the PodTemplateSpec

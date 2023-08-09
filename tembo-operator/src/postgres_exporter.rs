@@ -156,6 +156,8 @@ pub async fn reconcile_prom_configmap(cdb: &CoreDB, client: Client, ns: &str) ->
         .name
         .clone()
         .expect("instance should always have a name");
+    // Make sure we always check for queries in the spec, incase someone calls this function
+    // directly and not through the reconcile function.
     match cdb.spec.metrics.clone().and_then(|m| m.queries) {
         Some(queries) => {
             let qdata = serde_yaml::to_string(&queries).unwrap();
