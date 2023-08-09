@@ -15,27 +15,12 @@ fn help() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[test]
-fn create_dry_run() -> Result<(), Box<dyn std::error::Error>> {
+fn init() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
-    cmd.arg("create")
-        .arg("db")
-        .arg("--dry-run")
-        .arg("sample-db");
-    cmd.assert().stdout(predicate::str::contains("kind: Tembo"));
-
-    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
-    cmd.arg("create")
-        .arg("--dry-run")
-        .arg("db")
-        .arg("sample-db");
-    cmd.assert().stdout(predicate::str::contains("kind: Tembo"));
-
-    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
-    cmd.arg("create")
-        .arg("db")
-        .arg("sample-db")
-        .arg("--dry-run");
-    cmd.assert().stdout(predicate::str::contains("kind: Tembo"));
+    cmd.arg("init");
+    cmd.assert().stdout(predicate::str::contains(
+        "Soon this will persist a configuration file",
+    ));
 
     Ok(())
 }
