@@ -2,7 +2,7 @@ use crate::{
     apis::coredb_types::CoreDB,
     extensions::{
         kubernetes_queries::{add_trunk_install_to_status, remove_trunk_installs_from_status},
-        types::{InstallStatus, TrunkInstall, TrunkInstallStatus},
+        types::{TrunkInstall, TrunkInstallStatus},
     },
     Context,
 };
@@ -113,7 +113,7 @@ pub async fn install_extensions(
                 let trunk_install_status = TrunkInstallStatus {
                     name: ext.name.clone(),
                     version: None,
-                    status: InstallStatus::Error,
+                    error: true,
                     error_message: Some("Missing version".to_string()),
                 };
                 current_trunk_install_statuses =
@@ -148,7 +148,7 @@ pub async fn install_extensions(
                         let trunk_install_status = TrunkInstallStatus {
                             name: ext.name.clone(),
                             version: ext.version.clone(),
-                            status: InstallStatus::Installed,
+                            error: false,
                             error_message: None,
                         };
                         current_trunk_install_statuses =
@@ -165,7 +165,7 @@ pub async fn install_extensions(
                         let trunk_install_status = TrunkInstallStatus {
                             name: ext.name.clone(),
                             version: ext.version.clone(),
-                            status: InstallStatus::Error,
+                            error: true,
                             error_message: Some(output),
                         };
                         current_trunk_install_statuses =

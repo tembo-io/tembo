@@ -2,7 +2,7 @@ image:
   # This to get tests of conductor to use
   # new version of operator.
   # Delete this after merge.
-  tag: 02bc068
+  tag: 7d5f1e1
 env:
   - name: ENABLE_INITIAL_BACKUP
     value: "false"

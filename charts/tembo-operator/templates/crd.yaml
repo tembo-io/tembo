@@ -441,22 +441,19 @@ spec:
               trunk_installs:
                 items:
                   properties:
+                    error:
+                      type: boolean
                     error_message:
                       nullable: true
                       type: string
                     name:
                       type: string
-                    status:
-                      enum:
-                      - Installed
-                      - Error
-                      type: string
                     version:
                       nullable: true
                       type: string
                   required:
+                  - error
                   - name
-                  - status
                   type: object
                 nullable: true
                 type: array
