@@ -173,7 +173,7 @@ pub fn merge_pg_configs(
             Err(e) => Err(e),
         },
         (Some(c), None) | (None, Some(c)) => {
-            info!("No configs to merge");
+            debug!("No configs to merge");
             Ok(Some(c))
         }
         (None, None) => Ok(None),

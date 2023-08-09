@@ -6,7 +6,11 @@ use crate::{
 use kube::{runtime::controller::Action, Api};
 use serde_json::json;
 use std::{sync::Arc, time::Duration};
-use tracing::{error, warn};
+use tracing::{
+    error,
+    log::{debug, info},
+    warn,
+};
 
 pub async fn update_extension_location_in_status(
     cdb: &CoreDB,
@@ -117,26 +121,51 @@ pub async fn remove_trunk_installs_from_status(
     trunk_install_names: Vec<String>,
 ) -> crate::Result<(), Action> {
     if trunk_install_names.is_empty() {
+        debug!("No trunk installs to remove from status on {}", name);
         return Ok(());
     }
+    info!(
+        "Removing trunk installs {:?} from status on {}",
+        trunk_install_names, name
+    );
     let current_coredb = cdb.get(name).await.map_err(|e| {
         error!("Error getting CoreDB: {:?}", e);
         Action::requeue(Duration::from_secs(10))
     })?;
     let current_status = match current_coredb.status {
-        None => CoreDBStatus::default(),
+        None => {
+            warn!(
+                "Did not find current status, initializing an empty status {}",
+                name
+            );
+            CoreDBStatus::default()
+        }
         Some(status) => status,
     };
     let current_trunk_installs = match current_status.trunk_installs {
         None => {
             warn!(
-                "No trunk installs in status on {}, but we are trying remove from status {:?}",
+                "Trunk installs on status is None for {}, but we are trying remove from status {:?}",
                 name, trunk_install_names
             );
             return Ok(());
         }
         Some(trunk_installs) => trunk_installs,
     };
+    if current_trunk_installs.is_empty() {
+        warn!(
+            "No trunk installs in status is an empty list {}, but we are trying remove from status {:?}",
+            name, trunk_install_names
+        );
+        return Ok(());
+    } else {
+        info!(
+            "There are currently {} trunk installs in status, and we are removing {} for {}",
+            current_trunk_installs.len(),
+            trunk_install_names.len(),
+            name
+        );
+    }
     let mut new_trunk_installs_status = current_trunk_installs.clone();
 
     // Remove the trunk installs from the status
@@ -149,6 +178,11 @@ pub async fn remove_trunk_installs_from_status(
     // remove duplicates
     new_trunk_installs_status.dedup_by(|a, b| a.name == b.name);
 
+    info!(
+        "The new status will have {} trunk installs: {}",
+        new_trunk_installs_status.len(),
+        name
+    );
     let new_status = CoreDBStatus {
         trunk_installs: Some(new_trunk_installs_status),
         ..current_status
@@ -159,50 +193,74 @@ pub async fn remove_trunk_installs_from_status(
         "status": new_status
     });
     patch_cdb_status_merge(cdb, name, patch_status).await?;
+    info!("Patched status for {}", name);
     Ok(())
 }
 
 pub async fn add_trunk_install_to_status(
     cdb: &Api<CoreDB>,
     name: &str,
-    trunk_install: &TrunkInstallStatus,
+    new_trunk_install_status_to_include: &TrunkInstallStatus,
 ) -> crate::Result<Vec<TrunkInstallStatus>, Action> {
+    info!(
+        "Adding trunk install {:?} to status on {}",
+        new_trunk_install_status_to_include, name
+    );
     let current_coredb = cdb.get(name).await.map_err(|e| {
         error!("Error getting CoreDB: {:?}", e);
         Action::requeue(Duration::from_secs(10))
     })?;
     let current_status = match current_coredb.status {
-        None => CoreDBStatus::default(),
+        None => {
+            warn!(
+                "While adding trunk install, did not find current status, initializing an empty status {}",
+                name
+            );
+            CoreDBStatus::default()
+        }
         Some(status) => status,
     };
     let current_trunk_installs = match current_status.trunk_installs {
         None => {
+            warn!(
+                "While adding trunk install, trunk installs on status is None for {}, initializing an empty list",
+                name);
             vec![]
         }
         Some(trunk_installs) => trunk_installs,
     };
-    let mut new_trunk_installs_status = current_trunk_installs.clone();
+    info!(
+        "There are currently {} trunk installs in status for {}",
+        current_trunk_installs.len(),
+        name
+    );
+    let mut new_trunk_installs_status: Vec<TrunkInstallStatus> = vec![];
     let mut trunk_install_found = false;
     // Check if the trunk install is already in the list
-    for (_i, ti) in current_trunk_installs.iter().enumerate() {
-        if ti.name == trunk_install.clone().name {
+    for (_i, existing_trunk_install_status) in current_trunk_installs.iter().enumerate() {
+        if existing_trunk_install_status.name == new_trunk_install_status_to_include.clone().name {
             warn!(
                 "Trunk install {} already in status on {}, replacing.",
-                &trunk_install.name, name
+                &new_trunk_install_status_to_include.name, name
             );
-            new_trunk_installs_status.push(trunk_install.clone());
+            new_trunk_installs_status.push(new_trunk_install_status_to_include.clone());
             trunk_install_found = true;
         } else {
-            new_trunk_installs_status.push(ti.clone());
+            new_trunk_installs_status.push(existing_trunk_install_status.clone());
         }
     }
     if !trunk_install_found {
-        new_trunk_installs_status.push(trunk_install.clone());
+        new_trunk_installs_status.push(new_trunk_install_status_to_include.clone());
     }
     // sort alphabetically by name
     new_trunk_installs_status.sort_by(|a, b| a.name.cmp(&b.name));
     // remove duplicates
     new_trunk_installs_status.dedup_by(|a, b| a.name == b.name);
+    info!(
+        "The new status will have {} trunk installs: {}",
+        new_trunk_installs_status.len(),
+        name
+    );
     let new_status = CoreDBStatus {
         trunk_installs: Some(new_trunk_installs_status.clone()),
         ..current_status
@@ -213,6 +271,7 @@ pub async fn add_trunk_install_to_status(
         "status": new_status
     });
     patch_cdb_status_merge(cdb, name, patch_status).await?;
+    info!("Patched status to update trunk installs for {}", name);
     Ok(new_trunk_installs_status.clone())
 }
 

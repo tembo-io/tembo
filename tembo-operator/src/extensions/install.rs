@@ -10,6 +10,8 @@ use kube::{runtime::controller::Action, Api};
 use std::{sync::Arc, time::Duration};
 use tracing::{debug, error, info};
 
+use crate::apis::coredb_types::CoreDBStatus;
+
 pub async fn reconcile_trunk_installs(
     cdb: &CoreDB,
     ctx: Arc<Context>,
@@ -83,8 +85,26 @@ pub async fn install_extensions(
     trunk_installs: Vec<&TrunkInstall>,
     ctx: Arc<Context>,
 ) -> Result<Vec<TrunkInstallStatus>, Action> {
-    let mut current_trunk_install_statuses: Vec<TrunkInstallStatus> = vec![];
     let coredb_name = cdb.metadata.name.clone().expect("CoreDB should have a name");
+    let mut current_trunk_install_statuses: Vec<TrunkInstallStatus> = cdb
+        .status
+        .clone()
+        .unwrap_or_else(|| {
+            debug!("No current status on {}, initializing default", coredb_name);
+            CoreDBStatus::default()
+        })
+        .trunk_installs
+        .unwrap_or_else(|| {
+            debug!(
+                "No current trunk installs on {}, initializing empty list",
+                coredb_name
+            );
+            vec![]
+        });
+    if trunk_installs.is_empty() {
+        debug!("No extensions to install into {}", coredb_name);
+        return Ok(current_trunk_install_statuses);
+    }
     info!("Installing extensions into {}: {:?}", coredb_name, trunk_installs);
     let client = ctx.client.clone();
     let coredb_api: Api<CoreDB> = Api::namespaced(
@@ -136,11 +156,10 @@ pub async fn install_extensions(
 
         match result {
             Ok(result) => {
-                let output = format!(
-                    "stdout:\n{}\nstderr:\n{}",
-                    result.stdout.clone().unwrap_or_default(),
-                    result.stderr.clone().unwrap_or_default()
-                );
+                let output = result
+                    .stdout
+                    .clone()
+                    .unwrap_or_else(|| "Found no output from trunk install".to_string());
                 match result.success {
                     true => {
                         info!("Installed extension {} into {}", &ext.name, coredb_name);

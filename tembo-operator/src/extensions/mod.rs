@@ -11,6 +11,7 @@ use crate::{
 };
 use kube::{runtime::controller::Action, Api};
 use std::sync::Arc;
+use tracing::log::debug;
 
 /// reconcile extensions between the spec and the database
 pub async fn reconcile_extensions(
@@ -19,7 +20,10 @@ pub async fn reconcile_extensions(
     _cdb_api: &Api<CoreDB>,
     _name: &str,
 ) -> Result<(Vec<TrunkInstallStatus>, Vec<ExtensionStatus>), Action> {
+    let coredb_name = coredb.metadata.name.clone().expect("CoreDB should have a name");
+    debug!("Reconciling trunk installs: {}", coredb_name);
     let trunk_installs = install::reconcile_trunk_installs(coredb, ctx.clone()).await?;
+    debug!("Reconciling extension statuses: {}", coredb_name);
     let extension_statuses = toggle::reconcile_extension_toggle_state(coredb, ctx.clone()).await?;
     Ok((trunk_installs, extension_statuses))
 }
