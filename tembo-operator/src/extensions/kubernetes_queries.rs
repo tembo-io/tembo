@@ -275,7 +275,6 @@ pub async fn add_trunk_install_to_status(
     Ok(new_trunk_installs_status.clone())
 }
 
-
 #[cfg(test)]
 mod tests {
     use crate::extensions::{

@@ -188,7 +188,6 @@ pub async fn get_all_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<E
     Ok(ext_spec)
 }
 
-
 /// generates the CREATE or DROP EXTENSION command for a given extension
 /// handles schema specification in the command
 fn generate_extension_enable_cmd(
@@ -295,7 +294,6 @@ pub async fn toggle_extension(
     Ok(())
 }
 
-
 #[cfg(test)]
 mod tests {
     use crate::extensions::{
@@ -391,7 +389,6 @@ mod tests {
             assert!(check_input(i), "input {} should be valid", i);
         }
     }
-
 
     #[test]
     fn test_generate_extension_enable_cmd() {

@@ -2,7 +2,6 @@ use crate::{apis::coredb_types::CoreDB, defaults};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-
 #[derive(Clone, Debug, Deserialize, Eq, Hash, JsonSchema, Serialize, PartialEq)]
 pub struct TrunkInstall {
     pub name: String,
@@ -124,7 +123,6 @@ pub fn get_location_spec(
     }
     None
 }
-
 
 #[cfg(test)]
 mod tests {

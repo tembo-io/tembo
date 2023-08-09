@@ -263,7 +263,7 @@ impl CoreDB {
             "status": new_status
         });
 
-        apply_status_force(&coredbs, &name, patch_status).await?;
+        patch_cdb_status_merge(&coredbs, &name, patch_status).await?;
 
         info!("Fully reconciled {}", self.name_any());
         // Check back every 5 minutes
@@ -421,20 +421,6 @@ pub async fn get_current_coredb_resource(cdb: &CoreDB, ctx: Arc<Context>) -> Res
         Action::requeue(Duration::from_secs(10))
     })?;
     Ok(coredb.clone())
-}
-
-pub async fn apply_status_force(
-    cdb: &Api<CoreDB>,
-    name: &str,
-    patch: serde_json::Value,
-) -> Result<(), Action> {
-    let ps = PatchParams::apply("cntrlr").force();
-    let patch_status = Patch::Apply(patch);
-    let _o = cdb.patch_status(name, &ps, &patch_status).await.map_err(|e| {
-        error!("Error updating CoreDB status: {:?}", e);
-        Action::requeue(Duration::from_secs(10))
-    })?;
-    Ok(())
 }
 
 pub async fn patch_cdb_status_merge(

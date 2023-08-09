@@ -183,7 +183,6 @@ pub struct Stack {
     // TODO: add other stack attributes as they are supported
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;

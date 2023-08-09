@@ -3,7 +3,6 @@ use crate::{Context, Error};
 use kube::Client;
 use std::sync::Arc;
 
-
 use crate::exec::ExecCommand;
 
 pub struct PsqlOutput {

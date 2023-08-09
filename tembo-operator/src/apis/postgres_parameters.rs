@@ -12,7 +12,6 @@ use std::{cmp::Ordering, collections::BTreeSet, fmt, str::FromStr};
 use thiserror::Error;
 use tracing::*;
 
-
 // these values are multi-valued, and need to be merged across configuration layers
 pub const MULTI_VAL_CONFIGS: [&str; 5] = [
     "shared_preload_libraries",

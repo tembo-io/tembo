@@ -253,7 +253,6 @@ mod tests {
         assert_eq!(result, vec![]);
     }
 
-
     #[test]
     fn test_toggle_logic() {
         let desired_extensions = vec![
