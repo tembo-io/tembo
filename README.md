@@ -10,6 +10,25 @@ best experience working with Postgres in any environment.
 This repo is a work in progress. Soon, it will provide install instructions and a 
 detailed Getting Started guide.
 
+# Commands
+
+`tembo help`
+
+The help command will respond with the various commands and options available.
+
+`tembo init`
+
+The `init` command initializes your environment and can be used to generate configuration files. 
+The command supports a `dryrun` flag to test where a configuration file will be written. It also 
+supports a `file-path` flag that can be used to explicitly provide an absolute or relative file 
+path for the configuration file.
+
+The default configuration file path is $HOME/.config/tembo.
+
+The `init` command can be used to create global and project specific configuration files.
+
+For more information: `tembo init --help`
+
 # Contributing
 
 Before you start working on something, it's best to check if there is an existing plan 
