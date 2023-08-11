@@ -17,6 +17,7 @@ fn main() {
     // Check which subcommand the user ran...
     let res = match command.get_matches().subcommand() {
         Some(("init", sub_matches)) => cmd::init::execute(sub_matches),
+        Some(("install", sub_matches)) => cmd::install::execute(sub_matches),
         Some(("completions", sub_matches)) => (|| {
             let shell = sub_matches
                 .get_one::<Shell>("shell")
@@ -53,6 +54,7 @@ fn create_clap_command() -> Command {
              The source code for tembo is available at: https://github.com/tembo-io/tembo-cli",
         )
         .subcommand(cmd::init::make_subcommand())
+        .subcommand(cmd::install::make_subcommand())
         .subcommand(
             Command::new("completions")
                 .about("Generate shell completions for your shell to stdout")
