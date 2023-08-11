@@ -51,15 +51,14 @@ spec:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          probes:
-            livenessProbe:
-              httpGet:
-                path: "/health/lively"
-                port: http
-            readinessProbe:
-              httpGet:
-                path: "/health/lively"
-                port: http
+          livenessProbe:
+            httpGet:
+              path: "/health/lively"
+              port: http
+          readinessProbe:
+            httpGet:
+              path: "/health/lively"
+              port: http
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
       {{- with .Values.nodeSelector }}

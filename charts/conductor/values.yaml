@@ -29,7 +29,7 @@ image:
 # workload in practice.
 resources:
   limits:
-    cpu: 1000m
+    cpu: 1
     memory: 128Mi
   requests:
     cpu: 100m
