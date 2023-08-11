@@ -266,8 +266,8 @@ impl CoreDB {
         patch_cdb_status_merge(&coredbs, &name, patch_status).await?;
 
         info!("Fully reconciled {}", self.name_any());
-        // Check back every 5 minutes
-        Ok(Action::requeue(Duration::from_secs(300)))
+        // Check back every minute
+        Ok(Action::requeue(Duration::from_secs(60)))
     }
 
     // Finalizer cleanup (the object was deleted, ensure nothing is orphaned)
