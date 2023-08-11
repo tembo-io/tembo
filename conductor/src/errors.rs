@@ -1,5 +1,6 @@
 use aws_sdk_cloudformation::Error as CFError;
 use kube;
+use pgmq::errors::PgmqError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
@@ -15,6 +16,15 @@ pub enum ConductorError {
     // No status reported
     #[error("no status reported")]
     NoStatusReported,
+
+    #[error("Error parsing event ID {0}")]
+    EventIDParsing(String),
+
+    #[error("Error formatting event ID")]
+    EventIDFormat,
+
+    #[error("Error using queue {0}")]
+    PgmqError(#[from] PgmqError),
 
     /// a aws error
     #[error("aws sdk error {0}")]

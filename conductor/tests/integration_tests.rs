@@ -244,7 +244,10 @@ mod test {
         let msg = types::CRUDevent {
             organization_name: org_name.clone(),
             data_plane_id: "org_02s3owPQskuGXHE8vYsGSY".to_owned(),
-            event_id: "test-install-extension".to_owned(),
+            event_id: format!(
+                "{name}.org_02s3owPQskuGXHE8vYsGSY.CoreDB.inst_02s4UKVbRy34SAYVSwZq2H",
+                name = dbname
+            ),
             event_type: types::Event::Update,
             dbname: dbname.clone(),
             spec: Some(spec),
@@ -253,17 +256,20 @@ mod test {
         println!("msg_id: {msg_id:?}");
 
         // read message from data_plane_events queue
-        let msg = get_dataplane_message(retries, retry_delay, &queue).await;
-        queue
-            .archive("myqueue_data_plane", msg.msg_id)
-            .await
-            .expect("error deleting message");
+        let mut extensions: Vec<Extension> = vec![];
+        while num_expected_extensions != extensions.len() {
+            let msg = get_dataplane_message(retries, retry_delay, &queue).await;
+            queue
+                .archive("myqueue_data_plane", msg.msg_id)
+                .await
+                .expect("error deleting message");
 
-        let extensions = msg
-            .message
-            .spec
-            .expect("No spec found in message")
-            .extensions;
+            extensions = msg
+                .message
+                .spec
+                .expect("No spec found in message")
+                .extensions;
+        }
         // we added an extension, so it should be +1 now
         assert_eq!(num_expected_extensions, extensions.len());
 
@@ -312,7 +318,10 @@ mod test {
         let msg = types::CRUDevent {
             organization_name: org_name.clone(),
             data_plane_id: "org_02s3owPQskuGXHE8vYsGSY".to_owned(),
-            event_id: "test-install-extension".to_owned(),
+            event_id: format!(
+                "{name}.org_02s3owPQskuGXHE8vYsGSY.CoreDB.inst_02s4UKVbRy34SAYVSwZq2H",
+                name = dbname
+            ),
             event_type: types::Event::Delete,
             dbname: dbname.clone(),
             spec: None,

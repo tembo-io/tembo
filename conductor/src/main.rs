@@ -6,8 +6,8 @@ use conductor::monitoring::CustomMetrics;
 use conductor::{
     create_cloudformation, create_namespace, create_networkpolicy, create_or_update, delete,
     delete_cloudformation, delete_namespace, generate_rand_schedule, generate_spec,
-    get_coredb_error_without_status, get_one, get_pg_conn, lookup_role_arn, restart_cnpg,
-    restart_statefulset, types,
+    get_coredb_error_without_status, get_one, get_pg_conn, lookup_role_arn, parse_event_id,
+    restart_cnpg, restart_statefulset, types,
 };
 use controller::apis::coredb_types::{Backup, CoreDBSpec, ServiceAccountTemplate};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
@@ -18,10 +18,16 @@ use opentelemetry::sdk::metrics::{controllers, processors, selectors};
 use opentelemetry::{global, KeyValue};
 use pgmq::{Message, PGMQueueExt};
 use std::env;
+use std::sync::{Arc, Mutex};
 use std::{thread, time};
+
+use crate::status_reporter::run_status_reporter;
+use conductor::routes::health::background_threads_running;
 use tokio_retry::strategy::FixedInterval;
 use tokio_retry::Retry;
 use types::{CRUDevent, Event};
+
+mod status_reporter;
 
 async fn run(metrics: CustomMetrics) -> Result<(), Box<dyn std::error::Error>> {
     // Read connection info from environment variable
@@ -255,7 +261,18 @@ async fn run(metrics: CustomMetrics) -> Result<(), Box<dyn std::error::Error>> {
 
                 info!("{}: Generating spec", read_msg.msg_id);
                 // generate CoreDB spec based on values in body
-                let spec = generate_spec(&namespace, &coredb_spec).await;
+                let (workspace_id, org_id, entity_name, instance_id) =
+                    parse_event_id(read_msg.message.event_id.as_str())?;
+                let spec = generate_spec(
+                    &workspace_id,
+                    &org_id,
+                    &entity_name,
+                    &instance_id,
+                    &read_msg.message.data_plane_id,
+                    &namespace,
+                    &coredb_spec,
+                )
+                .await;
 
                 info!("{}: Creating or updating spec", read_msg.msg_id);
                 // create or update CoreDB
@@ -466,6 +483,9 @@ async fn run(metrics: CustomMetrics) -> Result<(), Box<dyn std::error::Error>> {
     }
 }
 
+// https://github.com/rust-lang/rust-clippy/issues/6446
+// False positive because lock is dropped before await
+#[allow(clippy::await_holding_lock)]
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     env_logger::init();
@@ -482,34 +502,70 @@ async fn main() -> std::io::Result<()> {
     let exporter = opentelemetry_prometheus::exporter(controller).init();
     let meter = global::meter("actix_web");
     let custom_metrics = CustomMetrics::new(&meter);
-    let custom_metrics_copy = custom_metrics.clone();
+
+    let background_threads: Arc<Mutex<Vec<tokio::task::JoinHandle<()>>>> =
+        Arc::new(Mutex::new(Vec::new()));
+
+    let mut background_threads_locked = background_threads
+        .lock()
+        .expect("Failed to remember our background threads");
 
     info!("Starting conductor");
-
-    tokio::spawn(async move {
-        loop {
-            match run(custom_metrics_copy.clone()).await {
-                Ok(_) => {}
-                Err(err) => {
-                    custom_metrics_copy.clone().conductor_errors.add(
-                        &opentelemetry::Context::current(),
-                        1,
-                        &[],
-                    );
-                    error!("error: {:?}", err);
+    background_threads_locked.push(tokio::spawn({
+        let custom_metrics_copy = custom_metrics.clone();
+        async move {
+            loop {
+                match run(custom_metrics_copy.clone()).await {
+                    Ok(_) => {}
+                    Err(err) => {
+                        custom_metrics_copy.clone().conductor_errors.add(
+                            &opentelemetry::Context::current(),
+                            1,
+                            &[],
+                        );
+                        error!("error in conductor: {:?}", err);
+                    }
                 }
+                warn!("conductor exited, sleeping for 1 second");
+                thread::sleep(time::Duration::from_secs(1));
             }
         }
-    });
+    }));
+
+    info!("Starting status reporter");
+    background_threads_locked.push(tokio::spawn({
+        let custom_metrics_copy = custom_metrics.clone();
+        async move {
+            loop {
+                match run_status_reporter(custom_metrics_copy.clone()).await {
+                    Ok(_) => {}
+                    Err(err) => {
+                        custom_metrics_copy.clone().conductor_errors.add(
+                            &opentelemetry::Context::current(),
+                            1,
+                            &[],
+                        );
+                        error!("error in conductor: {:?}", err);
+                    }
+                }
+                warn!("conductor exited, sleeping for 1 second");
+                thread::sleep(time::Duration::from_secs(1));
+            }
+        }
+    }));
+
+    std::mem::drop(background_threads_locked);
 
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(custom_metrics.clone()))
+            .app_data(web::Data::new(background_threads.clone()))
             .wrap(RequestTracing::new())
             .route(
                 "/metrics",
                 web::get().to(PrometheusMetricsHandler::new(exporter.clone())),
             )
+            .service(web::scope("/health").service(background_threads_running))
     })
     .workers(1)
     .bind(("0.0.0.0", 8080))?
