@@ -75,6 +75,9 @@ jobs:
           cargo build
           # Start conductor in the background
           just run-local > conductor-output.txt 2>&1 &
+          # Wait long enough that the server build grabs the cargo build lock file
+          # before the test does
+          sleep 5
           # Run the tests
           cargo test -- --ignored --nocapture
       - name: Debugging information

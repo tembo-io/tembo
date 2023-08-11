@@ -107,7 +107,7 @@ async fn send_status_update(
     let response = types::StateToControlPlane {
         data_plane_id,
         event_id: event_id.clone(),
-        event_type: Event::Update,
+        event_type: Event::Updated,
         spec: Some(coredb.spec.clone()),
         status: coredb.status.clone(),
         connection: Some(conn_info),
