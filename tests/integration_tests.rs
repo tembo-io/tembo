@@ -18,9 +18,9 @@ fn help() -> Result<(), Box<dyn std::error::Error>> {
 fn init() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
     cmd.arg("init");
-    cmd.assert().stdout(predicate::str::contains(
-        "Soon this will persist a configuration file",
-    ));
+    cmd.assert().stdout(predicate::str::contains("config file"));
+
+    // TODO: test that the configuration file is created
 
     Ok(())
 }
