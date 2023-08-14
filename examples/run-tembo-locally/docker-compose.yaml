@@ -1,0 +1,8 @@
+version: '3'
+
+services:
+  local-tembo:
+    container_name: local-tembo
+    build: .
+    ports:
+      - "5432:5432"
