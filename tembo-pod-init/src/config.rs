@@ -6,12 +6,11 @@ pub struct Config {
     pub namespace_label: String,
     pub server_host: String,
     pub server_port: u16,
-    pub log_level: String,
     pub container_image: String,
     pub init_container_name: String,
     pub tls_cert: String,
     pub tls_key: String,
-    pub opentelemetry_endpoint_url: String,
+    pub opentelemetry_endpoint_url: Option<String>,
 }
 
 impl Default for Config {
@@ -26,7 +25,6 @@ impl Default for Config {
                 .parse()
                 .unwrap(),
             server_port: from_env_or_default("SERVER_PORT", "8443").parse().unwrap(),
-            log_level: from_env_or_default("LOG_LEVEL", "info").parse().unwrap(),
             container_image: from_env_or_default(
                 "CONTAINER_IMAGE",
                 "quay.io/tembo/tembo-pg-cnpg:latest",
@@ -42,9 +40,14 @@ impl Default for Config {
             tls_key: from_env_or_default("TLS_KEY", "/certs/tls.key")
                 .parse()
                 .unwrap(),
-            opentelemetry_endpoint_url: from_env_or_default("OPENTELEMETRY_ENDPOINT_URL", "")
-                .parse()
-                .unwrap(),
+            opentelemetry_endpoint_url: {
+                let url = std::env::var("OPENTELEMETRY_ENDPOINT_URL").unwrap_or_default();
+                if url.is_empty() {
+                    None
+                } else {
+                    Some(url)
+                }
+            },
         }
     }
 }

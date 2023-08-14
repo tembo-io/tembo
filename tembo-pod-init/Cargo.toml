@@ -8,14 +8,6 @@ doc = false
 name = "tembo-pod-init"
 path = "src/main.rs"
 
-[lib]
-name = "tembo_pod_init"
-path = "src/lib.rs"
-
-[features]
-default = []
-telemetry = ["tonic", "opentelemetry-otlp"]
-
 [dependencies]
 actix-web = { version = "4.3", features = ["openssl"] }
 tokio = { version = "1.29", features = ["rt"] }
@@ -25,15 +17,11 @@ serde_json = "1.0"
 json-patch = "1"
 parking_lot = "0.12"
 futures = "0.3"
-tracing = "0.1"
-tracing-log = "0.1"
-tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"]}
 openssl = { version = "0.10", features = ["vendored"] }
 controller = {path = "../tembo-operator", package = "controller"}
-tracing-opentelemetry = "0.19.0"
-opentelemetry = { version = "0.19.0", features = ["trace", "rt-tokio"] }
-opentelemetry-otlp = { version = "0.12.0", features = ["tokio"], optional = true }
-tonic = { version = "0.8.0", optional = true } # 0.9 blocked on opentelemetry-otlp release
+tracing = "0.1"
+tembo-telemetry = "0.2.0"
+opentelemetry = { version = "0.19.0", features = ["trace", "metrics"] }
 
 [dependencies.kube]
 features = ["admission","runtime", "client", "derive", "ws"]

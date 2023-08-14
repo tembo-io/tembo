@@ -5,7 +5,7 @@ SEMVER_VERSION := `grep version Cargo.toml | awk -F"\"" '{print $2}' | head -n 1
 NAMESPACE := "default"
 KUBE_VERSION := "1.26"
 RUST_LOG := "debug"
-LOG_LEVEL := "debug"
+ENV := "development"
 
 default:
   @just --list --unsorted --color=always | rg -v "    default"
@@ -35,11 +35,11 @@ cnpg:
 
 # run
 run:
-  LOG_LEVEL={{LOG_LEVEL}} cargo run
+  RUST_LOG={{RUST_LOG}} ENV={{ENV}} cargo run
 
 # run cargo watch
 watch:
-  LOG_LEVEL={{LOG_LEVEL}} cargo watch -x 'run'
+  RUST_LOG={{RUST_LOG}} ENV={{ENV}} cargo watch -x 'run'
 
 # format with nightly rustfmt
 fmt:
@@ -47,4 +47,4 @@ fmt:
 
 # run integration testing
 test:
-  RUST_LOG={{RUST_LOG}} cargo test -- --ignored --nocapture
+  RUST_LOG={{RUST_LOG}} ENV={{ENV}} cargo test -- --ignored --nocapture

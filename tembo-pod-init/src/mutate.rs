@@ -9,6 +9,7 @@ use kube::Client;
 use serde_json::json;
 use std::collections::HashSet;
 use std::sync::Arc;
+use tembo_telemetry::TelemetryConfig;
 use tokio::sync::RwLock;
 use tracing::*;
 
@@ -21,7 +22,12 @@ async fn mutate(
     config: web::Data<Config>,
     namespaces: web::Data<Arc<RwLock<HashSet<String>>>>,
     client: web::Data<Arc<Client>>,
+    tc: web::Data<TelemetryConfig>,
 ) -> impl Responder {
+    // Set trace_id for logging
+    let trace_id = tc.get_trace_id();
+    Span::current().record("trace_id", &field::display(&trace_id));
+
     // Extract the AdmissionRequest from the AdmissionReview
     let admission_request: AdmissionRequest<Pod> = body.clone().request.unwrap();
 

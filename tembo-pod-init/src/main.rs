@@ -1,12 +1,14 @@
-use actix_web::{dev::ServerHandle, middleware, web, App, HttpServer};
+use actix_web::{dev::ServerHandle, web, App, HttpServer};
 use kube::Client;
 use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
+use opentelemetry::global;
 use parking_lot::Mutex;
 use std::sync::Arc;
-use tembo_pod_init::{
-    config::Config, health::*, mutate::mutate, telemetry, watcher::NamespaceWatcher,
-};
+use tembo_pod_init::{config::Config, health::*, mutate::mutate, watcher::NamespaceWatcher};
+use tembo_telemetry::{TelemetryConfig, TelemetryInit};
 use tracing::*;
+
+const TRACER_NAME: &str = "tembo.io/tembo-pod-init";
 
 #[instrument(fields(trace_id))]
 #[actix_web::main]
@@ -14,10 +16,18 @@ async fn main() -> std::io::Result<()> {
     let config = Config::default();
 
     // Initialize logging
-    telemetry::init(&config).await;
+    let otlp_endpoint_url = &config.opentelemetry_endpoint_url;
+    let telemetry_config = TelemetryConfig {
+        app_name: "tembo-pod-init".to_string(),
+        env: std::env::var("ENV").unwrap_or_else(|_| "production".to_string()),
+        endpoint_url: otlp_endpoint_url.clone(),
+        tracer_id: Some(TRACER_NAME.to_string()),
+    };
+
+    let _ = TelemetryInit::init(&telemetry_config).await;
 
     // Set trace_id for logging
-    let trace_id = telemetry::get_trace_id();
+    let trace_id = telemetry_config.get_trace_id();
     Span::current().record("trace_id", &field::display(&trace_id));
 
     let stop_handle = web::Data::new(StopHandle::default());
@@ -50,6 +60,7 @@ async fn main() -> std::io::Result<()> {
         let kube_data = web::Data::new(Arc::new(kube_client.clone()));
         let namespace_watcher_data = web::Data::new(namespaces.clone());
         let stop_handle = stop_handle.clone();
+        let tc = web::Data::new(telemetry_config.clone());
         move || {
             {
                 App::new()
@@ -57,10 +68,12 @@ async fn main() -> std::io::Result<()> {
                     .app_data(kube_data.clone())
                     .app_data(namespace_watcher_data.clone())
                     .app_data(stop_handle.clone())
+                    .app_data(tc.clone())
                     .wrap(
-                        middleware::Logger::default()
+                        tembo_telemetry::get_tracing_logger()
                             .exclude("/health/liveness")
-                            .exclude("/health/readiness"),
+                            .exclude("/health/readiness")
+                            .build(),
                     )
                     .service(liveness)
                     .service(readiness)
@@ -79,7 +92,12 @@ async fn main() -> std::io::Result<()> {
         config.server_host, config.server_port
     );
     debug!("Config: {:?}", config);
-    server.await
+    server.await?;
+
+    // Make sure we close all the spans
+    global::shutdown_tracer_provider();
+
+    Ok(())
 }
 
 #[derive(Default)]

@@ -4,7 +4,7 @@ COPY tembo-operator ./tembo-operator
 WORKDIR /tembo-pod-init
 COPY Cargo.toml .
 COPY src/ ./src/
-RUN cargo build --release --features=telemetry
+RUN cargo build --release
 
 FROM debian:bookworm-slim
 RUN set -eux; \
