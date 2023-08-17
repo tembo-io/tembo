@@ -473,6 +473,40 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
     Ok(())
 }
 
+fn schedule_expression_from_cdb(cdb: &CoreDB) -> String {
+    // Default to daily at midnight
+    let default = "0 0 0 * * *".to_string();
+    match &cdb.spec.backup.schedule {
+        None => default,
+        Some(expression) => {
+            let mut terms = expression.split(' ').collect::<Vec<&str>>();
+            if terms.len() == 5 {
+                // pre-pend "0" to the vector
+                let mut new_terms = vec!["0"];
+                new_terms.extend(terms);
+                terms = new_terms.clone();
+            }
+            if terms.len() != 6 {
+                warn!("Invalid schedule expression, expected five or six terms. Setting as default. Found expression: '{}'", expression);
+                return default;
+            }
+            // check that all terms are either parsable as int32 or "*"
+            for term in &terms {
+                if *term != "*" {
+                    match term.parse::<i32>() {
+                        Ok(_) => {}
+                        Err(_) => {
+                            warn!("Invalid schedule expression, only integers and '*' are accepted, setting as default. Found: {}", expression);
+                            return default;
+                        }
+                    }
+                }
+            }
+            terms.join(" ")
+        }
+    }
+}
+
 // Generate a ScheduledBackup
 fn cnpg_scheduled_backup(cdb: &CoreDB) -> ScheduledBackup {
     let name = cdb.name_any();
@@ -488,7 +522,7 @@ fn cnpg_scheduled_backup(cdb: &CoreDB) -> ScheduledBackup {
             backup_owner_reference: Some(ScheduledBackupBackupOwnerReference::Cluster),
             cluster: Some(ScheduledBackupCluster { name }),
             immediate: Some(true),
-            schedule: cdb.spec.backup.schedule.clone().unwrap(),
+            schedule: schedule_expression_from_cdb(cdb),
             suspend: Some(false),
             ..ScheduledBackupSpec::default()
         },
@@ -920,7 +954,7 @@ mod tests {
         let (backup, service_account_template) = cnpg_backup_configuration(&cdb, &cfg);
 
         // Assert to make sure that backup schedule is set
-        assert_eq!(scheduled_backup.spec.schedule, "55 7 * * *".to_string());
+        assert_eq!(scheduled_backup.spec.schedule, "0 55 7 * * *".to_string());
         assert_eq!(
             backup.clone().unwrap().retention_policy.unwrap(),
             "45d".to_string()
