@@ -77,6 +77,21 @@ pub fn cnpg_backup_configuration(
             .expect("Expected service account template annotations to contain an EKS role ARN")
             .clone();
 
+        let retention_days = match &cdb.spec.backup.retentionPolicy {
+            None => "30d".to_string(),
+            Some(retention_policy) => {
+                match retention_policy.parse::<i32>() {
+                    Ok(days) => {
+                        format!("{}d", days)
+                    }
+                    Err(_) => {
+                        warn!("Invalid retention policy because could not convert to i32, using default of 30 days");
+                        "30d".to_string()
+                    }
+                }
+            }
+        };
+
         let cluster_backup = Some(ClusterBackup {
             barman_object_store: Some(ClusterBackupBarmanObjectStore {
                 data: Some(ClusterBackupBarmanObjectStoreData {
@@ -97,7 +112,7 @@ pub fn cnpg_backup_configuration(
                 }),
                 ..ClusterBackupBarmanObjectStore::default()
             }),
-            retention_policy: Some("80d".to_string()),
+            retention_policy: Some(retention_days),
             ..ClusterBackup::default()
         });
 
@@ -878,7 +893,7 @@ mod tests {
           backup:
             destinationPath: s3://aws-s3-bucket/tembo/backup
             encryption: AES256
-            retentionPolicy: "30"
+            retentionPolicy: "45"
             schedule: 55 7 * * *
           image: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e 
           port: 5432
@@ -906,6 +921,10 @@ mod tests {
 
         // Assert to make sure that backup schedule is set
         assert_eq!(scheduled_backup.spec.schedule, "55 7 * * *".to_string());
+        assert_eq!(
+            backup.clone().unwrap().retention_policy.unwrap(),
+            "45d".to_string()
+        );
 
         // Assert to make sure that backup destination path is set
         assert_eq!(
