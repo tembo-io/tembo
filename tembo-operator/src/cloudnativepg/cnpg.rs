@@ -10,8 +10,9 @@ use crate::{
             ClusterExternalClusters, ClusterExternalClustersPassword, ClusterLogLevel, ClusterMonitoring,
             ClusterMonitoringCustomQueriesConfigMap, ClusterNodeMaintenanceWindow, ClusterPostgresql,
             ClusterPostgresqlSyncReplicaElectionConstraint, ClusterPrimaryUpdateMethod,
-            ClusterPrimaryUpdateStrategy, ClusterResources, ClusterServiceAccountTemplate,
-            ClusterServiceAccountTemplateMetadata, ClusterSpec, ClusterStorage, ClusterSuperuserSecret,
+            ClusterPrimaryUpdateStrategy, ClusterReplicationSlots, ClusterReplicationSlotsHighAvailability,
+            ClusterResources, ClusterServiceAccountTemplate, ClusterServiceAccountTemplateMetadata,
+            ClusterSpec, ClusterStorage, ClusterSuperuserSecret,
         },
         scheduledbackups::{
             ScheduledBackup, ScheduledBackupBackupOwnerReference, ScheduledBackupCluster, ScheduledBackupSpec,
@@ -235,20 +236,38 @@ fn cnpg_cluster_storage(cdb: &CoreDB) -> Option<ClusterStorage> {
     })
 }
 
+// Check replica count to enable HA
+fn cnpg_high_availability(cdb: &CoreDB) -> Option<ClusterReplicationSlots> {
+    if cdb.spec.replicas > 1 {
+        Some(ClusterReplicationSlots {
+            high_availability: Some(ClusterReplicationSlotsHighAvailability {
+                enabled: Some(true),
+                ..ClusterReplicationSlotsHighAvailability::default()
+            }),
+            update_interval: Some(30),
+        })
+    } else {
+        Some(ClusterReplicationSlots {
+            high_availability: Some(ClusterReplicationSlotsHighAvailability {
+                enabled: Some(false),
+                ..ClusterReplicationSlotsHighAvailability::default()
+            }),
+            update_interval: Some(30),
+        })
+    }
+}
+
 pub fn cnpg_cluster_from_cdb(cdb: &CoreDB) -> Cluster {
     let cfg = Config::default();
     let name = cdb.name_any();
     let namespace = cdb.namespace().unwrap();
     let owner_reference = cdb.controller_owner_ref(&()).unwrap();
-
     let mut annotations = BTreeMap::new();
     annotations.insert("tembo-pod-init.tembo.io/inject".to_string(), "true".to_string());
-
     let (bootstrap, external_clusters, superuser_secret) = cnpg_cluster_bootstrap_from_cdb(cdb);
-
     let (backup, service_account_template) = cnpg_backup_configuration(cdb, &cfg);
-
     let storage = cnpg_cluster_storage(cdb);
+    let replication = cnpg_high_availability(cdb);
 
     let PostgresConfig {
         postgres_parameters,
@@ -297,7 +316,7 @@ pub fn cnpg_cluster_from_cdb(cdb: &CoreDB) -> Cluster {
             enable_superuser_access: Some(true),
             failover_delay: Some(0),
             image_name: Some(image),
-            instances: 1,
+            instances: cdb.spec.replicas as i64,
             log_level: Some(ClusterLogLevel::Info),
             max_sync_replicas: Some(0),
             min_sync_replicas: Some(0),
@@ -325,6 +344,7 @@ pub fn cnpg_cluster_from_cdb(cdb: &CoreDB) -> Cluster {
             }),
             primary_update_method: Some(ClusterPrimaryUpdateMethod::Restart),
             primary_update_strategy: Some(ClusterPrimaryUpdateStrategy::Unsupervised),
+            replication_slots: replication,
             resources: Some(ClusterResources {
                 claims: None,
                 limits: cdb.spec.resources.clone().limits,

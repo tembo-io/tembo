@@ -83,7 +83,7 @@ start-kind:
 
 # run with opentelemetry
 run-telemetry:
-	DATA_PLANE_BASEDOMAIN=localhost OPENTELEMETRY_ENDPOINT_URL=http://localhost:4318 RUST_LOG=debug,kube=debug,controller=debug ENABLE_BACKUP=false cargo run --features=telemetry
+	DATA_PLANE_BASEDOMAIN=localhost OPENTELEMETRY_ENDPOINT_URL=http://localhost:4317 RUST_LOG=debug,kube=debug,controller=debug ENABLE_BACKUP=false cargo run --features=telemetry
 
 # run without opentelemetry
 run:
@@ -109,7 +109,7 @@ watch:
 
 # watch with opentelemetry
 watch-telemetry:
-	DATA_PLANE_BASEDOMAIN=localhost OPENTELEMETRY_ENDPOINT_URL=http://localhost:4318 RUST_LOG=debug,kube=debug,controller=debug ENABLE_BACKUP=false cargo watch -x 'run --features=telemetry'
+	DATA_PLANE_BASEDOMAIN=localhost OPENTELEMETRY_ENDPOINT_URL=http://localhost:4317 RUST_LOG=debug,kube=debug,controller=debug ENABLE_BACKUP=false cargo watch -x 'run --features=telemetry'
 
 # format with nightly rustfmt
 fmt:

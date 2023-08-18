@@ -1,4 +1,4 @@
-// Include the #[ignore] macro on slow tests
+// Include the #[gnore] macro on slow tests
 // That way, 'cargo test' does not run them by default.
 // To run just these tests, use 'cargo test -- --ignored'
 // To run all tests, use 'cargo test -- --include-ignored'
@@ -1419,6 +1419,254 @@ mod test {
         let _ = ingress_route_tcp_api.delete(name, &Default::default()).await;
 
         // Cleanup CoreDB resource
+        coredbs.delete(name, &Default::default()).await.unwrap();
+        println!("Waiting for CoreDB to be deleted: {}", &name);
+        let _assert_coredb_deleted = tokio::time::timeout(
+            Duration::from_secs(TIMEOUT_SECONDS_COREDB_DELETED),
+            await_condition(coredbs.clone(), name, conditions::is_deleted("")),
+        )
+        .await
+        .unwrap_or_else(|_| {
+            panic!(
+                "CoreDB {} was not deleted after waiting {} seconds",
+                name, TIMEOUT_SECONDS_COREDB_DELETED
+            )
+        });
+        println!("CoreDB resource deleted {}", name);
+
+        // Delete namespace
+        let _ = delete_namespace(client.clone(), &namespace).await;
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn functional_test_ha_basic_cnpg() {
+        // Initialize the Kubernetes client
+        let client = kube_client().await;
+        let state = State::default();
+        let context = state.create_context(client.clone());
+
+        // Configurations
+        let mut rng = rand::thread_rng();
+        let suffix = rng.gen_range(0..100000);
+        let name = &format!("test-coredb-{}", suffix);
+        let namespace = match create_namespace(client.clone(), name).await {
+            Ok(namespace) => namespace,
+            Err(e) => {
+                eprintln!("Error creating namespace: {}", e);
+                std::process::exit(1);
+            }
+        };
+
+        let kind = "CoreDB";
+        let replicas = 2;
+
+        // Create a pod we can use to run commands in the cluster
+        let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
+
+        // Apply a basic configuration of CoreDB
+        println!("Creating CoreDB resource {}", name);
+        let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
+        // Generate basic CoreDB resource to start with
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "replicas": replicas,
+            }
+        });
+        let params = PatchParams::apply("tembo-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        let coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        // Wait for CNPG Pod to be created
+        let pod_name_primary = format!("{}-1", name);
+        let pod_name_secondary = format!("{}-2", name);
+
+        pod_ready_and_running(pods.clone(), pod_name_primary.clone()).await;
+        pod_ready_and_running(pods.clone(), pod_name_secondary.clone()).await;
+
+        // Assert that we can query the database with \dt;
+        let result = coredb_resource
+            .psql("\\dx".to_string(), "postgres".to_string(), context.clone())
+            .await
+            .unwrap();
+        println!("psql out: {:?}", result.stdout.clone().unwrap());
+        assert!(result.stdout.clone().unwrap().contains("plpgsql"));
+
+        // Assert that both pods are replicating successfully
+        let result = coredb_resource
+            .psql(
+                "SELECT state FROM pg_stat_replication".to_string(),
+                "postgres".to_string(),
+                context.clone(),
+            )
+            .await
+            .unwrap();
+        assert!(result.stdout.clone().unwrap().contains("streaming"));
+
+        // CLEANUP TEST
+        // Cleanup CoreDB
+        coredbs.delete(name, &Default::default()).await.unwrap();
+        println!("Waiting for CoreDB to be deleted: {}", &name);
+        let _assert_coredb_deleted = tokio::time::timeout(
+            Duration::from_secs(TIMEOUT_SECONDS_COREDB_DELETED),
+            await_condition(coredbs.clone(), name, conditions::is_deleted("")),
+        )
+        .await
+        .unwrap_or_else(|_| {
+            panic!(
+                "CoreDB {} was not deleted after waiting {} seconds",
+                name, TIMEOUT_SECONDS_COREDB_DELETED
+            )
+        });
+        println!("CoreDB resource deleted {}", name);
+
+        // Delete namespace
+        let _ = delete_namespace(client.clone(), &namespace).await;
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn functional_test_ha_upgrade_cnpg() {
+        // Initialize the Kubernetes client
+        let client = kube_client().await;
+        let state = State::default();
+        let context = state.create_context(client.clone());
+
+        // Configurations
+        let mut rng = rand::thread_rng();
+        let suffix = rng.gen_range(0..100000);
+        let name = &format!("test-coredb-{}", suffix);
+        let namespace = match create_namespace(client.clone(), name).await {
+            Ok(namespace) => namespace,
+            Err(e) => {
+                eprintln!("Error creating namespace: {}", e);
+                std::process::exit(1);
+            }
+        };
+
+        let kind = "CoreDB";
+        let replicas = 1;
+
+        // Create a pod we can use to run commands in the cluster
+        let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
+
+        // Apply a basic configuration of CoreDB
+        println!("Creating CoreDB resource {}", name);
+        let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
+        // Generate basic CoreDB resource to start with
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "replicas": replicas,
+            }
+        });
+        let params = PatchParams::apply("tembo-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        let coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        // Wait for CNPG Pod to be created
+        let pod_name_primary = format!("{}-1", name);
+        pod_ready_and_running(pods.clone(), pod_name_primary.clone()).await;
+
+        // Assert that we can query the database with \dx;
+        let result = coredb_resource
+            .psql("\\dx".to_string(), "postgres".to_string(), context.clone())
+            .await
+            .unwrap();
+        assert!(result.stdout.clone().unwrap().contains("plpgsql"));
+
+        // Now upgrade the single instance to be HA
+        let replicas = 2;
+        // Generate HA CoreDB resource
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "replicas": replicas,
+            }
+        });
+        let params = PatchParams::apply("tembo-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        let coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        // Wait for new CNPG secondary Pod to be created and running
+        let pod_name_secondary = format!("{}-2", name);
+        pod_ready_and_running(pods.clone(), pod_name_secondary.clone()).await;
+
+        // Assert that we can query the database again now that HA is enabled with \dx;
+        let result = coredb_resource
+            .psql("\\dx".to_string(), "postgres".to_string(), context.clone())
+            .await
+            .unwrap();
+        assert!(result.stdout.clone().unwrap().contains("plpgsql"));
+
+        // Assert that both pods are replicating successfully
+        let result = coredb_resource
+            .psql(
+                "SELECT state FROM pg_stat_replication".to_string(),
+                "postgres".to_string(),
+                context.clone(),
+            )
+            .await
+            .unwrap();
+        assert!(result.stdout.clone().unwrap().contains("streaming"));
+
+        // Revert replicas back to 1 to disable HA
+        let replicas = 1;
+        // Generate HA CoreDB resource
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "replicas": replicas,
+            }
+        });
+        println!("Disabling HA by setting replicas to {}", replicas);
+        let params = PatchParams::apply("tembo-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        let coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        // Wait for secondary CNPG pod to be deleted
+        println!("Waiting for Pod {} to be deleted", pod_name_secondary);
+        let _assert_secondary_deleted = tokio::time::timeout(
+            Duration::from_secs(TIMEOUT_SECONDS_POD_DELETED),
+            await_condition(pods.clone(), &pod_name_secondary, conditions::is_deleted("")),
+        )
+        .await
+        .unwrap_or_else(|_| {
+            panic!(
+                "Pod {} was not deleted after waiting {} seconds",
+                pod_name_secondary, TIMEOUT_SECONDS_POD_DELETED
+            )
+        });
+
+        // Query the database again to ensure that pg_replication_slots is empty
+        wait_until_psql_contains(
+            context.clone(),
+            coredb_resource.clone(),
+            "SELECT count(*) from pg_replication_slots".to_string(),
+            "0".to_string(),
+            false,
+        )
+        .await;
+
+        // CLEANUP TEST
+        // Cleanup CoreDB
         coredbs.delete(name, &Default::default()).await.unwrap();
         println!("Waiting for CoreDB to be deleted: {}", &name);
         let _assert_coredb_deleted = tokio::time::timeout(
