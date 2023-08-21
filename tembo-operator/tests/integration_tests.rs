@@ -183,7 +183,8 @@ mod test {
         expected: String,
         inverse: bool,
     ) {
-        for _ in 1..300 {
+        // Wait up to 50 seconds
+        for _ in 1..10 {
             thread::sleep(Duration::from_millis(5000));
             // Assert extension no longer created
             let result = coredb_resource
@@ -923,13 +924,14 @@ mod test {
         let patch = Patch::Merge(patch_json);
         let _patch = cluster.patch(name, &params, &patch);
 
-        // It takes a few seconds for the CNPG pod to go into a "restarting" state
-        // sleep for 20 seconds
-        thread::sleep(Duration::from_millis(10000));
-
-        pod_ready_and_running(pods.clone(), pod_name.clone()).await;
-
-        thread::sleep(Duration::from_millis(10000));
+        wait_until_psql_contains(
+            context.clone(),
+            coredb_resource.clone(),
+            "show shared_preload_libraries;".to_string(),
+            "pg_stat_statements,pg_partman_pgw".to_string(),
+            false,
+        )
+        .await;
 
         // Assert that shared_preload_libraries contains pg_stat_statements
         // and pg_partman_bgw
