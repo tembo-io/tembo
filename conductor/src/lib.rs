@@ -21,7 +21,7 @@ use chrono::{SecondsFormat, Utc};
 use kube::{Api, Client};
 use log::{debug, info};
 use rand::Rng;
-use serde_json::{from_str, to_string, Value};
+use serde_json::Value;
 
 pub type Result<T, E = ConductorError> = std::result::Result<T, E>;
 
@@ -290,29 +290,68 @@ pub async fn delete_namespace(client: Client, name: &str) -> Result<(), Conducto
     Ok(())
 }
 
-async fn get_secret_for_db(client: Client, name: &str) -> Result<Secret, ConductorError> {
+async fn get_secret_for_db(client: Client, name: &str) -> Result<(Secret, Secret), ConductorError> {
     // read secret <name>-connection
-    let secret_name_cdb = format!("{name}-connection");
-    let secret_name_cnpg = format!("{name}-superuser");
+    let secret_name_cnpg_postgres = format!("{name}-connection");
+    let secret_name_cnpg_app = format!("{name}-app");
 
     let secret_api: Api<Secret> = Api::namespaced(client, name);
 
-    if let Some(secret) = secret_api.get_opt(secret_name_cnpg.as_str()).await? {
-        debug!("Found the secret {}", secret_name_cnpg);
-        Ok(secret)
-    } else {
-        debug!(
-            "Didn't find the secret {}, trying cdb-style {}",
-            secret_name_cnpg, secret_name_cdb
-        );
-        if let Some(secret) = secret_api.get_opt(secret_name_cdb.as_str()).await? {
-            debug!("Found the secret {}", secret_name_cdb);
-            Ok(secret)
-        } else {
-            debug!("Didn't find the secret {}", secret_name_cdb);
-            Err(ConductorError::PostgresConnectionInfoNotFound)
+    // Get the <name>-connection secret
+    let postgres_user_secret = match secret_api
+        .get_opt(secret_name_cnpg_postgres.as_str())
+        .await?
+    {
+        Some(secret) => {
+            debug!("Found the secret {}", secret_name_cnpg_postgres);
+            secret
         }
+        None => {
+            debug!("Didn't find the secret {}", secret_name_cnpg_postgres);
+            return Err(ConductorError::PostgresConnectionInfoNotFound);
+        }
+    };
+
+    // Get the <name>-app secret
+    let app_user_secret = match secret_api.get_opt(secret_name_cnpg_app.as_str()).await? {
+        Some(secret) => {
+            debug!("Found the secret {}", secret_name_cnpg_app);
+            secret
+        }
+        None => {
+            debug!("Didn't find the secret {}", secret_name_cnpg_app);
+            return Err(ConductorError::PostgresConnectionInfoNotFound);
+        }
+    };
+
+    Ok((postgres_user_secret, app_user_secret))
+}
+
+// Helper function to extract a string field from the secret data
+fn extract_field(
+    data: &std::collections::BTreeMap<String, k8s_openapi::ByteString>,
+    field: &str,
+) -> Result<String, ConductorError> {
+    match data.get(field) {
+        Some(k8s_openapi::ByteString(vec)) => {
+            let string_data = std::str::from_utf8(vec)
+                .map_err(|_| ConductorError::ParsingPostgresConnectionError)?;
+            Ok(string_data.to_string())
+        }
+        None => Err(ConductorError::PostgresConnectionInfoNotFound),
     }
+}
+
+// get_connection_string returns the username and password from the secret
+async fn get_connection_string(secret: Secret) -> Result<(String, String), ConductorError> {
+    let data = secret
+        .data
+        .ok_or(ConductorError::PostgresConnectionInfoNotFound)?;
+
+    let string_user = extract_field(&data, "username")?;
+    let string_pw = extract_field(&data, "password")?;
+
+    Ok((string_user, string_pw))
 }
 
 pub async fn get_pg_conn(
@@ -320,26 +359,27 @@ pub async fn get_pg_conn(
     name: &str,
     basedomain: &str,
 ) -> Result<types::ConnectionInfo, ConductorError> {
-    let secret = get_secret_for_db(client, name).await?;
+    let (postgres_user_secret, app_user_secret) = get_secret_for_db(client, name).await?;
 
-    let data = secret.data.unwrap();
+    // Get the postgres user and password from postgres_user_secret
+    let (postgres_string_user, postgres_string_pw) =
+        get_connection_string(postgres_user_secret).await?;
 
-    let user_data = data.get("user").unwrap();
-    let byte_user = to_string(user_data).unwrap();
-    let string_user: String = from_str(&byte_user).unwrap();
-
-    let pw_data = data.get("password").unwrap();
-    let byte_pw = to_string(pw_data).unwrap();
-    let string_pw: String = from_str(&byte_pw).unwrap();
+    let (app_string_user, app_string_pw) = get_connection_string(app_user_secret).await?;
 
     let host = format!("{name}.{basedomain}");
 
-    Ok(types::ConnectionInfo {
-        host,
+    // Create ConnectionInfo for the postgres user
+    let postgres_conn = types::ConnectionInfo {
+        host: host.clone(),
         port: 5432,
-        user: string_user,
-        password: string_pw,
-    })
+        user: postgres_string_user,
+        password: postgres_string_pw,
+        app_user: app_string_user,
+        app_password: app_string_pw,
+    };
+
+    Ok(postgres_conn)
 }
 
 pub async fn restart_statefulset(

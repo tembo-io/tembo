@@ -151,7 +151,7 @@ impl AWSConfigState {
                 }
                 Err(err) => {
                     error!("Error creating stack: {:?}", err);
-                    Err(ConductorError::AwsError(err.into()))
+                    Err(ConductorError::AwsError(Box::new(err.into())))
                 }
             }
         } else {
@@ -179,7 +179,7 @@ impl AWSConfigState {
                 }
                 Err(err) => {
                     error!("Error deleting stack: {:?}", err);
-                    Err(ConductorError::AwsError(err.into()))
+                    Err(ConductorError::AwsError(Box::new(err.into())))
                 }
             }
         } else {
@@ -228,7 +228,7 @@ impl AWSConfigState {
             }
             Err(err) => {
                 error!("Error describing stack: {:?}", err);
-                Err(ConductorError::AwsError(err.into()))
+                Err(ConductorError::AwsError(Box::new(err.into())))
             }
         }
     }

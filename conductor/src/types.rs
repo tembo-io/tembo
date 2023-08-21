@@ -49,4 +49,6 @@ pub struct ConnectionInfo {
     pub port: u16,
     pub user: String,
     pub password: String,
+    pub app_user: String,
+    pub app_password: String,
 }
