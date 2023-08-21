@@ -92,7 +92,10 @@ pub fn get_location_status(
                 for extension in extensions {
                     if extension.name == extension_name {
                         for location in &extension.locations {
-                            if location.database == location_database && location.schema == location_schema {
+                            // if location schema is not specified, then match any schema when returning location status
+                            if location.database == location_database
+                                && (location_schema.is_none() || location.schema == location_schema)
+                            {
                                 return Some(location.clone());
                             }
                         }

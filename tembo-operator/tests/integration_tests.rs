@@ -321,6 +321,21 @@ mod test {
             },
             "spec": {
                 "replicas": replicas,
+                "extensions": [{
+                        // Try including an extension
+                        // without specifying a schema
+                        "name": "pg_jsonschema",
+                        "description": "fake description",
+                        "locations": [{
+                            "enabled": true,
+                            "version": "0.1.4",
+                            "database": "postgres",
+                        }],
+                    }],
+                "trunk_installs": [{
+                        "name": "pg_jsonschema",
+                        "version": "0.1.4",
+                }]
             }
         });
         let params = PatchParams::apply("tembo-integration-test");
@@ -332,6 +347,15 @@ mod test {
 
         pod_ready_and_running(pods.clone(), pod_name.clone()).await;
 
+        let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
+        let lp =
+            ListParams::default().labels(format!("app=postgres-exporter,coredb.io/name={}", name).as_str());
+        let exporter_pods = pods.list(&lp).await.expect("could not get pods");
+        let exporter_pod_name = exporter_pods.items[0].metadata.name.as_ref().unwrap();
+        println!("Exporter pod name: {}", &exporter_pod_name);
+
+        pod_ready_and_running(pods.clone(), exporter_pod_name.clone()).await;
+
         // Assert that we can query the database with \dt;
         let result = coredb_resource
             .psql("\\dt".to_string(), "postgres".to_string(), context.clone())
@@ -339,6 +363,21 @@ mod test {
             .unwrap();
         println!("psql out: {}", result.stdout.clone().unwrap());
         assert!(!result.stdout.clone().unwrap().contains("postgres"));
+
+        let coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+        let mut found_extension = false;
+        for extension in coredb_resource.status.unwrap().extensions.unwrap() {
+            for location in extension.locations {
+                if extension.name == "pg_jsonschema" && location.enabled.unwrap() {
+                    found_extension = true;
+                    assert!(location.database == "postgres");
+                    // Even though we set the schema to be empty, it should report public
+                    // in the status
+                    assert!(location.schema.unwrap() == "public");
+                }
+            }
+        }
+        assert!(found_extension);
 
         // CLEANUP TEST
         // Cleanup CoreDB
@@ -1576,6 +1615,15 @@ mod test {
         // Wait for CNPG Pod to be created
         let pod_name_primary = format!("{}-1", name);
         pod_ready_and_running(pods.clone(), pod_name_primary.clone()).await;
+
+        let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
+        let lp =
+            ListParams::default().labels(format!("app=postgres-exporter,coredb.io/name={}", name).as_str());
+        let exporter_pods = pods.list(&lp).await.expect("could not get pods");
+        let exporter_pod_name = exporter_pods.items[0].metadata.name.as_ref().unwrap();
+        println!("Exporter pod name: {}", &exporter_pod_name);
+
+        pod_ready_and_running(pods.clone(), exporter_pod_name.clone()).await;
 
         // Assert that we can query the database with \dx;
         let result = coredb_resource

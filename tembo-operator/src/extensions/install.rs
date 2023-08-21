@@ -156,10 +156,15 @@ pub async fn install_extensions(
 
         match result {
             Ok(result) => {
-                let output = result
+                let output_stdout = result
                     .stdout
                     .clone()
-                    .unwrap_or_else(|| "Found no output from trunk install".to_string());
+                    .unwrap_or_else(|| "Nothing in stdout".to_string());
+                let output_stderr = result
+                    .stderr
+                    .clone()
+                    .unwrap_or_else(|| "Nothing in stderr".to_string());
+                let output = format!("{}\n{}", output_stdout, output_stderr);
                 match result.success {
                     true => {
                         info!("Installed extension {} into {}", &ext.name, coredb_name);
