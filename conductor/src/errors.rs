@@ -39,4 +39,7 @@ pub enum ConductorError {
 
     #[error("Failed to parse postgres connection information")]
     ParsingPostgresConnectionError,
+
+    #[error("Secret data not found for: {0}")]
+    SecretDataNotFound(String),
 }

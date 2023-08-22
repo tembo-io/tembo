@@ -21,7 +21,7 @@ use chrono::{SecondsFormat, Utc};
 use kube::{Api, Client};
 use log::{debug, info};
 use rand::Rng;
-use serde_json::Value;
+use serde_json::{from_str, to_string, Value};
 
 pub type Result<T, E = ConductorError> = std::result::Result<T, E>;
 
@@ -327,29 +327,25 @@ async fn get_secret_for_db(client: Client, name: &str) -> Result<(Secret, Secret
     Ok((postgres_user_secret, app_user_secret))
 }
 
-// Helper function to extract a string field from the secret data
-fn extract_field(
+// Helper function to get the base64 values from the secret data
+fn get_field_value_from_secret(
     data: &std::collections::BTreeMap<String, k8s_openapi::ByteString>,
-    field: &str,
-) -> Result<String, ConductorError> {
-    match data.get(field) {
-        Some(k8s_openapi::ByteString(vec)) => {
-            let string_data = std::str::from_utf8(vec)
-                .map_err(|_| ConductorError::ParsingPostgresConnectionError)?;
-            Ok(string_data.to_string())
-        }
-        None => Err(ConductorError::PostgresConnectionInfoNotFound),
-    }
-}
-
-// get_connection_string returns the username and password from the secret
-async fn get_connection_string(secret: Secret) -> Result<(String, String), ConductorError> {
-    let data = secret
-        .data
+) -> Result<(String, String), ConductorError> {
+    // Get username and password from data
+    let user_data = data
+        .get("username")
         .ok_or(ConductorError::PostgresConnectionInfoNotFound)?;
+    let byte_user =
+        to_string(user_data).map_err(|_| ConductorError::ParsingPostgresConnectionError)?;
+    let string_user: String =
+        from_str(&byte_user).map_err(|_| ConductorError::PostgresConnectionInfoNotFound)?;
 
-    let string_user = extract_field(&data, "username")?;
-    let string_pw = extract_field(&data, "password")?;
+    let pw_data = data
+        .get("password")
+        .ok_or(ConductorError::PostgresConnectionInfoNotFound)?;
+    let byte_pw = to_string(pw_data).map_err(|_| ConductorError::PostgresConnectionInfoNotFound)?;
+    let string_pw: String =
+        from_str(&byte_pw).map_err(|_| ConductorError::PostgresConnectionInfoNotFound)?;
 
     Ok((string_user, string_pw))
 }
@@ -361,22 +357,34 @@ pub async fn get_pg_conn(
 ) -> Result<types::ConnectionInfo, ConductorError> {
     let (postgres_user_secret, app_user_secret) = get_secret_for_db(client, name).await?;
 
-    // Get the postgres user and password from postgres_user_secret
-    let (postgres_string_user, postgres_string_pw) =
-        get_connection_string(postgres_user_secret).await?;
+    let postgres_data =
+        postgres_user_secret
+            .data
+            .as_ref()
+            .ok_or(ConductorError::SecretDataNotFound(
+                "postgres_user_secret".to_string(),
+            ))?;
+    let app_data = app_user_secret
+        .data
+        .as_ref()
+        .ok_or(ConductorError::SecretDataNotFound(
+            "app_user_secret".to_string(),
+        ))?;
 
-    let (app_string_user, app_string_pw) = get_connection_string(app_user_secret).await?;
+    let (postgres_user, postgres_pw) = get_field_value_from_secret(postgres_data)?;
+    let (app_user, app_pw) = get_field_value_from_secret(app_data)?;
 
     let host = format!("{name}.{basedomain}");
 
     // Create ConnectionInfo for the postgres user
+    // The user and password are base64 encoded when passed back to the control-plane
     let postgres_conn = types::ConnectionInfo {
         host: host.clone(),
         port: 5432,
-        user: postgres_string_user,
-        password: postgres_string_pw,
-        app_user: app_string_user,
-        app_password: app_string_pw,
+        user: postgres_user,
+        password: postgres_pw,
+        app_user,
+        app_password: app_pw,
     };
 
     Ok(postgres_conn)
@@ -532,4 +540,37 @@ pub async fn generate_rand_schedule() -> String {
     let hour: u8 = rng.gen_range(4..10);
 
     format!("{} {} * * *", minute, hour)
+}
+
+#[cfg(test)]
+mod tests {
+    const DECODER: base64::engine::GeneralPurpose = base64::engine::GeneralPurpose::new(
+        &base64::alphabet::STANDARD,
+        base64::engine::general_purpose::PAD,
+    );
+
+    use super::*;
+    use base64::Engine;
+
+    #[test]
+    fn test_get_field_value_from_secret() {
+        let mut mock_data = std::collections::BTreeMap::new();
+        mock_data.insert(
+            "username".to_string(),
+            k8s_openapi::ByteString("mock_user".as_bytes().to_vec()),
+        );
+        mock_data.insert(
+            "password".to_string(),
+            k8s_openapi::ByteString("mock_pw".as_bytes().to_vec()),
+        );
+
+        let (user, pw) = get_field_value_from_secret(&mock_data).unwrap();
+
+        // Decode the base64 values
+        let decoded_user = DECODER.decode(user).unwrap();
+        let decoded_pw = DECODER.decode(pw).unwrap();
+
+        assert_eq!(String::from_utf8(decoded_user).unwrap(), "mock_user");
+        assert_eq!(String::from_utf8(decoded_pw).unwrap(), "mock_pw");
+    }
 }
