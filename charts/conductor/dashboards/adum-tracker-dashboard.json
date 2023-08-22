@@ -536,8 +536,8 @@
       },
       "gridPos": {
         "h": 5,
-        "w": 24,
-        "x": 0,
+        "w": 21,
+        "x": 3,
         "y": 32
       },
       "id": 87,
@@ -563,11 +563,11 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "100 * avg(avg_over_time(avg by (namespace) (kube_pod_container_status_ready{container=\"postgres\"})[7d:30s]))",
+          "expr": "100 * avg_over_time(\n    ((\n        count(avg by (namespace) (kube_pod_container_status_ready{container=\"postgres\"}) == 1)\n    ) / \n    (\n        count(avg by (namespace) (kube_pod_container_status_ready{container=\"postgres\"}) == 1) \n        + \n        (count(avg by (namespace) (kube_pod_container_status_ready{container=\"postgres\"}) == 0) or vector(0))\n    ))[7d:30s]\n)\n\n",
           "hide": false,
-          "legendFormat": "__auto",
+          "legendFormat": "uptime",
           "range": true,
-          "refId": "C"
+          "refId": "G"
         }
       ],
       "title": "Uptime (7 days)",
@@ -839,6 +839,6 @@
   "timezone": "",
   "title": "Cloud Tracker",
   "uid": "XW3MOlCVz",
-  "version": 4,
+  "version": 1,
   "weekStart": ""
 }
