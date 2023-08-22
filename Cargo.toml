@@ -15,9 +15,13 @@ repository = "https://github.com/tembo-io/tembo-cli"
 anyhow = "1.0.71"
 clap = { version = "4.3.12", features = ["cargo", "wrap_help"] }
 clap_complete = "4.3.2"
+serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0.91"
 serde_yaml = "0.9.17"
 home = "0.5.5"
+spinners = "4.1.0"
+semver = "1.0.18"
+mockall = "0.11.4"
 
 [dev-dependencies]
 assert_cmd = "2.0.8"

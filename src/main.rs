@@ -2,14 +2,19 @@
 
 #[macro_use]
 extern crate clap;
+extern crate serde;
+extern crate serde_yaml;
 
 use anyhow::anyhow;
 use clap::{Arg, Command};
 use clap_complete::Shell;
+use serde::{Deserialize, Serialize};
 
+mod cli;
 mod cmd;
 
 const VERSION: &str = concat!("v", crate_version!());
+const WINDOWS_ERROR_MSG: &str = "- Windows is not supported at this time";
 
 fn main() {
     let command = create_clap_command();
@@ -35,7 +40,7 @@ fn main() {
         _ => unreachable!(),
     };
 
-    if let Err(_) = res {
+    if res.is_err() {
         // TODO: adding logging, log error
         std::process::exit(101);
     }
@@ -43,7 +48,7 @@ fn main() {
 
 /// Create a list of valid arguments and sub-commands
 fn create_clap_command() -> Command {
-    let app = Command::new(crate_name!())
+    Command::new(crate_name!())
         .about(crate_description!())
         .author("Tembo <ry@tembo.io>")
         .version(VERSION)
@@ -65,7 +70,5 @@ fn create_clap_command() -> Command {
                         .value_name("SHELL")
                         .required(true),
                 ),
-        );
-
-    app
+        )
 }

@@ -25,11 +25,4 @@ fn init() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-#[test]
-fn install() -> Result<(), Box<dyn std::error::Error>> {
-    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
-    cmd.arg("install");
-    cmd.assert().stdout(predicate::str::contains("coming soon"));
-
-    Ok(())
-}
+// TODO: add integration test for install command
