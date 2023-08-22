@@ -338,12 +338,12 @@ async fn run(metrics: CustomMetrics) -> Result<(), Box<dyn std::error::Error>> {
 
                 let result = get_one(client.clone(), &namespace).await;
 
-                let requeue = match &result {
+                let extension_still_processing = match &result {
                     Ok(coredb) => extensions_still_processing(coredb),
                     Err(_) => true,
                 };
 
-                if requeue {
+                if extension_still_processing && read_msg.message.event_type == Event::Create {
                     let _ = queue
                         .set_vt::<CRUDevent>(
                             &control_plane_events_queue,
