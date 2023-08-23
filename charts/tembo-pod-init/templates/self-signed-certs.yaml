@@ -27,4 +27,5 @@ spec:
   issuerRef:
     name: {{ printf "%s-issuer" (include "tembo-pod-init.fullname" .) }}
   secretName: {{ printf "%s-tls" (include "tembo-pod-init.fullname" .) }}
-
+  privateKey:
+    rotationPolicy: Always
