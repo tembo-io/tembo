@@ -29,7 +29,7 @@ For more information: `tembo init --help`
 
 ## `tembo stack create`
 
-The `stack create` command installs a local instance of a Tembo cluser locally. 
+The `stack create` command installs a local instance of a Tembo cluster locally. 
 It includes the Tembo flavored version of Postgres and 
 an additional items like extensions. 
 
