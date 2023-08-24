@@ -1,6 +1,6 @@
 use crate::{
     apis::coredb_types::CoreDB,
-    extensions::types::{Extension, ExtensionInstallLocation},
+    extensions::types::{ExtensionInstallLocation, ExtensionInstallLocationStatus, ExtensionStatus},
     Context, Error,
 };
 use kube::runtime::controller::Action;
@@ -152,21 +152,23 @@ pub fn parse_databases(psql_str: &str) -> Vec<String> {
 }
 
 /// list databases then get all extensions from each database
-pub async fn get_all_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<Extension>, Action> {
+pub async fn get_all_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<ExtensionStatus>, Action> {
     let databases = list_databases(cdb, ctx.clone()).await?;
     debug!("databases: {:?}", databases);
 
-    let mut ext_hashmap: HashMap<(String, String), Vec<ExtensionInstallLocation>> = HashMap::new();
+    let mut ext_hashmap: HashMap<(String, String), Vec<ExtensionInstallLocationStatus>> = HashMap::new();
     // query every database for extensions
     // transform results by extension name, rather than by database
     for db in databases {
         let extensions = list_extensions(cdb, ctx.clone(), &db).await?;
         for ext in extensions {
-            let extlocation = ExtensionInstallLocation {
+            let extlocation = ExtensionInstallLocationStatus {
                 database: db.clone(),
                 version: Some(ext.version),
-                enabled: ext.enabled,
+                enabled: Some(ext.enabled),
                 schema: Some(ext.schema),
+                error: None,
+                error_message: None,
             };
             ext_hashmap
                 .entry((ext.name, ext.description))
@@ -175,9 +177,9 @@ pub async fn get_all_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<E
         }
     }
 
-    let mut ext_spec: Vec<Extension> = Vec::new();
+    let mut ext_spec: Vec<ExtensionStatus> = Vec::new();
     for ((extname, extdescr), ext_locations) in &ext_hashmap {
-        ext_spec.push(Extension {
+        ext_spec.push(ExtensionStatus {
             name: extname.clone(),
             description: Some(extdescr.clone()),
             locations: ext_locations.clone(),
@@ -185,6 +187,7 @@ pub async fn get_all_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<E
     }
     // put them in order
     ext_spec.sort_by_key(|e| e.name.clone());
+
     Ok(ext_spec)
 }
 

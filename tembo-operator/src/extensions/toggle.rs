@@ -87,7 +87,7 @@ async fn toggle_extensions(
 
 fn determine_updated_extensions_status(
     cdb: &CoreDB,
-    all_actually_installed_extensions: Vec<Extension>,
+    all_actually_installed_extensions: Vec<ExtensionStatus>,
 ) -> Vec<ExtensionStatus> {
     // Our results - what we will update the status to
     let mut ext_status_updates: Vec<ExtensionStatus> = vec![];
@@ -102,7 +102,7 @@ fn determine_updated_extensions_status(
         for actual_location in actual_extension.locations {
             // Create a location status
             let mut location_status = ExtensionInstallLocationStatus {
-                enabled: Some(actual_location.enabled),
+                enabled: actual_location.enabled,
                 database: actual_location.database.clone(),
                 schema: actual_location.schema.clone(),
                 version: actual_location.version.clone(),
@@ -131,7 +131,7 @@ fn determine_updated_extensions_status(
             ) {
                 None => {}
                 Some(desired_location) => {
-                    if actual_location.enabled == desired_location.enabled {
+                    if actual_location.enabled == Some(desired_location.enabled) {
                         location_status.error = Some(false);
                         location_status.error_message = None;
                     }
@@ -407,64 +407,80 @@ mod tests {
         };
 
         let all_actually_installed_extensions = vec![
-            Extension {
+            ExtensionStatus {
                 name: "ext1".to_string(),
                 description: None,
                 locations: vec![
-                    ExtensionInstallLocation {
-                        enabled: false,
+                    ExtensionInstallLocationStatus {
+                        enabled: Some(false),
+                        error: None,
                         database: "db_where_its_available_and_disabled".to_string(),
                         schema: Some("public".to_string()),
                         version: None,
+                        error_message: None,
                     },
-                    ExtensionInstallLocation {
-                        enabled: true,
+                    ExtensionInstallLocationStatus {
+                        enabled: Some(true),
+                        error: None,
                         database: "db_where_its_available_and_enabled".to_string(),
                         schema: Some("public".to_string()),
                         version: None,
+                        error_message: None,
                     },
-                    ExtensionInstallLocation {
-                        enabled: false,
+                    ExtensionInstallLocationStatus {
+                        enabled: Some(false),
+                        error: None,
                         database: "db_where_its_available_and_disabled_missing_from_status".to_string(),
                         schema: Some("public".to_string()),
                         version: None,
+                        error_message: None,
                     },
-                    ExtensionInstallLocation {
-                        enabled: true,
+                    ExtensionInstallLocationStatus {
+                        enabled: Some(true),
+                        error: None,
                         database: "db_where_its_available_and_enabled_missing_from_status".to_string(),
                         schema: Some("public".to_string()),
                         version: None,
+                        error_message: None,
                     },
-                    ExtensionInstallLocation {
-                        enabled: false,
+                    ExtensionInstallLocationStatus {
+                        enabled: Some(false),
+                        error: None,
                         database: "db_where_it_is_currently_in_error_having_tried_to_enable_and_failed"
                             .to_string(),
                         schema: Some("public".to_string()),
                         version: None,
+                        error_message: None,
                     },
-                    ExtensionInstallLocation {
-                        enabled: false,
+                    ExtensionInstallLocationStatus {
+                        enabled: Some(false),
+                        error: None,
                         database: "db_where_enable_failed".to_string(),
                         schema: Some("public".to_string()),
                         version: None,
+                        error_message: None,
                     },
                 ],
             },
-            Extension {
+            ExtensionStatus {
                 name: "ext2".to_string(),
                 description: None,
                 locations: vec![
-                    ExtensionInstallLocation {
-                        enabled: true,
+                    ExtensionInstallLocationStatus {
+                        enabled: Some(true),
+                        error: None,
                         database: "db2".to_string(),
                         schema: Some("public".to_string()),
                         version: None,
+                        error_message: None,
                     },
-                    ExtensionInstallLocation {
-                        enabled: true,
+                    ExtensionInstallLocationStatus {
+                        enabled: Some(true),
+                        error: None,
                         database: "db1".to_string(),
                         schema: Some("public".to_string()),
                         version: None,
+                        error_message: None,
                     },
                 ],
             },
