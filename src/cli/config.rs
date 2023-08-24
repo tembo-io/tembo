@@ -36,7 +36,7 @@ impl<'a> Config<'a> {
 
     fn full_path(args: &ArgMatches) -> PathBuf {
         // if file-path was provided
-        if let Some(path) = args.get_one::<PathBuf>("file-path") {
+        if let Ok(Some(path)) = args.try_get_one::<PathBuf>("file-path") {
             if path.is_relative() {
                 env::current_dir()
                     .expect("Unable to determine the current directory")

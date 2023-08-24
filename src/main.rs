@@ -22,7 +22,8 @@ fn main() {
     // Check which subcommand the user ran...
     let res = match command.get_matches().subcommand() {
         Some(("init", sub_matches)) => cmd::init::execute(sub_matches),
-        Some(("install", sub_matches)) => cmd::install::execute(sub_matches),
+        Some(("install", sub_matches)) => cmd::stack::create::execute(sub_matches),
+        Some(("stack", sub_matches)) => cmd::stack::create::execute(sub_matches),
         Some(("completions", sub_matches)) => (|| {
             let shell = sub_matches
                 .get_one::<Shell>("shell")
@@ -41,7 +42,10 @@ fn main() {
     };
 
     if res.is_err() {
+        println!("{}", res.err().unwrap());
+
         // TODO: adding logging, log error
+        //
         std::process::exit(101);
     }
 }
@@ -50,7 +54,7 @@ fn main() {
 fn create_clap_command() -> Command {
     Command::new(crate_name!())
         .about(crate_description!())
-        .author("Tembo <ry@tembo.io>")
+        .author("Tembo.io")
         .version(VERSION)
         .propagate_version(true)
         .arg_required_else_help(true)
@@ -59,7 +63,12 @@ fn create_clap_command() -> Command {
              The source code for tembo is available at: https://github.com/tembo-io/tembo-cli",
         )
         .subcommand(cmd::init::make_subcommand())
-        .subcommand(cmd::install::make_subcommand())
+        .subcommand(cmd::install::make_subcommand()) // executes stack::create
+        .subcommand(
+            Command::new("stack")
+                .about("Commands used to manage local stack and cloud clusters")
+                .subcommand(cmd::stack::create::make_subcommand()),
+        )
         .subcommand(
             Command::new("completions")
                 .about("Generate shell completions for your shell to stdout")

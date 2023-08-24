@@ -72,8 +72,10 @@ pub fn define_stack(args: &ArgMatches) -> Result<String, Box<dyn Error>> {
         .map(|stack| stack.name.to_lowercase())
         .collect();
 
-    if let Some(stack) = args.get_one::<String>("stack") {
-        let given_stack = stack.to_lowercase();
+    let passed = args.try_get_one::<String>("stack");
+
+    if let Ok(Some(stack_option)) = passed {
+        let given_stack = stack_option.to_lowercase();
 
         if !names.contains(&given_stack) {
             return Err(Box::new(StackError::new("- Given Stack type not valid")));

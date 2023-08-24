@@ -10,6 +10,19 @@ best experience working with Postgres in any environment.
 This repo is a work in progress. Soon, it will provide install instructions and a 
 detailed Getting Started guide.
 
+# Local Testing
+If you would like to test out the CLI locally, you can clone this repo and run:
+
+`cargo install --path .`
+
+If the install path is in your shell path, you can then run:
+
+`tembo init`
+
+or 
+
+`tembo install`
+
 # Commands
 
 `tembo help`
@@ -28,6 +41,20 @@ The default configuration file path is $HOME/.config/tembo.
 The `init` command can be used to create global and project specific configuration files.
 
 For more information: `tembo init --help`
+
+`tembo install`
+
+The `install` command is an alias for the `stack create` command.
+
+`tembo stack create`
+
+The `stack create` command is used to install a local instance of a Tembo cluser locally. Because it 
+is only a single instance, it is called a stack. It includes the Tembo flavored version of Postgres and 
+an additional items like extensions. It all runs in a Docker container. That is the only hard requirement.
+
+The valid stack types are: standard and data-warehouse. More stack types will be added shortly.
+
+Next: `tembo start` - which will start an installed stack
 
 # Contributing
 
