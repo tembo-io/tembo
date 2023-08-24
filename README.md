@@ -10,13 +10,7 @@ Clone this repo and run:
 
 `cargo install --path .`
 
-If the install path is in your shell path, you can then run:
-
-`tembo init`
-
-or 
-
-`tembo install`
+If the install path is in your shell path, you can then run `tembo help` and other `tembo` commands.
 
 # Commands
 
