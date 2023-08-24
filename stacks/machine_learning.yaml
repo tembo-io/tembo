@@ -2,6 +2,25 @@ name: MachineLearning
 description: A Postgres instance equipped with machine learning extensions and optimized for machine learning workloads.
 image: "quay.io/tembo/ml-cnpg:15.3.0-1-ac943a8"
 stack_version: 0.3.0
+compute_templates:
+  - cpu: 2
+    memory: 4Gi
+  - cpu: 4
+    memory: 8Gi
+  - cpu: 8
+    memory: 16Gi
+  - cpu: 16
+    memory: 32Gi
+  - cpu: 32
+    memory: 32Gi
+  # pretty sure we do not yet support the below?
+  # uncomment when we do
+  # - cpu: 48
+  #   memory: 96Gi
+  # - cpu: 64
+  #   memory: 128Gi
+  # - cpu: 96
+  #   memory: 192Gi
 infrastructure:
   cpu: 2
   memory: 2Gi
@@ -14,10 +33,12 @@ postgres_config:
     value: all
   - name: cron.host
     value: /controller/run
+  - name: track_io_timing
+    value: 'on'
   - name: shared_preload_libraries
     value: vectorize,pg_stat_statements,pgml,pg_cron,pg_later
 trunk_installs:
-  - name: pg_vector
+  - name: pgvector
     version: 0.4.4
   - name: pgml
     version: 2.7.1
@@ -26,7 +47,7 @@ trunk_installs:
   - name: pg_cron
     version: 1.5.2
   - name: pgmq
-    version: 0.10.2
+    version: 0.14.2
   - name: vectorize
     version: 0.0.2
   - name: pg_later
@@ -57,23 +78,27 @@ extensions:
     description: pg_cron
     locations:
     - database: postgres
+      schema: pg_catalog
       enabled: true
       version: 1.5.2
   - name: pgmq
     description: pgmq
     locations:
     - database: postgres
+      schema: public
       enabled: true
-      version: 0.10.2
+      version: 0.14.2
   - name: vectorize
     description: simple vector search
     locations:
     - database: postgres
+      schema: public
       enabled: true
       version: 0.0.2
   - name: pg_later
     description: async query execution
     locations:
     - database: postgres
+      schema: public
       enabled: true
       version: 0.0.8
