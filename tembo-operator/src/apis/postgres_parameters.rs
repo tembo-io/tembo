@@ -363,7 +363,7 @@ impl<'de> Deserialize<'de> for PgConfig {
 #[cfg(test)]
 mod pg_param_tests {
     use super::*;
-    use crate::apis::coredb_types::{CoreDBSpec, Stack};
+    use crate::apis::coredb_types::{get_pg_configs, CoreDB, CoreDBSpec, Stack};
 
     #[test]
     fn test_pg_config() {
@@ -418,8 +418,12 @@ mod pg_param_tests {
             }),
             ..Default::default()
         };
-        let pg_configs = spec
-            .get_pg_configs()
+        let cdb = CoreDB {
+            metadata: Default::default(),
+            spec,
+            status: None,
+        };
+        let pg_configs = get_pg_configs(&cdb)
             .expect("failed to get pg configs")
             .expect("expected configs");
 

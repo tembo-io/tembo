@@ -1,5 +1,8 @@
 use crate::{
-    apis::{coredb_types::CoreDB, postgres_parameters::MergeError},
+    apis::{
+        coredb_types::{get_pg_configs, CoreDB},
+        postgres_parameters::MergeError,
+    },
     cloudnativepg::{
         clusters::{
             Cluster, ClusterAffinity, ClusterBackup, ClusterBackupBarmanObjectStore,
@@ -180,7 +183,7 @@ pub fn cnpg_cluster_bootstrap_from_cdb(
 
 // Get PGConfig from CoreDB and convert it to a postgres_parameters and shared_preload_libraries
 fn cnpg_postgres_config(cdb: &CoreDB) -> Result<PostgresConfig, MergeError> {
-    match cdb.spec.get_pg_configs() {
+    match get_pg_configs(cdb) {
         Ok(Some(pg_configs)) => {
             let mut postgres_parameters: BTreeMap<String, String> = BTreeMap::new();
             let mut shared_preload_libraries: Vec<String> = Vec::new();

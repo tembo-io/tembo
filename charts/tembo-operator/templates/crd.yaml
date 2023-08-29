@@ -363,10 +363,16 @@ spec:
               extensions:
                 items:
                   properties:
+                    create_extension:
+                      nullable: true
+                      type: boolean
                     description:
                       default: No description provided
                       nullable: true
                       type: string
+                    load:
+                      nullable: true
+                      type: boolean
                     locations:
                       items:
                         properties:
