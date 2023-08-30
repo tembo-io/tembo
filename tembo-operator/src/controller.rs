@@ -332,6 +332,15 @@ impl CoreDB {
             return Err(Action::requeue(Duration::from_secs(5)));
         }
         let primary = pod_list.items[0].clone();
+        // check if the pod is ready
+        if !is_postgres_ready().matches_object(Some(&primary)) {
+            // It's expected to sometimes be empty, we should retry after a short duration
+            warn!(
+                "Found CNPG primary pod of {}, but it is not ready",
+                &self.name_any()
+            );
+            return Err(Action::requeue(Duration::from_secs(5)));
+        }
         Ok(primary)
     }
 
