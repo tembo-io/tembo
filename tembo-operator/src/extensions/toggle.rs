@@ -17,10 +17,7 @@ use crate::{
     },
 };
 use std::{sync::Arc, time::Duration};
-use tracing::{
-    error,
-    log::{debug, info},
-};
+use tracing::{debug, error, info};
 
 
 pub async fn reconcile_extension_toggle_state(
@@ -89,7 +86,17 @@ pub async fn reconcile_shared_preload_libraries(
     _toggle_these_extensions: Vec<Extension>,
 ) -> Result<(), Action> {
     // These are already set in configuration and the database has been restarted to include them
+    debug!(
+        "Reconciling shared_preload_libraries: {}",
+        cdb.metadata.name.clone().unwrap()
+    );
     let currently_active_shared_preload_libraries = list_shared_preload_libraries(cdb, ctx.clone()).await?;
+    debug!(
+        "Found {} currently active shared_preload_libraries in {}: {:?}",
+        currently_active_shared_preload_libraries.len(),
+        cdb.metadata.name.clone().unwrap(),
+        currently_active_shared_preload_libraries.clone()
+    );
     for desired_library in get_desired_shared_preload_libraries(cdb) {
         if !currently_active_shared_preload_libraries.contains(&desired_library) {
             // When a desired library is detected as not enabled yet, then we requeue

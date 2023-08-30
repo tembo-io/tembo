@@ -9,6 +9,7 @@ use kube::runtime::controller::Action;
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::{collections::HashMap, sync::Arc, time::Duration};
+
 use tracing::{debug, error, info, warn};
 
 lazy_static! {
@@ -231,12 +232,16 @@ pub async fn list_shared_preload_libraries(cdb: &CoreDB, ctx: Arc<Context>) -> R
         .await?;
     let result_string = psql_out.stdout.unwrap();
     let result = parse_sql_output(&result_string);
+    let mut libraries: Vec<String> = vec![];
+    if result.len() == 1 {
+        libraries = result[0].split(',').map(|s| s.trim().to_string()).collect();
+    }
     debug!(
         "{}: Found shared_preload_libraries: {:?}",
         cdb.metadata.name.clone().unwrap(),
-        result
+        libraries.clone()
     );
-    Ok(result)
+    Ok(libraries)
 }
 
 pub fn parse_sql_output(psql_str: &str) -> Vec<String> {
