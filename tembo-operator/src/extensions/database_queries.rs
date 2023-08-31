@@ -1,55 +1,23 @@
 use crate::{
     apis::coredb_types::CoreDB,
-    extensions::types::{
-        get_extension_status, ExtensionInstallLocation, ExtensionInstallLocationStatus, ExtensionStatus,
-    },
+    extensions::types::{ExtensionInstallLocation, ExtensionInstallLocationStatus, ExtensionStatus},
     Context, Error,
 };
 use kube::runtime::controller::Action;
 use lazy_static::lazy_static;
 use regex::Regex;
-use std::{collections::HashMap, sync::Arc, time::Duration};
-
+use std::{collections::HashMap, sync::Arc};
 use tracing::{debug, error, info, warn};
 
 lazy_static! {
     static ref VALID_INPUT: Regex = Regex::new(r"^[a-zA-Z]([a-zA-Z0-9]*[-_]?)*[a-zA-Z0-9]+$").unwrap();
 }
 
-// TODO: Get this list from trunk instead of coding it here
-pub const REQUIRES_LOAD: [&str; 23] = [
-    "auth_delay",
-    "auto_explain",
-    "basebackup_to_shell",
-    "basic_archive",
-    "citus",
-    "passwordcheck",
-    "pg_anonymize",
-    "pgaudit",
-    "pg_cron",
-    "pg_failover_slots",
-    "pg_later",
-    "pglogical",
-    "pg_net",
-    "pg_stat_kcache",
-    "pg_stat_statements",
-    "pg_tle",
-    "pgml",
-    "plrust",
-    "postgresql_anonymizer",
-    "sepgsql",
-    "supautils",
-    "timescaledb",
-    "vectorize",
-];
-
 pub fn check_input(input: &str) -> bool {
     VALID_INPUT.is_match(input)
 }
 
 pub const LIST_DATABASES_QUERY: &str = r#"SELECT datname FROM pg_database WHERE datistemplate = false;"#;
-
-pub const LIST_SHARED_PRELOAD_LIBRARIES_QUERY: &str = r#"SHOW shared_preload_libraries;"#;
 
 pub const LIST_EXTENSIONS_QUERY: &str = r#"select
 distinct on
@@ -124,73 +92,12 @@ pub struct ExtRow {
 }
 
 /// lists all extensions in a single database
-pub async fn list_extensions_with_pg_available_extensions(
-    cdb: &CoreDB,
-    ctx: Arc<Context>,
-    database: &str,
-) -> Result<Vec<ExtRow>, Action> {
+pub async fn list_extensions(cdb: &CoreDB, ctx: Arc<Context>, database: &str) -> Result<Vec<ExtRow>, Action> {
     let psql_out = cdb
         .psql(LIST_EXTENSIONS_QUERY.to_owned(), database.to_owned(), ctx)
         .await?;
     let result_string = psql_out.stdout.unwrap();
     Ok(parse_extensions(&result_string))
-}
-
-async fn list_installed_libraries(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<String>, Action> {
-    let cmd = vec![
-        "/bin/bash".to_string(),
-        "-c".to_string(),
-        "ls $(pg_config --libdir) | grep -E '.*\\.so.?.*' | cut -d'.' -f1 | uniq".to_string(),
-    ];
-
-    let client = ctx.client.clone();
-    let pod_name = cdb
-        .primary_pod_cnpg(client.clone())
-        .await?
-        .metadata
-        .name
-        .expect("Pod should always have a name");
-
-    match cdb.exec(pod_name.clone(), client.clone(), &cmd).await {
-        Ok(result) => match result.stdout {
-            None => {
-                error!(
-                    "Failed to list installed libraries for {}, no stdout",
-                    cdb.metadata
-                        .name
-                        .clone()
-                        .expect("Database should always have a name")
-                );
-                Err(Action::requeue(Duration::from_secs(300)))
-            }
-            Some(stdout) => {
-                let mut libraries = vec![];
-                for line in stdout.lines() {
-                    if !check_input(line) {
-                        warn!("Found invalid library name: {}", line);
-                        continue;
-                    }
-                    libraries.push(line.to_owned());
-                }
-                debug!(
-                    "{} - found libraries: {:?}",
-                    cdb.metadata.name.clone().unwrap(),
-                    libraries
-                );
-                Ok(libraries)
-            }
-        },
-        Err(_) => {
-            warn!(
-                "Failed to list installed libraries for {}, failed to exec",
-                cdb.metadata
-                    .name
-                    .clone()
-                    .expect("Database should always have a name")
-            );
-            Err(Action::requeue(Duration::from_secs(10)))
-        }
-    }
 }
 
 pub fn parse_extensions(psql_str: &str) -> Vec<ExtRow> {
@@ -215,38 +122,18 @@ pub fn parse_extensions(psql_str: &str) -> Vec<ExtRow> {
     extensions
 }
 
+/// returns all the databases in an instance
 pub async fn list_databases(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<String>, Action> {
+    let _client = ctx.client.clone();
     let psql_out = cdb
         .psql(LIST_DATABASES_QUERY.to_owned(), "postgres".to_owned(), ctx)
         .await?;
     let result_string = psql_out.stdout.unwrap();
-    Ok(parse_sql_output(&result_string))
+    Ok(parse_databases(&result_string))
 }
 
-pub async fn list_shared_preload_libraries(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<String>, Action> {
-    let psql_out = cdb
-        .psql(
-            LIST_SHARED_PRELOAD_LIBRARIES_QUERY.to_owned(),
-            "postgres".to_owned(),
-            ctx,
-        )
-        .await?;
-    let result_string = psql_out.stdout.unwrap();
-    let result = parse_sql_output(&result_string);
-    let mut libraries: Vec<String> = vec![];
-    if result.len() == 1 {
-        libraries = result[0].split(',').map(|s| s.trim().to_string()).collect();
-    }
-    debug!(
-        "{}: Found shared_preload_libraries: {:?}",
-        cdb.metadata.name.clone().unwrap(),
-        libraries.clone()
-    );
-    Ok(libraries)
-}
-
-pub fn parse_sql_output(psql_str: &str) -> Vec<String> {
-    let mut results = vec![];
+pub fn parse_databases(psql_str: &str) -> Vec<String> {
+    let mut databases = vec![];
     for line in psql_str.lines().skip(2) {
         let fields: Vec<&str> = line.split('|').map(|s| s.trim()).collect();
         if fields.is_empty()
@@ -257,11 +144,11 @@ pub fn parse_sql_output(psql_str: &str) -> Vec<String> {
             debug!("Done:{:?}", fields);
             continue;
         }
-        results.push(fields[0].to_string());
+        databases.push(fields[0].to_string());
     }
-    let num_results = results.len();
-    info!("Found {} results", num_results);
-    results
+    let num_databases = databases.len();
+    info!("Found {} databases", num_databases);
+    databases
 }
 
 /// list databases then get all extensions from each database
@@ -273,7 +160,7 @@ pub async fn get_all_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<E
     // query every database for extensions
     // transform results by extension name, rather than by database
     for db in databases {
-        let extensions = list_extensions_with_pg_available_extensions(cdb, ctx.clone(), &db).await?;
+        let extensions = list_extensions(cdb, ctx.clone(), &db).await?;
         for ext in extensions {
             let extlocation = ExtensionInstallLocationStatus {
                 database: db.clone(),
@@ -292,85 +179,16 @@ pub async fn get_all_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<E
 
     let mut ext_spec: Vec<ExtensionStatus> = Vec::new();
     for ((extname, extdescr), ext_locations) in &ext_hashmap {
-        // load is required if the extension name is present in REQUIRES_LOAD constant
-        let load = REQUIRES_LOAD.contains(&extname.as_str());
         ext_spec.push(ExtensionStatus {
             name: extname.clone(),
             description: Some(extdescr.clone()),
             locations: ext_locations.clone(),
-            // Extensions discovered by pg_available_extensions require create extension
-            create_extension: Some(true),
-            // Determine if load is required using metadata from Trunk
-            load: Some(load),
         });
     }
-
-    // Discover installed extensions that do not require create extension.
-    // This is discovered by checking for any .so files in libdir that
-    // match a name present in REQUIRES_LOAD, that are not already
-    // covered by the pg_available_extensions query.
-    let installed_libraries = list_installed_libraries(cdb, ctx.clone()).await?;
-    let current_shared_preload_libraries = list_shared_preload_libraries(cdb, ctx.clone()).await?;
-    for library in installed_libraries {
-        if REQUIRES_LOAD.contains(&library.as_str()) {
-            // If the library is already in the list, skip it
-            if ext_spec.iter().any(|e| e.name == library) {
-                continue;
-            }
-            // version is included if there is an exact name match between the extension
-            // and a package in status.trunk_installs
-            let version = get_version_of_installed_library(cdb, library.clone());
-            // These extensions are considered enabled if present in shared_preload_libraries.
-            let enabled = current_shared_preload_libraries.contains(&library);
-            ext_spec.push(ExtensionStatus {
-                name: library.clone(),
-                description: None,
-                locations: vec![ExtensionInstallLocationStatus {
-                    // Even though technically not associated to a particular database,
-                    // we add the default "postgres" so it will show up in the UI.
-                    database: "postgres".to_string(),
-                    version,
-                    enabled: Some(enabled),
-                    // Since schema is not applicable, we set it to "-"
-                    schema: Some("-".to_string()),
-                    error: None,
-                    error_message: None,
-                }],
-                // Since we already omitted anything detected by pg_available_extensions,
-                // that means this does not require CREATE EXTENSION
-                create_extension: Some(false),
-                // Since we checked if this libraries is in the REQUIRES_LOAD list,
-                // we know that it requires load
-                load: Some(true),
-            });
-        }
-    }
-
     // put them in order
     ext_spec.sort_by_key(|e| e.name.clone());
 
     Ok(ext_spec)
-}
-
-fn get_version_of_installed_library(cdb: &CoreDB, library_name: String) -> Option<String> {
-    // If the library name is an exact match to a package name, then we can
-    // get the version from status.trunk_installs.
-    // Improve this using trunk package -> extension name mapping,
-    // The consequence is some extensions will not show a version.
-    match &cdb.status {
-        None => None,
-        Some(status) => match &status.trunk_installs {
-            None => None,
-            Some(trunk_installs) => {
-                for package in trunk_installs {
-                    if package.name == library_name {
-                        return package.version.clone();
-                    }
-                }
-                None
-            }
-        },
-    }
 }
 
 /// generates the CREATE or DROP EXTENSION command for a given extension
@@ -397,31 +215,12 @@ fn generate_extension_enable_cmd(
 
 /// Handles create/drop an extension location
 /// On failure, returns an error message
-pub async fn create_or_drop_extension_if_required(
+pub async fn toggle_extension(
     cdb: &CoreDB,
     ext_name: &str,
     ext_loc: ExtensionInstallLocation,
     ctx: Arc<Context>,
 ) -> Result<(), String> {
-    info!(
-        "{} Running CREATE or DROP extension process for {}. Desired state: {:?}",
-        cdb.metadata.name.clone().unwrap(),
-        ext_name.clone(),
-        ext_loc.clone()
-    );
-
-    let current_status = match get_extension_status(cdb, ext_name) {
-        None => {
-            error!("There should always be an extension status before attempting to toggle an extension");
-            return Err("Extension is not installed".to_string());
-        }
-        Some(status) => status,
-    };
-    if current_status.create_extension.is_some() && !current_status.create_extension.unwrap() {
-        // If the extension does not require CREATE EXTENSION, then we do not need to do anything in this function.
-        return Ok(());
-    }
-
     let coredb_name = cdb.metadata.name.clone().expect("CoreDB should have a name");
     if !check_input(ext_name) {
         warn!(
@@ -448,10 +247,7 @@ pub async fn create_or_drop_extension_if_required(
     }
 
     let command = match generate_extension_enable_cmd(ext_name, &ext_loc) {
-        Ok(command) => {
-            info!("{} Running command: {}", &coredb_name, &command);
-            command
-        }
+        Ok(command) => command,
         Err(_) => {
             return Err(
                 "Don't know how to enable this extension. You may enable the extension manually instead."
@@ -504,7 +300,7 @@ pub async fn create_or_drop_extension_if_required(
 #[cfg(test)]
 mod tests {
     use crate::extensions::{
-        database_queries::{check_input, generate_extension_enable_cmd, parse_extensions, parse_sql_output},
+        database_queries::{check_input, generate_extension_enable_cmd, parse_databases, parse_extensions},
         types::ExtensionInstallLocation,
     };
 
@@ -519,7 +315,7 @@ mod tests {
 
          ";
 
-        let rows = parse_sql_output(three_db);
+        let rows = parse_databases(three_db);
         println!("{:?}", rows);
         assert_eq!(rows.len(), 3);
         assert_eq!(rows[0], "postgres");
@@ -533,7 +329,7 @@ mod tests {
 
          ";
 
-        let rows = parse_sql_output(one_db);
+        let rows = parse_databases(one_db);
         println!("{:?}", rows);
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0], "postgres");

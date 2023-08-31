@@ -16,11 +16,7 @@ use kube::CustomResource;
 use crate::extensions::types::{Extension, TrunkInstall, TrunkInstallStatus};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::collections::{BTreeMap, BTreeSet};
-
-use crate::{
-    apis::postgres_parameters::ConfigValue, extensions::toggle::get_desired_shared_preload_libraries,
-};
+use std::collections::BTreeMap;
 
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema, Default)]
 pub struct ServiceAccountTemplate {
@@ -103,94 +99,65 @@ pub struct CoreDBSpec {
     pub override_configs: Option<Vec<PgConfig>>,
 }
 
-// extracts all postgres configurations
-// configs can be defined in several different places (from a stack, user override, from an extension installation, user overrides, etc)
-pub fn get_pg_configs(cdb: &CoreDB) -> Result<Option<Vec<PgConfig>>, MergeError> {
-    let stack_configs = cdb
-        .spec
-        .stack
-        .as_ref()
-        .and_then(|s| s.postgres_config.clone())
-        .unwrap_or_default();
-    let mut runtime_configs = cdb.spec.runtime_config.clone().unwrap_or_default();
+impl CoreDBSpec {
+    // extracts all postgres configurations
+    // configs can be defined in several different places (from a stack, user override, from an extension installation, user overrides, etc)
+    pub fn get_pg_configs(&self) -> Result<Option<Vec<PgConfig>>, MergeError> {
+        let stack_configs = self
+            .stack
+            .as_ref()
+            .and_then(|s| s.postgres_config.clone())
+            .unwrap_or_default();
+        let runtime_configs = self.runtime_config.clone().unwrap_or_default();
+        // TODO: configs that come with extension installation
+        // e.g. let extension_configs = ...
+        // these extensions could be set by the operator, or trunk + operator
+        // trunk install pg_partman could come with something like `pg_partman_bgw.dbname = xxx`
 
-    // Include in shared_preload_libraries from extensions list
-    //  let shared_preload_from_extensions = ConfigValue::(get_desired_shared_preload_libraries(cdb).join(",")
-    let mut shared_preload_from_extensions = BTreeSet::new();
-    for library in get_desired_shared_preload_libraries(cdb) {
-        shared_preload_from_extensions.insert(library);
-    }
-    let shared_preload_from_extensions = ConfigValue::Multiple(shared_preload_from_extensions);
-    let extension_settings_config = vec![PgConfig {
-        name: "shared_preload_libraries".to_string(),
-        value: shared_preload_from_extensions,
-    }];
-    match merge_pg_configs(
-        &runtime_configs,
-        &extension_settings_config,
-        "shared_preload_libraries",
-    )? {
-        None => {}
-        Some(new_shared_preload_libraries) => {
-            // check by name attribute if runtime_configs already has shared_preload_libraries
-            // if so replace the value. Otherwise add this pg config into the vector.
-            let mut found = false;
-            for cfg in &mut runtime_configs {
-                if cfg.name == "shared_preload_libraries" {
-                    cfg.value = new_shared_preload_libraries.value.clone();
-                    found = true;
-                    break;
-                }
-            }
-            if !found {
-                runtime_configs.push(new_shared_preload_libraries);
+        // handle merge of any of the settings that are multi-value.
+        // e.g. stack defines shared_preload_libraries = pg_cron, then operator installs pg_stat_statements at runtime
+        // we need to merge the two configs into one,  shared_preload_libraries = pg_cron, pg_stat_statements
+        let mut merged_multival_configs: Vec<PgConfig> = Vec::new();
+        for cfg_name in MULTI_VAL_CONFIGS {
+            let merged_config = merge_pg_configs(&stack_configs, &runtime_configs, cfg_name)?;
+            if let Some(merged_config) = merged_config {
+                merged_multival_configs.push(merged_config);
             }
         }
-    }
 
-    // handle merge of any of the settings that are multi-value.
-    // e.g. stack defines shared_preload_libraries = pg_cron, then operator installs pg_stat_statements at runtime
-    // we need to merge the two configs into one,  shared_preload_libraries = pg_cron, pg_stat_statements
-    let mut merged_multival_configs: Vec<PgConfig> = Vec::new();
-    for cfg_name in MULTI_VAL_CONFIGS {
-        let merged_config = merge_pg_configs(&stack_configs, &runtime_configs, cfg_name)?;
-        if let Some(merged_config) = merged_config {
-            merged_multival_configs.push(merged_config);
+        // Order matters - to ensure anything down stream does not have to worry about ordering,
+        // set these into a BTreeSet now
+        // 1. stack configs
+        // 2. runtime configs
+        // 3. merged multivals
+        // 4. overrides
+        let mut pg_configs: BTreeMap<String, PgConfig> = BTreeMap::new();
+
+        for p in stack_configs {
+            pg_configs.insert(p.name.clone(), p);
         }
-    }
-
-    // Order matters - to ensure anything down stream does not have to worry about ordering,
-    // set these into a BTreeSet now
-    // 1. stack configs
-    // 2. runtime configs
-    // 3. merged multivals
-    // 4. overrides
-    let mut pg_configs: BTreeMap<String, PgConfig> = BTreeMap::new();
-
-    for p in stack_configs {
-        pg_configs.insert(p.name.clone(), p);
-    }
-    for p in runtime_configs {
-        pg_configs.insert(p.name.clone(), p);
-    }
-    for p in merged_multival_configs {
-        pg_configs.insert(p.name.clone(), p);
-    }
-    if let Some(override_configs) = &cdb.spec.override_configs {
-        for p in override_configs {
-            pg_configs.insert(p.name.clone(), p.clone());
+        for p in runtime_configs {
+            pg_configs.insert(p.name.clone(), p);
         }
-    }
+        for p in merged_multival_configs {
+            pg_configs.insert(p.name.clone(), p);
+        }
+        if let Some(override_configs) = &self.override_configs {
+            for p in override_configs {
+                pg_configs.insert(p.name.clone(), p.clone());
+            }
+        }
 
-    // remove any configs that are not allowed
-    for key in DISALLOWED_CONFIGS {
-        pg_configs.remove(key);
-    }
+        // remove any configs that are not allowed
+        for key in DISALLOWED_CONFIGS {
+            pg_configs.remove(key);
+        }
 
-    if pg_configs.is_empty() {
-        Ok(None)
-    } else {
-        Ok(Some(pg_configs.values().cloned().collect()))
+        if pg_configs.is_empty() {
+            Ok(None)
+        } else {
+            Ok(Some(pg_configs.values().cloned().collect()))
+        }
     }
 }
 

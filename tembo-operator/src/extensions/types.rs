@@ -63,14 +63,6 @@ pub struct ExtensionStatus {
     #[serde(default = "defaults::default_description")]
     pub description: Option<String>,
     pub locations: Vec<ExtensionInstallLocationStatus>,
-    // 'create_extension' means we are supposed to run CREATE EXTENSION for this extension
-    pub create_extension: Option<bool>,
-    // 'load' means there is a library that needs to be loaded into postgres for this extension,
-    // that has to be done separately from CREATE EXTENSION. This situation occurs when there are
-    // hooks being used in the extension library. Many extensions have libraries but not hooks,
-    // and their libraries are just loaded by CREATE EXTENSION, and in that case load is 'false'
-    // here.
-    pub load: Option<bool>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, JsonSchema, Serialize, PartialEq)]
@@ -92,23 +84,6 @@ pub fn get_location_status(
     location_database: &str,
     location_schema: Option<String>,
 ) -> Option<ExtensionInstallLocationStatus> {
-    match get_extension_status(cdb, extension_name) {
-        None => None,
-        Some(extension_status) => {
-            for location_status in &extension_status.locations {
-                // if location schema is not specified, then match any schema when returning location status
-                if location_status.database == location_database
-                    && (location_schema.is_none() || location_status.schema == location_schema)
-                {
-                    return Some(location_status.clone());
-                }
-            }
-            None
-        }
-    }
-}
-
-pub fn get_extension_status(cdb: &CoreDB, extension_name: &str) -> Option<ExtensionStatus> {
     match &cdb.status {
         None => None,
         Some(status) => match &status.extensions {
@@ -116,7 +91,15 @@ pub fn get_extension_status(cdb: &CoreDB, extension_name: &str) -> Option<Extens
             Some(extensions) => {
                 for extension in extensions {
                     if extension.name == extension_name {
-                        return Some(extension.clone());
+                        for location in &extension.locations {
+                            // if location schema is not specified, then match any schema when returning location status
+                            if location.database == location_database
+                                && (location_schema.is_none() || location.schema == location_schema)
+                            {
+                                return Some(location.clone());
+                            }
+                        }
+                        return None;
                     }
                 }
                 None
@@ -173,8 +156,6 @@ mod tests {
                     name: extension_name.to_owned(),
                     description: None,
                     locations: vec![location.clone()],
-                    create_extension: None,
-                    load: None,
                 }]),
                 ..CoreDBStatus::default()
             }),

@@ -3,7 +3,7 @@ use kube::{api::Api, client::Client, core::subresource::AttachParams};
 use tokio::io::AsyncReadExt;
 
 use crate::Error;
-use tracing::{debug, error, warn};
+use tracing::{error, log::warn};
 
 #[derive(Debug)]
 pub struct ExecOutput {
@@ -99,8 +99,7 @@ impl ExecCommand {
                     result_stdout.clone(),
                     result_stderr.clone()
                 );
-                warn!("Error executing command on pod: {:?}", self.pod_name);
-                debug!(
+                error!(
                     "Error executing command: {:?} on pod: {:?}. response: {:?}",
                     command, self.pod_name, output
                 );

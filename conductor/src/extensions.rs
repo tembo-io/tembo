@@ -9,7 +9,9 @@ fn desired_location_present_in_status(
     for actual_extension in actual_extensions {
         if actual_extension.name == desired_ext_name {
             for actual_location in &actual_extension.locations {
-                if actual_location.database == desired_location.database {
+                if actual_location.database == desired_location.database
+                    && actual_location.schema == desired_location.schema
+                {
                     return true;
                 }
             }

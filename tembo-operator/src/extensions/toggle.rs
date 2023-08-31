@@ -11,13 +11,11 @@ use kube::runtime::controller::Action;
 use crate::{
     apis::coredb_types::CoreDBStatus,
     extensions::{
-        database_queries::list_shared_preload_libraries,
-        kubernetes_queries::merge_location_status_into_extension_status_list,
-        types::{get_extension_status, get_location_status},
+        kubernetes_queries::merge_location_status_into_extension_status_list, types::get_location_status,
     },
 };
-use std::{sync::Arc, time::Duration};
-use tracing::{debug, error, info, warn};
+use std::sync::Arc;
+use tracing::error;
 
 pub async fn reconcile_extension_toggle_state(
     cdb: &CoreDB,
@@ -28,86 +26,9 @@ pub async fn reconcile_extension_toggle_state(
     kubernetes_queries::update_extensions_status(cdb, ext_status_updates.clone(), &ctx).await?;
     let cdb = get_current_coredb_resource(cdb, ctx.clone()).await?;
     let toggle_these_extensions = determine_extension_locations_to_toggle(&cdb);
-    reconcile_shared_preload_libraries(&cdb, ctx.clone()).await?;
     let ext_status_updates =
         toggle_extensions(ctx, ext_status_updates, &cdb, toggle_these_extensions).await?;
     Ok(ext_status_updates)
-}
-
-pub fn get_desired_shared_preload_libraries(cdb: &CoreDB) -> Vec<String> {
-    // Get the list of extensions configured in spec that we want to enable libraries for
-    let extensions = cdb.spec.extensions.clone();
-    let mut result = vec![];
-    'extension: for extension in extensions {
-        match get_extension_status(cdb, &extension.name) {
-            None => {
-                // We should not enable libraries for extensions not yet present
-                // in status, for example when initially starting up the instance,
-                // since we have to install the extension(s) before we can set
-                // that configuration.
-                continue 'extension;
-            }
-            Some(extension_status) => {
-                if extension_status.load.is_some() && extension_status.load.unwrap() {
-                    'location: for location in extension.locations {
-                        match get_location_status(
-                            cdb,
-                            &extension.name,
-                            &location.database,
-                            location.schema.clone(),
-                        ) {
-                            None => {
-                                // We should not enable libraries for extensions not yet present
-                                // in status, for example when initially starting up the instance.
-                                continue 'location;
-                            }
-                            Some(_location_status) => {
-                                result.push(extension_status.name.clone());
-                                continue 'extension;
-                            }
-                        }
-                    }
-                }
-            }
-        };
-    }
-    debug!(
-        "{} desired shared_preload_libraries: {:?}",
-        cdb.metadata.name.clone().unwrap(),
-        result.clone()
-    );
-    result
-}
-
-pub async fn reconcile_shared_preload_libraries(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {
-    debug!(
-        "Reconciling shared_preload_libraries: {}",
-        cdb.metadata.name.clone().unwrap()
-    );
-    // These are already set in configuration and the database has been restarted to include them
-    debug!(
-        "Reconciling shared_preload_libraries: {}",
-        cdb.metadata.name.clone().unwrap()
-    );
-    let currently_active_shared_preload_libraries = list_shared_preload_libraries(cdb, ctx.clone()).await?;
-    debug!(
-        "Found {} currently active shared_preload_libraries in {}: {:?}",
-        currently_active_shared_preload_libraries.len(),
-        cdb.metadata.name.clone().unwrap(),
-        currently_active_shared_preload_libraries.clone()
-    );
-    for desired_library in get_desired_shared_preload_libraries(cdb) {
-        if !currently_active_shared_preload_libraries.contains(&desired_library) {
-            // When a desired library is detected as not enabled yet, then we requeue
-            info!(
-                "{} does not currently have {} in shared_preload_libraries, requeuing.",
-                cdb.metadata.name.clone().unwrap(),
-                desired_library.clone()
-            );
-            return Err(Action::requeue(Duration::from_secs(10)));
-        }
-    }
-    Ok(())
 }
 
 async fn toggle_extensions(
@@ -119,7 +40,7 @@ async fn toggle_extensions(
     let mut ext_status_updates = ext_status_updates.clone();
     for extension_to_toggle in toggle_these_extensions {
         for location_to_toggle in extension_to_toggle.locations {
-            match database_queries::create_or_drop_extension_if_required(
+            match database_queries::toggle_extension(
                 cdb,
                 &extension_to_toggle.name,
                 location_to_toggle.clone(),
@@ -129,13 +50,27 @@ async fn toggle_extensions(
             {
                 Ok(_) => {}
                 Err(error_message) => {
-                    let location_status = generate_errored_location_status(
+                    let mut location_status = match types::get_location_status(
                         cdb,
-                        extension_to_toggle.name.clone(),
-                        location_to_toggle.database.clone(),
+                        &extension_to_toggle.name,
+                        &location_to_toggle.database,
                         location_to_toggle.schema.clone(),
-                        error_message,
-                    );
+                    ) {
+                        None => {
+                            error!("There should always be an extension status for a location before attempting to toggle an extension for that location");
+                            ExtensionInstallLocationStatus {
+                                database: location_to_toggle.database.clone(),
+                                schema: location_to_toggle.schema.clone(),
+                                version: None,
+                                enabled: None,
+                                error: Some(true),
+                                error_message: None,
+                            }
+                        }
+                        Some(location_status) => location_status,
+                    };
+                    location_status.error = Some(true);
+                    location_status.error_message = Some(error_message);
                     ext_status_updates = kubernetes_queries::update_extension_location_in_status(
                         cdb,
                         ctx.clone(),
@@ -150,37 +85,6 @@ async fn toggle_extensions(
     Ok(ext_status_updates)
 }
 
-fn generate_errored_location_status(
-    cdb: &CoreDB,
-    extension_name: String,
-    database_name: String,
-    schema_name: Option<String>,
-    error_message: String,
-) -> ExtensionInstallLocationStatus {
-    let mut location_status = match types::get_location_status(
-        cdb,
-        &extension_name,
-        &database_name.clone(),
-        schema_name.clone(),
-    ) {
-        None => {
-            error!("There should always be an extension status for a location before attempting to set an error message for that location");
-            ExtensionInstallLocationStatus {
-                database: database_name,
-                schema: schema_name,
-                version: None,
-                enabled: None,
-                error: Some(true),
-                error_message: None,
-            }
-        }
-        Some(location_status) => location_status,
-    };
-    location_status.error = Some(true);
-    location_status.error_message = Some(error_message);
-    location_status
-}
-
 fn determine_updated_extensions_status(
     cdb: &CoreDB,
     all_actually_installed_extensions: Vec<ExtensionStatus>,
@@ -193,18 +97,9 @@ fn determine_updated_extensions_status(
             name: actual_extension.name.clone(),
             description: actual_extension.description.clone(),
             locations: vec![],
-            create_extension: actual_extension.create_extension,
-            load: actual_extension.load,
         };
         // For every location of an actually installed extension
         for actual_location in actual_extension.locations {
-            debug!(
-                "actual status of {} in db {}, schema {:?} is {:?}",
-                actual_extension.name.clone(),
-                actual_location.database.clone(),
-                actual_location.schema.clone(),
-                actual_location.enabled.clone()
-            );
             // Create a location status
             let mut location_status = ExtensionInstallLocationStatus {
                 enabled: actual_location.enabled,
@@ -259,12 +154,17 @@ fn determine_updated_extensions_status(
     for desired_extension in &cdb.spec.extensions {
         // For every location of the desired extension
         for desired_location in &desired_extension.locations {
-            // If the desired extension is not in the current status
+            // If the desired location is not in the current status
             // and the desired location is enabled, then
             // we need to add it into the status as unavailable.
             if desired_location.clone().enabled
-                && get_extension_status(&cdb_with_updated_extensions_status, &desired_extension.name)
-                    .is_none()
+                && get_location_status(
+                    &cdb_with_updated_extensions_status,
+                    &desired_extension.name,
+                    &desired_location.database,
+                    desired_location.schema.clone(),
+                )
+                .is_none()
             {
                 let location_status = ExtensionInstallLocationStatus {
                     enabled: None,
@@ -287,8 +187,6 @@ fn determine_updated_extensions_status(
     ext_status_updates
 }
 
-// This function returns the extensions from spec.extensions that are not already
-// errored or already at the desired state in the current status.
 fn determine_extension_locations_to_toggle(cdb: &CoreDB) -> Vec<Extension> {
     let mut extensions_to_toggle: Vec<Extension> = vec![];
     for desired_extension in &cdb.spec.extensions {
@@ -303,20 +201,7 @@ fn determine_extension_locations_to_toggle(cdb: &CoreDB) -> Vec<Extension> {
                 desired_location.schema.clone(),
             ) {
                 None => {
-                    match get_extension_status(cdb, &desired_extension.name) {
-                        None => {
-                            error!("When determining extensions to toggle, the any desired extension should be in the status, because that should be included by determine_updated_extensions_status.");
-                        }
-                        Some(_extension_status) => {
-                            // This happens when an extension is requested for a schema that's not in the status
-                            // If we fail to toggle, that will get added to status
-                            if desired_location.enabled {
-                                warn!("When determining extensions to toggle, we found the extension is in status, but the location is not. Assuming that a toggle is needed.");
-                                needs_toggle = true;
-                                extension_to_toggle.locations.push(desired_location.clone());
-                            }
-                        }
-                    }
+                    error!("When determining extensions to toggle, there should always be a location status for the desired location, because that should be included by determine_updated_extensions_status.");
                 }
                 Some(actual_status) => {
                     // If we don't have an error already, the extension exists, and the desired does not match the actual
@@ -429,6 +314,13 @@ mod tests {
                     schema: Some("public".to_string()),
                     version: None,
                 },
+                // Requesting to enable an extension that is not installed
+                ExtensionInstallLocation {
+                    enabled: true,
+                    database: "db_where_its_not_available".to_string(),
+                    schema: Some("public".to_string()),
+                    version: None,
+                },
                 // Requesting to enable an extension that previously failed to enable
                 ExtensionInstallLocation {
                     enabled: true,
@@ -446,19 +338,7 @@ mod tests {
                     database: "db1".to_string(),
                     schema: Some("public".to_string()),
                     version: None,
-                }
-                ],
-            },
-            Extension {
-                name: "ext3".to_string(),
-                description: None,
-                locations: vec![ExtensionInstallLocation {
-                                    enabled: true,
-                                    database: "db_where_its_not_available".to_string(),
-                                    schema: Some("public".to_string()),
-                                    version: None,
-                                },
-                ],
+                }],
             },
         ];
 
@@ -512,8 +392,6 @@ mod tests {
                     error_message: Some("Failed to enable extension".to_string()),
                 },
             ],
-            create_extension: None,
-            load: None,
         }];
 
         let cdb = CoreDB {
@@ -583,8 +461,6 @@ mod tests {
                         error_message: None,
                     },
                 ],
-                create_extension: None,
-                load: None,
             },
             ExtensionStatus {
                 name: "ext2".to_string(),
@@ -607,8 +483,6 @@ mod tests {
                         error_message: None,
                     },
                 ],
-                create_extension: None,
-                load: None,
             },
         ];
 
@@ -683,7 +557,7 @@ mod tests {
         assert!(location_status.error_message.is_some());
         let location_status = get_location_status(
             &cdb,
-            "ext3",
+            "ext1",
             "db_where_its_not_available",
             Some("public".to_string()),
         )

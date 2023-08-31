@@ -34,7 +34,6 @@ use crate::{
     extensions::reconcile_extensions,
     postgres_exporter::{create_postgres_exporter_role, reconcile_prom_configmap},
 };
-use rand::Rng;
 use serde::Serialize;
 use serde_json::json;
 use std::sync::Arc;
@@ -267,9 +266,8 @@ impl CoreDB {
         patch_cdb_status_merge(&coredbs, &name, patch_status).await?;
 
         info!("Fully reconciled {}", self.name_any());
-        // Check back every 60-90 seconds
-        let jitter = rand::thread_rng().gen_range(0..30);
-        Ok(Action::requeue(Duration::from_secs(60 + jitter)))
+        // Check back every minute
+        Ok(Action::requeue(Duration::from_secs(60)))
     }
 
     // Finalizer cleanup (the object was deleted, ensure nothing is orphaned)
@@ -332,15 +330,6 @@ impl CoreDB {
             return Err(Action::requeue(Duration::from_secs(5)));
         }
         let primary = pod_list.items[0].clone();
-        // check if the pod is ready
-        if !is_postgres_ready().matches_object(Some(&primary)) {
-            // It's expected to sometimes be empty, we should retry after a short duration
-            warn!(
-                "Found CNPG primary pod of {}, but it is not ready",
-                &self.name_any()
-            );
-            return Err(Action::requeue(Duration::from_secs(5)));
-        }
         Ok(primary)
     }
 

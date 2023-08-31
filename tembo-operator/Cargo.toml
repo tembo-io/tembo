@@ -49,7 +49,6 @@ itertools = "0.11.0"
 base64 = "0.21.2"
 semver = "1.0.18"
 anyhow = "1.0.72"
-rand = "0.8.5"
 
 [dev-dependencies]
 assert-json-diff = "2.0.2"

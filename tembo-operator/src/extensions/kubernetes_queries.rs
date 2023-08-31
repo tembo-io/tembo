@@ -1,9 +1,6 @@
 use crate::{
     apis::coredb_types::{CoreDB, CoreDBStatus},
-    extensions::{
-        database_queries::REQUIRES_LOAD,
-        types::{ExtensionInstallLocationStatus, ExtensionStatus, TrunkInstallStatus},
-    },
+    extensions::types::{ExtensionInstallLocationStatus, ExtensionStatus, TrunkInstallStatus},
     get_current_coredb_resource, patch_cdb_status_merge, Context,
 };
 use kube::{runtime::controller::Action, Api};
@@ -76,15 +73,11 @@ pub fn merge_location_status_into_extension_status_list(
             return new_extensions_status;
         }
     }
-    error!("Merging a location status into extension status list, but the extension was not found in the list. This is not expected");
-    let load = REQUIRES_LOAD.contains(&extension_name);
     // If we never found the extension status, append it
     new_extensions_status.push(ExtensionStatus {
         name: extension_name.to_string(),
         description: None,
         locations: vec![new_location_status.clone()],
-        create_extension: None,
-        load: Some(load),
     });
     // Then sort alphabetically by name
     new_extensions_status.sort_by(|a, b| a.name.cmp(&b.name));
@@ -302,8 +295,6 @@ mod tests {
                 error: Some(false),
                 error_message: None,
             }],
-            create_extension: None,
-            load: None,
         }];
         let new_location_status = ExtensionInstallLocationStatus {
             enabled: Some(true),
@@ -339,8 +330,6 @@ mod tests {
                 error: Some(false),
                 error_message: None,
             }],
-            create_extension: None,
-            load: None,
         }];
         let new_location_status = ExtensionInstallLocationStatus {
             enabled: Some(true),
@@ -380,8 +369,6 @@ mod tests {
                 error: Some(false),
                 error_message: None,
             }],
-            create_extension: None,
-            load: None,
         }];
         let new_location_status = ExtensionInstallLocationStatus {
             enabled: Some(true),
