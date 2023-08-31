@@ -18,9 +18,9 @@ const WINDOWS_ERROR_MSG: &str = "- Windows is not supported at this time";
 
 fn main() {
     let command = create_clap_command();
+    let matches = command.get_matches();
 
-    // Check which subcommand the user ran...
-    let res = match command.get_matches().subcommand() {
+    let res = match matches.subcommand() {
         Some(("init", sub_matches)) => cmd::init::execute(sub_matches),
         Some(("install", sub_matches)) => cmd::stack::create::execute(sub_matches),
         Some(("stack", sub_matches)) => cmd::stack::create::execute(sub_matches),
@@ -45,7 +45,6 @@ fn main() {
         println!("{}", res.err().unwrap());
 
         // TODO: adding logging, log error
-        //
         std::process::exit(101);
     }
 }
@@ -54,7 +53,7 @@ fn main() {
 fn create_clap_command() -> Command {
     Command::new(crate_name!())
         .about(crate_description!())
-        .author("Tembo.io")
+        .author("Tembo <ry@tembo.io>")
         .version(VERSION)
         .propagate_version(true)
         .arg_required_else_help(true)

@@ -1,11 +1,10 @@
 pub mod create {
-    use crate::cli::config::Config;
+    use crate::cli::config::{Config, EnabledExtensions, InstalledExtensions, Stacks};
     use crate::cli::docker::{Docker, DockerError};
     use crate::cli::stacks;
     use clap::{Arg, ArgAction, ArgMatches, Command};
     use spinners::{Spinner, Spinners};
     use std::error::Error;
-    use std::path::PathBuf;
     use std::process::Command as ShellCommand;
 
     pub fn make_subcommand() -> Command {
@@ -20,18 +19,6 @@ pub mod create {
                     .default_value("standard")
                     .help("The name of a Tembo stack type to install"),
             )
-            .arg(
-                Arg::new("file-path")
-                    .short('f')
-                    .long("file-path")
-                    .value_parser(clap::value_parser!(std::path::PathBuf))
-                    .action(ArgAction::Set)
-                    .required(false)
-                    .help(
-                        "A path to the directory to add the configuration \
-                    file to, default is $HOME/.config/tembo",
-                    ),
-            )
     }
 
     pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
@@ -41,7 +28,14 @@ pub mod create {
             return Err(Box::new(DockerError::new(crate::WINDOWS_ERROR_MSG)));
         }
 
-        let (_name, matches) = args.subcommand().unwrap();
+        // NOTE: install is a command (so just use the args), stack create is a subcommand, so we
+        // need to fetch the args
+        let matches = if args.subcommand().is_none() {
+            args
+        } else {
+            let (_name, matches) = args.subcommand().unwrap();
+            matches
+        };
 
         // ensure the stack type provided is valid, if none given, default to the standard stack
         if let Ok(stack) = stacks::define_stack(matches) {
@@ -99,8 +93,6 @@ pub mod create {
 
         let desired_stack: &stacks::StackDetails = stack_details[0];
 
-        let _ = persist_stack_config(desired_stack, args);
-
         for install in &desired_stack.trunk_installs {
             let _ = install_extension(stack, install);
         }
@@ -109,16 +101,19 @@ pub mod create {
             let _ = enable_extension(stack, extension);
         }
 
+        let _ = persist_stack_config(desired_stack, args);
+
         Ok(())
     }
 
-    // TODO: persist what extensions are installed in the config file
     fn install_extension(
         stack: &str,
         extension: &stacks::TrunkInstall,
     ) -> Result<(), Box<dyn Error>> {
         let mut sp = Spinner::new(Spinners::Dots12, "Installing extension".into());
 
+        // TODO: init may need to move the dockerfile and docker-compose files to the
+        // ~/.config/tembo directory
         let mut command = String::from("cd tembo && docker-compose ");
         command.push_str(stack);
         command.push_str(" run bash && trunk install ");
@@ -142,11 +137,12 @@ pub mod create {
                 format!("There was an issue installing the extension: {}", stderr).as_str(),
             )));
         } else {
+            // TODO: persist the extension info to the config
+
             Ok(())
         }
     }
 
-    // TODO: persist what extensions are enabled in the config file
     fn enable_extension(stack: &str, extension: &stacks::Extension) -> Result<(), Box<dyn Error>> {
         let mut sp = Spinner::new(Spinners::Dots12, "Enabling extension".into());
 
@@ -183,6 +179,8 @@ pub mod create {
                 format!("There was an issue enabling the extension: {}", stderr).as_str(),
             )));
         } else {
+            // TODO: persist what extensions are enabled in the config file
+            //
             Ok(())
         }
     }
@@ -238,72 +236,143 @@ pub mod create {
         stack: &stacks::StackDetails,
         args: &ArgMatches,
     ) -> Result<(), Box<dyn Error>> {
-        let config: Config = Config::new(args);
-        let file_path: PathBuf = config.file_path;
+        let mut config: Config = Config::new(args);
+        let mut stack_config = Stacks {
+            name: Some(stack.name.clone()),
+            version: Some(stack.stack_version.clone()),
+            installed_extensions: InstalledExtensions {
+                name: None,
+                version: None,
+            },
+            enabled_extensions: EnabledExtensions {
+                name: None,
+                version: None,
+            },
+        };
 
-        let mut contents = String::from("\n[stacks]");
-        contents.push_str("\nstandard = ");
-        contents.push_str(&stack.stack_version);
+        for install in &stack.trunk_installs {
+            stack_config.installed_extensions = InstalledExtensions {
+                name: Some(install.name.clone()),
+                version: Some(install.version.clone()),
+            }
+        }
 
-        // TODO: don't just append, add to a section if not already there
-        match Config::append(file_path.clone(), &contents) {
+        // TODO: don't overwrite the trunk installs, add or modify them
+        for extension in &stack.extensions {
+            stack_config.enabled_extensions = EnabledExtensions {
+                name: Some(extension.name.clone()),
+                version: Some(String::from("2.0")),
+            }
+        }
+
+        config.stacks = stack_config;
+
+        match Config::write(&config) {
             Ok(_) => println!("- Stack install info added to configuration file"),
             Err(e) => eprintln!("{}", e),
         }
 
         Ok(())
     }
-}
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use clap::{Arg, ArgAction, Command};
+    #[cfg(test)]
+    mod tests {
+        use crate::cli::stacks::ExtensionLocation;
 
-    // NOTE: need to mock check_requirements, build_image, install_stack_config
-    #[test]
-    #[ignore]
-    fn valid_execute_test() {
-        // with a valid stack type
-        let stack_type = String::from("standard");
+        use super::*;
+        use crate::cli::stacks::*;
+        use clap::{Arg, ArgAction, Command};
 
-        let m = Command::new("myapp").subcommand(
-            Command::new("create").arg(
-                Arg::new("stack")
-                    .short('s')
-                    .long("stack")
-                    .action(ArgAction::Set)
-                    .required(false)
-                    .default_value("standard")
-                    .help("The name of a Tembo stack type to install"),
-            ),
-        );
+        // NOTE: need to mock check_requirements, build_image, install_stack_config
+        #[test]
+        #[ignore]
+        fn valid_execute_test() {
+            // with a valid stack type
+            let stack_type = String::from("standard");
 
-        let result =
-            create::execute(&m.get_matches_from(vec!["myapp", "create", "--stack", &stack_type]));
-        assert_eq!(result.is_ok(), true);
-    }
+            let m = Command::new("myapp").subcommand(
+                Command::new("create").arg(
+                    Arg::new("stack")
+                        .short('s')
+                        .long("stack")
+                        .action(ArgAction::Set)
+                        .required(false)
+                        .default_value("standard")
+                        .help("The name of a Tembo stack type to install"),
+                ),
+            );
 
-    #[test]
-    #[ignore]
-    fn invalid_execute_test() {
-        // with a valid stack type
-        let stack_type = String::from("foo");
+            let result =
+                execute(&m.get_matches_from(vec!["myapp", "create", "--stack", &stack_type]));
+            assert_eq!(result.is_ok(), true);
+        }
 
-        let m = Command::new("myapp").subcommand(
-            Command::new("create").arg(
-                Arg::new("stack")
-                    .short('s')
-                    .long("stack")
-                    .action(ArgAction::Set)
-                    .required(false)
-                    .default_value("standard")
-                    .help("The name of a Tembo stack type to install"),
-            ),
-        );
+        #[test]
+        #[ignore]
+        fn invalid_execute_test() {
+            // with a valid stack type
+            let stack_type = String::from("foo");
 
-        let result =
-            create::execute(&m.get_matches_from(vec!["myapp", "create", "--stack", &stack_type]));
-        assert_eq!(result.is_err(), true);
+            let m = Command::new("myapp").subcommand(
+                Command::new("create").arg(
+                    Arg::new("stack")
+                        .short('s')
+                        .long("stack")
+                        .action(ArgAction::Set)
+                        .required(false)
+                        .default_value("standard")
+                        .help("The name of a Tembo stack type to install"),
+                ),
+            );
+
+            let result =
+                execute(&m.get_matches_from(vec!["myapp", "create", "--stack", &stack_type]));
+            assert_eq!(result.is_err(), true);
+        }
+
+        #[test]
+        #[ignore]
+        fn persist_stack_config_test() {
+            let stack_type = String::from("standard");
+            let trunk_install = TrunkInstall {
+                name: String::from("pgmq"),
+                version: String::from("1.0"),
+            };
+            let extension_location = ExtensionLocation {
+                database: String::from("my_warehouse"),
+                enabled: String::from("true"),
+                version: String::from("1.0"),
+            };
+            let extension = Extension {
+                name: "pgmq".to_string(),
+                locations: vec![extension_location],
+            };
+            let stack: StackDetails = StackDetails {
+                name: String::from("foo"),
+                description: String::from("some description"),
+                stack_version: String::from("1.0"),
+                trunk_installs: vec![trunk_install],
+                extensions: vec![extension],
+            };
+
+            let m = Command::new("myapp").subcommand(
+                Command::new("create").arg(
+                    Arg::new("stack")
+                        .short('s')
+                        .long("stack")
+                        .action(ArgAction::Set)
+                        .required(false)
+                        .default_value("standard")
+                        .help("The name of a Tembo stack type to install"),
+                ),
+            );
+
+            let matches = &m.get_matches_from(vec!["myapp", "create", "--stack", &stack_type]);
+            let result = persist_stack_config(&stack, &matches);
+
+            assert_eq!(result.is_ok(), true);
+
+            // TODO: ensure the file contains the correct information
+        }
     }
 }

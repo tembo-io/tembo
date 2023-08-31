@@ -12,16 +12,4 @@ pub fn make_subcommand() -> Command {
                 .action(ArgAction::Append)
                 .help("The name of a Tembo stack type to install"),
         )
-        .arg(
-            Arg::new("file-path")
-                .short('f')
-                .long("file-path")
-                .value_name("dir")
-                .value_parser(clap::value_parser!(std::path::PathBuf))
-                .action(ArgAction::Append)
-                .help(
-                    "A path to the directory to add to the configuration \
-                    file to, default is $HOME/.config/tembo",
-                ),
-        )
 }
