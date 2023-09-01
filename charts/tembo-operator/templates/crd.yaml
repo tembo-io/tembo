@@ -83,7 +83,7 @@ spec:
                   type: object
                 type: array
               image:
-                default: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e
+                default: quay.io/tembo/standard-cnpg:15.3.0-1-0c19c7e
                 type: string
               metrics:
                 nullable: true

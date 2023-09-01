@@ -38,11 +38,11 @@ pub fn default_port() -> i32 {
 }
 
 pub fn default_image() -> String {
-    "quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e".to_owned()
+    "quay.io/tembo/standard-cnpg:15.3.0-1-0c19c7e".to_owned()
 }
 
 pub fn default_llm_image() -> String {
-    "quay.io/tembo/ml-cnpg:15.3.0-1-77fcafc".to_owned()
+    "quay.io/tembo/ml-cnpg:15.3.0-1-63e32a1".to_owned()
 }
 
 pub fn default_storage() -> Quantity {
