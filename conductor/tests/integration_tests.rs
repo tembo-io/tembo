@@ -126,16 +126,16 @@ mod test {
             serde_json::from_value(custom_metrics).expect("failed to deserialize");
 
         // conductor receives a CRUDevent from control plane
+        let mut install_location = ExtensionInstallLocation::default();
+        install_location.enabled = true;
+        install_location.version = Some("1.3.0".to_owned());
+        install_location.database = "postgres".to_owned();
+        let install_location = install_location.clone();
         let spec_js = serde_json::json!({
             "extensions": Some(vec![Extension {
                 name: "aggs_for_vecs".to_owned(),
                 description: Some("aggs_for_vecs extension".to_owned()),
-                locations: vec![ExtensionInstallLocation {
-                    enabled: true,
-                    version: Some("1.3.0".to_owned()),
-                    schema: Some("public".to_string()),
-                    database: "postgres".to_owned(),
-                }],
+                locations: vec![install_location],
             }]),
             "storage": Some("1Gi".to_owned()),
             "replicas": Some(1),
@@ -226,15 +226,15 @@ mod test {
         // conductor receives a CRUDevent from control plane
         // take note of number of extensions at this point in time
         let mut extensions_add = extensions.clone();
+        let mut install_location = ExtensionInstallLocation::default();
+        install_location.enabled = true;
+        install_location.version = Some("0.1.4".to_owned());
+        install_location.database = "postgres".to_owned();
+        let install_location = install_location.clone();
         extensions_add.push(Extension {
             name: "pg_jsonschema".to_owned(),
             description: Some("fake description".to_string()),
-            locations: vec![ExtensionInstallLocation {
-                enabled: true,
-                version: Some("0.1.4".to_owned()),
-                schema: Some("public".to_owned()),
-                database: "postgres".to_owned(),
-            }],
+            locations: vec![install_location],
         });
         let num_expected_extensions = extensions_add.len();
         let spec_js = serde_json::json!({
