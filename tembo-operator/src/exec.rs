@@ -3,7 +3,7 @@ use kube::{api::Api, client::Client, core::subresource::AttachParams};
 use tokio::io::AsyncReadExt;
 
 use crate::Error;
-use tracing::{error, log::warn};
+use tracing::{debug, error, warn};
 
 #[derive(Debug)]
 pub struct ExecOutput {
@@ -99,10 +99,11 @@ impl ExecCommand {
                     result_stdout.clone(),
                     result_stderr.clone()
                 );
-                error!(
-                    "Error executing command: {:?} on pod: {:?}. response: {:?}",
-                    command, self.pod_name, output
+                warn!(
+                    "Error executing command on pod: {:?}. response: {:?}",
+                    self.pod_name, output
                 );
+                debug!("Failed command: {:?}", command);
                 false
             }
             // This is never supposed to happen because status is supposed to only be

@@ -9,7 +9,7 @@ use crate::{
 use kube::runtime::controller::Action;
 use lazy_static::lazy_static;
 use regex::Regex;
-use std::{collections::HashMap, sync::Arc};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 use tracing::{debug, error, info, warn};
 
 lazy_static! {
@@ -19,6 +19,8 @@ lazy_static! {
 pub fn check_input(input: &str) -> bool {
     VALID_INPUT.is_match(input)
 }
+
+pub const LIST_SHARED_PRELOAD_LIBRARIES_QUERY: &str = r#"SHOW shared_preload_libraries;"#;
 
 pub const LIST_DATABASES_QUERY: &str = r#"SELECT datname FROM pg_database WHERE datistemplate = false;"#;
 
@@ -94,6 +96,37 @@ pub struct ExtRow {
     pub schema: String,
 }
 
+pub async fn list_shared_preload_libraries(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<String>, Action> {
+    let psql_out = cdb
+        .psql(
+            LIST_SHARED_PRELOAD_LIBRARIES_QUERY.to_owned(),
+            "postgres".to_owned(),
+            ctx,
+        )
+        .await?;
+    let result_string = match psql_out.stdout {
+        None => {
+            error!(
+                "No stdout from psql when looking for shared_preload_libraries for {}",
+                cdb.metadata.name.clone().unwrap()
+            );
+            return Err(Action::requeue(Duration::from_secs(300)));
+        }
+        Some(out) => out,
+    };
+    let result = parse_sql_output(&result_string);
+    let mut libraries: Vec<String> = vec![];
+    if result.len() == 1 {
+        libraries = result[0].split(',').map(|s| s.trim().to_string()).collect();
+    }
+    debug!(
+        "{}: Found shared_preload_libraries: {:?}",
+        cdb.metadata.name.clone().unwrap(),
+        libraries.clone()
+    );
+    Ok(libraries)
+}
+
 /// lists all extensions in a single database
 pub async fn list_extensions(cdb: &CoreDB, ctx: Arc<Context>, database: &str) -> Result<Vec<ExtRow>, Action> {
     let psql_out = cdb
@@ -132,11 +165,11 @@ pub async fn list_databases(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<Strin
         .psql(LIST_DATABASES_QUERY.to_owned(), "postgres".to_owned(), ctx)
         .await?;
     let result_string = psql_out.stdout.unwrap();
-    Ok(parse_databases(&result_string))
+    Ok(parse_sql_output(&result_string))
 }
 
-pub fn parse_databases(psql_str: &str) -> Vec<String> {
-    let mut databases = vec![];
+pub fn parse_sql_output(psql_str: &str) -> Vec<String> {
+    let mut results = vec![];
     for line in psql_str.lines().skip(2) {
         let fields: Vec<&str> = line.split('|').map(|s| s.trim()).collect();
         if fields.is_empty()
@@ -147,11 +180,11 @@ pub fn parse_databases(psql_str: &str) -> Vec<String> {
             debug!("Done:{:?}", fields);
             continue;
         }
-        databases.push(fields[0].to_string());
+        results.push(fields[0].to_string());
     }
-    let num_databases = databases.len();
-    info!("Found {} databases", num_databases);
-    databases
+    let num_results = results.len();
+    info!("Found {} results", num_results);
+    results
 }
 
 /// list databases then get all extensions from each database
@@ -264,7 +297,7 @@ pub async fn toggle_extension(
 
 #[cfg(test)]
 mod tests {
-    use crate::extensions::database_queries::{check_input, parse_databases, parse_extensions};
+    use crate::extensions::database_queries::{check_input, parse_extensions, parse_sql_output};
 
     #[test]
     fn test_parse_databases() {
@@ -277,7 +310,7 @@ mod tests {
 
          ";
 
-        let rows = parse_databases(three_db);
+        let rows = parse_sql_output(three_db);
         println!("{:?}", rows);
         assert_eq!(rows.len(), 3);
         assert_eq!(rows[0], "postgres");
@@ -291,7 +324,7 @@ mod tests {
 
          ";
 
-        let rows = parse_databases(one_db);
+        let rows = parse_sql_output(one_db);
         println!("{:?}", rows);
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0], "postgres");

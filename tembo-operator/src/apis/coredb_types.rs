@@ -159,6 +159,16 @@ impl CoreDBSpec {
             Ok(Some(pg_configs.values().cloned().collect()))
         }
     }
+
+    pub fn get_pg_config_by_name(&self, config_name: &str) -> Result<Option<PgConfig>, MergeError> {
+        let all_configs = self.get_pg_configs()?;
+        for config in all_configs.unwrap_or_default() {
+            if config.name == config_name {
+                return Ok(Some(config));
+            }
+        }
+        Ok(None)
+    }
 }
 
 /// The status object of `CoreDB`
