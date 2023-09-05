@@ -366,11 +366,7 @@ impl CoreDB {
             context,
         );
         debug!("Running exec command in {}", pod_name_cnpg);
-        let cnpg_exec = cnpg_psql_command.execute();
-        cnpg_exec.await.map_err(|_e| {
-            warn!("Failed executing command in primary pod of {}", &self.name_any());
-            Action::requeue(Duration::from_secs(30))
-        })
+        cnpg_psql_command.execute().await
     }
 
     pub async fn exec(

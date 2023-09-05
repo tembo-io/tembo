@@ -1,5 +1,6 @@
 .DS_Store
 
+temp.yaml
 # VSCode
 .vscode
 ./.vscode

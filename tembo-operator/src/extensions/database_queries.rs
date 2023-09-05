@@ -238,9 +238,9 @@ pub async fn toggle_extension(
                     "Failed to toggle extension {} in database {}, instance {}",
                     ext_name, database_name, &coredb_name
                 );
-                match psql_output.stdout {
-                    Some(stdout) => {
-                        return Err(stdout);
+                match psql_output.stderr {
+                    Some(stderr) => {
+                        return Err(stderr);
                     }
                     None => {
                         return Err("Failed to enable extension, and found no output. Please try again. If this issue persists, contact support.".to_string());
