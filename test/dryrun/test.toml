@@ -1,4 +1,0 @@
-file_name = "configuration.toml"
-file_path = "/Users/mkrisher/projects/tembo-cli/./test/dryrun/test.toml"
-
-[stacks]

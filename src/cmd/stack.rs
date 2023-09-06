@@ -1,7 +1,11 @@
 pub mod create {
-    use crate::cli::config::{Config, EnabledExtensions, InstalledExtensions, Stacks};
+    use crate::cli::cluster::Cluster;
+    use crate::cli::cluster::EnabledExtensions;
+    use crate::cli::cluster::InstalledExtensions;
+    use crate::cli::config::Config;
     use crate::cli::docker::{Docker, DockerError};
     use crate::cli::stacks;
+    use chrono::prelude::*;
     use clap::{Arg, ArgAction, ArgMatches, Command};
     use spinners::{Spinner, Spinners};
     use std::error::Error;
@@ -101,7 +105,7 @@ pub mod create {
             let _ = enable_extension(stack, extension);
         }
 
-        let _ = persist_stack_config(desired_stack, args);
+        let _ = persist_config(desired_stack, args);
 
         Ok(())
     }
@@ -232,42 +236,49 @@ pub mod create {
         image.is_some()
     }
 
-    fn persist_stack_config(
+    fn persist_config(
         stack: &stacks::StackDetails,
         args: &ArgMatches,
     ) -> Result<(), Box<dyn Error>> {
-        let mut config: Config = Config::new(args);
-        let mut stack_config = Stacks {
+        let mut config: Config = Config::new(args, &Config::full_path(args));
+        let mut cluster_config = Cluster {
             name: Some(stack.name.clone()),
+            r#type: Some(String::from("standard")),
             version: Some(stack.stack_version.clone()),
-            installed_extensions: InstalledExtensions {
+            created_at: Some(Utc::now()),
+            installed_extensions: vec![InstalledExtensions {
                 name: None,
                 version: None,
-            },
-            enabled_extensions: EnabledExtensions {
+                created_at: Some(Utc::now()),
+            }],
+            enabled_extensions: vec![EnabledExtensions {
                 name: None,
                 version: None,
-            },
+                created_at: Some(Utc::now()),
+            }],
         };
 
         for install in &stack.trunk_installs {
-            stack_config.installed_extensions = InstalledExtensions {
-                name: Some(install.name.clone()),
-                version: Some(install.version.clone()),
-            }
+            cluster_config
+                .installed_extensions
+                .push(InstalledExtensions {
+                    name: Some(install.name.clone()),
+                    version: Some(install.version.clone()),
+                    created_at: Some(Utc::now()),
+                })
         }
 
-        // TODO: don't overwrite the trunk installs, add or modify them
         for extension in &stack.extensions {
-            stack_config.enabled_extensions = EnabledExtensions {
+            cluster_config.enabled_extensions.push(EnabledExtensions {
                 name: Some(extension.name.clone()),
                 version: Some(String::from("2.0")),
-            }
+                created_at: Some(Utc::now()),
+            })
         }
 
-        config.stacks = stack_config;
+        config.clusters = vec![cluster_config];
 
-        match Config::write(&config) {
+        match Config::write(&config, &Config::full_path(args)) {
             Ok(_) => println!("- Stack install info added to configuration file"),
             Err(e) => eprintln!("{}", e),
         }
@@ -332,7 +343,7 @@ pub mod create {
 
         #[test]
         #[ignore]
-        fn persist_stack_config_test() {
+        fn persist_config_test() {
             let stack_type = String::from("standard");
             let trunk_install = TrunkInstall {
                 name: String::from("pgmq"),
@@ -368,7 +379,7 @@ pub mod create {
             );
 
             let matches = &m.get_matches_from(vec!["myapp", "create", "--stack", &stack_type]);
-            let result = persist_stack_config(&stack, &matches);
+            let result = persist_config(&stack, &matches);
 
             assert_eq!(result.is_ok(), true);
 
