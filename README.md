@@ -19,7 +19,7 @@ This code repository is our entire "data plane" codebase. You can use it to self
 
 ## Try on Tembo Cloud
 
-You can sign up for Tembo Cloud at [tembo.io](https://cloud.tembo.io)
+You can sign up for Tembo Cloud at [cloud.tembo.io](https://cloud.tembo.io).
 
 Tembo Cloud is a managed service where users can deploy Postgres in various forms. We have a control plane / data plane architecture, where we have a control plane for a centralized UI and API, and data plane(s) where Postgres stacks are hosted.
 
