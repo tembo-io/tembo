@@ -1735,4 +1735,137 @@ mod test {
         // Delete namespace
         let _ = delete_namespace(client.clone(), &namespace).await;
     }
+
+    #[tokio::test]
+    #[ignore]
+    async fn functional_test_shared_preload_libraries() {
+        // Initialize the Kubernetes client
+        let client = kube_client().await;
+        let state = State::default();
+        let context = state.create_context(client.clone());
+
+        // Configurations
+        let mut rng = rand::thread_rng();
+        let suffix = rng.gen_range(0..100000);
+        let name = &format!("test-requires-load-{}", suffix);
+        let namespace = match create_namespace(client.clone(), name).await {
+            Ok(namespace) => namespace,
+            Err(e) => {
+                eprintln!("Error creating namespace: {}", e);
+                std::process::exit(1);
+            }
+        };
+
+        let kind = "CoreDB";
+        let replicas = 1;
+
+        // Create a pod we can use to run commands in the cluster
+        let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
+
+        // Apply a basic configuration of CoreDB
+        println!("Creating CoreDB resource {}", name);
+        let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
+        // Generate basic CoreDB resource to start with
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "replicas": replicas,
+                "extensions": [{
+                        "name": "pg_cron",
+                        "description": "cron",
+                        "locations": [{
+                            "enabled": true,
+                            "version": "1.5.2",
+                            "database": "postgres",
+                        }],
+                    },
+                    {
+                        "name": "citus",
+                        "description": "citus",
+                        "locations": [{
+                            "enabled": true,
+                            "version": "12.0.1",
+                            "database": "postgres",
+                        }],
+                }],
+                "trunk_installs": [{
+                        "name": "pg_cron",
+                        "version": "1.5.2",
+                },
+                {
+                        "name": "citus",
+                        "version": "12.0.1",
+                }]
+            }
+        });
+        let params = PatchParams::apply("tembo-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        let coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        // Wait for CNPG Pod to be created
+        let pod_name = format!("{}-1", name);
+
+        pod_ready_and_running(pods.clone(), pod_name.clone()).await;
+
+        let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
+        let lp =
+            ListParams::default().labels(format!("app=postgres-exporter,coredb.io/name={}", name).as_str());
+        let exporter_pods = pods.list(&lp).await.expect("could not get pods");
+        let exporter_pod_name = exporter_pods.items[0].metadata.name.as_ref().unwrap();
+        println!("Exporter pod name: {}", &exporter_pod_name);
+
+        pod_ready_and_running(pods.clone(), exporter_pod_name.clone()).await;
+
+        // Assert that we can query the database with \dt;
+        let result = coredb_resource
+            .psql("\\dt".to_string(), "postgres".to_string(), context.clone())
+            .await
+            .unwrap();
+        println!("psql out: {}", result.stdout.clone().unwrap());
+        assert!(!result.stdout.clone().unwrap().contains("postgres"));
+
+        let coredb_resource = coredbs.get(name).await.unwrap();
+        let mut found_citus = false;
+        let mut found_cron = false;
+        for extension in coredb_resource.status.unwrap().extensions.unwrap() {
+            for location in extension.locations {
+                if extension.name == "citus" && location.enabled.unwrap() {
+                    found_citus = true;
+                    assert!(location.database == "postgres");
+                    assert!(location.schema.clone().unwrap() == "pg_catalog");
+                }
+                if extension.name == "pg_cron" && location.enabled.unwrap() {
+                    found_cron = true;
+                    assert!(location.database == "postgres");
+                    assert!(location.schema.unwrap() == "pg_catalog");
+                }
+            }
+        }
+        assert!(found_citus);
+        assert!(found_cron);
+
+        // CLEANUP TEST
+        // Cleanup CoreDB
+        coredbs.delete(name, &Default::default()).await.unwrap();
+        println!("Waiting for CoreDB to be deleted: {}", &name);
+        let _assert_coredb_deleted = tokio::time::timeout(
+            Duration::from_secs(TIMEOUT_SECONDS_COREDB_DELETED),
+            await_condition(coredbs.clone(), name, conditions::is_deleted("")),
+        )
+        .await
+        .unwrap_or_else(|_| {
+            panic!(
+                "CoreDB {} was not deleted after waiting {} seconds",
+                name, TIMEOUT_SECONDS_COREDB_DELETED
+            )
+        });
+        println!("CoreDB resource deleted {}", name);
+
+        // Delete namespace
+        let _ = delete_namespace(client.clone(), &namespace).await;
+    }
 }

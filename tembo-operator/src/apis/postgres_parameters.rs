@@ -22,7 +22,9 @@ pub const MULTI_VAL_CONFIGS: [&str; 5] = [
 ];
 
 // This array defines the priority order for any multi-value config
-pub const MULTI_VAL_CONFIGS_PRIORITY_LIST: [&str; 2] = ["pg_stat_statements", "pg_stat_kcache"];
+// This defines any required order for shared_preload_libraries, otherwise alphabetical
+// TODO: move this to a trunk endpoint
+pub const MULTI_VAL_CONFIGS_PRIORITY_LIST: [&str; 3] = ["citus", "pg_stat_statements", "pg_stat_kcache"];
 
 // configurations that are not allowed to be set by the user
 pub const DISALLOWED_CONFIGS: [&str; 66] = [

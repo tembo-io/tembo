@@ -13,10 +13,16 @@ use crate::{
 };
 use kube::CustomResource;
 
-use crate::extensions::types::{Extension, TrunkInstall, TrunkInstallStatus};
+use crate::{
+    apis::postgres_parameters::ConfigValue,
+    extensions::{
+        toggle::REQUIRES_LOAD,
+        types::{Extension, TrunkInstall, TrunkInstallStatus},
+    },
+};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema, Default)]
 pub struct ServiceAccountTemplate {
@@ -108,11 +114,51 @@ impl CoreDBSpec {
             .as_ref()
             .and_then(|s| s.postgres_config.clone())
             .unwrap_or_default();
-        let runtime_configs = self.runtime_config.clone().unwrap_or_default();
+        let mut runtime_configs = self.runtime_config.clone().unwrap_or_default();
         // TODO: configs that come with extension installation
         // e.g. let extension_configs = ...
         // these extensions could be set by the operator, or trunk + operator
         // trunk install pg_partman could come with something like `pg_partman_bgw.dbname = xxx`
+
+        // Get list of extension names that require load
+        let mut requires_load = BTreeSet::new();
+        for ext in self.extensions.iter() {
+            'loc: for location in ext.locations.iter() {
+                if location.clone().enabled && REQUIRES_LOAD.contains(&ext.name.as_str()) {
+                    requires_load.insert(ext.name.clone());
+                    break 'loc;
+                }
+            }
+        }
+
+        let shared_preload_from_extensions = ConfigValue::Multiple(requires_load);
+        let extension_settings_config = vec![PgConfig {
+            name: "shared_preload_libraries".to_string(),
+            value: shared_preload_from_extensions,
+        }];
+
+        match merge_pg_configs(
+            &runtime_configs,
+            &extension_settings_config,
+            "shared_preload_libraries",
+        )? {
+            None => {}
+            Some(new_shared_preload_libraries) => {
+                // check by name attribute if runtime_configs already has shared_preload_libraries
+                // if so replace the value. Otherwise add this PgConfig into the vector.
+                let mut found = false;
+                for cfg in &mut runtime_configs {
+                    if cfg.name == "shared_preload_libraries" {
+                        cfg.value = new_shared_preload_libraries.value.clone();
+                        found = true;
+                        break;
+                    }
+                }
+                if !found {
+                    runtime_configs.push(new_shared_preload_libraries);
+                }
+            }
+        }
 
         // handle merge of any of the settings that are multi-value.
         // e.g. stack defines shared_preload_libraries = pg_cron, then operator installs pg_stat_statements at runtime
