@@ -1,9 +1,7 @@
 pub mod create {
-    use crate::cli::cluster::Cluster;
-    use crate::cli::cluster::EnabledExtensions;
-    use crate::cli::cluster::InstalledExtensions;
     use crate::cli::config::Config;
     use crate::cli::docker::{Docker, DockerError};
+    use crate::cli::instance::{EnabledExtensions, InstalledExtensions, Instance};
     use crate::cli::stacks;
     use chrono::prelude::*;
     use clap::{Arg, ArgAction, ArgMatches, Command};
@@ -241,7 +239,7 @@ pub mod create {
         args: &ArgMatches,
     ) -> Result<(), Box<dyn Error>> {
         let mut config: Config = Config::new(args, &Config::full_path(args));
-        let mut cluster_config = Cluster {
+        let mut instance_config = Instance {
             name: Some(stack.name.clone()),
             r#type: Some(String::from("standard")),
             version: Some(stack.stack_version.clone()),
@@ -259,7 +257,7 @@ pub mod create {
         };
 
         for install in &stack.trunk_installs {
-            cluster_config
+            instance_config
                 .installed_extensions
                 .push(InstalledExtensions {
                     name: Some(install.name.clone()),
@@ -269,14 +267,14 @@ pub mod create {
         }
 
         for extension in &stack.extensions {
-            cluster_config.enabled_extensions.push(EnabledExtensions {
+            instance_config.enabled_extensions.push(EnabledExtensions {
                 name: Some(extension.name.clone()),
                 version: Some(String::from("2.0")),
                 created_at: Some(Utc::now()),
             })
         }
 
-        config.clusters = vec![cluster_config];
+        config.instances = vec![instance_config];
 
         match Config::write(&config, &Config::full_path(args)) {
             Ok(_) => println!("- Stack install info added to configuration file"),

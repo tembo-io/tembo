@@ -16,35 +16,33 @@ If the install path is in your shell path, you can then run `tembo help` and oth
 
 ## `tembo init`
 
-The `init` command initializes your environment and can be used to generate configuration files. 
-The command supports a `dryrun` flag to test where a configuration file will be written. It also 
-supports a `file-path` flag that can be used to explicitly provide an absolute or relative file 
-path for the configuration file.
+The `init` command initializes your environment and can be used to generate configuration files. It will
+also alert you to any missing requirements.
 
 The default configuration file path is $HOME/.config/tembo.
-
-The `init` command can be used to create global and project specific configuration files.
 
 For more information: `tembo init --help`
 
 ## `tembo stack create`
 
-The `stack create` command installs a local instance of a Tembo cluster locally. 
-It includes the Tembo flavored version of Postgres and 
-an additional items like extensions. 
+WIP: being renamed to `instance create`
+
+The `stack create` command installs a local instance of a Tembo locally. 
+It includes the Tembo flavored version of Postgres and an additional items like extensions. You can specify the 
+type of instance you want to create.
 
 It all runs in a Docker container.
 
-Currently supported stacks include: 
+Currently supported types include: 
 
 * standard
 * data-warehouse
 
 More stack types will be added shortly.
 
-## `tembo start`
+## `tembo instance start`
 
-Coming soon - will start an installed stack.
+Coming soon - will start an installed instance.
 
 # Contributing
 

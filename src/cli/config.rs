@@ -1,7 +1,7 @@
 #![allow(dead_code)]
 
 use crate::cli::cloud_account::CloudAccount;
-use crate::cli::cluster::Cluster;
+use crate::cli::instance::Instance;
 use chrono::prelude::*;
 use clap::ArgMatches;
 use serde::Deserialize;
@@ -23,7 +23,7 @@ const CONFIG_FILE_PATH: &str = ".config/tembo/";
 pub struct Config {
     pub created_at: DateTime<Utc>,
     pub cloud_account: Option<CloudAccount>,
-    pub clusters: Vec<Cluster>,
+    pub instances: Vec<Instance>,
 }
 
 impl fmt::Display for Config {
@@ -46,7 +46,7 @@ impl Config {
                 let config = Config {
                     created_at: utc,
                     cloud_account: None,
-                    clusters: vec![],
+                    instances: vec![],
                 };
 
                 let _init = Self::init(&config, file_path);
@@ -135,10 +135,8 @@ impl Config {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::cli::cluster::Cluster;
-    use crate::cli::cluster::EnabledExtensions;
-    use crate::cli::cluster::InstalledExtensions;
     use crate::cli::config::Config;
+    use crate::cli::instance::{EnabledExtensions, InstalledExtensions, Instance};
     use clap::{Arg, ArgAction, Command};
     use std::env;
 
@@ -231,12 +229,12 @@ mod tests {
         let mut config = setup();
         let toml = Config::to_toml(&config.to_string());
 
-        // with no cluster instances
-        assert_eq!(toml.clusters, vec![]);
+        // with no instances
+        assert_eq!(toml.instances, vec![]);
 
-        // wth clusters instances
-        let cluster = Cluster {
-            name: Some(String::from("cluster_name")),
+        // wth instances
+        let instance = Instance {
+            name: Some(String::from("instance_name")),
             r#type: Some(String::from("standard")),
             version: Some(String::from("1.1")),
             created_at: Some(Utc::now()),
@@ -251,14 +249,14 @@ mod tests {
                 created_at: Some(Utc::now()),
             }],
         };
-        config.clusters = vec![cluster];
+        config.instances = vec![instance];
 
         let toml = Config::to_toml(&config.to_string());
 
         //assert_eq!(toml.created_at.is_some(), true);
-        assert_eq!(toml.clusters[0].name, Some(String::from("cluster_name")));
+        assert_eq!(toml.instances[0].name, Some(String::from("instance_name")));
         assert_eq!(
-            toml.clusters[0].installed_extensions[0].name,
+            toml.instances[0].installed_extensions[0].name,
             Some(String::from("pgmq"))
         );
     }

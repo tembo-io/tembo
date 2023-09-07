@@ -65,7 +65,7 @@ fn create_clap_command() -> Command {
         .subcommand(cmd::install::make_subcommand()) // executes stack::create
         .subcommand(
             Command::new("stack")
-                .about("Commands used to manage local stack and cloud clusters")
+                .about("Commands used to manage local stack and cloud instances")
                 .subcommand(cmd::stack::create::make_subcommand()),
         )
         .subcommand(

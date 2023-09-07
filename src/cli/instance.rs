@@ -4,7 +4,7 @@ use serde::Serialize;
 use std::cmp::PartialEq;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq)]
-pub struct Cluster {
+pub struct Instance {
     pub name: Option<String>,
     pub r#type: Option<String>,
     pub version: Option<String>,
