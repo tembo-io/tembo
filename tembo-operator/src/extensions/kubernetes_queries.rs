@@ -270,6 +270,9 @@ fn update_trunk_installs(
         {
             // Update existing status
             let mut update_status = existing_status.clone();
+            if update_status.installed_to_pods.is_none() {
+                update_status.installed_to_pods = Some(vec![]);
+            }
             if let Some(ref mut installed_to_pods) = update_status.installed_to_pods {
                 if let Some(new_instances) = &new_trunk_install.installed_to_pods {
                     installed_to_pods.extend_from_slice(new_instances);
@@ -299,6 +302,33 @@ fn update_trunk_installs(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+
+    #[test]
+    fn test_update_trunk_installs_from_no_pods() {
+        let current_trunk_installs = vec![TrunkInstallStatus {
+            name: "pg_stat_statements".to_string(),
+            version: Some("1.0".to_string()),
+            error: false,
+            error_message: None,
+            installed_to_pods: None,
+        }];
+        let new_trunk_install = TrunkInstallStatus {
+            name: "pg_stat_statements".to_string(),
+            version: Some("1.0".to_string()),
+            error: false,
+            error_message: None,
+            installed_to_pods: Some(vec!["pod-1".to_string(), "pod-2".to_string()]),
+        };
+
+        let updated_trunk_installs = update_trunk_installs(current_trunk_installs, &new_trunk_install);
+
+        assert_eq!(updated_trunk_installs.clone().len(), 1);
+        assert_eq!(
+            updated_trunk_installs[0].installed_to_pods.clone().unwrap().len(),
+            2
+        );
+    }
 
     #[test]
     fn test_add_new_trunk_install_with_same_name_new_host() {
