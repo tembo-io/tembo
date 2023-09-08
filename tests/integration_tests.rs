@@ -18,11 +18,9 @@ fn help() -> Result<(), Box<dyn std::error::Error>> {
 fn init() -> Result<(), Box<dyn std::error::Error>> {
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
     cmd.arg("init");
-    cmd.assert().stdout(predicate::str::contains("config file"));
-
-    // TODO: test that the configuration file is created
+    cmd.assert().stdout(predicate::str::contains("Config file"));
+    cmd.assert()
+        .stdout(predicate::str::contains("Checking requirements"));
 
     Ok(())
 }
-
-// TODO: add integration test for install command
