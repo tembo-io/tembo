@@ -1,4 +1,3 @@
-// Include the #[ignore] macro on slow tests.
 // That way, 'cargo test' does not run them by default.
 // To run just these tests, use 'cargo test -- --ignored'
 // To run all tests, use 'cargo test -- --include-ignored'
@@ -164,7 +163,7 @@ mod test {
         };
 
         let msg_id = queue.send(&myqueue, &msg).await;
-        println!("msg_id: {msg_id:?}");
+        println!("Create msg_id: {msg_id:?}");
 
         let client = kube_client().await;
         let state = State::default();
@@ -172,7 +171,7 @@ mod test {
 
         let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
 
-        let timeout_seconds_start_pod = 120;
+        let timeout_seconds_start_pod = 300;
 
         let pod_name = format!("{namespace}-1");
 
@@ -181,7 +180,12 @@ mod test {
             await_condition(pods.clone(), &pod_name, conditions::is_pod_running()),
         )
         .await
-        .unwrap_or_else(|_| panic!("Did not find the pod {pod_name} to be running after waiting {timeout_seconds_start_pod} seconds"));
+        .unwrap_or_else(|_| {
+            panic!(
+                "Did not find the pod {} to be running after waiting {} seconds",
+                pod_name, timeout_seconds_start_pod
+            )
+        });
 
         // wait for conductor to send message to data_plane_events queue
         let retries = 120;
@@ -196,6 +200,7 @@ mod test {
         let spec = msg.message.spec.expect("No spec found in message");
 
         // assert that the message returned by Conductor includes the new metrics values in the spec
+        //println!("spec: {:?}", spec);
         assert!(spec
             .metrics
             .expect("no metrics in data-plane-event message")
@@ -217,10 +222,17 @@ mod test {
 
         let coredb_api: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
         let coredb_resource = coredb_api.get(&namespace).await.unwrap();
+
         // Wait for CNPG pod to be running and ready
-        let pods_api: Api<Pod> = Api::namespaced(client.clone(), &namespace);
-        let pod_name = namespace.clone();
-        pod_ready_and_running(pods_api.clone(), format!("{}-1", pod_name)).await;
+        let pod_name = format!("{}-1", &namespace);
+        pod_ready_and_running(pods.clone(), pod_name.clone()).await;
+
+        // Wait for postgres-exporter pod to be running
+        let lp = ListParams::default()
+            .labels(format!("app=postgres-exporter,coredb.io/name={}", namespace).as_str());
+        let exporter_pods = pods.list(&lp).await.expect("could not get pods");
+        let exporter_pod_name = exporter_pods.items[0].metadata.name.as_ref().unwrap();
+        pod_ready_and_running(pods.clone(), exporter_pod_name.clone()).await;
 
         // ADD AN EXTENSION - ASSERT IT MAKES IT TO STATUS.EXTENSIONS
         // conductor receives a CRUDevent from control plane
@@ -253,12 +265,13 @@ mod test {
             spec: Some(spec),
         };
         let msg_id = queue.send(&myqueue, &msg).await;
-        println!("msg_id: {msg_id:?}");
+        println!("Update msg_id: {msg_id:?}");
 
         // read message from data_plane_events queue
         let mut extensions: Vec<Extension> = vec![];
         while num_expected_extensions != extensions.len() {
             let msg = get_dataplane_message(retries, retry_delay, &queue).await;
+            //println!("msg: {:?}", msg);
             queue
                 .archive("myqueue_data_plane", msg.msg_id)
                 .await
@@ -273,18 +286,35 @@ mod test {
         // we added an extension, so it should be +1 now
         assert_eq!(num_expected_extensions, extensions.len());
 
+        // Installing the new extensions will cause the pods to restart, but it can take a few
+        // seconds for that to happen.  For now lets just wait and see if that fixes the problem.
+        thread::sleep(time::Duration::from_secs(40));
+
+        pod_ready_and_running(pods.clone(), pod_name.clone()).await;
+        let exporter_pods = pods.list(&lp).await.expect("could not get pods");
+        let exporter_pod_name = exporter_pods.items[0].metadata.name.as_ref().unwrap();
+        pod_ready_and_running(pods.clone(), exporter_pod_name.clone()).await;
+
         // Get the last time the pod was started
         // using SELECT pg_postmaster_start_time();
-        let start_time = coredb_resource
+        let start_time = match coredb_resource
             .psql(
                 "SELECT pg_postmaster_start_time();".to_string(),
                 "postgres".to_string(),
                 context.clone(),
             )
             .await
-            .unwrap();
+        {
+            Ok(res) => res,
+            Err(e) => panic!("Failed to execute psql for start_time: {:?}", e),
+        };
 
-        println!("start_time: {:?}", start_time.stdout.clone().unwrap());
+        let stdout = match start_time.stdout {
+            Some(output) => output,
+            None => panic!("stdout for start_time is None"),
+        };
+
+        println!("start_time: {:?}", stdout);
 
         // Once CNPG is running we want to restart
         let cluster_name = namespace.clone();
@@ -292,11 +322,14 @@ mod test {
             .await
             .expect("failed restarting cnpg pod");
 
-        // Restarting of the pod can take some time as CNPG does various
-        // checks before shutting down.  We will need to wait up to 20 seconds
+        // Restarting of the pod can take some time (20-40 seconds) as CNPG does various
+        // checks before shutting down.  We will need to wait up to 40 seconds
         // then check that the pod is running and ready
-        thread::sleep(time::Duration::from_secs(20));
-        pod_ready_and_running(pods_api.clone(), format!("{}-1", pod_name)).await;
+        thread::sleep(time::Duration::from_secs(40));
+        pod_ready_and_running(pods.clone(), pod_name).await;
+        let exporter_pods = pods.list(&lp).await.expect("could not get pods");
+        let exporter_pod_name = exporter_pods.items[0].metadata.name.as_ref().unwrap();
+        pod_ready_and_running(pods.clone(), exporter_pod_name.clone()).await;
 
         // Get the last time the pod was started
         // using SELECT pg_postmaster_start_time();
@@ -314,6 +347,7 @@ mod test {
         // assert that restart_time is greater than start_time
         // TODO: https://linear.app/tembo/issue/TEM-1296/status-on-an-instance-shows-ok-even-during-restart
         // assert!(restart_time.stdout.clone().unwrap() > start_time.stdout.clone().unwrap());
+
         // delete the instance
         let msg = types::CRUDevent {
             organization_name: org_name.clone(),
@@ -327,30 +361,27 @@ mod test {
             spec: None,
         };
         let msg_id = queue.send(&myqueue, &msg).await;
-        println!("msg_id: {msg_id:?}");
+        println!("Delete msg_id: {msg_id:?}");
 
-        // wait for it to delete
-        let wait_for_delete = 60;
-        println!("Waiting {} seconds for delete operation", wait_for_delete);
-        thread::sleep(time::Duration::from_secs(wait_for_delete));
+        // Wait for CoreDB to be deleted
+        let cdb_delete =
+            wait_until_resource_deleted(client.clone(), &namespace, &namespace, "CoreDB").await;
+        assert!(cdb_delete);
 
-        // assert namespace is gone
-        let ns_api: Api<Namespace> = Api::all(client.clone());
-        let ns_dne = ns_api.get(&namespace).await;
-        assert!(ns_dne.is_err(), "Namespace was not deleted");
-        // assert pvcs is gone
-        let pvcs: Api<PersistentVolumeClaim> = Api::all(client.clone());
-        let lp = ListParams::default().fields(&format!("metadata.name={}-1", namespace));
-        let pvc_list = pvcs.list(&lp).await.expect("failed to list pvcs");
-        assert!(
-            pvc_list.items.is_empty(),
-            "PVCs were not deleted: {:?}",
-            pvc_list
-        );
+        // Wait for pvc to be deleted
+        let pvc_delete = wait_until_resource_deleted(
+            client.clone(),
+            &namespace,
+            &namespace,
+            "PersistentVolumeClaim",
+        )
+        .await;
+        assert!(pvc_delete);
 
-        let cdb_api: Api<CoreDB> = Api::all(client.clone());
-        let cdb_dne = cdb_api.get(&namespace).await;
-        assert!(cdb_dne.is_err(), "CoreDB was not deleted");
+        // Wait for namespace to be deleted
+        let ns_delete =
+            wait_until_resource_deleted(client.clone(), &namespace, &namespace, "Namespace").await;
+        assert!(ns_delete);
 
         // call aws api and verify CF stack was deleted
         use aws_sdk_cloudformation::config::Region;
@@ -418,5 +449,45 @@ mod test {
             )
         });
         println!("Found pod ready: {}", pod_name);
+    }
+
+    async fn wait_until_resource_deleted(
+        client: Client,
+        namespace: &str,
+        name: &str,
+        resource_type: &str,
+    ) -> bool {
+        for _ in 0..10 {
+            let result: Result<(), kube::Error> = match resource_type {
+                "Namespace" => {
+                    let api: Api<Namespace> = Api::all(client.clone());
+                    api.get(name).await.map(|_| ())
+                }
+                "PersistentVolumeClaim" => {
+                    let api: Api<PersistentVolumeClaim> =
+                        Api::namespaced(client.clone(), namespace);
+                    api.get(name).await.map(|_| ())
+                }
+                "CoreDB" => {
+                    let api: Api<CoreDB> = Api::namespaced(client.clone(), namespace);
+                    api.get(name).await.map(|_| ())
+                }
+                _ => {
+                    println!("Unsupported resource type");
+                    return false;
+                }
+            };
+
+            if result.is_err() {
+                return true; // Resource is deleted
+            }
+
+            println!(
+                "Waiting for resource {} of type {} to be deleted...",
+                name, resource_type
+            );
+            thread::sleep(time::Duration::from_secs(20));
+        }
+        false
     }
 }

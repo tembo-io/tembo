@@ -446,6 +446,11 @@ spec:
                     error_message:
                       nullable: true
                       type: string
+                    installed_to_pods:
+                      items:
+                        type: string
+                      nullable: true
+                      type: array
                     name:
                       type: string
                     version:

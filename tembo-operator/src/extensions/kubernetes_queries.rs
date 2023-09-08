@@ -6,11 +6,7 @@ use crate::{
 use kube::{runtime::controller::Action, Api};
 use serde_json::json;
 use std::{sync::Arc, time::Duration};
-use tracing::{
-    error,
-    log::{debug, info},
-    warn,
-};
+use tracing::{debug, error, info, instrument, warn};
 
 pub async fn update_extension_location_in_status(
     cdb: &CoreDB,
@@ -111,6 +107,7 @@ pub async fn update_extensions_status(
     Ok(())
 }
 
+#[instrument(skip(cdb))]
 pub async fn remove_trunk_installs_from_status(
     cdb: &Api<CoreDB>,
     name: &str,
@@ -198,14 +195,16 @@ pub async fn add_trunk_install_to_status(
     name: &str,
     new_trunk_install_status_to_include: &TrunkInstallStatus,
 ) -> crate::Result<Vec<TrunkInstallStatus>, Action> {
-    info!(
+    debug!(
         "Adding trunk install {:?} to status on {}",
         new_trunk_install_status_to_include, name
     );
+
     let current_coredb = cdb.get(name).await.map_err(|e| {
         error!("Error getting CoreDB: {:?}", e);
         Action::requeue(Duration::from_secs(10))
     })?;
+
     let current_status = match current_coredb.status {
         None => {
             warn!(
@@ -216,57 +215,257 @@ pub async fn add_trunk_install_to_status(
         }
         Some(status) => status,
     };
+
     let current_trunk_installs = match current_status.trunk_installs {
         None => {
             warn!(
                 "While adding trunk install, trunk installs on status is None for {}, initializing an empty list",
-                name);
+                name
+            );
             vec![]
         }
         Some(trunk_installs) => trunk_installs,
     };
+
     info!(
         "There are currently {} trunk installs in status for {}",
         current_trunk_installs.len(),
         name
     );
-    let mut new_trunk_installs_status: Vec<TrunkInstallStatus> = vec![];
-    let mut trunk_install_found = false;
-    // Check if the trunk install is already in the list
-    for (_i, existing_trunk_install_status) in current_trunk_installs.iter().enumerate() {
-        if existing_trunk_install_status.name == new_trunk_install_status_to_include.clone().name {
-            warn!(
-                "Trunk install {} already in status on {}, replacing.",
-                &new_trunk_install_status_to_include.name, name
-            );
-            new_trunk_installs_status.push(new_trunk_install_status_to_include.clone());
-            trunk_install_found = true;
-        } else {
-            new_trunk_installs_status.push(existing_trunk_install_status.clone());
-        }
-    }
-    if !trunk_install_found {
-        new_trunk_installs_status.push(new_trunk_install_status_to_include.clone());
-    }
-    // sort alphabetically by name
-    new_trunk_installs_status.sort_by(|a, b| a.name.cmp(&b.name));
-    // remove duplicates
-    new_trunk_installs_status.dedup_by(|a, b| a.name == b.name);
+
+    let updated_trunk_installs_status =
+        update_trunk_installs(current_trunk_installs, new_trunk_install_status_to_include);
+
     info!(
         "The new status will have {} trunk installs: {}",
-        new_trunk_installs_status.len(),
+        updated_trunk_installs_status.len(),
         name
     );
+
     let new_status = CoreDBStatus {
-        trunk_installs: Some(new_trunk_installs_status.clone()),
+        trunk_installs: Some(updated_trunk_installs_status.clone()),
         ..current_status
     };
+
     let patch_status = json!({
         "apiVersion": "coredb.io/v1alpha1",
         "kind": "CoreDB",
         "status": new_status
     });
+
     patch_cdb_status_merge(cdb, name, patch_status).await?;
-    info!("Patched status to update trunk installs for {}", name);
-    Ok(new_trunk_installs_status.clone())
+
+    Ok(updated_trunk_installs_status)
+}
+
+fn update_trunk_installs(
+    current_trunk_installs: Vec<TrunkInstallStatus>,
+    new_trunk_install: &TrunkInstallStatus,
+) -> Vec<TrunkInstallStatus> {
+    let mut updated_trunk_installs: Vec<TrunkInstallStatus> = vec![];
+
+    for existing_status in &current_trunk_installs {
+        if existing_status.name == new_trunk_install.name
+            && existing_status.version == new_trunk_install.version
+        {
+            // Update existing status
+            let mut update_status = existing_status.clone();
+            if let Some(ref mut installed_to_pods) = update_status.installed_to_pods {
+                if let Some(new_instances) = &new_trunk_install.installed_to_pods {
+                    installed_to_pods.extend_from_slice(new_instances);
+                    installed_to_pods.sort();
+                    installed_to_pods.dedup();
+                }
+            }
+            updated_trunk_installs.push(update_status);
+        } else {
+            updated_trunk_installs.push(existing_status.clone());
+        }
+    }
+
+    // If the trunk install status was not found, add it
+    if !updated_trunk_installs
+        .iter()
+        .any(|status| status.name == new_trunk_install.name)
+    {
+        updated_trunk_installs.push(new_trunk_install.clone());
+    }
+
+    // sort alphabetically by name
+    updated_trunk_installs.sort_by(|a, b| a.name.cmp(&b.name));
+    updated_trunk_installs.clone()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_add_new_trunk_install_with_same_name_new_host() {
+        let initial_trunk_installs = vec![TrunkInstallStatus {
+            error: false,
+            installed_to_pods: Some(vec!["test-coredb-24631-1".to_string()]),
+            name: "test_name".to_string(),
+            version: Some("1.0.0".to_string()),
+            error_message: None,
+        }];
+
+        let new_trunk_install = TrunkInstallStatus {
+            error: false,
+            installed_to_pods: Some(vec!["test-coredb-24631-2".to_string()]),
+            name: "test_name".to_string(),
+            version: Some("1.0.0".to_string()),
+            error_message: None,
+        };
+
+        let updated_trunk_installs =
+            update_trunk_installs(initial_trunk_installs.clone(), &new_trunk_install);
+
+        assert_eq!(
+            updated_trunk_installs[0].installed_to_pods,
+            Some(vec![
+                "test-coredb-24631-1".to_string(),
+                "test-coredb-24631-2".to_string(),
+            ])
+        );
+    }
+
+    #[test]
+    fn test_add_new_trunk_install_with_diff_names_new_host() {
+        let initial_trunk_installs = vec![
+            TrunkInstallStatus {
+                error: false,
+                installed_to_pods: Some(vec![
+                    "test-coredb-24631-1".to_string(),
+                    "test-coredb-24631-2".to_string(),
+                ]),
+                name: "test_name".to_string(),
+                version: Some("1.0.0".to_string()),
+                error_message: None,
+            },
+            TrunkInstallStatus {
+                error: false,
+                installed_to_pods: Some(vec!["test-coredb-24631-1".to_string()]),
+                name: "test_name2".to_string(),
+                version: Some("1.0.0".to_string()),
+                error_message: None,
+            },
+        ];
+
+        let new_trunk_install = TrunkInstallStatus {
+            error: false,
+            installed_to_pods: Some(vec!["test-coredb-24631-2".to_string()]),
+            name: "test_name2".to_string(),
+            version: Some("1.0.0".to_string()),
+            error_message: None,
+        };
+
+        let updated_trunk_installs =
+            update_trunk_installs(initial_trunk_installs.clone(), &new_trunk_install);
+
+        assert_eq!(
+            updated_trunk_installs[0].installed_to_pods,
+            Some(vec![
+                "test-coredb-24631-1".to_string(),
+                "test-coredb-24631-2".to_string(),
+            ])
+        );
+        assert_eq!(
+            updated_trunk_installs[1].installed_to_pods,
+            Some(vec![
+                "test-coredb-24631-1".to_string(),
+                "test-coredb-24631-2".to_string(),
+            ])
+        );
+    }
+
+    #[test]
+    fn test_add_new_trunk_install_test2() {
+        let initial_trunk_installs = vec![
+            TrunkInstallStatus {
+                error: false,
+                installed_to_pods: Some(vec!["test-coredb-24631-1".to_string()]),
+                name: "pg_partman".to_string(),
+                version: Some("4.7.3".to_string()),
+                error_message: None,
+            },
+            TrunkInstallStatus {
+                error: false,
+                installed_to_pods: Some(vec!["test-coredb-24631-1".to_string()]),
+                name: "pg_stat_statements".to_string(),
+                version: Some("1.10.0".to_string()),
+                error_message: None,
+            },
+            TrunkInstallStatus {
+                error: false,
+                installed_to_pods: Some(vec!["test-coredb-24631-1".to_string()]),
+                name: "pgmq".to_string(),
+                version: Some("0.10.0".to_string()),
+                error_message: None,
+            },
+        ];
+
+        let new_trunk_install = TrunkInstallStatus {
+            error: false,
+            installed_to_pods: Some(vec!["test-coredb-24631-2".to_string()]),
+            name: "pg_partman".to_string(),
+            version: Some("4.7.3".to_string()),
+            error_message: None,
+        };
+
+        let updated_trunk_installs =
+            update_trunk_installs(initial_trunk_installs.clone(), &new_trunk_install);
+
+        println!("updated_trunk_installs: {:?}", updated_trunk_installs);
+
+        assert_eq!(
+            updated_trunk_installs[0].installed_to_pods,
+            Some(vec![
+                "test-coredb-24631-1".to_string(),
+                "test-coredb-24631-2".to_string(),
+            ])
+        );
+
+        let new_trunk_install = TrunkInstallStatus {
+            error: false,
+            installed_to_pods: Some(vec!["test-coredb-24631-2".to_string()]),
+            name: "pg_stat_statements".to_string(),
+            version: Some("1.10.0".to_string()),
+            error_message: None,
+        };
+
+        let updated_trunk_installs =
+            update_trunk_installs(updated_trunk_installs.clone(), &new_trunk_install);
+
+        println!("updated_trunk_installs: {:?}", updated_trunk_installs);
+
+        assert_eq!(
+            updated_trunk_installs[1].installed_to_pods,
+            Some(vec![
+                "test-coredb-24631-1".to_string(),
+                "test-coredb-24631-2".to_string(),
+            ])
+        );
+
+        let new_trunk_install = TrunkInstallStatus {
+            error: false,
+            installed_to_pods: Some(vec!["test-coredb-24631-2".to_string()]),
+            name: "pgmq".to_string(),
+            version: Some("0.10.0".to_string()),
+            error_message: None,
+        };
+
+        let updated_trunk_installs =
+            update_trunk_installs(updated_trunk_installs.clone(), &new_trunk_install);
+
+        println!("updated_trunk_installs: {:?}", updated_trunk_installs);
+
+        assert_eq!(
+            updated_trunk_installs[2].installed_to_pods,
+            Some(vec![
+                "test-coredb-24631-1".to_string(),
+                "test-coredb-24631-2".to_string(),
+            ])
+        );
+    }
 }

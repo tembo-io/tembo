@@ -15,6 +15,7 @@ pub struct TrunkInstallStatus {
     pub version: Option<String>,
     pub error: bool,
     pub error_message: Option<String>,
+    pub installed_to_pods: Option<Vec<String>>,
 }
 
 #[derive(Clone, Debug, Deserialize, Eq, Hash, JsonSchema, Serialize, PartialEq)]

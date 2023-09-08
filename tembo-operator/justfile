@@ -83,12 +83,15 @@ start-kind:
 	kubectl wait pods --for=condition=Ready --timeout=300s --all --all-namespaces
 
 # run with opentelemetry
-run-telemetry:
+run-telemetry: run-jaeger
 	DATA_PLANE_BASEDOMAIN=localhost OPENTELEMETRY_ENDPOINT_URL=http://localhost:4317 RUST_LOG=debug,kube=debug,controller=debug ENABLE_BACKUP=false cargo run --features=telemetry
 
 # run without opentelemetry
 run:
   DATA_PLANE_BASEDOMAIN=localhost ENABLE_BACKUP=false RUST_LOG=info,kube=info,controller=info cargo run
+
+run-jaeger:
+	docker run --rm -d --name jaeger -e COLLECTOR_OTLP_ENABLED=true -p 16686:16686 -p 4317:4317 -p 4318:4318 jaegertracing/all-in-one:latest
 
 # annotate namespace to allow for tests
 annotate:

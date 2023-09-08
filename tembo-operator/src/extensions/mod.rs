@@ -11,7 +11,7 @@ use crate::{
 };
 use kube::{runtime::controller::Action, Api};
 use std::sync::Arc;
-use tracing::log::debug;
+use tracing::debug;
 
 /// reconcile extensions between the spec and the database
 pub async fn reconcile_extensions(

@@ -183,7 +183,7 @@ pub fn parse_sql_output(psql_str: &str) -> Vec<String> {
         results.push(fields[0].to_string());
     }
     let num_results = results.len();
-    info!("Found {} results", num_results);
+    debug!("Found {} results", num_results);
     results
 }
 

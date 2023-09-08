@@ -935,20 +935,25 @@ mod test {
 
         // Assert that shared_preload_libraries contains pg_stat_statements
         // and pg_partman_bgw
-        let result = coredb_resource
+
+        let result = match coredb_resource
             .psql(
                 "show shared_preload_libraries;".to_string(),
                 "postgres".to_string(),
                 context.clone(),
             )
             .await
-            .unwrap();
-        println!("{}", result.stdout.clone().unwrap());
-        assert!(result
-            .stdout
-            .clone()
-            .unwrap()
-            .contains("pg_stat_statements,pg_partman_bgw"));
+        {
+            Ok(res) => res,
+            Err(e) => panic!("Failed to execute psql: {:?}", e),
+        };
+
+        let stdout = match result.stdout {
+            Some(output) => output,
+            None => panic!("stdout is None"),
+        };
+
+        assert!(stdout.contains("pg_stat_statements,pg_partman_bgw"));
 
         // CLEANUP TEST
         // Cleanup CoreDB
@@ -1535,7 +1540,6 @@ mod test {
             .psql("\\dx".to_string(), "postgres".to_string(), context.clone())
             .await
             .unwrap();
-        println!("psql out: {:?}", result.stdout.clone().unwrap());
         assert!(result.stdout.clone().unwrap().contains("plpgsql"));
 
         // Assert that both pods are replicating successfully
@@ -1847,6 +1851,686 @@ mod test {
         }
         assert!(found_citus);
         assert!(found_cron);
+
+        // CLEANUP TEST
+        // Cleanup CoreDB
+        coredbs.delete(name, &Default::default()).await.unwrap();
+        println!("Waiting for CoreDB to be deleted: {}", &name);
+        let _assert_coredb_deleted = tokio::time::timeout(
+            Duration::from_secs(TIMEOUT_SECONDS_COREDB_DELETED),
+            await_condition(coredbs.clone(), name, conditions::is_deleted("")),
+        )
+        .await
+        .unwrap_or_else(|_| {
+            panic!(
+                "CoreDB {} was not deleted after waiting {} seconds",
+                name, TIMEOUT_SECONDS_COREDB_DELETED
+            )
+        });
+        println!("CoreDB resource deleted {}", name);
+
+        // Delete namespace
+        let _ = delete_namespace(client.clone(), &namespace).await;
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn functional_test_ha_two_replicas() {
+        // Initialize the Kubernetes client
+        let client = kube_client().await;
+        let state = State::default();
+        let context = state.create_context(client.clone());
+
+        // Configurations
+        let mut rng = rand::thread_rng();
+        let suffix = rng.gen_range(0..100000);
+        let name = &format!("test-coredb-{}", suffix);
+        let namespace = match create_namespace(client.clone(), name).await {
+            Ok(namespace) => namespace,
+            Err(e) => {
+                eprintln!("Error creating namespace: {}", e);
+                std::process::exit(1);
+            }
+        };
+
+        let kind = "CoreDB";
+        let replicas = 2;
+
+        // Create a pod we can use to run commands in the cluster
+        let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
+
+        // Apply a basic configuration of CoreDB
+        println!("Creating CoreDB resource {}", name);
+        let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
+        // Generate basic CoreDB resource to start with
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "replicas": replicas,
+            }
+        });
+        let params = PatchParams::apply("tembo-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        let coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        // Wait for CNPG Pod to be created
+        let pod_name_primary = format!("{}-1", name);
+        pod_ready_and_running(pods.clone(), pod_name_primary.clone()).await;
+
+        let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
+        let lp =
+            ListParams::default().labels(format!("app=postgres-exporter,coredb.io/name={}", name).as_str());
+        let exporter_pods = pods.list(&lp).await.expect("could not get pods");
+        let exporter_pod_name = exporter_pods.items[0].metadata.name.as_ref().unwrap();
+        println!("Exporter pod name: {}", &exporter_pod_name);
+
+        // Wait for CNPG Cluster to be created by looping over replicas until
+        // they are in a running state
+        for i in 1..=replicas {
+            let pod_name = format!("{}-{}", name, i);
+            pod_ready_and_running(pods.clone(), pod_name).await;
+        }
+
+        // Assert that we can query the database with \dx;
+        let result = coredb_resource
+            .psql("\\dx".to_string(), "postgres".to_string(), context.clone())
+            .await
+            .unwrap();
+        assert!(result.stdout.clone().unwrap().contains("plpgsql"));
+
+        // Assert that both pods are replicating successfully
+        let result = coredb_resource
+            .psql(
+                "SELECT state FROM pg_stat_replication".to_string(),
+                "postgres".to_string(),
+                context.clone(),
+            )
+            .await
+            .unwrap();
+        assert!(result.stdout.clone().unwrap().contains("streaming"));
+
+        // Add in an extension and lets make sure it's installed on all pods
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "replicas": replicas,
+                "trunk_installs": [
+                    {
+                        "name": "aggs_for_vecs",
+                        "version": "1.3.0",
+                    },
+                ],
+                "extensions": [
+                    {
+                        "name": "aggs_for_vecs",
+                        "description": "aggs_for_vecs extension",
+                        "locations": [{
+                            "enabled": false,
+                            "version": "1.3.0",
+                            "database": "postgres",
+                            "schema": "public"}
+                        ]
+                    }]
+            }
+        });
+        let params = PatchParams::apply("tembo-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        let coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        // Wait until the extension is installed
+        wait_until_psql_contains(
+            context.clone(),
+            coredb_resource.clone(),
+            "select extname from pg_catalog.pg_extension;".to_string(),
+            "aggs_for_vecs".to_string(),
+            true,
+        )
+        .await;
+
+        // Assert that the extensions are installed on both replicas
+        let retrieved_pods_result = coredb_resource.pods_by_cluster(client.clone()).await;
+
+        let retrieved_pods = match retrieved_pods_result {
+            Ok(pods_list) => pods_list,
+            Err(e) => {
+                panic!("Failed to retrieve pods: {:?}", e);
+            }
+        };
+        for pod in &retrieved_pods {
+            let cmd = vec![
+                "/bin/sh".to_owned(),
+                "-c".to_owned(),
+                "ls /var/lib/postgresql/data/tembo/extension/aggs_for_vecs.control".to_owned(),
+            ];
+            let pod_name = pod.metadata.name.clone().expect("Pod should have a name");
+            let result =
+                run_command_in_container(pods.clone(), pod_name, cmd.clone(), Some("postgres".to_string()))
+                    .await;
+            assert!(result.contains("aggs_for_vecs.control"));
+        }
+
+        // CLEANUP TEST
+        // Cleanup CoreDB
+        coredbs.delete(name, &Default::default()).await.unwrap();
+        println!("Waiting for CoreDB to be deleted: {}", &name);
+        let _assert_coredb_deleted = tokio::time::timeout(
+            Duration::from_secs(TIMEOUT_SECONDS_COREDB_DELETED),
+            await_condition(coredbs.clone(), name, conditions::is_deleted("")),
+        )
+        .await
+        .unwrap_or_else(|_| {
+            panic!(
+                "CoreDB {} was not deleted after waiting {} seconds",
+                name, TIMEOUT_SECONDS_COREDB_DELETED
+            )
+        });
+        println!("CoreDB resource deleted {}", name);
+
+        // Delete namespace
+        let _ = delete_namespace(client.clone(), &namespace).await;
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn functional_test_ha_verify_extensions_ha_later() {
+        // Initialize the Kubernetes client
+        let client = kube_client().await;
+        let state = State::default();
+        let context = state.create_context(client.clone());
+
+        // Configurations
+        let mut rng = rand::thread_rng();
+        let suffix = rng.gen_range(0..100000);
+        let name = &format!("test-coredb-{}", suffix);
+        let namespace = match create_namespace(client.clone(), name).await {
+            Ok(namespace) => namespace,
+            Err(e) => {
+                eprintln!("Error creating namespace: {}", e);
+                std::process::exit(1);
+            }
+        };
+
+        let kind = "CoreDB";
+        let replicas = 1;
+
+        // Create a pod we can use to run commands in the cluster
+        let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
+        let lp =
+            ListParams::default().labels(format!("app=postgres-exporter,coredb.io/name={}", name).as_str());
+
+        // Apply a basic configuration of CoreDB
+        println!("Creating CoreDB resource {}", name);
+        let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
+        // Generate basic CoreDB resource to start with
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "replicas": replicas,
+            }
+        });
+        let params = PatchParams::apply("tembo-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        let coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        // Wait for CNPG Cluster to be created by looping over replicas until
+        // they are in a running state
+        for i in 1..=replicas {
+            let pod_name = format!("{}-{}", name, i);
+            pod_ready_and_running(pods.clone(), pod_name).await;
+        }
+        let exporter_pods = pods.list(&lp).await.expect("could not get pods");
+        let exporter_pod_name = exporter_pods.items[0].metadata.name.as_ref().unwrap();
+        pod_ready_and_running(pods.clone(), exporter_pod_name.clone()).await;
+
+        wait_until_psql_contains(
+            context.clone(),
+            coredb_resource.clone(),
+            "select extname from pg_catalog.pg_extension;".to_string(),
+            "plpgsql".to_string(),
+            true,
+        )
+        .await;
+
+        // Assert that we can query the database with \dx;
+        let result = coredb_resource
+            .psql("\\dx".to_string(), "postgres".to_string(), context.clone())
+            .await
+            .unwrap_or_else(|err| {
+                // Log the error, send it to an error tracking service, etc.
+                panic!("Failed to query the database with \\dx, error: {:?}", err);
+            });
+
+        assert!(result.stdout.clone().unwrap().contains("plpgsql"));
+
+        // Add in an extension and lets make sure it's installed on all pods
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "replicas": replicas,
+                "trunk_installs": [
+                    {
+                        "name": "aggs_for_vecs",
+                        "version": "1.3.0",
+                    },
+                ],
+                "extensions": [
+                    {
+                        "name": "aggs_for_vecs",
+                        "description": "aggs_for_vecs extension",
+                        "locations": [{
+                            "enabled": false,
+                            "version": "1.3.0",
+                            "database": "postgres",
+                            "schema": "public"}
+                        ]
+                    }]
+            }
+        });
+        let params = PatchParams::apply("tembo-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        let coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        // Wait until the extension is installed
+        wait_until_psql_contains(
+            context.clone(),
+            coredb_resource.clone(),
+            "select extname from pg_catalog.pg_extension;".to_string(),
+            "aggs_for_vecs".to_string(),
+            true,
+        )
+        .await;
+
+        // Assert that the extensions are installed on both replicas
+        let retrieved_pods_result = coredb_resource.pods_by_cluster(client.clone()).await;
+
+        let retrieved_pods = match retrieved_pods_result {
+            Ok(pods_list) => pods_list,
+            Err(e) => {
+                panic!("Failed to retrieve pods: {:?}", e);
+            }
+        };
+        for pod in &retrieved_pods {
+            let cmd = vec![
+                "/bin/sh".to_owned(),
+                "-c".to_owned(),
+                "ls /var/lib/postgresql/data/tembo/extension/aggs_for_vecs.control".to_owned(),
+            ];
+            let pod_name = pod.metadata.name.clone().expect("Pod should have a name");
+            let result =
+                run_command_in_container(pods.clone(), pod_name, cmd.clone(), Some("postgres".to_string()))
+                    .await;
+            assert!(result.contains("aggs_for_vecs.control"));
+        }
+
+        // Now lets make the instance HA and ensure that all extenstions are present on both
+        // replicas
+        let replicas = 2;
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "replicas": replicas,
+                "trunk_installs": [
+                    {
+                        "name": "aggs_for_vecs",
+                        "version": "1.3.0",
+                    },
+                ],
+                "extensions": [
+                    {
+                        "name": "aggs_for_vecs",
+                        "description": "aggs_for_vecs extension",
+                        "locations": [{
+                            "enabled": false,
+                            "version": "1.3.0",
+                            "database": "postgres",
+                            "schema": "public"}
+                        ]
+                    }]
+            }
+        });
+        let params = PatchParams::apply("tembo-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        let coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        // Wait for new replicas to be spun up before checking for extensions
+        for i in 1..=replicas {
+            let pod_name = format!("{}-{}", name, i);
+            pod_ready_and_running(pods.clone(), pod_name).await;
+        }
+
+        // Wait until the extension is installed
+        wait_until_psql_contains(
+            context.clone(),
+            coredb_resource.clone(),
+            "select extname from pg_catalog.pg_extension;".to_string(),
+            "aggs_for_vecs".to_string(),
+            true,
+        )
+        .await;
+
+        // Assert that the extensions are installed on both replicas
+        let retrieved_pods_result = coredb_resource.pods_by_cluster(client.clone()).await;
+
+        let retrieved_pods = match retrieved_pods_result {
+            Ok(pods_list) => pods_list,
+            Err(e) => {
+                panic!("Failed to retrieve pods: {:?}", e);
+            }
+        };
+        for pod in &retrieved_pods {
+            let cmd = vec![
+                "/bin/sh".to_owned(),
+                "-c".to_owned(),
+                "ls /var/lib/postgresql/data/tembo/extension/aggs_for_vecs.control".to_owned(),
+            ];
+            let pod_name = pod.metadata.name.clone().expect("Pod should have a name");
+            let result =
+                run_command_in_container(pods.clone(), pod_name, cmd.clone(), Some("postgres".to_string()))
+                    .await;
+            assert!(result.contains("aggs_for_vecs.control"));
+        }
+
+        // CLEANUP TEST
+        // Cleanup CoreDB
+        coredbs.delete(name, &Default::default()).await.unwrap();
+        println!("Waiting for CoreDB to be deleted: {}", &name);
+        let _assert_coredb_deleted = tokio::time::timeout(
+            Duration::from_secs(TIMEOUT_SECONDS_COREDB_DELETED),
+            await_condition(coredbs.clone(), name, conditions::is_deleted("")),
+        )
+        .await
+        .unwrap_or_else(|_| {
+            panic!(
+                "CoreDB {} was not deleted after waiting {} seconds",
+                name, TIMEOUT_SECONDS_COREDB_DELETED
+            )
+        });
+        println!("CoreDB resource deleted {}", name);
+
+        // Delete namespace
+        let _ = delete_namespace(client.clone(), &namespace).await;
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn functional_test_ha_shared_preload_libraries() {
+        // Initialize the Kubernetes client
+        let client = kube_client().await;
+        let state = State::default();
+        let context = state.create_context(client.clone());
+
+        // Configurations
+        let mut rng = rand::thread_rng();
+        let suffix = rng.gen_range(0..100000);
+        let name = &format!("test-coredb-{}", suffix);
+        let namespace = match create_namespace(client.clone(), name).await {
+            Ok(namespace) => namespace,
+            Err(e) => {
+                eprintln!("Error creating namespace: {}", e);
+                std::process::exit(1);
+            }
+        };
+
+        let kind = "CoreDB";
+        let replicas = 1;
+
+        // Create a pod we can use to run commands in the cluster
+        let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
+        let lp =
+            ListParams::default().labels(format!("app=postgres-exporter,coredb.io/name={}", name).as_str());
+
+        // Apply a basic configuration of CoreDB
+        println!("Creating CoreDB resource {}", name);
+        let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
+        // Generate basic CoreDB resource to start with
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "replicas": replicas,
+                "trunk_installs": [
+                    {
+                        "name": "pg_partman",
+                        "version": "4.7.3",
+                    },
+                    {
+                        "name": "pgmq",
+                        "version": "0.10.0",
+                    },
+                    {
+                        "name": "pg_stat_statements",
+                        "version": "1.10.0",
+                    },
+                ],
+                "extensions": [
+                    {
+                        "name": "pg_partman",
+                        "description": "pg_partman extension",
+                        "locations": [{
+                            "enabled": false,
+                            "version": "4.7.3",
+                            "database": "postgres",
+                            "schema": "public"}
+                        ]
+                    },
+                    {
+                        "name": "pgmq",
+                        "description": "pgmq extension",
+                        "locations": [{
+                            "enabled": false,
+                            "version": "0.10.0",
+                            "database": "postgres",
+                            "schema": "public"}
+                        ]
+                    },
+                    {
+                        "name": "pg_stat_statements",
+                        "description": "pg_stat_statements extension",
+                        "locations": [{
+                            "enabled": false,
+                            "version": "1.10.0",
+                            "database": "postgres",
+                            "schema": "public"}
+                        ]
+                    },
+                ]
+            }
+        });
+        let params = PatchParams::apply("tembo-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        let coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        // Wait for CNPG Cluster to be created by looping over replicas until
+        // they are in a running state
+        for i in 1..=replicas {
+            let pod_name = format!("{}-{}", name, i);
+            pod_ready_and_running(pods.clone(), pod_name).await;
+        }
+        let exporter_pods = pods.list(&lp).await.expect("could not get pods");
+        let exporter_pod_name = exporter_pods.items[0].metadata.name.as_ref().unwrap();
+        pod_ready_and_running(pods.clone(), exporter_pod_name.clone()).await;
+
+        // Assert that we can query the database with \dx;
+        let result = match coredb_resource
+            .psql("\\dx".to_string(), "postgres".to_string(), context.clone())
+            .await
+        {
+            Ok(res) => res,
+            Err(e) => panic!("Failed to execute psql: {:?}", e),
+        };
+
+        let stdout = match result.stdout {
+            Some(output) => output,
+            None => panic!("stdout is None"),
+        };
+
+        assert!(stdout.contains("plpgsql"));
+
+        // Wait until the extension is installed
+        wait_until_psql_contains(
+            context.clone(),
+            coredb_resource.clone(),
+            "select extname from pg_catalog.pg_extension;".to_string(),
+            "pgmq".to_string(),
+            true,
+        )
+        .await;
+
+        // Assert that the extensions are installed on both replicas
+        let retrieved_pods_result = coredb_resource.pods_by_cluster(client.clone()).await;
+
+        let retrieved_pods = match retrieved_pods_result {
+            Ok(pods_list) => pods_list,
+            Err(e) => {
+                panic!("Failed to retrieve pods: {:?}", e);
+            }
+        };
+
+        for i in 1..=replicas {
+            let pod_name = format!("{}-{}", name, i);
+            pod_ready_and_running(pods.clone(), pod_name).await;
+        }
+        let exporter_pods = pods.list(&lp).await.expect("could not get pods");
+        let exporter_pod_name = exporter_pods.items[0].metadata.name.as_ref().unwrap();
+        pod_ready_and_running(pods.clone(), exporter_pod_name.clone()).await;
+
+        for pod in &retrieved_pods {
+            let cmd = vec![
+                "/bin/sh".to_owned(),
+                "-c".to_owned(),
+                "ls /var/lib/postgresql/data/tembo/extension/pgmq.control".to_owned(),
+            ];
+            let pod_name = pod.metadata.name.clone().expect("Pod should have a name");
+            let result =
+                run_command_in_container(pods.clone(), pod_name, cmd.clone(), Some("postgres".to_string()))
+                    .await;
+            println!("result: {}", result);
+            assert!(result.contains("pgmq.control"));
+        }
+
+        // Now lets make the instance HA and ensure that all extenstions are present on both
+        // replicas
+        let replicas = 2;
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "replicas": replicas,
+                "trunk_installs": [
+                    {
+                        "name": "pg_partman",
+                        "version": "4.7.3",
+                    },
+                    {
+                        "name": "pgmq",
+                        "version": "0.10.0",
+                    },
+                    {
+                        "name": "pg_stat_statements",
+                        "version": "1.10.0",
+                    },
+                ],
+                "extensions": [
+                    {
+                        "name": "pg_partman",
+                        "description": "pg_partman extension",
+                        "locations": [{
+                            "enabled": false,
+                            "version": "4.7.3",
+                            "database": "postgres",
+                            "schema": "public"}
+                        ]
+                    },
+                    {
+                        "name": "pgmq",
+                        "description": "pgmq extension",
+                        "locations": [{
+                            "enabled": false,
+                            "version": "0.10.0",
+                            "database": "postgres",
+                            "schema": "public"}
+                        ]
+                    },
+                    {
+                        "name": "pg_stat_statements",
+                        "description": "pg_stat_statements extension",
+                        "locations": [{
+                            "enabled": false,
+                            "version": "1.10.0",
+                            "database": "postgres",
+                            "schema": "public"}
+                        ]
+                    },
+                ]
+            }
+        });
+        let params = PatchParams::apply("tembo-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        let coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        // Wait for new replicas to be spun up before checking for extensions
+        for i in 1..=replicas {
+            let pod_name = format!("{}-{}", name, i);
+            pod_ready_and_running(pods.clone(), pod_name).await;
+        }
+
+        // Wait until the extension is installed
+        wait_until_psql_contains(
+            context.clone(),
+            coredb_resource.clone(),
+            "select extname from pg_catalog.pg_extension;".to_string(),
+            "pgmq".to_string(),
+            true,
+        )
+        .await;
+
+        // Assert that the extensions are installed on both replicas
+        let retrieved_pods_result = coredb_resource.pods_by_cluster(client.clone()).await;
+
+        let retrieved_pods = match retrieved_pods_result {
+            Ok(pods_list) => pods_list,
+            Err(e) => {
+                panic!("Failed to retrieve pods: {:?}", e);
+            }
+        };
+        for pod in &retrieved_pods {
+            let cmd = vec![
+                "/bin/sh".to_owned(),
+                "-c".to_owned(),
+                "ls /var/lib/postgresql/data/tembo/extension/pgmq.control".to_owned(),
+            ];
+            let pod_name = pod.metadata.name.clone().expect("Pod should have a name");
+            let result =
+                run_command_in_container(pods.clone(), pod_name, cmd.clone(), Some("postgres".to_string()))
+                    .await;
+            assert!(result.contains("pgmq.control"));
+        }
 
         // CLEANUP TEST
         // Cleanup CoreDB
