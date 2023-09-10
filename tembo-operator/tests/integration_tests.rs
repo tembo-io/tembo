@@ -1230,6 +1230,101 @@ mod test {
         // The coredb service is named the same as the coredb resource
         assert_eq!(&service_name, format!("{}-rw", name).as_str());
 
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "extra_domains_rw": ["any-given-domain.com", "another-domain.com"]
+            }
+        });
+        let params = PatchParams::apply("functional-test-ingress-route-tcp");
+        let patch = Patch::Merge(&coredb_json);
+        let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        // extra domains should be created almost right away, within a few milliseconds
+        tokio::time::sleep(Duration::from_secs(5)).await;
+
+        let ing_route_tcp_name = format!("extra-{}-rw", name);
+        let ingress_route_tcp_api: Api<IngressRouteTCP> = Api::namespaced(client.clone(), &namespace);
+        // Get the ingress route tcp
+        let ing_route_tcp = ingress_route_tcp_api
+            .get(&ing_route_tcp_name)
+            .await
+            .unwrap_or_else(|_| panic!("Expected to find ingress route TCP {}", ing_route_tcp_name));
+        let service_name = ing_route_tcp.spec.routes[0]
+            .services
+            .clone()
+            .expect("Ingress route has no services")[0]
+            .name
+            .clone();
+        // Assert the ingress route tcp service points to coredb service
+        // The coredb service is named the same as the coredb resource
+        assert_eq!(&service_name, format!("{}-rw", name).as_str());
+        let matcher = ing_route_tcp.spec.routes[0].r#match.clone();
+        assert_eq!(
+            matcher,
+            "Host(`another-domain.com`) || Host(`any-given-domain.com`)"
+        );
+
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "extra_domains_rw": ["new-domain.com"]
+            }
+        });
+        let params = PatchParams::apply("functional-test-ingress-route-tcp");
+        let patch = Patch::Merge(&coredb_json);
+        let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        // extra domains should be created almost right away, within a few milliseconds
+        tokio::time::sleep(Duration::from_secs(5)).await;
+
+        // Get the ingress route tcp
+        let ing_route_tcp = ingress_route_tcp_api
+            .get(&ing_route_tcp_name)
+            .await
+            .unwrap_or_else(|_| panic!("Expected to find ingress route TCP {}", ing_route_tcp_name));
+        let service_name = ing_route_tcp.spec.routes[0]
+            .services
+            .clone()
+            .expect("Ingress route has no services")[0]
+            .name
+            .clone();
+        // Assert the ingress route tcp service points to coredb service
+        // The coredb service is named the same as the coredb resource
+        assert_eq!(&service_name, format!("{}-rw", name).as_str());
+        let matcher = ing_route_tcp.spec.routes[0].r#match.clone();
+        assert_eq!(matcher, "Host(`new-domain.com`)");
+
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "replicas": replicas,
+                "extra_domains_rw": [],
+            }
+        });
+        let params = PatchParams::apply("functional-test-ingress-route-tcp").force();
+        let patch = Patch::Apply(&coredb_json);
+        let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        tokio::time::sleep(Duration::from_secs(5)).await;
+
+        // Get the ingress route tcp
+        let ing_route_tcp = ingress_route_tcp_api.get(&ing_route_tcp_name).await;
+        // Should be deleted
+        assert!(ing_route_tcp.is_err());
+
         // Cleanup CoreDB resource
         coredbs.delete(name, &Default::default()).await.unwrap();
         println!("Waiting for CoreDB to be deleted: {}", &name);

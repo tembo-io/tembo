@@ -32,6 +32,7 @@ use kube::{
 
 use crate::{
     extensions::reconcile_extensions,
+    ingress::reconcile_extra_postgres_ing_route_tcp,
     postgres_exporter::{create_postgres_exporter_role, reconcile_prom_configmap},
 };
 use rand::Rng;
@@ -138,6 +139,21 @@ impl CoreDB {
                 .await
                 .map_err(|e| {
                     error!("Error reconciling postgres ingress route: {:?}", e);
+                    // For unexpected errors, we should requeue for several minutes at least,
+                    // for expected, "waiting" type of requeuing, those should be shorter, just a few seconds.
+                    // IngressRouteTCP does not have expected errors during reconciliation.
+                    Action::requeue(Duration::from_secs(300))
+                })?;
+                reconcile_extra_postgres_ing_route_tcp(
+                    self,
+                    ctx.clone(),
+                    ns.as_str(),
+                    service_name_read_write.as_str(),
+                    IntOrString::Int(5432),
+                )
+                .await
+                .map_err(|e| {
+                    error!("Error reconciling extra postgres ingress route: {:?}", e);
                     // For unexpected errors, we should requeue for several minutes at least,
                     // for expected, "waiting" type of requeuing, those should be shorter, just a few seconds.
                     // IngressRouteTCP does not have expected errors during reconciliation.

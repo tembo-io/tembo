@@ -5,11 +5,8 @@ pub enum OperatorError {
     #[error("An IngressRouteTCP did not have a name")]
     IngressRouteTCPName,
 
-    #[error("An IngressRouteTCP failed to update")]
-    IngressRouteTCPUpdate,
-
-    #[error("An IngressRouteTCP failed to create")]
-    IngressRouteTCPCreate,
+    #[error("An IngressRouteTCP failed to Create, Update, or Delete")]
+    IngressRouteTcpError,
 
     #[error("KubeErr: {0}")]
     KubeErr(#[from] kube::Error),

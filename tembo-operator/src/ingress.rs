@@ -7,7 +7,7 @@ use k8s_openapi::apimachinery::pkg::{
     util::intstr::IntOrString,
 };
 use kube::{
-    api::{Patch, PatchParams},
+    api::{DeleteParams, Patch, PatchParams},
     Api, Resource, ResourceExt,
 };
 use std::sync::Arc;
@@ -55,6 +55,119 @@ fn postgres_ingress_route_tcp(
             }),
         },
     }
+}
+
+// For end-user provided, extra domain names,
+// we allow for update and deletion of domain names.
+pub async fn reconcile_extra_postgres_ing_route_tcp(
+    cdb: &CoreDB,
+    ctx: Arc<Context>,
+    namespace: &str,
+    service_name_read_write: &str,
+    port: IntOrString,
+) -> Result<(), OperatorError> {
+    let mut extra_domain_names = cdb.spec.extra_domains_rw.clone().unwrap_or_default();
+    // Ensure always same order
+    extra_domain_names.sort();
+    let matchers = extra_domain_names
+        .iter()
+        .map(|domain_name| format!("Host(`{}`)", domain_name))
+        .collect::<Vec<String>>();
+    let matcher_actual = matchers.join(" || ");
+    let ingress_route_tcp_name = format!("extra-{}-rw", cdb.name_any());
+    let owner_reference = cdb.controller_owner_ref(&()).unwrap();
+    let ingress_route_tcp_to_apply = postgres_ingress_route_tcp(
+        ingress_route_tcp_name.clone(),
+        namespace.to_string(),
+        owner_reference.clone(),
+        matcher_actual.clone(),
+        service_name_read_write.to_string(),
+        port.clone(),
+    );
+    let ingress_route_tcp_api: Api<IngressRouteTCP> = Api::namespaced(ctx.client.clone(), namespace);
+    if !extra_domain_names.is_empty() {
+        apply_ingress_route_tcp(
+            ingress_route_tcp_api,
+            namespace,
+            &ingress_route_tcp_name,
+            &ingress_route_tcp_to_apply,
+        )
+        .await
+    } else {
+        delete_ingress_route_tcp(ingress_route_tcp_api, namespace, &ingress_route_tcp_name).await
+    }
+}
+
+async fn apply_ingress_route_tcp(
+    ingress_route_tcp_api: Api<IngressRouteTCP>,
+    namespace: &str,
+    ingress_route_tcp_name: &String,
+    ingress_route_tcp_to_apply: &IngressRouteTCP,
+) -> Result<(), OperatorError> {
+    let patch = Patch::Apply(&ingress_route_tcp_to_apply);
+    let patch_parameters = PatchParams::apply("cntrlr").force();
+    match ingress_route_tcp_api
+        .patch(&ingress_route_tcp_name.clone(), &patch_parameters, &patch)
+        .await
+    {
+        Ok(_) => {
+            info!(
+                "Updated postgres read and write IngressRouteTCP {}.{}",
+                ingress_route_tcp_name.clone(),
+                namespace
+            );
+        }
+        Err(e) => {
+            error!(
+                "Failed to update postgres read and write IngressRouteTCP {}.{}: {}",
+                ingress_route_tcp_name, namespace, e
+            );
+            return Err(OperatorError::IngressRouteTcpError);
+        }
+    }
+    Ok(())
+}
+
+
+async fn delete_ingress_route_tcp(
+    ingress_route_tcp_api: Api<IngressRouteTCP>,
+    namespace: &str,
+    ingress_route_tcp_name: &String,
+) -> Result<(), OperatorError> {
+    // Check if the resource exists
+    if ingress_route_tcp_api
+        .get(&ingress_route_tcp_name.clone())
+        .await
+        .is_ok()
+    {
+        // If it exists, proceed with the deletion
+        let delete_parameters = DeleteParams::default();
+        match ingress_route_tcp_api
+            .delete(&ingress_route_tcp_name.clone(), &delete_parameters)
+            .await
+        {
+            Ok(_) => {
+                info!(
+                    "Deleted IngressRouteTCP {}.{}",
+                    ingress_route_tcp_name.clone(),
+                    namespace
+                );
+            }
+            Err(e) => {
+                error!(
+                    "Failed to delete IngressRouteTCP {}.{}: {}",
+                    ingress_route_tcp_name, namespace, e
+                );
+                return Err(OperatorError::IngressRouteTcpError);
+            }
+        }
+    } else {
+        debug!(
+            "IngressRouteTCP {}.{} was not found. Assuming it's already deleted.",
+            ingress_route_tcp_name, namespace
+        );
+    }
+    Ok(())
 }
 
 // 1) We should never delete or update the hostname of an ingress route tcp.
@@ -170,27 +283,13 @@ pub async fn reconcile_postgres_ing_route_tcp(
                 port.clone(),
             );
             // Apply this ingress route tcp
-            let patch = Patch::Apply(&ingress_route_tcp_to_apply);
-            let patch_parameters = PatchParams::apply("cntrlr").force();
-            match ingress_route_tcp_api
-                .patch(&ingress_route_tcp_name.clone(), &patch_parameters, &patch)
-                .await
-            {
-                Ok(_) => {
-                    info!(
-                        "Updated postgres read and write IngressRouteTCP {}.{}",
-                        ingress_route_tcp_name.clone(),
-                        namespace
-                    );
-                }
-                Err(e) => {
-                    error!(
-                        "Failed to update postgres read and write IngressRouteTCP {}.{}: {}",
-                        ingress_route_tcp_name, namespace, e
-                    );
-                    return Err(OperatorError::IngressRouteTCPUpdate);
-                }
-            }
+            apply_ingress_route_tcp(
+                ingress_route_tcp_api.clone(),
+                namespace,
+                &ingress_route_tcp_name,
+                &ingress_route_tcp_to_apply,
+            )
+            .await?;
         }
     }
 
@@ -222,26 +321,13 @@ pub async fn reconcile_postgres_ing_route_tcp(
             port.clone(),
         );
         // Apply this ingress route tcp
-        let patch = Patch::Apply(&ingress_route_tcp_to_apply);
-        let patch_parameters = PatchParams::apply("cntrlr").force();
-        match ingress_route_tcp_api
-            .patch(&ingress_route_tcp_name_new, &patch_parameters, &patch)
-            .await
-        {
-            Ok(_) => {
-                info!(
-                    "Created new postgres read and write IngressRouteTCP {}.{}",
-                    ingress_route_tcp_name_new, namespace
-                );
-            }
-            Err(e) => {
-                error!(
-                    "Failed to create new postgres read and write IngressRouteTCP {}.{}: {}",
-                    ingress_route_tcp_name_new, namespace, e
-                );
-                return Err(OperatorError::IngressRouteTCPCreate);
-            }
-        }
+        apply_ingress_route_tcp(
+            ingress_route_tcp_api,
+            namespace,
+            &ingress_route_tcp_name_new,
+            &ingress_route_tcp_to_apply,
+        )
+        .await?;
     } else {
         debug!(
             "There is already an IngressRouteTCP for this matcher, so we don't need to create a new one: {}",

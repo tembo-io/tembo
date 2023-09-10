@@ -98,6 +98,8 @@ pub struct CoreDBSpec {
 
     pub metrics: Option<PostgresMetrics>,
 
+    pub extra_domains_rw: Option<Vec<String>>,
+
     pub stack: Option<Stack>,
     // dynamic runtime configs
     pub runtime_config: Option<Vec<PgConfig>>,
