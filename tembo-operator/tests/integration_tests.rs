@@ -1266,7 +1266,7 @@ mod test {
         let matcher = ing_route_tcp.spec.routes[0].r#match.clone();
         assert_eq!(
             matcher,
-            "Host(`another-domain.com`) || Host(`any-given-domain.com`)"
+            "HostSNI(`another-domain.com`) || HostSNI(`any-given-domain.com`)"
         );
 
         let coredb_json = serde_json::json!({
@@ -1301,7 +1301,7 @@ mod test {
         // The coredb service is named the same as the coredb resource
         assert_eq!(&service_name, format!("{}-rw", name).as_str());
         let matcher = ing_route_tcp.spec.routes[0].r#match.clone();
-        assert_eq!(matcher, "Host(`new-domain.com`)");
+        assert_eq!(matcher, "HostSNI(`new-domain.com`)");
 
         let coredb_json = serde_json::json!({
             "apiVersion": API_VERSION,

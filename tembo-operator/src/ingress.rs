@@ -71,7 +71,7 @@ pub async fn reconcile_extra_postgres_ing_route_tcp(
     extra_domain_names.sort();
     let matchers = extra_domain_names
         .iter()
-        .map(|domain_name| format!("Host(`{}`)", domain_name))
+        .map(|domain_name| format!("HostSNI(`{}`)", domain_name))
         .collect::<Vec<String>>();
     let matcher_actual = matchers.join(" || ");
     let ingress_route_tcp_name = format!("extra-{}-rw", cdb.name_any());
@@ -127,7 +127,6 @@ async fn apply_ingress_route_tcp(
     }
     Ok(())
 }
-
 
 async fn delete_ingress_route_tcp(
     ingress_route_tcp_api: Api<IngressRouteTCP>,
