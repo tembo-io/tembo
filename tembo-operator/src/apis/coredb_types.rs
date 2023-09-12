@@ -15,10 +15,7 @@ use kube::CustomResource;
 
 use crate::{
     apis::postgres_parameters::ConfigValue,
-    extensions::{
-        toggle::REQUIRES_LOAD,
-        types::{Extension, TrunkInstall, TrunkInstallStatus},
-    },
+    extensions::types::{Extension, TrunkInstall, TrunkInstallStatus},
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -110,7 +107,7 @@ pub struct CoreDBSpec {
 impl CoreDBSpec {
     // extracts all postgres configurations
     // configs can be defined in several different places (from a stack, user override, from an extension installation, user overrides, etc)
-    pub fn get_pg_configs(&self) -> Result<Option<Vec<PgConfig>>, MergeError> {
+    pub fn get_pg_configs(&self, requires_load: Vec<String>) -> Result<Option<Vec<PgConfig>>, MergeError> {
         let stack_configs = self
             .stack
             .as_ref()
@@ -123,17 +120,17 @@ impl CoreDBSpec {
         // trunk install pg_partman could come with something like `pg_partman_bgw.dbname = xxx`
 
         // Get list of extension names that require load
-        let mut requires_load = BTreeSet::new();
+        let mut include_with_shared_preload_libraries = BTreeSet::new();
         for ext in self.extensions.iter() {
             'loc: for location in ext.locations.iter() {
-                if location.clone().enabled && REQUIRES_LOAD.contains(&ext.name.as_str()) {
-                    requires_load.insert(ext.name.clone());
+                if location.clone().enabled && requires_load.contains(&ext.name) {
+                    include_with_shared_preload_libraries.insert(ext.name.clone());
                     break 'loc;
                 }
             }
         }
 
-        let shared_preload_from_extensions = ConfigValue::Multiple(requires_load);
+        let shared_preload_from_extensions = ConfigValue::Multiple(include_with_shared_preload_libraries);
         let extension_settings_config = vec![PgConfig {
             name: "shared_preload_libraries".to_string(),
             value: shared_preload_from_extensions,
@@ -208,8 +205,12 @@ impl CoreDBSpec {
         }
     }
 
-    pub fn get_pg_config_by_name(&self, config_name: &str) -> Result<Option<PgConfig>, MergeError> {
-        let all_configs = self.get_pg_configs()?;
+    pub fn get_pg_config_by_name(
+        &self,
+        config_name: &str,
+        requires_load: Vec<String>,
+    ) -> Result<Option<PgConfig>, MergeError> {
+        let all_configs = self.get_pg_configs(requires_load)?;
         for config in all_configs.unwrap_or_default() {
             if config.name == config_name {
                 return Ok(Some(config));

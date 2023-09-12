@@ -26,6 +26,7 @@ mod psql;
 mod rbac;
 mod secret;
 mod service;
+mod trunk;
 
 use thiserror::Error;
 

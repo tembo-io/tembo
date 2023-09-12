@@ -14,37 +14,10 @@ use crate::{
         database_queries::list_shared_preload_libraries,
         kubernetes_queries::merge_location_status_into_extension_status_list, types::get_location_status,
     },
+    trunk::extensions_that_require_load,
 };
 use std::{sync::Arc, time::Duration};
 use tracing::{error, warn};
-
-
-// TODO: @sjmiller609 fetch from trunk
-pub const REQUIRES_LOAD: [&str; 23] = [
-    "auth_delay",
-    "auto_explain",
-    "basebackup_to_shell",
-    "basic_archive",
-    "citus",
-    "passwordcheck",
-    "pg_anonymize",
-    "pgaudit",
-    "pg_cron",
-    "pg_failover_slots",
-    "pg_later",
-    "pglogical",
-    "pg_net",
-    "pg_stat_kcache",
-    "pg_stat_statements",
-    "pg_tle",
-    "pgml",
-    "plrust",
-    "postgresql_anonymizer",
-    "sepgsql",
-    "supautils",
-    "timescaledb",
-    "vectorize",
-];
 
 pub async fn reconcile_extension_toggle_state(
     cdb: &CoreDB,
@@ -67,6 +40,8 @@ async fn toggle_extensions(
     toggle_these_extensions: Vec<Extension>,
 ) -> Result<Vec<ExtensionStatus>, Action> {
     let current_shared_preload_libraries = list_shared_preload_libraries(cdb, ctx.clone()).await?;
+    let requires_load =
+        extensions_that_require_load(ctx.client.clone(), &cdb.metadata.namespace.clone().unwrap()).await?;
     let mut ext_status_updates = ext_status_updates.clone();
     for extension_to_toggle in toggle_these_extensions {
         for location_to_toggle in extension_to_toggle.locations {
@@ -75,14 +50,18 @@ async fn toggle_extensions(
             // and also is not present in shared_preload_libraries,
             // then requeue.
             if location_to_toggle.enabled
-                && REQUIRES_LOAD.contains(&extension_to_toggle.name.as_str())
+                && requires_load.contains(&extension_to_toggle.name)
                 && !current_shared_preload_libraries.contains(&extension_to_toggle.name)
             {
                 warn!(
                     "Extension {} requires load, but is not present in shared_preload_libraries for {}, checking if we should requeue.",
                     extension_to_toggle.name, cdb.metadata.name.clone().unwrap());
                 // Requeue only if we are expecting a shared preload library that is not yet present
-                requeue_if_expecting_shared_preload_library(cdb, &extension_to_toggle.name)?;
+                requeue_if_expecting_shared_preload_library(
+                    cdb,
+                    &extension_to_toggle.name,
+                    requires_load.clone(),
+                )?;
             }
             match database_queries::toggle_extension(
                 cdb,
@@ -132,9 +111,13 @@ async fn toggle_extensions(
 fn requeue_if_expecting_shared_preload_library(
     cdb: &CoreDB,
     extension_to_toggle: &str,
+    requires_load: Vec<String>,
 ) -> Result<(), Action> {
     // Get config by name
-    match cdb.spec.get_pg_config_by_name("shared_preload_libraries") {
+    match cdb
+        .spec
+        .get_pg_config_by_name("shared_preload_libraries", requires_load)
+    {
         // If there is not an error
         Ok(shared_preload_libraries_config_value) => match shared_preload_libraries_config_value {
             // If there is no value, then we are not expecting a restart

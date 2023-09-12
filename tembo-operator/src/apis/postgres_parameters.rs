@@ -420,8 +420,9 @@ mod pg_param_tests {
             }),
             ..Default::default()
         };
+        let requires_load: Vec<String> = vec!["pg_cron".to_string(), "pg_stat_statements".to_string()];
         let pg_configs = spec
-            .get_pg_configs()
+            .get_pg_configs(requires_load)
             .expect("failed to get pg configs")
             .expect("expected configs");
 

@@ -20,6 +20,7 @@ use crate::{
     },
     config::Config,
     defaults::{default_image, default_llm_image},
+    trunk::extensions_that_require_load,
     Context,
 };
 use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
@@ -179,8 +180,8 @@ pub fn cnpg_cluster_bootstrap_from_cdb(
 }
 
 // Get PGConfig from CoreDB and convert it to a postgres_parameters and shared_preload_libraries
-fn cnpg_postgres_config(cdb: &CoreDB) -> Result<PostgresConfig, MergeError> {
-    match cdb.spec.get_pg_configs() {
+fn cnpg_postgres_config(cdb: &CoreDB, requires_load: Vec<String>) -> Result<PostgresConfig, MergeError> {
+    match cdb.spec.get_pg_configs(requires_load) {
         Ok(Some(pg_configs)) => {
             let mut postgres_parameters: BTreeMap<String, String> = BTreeMap::new();
             let mut shared_preload_libraries: Vec<String> = Vec::new();
@@ -257,7 +258,11 @@ fn cnpg_high_availability(cdb: &CoreDB) -> Option<ClusterReplicationSlots> {
     }
 }
 
-pub fn cnpg_cluster_from_cdb(cdb: &CoreDB, fenced_pods: Option<Vec<String>>) -> Cluster {
+pub fn cnpg_cluster_from_cdb(
+    cdb: &CoreDB,
+    fenced_pods: Option<Vec<String>>,
+    requires_load: Vec<String>,
+) -> Cluster {
     let cfg = Config::default();
     let name = cdb.name_any();
     let namespace = cdb.namespace().unwrap();
@@ -272,7 +277,7 @@ pub fn cnpg_cluster_from_cdb(cdb: &CoreDB, fenced_pods: Option<Vec<String>>) -> 
     let PostgresConfig {
         postgres_parameters,
         shared_preload_libraries,
-    } = match cnpg_postgres_config(cdb) {
+    } = match cnpg_postgres_config(cdb, requires_load) {
         Ok(config) => config,
         Err(e) => {
             error!("Error generating postgres parameters: {}", e);
@@ -486,9 +491,11 @@ async fn pods_to_fence(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<String>, A
 #[instrument(skip(cdb, ctx) fields(trace_id))]
 pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {
     let pods_to_fence = pods_to_fence(cdb, ctx.clone()).await?;
+    let requires_load =
+        extensions_that_require_load(ctx.client.clone(), &cdb.metadata.namespace.clone().unwrap()).await?;
 
     debug!("Generating CNPG spec");
-    let mut cluster = cnpg_cluster_from_cdb(cdb, Some(pods_to_fence));
+    let mut cluster = cnpg_cluster_from_cdb(cdb, Some(pods_to_fence), requires_load);
 
     debug!("Getting namespace of cluster");
     let namespace = cluster

@@ -34,6 +34,7 @@ use crate::{
     extensions::reconcile_extensions,
     ingress::reconcile_extra_postgres_ing_route_tcp,
     postgres_exporter::{create_postgres_exporter_role, reconcile_prom_configmap},
+    trunk::{extensions_that_require_load, reconcile_trunk_configmap},
 };
 use rand::Rng;
 use serde::Serialize;
@@ -116,6 +117,9 @@ impl CoreDB {
         let ns = self.namespace().unwrap();
         let name = self.name_any();
         let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &ns);
+
+        // Fetch any metadata we need from Trunk
+        reconcile_trunk_configmap(ctx.client.clone(), &ns).await?;
 
         // Ingress
         match std::env::var("DATA_PLANE_BASEDOMAIN") {
@@ -321,6 +325,7 @@ impl CoreDB {
         patch_cdb_status_merge(&coredbs, &name, patch_status).await?;
 
         info!("Fully reconciled {}", self.name_any());
+        // Check back every 60-90 seconds
         let jitter = rand::thread_rng().gen_range(0..30);
         Ok(Action::requeue(Duration::from_secs(60 + jitter)))
     }
@@ -363,7 +368,9 @@ impl CoreDB {
     pub async fn primary_pod_cnpg(&self, client: Client) -> Result<Pod, Action> {
         let span = span!(Level::INFO, "primary_pod_cnpg");
         let _enter = span.enter();
-        let cluster = cnpg_cluster_from_cdb(self, None);
+        let requires_load =
+            extensions_that_require_load(client.clone(), &self.metadata.namespace.clone().unwrap()).await?;
+        let cluster = cnpg_cluster_from_cdb(self, None, requires_load);
         let cluster_name = cluster
             .metadata
             .name
@@ -409,7 +416,9 @@ impl CoreDB {
     pub async fn pods_by_cluster(&self, client: Client) -> Result<Vec<Pod>, Action> {
         let span = span!(Level::INFO, "pods_in_cluster");
         let _enter = span.enter();
-        let cluster = cnpg_cluster_from_cdb(self, None);
+        let requires_load =
+            extensions_that_require_load(client.clone(), &self.metadata.namespace.clone().unwrap()).await?;
+        let cluster = cnpg_cluster_from_cdb(self, None, requires_load);
         let cluster_name = cluster
             .metadata
             .name
