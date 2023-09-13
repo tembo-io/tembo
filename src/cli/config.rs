@@ -136,7 +136,7 @@ impl Config {
 mod tests {
     use super::*;
     use crate::cli::config::Config;
-    use crate::cli::instance::{EnabledExtensions, InstalledExtensions, Instance};
+    use crate::cli::instance::{EnabledExtension, InstalledExtension, Instance};
     use clap::{Arg, ArgAction, Command};
     use std::env;
 
@@ -236,17 +236,19 @@ mod tests {
         let instance = Instance {
             name: Some(String::from("instance_name")),
             r#type: Some(String::from("standard")),
+            port: Some(String::from("5432")),
             version: Some(String::from("1.1")),
             created_at: Some(Utc::now()),
-            installed_extensions: vec![InstalledExtensions {
+            installed_extensions: vec![InstalledExtension {
                 name: Some(String::from("pgmq")),
                 version: Some(String::from("1.0")),
                 created_at: Some(Utc::now()),
             }],
-            enabled_extensions: vec![EnabledExtensions {
+            enabled_extensions: vec![EnabledExtension {
                 name: Some(String::from("pgmq")),
                 version: Some(String::from("1.0")),
                 created_at: Some(Utc::now()),
+                locations: vec![],
             }],
         };
         config.instances = vec![instance];

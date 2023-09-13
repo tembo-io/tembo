@@ -22,8 +22,7 @@ fn main() {
 
     let res = match matches.subcommand() {
         Some(("init", sub_matches)) => cmd::init::execute(sub_matches),
-        Some(("install", sub_matches)) => cmd::stack::create::execute(sub_matches),
-        Some(("stack", sub_matches)) => cmd::stack::create::execute(sub_matches),
+        Some(("instance", sub_matches)) => cmd::instance::create::execute(sub_matches),
         Some(("completions", sub_matches)) => (|| {
             let shell = sub_matches
                 .get_one::<Shell>("shell")
@@ -62,11 +61,10 @@ fn create_clap_command() -> Command {
              The source code for tembo is available at: https://github.com/tembo-io/tembo-cli",
         )
         .subcommand(cmd::init::make_subcommand())
-        .subcommand(cmd::install::make_subcommand()) // executes stack::create
         .subcommand(
-            Command::new("stack")
-                .about("Commands used to manage local stack and cloud instances")
-                .subcommand(cmd::stack::create::make_subcommand()),
+            Command::new("instance")
+                .about("Commands used to manage local and cloud instances")
+                .subcommand(cmd::instance::create::make_subcommand()),
         )
         .subcommand(
             Command::new("completions")

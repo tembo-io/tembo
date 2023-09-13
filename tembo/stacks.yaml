@@ -1,7 +1,7 @@
 stacks:
   - name: Standard
     description: A balanced Postgres instance optimized for OLTP workloads.
-    stack_version: 0.1.0
+    version: 0.1.0
     trunk_installs:
       - name: pg_stat_statements
         version: 1.10.0
@@ -14,7 +14,7 @@ stacks:
           version: 1.10.0
   - name: Data-Warehouse
     description: A Postgres instance equipped with configuration and extensions for data warehouses.
-    stack_version: 0.1.0
+    version: 0.1.0
     trunk_installs:
       - name: pg_stat_statements
         version: 1.10.0

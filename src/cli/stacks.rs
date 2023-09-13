@@ -1,33 +1,42 @@
+// Stacks are defined templates provided by Tembo containing attributes and extensions
+// (templates contain configuration information tailored to a specific use case)
+
+use crate::cli::stack_error::StackError;
 use crate::{Deserialize, Serialize};
+use chrono::{DateTime, Utc};
 use clap::ArgMatches;
 use std::error::Error;
-use std::fmt;
 use std::fs::File;
 use std::io::Read;
 
+// object containing all of the defined stacks
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
 pub struct Stacks {
-    pub stacks: Vec<StackDetails>,
+    pub stacks: Vec<Stack>,
 }
 
+// TODO: give a stack a unique id (name + version)
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct StackDetails {
+pub struct Stack {
     pub name: String,
     pub description: String,
-    pub stack_version: String,
+    pub version: String,
     pub trunk_installs: Vec<TrunkInstall>,
     pub extensions: Vec<Extension>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TrunkInstall {
-    pub name: String,
-    pub version: String, // needs to be parsed as a Version of semver
+    pub name: Option<String>,
+    pub version: Option<String>,
+    pub created_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Extension {
-    pub name: String,
+    pub name: Option<String>,
+    pub version: Option<String>,
+    pub created_at: Option<DateTime<Utc>>,
     pub locations: Vec<ExtensionLocation>,
 }
 
@@ -38,31 +47,7 @@ pub struct ExtensionLocation {
     pub version: String,
 }
 
-#[derive(Debug)]
-pub struct StackError {
-    pub details: String,
-}
-
-impl StackError {
-    pub fn new(msg: &str) -> StackError {
-        StackError {
-            details: msg.to_string(),
-        }
-    }
-}
-
-impl fmt::Display for StackError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.details)
-    }
-}
-
-impl Error for StackError {
-    fn description(&self) -> &str {
-        &self.details
-    }
-}
-
+// returns a result containing the stack name
 pub fn define_stack(args: &ArgMatches) -> Result<String, Box<dyn Error>> {
     let stacks: Stacks = define_stacks();
     let names: Vec<String> = stacks
@@ -88,6 +73,7 @@ pub fn define_stack(args: &ArgMatches) -> Result<String, Box<dyn Error>> {
     }
 }
 
+// returns a Stacks object containing attributes loaded from the stacks.yml file
 pub fn define_stacks() -> Stacks {
     let file = "./tembo/stacks.yaml"; // TODO: move to a constant
     let mut file = File::open(file).expect("Unable to open stack config file");
