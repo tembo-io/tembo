@@ -2114,9 +2114,9 @@ pub struct ClusterStatusInstancesReportedState {
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct ClusterStatusManagedRolesStatus {
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "byStatus")]
-    pub by_status: Option<BTreeMap<String, String>>,
+    pub by_status: Option<BTreeMap<String, Vec<String>>>,
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "cannotReconcile")]
-    pub cannot_reconcile: Option<BTreeMap<String, String>>,
+    pub cannot_reconcile: Option<BTreeMap<String, Vec<String>>>,
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "passwordStatus")]
     pub password_status: Option<BTreeMap<String, ClusterStatusManagedRolesStatusPasswordStatus>>,
 }
