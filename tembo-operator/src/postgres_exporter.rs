@@ -1,9 +1,9 @@
-use crate::{apis::coredb_types::CoreDB, defaults, secret::PrometheusExporterSecretData, Context, Error};
+use crate::{apis::coredb_types::CoreDB, defaults, Error};
 use kube::Client;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, sync::Arc};
-use tracing::{debug, error};
+use std::collections::BTreeMap;
+use tracing::debug;
 
 pub const QUERIES_YAML: &str = "queries.yaml";
 pub const EXPORTER_VOLUME: &str = "postgres-exporter";
@@ -55,9 +55,9 @@ fn preserve_arbitrary(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::sc
 }
 
 use crate::configmap::apply_configmap;
-use kube::runtime::controller::Action;
+
 use std::str::FromStr;
-use tokio::time::Duration;
+
 
 #[derive(Clone, Debug, JsonSchema, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "UPPERCASE")]
@@ -79,73 +79,6 @@ impl FromStr for Usage {
             "LABEL" => Ok(Usage::Label),
             _ => Err(()),
         }
-    }
-}
-
-pub async fn create_postgres_exporter_role(
-    cdb: &CoreDB,
-    ctx: Arc<Context>,
-    secret: Option<PrometheusExporterSecretData>,
-) -> Result<(), Action> {
-    if !(cdb.spec.postgresExporterEnabled) {
-        return Ok(());
-    }
-
-    debug!(
-        "Creating postgres_exporter role for database {} in namespace {}",
-        cdb.metadata
-            .name
-            .clone()
-            .expect("instance should always have a name"),
-        cdb.metadata
-            .namespace
-            .clone()
-            .expect("instance should always have a namespace")
-    );
-
-    // Check if secret data is available
-    let password = match &secret {
-        Some(data) => data.password.clone(),
-        None => {
-            error!(
-                "No secret data available for postgres_exporter in instance {}",
-                cdb.metadata
-                    .name
-                    .clone()
-                    .expect("instance should always have a name")
-            );
-            return Err(Action::requeue(Duration::from_secs(300)));
-        }
-    };
-    // https://github.com/prometheus-community/postgres_exporter#running-as-non-superuser
-    let query = format!(
-        "
-        CREATE OR REPLACE FUNCTION __tmp_create_user() returns void as $$
-        BEGIN
-          IF NOT EXISTS (
-                  SELECT
-                  FROM   pg_catalog.pg_user
-                  WHERE  usename = 'postgres_exporter') THEN
-            CREATE USER postgres_exporter;
-          END IF;
-        END;
-        $$ language plpgsql;
-
-        SELECT __tmp_create_user();
-        DROP FUNCTION __tmp_create_user();
-
-        ALTER USER postgres_exporter SET SEARCH_PATH TO postgres_exporter,pg_catalog;
-        ALTER USER postgres_exporter WITH PASSWORD '{}';
-        GRANT CONNECT ON DATABASE postgres TO postgres_exporter;
-        GRANT pg_monitor to postgres_exporter;
-        GRANT pg_read_all_stats to postgres_exporter;
-        ",
-        password
-    );
-    let query_result = cdb.psql(query, "postgres".to_owned(), ctx.clone()).await;
-    match query_result {
-        Ok(_) => Ok(()),
-        Err(e) => Err(e),
     }
 }
 

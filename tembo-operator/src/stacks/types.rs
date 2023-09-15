@@ -1,6 +1,6 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::{collections::BTreeMap, default};
+use std::collections::BTreeMap;
 use utoipa::ToSchema;
 
 use crate::{

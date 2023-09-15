@@ -9,7 +9,7 @@ use crate::{
     exec::{ExecCommand, ExecOutput},
     ingress::reconcile_postgres_ing_route_tcp,
     psql::{PsqlCommand, PsqlOutput},
-    secret::{reconcile_postgres_exporter_secret, reconcile_secret, PrometheusExporterSecretData},
+    secret::{reconcile_postgres_role_secret, reconcile_secret},
     service::reconcile_prometheus_exporter_service,
     telemetry, Error, Metrics, Result,
 };
@@ -33,7 +33,7 @@ use kube::{
 use crate::{
     extensions::reconcile_extensions,
     ingress::reconcile_extra_postgres_ing_route_tcp,
-    postgres_exporter::{create_postgres_exporter_role, reconcile_prom_configmap},
+    postgres_exporter::reconcile_prom_configmap,
     trunk::{extensions_that_require_load, reconcile_trunk_configmap},
 };
 use rand::Rng;
@@ -198,24 +198,27 @@ impl CoreDB {
         })?;
 
         // Postgres exporter connection info
-        let secret_data: Option<PrometheusExporterSecretData> = if self.spec.postgresExporterEnabled {
-            let result = reconcile_postgres_exporter_secret(self, ctx.clone())
+        if self.spec.postgresExporterEnabled {
+            let _ = reconcile_postgres_role_secret(
+                self,
+                ctx.clone(),
+                "postgres_exporter",
+                &format!("{}-exporter", name.clone()),
+            )
+            .await
+            .map_err(|e| {
+                error!("Error reconciling postgres exporter secret: {:?}", e);
+                Action::requeue(Duration::from_secs(300))
+            })?;
+        }
+
+        let _ =
+            reconcile_postgres_role_secret(self, ctx.clone(), "readonly", &format!("{}-ro", name.clone()))
                 .await
                 .map_err(|e| {
                     error!("Error reconciling postgres exporter secret: {:?}", e);
                     Action::requeue(Duration::from_secs(300))
                 })?;
-
-            match result {
-                Some(data) => Some(data),
-                None => {
-                    warn!("Secret already exists, no new password is generated");
-                    None
-                }
-            }
-        } else {
-            None
-        };
 
         // Deploy cluster
         let span = span!(Level::INFO, "reconcile_cnpg");
@@ -282,10 +285,6 @@ impl CoreDB {
                 let _enter = span.enter();
                 let (trunk_installs, extensions) =
                     reconcile_extensions(self, ctx.clone(), &coredbs, &name).await?;
-
-                let span = span!(Level::DEBUG, "create_postgres_exporter_role");
-                let _enter = span.enter();
-                create_postgres_exporter_role(self, ctx.clone(), secret_data).await?;
 
                 // At this point all pods should be unfenced so lets make sure
                 let span = span!(Level::DEBUG, "unfence_pods");

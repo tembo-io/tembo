@@ -10,8 +10,8 @@ use passwords::PasswordGenerator;
 use std::{collections::BTreeMap, sync::Arc};
 use tracing::debug;
 
-#[derive(Clone, Debug)]
-pub struct PrometheusExporterSecretData {
+#[derive(Clone)]
+pub struct RolePassword {
     pub password: String,
 }
 
@@ -106,38 +106,30 @@ fn secret_data(cdb: &CoreDB, name: &str, ns: &str, password: String) -> BTreeMap
 }
 
 // Set postgres-exporter secret
-pub async fn reconcile_postgres_exporter_secret(
+pub async fn reconcile_postgres_role_secret(
     cdb: &CoreDB,
     ctx: Arc<Context>,
-) -> Result<Option<PrometheusExporterSecretData>, Error> {
+    role_name: &str,
+    secret_name: &str,
+) -> Result<Option<RolePassword>, Error> {
     let client = ctx.client.clone();
     let ns = cdb.namespace().unwrap();
-    let name = format!("{}-metrics", cdb.name_any());
+    let name = secret_name.to_string();
     let mut labels: BTreeMap<String, String> = BTreeMap::new();
     let secret_api: Api<Secret> = Api::namespaced(client.clone(), &ns);
     let oref = cdb.controller_owner_ref(&()).unwrap();
-    labels.insert("app".to_owned(), "postgres-exporter".to_string());
-    labels.insert("component".to_owned(), "metrics".to_string());
-    labels.insert("coredb.io/name".to_owned(), cdb.name_any());
+    labels.insert("role".to_owned(), role_name.to_string());
+    labels.insert("tembo.io/name".to_owned(), cdb.name_any());
 
-    // check for existing secret
-    let lp = ListParams::default()
-        .labels(format!("coredb.io/name={},app=postgres-exporter", &cdb.name_any()).as_str());
-    let secrets = secret_api.list(&lp).await.expect("could not get Secrets");
-
-    // if the secret has already been created, return (avoids overwriting password value)
-    if !secrets.items.is_empty() {
-        for s in &secrets.items {
-            if s.name_any() == name {
-                debug!("skipping secret creation: secret {} exists", &name);
-                let secret_data = fetch_secret_data(client.clone(), name, &ns).await?;
-                return Ok(Some(secret_data));
-            }
-        }
-    }
+    // Get secret by name
+    if secret_api.get(secret_name).await.is_ok() {
+        debug!("skipping secret creation: secret {} exists", &name);
+        let secret_data = fetch_secret_data(client.clone(), name, &ns).await?;
+        return Ok(Some(secret_data));
+    };
 
     // generate secret data
-    let (data, secret_data) = postgres_exporter_secret_data();
+    let (data, secret_data) = generate_role_secret_data(role_name);
 
     let secret: Secret = Secret {
         metadata: ObjectMeta {
@@ -159,25 +151,22 @@ pub async fn reconcile_postgres_exporter_secret(
     Ok(Some(secret_data))
 }
 
-fn postgres_exporter_secret_data() -> (BTreeMap<String, ByteString>, PrometheusExporterSecretData) {
+fn generate_role_secret_data(role_name: &str) -> (BTreeMap<String, ByteString>, RolePassword) {
     let mut data = BTreeMap::new();
 
     // encode and insert password into secret data
     let password = generate_password();
     let b64_password = b64_encode(&password);
     data.insert("password".to_owned(), b64_password);
+    data.insert("username".to_owned(), b64_encode(role_name));
 
-    let secret_data = PrometheusExporterSecretData { password };
+    let secret_data = RolePassword { password };
 
     (data, secret_data)
 }
 
 // Lookup secret data for postgres-exporter
-async fn fetch_secret_data(
-    client: Client,
-    name: String,
-    ns: &str,
-) -> Result<PrometheusExporterSecretData, Error> {
+async fn fetch_secret_data(client: Client, name: String, ns: &str) -> Result<RolePassword, Error> {
     let secret_api: Api<Secret> = Api::namespaced(client, ns);
     let secret_name = name.to_string();
 
@@ -186,7 +175,7 @@ async fn fetch_secret_data(
             if let Some(data_map) = secret.data {
                 if let Some(password_bytes) = data_map.get("password") {
                     let password = String::from_utf8(password_bytes.0.clone()).unwrap();
-                    let secret_data = PrometheusExporterSecretData { password };
+                    let secret_data = RolePassword { password };
                     Ok(secret_data)
                 } else {
                     Err(Error::MissingSecretError(

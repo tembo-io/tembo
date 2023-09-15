@@ -34,6 +34,7 @@ install-cnpg:
 	  --namespace cnpg-system \
 	  --create-namespace \
 		--values=./testdata/cnpg.yaml \
+		--version=0.18.2 \
 	  cnpg/cloudnative-pg
 
 install-tempo:

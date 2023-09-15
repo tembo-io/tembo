@@ -7,9 +7,10 @@ use crate::{
             ClusterBackupBarmanObjectStoreDataEncryption, ClusterBackupBarmanObjectStoreS3Credentials,
             ClusterBackupBarmanObjectStoreWal, ClusterBackupBarmanObjectStoreWalCompression,
             ClusterBackupBarmanObjectStoreWalEncryption, ClusterBootstrap, ClusterBootstrapInitdb,
-            ClusterExternalClusters, ClusterExternalClustersPassword, ClusterLogLevel, ClusterMonitoring,
-            ClusterMonitoringCustomQueriesConfigMap, ClusterNodeMaintenanceWindow, ClusterPostgresql,
-            ClusterPostgresqlSyncReplicaElectionConstraint, ClusterPrimaryUpdateMethod,
+            ClusterExternalClusters, ClusterExternalClustersPassword, ClusterLogLevel, ClusterManaged,
+            ClusterManagedRoles, ClusterManagedRolesEnsure, ClusterManagedRolesPasswordSecret,
+            ClusterMonitoring, ClusterMonitoringCustomQueriesConfigMap, ClusterNodeMaintenanceWindow,
+            ClusterPostgresql, ClusterPostgresqlSyncReplicaElectionConstraint, ClusterPrimaryUpdateMethod,
             ClusterPrimaryUpdateStrategy, ClusterReplicationSlots, ClusterReplicationSlotsHighAvailability,
             ClusterResources, ClusterServiceAccountTemplate, ClusterServiceAccountTemplateMetadata,
             ClusterSpec, ClusterStorage, ClusterSuperuserSecret,
@@ -44,7 +45,6 @@ pub fn cnpg_backup_configuration(
 ) -> (Option<ClusterBackup>, Option<ClusterServiceAccountTemplate>) {
     // Check to make sure that backups are enabled, and return None if it is disabled.
     if !cfg.enable_backup {
-        warn!("Backups are disabled");
         (None, None)
     } else {
         debug!("Backups are enabled, configuring...");
@@ -308,7 +308,7 @@ pub fn cnpg_cluster_from_cdb(
 
     Cluster {
         metadata: ObjectMeta {
-            name: Some(name),
+            name: Some(name.clone()),
             namespace: Some(namespace),
             annotations: Some(annotations),
             owner_references: Some(vec![owner_reference]),
@@ -330,6 +330,7 @@ pub fn cnpg_cluster_from_cdb(
             image_name: Some(image),
             instances: cdb.spec.replicas as i64,
             log_level: Some(ClusterLogLevel::Info),
+            managed: cluster_managed(&name),
             max_sync_replicas: Some(0),
             min_sync_replicas: Some(0),
             monitoring: Some(ClusterMonitoring {
@@ -382,6 +383,33 @@ pub fn cnpg_cluster_from_cdb(
         },
         status: None,
     }
+}
+
+fn cluster_managed(name: &str) -> Option<ClusterManaged> {
+    Some(ClusterManaged {
+        roles: Some(vec![
+            ClusterManagedRoles {
+                name: "readonly".to_string(),
+                ensure: Some(ClusterManagedRolesEnsure::Present),
+                login: Some(true),
+                password_secret: Some(ClusterManagedRolesPasswordSecret {
+                    name: format!("{}-ro", name).to_string(),
+                }),
+                in_roles: Some(vec!["pg_read_all_data".to_string()]),
+                ..ClusterManagedRoles::default()
+            },
+            ClusterManagedRoles {
+                name: "postgres_exporter".to_string(),
+                ensure: Some(ClusterManagedRolesEnsure::Present),
+                login: Some(true),
+                password_secret: Some(ClusterManagedRolesPasswordSecret {
+                    name: format!("{}-exporter", name).to_string(),
+                }),
+                in_roles: Some(vec!["pg_read_all_stats".to_string(), "pg_monitor".to_string()]),
+                ..ClusterManagedRoles::default()
+            },
+        ]),
+    })
 }
 
 // This is a synchronous function that takes the latest_generated_node and diff_instances
@@ -1535,5 +1563,61 @@ mod tests {
         let expected = vec!["instance-1", "instance-2"];
 
         assert_eq!(pod_names_to_fence, expected);
+    }
+
+    #[test]
+    fn test_parse_cnpg_with_managed_roles_in_status() {
+        let json_str = r#"
+        {
+          "apiVersion": "postgresql.cnpg.io/v1",
+          "kind": "Cluster",
+          "metadata": {
+            "name": "test-coredb",
+            "namespace": "default"
+          },
+          "spec": {
+            "imageName": "quay.io/tembo/standard-cnpg:15.3.0-1-0c19c7e",
+            "instances": 1,
+            "managed": {
+              "roles": [
+                {
+                  "connectionLimit": -1,
+                  "ensure": "present",
+                  "inRoles": [
+                    "pg_read_all_data"
+                  ],
+                  "inherit": true,
+                  "login": true,
+                  "name": "readonly",
+                  "passwordSecret": {
+                    "name": "test-coredb-ro-password"
+                  }
+                }
+              ]
+            }
+          },
+          "status": {
+            "managedRolesStatus": {
+              "byStatus": {
+                "not-managed": [
+                  "app"
+                ],
+                "reconciled": [
+                  "readonly"
+                ],
+                "reserved": [
+                  "postgres"
+                ]
+              },
+              "passwordStatus": {
+                "readonly": {
+                  "transactionID": 726
+                }
+              }
+            }
+          }
+        }
+        "#;
+        let _result: Cluster = serde_json::from_str(json_str).expect("Should be able to deserialize");
     }
 }

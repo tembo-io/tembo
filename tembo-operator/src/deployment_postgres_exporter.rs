@@ -110,7 +110,7 @@ pub async fn reconcile_prometheus_exporter_deployment(cdb: &CoreDB, ctx: Arc<Con
             value_from: Some(EnvVarSource {
                 secret_key_ref: Some(SecretKeySelector {
                     key: "password".to_string(),
-                    name: Some(name.to_owned()),
+                    name: Some(format!("{}-exporter", coredb_name.clone())),
                     optional: Some(false),
                 }),
                 ..EnvVarSource::default()
