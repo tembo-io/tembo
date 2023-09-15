@@ -36,15 +36,7 @@ pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
     );
 
     // pull the Tembo image
-    match build_image() {
-        Ok(_) => println!("- Tembo image is installed"),
-        Err(e) => {
-            eprintln!("{}", e);
-            return Err(e);
-        }
-    }
-
-    Ok(())
+    build_image()
 }
 
 fn check_requirements() -> Result<(), Box<dyn Error>> {
@@ -59,8 +51,7 @@ fn build_image() -> Result<(), Box<dyn Error>> {
 
     let mut sp = Spinner::new(Spinners::Line, "Installing image".into());
     let mut command = String::from("cd tembo"); // TODO: does this work for installed crates?
-    command.push_str("&& docker image pull ");
-    command.push_str("quay.io/tembo/tembo-pg-cnpg:latest");
+    command.push_str("&& docker build -t tembo-pg . ");
     command.push_str(" --quiet");
 
     let output = ShellCommand::new("sh")

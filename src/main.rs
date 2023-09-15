@@ -22,7 +22,7 @@ fn main() {
 
     let res = match matches.subcommand() {
         Some(("init", sub_matches)) => cmd::init::execute(sub_matches),
-        Some(("instance", sub_matches)) => cmd::instance::create::execute(sub_matches),
+        Some(("instance", sub_matches)) => cmd::instance::execute(sub_matches),
         Some(("completions", sub_matches)) => (|| {
             let shell = sub_matches
                 .get_one::<Shell>("shell")
@@ -64,7 +64,9 @@ fn create_clap_command() -> Command {
         .subcommand(
             Command::new("instance")
                 .about("Commands used to manage local and cloud instances")
-                .subcommand(cmd::instance::create::make_subcommand()),
+                .subcommand(cmd::instance::create::make_subcommand())
+                .subcommand(cmd::instance::list::make_subcommand())
+                .subcommand(cmd::instance::start::make_subcommand()),
         )
         .subcommand(
             Command::new("completions")

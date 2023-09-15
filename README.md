@@ -30,8 +30,6 @@ The `instance create` command creates an instance of a Tembo stack locally. It i
 version of Postgres and an additional items like extensions. You can specify the 
 type of instance you want to create. You'll also need to provide a name and port number.
 
-Each instance runs as a Docker container.
-
 Currently supported types include: 
 
 * standard
@@ -39,9 +37,16 @@ Currently supported types include:
 
 More stack types will be added shortly.
 
+## `tembo instance list`
+
+The `instance list` command simply lists all of the instances that have been created. It lists key attributes such as name, type and port.
+
 ## `tembo instance start`
 
-Coming soon - will start an installed instance.
+The `instance start` command allows users to start their instances. It requires the name as a parameter and Docker to be running. No two 
+instances can be started that share a port number.
+
+Each instance runs as a Docker container.
 
 # Contributing
 
