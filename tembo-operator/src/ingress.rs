@@ -13,7 +13,7 @@ use kube::{
 use std::sync::Arc;
 
 use crate::{apis::coredb_types::CoreDB, errors::OperatorError, Context};
-use tracing::log::{debug, error, info, warn};
+use tracing::{debug, error, info, warn};
 
 fn postgres_ingress_route_tcp(
     name: String,
