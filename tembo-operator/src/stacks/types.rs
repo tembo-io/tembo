@@ -1,6 +1,6 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, default};
 use utoipa::ToSchema;
 
 use crate::{
@@ -61,9 +61,9 @@ pub struct Stack {
     pub name: String,
     pub compute_templates: Option<Vec<ComputeTemplate>>,
     pub description: Option<String>,
-    #[serde(default = "default_image")]
-    pub image: String,
-    pub stack_version: String,
+    #[serde(default = "default_stack_image")]
+    pub image: Option<String>,
+    pub stack_version: Option<String>,
     pub trunk_installs: Option<Vec<TrunkInstall>>,
     pub extensions: Option<Vec<Extension>>,
     // postgres metric definition specific to the Stack
@@ -86,6 +86,10 @@ impl Stack {
             None => Some(standard_config_engine(self)),
         }
     }
+}
+
+fn default_stack_image() -> Option<String> {
+    Some(default_image())
 }
 
 fn default_config_engine() -> Option<ConfigEngine> {
