@@ -2,14 +2,14 @@ use crate::{apis::coredb_types::CoreDB, defaults, extensions::database_queries::
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tracing::warn;
-
-#[derive(Clone, Debug, Deserialize, Eq, Hash, JsonSchema, Serialize, PartialEq)]
+use utoipa::ToSchema;
+#[derive(Clone, Debug, Deserialize, Eq, Hash, JsonSchema, Serialize, PartialEq, ToSchema)]
 pub struct TrunkInstall {
     pub name: String,
     pub version: Option<String>,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, Hash, JsonSchema, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, JsonSchema, Serialize, PartialEq, ToSchema)]
 pub struct TrunkInstallStatus {
     pub name: String,
     pub version: Option<String>,
@@ -18,7 +18,7 @@ pub struct TrunkInstallStatus {
     pub installed_to_pods: Option<Vec<String>>,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, Hash, JsonSchema, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, JsonSchema, Serialize, PartialEq, ToSchema)]
 pub struct Extension {
     pub name: String,
     #[serde(default = "defaults::default_description")]
@@ -38,13 +38,13 @@ impl Default for Extension {
     }
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, Hash, JsonSchema, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, JsonSchema, Serialize, PartialEq, ToSchema)]
 pub struct ExtensionInstallLocation {
     pub enabled: bool,
     #[serde(default = "defaults::default_database")]
     pub database: String,
     pub version: Option<String>,
-    schema: Option<String>,
+    pub schema: Option<String>,
 }
 
 impl Default for ExtensionInstallLocation {
@@ -88,7 +88,7 @@ pub fn generate_extension_enable_cmd(
     Ok(command)
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, Hash, JsonSchema, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, JsonSchema, Serialize, PartialEq, ToSchema)]
 pub struct ExtensionStatus {
     pub name: String,
     #[serde(default = "defaults::default_description")]
@@ -96,7 +96,7 @@ pub struct ExtensionStatus {
     pub locations: Vec<ExtensionInstallLocationStatus>,
 }
 
-#[derive(Clone, Debug, Deserialize, Eq, Hash, JsonSchema, Serialize, PartialEq)]
+#[derive(Clone, Debug, Deserialize, Eq, Hash, JsonSchema, Serialize, PartialEq, ToSchema)]
 pub struct ExtensionInstallLocationStatus {
     #[serde(default = "defaults::default_database")]
     pub database: String,

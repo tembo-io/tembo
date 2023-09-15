@@ -13,20 +13,6 @@ compute_templates:
     memory: 32Gi
   - cpu: 32
     memory: 32Gi
-  # pretty sure we do not yet support the below?
-  # uncomment when we do
-  # - cpu: 48
-  #   memory: 96Gi
-  # - cpu: 64
-  #   memory: 128Gi
-  # - cpu: 96
-  #   memory: 192Gi
-infrastructure:
-  cpu: 2
-  memory: 2Gi
-  storage_size: 10Gi
-  instance_type: GeneralPurpose
-  storage_class: gp3
 postgres_config_engine: standard
 postgres_config:
   - name: pg_stat_statements.track
@@ -39,7 +25,7 @@ postgres_config:
     value: vectorize,pg_stat_statements,pgml,pg_cron,pg_later
 trunk_installs:
   - name: pgvector
-    version: 0.4.4
+    version: 0.5.0
   - name: pgml
     version: 2.7.1
   - name: pg_embedding
@@ -57,48 +43,41 @@ extensions:
   - name: vector
     locations:
       - database: postgres
-        schema: public
         enabled: true
-        version: 0.4.4
+        version: 0.5.0
   # trunk project postgresml
   - name: pgml
     locations:
       - database: postgres
-        schema: public
         enabled: true
         version: 2.7.1
   # trunk project pg_embedding
   - name: embedding
     locations:
       - database: postgres
-        schema: public
-        enabled: true
+        enabled: false
         version: 0.1.0
   - name: pg_cron
     description: pg_cron
     locations:
     - database: postgres
-      schema: pg_catalog
       enabled: true
       version: 1.5.2
   - name: pgmq
     description: pgmq
     locations:
     - database: postgres
-      schema: public
       enabled: true
       version: 0.14.2
   - name: vectorize
     description: simple vector search
     locations:
     - database: postgres
-      schema: public
       enabled: true
       version: 0.0.2
   - name: pg_later
     description: async query execution
     locations:
     - database: postgres
-      schema: public
       enabled: true
       version: 0.0.8

@@ -1,10 +1,11 @@
 [package]
 name = "controller"
-version = "0.0.1"
+description = "Tembo Operator for Postgres"
+version = "0.1.0"
 edition = "2021"
 default-run = "controller"
 license = "Apache-2.0"
-publish = false
+publish = true
 
 [[bin]]
 doc = false
@@ -51,6 +52,7 @@ semver = "1.0.18"
 anyhow = "1.0.72"
 rand = "0.8.5"
 reqwest = "0.11.20"
+utoipa = "3.5.0"
 
 [dev-dependencies]
 assert-json-diff = "2.0.2"

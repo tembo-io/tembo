@@ -11,6 +11,7 @@ use serde::{
 use std::{cmp::Ordering, collections::BTreeSet, fmt, str::FromStr};
 use thiserror::Error;
 use tracing::*;
+use utoipa::ToSchema;
 
 // these values are multi-valued, and need to be merged across configuration layers
 pub const MULTI_VAL_CONFIGS: [&str; 5] = [
@@ -101,7 +102,7 @@ pub const TEMBO_POSTGRESQL_CONF_VOLUME_PATH: &str = "/tembo/config";
 pub const TEMBO_POSTGRESQL_CONFIGMAP: &str = "tembo-postgresql-conf";
 
 // defines the postgresql configuration
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, JsonSchema)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, JsonSchema, ToSchema)]
 pub struct PgConfig {
     pub name: String,
     pub value: ConfigValue,
@@ -200,6 +201,17 @@ impl From<WrapValue> for Result<ConfigValue, JsonParsingError> {
             }
         } else {
             Err(JsonParsingError::custom("Invalid value: expected string"))
+        }
+    }
+}
+
+impl From<&str> for ConfigValue {
+    fn from(item: &str) -> Self {
+        let values: Vec<String> = item.split(',').map(|s| s.trim().to_string()).collect();
+        if values.len() > 1 {
+            ConfigValue::Multiple(values.into_iter().collect())
+        } else {
+            ConfigValue::Single(values[0].clone())
         }
     }
 }

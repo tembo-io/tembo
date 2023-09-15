@@ -303,7 +303,6 @@ fn update_trunk_installs(
 mod tests {
     use super::*;
 
-
     #[test]
     fn test_update_trunk_installs_from_no_pods() {
         let current_trunk_installs = vec![TrunkInstallStatus {

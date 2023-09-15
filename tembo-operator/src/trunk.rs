@@ -5,7 +5,6 @@ use std::{collections::BTreeMap, env, time::Duration};
 use crate::configmap::apply_configmap;
 use tracing::log::error;
 
-
 const DEFAULT_TRUNK_REGISTRY_DOMAIN: &str = "registry.pgtrunk.io";
 
 // One configmap per namespace

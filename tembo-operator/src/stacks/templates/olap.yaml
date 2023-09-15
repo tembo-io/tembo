@@ -4,31 +4,15 @@ image: "quay.io/tembo/standard-cnpg:15.3.0-1-0c19c7e"
 stack_version: 0.1.0
 compute_templates:
   - cpu: 1
-    memory: 2Gi
-  - cpu: 2
     memory: 4Gi
   - cpu: 2
     memory: 8Gi
-  - cpu: 2
-    memory: 16Gi
   - cpu: 4
-    memory: 8Gi
-  - cpu: 4
-    memory: 16Gi
-  - cpu: 4
-    memory: 32Gi
-  - cpu: 8
     memory: 16Gi
   - cpu: 8
     memory: 32Gi
   - cpu: 16
     memory: 32Gi
-infrastructure:
-  cpu: 1
-  memory: 2Gi
-  storage_size: 10Gi
-  instance_type: GeneralPurpose
-  storage_class: gp3
 postgres_config_engine: olap
 postgres_config:
   - name: checkpoint_timeout
@@ -53,44 +37,46 @@ trunk_installs:
   - name: postgres_fdw
     version: 1.1.0
   - name: clerk_fdw
-    version: 0.0.0
+    version: 0.2.4
+  - name: redis_fdw
+    version: 1.0.0
 extensions:
   - name: pg_stat_statements
     locations:
       - database: postgres
-        schema: public
         enabled: true
         version: 1.10.0
   - name: columnar
     locations:
       - database: postgres
-        schema: public
         enabled: true
         version: '11.1-7'
   - name: pg_partman
     locations:
       - database: postgres
-        schema: public
         enabled: true
         version: 4.7.3
   - name: pg_cron
     description: pg_cron
     locations:
     - database: postgres
-      schema: pg_catalog
       enabled: true
       version: 1.5.2
   - name: postgres_fdw
     description: postgres_fdw
     locations:
     - database: postgres
-      schema: public
       enabled: true
       version: '1.1'
   - name: clerk_fdw
     description: clerk_fdw
     locations:
     - database: postgres
-      schema: public
       enabled: true
-      version:  0.0.0
+      version:  0.2.4
+  - name: redis_fdw
+    description: redis_fdw
+    locations:
+    - database: postgres
+      enabled: true
+      version:  1.0.0
