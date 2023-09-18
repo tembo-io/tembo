@@ -172,7 +172,7 @@ pub fn merge_pg_configs(
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, ToSchema)]
 pub enum ConfigValue {
     Single(String),
     Multiple(BTreeSet<String>),
