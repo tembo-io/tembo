@@ -1,6 +1,6 @@
 name: OLAP
 description: A Postgres instance equipped with configuration and extensions for OLAP workloads.
-image: "quay.io/tembo/standard-cnpg:15.3.0-1-0c19c7e"
+image: "quay.io/tembo/standard-cnpg:15.3.0-1-45c2054"
 stack_version: 0.1.0
 compute_templates:
   - cpu: 1
