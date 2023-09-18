@@ -1,4 +1,4 @@
-use crate::extensions::types::ExtensionStatus;
+use crate::{extensions::types::ExtensionStatus, stacks::types::Stack};
 use k8s_openapi::{
     api::core::v1::ResourceRequirements,
     apimachinery::pkg::{api::resource::Quantity, apis::meta::v1::ObjectMeta},
@@ -234,13 +234,6 @@ pub struct CoreDBStatus {
     pub runtime_config: Option<Vec<PgConfig>>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
-pub struct Stack {
-    pub name: String,
-    // static configs defined in the tembo stack
-    pub postgres_config: Option<Vec<PgConfig>>,
-    // TODO: add other stack attributes as they are supported
-}
 
 #[cfg(test)]
 mod tests {
