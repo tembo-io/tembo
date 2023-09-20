@@ -1,4 +1,4 @@
-use crate::{extensions::types::ExtensionStatus, stacks::types::Stack};
+use crate::extensions::types::ExtensionStatus;
 use k8s_openapi::{
     api::core::v1::ResourceRequirements,
     apimachinery::pkg::{api::resource::Quantity, apis::meta::v1::ObjectMeta},
@@ -20,6 +20,13 @@ use crate::{
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
+
+#[derive(Clone, Default, Debug, Serialize, Deserialize, JsonSchema)]
+pub struct Stack {
+    pub name: String,
+    pub postgres_config: Option<Vec<PgConfig>>,
+}
+
 
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema, Default)]
 pub struct ServiceAccountTemplate {

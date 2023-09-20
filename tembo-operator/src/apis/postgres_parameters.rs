@@ -377,7 +377,7 @@ impl<'de> Deserialize<'de> for PgConfig {
 #[cfg(test)]
 mod pg_param_tests {
     use super::*;
-    use crate::{apis::coredb_types::CoreDBSpec, stacks::types::Stack};
+    use crate::apis::coredb_types::{CoreDBSpec, Stack};
 
     #[test]
     fn test_pg_config() {
