@@ -1,6 +1,7 @@
 use actix_web::{middleware, web, App, HttpServer};
 
 use actix_cors::Cors;
+
 use dataplane_webserver::{
     config,
     routes::health::{lively, ready},
@@ -8,7 +9,7 @@ use dataplane_webserver::{
 };
 use log::info;
 
-use dataplane_webserver::routes::metrics;
+use dataplane_webserver::routes::{metrics, secrets};
 use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::{Modify, OpenApi};
 
@@ -30,7 +31,9 @@ async fn main() -> std::io::Result<()> {
 
     #[derive(OpenApi)]
     #[openapi(
-        paths(metrics::query_range),
+        paths(metrics::query_range,
+              secrets::get_secret,
+              secrets::get_secret_names),
         components(schemas()),
         modifiers(&SecurityAddon),
         security(("jwt_token" = [])),
@@ -70,6 +73,11 @@ async fn main() -> std::io::Result<()> {
             .wrap(middleware::Logger::default())
             .service(web::scope("/").service(root::ok))
             .service(web::scope("/{namespace}/metrics").service(metrics::query_range))
+            .service(
+                web::scope("/{namespace}/secrets")
+                    .service(secrets::get_secret)
+                    .service(secrets::get_secret_names),
+            )
             .service(web::scope("/health").service(ready).service(lively))
             .service(SwaggerUi::new("/swagger-ui/{_:.*}").urls(vec![(
                 Url::new("dataplane-api", "/api-docs/openapi.json"),
