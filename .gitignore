@@ -13,4 +13,7 @@ target/
 
 /target
 .idea/**
+**/.idea/**
+**/.idea
 temp.sh
+.idea

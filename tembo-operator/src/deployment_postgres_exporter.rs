@@ -160,7 +160,6 @@ pub async fn reconcile_prometheus_exporter_deployment(cdb: &CoreDB, ctx: Arc<Con
     // Generate the PodSpec for the PodTemplateSpec
     let pod_spec = PodSpec {
         containers: vec![Container {
-            args: Some(vec!["--auto-discover-databases".to_string()]),
             env: Some(env_vars),
             image: Some(get_exporter_image(&cdb.clone())),
             name: "postgres-exporter".to_string(),
