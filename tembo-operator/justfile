@@ -83,6 +83,25 @@ start-kind:
 	just annotate
 	kubectl wait pods --for=condition=Ready --timeout=300s --all --all-namespaces
 
+# install dependencies on a cluster
+install-dependencies:
+	just update-helm-repos
+	just enable-cnpg-default-namespace
+	just install-kube-prometheus-stack
+	just install-tempo
+	just install-traefik
+	just install-crd
+	just install-cnpg
+	just install-tembo-pod-init
+	just annotate
+	kubectl wait pods --for=condition=Ready --timeout=300s --all --all-namespaces
+
+# deploy the controller on a cluster
+install-chart:
+    kubectl create ns coredb-operator || true
+    kubectl delete crd coredbs.coredb.io || true
+    helm upgrade tembo-operator ../charts/tembo-operator --install --namespace=coredb-operator --values=testdata/tembo-operator.yaml
+
 # run with opentelemetry
 run-telemetry: run-jaeger
 	DATA_PLANE_BASEDOMAIN=localhost OPENTELEMETRY_ENDPOINT_URL=http://localhost:4317 RUST_LOG=debug,kube=debug,controller=debug ENABLE_BACKUP=false cargo run --features=telemetry

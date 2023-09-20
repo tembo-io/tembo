@@ -26,7 +26,7 @@ rustup component add rustfmt --toolchain nightly
 cargo +nightly fmt
 ```
 
-### Running
+### Running Locally
 
 To build and run the operator locally
 
@@ -48,12 +48,11 @@ cargo install cargo-watch
 just watch
 ```
 
-### Testing
-
-#### Unit testing
+### Install on an existing cluster
 
 ```bash
-just test
+just install-depedencies
+just install-chart
 ```
 
 #### Integration testing
