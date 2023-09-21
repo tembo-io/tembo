@@ -406,6 +406,10 @@ spec:
               extensionsUpdating:
                 default: false
                 type: boolean
+              first_recoverability_time:
+                format: date-time
+                nullable: true
+                type: string
               resources:
                 description: ResourceRequirements describes the compute resource requirements.
                 nullable: true

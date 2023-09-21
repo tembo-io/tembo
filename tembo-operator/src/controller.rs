@@ -3,7 +3,10 @@ use futures::stream::StreamExt;
 
 use crate::{
     apis::coredb_types::{CoreDB, CoreDBStatus},
-    cloudnativepg::cnpg::{cnpg_cluster_from_cdb, reconcile_cnpg, reconcile_cnpg_scheduled_backup},
+    cloudnativepg::{
+        backups::Backup,
+        cnpg::{cnpg_cluster_from_cdb, reconcile_cnpg, reconcile_cnpg_scheduled_backup},
+    },
     config::Config,
     deployment_postgres_exporter::reconcile_prometheus_exporter_deployment,
     exec::{ExecCommand, ExecOutput},
@@ -61,8 +64,6 @@ pub struct Context {
 async fn reconcile(cdb: Arc<CoreDB>, ctx: Arc<Context>) -> Result<Action> {
     let trace_id = telemetry::get_trace_id();
     Span::current().record("trace_id", &field::display(&trace_id));
-    let span = span!(Level::INFO, "reconcile");
-    let _enter = span.enter();
     let cfg = Config::default();
     let _timer = ctx.metrics.count_and_measure();
     ctx.diagnostics.write().await.last_event = Utc::now();
@@ -110,8 +111,6 @@ impl CoreDB {
     // Reconcile (for non-finalizer related changes)
     #[instrument(skip(self, ctx, cfg))]
     async fn reconcile(&self, ctx: Arc<Context>, cfg: &Config) -> Result<Action, Action> {
-        let span = span!(Level::INFO, "self_reconcile");
-        let _enter = span.enter();
         let client = ctx.client.clone();
         let _recorder = ctx.diagnostics.read().await.recorder(client.clone(), self);
         let ns = self.namespace().unwrap();
@@ -128,8 +127,6 @@ impl CoreDB {
                     "DATA_PLANE_BASEDOMAIN is set to {}, reconciling ingress route tcp",
                     basedomain
                 );
-                let span = span!(Level::INFO, "reconcile_ingress_route_tcp");
-                let _enter = span.enter();
                 let service_name_read_write = format!("{}-rw", self.name_any().as_str());
                 reconcile_postgres_ing_route_tcp(
                     self,
@@ -178,8 +175,6 @@ impl CoreDB {
                 .is_some()
         {
             debug!("Reconciling prometheus configmap");
-            let span = span!(Level::INFO, "reconcile_prom_configmap");
-            let _enter = span.enter();
             reconcile_prom_configmap(self, client.clone(), &ns)
                 .await
                 .map_err(|e| {
@@ -189,8 +184,6 @@ impl CoreDB {
         }
 
         debug!("Reconciling secret");
-        let span = span!(Level::INFO, "reconcile_secret");
-        let _enter = span.enter();
         // Superuser connection info
         reconcile_secret(self, ctx.clone()).await.map_err(|e| {
             error!("Error reconciling secret: {:?}", e);
@@ -221,19 +214,13 @@ impl CoreDB {
                 })?;
 
         // Deploy cluster
-        let span = span!(Level::INFO, "reconcile_cnpg");
-        let _enter = span.enter();
         reconcile_cnpg(self, ctx.clone()).await?;
         if cfg.enable_backup {
-            let span = span!(Level::DEBUG, "reconcile_cnpg_scheduled_backup");
-            let _enter = span.enter();
             reconcile_cnpg_scheduled_backup(self, ctx.clone()).await?;
         }
 
         if self.spec.postgresExporterEnabled {
             debug!("Reconciling prometheus exporter deployment");
-            let span = span!(Level::DEBUG, "reconcile_prometheus_exporter_deployment");
-            let _enter = span.enter();
             reconcile_prometheus_exporter_deployment(self, ctx.clone())
                 .await
                 .map_err(|e| {
@@ -244,8 +231,6 @@ impl CoreDB {
 
         // reconcile service
         debug!("Reconciling prometheus exporter service");
-        let span = span!(Level::DEBUG, "reconcile_prometheus_exporter_service");
-        let _enter = span.enter();
         reconcile_prometheus_exporter_service(self, ctx.clone())
             .await
             .map_err(|e| {
@@ -253,13 +238,8 @@ impl CoreDB {
                 Action::requeue(Duration::from_secs(300))
             })?;
 
-        let span = span!(Level::INFO, "status_update");
-        let _enter = span.enter();
-
         let new_status = match self.spec.stop {
             false => {
-                let span = span!(Level::DEBUG, "check_postgres_ready");
-                let _enter = span.enter();
                 let primary_pod_cnpg = self.primary_pod_cnpg(ctx.client.clone()).await?;
 
                 if !is_postgres_ready().matches_object(Some(&primary_pod_cnpg)) {
@@ -270,8 +250,6 @@ impl CoreDB {
                     return Ok(Action::requeue(Duration::from_secs(5)));
                 }
 
-                let span = span!(Level::INFO, "patch_status");
-                let _enter = span.enter();
                 let patch_status = json!({
                     "apiVersion": "coredb.io/v1alpha1",
                     "kind": "CoreDB",
@@ -281,14 +259,10 @@ impl CoreDB {
                 });
                 patch_cdb_status_merge(&coredbs, &name, patch_status).await?;
 
-                let span = span!(Level::INFO, "reconcile_extensions");
-                let _enter = span.enter();
                 let (trunk_installs, extensions) =
                     reconcile_extensions(self, ctx.clone(), &coredbs, &name).await?;
 
-                // At this point all pods should be unfenced so lets make sure
-                let span = span!(Level::DEBUG, "unfence_pods");
-                let _enter = span.enter();
+                let recovery_time = self.get_recovery_time(ctx.clone()).await?;
 
                 CoreDBStatus {
                     running: true,
@@ -298,6 +272,7 @@ impl CoreDB {
                     trunk_installs: Some(trunk_installs),
                     resources: Some(self.spec.resources.clone()),
                     runtime_config: self.spec.runtime_config.clone(),
+                    first_recoverability_time: recovery_time,
                 }
             }
             true => CoreDBStatus {
@@ -308,6 +283,7 @@ impl CoreDB {
                 trunk_installs: self.status.clone().and_then(|f| f.trunk_installs),
                 resources: Some(self.spec.resources.clone()),
                 runtime_config: self.spec.runtime_config.clone(),
+                first_recoverability_time: self.status.as_ref().and_then(|f| f.first_recoverability_time),
             },
         };
 
@@ -319,8 +295,6 @@ impl CoreDB {
             "status": new_status
         });
 
-        let span = span!(Level::INFO, "patch_cdb_status_merge");
-        let _enter = span.enter();
         patch_cdb_status_merge(&coredbs, &name, patch_status).await?;
 
         info!("Fully reconciled {}", self.name_any());
@@ -332,8 +306,6 @@ impl CoreDB {
     // Finalizer cleanup (the object was deleted, ensure nothing is orphaned)
     #[instrument(skip(self, ctx))]
     async fn cleanup(&self, ctx: Arc<Context>) -> Result<Action> {
-        let span = span!(Level::INFO, "cleanup");
-        let _enter = span.enter();
         // If namespace is terminating, do not publish delete event. Attempting to publish an event
         // in a terminating namespace will leave us in a bad state in which the namespace will hang
         // in terminating state.
@@ -348,8 +320,6 @@ impl CoreDB {
         }
         let recorder = ctx.diagnostics.read().await.recorder(ctx.client.clone(), self);
         // CoreDB doesn't have dependencies in this example case, so we just publish an event
-        let span = span!(Level::INFO, "recorder.publish");
-        let _enter = span.enter();
         recorder
             .publish(Event {
                 type_: EventType::Normal,
@@ -365,8 +335,6 @@ impl CoreDB {
 
     #[instrument(skip(self, client))]
     pub async fn primary_pod_cnpg(&self, client: Client) -> Result<Pod, Action> {
-        let span = span!(Level::INFO, "primary_pod_cnpg");
-        let _enter = span.enter();
         let requires_load =
             extensions_that_require_load(client.clone(), &self.metadata.namespace.clone().unwrap()).await?;
         let cluster = cnpg_cluster_from_cdb(self, None, requires_load);
@@ -413,8 +381,6 @@ impl CoreDB {
 
     #[instrument(skip(self, client))]
     pub async fn pods_by_cluster(&self, client: Client) -> Result<Vec<Pod>, Action> {
-        let span = span!(Level::INFO, "pods_in_cluster");
-        let _enter = span.enter();
         let requires_load =
             extensions_that_require_load(client.clone(), &self.metadata.namespace.clone().unwrap()).await?;
         let cluster = cnpg_cluster_from_cdb(self, None, requires_load);
@@ -458,8 +424,6 @@ impl CoreDB {
         }
 
         // Filter only pods that are ready
-        let span = span!(Level::INFO, "filter_ready_pods");
-        let _enter = span.enter();
         let ready_pods: Vec<Pod> = pod_list
             .into_iter()
             .filter(|pod| {
@@ -483,8 +447,6 @@ impl CoreDB {
 
     #[instrument(skip(self, client))]
     async fn check_replica_count_matches_pods(&self, client: Client) -> Result<(), Action> {
-        let span = span!(Level::INFO, "check_replica_count_matches_pods");
-        let _enter = span.enter();
         // Fetch current replica count from Self
         let desired_replica_count = self.spec.replicas;
         debug!(
@@ -563,9 +525,6 @@ impl CoreDB {
         database: String,
         context: Arc<Context>,
     ) -> Result<PsqlOutput, Action> {
-        let span = span!(Level::INFO, "psql");
-        let _enter = span.enter();
-
         let client = context.client.clone();
 
         let pod_name_cnpg = self
@@ -575,8 +534,6 @@ impl CoreDB {
             .name
             .expect("All pods should have a name");
 
-        let span = span!(Level::DEBUG, "cnpg_psql_command");
-        let _enter = span.enter();
         let cnpg_psql_command = PsqlCommand::new(
             pod_name_cnpg.clone(),
             self.metadata.namespace.clone().unwrap(),
@@ -597,6 +554,42 @@ impl CoreDB {
         ExecCommand::new(pod_name, self.metadata.namespace.clone().unwrap(), client)
             .execute(command)
             .await
+    }
+
+    fn process_backups(&self, backup_list: Vec<Backup>) -> Option<DateTime<Utc>> {
+        let backup = backup_list
+            .iter()
+            .filter_map(|backup| backup.status.as_ref())
+            .filter(|status| status.phase.as_deref() == Some("completed"))
+            .filter_map(|status| status.stopped_at.as_ref())
+            .filter_map(|stopped_at_str| DateTime::parse_from_rfc3339(stopped_at_str).ok())
+            .map(|dt_with_offset| dt_with_offset.with_timezone(&Utc))
+            .min();
+
+        backup
+    }
+
+    // get_recovery_time returns the time at which the first recovery will be possible from the
+    // oldest completed Backup object in the namespace.
+    #[instrument(skip(self, context))]
+    pub async fn get_recovery_time(&self, context: Arc<Context>) -> Result<Option<DateTime<Utc>>, Action> {
+        let client = context.client.clone();
+        let namespace = self
+            .metadata
+            .namespace
+            .clone()
+            .expect("CoreDB should have a namespace");
+        let backup: Api<Backup> = Api::namespaced(client, &namespace);
+        let cluster_name = self.metadata.name.clone().unwrap_or_default();
+        let lp = ListParams::default().labels(&format!("cnpg.io/cluster={}", cluster_name));
+        let backup_list = backup.list(&lp).await.map_err(|e| {
+            error!("Error getting backups: {:?}", e);
+            Action::requeue(Duration::from_secs(300))
+        })?;
+
+        let oldest_backup_time = self.process_backups(backup_list.items);
+
+        Ok(oldest_backup_time)
     }
 }
 
@@ -753,7 +746,10 @@ pub async fn run(state: State) {
 // Tests rely on fixtures.rs
 #[cfg(test)]
 mod test {
-    use super::{reconcile, Context, CoreDB};
+    use super::{reconcile, Backup, Context, CoreDB};
+    use crate::cloudnativepg::backups::{BackupCluster, BackupSpec, BackupStatus};
+    use chrono::{DateTime, NaiveDate, Utc};
+    use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
     use std::sync::Arc;
 
     #[tokio::test]
@@ -764,5 +760,140 @@ mod test {
         fakeserver.handle_finalizer_creation(&coredb);
         let res = reconcile(Arc::new(coredb), testctx).await;
         assert!(res.is_ok(), "initial creation succeeds in adding finalizer");
+    }
+
+    #[tokio::test]
+    async fn test_process_backups() {
+        let coredb = CoreDB::test();
+        let backup_name = "test-backup-1".to_string();
+        let namespace = "test".to_string();
+
+        let backup_list = vec![Backup {
+            metadata: ObjectMeta {
+                name: Some(backup_name.clone()),
+                namespace: Some(namespace),
+                ..Default::default()
+            },
+            spec: BackupSpec {
+                cluster: Some(BackupCluster {
+                    name: backup_name.clone(),
+                }),
+                ..Default::default()
+            },
+            status: Some(BackupStatus {
+                phase: Some("completed".to_string()),
+                stopped_at: Some("2023-09-19T23:14:00Z".to_string()),
+                ..Default::default()
+            }),
+        }];
+
+        let oldest_backup_time = coredb.process_backups(backup_list);
+
+        let expected_time = NaiveDate::from_ymd_opt(2023, 9, 19)
+            .and_then(|date| date.and_hms_opt(23, 14, 0))
+            .map(|naive_dt| DateTime::<Utc>::from_utc(naive_dt, Utc));
+
+        assert_eq!(oldest_backup_time, expected_time);
+    }
+
+    #[tokio::test]
+    async fn test_process_backups_multiple_backups() {
+        let coredb = CoreDB::test();
+
+        let backup_list = vec![
+            Backup {
+                metadata: ObjectMeta {
+                    name: Some("backup-1".to_string()),
+                    namespace: Some("test".to_string()),
+                    ..Default::default()
+                },
+                spec: BackupSpec {
+                    cluster: Some(BackupCluster {
+                        name: "backup-1".to_string(),
+                    }),
+                    ..Default::default()
+                },
+                status: Some(BackupStatus {
+                    phase: Some("completed".to_string()),
+                    stopped_at: Some("2023-09-19T23:14:00Z".to_string()),
+                    ..Default::default()
+                }),
+            },
+            Backup {
+                metadata: ObjectMeta {
+                    name: Some("backup-2".to_string()),
+                    namespace: Some("test".to_string()),
+                    ..Default::default()
+                },
+                spec: BackupSpec {
+                    cluster: Some(BackupCluster {
+                        name: "backup-2".to_string(),
+                    }),
+                    ..Default::default()
+                },
+                status: Some(BackupStatus {
+                    phase: Some("completed".to_string()),
+                    stopped_at: Some("2023-09-18T22:12:00Z".to_string()), // This is the oldest
+                    ..Default::default()
+                }),
+            },
+            Backup {
+                metadata: ObjectMeta {
+                    name: Some("backup-3".to_string()),
+                    namespace: Some("test".to_string()),
+                    ..Default::default()
+                },
+                spec: BackupSpec {
+                    cluster: Some(BackupCluster {
+                        name: "backup-3".to_string(),
+                    }),
+                    ..Default::default()
+                },
+                status: Some(BackupStatus {
+                    phase: Some("completed".to_string()),
+                    stopped_at: Some("2023-09-19T21:11:00Z".to_string()),
+                    ..Default::default()
+                }),
+            },
+            Backup {
+                metadata: ObjectMeta {
+                    name: Some("backup-4".to_string()),
+                    namespace: Some("test".to_string()),
+                    ..Default::default()
+                },
+                spec: BackupSpec {
+                    cluster: Some(BackupCluster {
+                        name: "backup-4".to_string(),
+                    }),
+                    ..Default::default()
+                },
+                status: Some(BackupStatus {
+                    phase: Some("failed".to_string()),
+                    stopped_at: Some("2023-09-19T21:11:00Z".to_string()),
+                    ..Default::default()
+                }),
+            },
+        ];
+
+        let oldest_backup_time = coredb.process_backups(backup_list);
+
+        let expected_time = NaiveDate::from_ymd_opt(2023, 9, 18)
+            .and_then(|date| date.and_hms_opt(22, 12, 0))
+            .map(|naive_dt| DateTime::<Utc>::from_utc(naive_dt, Utc));
+
+        assert_eq!(oldest_backup_time, expected_time);
+    }
+
+    #[tokio::test]
+    async fn test_process_backups_no_backup() {
+        let coredb = CoreDB::test();
+
+        // An empty list to simulate no Backups
+        let backup_list: Vec<Backup> = vec![];
+
+        let oldest_backup_time = coredb.process_backups(backup_list);
+
+        // We expect None since there are no Backups
+        assert_eq!(oldest_backup_time, None);
     }
 }
