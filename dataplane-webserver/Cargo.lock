@@ -567,6 +567,7 @@ dependencies = [
  "chrono",
  "env_logger",
  "futures",
+ "indexmap 2.0.0",
  "k8s-openapi",
  "kube",
  "lazy_static",

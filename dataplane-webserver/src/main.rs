@@ -2,6 +2,7 @@ use actix_web::{middleware, web, App, HttpServer};
 
 use actix_cors::Cors;
 
+use dataplane_webserver::routes::secrets::AvailableSecret;
 use dataplane_webserver::{
     config,
     routes::health::{lively, ready},
@@ -31,10 +32,14 @@ async fn main() -> std::io::Result<()> {
 
     #[derive(OpenApi)]
     #[openapi(
-        paths(metrics::query_range,
+        paths(
               secrets::get_secret,
-              secrets::get_secret_names),
-        components(schemas()),
+              secrets::get_secret_names,
+              metrics::query_range,
+        ),
+        components(schemas(
+            AvailableSecret
+        )),
         modifiers(&SecurityAddon),
         security(("jwt_token" = [])),
     )]
@@ -44,26 +49,25 @@ async fn main() -> std::io::Result<()> {
 
     impl Modify for SecurityAddon {
         fn modify(&self, openapi: &mut utoipa::openapi::OpenApi) {
-            openapi.components = Some(
-                utoipa::openapi::ComponentsBuilder::new()
-                    .security_scheme(
-                        "jwt_token",
-                        SecurityScheme::Http(
-                            HttpBuilder::new()
-                                .scheme(HttpAuthScheme::Bearer)
-                                .bearer_format("JWT")
-                                .build(),
-                        ),
-                    )
-                    .build(),
+            let components = openapi.components.as_mut().unwrap();
+            components.add_security_scheme(
+                "jwt_token",
+                SecurityScheme::Http(
+                    HttpBuilder::new()
+                        .scheme(HttpAuthScheme::Bearer)
+                        .bearer_format("JWT")
+                        .build(),
+                ),
             )
         }
     }
 
     HttpServer::new(move || {
         let mut doc = ApiDoc::openapi();
-        doc.info.description = Some("Dataplane API".to_string());
+        doc.info.title = "Tembo Data API".to_string();
         doc.info.license = None;
+        doc.info.description = Some("In the case of large or sensitive data, we avoid collecting it into Tembo Cloud. Instead, there is a Tembo Data API for each region, cloud, or private data plane.".to_string());
+        doc.info.version = "v0.0.1".to_owned();
 
         let cors = Cors::permissive();
         App::new()

@@ -1,57 +1,63 @@
 use crate::config;
 use actix_web::{get, web, Error, HttpRequest, HttpResponse};
-use lazy_static::lazy_static;
-use log::error;
-use std::collections::BTreeMap;
-
 use k8s_openapi::ByteString;
 use kube::{Api, Client};
+use lazy_static::lazy_static;
+use log::error;
+use serde;
+use serde::Serialize;
+use std::collections::BTreeMap;
+use std::ops::Deref;
+use utoipa::ToSchema;
 
 type SecretNameFormatter = Box<dyn Fn(&str) -> String + Send + Sync>;
 
-struct Secret {
+#[derive(Serialize, ToSchema)]
+pub struct AvailableSecret {
+    /// The name of an available secret
     name: String,
-    // For some secrets, we only return some of the keys
-    allowed_keys: Vec<String>,
+    /// For this secret, available keys
+    possible_keys: Vec<String>,
     // All secrets need a string formatting function
+    #[serde(skip)]
     formatter: SecretNameFormatter,
 }
 
-impl Secret {
+impl AvailableSecret {
     fn kube_secret_name(&self, instance_name: &str) -> String {
         (self.formatter)(instance_name)
     }
 }
 
 lazy_static! {
-    static ref SECRETS_ALLOW_LIST: Vec<Secret> = {
-        let mut secrets_allow_list: Vec<Secret> = Vec::new();
+    static ref SECRETS_ALLOW_LIST: Vec<AvailableSecret> = {
+        let mut secrets_allow_list: Vec<AvailableSecret> = Vec::new();
         secrets_allow_list.push(
-            Secret {
+            AvailableSecret {
                 name: "app-role".to_string(),
-                allowed_keys: vec!["username".to_string(), "password".to_string()],
+                possible_keys: vec!["username".to_string(), "password".to_string()],
                 formatter: Box::new(|instance_name| format!("{}-app", instance_name)),
             }
         );
         secrets_allow_list.push(
-            Secret {
+            AvailableSecret {
                 name: "readonly-role".to_string(),
-                allowed_keys: vec!["username".to_string(), "password".to_string()],
+                possible_keys: vec!["username".to_string(), "password".to_string()],
                 formatter: Box::new(|instance_name| format!("{}-ro", instance_name)),
             }
         );
         secrets_allow_list.push(
-            Secret {
+            AvailableSecret {
                 name: "superuser-role".to_string(),
-                allowed_keys: vec!["username".to_string(), "password".to_string()],
+                possible_keys: vec!["username".to_string(), "password".to_string()],
                 formatter: Box::new(|instance_name| format!("{}-connection", instance_name)),
             }
         );
         secrets_allow_list.push(
-            Secret {
+            AvailableSecret {
                 name: "certificate".to_string(),
                 // Don't return the private key
-                allowed_keys: vec!["ca.crt".to_string()],
+                possible_keys: vec!["ca.crt".to_string()],
                 formatter: Box::new(|instance_name| format!("{}-ca", instance_name)),
             }
         );
@@ -62,31 +68,32 @@ lazy_static! {
 #[utoipa::path(
     context_path = "/{namespace}/secrets",
     params(
-        ("namespace", example="org-myco-inst-prod", description = "Instance namespace"),
+        ("namespace" = String, Path, example="org-myco-inst-prod", description = "Instance namespace"),
     ),
     responses(
-        (status = 200, description = "Map of secret names and the keys this user is authorized for", body = Value,
-        example = json!({"app-role": ["username", "password"], "certificate": ["ca.crt"]})),
+        (status = 200, description = "Map of secret names and the keys this user is authorized for", body = Vec<AvailableSecret>,
+        example = json!([
+            {"name":"app-role","possible_keys":["username","password"]},
+            {"name":"readonly-role","possible_keys":["username","password"]},
+            {"name":"superuser-role","possible_keys":["username","password"]},
+            {"name":"certificate","possible_keys":["ca.crt"]}])),
         (status = 403, description = "Not authorized for query"),
     )
 )]
 #[get("")]
 pub async fn get_secret_names() -> Result<HttpResponse, Error> {
-    let mut allowed_secrets_with_keys: BTreeMap<String, Vec<String>> = BTreeMap::new();
-    for secret in SECRETS_ALLOW_LIST.iter() {
-        allowed_secrets_with_keys.insert(secret.name.clone(), secret.allowed_keys.clone());
-    }
-    Ok(HttpResponse::Ok().json(allowed_secrets_with_keys))
+    let allow_list = SECRETS_ALLOW_LIST.deref();
+    Ok(HttpResponse::Ok().json(allow_list))
 }
 
 #[utoipa::path(
     context_path = "/{namespace}/secrets",
     params(
-        ("namespace", example="org-myco-inst-prod", description = "Instance namespace"),
+        ("namespace" = String, Path, example="org-myco-inst-prod", description = "Instance namespace"),
         ("secret_name", example="readonly-role", description = "Secret name"),
     ),
     responses(
-        (status = 200, description = "Secret content in JSON", body = Value,
+        (status = 200, description = "Content of a secret. Available secrets and possible keys can be determined from a query to /{namespace}/secrets.", body = IndexMap<String, String>,
         example = json!({ "password": "sv5uli3gR3XPbjwz", "username": "postgres" })),
         (status = 403, description = "Not authorized for query"),
     )
@@ -143,7 +150,7 @@ pub async fn get_secret(
                 }
                 Some(data) => data,
             };
-            for key in &secret_config.allowed_keys {
+            for key in &secret_config.possible_keys {
                 if let Some(value) = secret_data.get(key) {
                     let value = match byte_string_to_string(value) {
                         Ok(value) => value,
