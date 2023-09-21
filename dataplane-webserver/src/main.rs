@@ -13,6 +13,7 @@ use log::info;
 use dataplane_webserver::routes::{metrics, secrets};
 use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::{Modify, OpenApi};
+use utoipa_redoc::{Redoc, Servable};
 
 use utoipa_swagger_ui::{SwaggerUi, Url};
 
@@ -66,8 +67,22 @@ async fn main() -> std::io::Result<()> {
         let mut doc = ApiDoc::openapi();
         doc.info.title = "Tembo Data API".to_string();
         doc.info.license = None;
-        doc.info.description = Some("In the case of large or sensitive data, we avoid collecting it into Tembo Cloud. Instead, there is a Tembo Data API for each region, cloud, or private data plane.".to_string());
+        doc.info.description = Some(
+            r#"In the case of large or sensitive data, we avoid collecting it into Tembo Cloud. Instead, there is a Tembo Data API for each region, cloud, or private data plane.
+            </br>
+            </br>
+            To find the Tembo Cloud API, please find it [here](https://api.tembo.io/swagger-ui/).
+            "#.to_string()
+        );
         doc.info.version = "v0.0.1".to_owned();
+        let mut redoc_docs = doc.clone();
+        redoc_docs.info.description = Some(
+            r#"In the case of large or sensitive data, we avoid collecting it into Tembo Cloud. Instead, there is a Tembo Data API for each region, cloud, or private data plane.
+            </br>
+            </br>
+            To find the Tembo Cloud API, please find it [here](https://api.tembo.io/redoc).
+            "#.to_string()
+        );
 
         let cors = Cors::permissive();
         App::new()
@@ -85,8 +100,9 @@ async fn main() -> std::io::Result<()> {
             .service(web::scope("/health").service(ready).service(lively))
             .service(SwaggerUi::new("/swagger-ui/{_:.*}").urls(vec![(
                 Url::new("dataplane-api", "/api-docs/openapi.json"),
-                doc,
+                doc.clone(),
             )]))
+            .service(Redoc::with_url("/redoc", redoc_docs.clone()))
     })
     .workers(8)
     .bind(("0.0.0.0", 8080))?
