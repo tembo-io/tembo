@@ -2,7 +2,7 @@ use actix_web::{middleware, web, App, HttpServer};
 
 use actix_cors::Cors;
 
-use dataplane_webserver::routes::secrets::AvailableSecret;
+use dataplane_webserver::secrets::types::AvailableSecret;
 use dataplane_webserver::{
     config,
     routes::health::{lively, ready},
