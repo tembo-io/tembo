@@ -3,6 +3,7 @@ pub mod controller;
 pub use crate::controller::*;
 pub mod apis;
 
+pub mod app_service;
 pub mod configmap;
 pub mod extensions;
 pub mod postgres_exporter;

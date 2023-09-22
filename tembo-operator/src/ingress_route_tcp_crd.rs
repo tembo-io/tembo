@@ -4,9 +4,11 @@
 
 use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 use kube::CustomResource;
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
-#[derive(CustomResource, Serialize, Deserialize, Clone, Debug)]
+#[derive(CustomResource, Serialize, Deserialize, Clone, Debug, JsonSchema, ToSchema)]
 #[kube(
     group = "traefik.containo.us",
     version = "v1alpha1",
@@ -23,7 +25,7 @@ pub struct IngressRouteTCPSpec {
     pub tls: Option<IngressRouteTCPTls>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema, ToSchema)]
 pub struct IngressRouteTCPRoutes {
     #[serde(rename = "match")]
     pub r#match: String,
@@ -35,14 +37,14 @@ pub struct IngressRouteTCPRoutes {
     pub services: Option<Vec<IngressRouteTCPRoutesServices>>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema, ToSchema)]
 pub struct IngressRouteTCPRoutesMiddlewares {
     pub name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub namespace: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema, ToSchema)]
 pub struct IngressRouteTCPRoutesServices {
     pub name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -56,13 +58,13 @@ pub struct IngressRouteTCPRoutesServices {
     pub weight: Option<i64>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema, ToSchema)]
 pub struct IngressRouteTCPRoutesServicesProxyProtocol {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub version: Option<i64>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema, ToSchema)]
 pub struct IngressRouteTCPTls {
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "certResolver")]
     pub cert_resolver: Option<String>,
@@ -78,7 +80,7 @@ pub struct IngressRouteTCPTls {
     pub store: Option<IngressRouteTCPTlsStore>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema, ToSchema)]
 pub struct IngressRouteTCPTlsDomains {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub main: Option<String>,
@@ -86,14 +88,14 @@ pub struct IngressRouteTCPTlsDomains {
     pub sans: Option<Vec<String>>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema, ToSchema)]
 pub struct IngressRouteTCPTlsOptions {
     pub name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub namespace: Option<String>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema, ToSchema)]
 pub struct IngressRouteTCPTlsStore {
     pub name: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]

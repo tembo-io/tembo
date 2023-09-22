@@ -2599,4 +2599,273 @@ mod test {
         // Delete namespace
         let _ = delete_namespace(client.clone(), &namespace).await;
     }
+
+    #[tokio::test]
+    #[ignore]
+    async fn functional_test_app_service() {
+        // Initialize the Kubernetes client
+        let client = kube_client().await;
+
+        // Configurations
+        let mut rng = rand::thread_rng();
+        let suffix = rng.gen_range(0..100000);
+        let cdb_name = &format!("test-coredb-{}", suffix);
+        let namespace = match create_namespace(client.clone(), cdb_name).await {
+            Ok(namespace) => namespace,
+            Err(e) => {
+                eprintln!("Error creating namespace: {}", e);
+                std::process::exit(1);
+            }
+        };
+
+        let kind = "CoreDB";
+
+        // Apply a basic configuration of CoreDB
+        println!("Creating CoreDB resource {}", cdb_name);
+        let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
+        // generate an instance w/ 2 services
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": cdb_name
+            },
+            "spec": {
+                "appServices": [
+                    {
+                        "name": "test-app-0",
+                        "image": "crccheck/hello-world:latest",
+                        "ports": [
+                            "80:8000"
+                        ],
+                        "resources": {
+                            "requests": {
+                                "cpu": "100m",
+                                "memory": "256Mi"
+                            },
+                            "limits": {
+                                "cpu": "100m",
+                                "memory": "256Mi"
+                            }
+                        }
+                    },
+                    {
+                        "name": "test-app-1",
+                        "image": "crccheck/hello-world:latest",
+                        "ports": [
+                            "81:8000"
+                        ],
+                        "resources": {
+                            "requests": {
+                                "cpu": "50m",
+                                "memory": "128Mi"
+                            },
+                            "limits": {
+                                "cpu": "50m",
+                                "memory": "128Mi"
+                            }
+                        }
+                    }
+                ],
+                "postgresExporterEnabled": false
+            }
+        });
+        let params = PatchParams::apply("tembo-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        coredbs.patch(cdb_name, &params, &patch).await.unwrap();
+
+        thread::sleep(Duration::from_millis(2000));
+
+        // assert we created two Deployments, with the names we provided
+        let deployments: Api<Deployment> = Api::namespaced(client.clone(), &namespace);
+        let lp = ListParams::default().labels(format!("coredb.io/name={}", cdb_name).as_str());
+
+        let mut deployment_items: Vec<Deployment> = Vec::new();
+        let mut passed_retry = false;
+        let retry = 10;
+        for _ in 0..retry {
+            let deployments_list = deployments.list(&lp).await.expect("could not get deployments");
+            if deployments_list.items.len() == 2 {
+                deployment_items.extend(deployments_list.items);
+                passed_retry = true;
+                break;
+            }
+            thread::sleep(Duration::from_millis(2000));
+        }
+        assert!(passed_retry, "failed to get deployments after {} retries", retry);
+        // two AppService deployments. the postgres exporter is disabled
+        assert!(deployment_items.len() == 2);
+
+        let app_0 = deployment_items[0].clone();
+        let app_1 = deployment_items[1].clone();
+        assert_eq!(app_0.metadata.name.unwrap(), format!("{cdb_name}-test-app-0"));
+        assert_eq!(app_1.metadata.name.unwrap(), format!("{cdb_name}-test-app-1"));
+
+        // Assert resources in first AppService
+        // select the pod
+        let selector_map = app_0
+            .spec
+            .as_ref()
+            .and_then(|s| s.selector.match_labels.as_ref())
+            .expect("Deployment should have a selector");
+        let selector = selector_map
+            .iter()
+            .map(|(k, v)| format!("{}={}", k, v))
+            .collect::<Vec<_>>()
+            .join(",");
+        let lp = ListParams::default().labels(&selector);
+        let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
+        // Fetch and print all the pods matching the label selector
+        let pod_list = pods.list(&lp).await.unwrap();
+        assert_eq!(pod_list.items.len(), 1);
+        let app_0_pod = pod_list.items[0].clone();
+        let app_0_container = app_0_pod.spec.unwrap().containers[0].clone();
+
+        let expected: ResourceRequirements = serde_json::from_value(serde_json::json!({
+            "requests": {
+                "cpu": "100m",
+                "memory": "256Mi"
+            },
+            "limits": {
+                "cpu": "100m",
+                "memory": "256Mi"
+            }
+        }))
+        .unwrap();
+        let app_0_resources = app_0_container.resources.unwrap();
+        assert_eq!(app_0_resources, expected);
+
+
+        // Assert resources in second AppService
+        let selector_map = app_1
+            .spec
+            .as_ref()
+            .and_then(|s| s.selector.match_labels.as_ref())
+            .expect("Deployment should have a selector");
+        let selector = selector_map
+            .iter()
+            .map(|(k, v)| format!("{}={}", k, v))
+            .collect::<Vec<_>>()
+            .join(",");
+        let lp = ListParams::default().labels(&selector);
+        let pod_list = pods.list(&lp).await.unwrap();
+        assert_eq!(pod_list.items.len(), 1);
+        let app_1_pod = pod_list.items[0].clone();
+        let app_1_container = app_1_pod.spec.unwrap().containers[0].clone();
+
+        let expected: ResourceRequirements = serde_json::from_value(serde_json::json!({
+            "requests": {
+                "cpu": "50m",
+                "memory": "128Mi"
+            },
+            "limits": {
+                "cpu": "50m",
+                "memory": "128Mi"
+            }
+        }))
+        .unwrap();
+        let app_1_resources = app_1_container.resources.unwrap();
+        assert_eq!(app_1_resources, expected);
+
+        // Delete one
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": cdb_name
+            },
+            "spec": {
+                "appServices": [
+                    {
+                        "name": "test-app-0",
+                        "image": "crccheck/hello-world:latest",
+                        "ports": [
+                            "80:8000"
+                        ],
+                        "resources": {
+                            "requests": {
+                                "cpu": "100m",
+                                "memory": "256Mi"
+                            },
+                            "limits": {
+                                "cpu": "100m",
+                                "memory": "256Mi"
+                            }
+                        }
+                    },
+                ],
+                "postgresExporterEnabled": false
+            }
+        });
+        let params = PatchParams::apply("tembo-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        coredbs.patch(cdb_name, &params, &patch).await.unwrap();
+
+        let lp = ListParams::default().labels(format!("coredb.io/name={}", cdb_name).as_str());
+        let mut deployment_items: Vec<Deployment> = Vec::new();
+        let mut passed_retry = false;
+        let retry = 10;
+        for _ in 0..retry {
+            let deployments_list = deployments.list(&lp).await.expect("could not get deployments");
+            if deployments_list.items.len() == 1 {
+                deployment_items.extend(deployments_list.items);
+                passed_retry = true;
+                break;
+            }
+            thread::sleep(Duration::from_millis(2000));
+        }
+        assert!(passed_retry, "failed to get deployments after {} retries", retry);
+        assert!(deployment_items.len() == 1);
+        let app_0 = deployment_items[0].clone();
+        assert_eq!(app_0.metadata.name.unwrap(), format!("{cdb_name}-test-app-0"));
+
+        // Delete all of them
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": cdb_name
+            },
+            "spec": {
+                "postgresExporterEnabled": false
+            }
+        });
+        let params = PatchParams::apply("tembo-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        coredbs.patch(cdb_name, &params, &patch).await.unwrap();
+        let lp = ListParams::default().labels(format!("coredb.io/name={}", cdb_name).as_str());
+        let deployment_items: Vec<Deployment> = Vec::new();
+        let mut passed_retry = false;
+        let retry = 10;
+        for _ in 0..retry {
+            let deployments_list = deployments.list(&lp).await.expect("could not get deployments");
+            if deployments_list.items.is_empty() {
+                passed_retry = true;
+                break;
+            }
+            thread::sleep(Duration::from_millis(2000));
+        }
+        assert!(passed_retry, "failed to get deployments after {} retries", retry);
+        assert!(deployment_items.is_empty());
+
+        // CLEANUP TEST
+        // Cleanup CoreDB
+        coredbs.delete(cdb_name, &Default::default()).await.unwrap();
+        println!("Waiting for CoreDB to be deleted: {}", &cdb_name);
+        let _assert_coredb_deleted = tokio::time::timeout(
+            Duration::from_secs(TIMEOUT_SECONDS_COREDB_DELETED),
+            await_condition(coredbs.clone(), cdb_name, conditions::is_deleted("")),
+        )
+        .await
+        .unwrap_or_else(|_| {
+            panic!(
+                "CoreDB {} was not deleted after waiting {} seconds",
+                cdb_name, TIMEOUT_SECONDS_COREDB_DELETED
+            )
+        });
+        println!("CoreDB resource deleted {}", cdb_name);
+
+        // Delete namespace
+        let _ = delete_namespace(client.clone(), &namespace).await;
+    }
 }

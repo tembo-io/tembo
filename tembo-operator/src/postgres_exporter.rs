@@ -58,7 +58,6 @@ use crate::configmap::apply_configmap;
 
 use std::str::FromStr;
 
-
 #[derive(Clone, Debug, JsonSchema, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "UPPERCASE")]
 pub enum Usage {

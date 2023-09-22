@@ -1,8 +1,3 @@
-use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
-use utoipa::ToSchema;
-
 use crate::{
     apis::postgres_parameters::PgConfig,
     defaults::default_image,
@@ -10,6 +5,9 @@ use crate::{
     postgres_exporter::QueryConfig,
     stacks::config_engines::{olap_config_engine, standard_config_engine, ConfigEngine},
 };
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema, PartialEq, ToSchema)]
 pub enum StackType {
@@ -49,7 +47,6 @@ impl StackType {
     }
 }
 
-
 #[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema, PartialEq, ToSchema)]
 pub struct Stack {
     pub name: String,
@@ -67,7 +64,6 @@ pub struct Stack {
     #[serde(default = "default_config_engine")]
     pub postgres_config_engine: Option<ConfigEngine>,
     // external application services
-    pub services: Option<Vec<Service>>,
     pub infrastructure: Option<Infrastructure>,
 }
 
@@ -117,15 +113,6 @@ fn default_storage() -> String {
 pub struct ComputeTemplate {
     pub cpu: String,
     pub memory: String,
-}
-
-
-// defines a sidecar container
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, JsonSchema, PartialEq)]
-pub struct Service {
-    pub image: String,
-    pub command: String,
-    pub ports: Vec<BTreeMap<String, String>>,
 }
 
 #[cfg(test)]
