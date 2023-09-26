@@ -67,7 +67,8 @@ fn create_clap_command() -> Command {
                 .about("Commands used to manage local and cloud instances")
                 .subcommand(cmd::instance::create::make_subcommand())
                 .subcommand(cmd::instance::list::make_subcommand())
-                .subcommand(cmd::instance::start::make_subcommand()),
+                .subcommand(cmd::instance::start::make_subcommand())
+                .subcommand(cmd::instance::stop::make_subcommand()),
         )
         .subcommand(
             Command::new("auth")

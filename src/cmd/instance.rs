@@ -5,6 +5,7 @@ use std::error::Error;
 pub mod create;
 pub mod list;
 pub mod start;
+pub mod stop;
 
 // handles all instance command calls
 pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
@@ -19,6 +20,7 @@ pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
         Some(("create", sub_matches)) => create::execute(sub_matches),
         Some(("list", sub_matches)) => list::execute(sub_matches),
         Some(("start", sub_matches)) => start::execute(sub_matches),
+        Some(("stop", sub_matches)) => stop::execute(sub_matches),
         _ => unreachable!(),
     };
 

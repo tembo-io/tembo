@@ -1,4 +1,4 @@
-// instance start command
+// instance stop command
 use crate::cli::config::Config;
 use crate::cli::docker::Docker;
 use crate::cli::docker::DockerError;
@@ -6,17 +6,17 @@ use anyhow::anyhow;
 use clap::{Arg, ArgAction, ArgMatches, Command};
 use std::error::Error;
 
-// example usage: tembo instance start -n my_app_db
+// example usage: tembo instance stop -n my_app_db
 pub fn make_subcommand() -> Command {
-    Command::new("start")
-        .about("Command used to start local instances")
+    Command::new("stop")
+        .about("Command used to stop local instances")
         .arg(
             Arg::new("name")
                 .short('n')
                 .long("name")
                 .action(ArgAction::Set)
                 .required(true)
-                .help("The name you want to use for this instance"),
+                .help("The name of running instance"),
         )
 }
 
@@ -39,10 +39,7 @@ pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
 
         for instance in &config.instances {
             if instance.name.clone().unwrap().to_lowercase() == name.to_lowercase() {
-                println!("- config has been found");
-                println!("- starting via Docker");
-
-                Docker::start(name, instance)?;
+                Docker::stop(name)?;
             }
         }
     }

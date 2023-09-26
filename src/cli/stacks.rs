@@ -1,6 +1,7 @@
 // Stacks are defined templates provided by Tembo containing attributes and extensions
 // (templates contain configuration information tailored to a specific use case)
 
+use crate::cli::extension::Extension;
 use crate::cli::stack_error::StackError;
 use crate::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
@@ -30,21 +31,6 @@ pub struct TrunkInstall {
     pub name: Option<String>,
     pub version: Option<String>,
     pub created_at: Option<DateTime<Utc>>,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Extension {
-    pub name: Option<String>,
-    pub version: Option<String>,
-    pub created_at: Option<DateTime<Utc>>,
-    pub locations: Vec<ExtensionLocation>,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-pub struct ExtensionLocation {
-    pub database: String,
-    pub enabled: String,
-    pub version: String,
 }
 
 // returns a result containing the stack name

@@ -87,8 +87,6 @@ fn persist_instance_config(matches: &ArgMatches) -> Result<(), Box<dyn Error>> {
     let path = Config::full_path(matches);
     let mut config = Config::new(matches, &path); // calls init and writes the file
 
-    dbg!(&matches);
-
     let r#type = matches.get_one::<String>("type").unwrap();
     let name = matches.get_one::<String>("name").unwrap();
     let port = matches.get_one::<String>("port").unwrap();

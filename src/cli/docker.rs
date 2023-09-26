@@ -1,3 +1,5 @@
+use crate::cli::instance::Instance;
+use spinners::{Spinner, Spinners};
 use std::error::Error;
 use std::fmt;
 use std::process::Command as ShellCommand;
@@ -40,6 +42,83 @@ impl Docker {
         }
 
         Ok(())
+    }
+
+    // start container if exists for name otherwise build container and start
+    pub fn start(name: &str, instance: &Instance) -> Result<(), Box<dyn Error>> {
+        if Self::container_list_filtered(name)
+            .unwrap()
+            .contains("tembo-pg")
+        {
+            println!("- existing container found");
+
+            instance.start();
+        } else {
+            println!("- building and then running container");
+
+            let _ = instance.init();
+        };
+
+        Ok(())
+    }
+
+    // stop container for given name
+    pub fn stop(name: &str) -> Result<(), Box<dyn Error>> {
+        let mut sp = Spinner::new(Spinners::Line, "Stopping instance".into());
+        let mut command = String::from("cd tembo ");
+        command.push_str("&& docker stop ");
+        command.push_str(name);
+
+        let output = ShellCommand::new("sh")
+            .arg("-c")
+            .arg(&command)
+            .output()
+            .expect("failed to execute process");
+
+        let message = format!("- Tembo instance {} stopped", &name);
+        sp.stop_with_message(message);
+
+        let stderr = String::from_utf8(output.stderr).unwrap();
+
+        if !stderr.is_empty() {
+            return Err(Box::new(DockerError::new(
+                format!("There was an issue stopping the instance: {}", stderr).as_str(),
+            )));
+        }
+
+        Ok(())
+    }
+
+    #[allow(dead_code)]
+    pub fn container_list() -> Result<String, Box<dyn Error>> {
+        let mut ls_command = String::from("cd tembo "); // TODO: does this work for installed crates?
+        ls_command.push_str("&& docker ls --all");
+
+        let output = ShellCommand::new("sh")
+            .arg("-c")
+            .arg(&ls_command)
+            .output()
+            .expect("failed to execute process");
+        let stdout = String::from_utf8(output.stdout);
+
+        Ok(stdout.unwrap())
+    }
+
+    pub fn container_list_filtered(name: &str) -> Result<String, Box<dyn Error>> {
+        let filter = format!("docker container ls --all -f name={}", name);
+
+        let mut ls_command = String::from("cd tembo "); // TODO: does this work for installed crates?
+        ls_command.push_str("&& ");
+        ls_command.push_str(&filter);
+
+        let output = ShellCommand::new("sh")
+            .arg("-c")
+            .arg(&ls_command)
+            .output()
+            .expect("failed to execute process");
+        let stdout = String::from_utf8(output.stdout);
+
+        Ok(stdout.unwrap())
     }
 }
 
