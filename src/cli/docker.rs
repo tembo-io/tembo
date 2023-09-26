@@ -1,3 +1,4 @@
+use simplelog::*;
 use crate::cli::instance::Instance;
 use spinners::{Spinner, Spinners};
 use std::error::Error;
@@ -17,7 +18,7 @@ impl Docker {
     }
 
     pub fn installed_and_running() -> Result<(), Box<dyn Error>> {
-        println!("- Checking requirements: [Docker]");
+        info!("Checking requirements: [Docker]");
 
         let output = Self::info();
         let stdout = String::from_utf8(output.stdout).unwrap();

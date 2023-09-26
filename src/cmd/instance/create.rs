@@ -7,6 +7,7 @@ use crate::cli::stacks;
 use crate::cli::stacks::Stacks;
 use chrono::prelude::*;
 use clap::{Arg, ArgAction, ArgMatches, Command};
+use simplelog::*;
 use std::error::Error;
 
 // example usage: tembo instance create -t oltp -n my_app_db -p 5432
@@ -43,7 +44,7 @@ pub fn make_subcommand() -> Command {
 
 pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
     if cfg!(target_os = "windows") {
-        println!("{}", crate::WINDOWS_ERROR_MSG);
+        warn!("{}", crate::WINDOWS_ERROR_MSG);
 
         return Err(Box::new(DockerError::new(crate::WINDOWS_ERROR_MSG)));
     }
@@ -54,24 +55,22 @@ pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
     if let Ok(_stack) = stacks::define_stack(matches) {
         // make sure requirements are met
         match check_requirements() {
-            Ok(_) => println!("- Docker was found and appears running"),
+            Ok(_) => info!("Docker was found and appears running"),
             Err(e) => {
-                eprintln!("{}", e);
+                error!("{}", e);
                 return Err(e);
             }
         }
 
         match persist_instance_config(matches) {
-            Ok(_) => println!("- Instance config persisted in config file"),
+            Ok(_) => info!("Instance config persisted in config file"),
             Err(e) => {
-                eprintln!("{}", e);
+                error!("{}", e);
                 return Err(e);
             }
         }
 
-        println!(
-                "- Instance configuration created, you can start the instance using the command 'tembo start -i <name>'"
-            );
+        info!("Instance configuration created, you can start the instance using the command 'tembo start -i <name>'");
     } else {
         return Err(Box::new(StackError::new("- Given Stack type is not valid")));
     }

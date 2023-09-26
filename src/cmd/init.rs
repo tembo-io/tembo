@@ -1,6 +1,7 @@
 use crate::cli::config::Config;
 use crate::cli::docker::{Docker, DockerError};
 use clap::{ArgMatches, Command};
+use simplelog::*;
 use spinners::{Spinner, Spinners};
 use std::error::Error;
 use std::process::Command as ShellCommand;
@@ -14,14 +15,14 @@ pub fn make_subcommand() -> Command {
 pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
     // alert that windows is not supported yet
     if cfg!(target_os = "windows") {
-        println!("{}", crate::WINDOWS_ERROR_MSG);
+        info!("{}", crate::WINDOWS_ERROR_MSG);
 
         return Err(Box::new(DockerError::new(crate::WINDOWS_ERROR_MSG)));
     }
 
     // check the system requirements
     match check_requirements() {
-        Ok(_) => println!("- Docker was found and appears running"),
+        Ok(_) => info!("Docker was found and appears running"),
         Err(e) => {
             return Err(e);
         }
@@ -30,10 +31,7 @@ pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
     // create the configuration file in the default location
     let config = Config::new(args, &Config::full_path(args));
 
-    println!(
-        "- Config file created at: {}",
-        &config.created_at.to_string()
-    );
+    info!("Config file created at: {}", &config.created_at.to_string());
 
     // pull the Tembo image
     build_image()
@@ -45,11 +43,12 @@ fn check_requirements() -> Result<(), Box<dyn Error>> {
 
 fn build_image() -> Result<(), Box<dyn Error>> {
     if image_exist() {
-        println!("- Tembo image already exists, proceeding");
+        info!("Tembo image already exists, proceeding");
         return Ok(());
     }
 
-    let mut sp = Spinner::new(Spinners::Line, "Installing image".into());
+    info!("Installing Tembo image");
+    let mut sp = Spinner::new(Spinners::Line, String::new());
     let mut command = String::from("cd tembo"); // TODO: does this work for installed crates?
     command.push_str("&& docker build -t tembo-pg . ");
     command.push_str(" --quiet");
@@ -60,7 +59,7 @@ fn build_image() -> Result<(), Box<dyn Error>> {
         .output()
         .expect("failed to execute process");
 
-    sp.stop_with_message("- Tembo image install complete".into());
+    sp.stop_with_newline();
 
     let stderr = String::from_utf8(output.stderr).unwrap();
 
@@ -69,6 +68,7 @@ fn build_image() -> Result<(), Box<dyn Error>> {
             format!("There was an issue pulling the image: {}", stderr).as_str(),
         )));
     } else {
+        info!("Tembo image was installed");
         Ok(())
     }
 }

@@ -4,6 +4,8 @@ use crate::cli::docker::Docker;
 use crate::cli::docker::DockerError;
 use anyhow::anyhow;
 use clap::{Arg, ArgAction, ArgMatches, Command};
+use simplelog::*;
+use spinners::{Spinner, Spinners};
 use std::error::Error;
 
 // example usage: tembo instance start -n my_app_db
@@ -22,7 +24,7 @@ pub fn make_subcommand() -> Command {
 
 pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
     if cfg!(target_os = "windows") {
-        println!("{}", crate::WINDOWS_ERROR_MSG);
+        warn!("{}", crate::WINDOWS_ERROR_MSG);
 
         return Err(Box::new(DockerError::new(crate::WINDOWS_ERROR_MSG)));
     }
@@ -33,14 +35,14 @@ pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
         .ok_or_else(|| anyhow!("Name is missing."))?;
 
     if config.instances.is_empty() {
-        println!("- No instances have been configured");
+        info!("No instances have been configured");
     } else {
-        println!("- Finding config for {}", name);
+        info!("Finding config for {}", name);
 
         for instance in &config.instances {
             if instance.name.clone().unwrap().to_lowercase() == name.to_lowercase() {
-                println!("- config has been found");
-                println!("- starting via Docker");
+                info!(" config has been found");
+                info!(" starting via Docker");
 
                 Docker::start(name, instance)?;
             }

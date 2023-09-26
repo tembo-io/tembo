@@ -2,21 +2,40 @@
 
 #[macro_use]
 extern crate clap;
+extern crate log;
 extern crate serde;
 extern crate serde_yaml;
+extern crate simplelog;
 
 use anyhow::anyhow;
 use clap::{Arg, Command};
 use clap_complete::Shell;
 use serde::{Deserialize, Serialize};
+use simplelog::*;
+use std::fs::File;
 
 mod cli;
 mod cmd;
 
 const VERSION: &str = concat!("v", crate_version!());
-const WINDOWS_ERROR_MSG: &str = "- Windows is not supported at this time";
+const WINDOWS_ERROR_MSG: &str = "Windows is not supported at this time";
 
 fn main() {
+    CombinedLogger::init(vec![
+        TermLogger::new(
+            LevelFilter::Trace,
+            Config::default(),
+            TerminalMode::Mixed,
+            ColorChoice::Auto,
+        ),
+        WriteLogger::new(
+            LevelFilter::Info,
+            Config::default(),
+            File::create("tembo.log").unwrap(),
+        ),
+    ])
+    .unwrap();
+
     let command = create_clap_command();
     let matches = command.get_matches();
 
@@ -43,9 +62,8 @@ fn main() {
     };
 
     if res.is_err() {
-        println!("{}", res.err().unwrap());
+        error!("{}", res.err().unwrap());
 
-        // TODO: adding logging, log error
         std::process::exit(101);
     }
 }

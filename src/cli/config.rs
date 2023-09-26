@@ -6,6 +6,7 @@ use chrono::prelude::*;
 use clap::ArgMatches;
 use serde::Deserialize;
 use serde::Serialize;
+use simplelog::*;
 use std::env;
 use std::error::Error;
 use std::fmt;
@@ -126,7 +127,7 @@ impl Config {
         match Config::create_config_dir(&dir_path.to_string_lossy()) {
             Ok(()) => Config::create_config_file(&file_path.to_string_lossy()),
             Err(e) => {
-                println!("- Directory can not be created, {}", e);
+                error!("Directory can not be created, {}", e);
 
                 Err(e)
             }
