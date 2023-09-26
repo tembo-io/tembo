@@ -23,6 +23,7 @@ fn main() {
     let res = match matches.subcommand() {
         Some(("init", sub_matches)) => cmd::init::execute(sub_matches),
         Some(("instance", sub_matches)) => cmd::instance::execute(sub_matches),
+        Some(("auth", sub_matches)) => cmd::auth::execute(sub_matches),
         Some(("completions", sub_matches)) => (|| {
             let shell = sub_matches
                 .get_one::<Shell>("shell")
@@ -67,6 +68,12 @@ fn create_clap_command() -> Command {
                 .subcommand(cmd::instance::create::make_subcommand())
                 .subcommand(cmd::instance::list::make_subcommand())
                 .subcommand(cmd::instance::start::make_subcommand()),
+        )
+        .subcommand(
+            Command::new("auth")
+                .about("Commands used to manage authentication")
+                .subcommand(cmd::auth::login::make_subcommand())
+                .subcommand(cmd::auth::info::make_subcommand()),
         )
         .subcommand(
             Command::new("completions")

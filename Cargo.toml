@@ -1,6 +1,6 @@
 [package]
 name = "tembo"
-version = "0.5.0"
+version = "0.6.0"
 edition = "2021"
 authors = ["Tembo.io"]
 description = "The CLI for Tembo"
@@ -24,6 +24,18 @@ semver = "1.0.18"
 mockall = "0.11.4"
 toml = "0.7.6"
 chrono = { version = "0.4.29", features = ["serde"] }
+clerk-rs = "0.1.7"
+jsonwebtoken = "8.3.0"
+log = "0.4.20"
+reqwest = { version = "^0.11", default-features = false, features = [
+  "cookies",
+  "default-tls",
+  "blocking",
+] }
+hyper = "0.14.27"
+rpassword = "7.2.0"
+jwt = "0.16.0"
+dateparser = "0.2.0"
 
 [dev-dependencies]
 assert_cmd = "2.0.8"

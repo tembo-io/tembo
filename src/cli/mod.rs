@@ -1,3 +1,4 @@
+pub mod auth_client;
 pub mod cloud_account;
 pub mod config;
 pub mod docker;

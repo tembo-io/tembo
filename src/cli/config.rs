@@ -23,6 +23,7 @@ const CONFIG_FILE_PATH: &str = ".config/tembo/";
 pub struct Config {
     pub created_at: DateTime<Utc>,
     pub cloud_account: Option<CloudAccount>,
+    pub jwt: Option<String>,
     pub instances: Vec<Instance>,
 }
 
@@ -46,6 +47,7 @@ impl Config {
                 let config = Config {
                     created_at: utc,
                     cloud_account: None,
+                    jwt: None,
                     instances: vec![],
                 };
 
