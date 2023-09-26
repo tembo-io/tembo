@@ -30,6 +30,7 @@ mod test {
             apps::v1::Deployment,
             core::v1::{
                 Container, Namespace, PersistentVolumeClaim, Pod, PodSpec, ResourceRequirements, Secret,
+                Service,
             },
         },
         apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
@@ -314,6 +315,50 @@ mod test {
 
         Ok(())
     }
+
+    use controller::errors;
+    use k8s_openapi::NamespaceResourceScope;
+    use serde::de::DeserializeOwned;
+
+    // helper function retrieve all instances of a resource in namespace
+    // used repeatedly in appService tests
+    // handles retries
+    async fn list_resources<R>(
+        client: Client,
+        cdb_name: &str,
+        namespace: &str,
+        num_expected: usize,
+    ) -> Result<Vec<R>, errors::OperatorError>
+    where
+        R: kube::api::Resource<Scope = NamespaceResourceScope>
+            + std::fmt::Debug
+            + 'static
+            + Clone
+            + DeserializeOwned
+            + for<'de> serde::Deserialize<'de>,
+        R::DynamicType: Default,
+    {
+        let api: Api<R> = Api::namespaced(client, namespace);
+        let lp = ListParams::default().labels(format!("coredb.io/name={}", cdb_name).as_str());
+        let retry = 10;
+        let mut passed_retry = false;
+        let mut resource_list: Vec<R> = Vec::new();
+        for _ in 0..retry {
+            let resources = api.list(&lp).await?;
+            if resources.items.len() == num_expected {
+                resource_list.extend(resources.items);
+                passed_retry = true;
+                break;
+            }
+            thread::sleep(Duration::from_millis(2000));
+        }
+        if passed_retry {
+            Ok(resource_list)
+        } else {
+            Err(errors::ValueError::Invalid("Failed to get all resources in namespace".to_string()).into())
+        }
+    }
+
 
     #[tokio::test]
     #[ignore]
@@ -2623,7 +2668,7 @@ mod test {
         // Apply a basic configuration of CoreDB
         println!("Creating CoreDB resource {}", cdb_name);
         let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
-        // generate an instance w/ 2 services
+        // generate an instance w/ 2 appServices
         let coredb_json = serde_json::json!({
             "apiVersion": API_VERSION,
             "kind": kind,
@@ -2652,9 +2697,6 @@ mod test {
                     {
                         "name": "test-app-1",
                         "image": "crccheck/hello-world:latest",
-                        "ports": [
-                            "81:8000"
-                        ],
                         "resources": {
                             "requests": {
                                 "cpu": "50m",
@@ -2674,34 +2716,25 @@ mod test {
         let patch = Patch::Apply(&coredb_json);
         coredbs.patch(cdb_name, &params, &patch).await.unwrap();
 
-        thread::sleep(Duration::from_millis(2000));
-
         // assert we created two Deployments, with the names we provided
-        let deployments: Api<Deployment> = Api::namespaced(client.clone(), &namespace);
-        let lp = ListParams::default().labels(format!("coredb.io/name={}", cdb_name).as_str());
-
-        let mut deployment_items: Vec<Deployment> = Vec::new();
-        let mut passed_retry = false;
-        let retry = 10;
-        for _ in 0..retry {
-            let deployments_list = deployments.list(&lp).await.expect("could not get deployments");
-            if deployments_list.items.len() == 2 {
-                deployment_items.extend(deployments_list.items);
-                passed_retry = true;
-                break;
-            }
-            thread::sleep(Duration::from_millis(2000));
-        }
-        assert!(passed_retry, "failed to get deployments after {} retries", retry);
+        let deployment_items: Vec<Deployment> = list_resources(client.clone(), cdb_name, &namespace, 2)
+            .await
+            .unwrap();
         // two AppService deployments. the postgres exporter is disabled
         assert!(deployment_items.len() == 2);
+
+        let service_items: Vec<Service> = list_resources(client.clone(), cdb_name, &namespace, 1)
+            .await
+            .unwrap();
+        // one AppService Service, since only ports exposed on one
+        assert!(service_items.len() == 1);
 
         let app_0 = deployment_items[0].clone();
         let app_1 = deployment_items[1].clone();
         assert_eq!(app_0.metadata.name.unwrap(), format!("{cdb_name}-test-app-0"));
         assert_eq!(app_1.metadata.name.unwrap(), format!("{cdb_name}-test-app-1"));
 
-        // Assert resources in first AppService
+        // Assert resources in first appService
         // select the pod
         let selector_map = app_0
             .spec
@@ -2767,7 +2800,7 @@ mod test {
         let app_1_resources = app_1_container.resources.unwrap();
         assert_eq!(app_1_resources, expected);
 
-        // Delete one
+        // Delete the one without a service
         let coredb_json = serde_json::json!({
             "apiVersion": API_VERSION,
             "kind": kind,
@@ -2801,23 +2834,19 @@ mod test {
         let patch = Patch::Apply(&coredb_json);
         coredbs.patch(cdb_name, &params, &patch).await.unwrap();
 
-        let lp = ListParams::default().labels(format!("coredb.io/name={}", cdb_name).as_str());
-        let mut deployment_items: Vec<Deployment> = Vec::new();
-        let mut passed_retry = false;
-        let retry = 10;
-        for _ in 0..retry {
-            let deployments_list = deployments.list(&lp).await.expect("could not get deployments");
-            if deployments_list.items.len() == 1 {
-                deployment_items.extend(deployments_list.items);
-                passed_retry = true;
-                break;
-            }
-            thread::sleep(Duration::from_millis(2000));
-        }
-        assert!(passed_retry, "failed to get deployments after {} retries", retry);
+        let deployment_items: Vec<Deployment> = list_resources(client.clone(), cdb_name, &namespace, 1)
+            .await
+            .unwrap();
         assert!(deployment_items.len() == 1);
         let app_0 = deployment_items[0].clone();
         assert_eq!(app_0.metadata.name.unwrap(), format!("{cdb_name}-test-app-0"));
+
+        // should still be just one Service
+        let service_items: Vec<Service> = list_resources(client.clone(), cdb_name, &namespace, 1)
+            .await
+            .unwrap();
+        // One appService Services
+        assert!(service_items.len() == 1);
 
         // Delete all of them
         let coredb_json = serde_json::json!({
@@ -2833,20 +2862,16 @@ mod test {
         let params = PatchParams::apply("tembo-integration-test");
         let patch = Patch::Apply(&coredb_json);
         coredbs.patch(cdb_name, &params, &patch).await.unwrap();
-        let lp = ListParams::default().labels(format!("coredb.io/name={}", cdb_name).as_str());
-        let deployment_items: Vec<Deployment> = Vec::new();
-        let mut passed_retry = false;
-        let retry = 10;
-        for _ in 0..retry {
-            let deployments_list = deployments.list(&lp).await.expect("could not get deployments");
-            if deployments_list.items.is_empty() {
-                passed_retry = true;
-                break;
-            }
-            thread::sleep(Duration::from_millis(2000));
-        }
-        assert!(passed_retry, "failed to get deployments after {} retries", retry);
+        let deployment_items: Vec<Deployment> = list_resources(client.clone(), cdb_name, &namespace, 0)
+            .await
+            .unwrap();
         assert!(deployment_items.is_empty());
+
+        let service_items: Vec<Service> = list_resources(client.clone(), cdb_name, &namespace, 0)
+            .await
+            .unwrap();
+        assert!(service_items.is_empty());
+        // should be no Services
 
         // CLEANUP TEST
         // Cleanup CoreDB
