@@ -62,6 +62,10 @@ pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
             }
         }
 
+        // TODO: make sure the instance name is valid
+        // unique and API will respond with 4xx when instance name starts
+        // or ends with non-alpha numeric character
+
         match persist_instance_config(matches) {
             Ok(_) => info!("Instance config persisted in config file"),
             Err(e) => {
@@ -140,7 +144,15 @@ fn persist_instance_config(matches: &ArgMatches) -> Result<(), Box<dyn Error>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use clap::{Arg, ArgAction, Command};
+    use clap::{Arg, ArgAction, ArgMatches, Command};
+
+    fn cleanup(matches: &ArgMatches) {
+        let path = Config::full_path(matches);
+        let mut config = Config::new(matches, &path);
+
+        let _ = &config.instances.pop(); // remove last instance created from test
+        let _ = &config.write(&Config::full_path(&matches));
+    }
 
     #[test]
     fn valid_execute_test() {
@@ -173,15 +185,18 @@ mod tests {
                     .help("The port number you want the instance to run on"),
             );
 
-        let result = execute(&m.get_matches_from(vec![
+        let matches = &m.get_matches_from(vec![
             "create",
             "-t",
             &stack_type,
             "-n",
-            "test",
+            "test_file",
             "-p",
             "5432",
-        ]));
+        ]);
+        let result = execute(&matches);
         assert_eq!(result.is_ok(), true);
+
+        cleanup(&matches);
     }
 }

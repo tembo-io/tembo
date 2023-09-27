@@ -28,7 +28,6 @@ log = "0.4.20"
 simplelog = { version = "^0.12.1", features = ["paris"] }
 clerk-rs = "0.1.7"
 jsonwebtoken = "8.3.0"
-log = "0.4.20"
 reqwest = { version = "^0.11", default-features = false, features = [
   "cookies",
   "default-tls",

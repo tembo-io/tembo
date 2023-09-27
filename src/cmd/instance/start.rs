@@ -5,7 +5,6 @@ use crate::cli::docker::DockerError;
 use anyhow::anyhow;
 use clap::{Arg, ArgAction, ArgMatches, Command};
 use simplelog::*;
-use spinners::{Spinner, Spinners};
 use std::error::Error;
 
 // example usage: tembo instance start -n my_app_db

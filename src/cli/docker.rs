@@ -1,5 +1,5 @@
-use simplelog::*;
 use crate::cli::instance::Instance;
+use simplelog::*;
 use spinners::{Spinner, Spinners};
 use std::error::Error;
 use std::fmt;
