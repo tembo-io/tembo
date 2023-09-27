@@ -77,7 +77,7 @@ jobs:
           export ENABLE_BACKUP=false
           export DATA_PLANE_BASEDOMAIN=localhost
           # Start the operator in the background
-          cargo run --release > operator-output.txt 2>&1 &
+          cargo run > operator-output.txt 2>&1 &
           # Run the tests
           cargo test --jobs 1 -- --ignored --nocapture
       - name: Debugging information

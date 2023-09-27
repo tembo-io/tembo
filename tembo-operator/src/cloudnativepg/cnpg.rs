@@ -959,10 +959,13 @@ pub async fn unfence_pod(cdb: &CoreDB, ctx: Arc<Context>, pod_name: &str) -> Res
     };
 
     let cluster: Api<Cluster> = Api::namespaced(ctx.client.clone(), &namespace);
-    let co = cluster.get(instance_name).await;
+    let co = cluster.get(instance_name).await.map_err(|e| {
+        error!("Error getting cluster: {}", e);
+        Action::requeue(Duration::from_secs(300))
+    })?;
 
     // get the annotations from the cluster object
-    if let Ok(mut cluster_resource) = co {
+    if let mut cluster_resource = co {
         let annotations_clone = cluster_resource.metadata.annotations.clone();
         debug!(
             "Instance initial annotations for instance {}: {:?}",
