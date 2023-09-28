@@ -1,0 +1,8 @@
+mode: standalone
+persistence:
+  enabled: true
+  size: 10Gi
+users:
+  - accessKey: tembo
+    secretKey: tembo12345
+    policy: readwrite

@@ -2,7 +2,7 @@ use k8s_openapi::{api::core::v1::ResourceRequirements, apimachinery::pkg::api::r
 use std::collections::BTreeMap;
 
 use crate::{
-    apis::coredb_types::{Backup, ServiceAccountTemplate},
+    apis::coredb_types::{Backup, S3Credentials, ServiceAccountTemplate},
     extensions::types::{Extension, TrunkInstall},
 };
 
@@ -99,6 +99,8 @@ pub fn default_backup() -> Backup {
         encryption: default_encryption(),
         retentionPolicy: default_retention_policy(),
         schedule: default_backup_schedule(),
+        s3_credentials: default_s3_credentials(),
+        ..Default::default()
     }
 }
 
@@ -117,4 +119,11 @@ pub fn default_retention_policy() -> Option<String> {
 pub fn default_backup_schedule() -> Option<String> {
     // Every day at midnight
     Some("0 0 * * *".to_owned())
+}
+
+pub fn default_s3_credentials() -> Option<S3Credentials> {
+    Some(S3Credentials {
+        inherit_from_iam_role: Some(true),
+        ..Default::default()
+    })
 }

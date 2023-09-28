@@ -128,6 +128,9 @@ spec:
                   encryption: AES256
                   retentionPolicy: '30'
                   schedule: 0 0 * * *
+                  endpointURL: null
+                  s3Credentials:
+                    inheritFromIAMRole: true
                 properties:
                   destinationPath:
                     default: s3://
@@ -137,10 +140,66 @@ spec:
                     default: AES256
                     nullable: true
                     type: string
+                  endpointURL:
+                    nullable: true
+                    type: string
                   retentionPolicy:
                     default: '30'
                     nullable: true
                     type: string
+                  s3Credentials:
+                    default:
+                      inheritFromIAMRole: true
+                    nullable: true
+                    properties:
+                      accessKeyId:
+                        nullable: true
+                        properties:
+                          key:
+                            type: string
+                          name:
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                      inheritFromIAMRole:
+                        nullable: true
+                        type: boolean
+                      region:
+                        nullable: true
+                        properties:
+                          key:
+                            type: string
+                          name:
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                      secretAccessKey:
+                        nullable: true
+                        properties:
+                          key:
+                            type: string
+                          name:
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                      sessionToken:
+                        nullable: true
+                        properties:
+                          key:
+                            type: string
+                          name:
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                    type: object
                   schedule:
                     default: 0 0 * * *
                     nullable: true
@@ -254,6 +313,71 @@ spec:
                       type: string
                     description: 'Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                     type: object
+                type: object
+              restore:
+                nullable: true
+                properties:
+                  endpointURL:
+                    nullable: true
+                    type: string
+                  recoveryTargetTime:
+                    nullable: true
+                    type: string
+                  s3Credentials:
+                    nullable: true
+                    properties:
+                      accessKeyId:
+                        nullable: true
+                        properties:
+                          key:
+                            type: string
+                          name:
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                      inheritFromIAMRole:
+                        nullable: true
+                        type: boolean
+                      region:
+                        nullable: true
+                        properties:
+                          key:
+                            type: string
+                          name:
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                      secretAccessKey:
+                        nullable: true
+                        properties:
+                          key:
+                            type: string
+                          name:
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                      sessionToken:
+                        nullable: true
+                        properties:
+                          key:
+                            type: string
+                          name:
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                    type: object
+                  serverName:
+                    type: string
+                required:
+                - serverName
                 type: object
               runtime_config:
                 items:

@@ -1,24 +1,20 @@
-use crate::{app_service::types::AppService, extensions::types::ExtensionStatus};
+use crate::{
+    apis::postgres_parameters::{
+        merge_pg_configs, ConfigValue, MergeError, PgConfig, DISALLOWED_CONFIGS, MULTI_VAL_CONFIGS,
+    },
+    app_service::types::AppService,
+    defaults,
+    extensions::types::{Extension, ExtensionStatus, TrunkInstall, TrunkInstallStatus},
+    postgres_exporter::PostgresMetrics,
+};
 
 use k8s_openapi::{
     api::core::v1::ResourceRequirements,
     apimachinery::pkg::{api::resource::Quantity, apis::meta::v1::ObjectMeta},
 };
 
-use crate::{
-    apis::postgres_parameters::{
-        merge_pg_configs, MergeError, PgConfig, DISALLOWED_CONFIGS, MULTI_VAL_CONFIGS,
-    },
-    defaults,
-    postgres_exporter::PostgresMetrics,
-};
-use kube::CustomResource;
-
-use crate::{
-    apis::postgres_parameters::ConfigValue,
-    extensions::types::{Extension, TrunkInstall, TrunkInstallStatus},
-};
 use chrono::{DateTime, Utc};
+use kube::CustomResource;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
@@ -34,7 +30,49 @@ pub struct ServiceAccountTemplate {
     pub metadata: Option<ObjectMeta>,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, JsonSchema, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+pub struct S3Credentials {
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "accessKeyId")]
+    pub access_key_id: Option<S3CredentialsAccessKeyId>,
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "inheritFromIAMRole"
+    )]
+    pub inherit_from_iam_role: Option<bool>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub region: Option<S3CredentialsRegion>,
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "secretAccessKey")]
+    pub secret_access_key: Option<S3CredentialsSecretAccessKey>,
+    #[serde(default, skip_serializing_if = "Option::is_none", rename = "sessionToken")]
+    pub session_token: Option<S3CredentialsSessionToken>,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+pub struct S3CredentialsAccessKeyId {
+    pub key: String,
+    pub name: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+pub struct S3CredentialsRegion {
+    pub key: String,
+    pub name: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+pub struct S3CredentialsSecretAccessKey {
+    pub key: String,
+    pub name: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+pub struct S3CredentialsSessionToken {
+    pub key: String,
+    pub name: String,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
 #[allow(non_snake_case)]
 pub struct Backup {
     #[serde(default = "defaults::default_destination_path")]
@@ -45,6 +83,22 @@ pub struct Backup {
     pub retentionPolicy: Option<String>,
     #[serde(default = "defaults::default_backup_schedule")]
     pub schedule: Option<String>,
+    #[serde(default, rename = "endpointURL")]
+    pub endpoint_url: Option<String>,
+    #[serde(default = "defaults::default_s3_credentials", rename = "s3Credentials")]
+    pub s3_credentials: Option<S3Credentials>,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
+pub struct Restore {
+    #[serde(rename = "serverName")]
+    pub server_name: String,
+    #[serde(rename = "recoveryTargetTime")]
+    pub recovery_target_time: Option<String>,
+    #[serde(default, rename = "endpointURL")]
+    pub endpoint_url: Option<String>,
+    #[serde(rename = "s3Credentials")]
+    pub s3_credentials: Option<S3Credentials>,
 }
 
 /// Generate the Kubernetes wrapper struct `CoreDB` from our Spec and Status struct
@@ -112,6 +166,9 @@ pub struct CoreDBSpec {
     pub override_configs: Option<Vec<PgConfig>>,
     #[serde(rename = "appServices")]
     pub app_services: Option<Vec<AppService>>,
+
+    // instance restore from backup
+    pub restore: Option<Restore>,
 }
 
 impl CoreDBSpec {

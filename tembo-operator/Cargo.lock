@@ -493,7 +493,7 @@ dependencies = [
 
 [[package]]
 name = "controller"
-version = "0.5.1"
+version = "0.6.0"
 dependencies = [
  "actix-web",
  "anyhow",
@@ -501,6 +501,7 @@ dependencies = [
  "base64 0.21.4",
  "chrono",
  "futures",
+ "futures-util",
  "http",
  "hyper",
  "itertools 0.11.0",

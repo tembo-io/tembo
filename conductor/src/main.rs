@@ -9,7 +9,7 @@ use conductor::{
     get_coredb_error_without_status, get_one, get_pg_conn, lookup_role_arn, parse_event_id,
     restart_cnpg, restart_statefulset, types,
 };
-use controller::apis::coredb_types::{Backup, CoreDBSpec, ServiceAccountTemplate};
+use controller::apis::coredb_types::{Backup, CoreDBSpec, S3Credentials, ServiceAccountTemplate};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use kube::Client;
 use log::{debug, error, info, warn};
@@ -242,6 +242,11 @@ async fn run(metrics: CustomMetrics) -> Result<(), Box<dyn std::error::Error>> {
                     encryption: Some(String::from("AES256")),
                     retentionPolicy: Some(String::from("30")),
                     schedule: Some(generate_rand_schedule().await),
+                    s3_credentials: Some(S3Credentials {
+                        inherit_from_iam_role: Some(true),
+                        ..Default::default()
+                    }),
+                    ..Default::default()
                 };
 
                 // Merge backup and service_account_template into spec

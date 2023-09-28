@@ -74,7 +74,6 @@ jobs:
       - name: Run functional / integration tests
         run: |
           set -xe
-          export ENABLE_BACKUP=false
           export DATA_PLANE_BASEDOMAIN=localhost
           # Start the operator in the background
           cargo run > operator-output.txt 2>&1 &

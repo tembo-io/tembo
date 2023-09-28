@@ -243,7 +243,6 @@ impl CoreDB {
                 Action::requeue(Duration::from_secs(300))
             })?;
 
-
         // Check if Postgres is already running
         is_not_restarting(self, ctx.clone(), "postgres").await?;
 
@@ -811,7 +810,6 @@ mod test {
         let expected_time = NaiveDate::from_ymd_opt(2023, 9, 19)
             .and_then(|date| date.and_hms_opt(23, 14, 0))
             .map(|naive_dt| DateTime::from_naive_utc_and_offset(naive_dt, Utc));
-
         assert_eq!(oldest_backup_time, expected_time);
     }
 

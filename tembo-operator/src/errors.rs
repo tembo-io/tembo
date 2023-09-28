@@ -28,4 +28,6 @@ pub enum ValueError {
     ByteError(#[from] Utf8Error),
     #[error("FloatError: {0}")]
     FloatError(#[from] std::num::ParseFloatError),
+    #[error("DateTime Parse Error: {0}")]
+    ChronoParseError(#[from] chrono::format::ParseError),
 }

@@ -10,7 +10,7 @@ use crate::{
 use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
 use kube::{runtime::controller::Action, Api};
 use std::{collections::HashSet, sync::Arc, time::Duration};
-use tracing::{debug, error, info, instrument, span, warn, Level};
+use tracing::{debug, error, info, instrument, warn};
 
 use crate::apis::coredb_types::CoreDBStatus;
 
@@ -51,8 +51,6 @@ fn merge_and_deduplicate_pods(non_fenced_pods: Vec<Pod>, fenced_names: Option<Ve
 // Collect any fenced pods and add them to the list of pods to install extensions into
 #[instrument(skip(ctx, cdb) fields(trace_id))]
 async fn all_fenced_and_non_fenced_pods(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<Pod>, Action> {
-    let span = span!(Level::DEBUG, "all_fenced_and_non_fenced_pods");
-    let _enter = span.enter();
     let name = cdb.metadata.name.clone().expect("CoreDB should have a name");
 
     // Get fenced pods
@@ -76,9 +74,6 @@ async fn all_fenced_and_non_fenced_pods(cdb: &CoreDB, ctx: Arc<Context>) -> Resu
 /// Find all trunk installs to remove and return a list of strings
 #[instrument(skip(cdb) fields(trace_id))]
 fn find_trunk_installs_to_remove_from_status(cdb: &CoreDB) -> Vec<String> {
-    let span = span!(Level::DEBUG, "remove_trunk_installs_from_status");
-    let _enter = span.enter();
-
     debug!(
         "Checking for trunk installs to remove from status for {}",
         cdb.metadata.name.clone().expect("CoreDB should have a name")
@@ -120,9 +115,6 @@ fn find_trunk_installs_to_remove_from_status(cdb: &CoreDB) -> Vec<String> {
 /// TrunkInstall, which is owned by CoreDB we only need to define a lifetime for CoreDB
 #[instrument(skip(cdb, pod_name) fields(trace_id))]
 fn find_trunk_installs_to_pod<'a>(cdb: &'a CoreDB, pod_name: &str) -> Vec<&'a TrunkInstall> {
-    let span = span!(Level::DEBUG, "find_trunk_installs_to_pod");
-    let _enter = span.enter();
-
     debug!(
         "Checking for trunk installs to install on pod {} for {}",
         pod_name,
@@ -159,9 +151,6 @@ fn find_trunk_installs_to_pod<'a>(cdb: &'a CoreDB, pod_name: &str) -> Vec<&'a Tr
 // is_pod_fenced function checks if a pod is fenced and returns a bool or requeue action
 #[instrument(skip(cdb, ctx, pod_name) fields(trace_id))]
 async fn is_pod_fenced(cdb: &CoreDB, ctx: Arc<Context>, pod_name: &str) -> Result<bool, Action> {
-    let span = span!(Level::DEBUG, "is_pod_fenced");
-    let _enter = span.enter();
-
     let coredb_name = cdb.metadata.name.as_deref().unwrap_or_default();
 
     debug!(
@@ -187,9 +176,6 @@ pub async fn reconcile_trunk_installs(
     cdb: &CoreDB,
     ctx: Arc<Context>,
 ) -> Result<Vec<TrunkInstallStatus>, Action> {
-    let span = span!(Level::INFO, "reconcile_trunk_installs");
-    let _enter = span.enter();
-
     let instance_name = cdb.metadata.name.clone().expect("CoreDB should have a name");
 
     debug!("Starting to reconcile trunk installs for {}", instance_name);
@@ -394,9 +380,6 @@ pub async fn install_extensions_to_pod(
     ctx: &Arc<Context>,
     pod_name: String,
 ) -> Result<Vec<TrunkInstallStatus>, Action> {
-    let span = span!(Level::INFO, "install_extensions");
-    let _enter = span.enter();
-
     let coredb_name = cdb.metadata.name.clone().expect("CoreDB should have a name");
     let coredb_api: Api<CoreDB> = Api::namespaced(
         ctx.client.clone(),
@@ -414,14 +397,9 @@ pub async fn install_extensions_to_pod(
         return Ok(current_trunk_install_statuses);
     }
     info!("Installing extensions into {}: {:?}", coredb_name, trunk_installs);
-    let span = span!(Level::INFO, "install_each_extension");
-    let _enter = span.enter();
 
     let mut requeue = false;
     for ext in trunk_installs.iter() {
-        // Nested span for individual extension installation
-        let ext_span = span!(Level::DEBUG, "install_individual_extension", extension = ext.name);
-        let _ext_enter = ext_span.enter();
         info!("Attempting to install extension: {} on {}", ext.name, coredb_name);
 
         // Execute trunk install command

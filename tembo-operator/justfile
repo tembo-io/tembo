@@ -14,7 +14,7 @@ generate-crd:
 
 install-traefik:
 	kubectl create namespace traefik || true
-	helm upgrade --install --version=20.8.0 --namespace=traefik --values=./testdata/traefik-values.yaml traefik traefik/traefik
+	helm upgrade --install --namespace=traefik --version=20.8.0 --values=./testdata/traefik-values.yaml traefik traefik/traefik
 
 install-kube-prometheus-stack:
 	kubectl create namespace monitoring || true
@@ -42,6 +42,24 @@ install-tempo:
 		tempo grafana/tempo \
 	  --namespace monitoring
 
+install-minio:
+	helm upgrade --install \
+		minio minio/minio \
+	  --namespace minio \
+		--create-namespace \
+		--values=./testdata/minio.yaml \
+		&& kubectl wait pods --for=condition=Ready --timeout=300s --all --all-namespaces \
+		&& kubectl apply -f ./testdata/minio-secret.yaml \
+		&& kubectl apply -f ./testdata/minio-bucket-job.yaml \
+		&& kubectl -n minio wait --for=condition=complete job/minio-create-backup-bucket --timeout=300s\
+		&& kubectl -n minio delete job/minio-create-backup-bucket
+
+install-reflector:
+	helm upgrade --install \
+		reflector emberstack/reflector \
+	  --namespace reflector \
+		--create-namespace 
+
 enable-cnpg-default-namespace:
 	kubectl label namespace default "tembo-pod-init.tembo.io/watch"="true"
 	kubectl delete pods -n tembo-pod-init --all
@@ -58,6 +76,8 @@ update-helm-repos:
 	helm repo add traefik https://traefik.github.io/charts
 	helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
 	helm repo add grafana https://grafana.github.io/helm-charts
+	helm repo add minio https://charts.min.io/
+	helm repo add emberstack https://emberstack.github.io/helm-charts
 	helm repo update
 
 # generate and install crd into the cluster
@@ -74,9 +94,11 @@ start-kind:
 	kind create cluster --image=kindest/node:v{{KUBE_VERSION}} --config testdata/kind-config.yaml
 	just update-helm-repos
 	just enable-cnpg-default-namespace
+	just install-reflector
 	just install-kube-prometheus-stack
 	just install-tempo
 	just install-traefik
+	just install-minio
 	just install-crd
 	just install-cnpg
 	just install-tembo-pod-init

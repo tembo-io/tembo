@@ -1,19 +1,32 @@
 use crate::{
-    apis::{coredb_types::CoreDB, postgres_parameters::MergeError},
+    apis::{
+        coredb_types::{CoreDB, S3Credentials},
+        postgres_parameters::MergeError,
+    },
     cloudnativepg::{
         clusters::{
             Cluster, ClusterAffinity, ClusterBackup, ClusterBackupBarmanObjectStore,
             ClusterBackupBarmanObjectStoreData, ClusterBackupBarmanObjectStoreDataCompression,
             ClusterBackupBarmanObjectStoreDataEncryption, ClusterBackupBarmanObjectStoreS3Credentials,
-            ClusterBackupBarmanObjectStoreWal, ClusterBackupBarmanObjectStoreWalCompression,
-            ClusterBackupBarmanObjectStoreWalEncryption, ClusterBootstrap, ClusterBootstrapInitdb,
-            ClusterExternalClusters, ClusterExternalClustersPassword, ClusterLogLevel, ClusterManaged,
-            ClusterManagedRoles, ClusterManagedRolesEnsure, ClusterManagedRolesPasswordSecret,
-            ClusterMonitoring, ClusterMonitoringCustomQueriesConfigMap, ClusterNodeMaintenanceWindow,
-            ClusterPostgresql, ClusterPostgresqlSyncReplicaElectionConstraint, ClusterPrimaryUpdateMethod,
-            ClusterPrimaryUpdateStrategy, ClusterReplicationSlots, ClusterReplicationSlotsHighAvailability,
-            ClusterResources, ClusterServiceAccountTemplate, ClusterServiceAccountTemplateMetadata,
-            ClusterSpec, ClusterStorage, ClusterSuperuserSecret,
+            ClusterBackupBarmanObjectStoreS3CredentialsAccessKeyId,
+            ClusterBackupBarmanObjectStoreS3CredentialsRegion,
+            ClusterBackupBarmanObjectStoreS3CredentialsSecretAccessKey,
+            ClusterBackupBarmanObjectStoreS3CredentialsSessionToken, ClusterBackupBarmanObjectStoreWal,
+            ClusterBackupBarmanObjectStoreWalCompression, ClusterBackupBarmanObjectStoreWalEncryption,
+            ClusterBootstrap, ClusterBootstrapInitdb, ClusterBootstrapRecovery,
+            ClusterBootstrapRecoveryRecoveryTarget, ClusterExternalClusters,
+            ClusterExternalClustersBarmanObjectStore, ClusterExternalClustersBarmanObjectStoreS3Credentials,
+            ClusterExternalClustersBarmanObjectStoreS3CredentialsAccessKeyId,
+            ClusterExternalClustersBarmanObjectStoreS3CredentialsRegion,
+            ClusterExternalClustersBarmanObjectStoreS3CredentialsSecretAccessKey,
+            ClusterExternalClustersBarmanObjectStoreS3CredentialsSessionToken,
+            ClusterExternalClustersBarmanObjectStoreWal, ClusterExternalClustersPassword, ClusterLogLevel,
+            ClusterManaged, ClusterManagedRoles, ClusterManagedRolesEnsure,
+            ClusterManagedRolesPasswordSecret, ClusterMonitoring, ClusterMonitoringCustomQueriesConfigMap,
+            ClusterNodeMaintenanceWindow, ClusterPostgresql, ClusterPostgresqlSyncReplicaElectionConstraint,
+            ClusterPrimaryUpdateMethod, ClusterPrimaryUpdateStrategy, ClusterReplicationSlots,
+            ClusterReplicationSlotsHighAvailability, ClusterResources, ClusterServiceAccountTemplate,
+            ClusterServiceAccountTemplateMetadata, ClusterSpec, ClusterStorage, ClusterSuperuserSecret,
         },
         scheduledbackups::{
             ScheduledBackup, ScheduledBackupBackupOwnerReference, ScheduledBackupCluster, ScheduledBackupSpec,
@@ -21,10 +34,12 @@ use crate::{
     },
     config::Config,
     defaults::{default_image, default_llm_image},
+    errors::ValueError,
     patch_cdb_status_merge,
     trunk::extensions_that_require_load,
     Context, RESTARTED_AT,
 };
+use chrono::{DateTime, NaiveDateTime, Offset};
 use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
 use kube::{
     api::{Patch, PatchParams},
@@ -41,21 +56,146 @@ pub struct PostgresConfig {
     pub shared_preload_libraries: Option<Vec<String>>,
 }
 
+fn create_cluster_backup_barman_data(cdb: &CoreDB) -> Option<ClusterBackupBarmanObjectStoreData> {
+    let encryption = match &cdb.spec.backup.encryption {
+        Some(encryption) => match encryption.as_str() {
+            "AES256" => Some(ClusterBackupBarmanObjectStoreDataEncryption::Aes256),
+            "aws:kms" => Some(ClusterBackupBarmanObjectStoreDataEncryption::AwsKms),
+            _ => None,
+        },
+        _ => None,
+    };
+
+    Some(ClusterBackupBarmanObjectStoreData {
+        compression: Some(ClusterBackupBarmanObjectStoreDataCompression::Bzip2),
+        encryption,
+        immediate_checkpoint: Some(true),
+        ..ClusterBackupBarmanObjectStoreData::default()
+    })
+}
+
+fn create_cluster_backup_barman_wal(cdb: &CoreDB) -> Option<ClusterBackupBarmanObjectStoreWal> {
+    let encryption = match &cdb.spec.backup.encryption {
+        Some(encryption) => match encryption.as_str() {
+            "AES256" => Some(ClusterBackupBarmanObjectStoreWalEncryption::Aes256),
+            "aws:kms" => Some(ClusterBackupBarmanObjectStoreWalEncryption::AwsKms),
+            _ => None,
+        },
+        _ => None,
+    };
+
+    if encryption.is_some() {
+        Some(ClusterBackupBarmanObjectStoreWal {
+            compression: Some(ClusterBackupBarmanObjectStoreWalCompression::Bzip2),
+            encryption,
+            max_parallel: Some(5),
+        })
+    } else {
+        None
+    }
+}
+
+fn create_cluster_backup_barman_object_store(
+    cdb: &CoreDB,
+    endpoint_url: &str,
+    backup_path: &str,
+    s3_credentials: &ClusterBackupBarmanObjectStoreS3Credentials,
+) -> ClusterBackupBarmanObjectStore {
+    ClusterBackupBarmanObjectStore {
+        data: create_cluster_backup_barman_data(cdb),
+        endpoint_url: Some(endpoint_url.to_string()),
+        destination_path: backup_path.to_string(),
+        s3_credentials: Some(s3_credentials.clone()),
+        wal: create_cluster_backup_barman_wal(cdb),
+        ..ClusterBackupBarmanObjectStore::default()
+    }
+}
+
+fn create_cluster_backup(
+    cdb: &CoreDB,
+    endpoint_url: &str,
+    backup_path: &str,
+    s3_credentials: &ClusterBackupBarmanObjectStoreS3Credentials,
+) -> Option<ClusterBackup> {
+    let retention_days = match &cdb.spec.backup.retentionPolicy {
+        None => "30d".to_string(),
+        Some(retention_policy) => match retention_policy.parse::<i32>() {
+            Ok(days) => {
+                format!("{}d", days)
+            }
+            Err(_) => {
+                warn!("Invalid retention policy because could not convert to i32, using default of 30 days");
+                "30d".to_string()
+            }
+        },
+    };
+
+    Some(ClusterBackup {
+        barman_object_store: Some(create_cluster_backup_barman_object_store(
+            cdb,
+            endpoint_url,
+            backup_path,
+            s3_credentials,
+        )),
+        retention_policy: Some(retention_days), // Adjust as needed
+        ..ClusterBackup::default()
+    })
+}
+
 pub fn cnpg_backup_configuration(
     cdb: &CoreDB,
     cfg: &Config,
 ) -> (Option<ClusterBackup>, Option<ClusterServiceAccountTemplate>) {
-    // Check to make sure that backups are enabled, and return None if it is disabled.
-    if !cfg.enable_backup {
-        (None, None)
-    } else {
-        debug!("Backups are enabled, configuring...");
+    let mut service_account_template: Option<ClusterServiceAccountTemplate> = None;
 
-        let backup_path = cdb.spec.backup.destinationPath.clone();
-        if backup_path.is_none() {
-            warn!("Backups are disabled because we don't have an S3 backup path");
-            return (None, None);
-        }
+    // Check if backups are enabled
+    if !cfg.enable_backup {
+        return (None, None);
+    }
+
+    debug!("Backups are enabled, configuring...");
+
+    // Check for backup path
+    let backup_path = cdb.spec.backup.destinationPath.clone();
+    if backup_path.is_none() {
+        warn!("Backups are disabled because we don't have an S3 backup path");
+        return (None, None);
+    }
+
+    let should_set_service_account_template = (cdb.spec.backup.endpoint_url.is_none()
+        && cdb.spec.backup.s3_credentials.is_none())
+        || (cdb
+            .spec
+            .backup
+            .s3_credentials
+            .as_ref()
+            .and_then(|cred| cred.inherit_from_iam_role)
+            .unwrap_or(false)
+            && cdb
+                .spec
+                .serviceAccountTemplate
+                .metadata
+                .as_ref()
+                .and_then(|meta| meta.annotations.as_ref())
+                .map_or(false, |annots| annots.contains_key("eks.amazonaws.com/role-arn")));
+
+    let should_reset_service_account_template = cdb
+        .spec
+        .backup
+        .s3_credentials
+        .as_ref()
+        .and_then(|cred| cred.inherit_from_iam_role)
+        == Some(false)
+        && (cdb.spec.backup.s3_credentials.as_ref().map_or(false, |cred| {
+            cred.access_key_id.is_some()
+                || cred.region.is_some()
+                || cred.secret_access_key.is_some()
+                || cred.session_token.is_some()
+        }));
+
+    if should_reset_service_account_template {
+        service_account_template = None;
+    } else if should_set_service_account_template {
         let service_account_metadata = cdb.spec.serviceAccountTemplate.metadata.clone();
         if service_account_metadata.is_none() {
             warn!("Backups are disabled because we don't have a service account template");
@@ -68,9 +208,8 @@ pub fn cnpg_backup_configuration(
             warn!("Backups are disabled because we don't have a service account template with annotations");
             return (None, None);
         }
-        let service_account_annotations =
-            service_account_annotations.expect("Expected service account template annotations");
-        let service_account_role_arn = service_account_annotations.get("eks.amazonaws.com/role-arn");
+        let annotations = service_account_annotations.expect("Expected service account template annotations");
+        let service_account_role_arn = annotations.get("eks.amazonaws.com/role-arn");
         if service_account_role_arn.is_none() {
             warn!(
                 "Backups are disabled because we don't have a service account template with an EKS role ARN"
@@ -81,46 +220,7 @@ pub fn cnpg_backup_configuration(
             .expect("Expected service account template annotations to contain an EKS role ARN")
             .clone();
 
-        let retention_days = match &cdb.spec.backup.retentionPolicy {
-            None => "30d".to_string(),
-            Some(retention_policy) => {
-                match retention_policy.parse::<i32>() {
-                    Ok(days) => {
-                        format!("{}d", days)
-                    }
-                    Err(_) => {
-                        warn!("Invalid retention policy because could not convert to i32, using default of 30 days");
-                        "30d".to_string()
-                    }
-                }
-            }
-        };
-
-        let cluster_backup = Some(ClusterBackup {
-            barman_object_store: Some(ClusterBackupBarmanObjectStore {
-                data: Some(ClusterBackupBarmanObjectStoreData {
-                    compression: Some(ClusterBackupBarmanObjectStoreDataCompression::Bzip2),
-                    encryption: Some(ClusterBackupBarmanObjectStoreDataEncryption::Aes256),
-                    immediate_checkpoint: Some(true),
-                    ..ClusterBackupBarmanObjectStoreData::default()
-                }),
-                destination_path: backup_path.expect("Expected to find S3 path"),
-                s3_credentials: Some(ClusterBackupBarmanObjectStoreS3Credentials {
-                    inherit_from_iam_role: Some(true),
-                    ..ClusterBackupBarmanObjectStoreS3Credentials::default()
-                }),
-                wal: Some(ClusterBackupBarmanObjectStoreWal {
-                    compression: Some(ClusterBackupBarmanObjectStoreWalCompression::Bzip2),
-                    encryption: Some(ClusterBackupBarmanObjectStoreWalEncryption::Aes256),
-                    max_parallel: Some(5),
-                }),
-                ..ClusterBackupBarmanObjectStore::default()
-            }),
-            retention_policy: Some(retention_days),
-            ..ClusterBackup::default()
-        });
-
-        let service_account_template = Some(ClusterServiceAccountTemplate {
+        service_account_template = Some(ClusterServiceAccountTemplate {
             metadata: ClusterServiceAccountTemplateMetadata {
                 annotations: Some(BTreeMap::from([(
                     "eks.amazonaws.com/role-arn".to_string(),
@@ -129,11 +229,74 @@ pub fn cnpg_backup_configuration(
                 ..ClusterServiceAccountTemplateMetadata::default()
             },
         });
+    }
+    // Copy the endpoint_url and s3_credentials from cdb to configure backups
+    let endpoint_url = cdb.spec.backup.endpoint_url.as_deref().unwrap_or_default();
+    let s3_credentials = generate_s3_backup_credentials(cdb.spec.backup.s3_credentials.as_ref());
+    let cluster_backup = create_cluster_backup(cdb, endpoint_url, &backup_path.unwrap(), &s3_credentials);
 
-        (cluster_backup, service_account_template)
+    (cluster_backup, service_account_template)
+}
+
+// parse_target_time returns the parsed target_time which is used for point-in-time-recovery
+// Currently, we support formats of target_time as follows (Basically support what CNPG supports):
+// YYYY-MM-DD HH24:MI:SS
+// YYYY-MM-DD HH24:MI:SS.FF6TZH
+// YYYY-MM-DD HH24:MI:SS.FF6TZH:TZM
+// YYYY-MM-DDTHH24:MI:SSZ            (RFC3339)
+// YYYY-MM-DDTHH24:MI:SS±TZH:TZM     (RFC3339)
+// YYYY-MM-DDTHH24:MI:SSS±TZH:TZM	   (RFC3339Micro)
+// YYYY-MM-DDTHH24:MI:SS             (modified RFC3339)
+fn parse_target_time(target_time: Option<&str>) -> Result<Option<String>, ValueError> {
+    if let Some(time_str) = target_time {
+        // Try to parse the target_time with the following formats in order
+        // 1. YYYY-MM-DD HH24:MI:SS
+        let result = NaiveDateTime::parse_from_str(time_str, "%Y-%m-%d %H:%M:%S")
+            .map(|dt| dt.to_string())
+            .or_else(|_| {
+                // 2. YYYY-MM-DD HH24:MI:SS.FF6TZH
+                // 3. YYYY-MM-DD HH24:MI:SS.FF6TZH:TZM
+                DateTime::parse_from_str(time_str, "%Y-%m-%d %H:%M:%S%.6f%z").map(|dt| {
+                    let offset_hours = dt.offset().fix().local_minus_utc() / 3600;
+                    let formatted_offset = format!("{:+03}", offset_hours);
+                    format!(
+                        "{}.{:06}{}",
+                        dt.format("%Y-%m-%d %H:%M:%S"),
+                        dt.timestamp_subsec_micros(),
+                        formatted_offset
+                    )
+                })
+            })
+            .or_else(|_| {
+                // 4. YYYY-MM-DDTHH24:MI:SSZ            (RFC3339)
+                // 5. YYYY-MM-DDTHH24:MI:SS±TZH:TZM     (RFC3339)
+                // 6. YYYY-MM-DDTHH24:MI:SSS±TZH:TZM    (RFC3339Micro)
+                // 7. YYYY-MM-DDTHH24:MI:SS             (modified RFC3339)
+                DateTime::parse_from_rfc3339(time_str).map(|dt| {
+                    let offset_hours = dt.offset().fix().local_minus_utc() / 3600;
+                    let formatted_offset = format!("{:+03}", offset_hours);
+                    format!(
+                        "{}.{:06}{}",
+                        dt.format("%Y-%m-%d %H:%M:%S"),
+                        dt.timestamp_subsec_micros(),
+                        formatted_offset
+                    )
+                })
+            });
+
+        // Return the parsed target_time if it is Ok, otherwise return ValueError
+        // todo: Somehow turn this into a requeue action, so that we can retry
+        //      when the target_time is not in the correct format.
+        match result {
+            Ok(parsed_time) => Ok(Some(parsed_time)),
+            Err(err) => Err(ValueError::ChronoParseError(err)),
+        }
+    } else {
+        Ok(None)
     }
 }
 
+#[instrument(skip(cdb))]
 pub fn cnpg_cluster_bootstrap_from_cdb(
     cdb: &CoreDB,
 ) -> (
@@ -141,12 +304,48 @@ pub fn cnpg_cluster_bootstrap_from_cdb(
     Option<Vec<ClusterExternalClusters>>,
     Option<ClusterSuperuserSecret>,
 ) {
-    // todo: Add logic if restore is needed
-    let cluster_bootstrap = ClusterBootstrap {
-        initdb: Some(ClusterBootstrapInitdb {
-            ..ClusterBootstrapInitdb::default()
-        }),
-        ..ClusterBootstrap::default()
+    // parse_target_time returns the parsed target_time which is used for point-in-time-recovery
+    // todo: Somehow turn this into a requeue action, so that we can retry when the target_time is not in the correct format.
+    //      for now we just log the error and return None, which will disable point-in-time-recovery, but allow for a full recovery
+    let parsed_target_time = cdb.spec.restore.as_ref().and_then(|restore| {
+        restore
+            .recovery_target_time
+            .as_ref()
+            .and_then(|time_str| match parse_target_time(Some(time_str)) {
+                Ok(Some(parsed_time)) => Some(parsed_time),
+                Ok(None) => None,
+                Err(err) => {
+                    error!(
+                        "Failed to parse target_time for instance: {}, {}",
+                        cdb.name_any(),
+                        err
+                    );
+                    None
+                }
+            })
+    });
+
+    let cluster_bootstrap = if let Some(_restore) = &cdb.spec.restore {
+        ClusterBootstrap {
+            recovery: Some(ClusterBootstrapRecovery {
+                source: Some("tembo-recovery".to_string()),
+                recovery_target: parsed_target_time.map(|target_time| {
+                    ClusterBootstrapRecoveryRecoveryTarget {
+                        target_time: Some(target_time),
+                        ..ClusterBootstrapRecoveryRecoveryTarget::default()
+                    }
+                }),
+                ..ClusterBootstrapRecovery::default()
+            }),
+            ..ClusterBootstrap::default()
+        }
+    } else {
+        ClusterBootstrap {
+            initdb: Some(ClusterBootstrapInitdb {
+                ..ClusterBootstrapInitdb::default()
+            }),
+            ..ClusterBootstrap::default()
+        }
     };
     let cluster_name = cdb.name_any();
 
@@ -157,17 +356,41 @@ pub fn cnpg_cluster_bootstrap_from_cdb(
 
     let superuser_secret_name = format!("{}-connection", cluster_name);
 
-    let coredb_cluster = ClusterExternalClusters {
-        name: "coredb".to_string(),
-        connection_parameters: Some(coredb_connection_parameters),
-        password: Some(ClusterExternalClustersPassword {
-            // The CoreDB operator connection secret is named as the cluster
-            // name, suffixed by -connection
-            name: Some(superuser_secret_name.clone()),
-            key: "password".to_string(),
-            ..ClusterExternalClustersPassword::default()
-        }),
-        ..ClusterExternalClusters::default()
+    let coredb_cluster = if let Some(restore) = &cdb.spec.restore {
+        let s3_credentials = generate_s3_restore_credentials(restore.s3_credentials.as_ref());
+        // Find destination_path from Backup to generate the restore destination path
+        let restore_destination_path = match &cdb.spec.backup.destinationPath {
+            Some(path) => generate_restore_destination_path(path),
+            None => "".to_string(), // or any other default value you'd like
+        };
+        ClusterExternalClusters {
+            name: "tembo-recovery".to_string(),
+            barman_object_store: Some(ClusterExternalClustersBarmanObjectStore {
+                destination_path: format!("{}/{}", restore_destination_path, restore.server_name),
+                endpoint_url: restore.endpoint_url.clone(),
+                s3_credentials: Some(s3_credentials),
+                wal: Some(ClusterExternalClustersBarmanObjectStoreWal {
+                    max_parallel: Some(5),
+                    ..ClusterExternalClustersBarmanObjectStoreWal::default()
+                }),
+                server_name: Some(restore.server_name.clone()),
+                ..ClusterExternalClustersBarmanObjectStore::default()
+            }),
+            ..ClusterExternalClusters::default()
+        }
+    } else {
+        ClusterExternalClusters {
+            name: "coredb".to_string(),
+            connection_parameters: Some(coredb_connection_parameters),
+            password: Some(ClusterExternalClustersPassword {
+                // The CoreDB operator connection secret is named as the cluster
+                // name, suffixed by -connection
+                name: Some(superuser_secret_name.clone()),
+                key: "password".to_string(),
+                ..ClusterExternalClustersPassword::default()
+            }),
+            ..ClusterExternalClusters::default()
+        }
     };
 
     let superuser_secret = ClusterSuperuserSecret {
@@ -473,7 +696,7 @@ async fn pods_to_fence(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<String>, A
                         }
                     }
                     Ok(None) => {
-                        warn!("Latest generated node is not available yet. It might be a new or initializing cluster.");
+                        warn!("Latest generated node is not available yet for instance {}. It might be a new or initializing cluster.", &cdb.name_any());
                         Err(Action::requeue(Duration::from_secs(30)))
                     }
                     Err(e) => {
@@ -1070,6 +1293,111 @@ pub async fn unfence_pod(cdb: &CoreDB, ctx: Arc<Context>, pod_name: &str) -> Res
     }
 }
 
+// generate_restore_destination_path function will generate the restore destination path from the backup
+// object and return a string
+fn generate_restore_destination_path(path: &str) -> String {
+    let mut parts: Vec<&str> = path.split('/').collect();
+    parts.pop();
+    parts.join("/")
+}
+
+// generate_s3_backup_credentials function will generate the s3 backup credentials from
+// S3Credentials object and return a ClusterBackupBarmanObjectStoreS3Credentials object
+fn generate_s3_backup_credentials(
+    creds: Option<&S3Credentials>,
+) -> ClusterBackupBarmanObjectStoreS3Credentials {
+    if let Some(creds) = creds {
+        if creds.access_key_id.is_none() && creds.secret_access_key.is_none() {
+            return ClusterBackupBarmanObjectStoreS3Credentials {
+                inherit_from_iam_role: Some(true),
+                ..Default::default()
+            };
+        }
+
+        ClusterBackupBarmanObjectStoreS3Credentials {
+            access_key_id: creds.access_key_id.as_ref().map(|id| {
+                ClusterBackupBarmanObjectStoreS3CredentialsAccessKeyId {
+                    key: id.key.clone(),
+                    name: id.name.clone(),
+                }
+            }),
+            inherit_from_iam_role: Some(false),
+            region: creds
+                .region
+                .as_ref()
+                .map(|r| ClusterBackupBarmanObjectStoreS3CredentialsRegion {
+                    key: r.key.clone(),
+                    name: r.name.clone(),
+                }),
+            secret_access_key: creds.secret_access_key.as_ref().map(|key| {
+                ClusterBackupBarmanObjectStoreS3CredentialsSecretAccessKey {
+                    key: key.key.clone(),
+                    name: key.name.clone(),
+                }
+            }),
+            session_token: creds.session_token.as_ref().map(|token| {
+                ClusterBackupBarmanObjectStoreS3CredentialsSessionToken {
+                    key: token.key.clone(),
+                    name: token.name.clone(),
+                }
+            }),
+        }
+    } else {
+        ClusterBackupBarmanObjectStoreS3Credentials {
+            inherit_from_iam_role: Some(true),
+            ..Default::default()
+        }
+    }
+}
+
+// generate_s3_restore_credentials function will generate the s3 restore credentials from
+// S3Credentials object and return a ClusterExternalClustersBarmanObjectStoreS3Credentials object
+fn generate_s3_restore_credentials(
+    creds: Option<&S3Credentials>,
+) -> ClusterExternalClustersBarmanObjectStoreS3Credentials {
+    if let Some(creds) = creds {
+        if creds.access_key_id.is_none() && creds.secret_access_key.is_none() {
+            return ClusterExternalClustersBarmanObjectStoreS3Credentials {
+                inherit_from_iam_role: Some(true),
+                ..Default::default()
+            };
+        }
+
+        ClusterExternalClustersBarmanObjectStoreS3Credentials {
+            access_key_id: creds.access_key_id.as_ref().map(|id| {
+                ClusterExternalClustersBarmanObjectStoreS3CredentialsAccessKeyId {
+                    key: id.key.clone(),
+                    name: id.name.clone(),
+                }
+            }),
+            inherit_from_iam_role: Some(false),
+            region: creds.region.as_ref().map(|r| {
+                ClusterExternalClustersBarmanObjectStoreS3CredentialsRegion {
+                    key: r.key.clone(),
+                    name: r.name.clone(),
+                }
+            }),
+            secret_access_key: creds.secret_access_key.as_ref().map(|key| {
+                ClusterExternalClustersBarmanObjectStoreS3CredentialsSecretAccessKey {
+                    key: key.key.clone(),
+                    name: key.name.clone(),
+                }
+            }),
+            session_token: creds.session_token.as_ref().map(|token| {
+                ClusterExternalClustersBarmanObjectStoreS3CredentialsSessionToken {
+                    key: token.key.clone(),
+                    name: token.name.clone(),
+                }
+            }),
+        }
+    } else {
+        ClusterExternalClustersBarmanObjectStoreS3Credentials {
+            inherit_from_iam_role: Some(true),
+            ..Default::default()
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1654,5 +1982,59 @@ mod tests {
         }
         "#;
         let _result: Cluster = serde_json::from_str(json_str).expect("Should be able to deserialize");
+    }
+
+    #[test]
+    fn test_generate_restore_destination_path() {
+        // Define test cases
+        let test_cases = vec![
+            (
+                "s3://cdb-plat-use1-dev-instance-backups/coredb/coredb/org-coredb-inst-test-testing-test-1",
+                "s3://cdb-plat-use1-dev-instance-backups/coredb/coredb",
+            ),
+            ("s3://path/with/multiple/segments", "s3://path/with/multiple"),
+            ("s3://short/path", "s3://short"),
+            ("single_segment", ""),
+        ];
+
+        for (input, expected) in test_cases.iter() {
+            assert_eq!(generate_restore_destination_path(input), *expected);
+        }
+    }
+
+    #[test]
+    fn test_basic_format() {
+        let result = parse_target_time(Some("2023-09-26 21:15:42")).unwrap();
+        assert_eq!(result, Some("2023-09-26 21:15:42".to_string()));
+    }
+
+    #[test]
+    fn test_milliseconds_and_offset() {
+        let result = parse_target_time(Some("2023-09-26 21:15:42.123456+02:00")).unwrap();
+        assert_eq!(result, Some("2023-09-26 21:15:42.123456+02".to_string()));
+    }
+
+    #[test]
+    fn test_rfc3339() {
+        let result = parse_target_time(Some("2023-09-26T21:15:42Z")).unwrap();
+        assert_eq!(result, Some("2023-09-26 21:15:42.000000+00".to_string())); // adjusted expected output
+    }
+
+    #[test]
+    fn test_rfc3339_with_offset() {
+        let result = parse_target_time(Some("2023-09-26T21:15:42+05:00")).unwrap();
+        assert_eq!(result, Some("2023-09-26 21:15:42.000000+05".to_string())); // adjusted expected output
+    }
+
+    #[test]
+    fn test_rfc3339micro() {
+        let result = parse_target_time(Some("2023-09-26T21:15:42.123456+05:00")).unwrap();
+        assert_eq!(result, Some("2023-09-26 21:15:42.123456+05".to_string())); // adjusted expected output
+    }
+
+    #[test]
+    fn test_invalid_format() {
+        let result = parse_target_time(Some("invalid-format"));
+        assert!(result.is_err()); // check for error
     }
 }
