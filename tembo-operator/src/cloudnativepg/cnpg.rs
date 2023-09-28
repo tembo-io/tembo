@@ -830,10 +830,13 @@ pub async fn get_fenced_pods(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Option<V
     })?;
 
     let cluster: Api<Cluster> = Api::namespaced(ctx.client.clone(), &namespace);
-    let co = cluster.get(instance_name).await;
+    let co = cluster.get(instance_name).await.map_err(|e| {
+        error!("Error getting cluster: {}", e);
+        Action::requeue(Duration::from_secs(300))
+    })?;
 
     match co {
-        Ok(cluster_resource) => {
+        cluster_resource => {
             let annotations = match cluster_resource.metadata.annotations {
                 Some(ann) => ann,
                 None => {
@@ -882,13 +885,6 @@ pub async fn get_fenced_pods(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Option<V
                 );
                 Ok(None)
             }
-        }
-        Err(_) => {
-            info!(
-                "Cluster {} not found, possible new cluster detected",
-                instance_name
-            );
-            Ok(None)
         }
     }
 }
