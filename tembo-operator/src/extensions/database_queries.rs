@@ -4,9 +4,10 @@ use crate::{
         types,
         types::{ExtensionInstallLocation, ExtensionInstallLocationStatus, ExtensionStatus},
     },
-    Context,
+    Context, RESTARTED_AT,
 };
-use kube::runtime::controller::Action;
+use chrono::{DateTime, Utc};
+use kube::{runtime::controller::Action, ResourceExt};
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::{collections::HashMap, sync::Arc, time::Duration};
@@ -134,6 +135,69 @@ pub async fn list_extensions(cdb: &CoreDB, ctx: Arc<Context>, database: &str) ->
         .await?;
     let result_string = psql_out.stdout.unwrap();
     Ok(parse_extensions(&result_string))
+}
+
+/// Returns Ok if the given database is running (i.e. not restarting)
+pub async fn is_not_restarting(cdb: &CoreDB, ctx: Arc<Context>, database: &str) -> Result<(), Action> {
+    // chrono strftime declaration to parse Postgres timestamps
+    const PG_TIMESTAMP_DECL: &str = "%Y-%m-%d %H:%M:%S.%f%#z";
+
+    fn parse_psql_output(output: &str) -> Option<&str> {
+        output.lines().nth(2).map(str::trim)
+    }
+
+    let cdb_name = cdb.name_any();
+    let Some(restarted_at) = cdb.annotations().get(RESTARTED_AT) else {
+        // No restartedAt annotation, so we're not restarting
+        return Ok(());
+    };
+
+    let restarted_requested_at: DateTime<Utc> = DateTime::parse_from_rfc3339(restarted_at)
+        .map_err(|err| {
+            tracing::error!("{cdb_name}: Failed to deserialize DateTime from `restartedAt`: {err}");
+
+            Action::requeue(Duration::from_secs(300))
+        })?
+        .into();
+
+    let pg_postmaster = cdb
+        .psql(
+            "select pg_postmaster_start_time();".to_owned(),
+            database.to_owned(),
+            ctx,
+        )
+        .await?
+        .stdout
+        .ok_or_else(|| {
+            tracing::error!("{cdb_name}: select pg_postmaster_start_time() had no stdout");
+
+            Action::requeue(Duration::from_secs(300))
+        })?;
+
+    let pg_postmaster_start_time = parse_psql_output(&pg_postmaster).ok_or_else(|| {
+        tracing::error!("{cdb_name}: failed to parse pg_postmaster_start_time() output");
+
+        Action::requeue(Duration::from_secs(300))
+    })?;
+
+    let server_started_at: DateTime<Utc> = DateTime::parse_from_str(pg_postmaster_start_time, PG_TIMESTAMP_DECL)
+        .map_err(|err| {
+            tracing::error!(
+                "{cdb_name}: Failed to deserialize DateTime from `pg_postmaster_start_time`: {err}, received '{pg_postmaster_start_time}'"
+            );
+
+            Action::requeue(Duration::from_secs(300))
+        })?
+        .into();
+
+    if server_started_at >= restarted_requested_at {
+        // Server started after the moment we requested it to restart,
+        // meaning the restart is done
+        Ok(())
+    } else {
+        // Server hasn't even started restarting yet
+        Err(Action::requeue(Duration::from_secs(5)))
+    }
 }
 
 pub fn parse_extensions(psql_str: &str) -> Vec<ExtRow> {

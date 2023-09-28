@@ -429,7 +429,6 @@ mod pg_param_tests {
                         value: "yolo".parse().unwrap(),
                     },
                 ]),
-                ..Default::default()
             }),
             ..Default::default()
         };

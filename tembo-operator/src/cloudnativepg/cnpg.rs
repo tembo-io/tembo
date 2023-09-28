@@ -21,8 +21,9 @@ use crate::{
     },
     config::Config,
     defaults::{default_image, default_llm_image},
+    patch_cdb_status_merge,
     trunk::extensions_that_require_load,
-    Context,
+    Context, RESTARTED_AT,
 };
 use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
 use kube::{
@@ -30,6 +31,7 @@ use kube::{
     runtime::controller::Action,
     Api, Resource, ResourceExt,
 };
+use serde_json::json;
 use std::{collections::BTreeMap, sync::Arc};
 use tokio::time::Duration;
 use tracing::{debug, error, info, instrument, warn};
@@ -537,6 +539,29 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
         .name
         .clone()
         .expect("CNPG Cluster should always have a name");
+
+    let existing_restarted_at_annotation = cluster
+        .metadata
+        .annotations
+        .as_ref()
+        .and_then(|annotations| annotations.get(RESTARTED_AT));
+
+    let restart_annotation_updated = if let Some(restarted_at) = cdb.annotations().get(RESTARTED_AT) {
+        match existing_restarted_at_annotation {
+            Some(timestamp) if timestamp == restarted_at => false,
+            Some(_) | None => {
+                // Forward the `restartedAt` annotation from CoreDB over to the CNPG cluster
+                let mut cluster_annotations = cluster.metadata.annotations.unwrap_or_default();
+                cluster_annotations.insert(RESTARTED_AT.into(), restarted_at.to_owned());
+
+                cluster.metadata.annotations = Some(cluster_annotations);
+                true
+            }
+        }
+    } else {
+        false
+    };
+
     let cluster_api: Api<Cluster> = Api::namespaced(ctx.client.clone(), namespace.as_str());
 
     let mut _restart_required = false;
@@ -637,6 +662,24 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
             error!("Error patching cluster: {}", e);
             Action::requeue(Duration::from_secs(300))
         })?;
+
+    // If we updated the restartedAt annotation, set `status.running` in CoreDB to false
+    if restart_annotation_updated {
+        let cdb_cluster: Api<CoreDB> = Api::namespaced(ctx.client.clone(), &namespace);
+        let cluster_name = &name;
+
+        patch_cdb_status_merge(
+            &cdb_cluster,
+            cluster_name,
+            json!({
+                "status": {
+                    "running": false
+                }
+            }),
+        )
+        .await?;
+    }
+
     debug!("Applied");
     // If restart is required, then we should trigger the restart above
     Ok(())

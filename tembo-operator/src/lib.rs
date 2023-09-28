@@ -30,6 +30,8 @@ mod secret;
 mod service;
 mod trunk;
 
+pub const RESTARTED_AT: &str = "kubectl.kubernetes.io/restartedAt";
+
 use thiserror::Error;
 
 #[derive(Error, Debug)]

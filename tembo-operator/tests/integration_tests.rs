@@ -15,7 +15,7 @@
 
 #[cfg(test)]
 mod test {
-    use chrono::{SecondsFormat, Utc};
+    use chrono::{DateTime, SecondsFormat, Utc};
     use controller::{
         apis::coredb_types::CoreDB,
         cloudnativepg::clusters::Cluster,
@@ -42,7 +42,7 @@ mod test {
         Api, Client, Config, Error,
     };
     use rand::Rng;
-    use std::{str, sync::Arc, thread, time::Duration};
+    use std::{ops::Not, str, sync::Arc, thread, time::Duration};
 
     use tokio::io::AsyncReadExt;
 
@@ -2892,5 +2892,200 @@ mod test {
 
         // Delete namespace
         let _ = delete_namespace(client.clone(), &namespace).await;
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn restarts_postgres_correctly() {
+        async fn wait_til_status_is_filled(coredbs: &Api<CoreDB>, name: &str) {
+            let started_waiting = Utc::now();
+            let max_wait_time = chrono::Duration::seconds(45);
+
+            while Utc::now().signed_duration_since(started_waiting) <= max_wait_time {
+                let coredb = coredbs.get(name).await.expect("spec not found");
+                if coredb.status.is_some() {
+                    return;
+                }
+                tokio::time::sleep(Duration::from_secs(2)).await;
+            }
+
+            panic!("Status was not populated fast enough");
+        }
+
+        async fn get_pg_start_time(coredbs: &Api<CoreDB>, name: &str, ctx: Arc<Context>) -> DateTime<Utc> {
+            const PG_TIMESTAMP_DECL: &str = "%Y-%m-%d %H:%M:%S.%f%#z";
+
+            let coredb = coredbs.get(name).await.expect("spec not found");
+
+            let psql_output = coredb
+                .psql(
+                    "SELECT pg_postmaster_start_time()".into(),
+                    "postgres".to_string(),
+                    ctx,
+                )
+                .await
+                .map_err(|err| eprintln!("Error: {:?}", err))
+                .unwrap();
+            let stdout = psql_output
+                .stdout
+                .as_ref()
+                .and_then(|stdout| stdout.lines().nth(2).map(str::trim))
+                .expect("expected stdout");
+
+            DateTime::parse_from_str(stdout, PG_TIMESTAMP_DECL)
+                .unwrap()
+                .into()
+        }
+
+        async fn status_running(coredbs: &Api<CoreDB>, name: &str) -> bool {
+            let spec = coredbs.get(name).await.expect("spec not found");
+
+            spec.status.expect("Expected status to be present").running
+        }
+
+        // Initialize tracing
+        tracing_subscriber::fmt().init();
+
+        // Initialize the Kubernetes client
+        let client = kube_client().await;
+        let state = State::default();
+        let context = state.create_context(client.clone());
+
+        let name = {
+            let mut rng = rand::thread_rng();
+            let suffix = rng.gen_range(0..100000);
+
+            format!("test-coredb-{}", suffix)
+        };
+
+        let namespace = create_namespace(client.clone(), &name).await.unwrap();
+
+        // Apply a basic configuration of CoreDB
+        let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
+        let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
+
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": "CoreDB",
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "replicas": 1,
+                "extensions": [],
+                "trunk_installs": []
+            }
+        });
+
+        let params = PatchParams::apply("tembo-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        coredbs.patch(&name, &params, &patch).await.unwrap();
+
+        // Wait for CNPG Pod to be created
+        {
+            let pod_name = format!("{}-1", name);
+
+            pod_ready_and_running(pods.clone(), pod_name.clone()).await;
+            wait_til_status_is_filled(&coredbs, &name).await;
+        }
+
+        // Ensure status.running is true
+        assert!(status_running(&coredbs, &name).await);
+        let initial_start_time = get_pg_start_time(&coredbs, &name, context.clone()).await;
+
+        // Apply the annotation to restart Postgres
+        {
+            let restart = Utc::now().to_rfc3339_opts(SecondsFormat::Secs, true).to_string();
+
+            let patch_json = serde_json::json!({
+                "metadata": {
+                    "annotations": {
+                        "kubectl.kubernetes.io/restartedAt": restart
+                    }
+                }
+            });
+
+            let patch = Patch::Merge(&patch_json);
+            coredbs
+                .patch(&name, &PatchParams::default(), &patch)
+                .await
+                .unwrap();
+        }
+
+        // Ensure that eventually `status.running` becomes false to reflect
+        // that Postgres is down
+        {
+            let started = Utc::now();
+            let max_wait_time = chrono::Duration::seconds(30);
+            let mut running_became_false = false;
+            while Utc::now().signed_duration_since(started) < max_wait_time {
+                if status_running(&coredbs, &name).await {
+                    println!("status.running is still true. Retrying in 1 sec.");
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                } else {
+                    println!("status.running is now false!");
+
+                    running_became_false = true;
+                    break;
+                }
+            }
+
+            assert!(
+                running_became_false,
+                "status.running should've become false after restart"
+            );
+        }
+
+        // Wait for Postgres to restart
+        {
+            let started = Utc::now();
+            let max_wait_time = chrono::Duration::seconds(TIMEOUT_SECONDS_POD_READY as _);
+            let mut running_became_true = false;
+            while Utc::now().signed_duration_since(started) < max_wait_time {
+                if status_running(&coredbs, &name).await.not() {
+                    println!("status.running is still false. Retrying in 3 secs.");
+                    tokio::time::sleep(Duration::from_secs(3)).await;
+                } else {
+                    println!("status.running is now true once again!");
+
+                    running_became_true = true;
+                    break;
+                }
+            }
+
+            assert!(
+                running_became_true,
+                "status.running should've become true once restarted"
+            );
+
+            let reboot_start_time = get_pg_start_time(&coredbs, &name, context).await;
+
+
+            assert!(
+                reboot_start_time > initial_start_time,
+                "start time should've changed"
+            );
+        }
+
+        // Perform cleanup
+        {
+            coredbs.delete(&name, &Default::default()).await.unwrap();
+            println!("Waiting for CoreDB to be deleted: {name}");
+            let _assert_coredb_deleted = tokio::time::timeout(
+                Duration::from_secs(TIMEOUT_SECONDS_COREDB_DELETED),
+                await_condition(coredbs.clone(), &name, conditions::is_deleted("")),
+            )
+            .await
+            .unwrap_or_else(|_| {
+                panic!(
+                    "CoreDB {} was not deleted after waiting {} seconds",
+                    name, TIMEOUT_SECONDS_COREDB_DELETED
+                )
+            });
+            println!("CoreDB resource deleted {name}");
+
+            // Delete namespace
+            let _ = delete_namespace(client.clone(), &namespace).await;
+        }
     }
 }
