@@ -7,6 +7,9 @@ pub enum OperatorError {
     #[error("An IngressRouteTCP did not have a name")]
     IngressRouteTCPName,
 
+    #[error("An IngressRoute failed to Create, Update, or Delete")]
+    IngressRouteError,
+
     #[error("An IngressRouteTCP failed to Create, Update, or Delete")]
     IngressRouteTcpError,
 

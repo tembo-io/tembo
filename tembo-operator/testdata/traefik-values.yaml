@@ -20,11 +20,17 @@ ports:
     exposedPort: 5432
     nodePort: 32432
     protocol: TCP
-  web:
+  # web:
+  #   expose: true
+  #   port: 8080
+  #   exposedPort: 8080
+  #   nodePort: 32430
+  #   protocol: TCP
+  websecure:
     expose: true
-    port: 8080
-    exposedPort: 8080
-    nodePort: 32430
+    port: 8443
+    exposedPort: 8443
+    nodePort: 32443
     protocol: TCP
   traefik:
     expose: true

@@ -20,6 +20,7 @@ mod test {
         apis::coredb_types::CoreDB,
         cloudnativepg::clusters::Cluster,
         defaults::{default_resources, default_storage},
+        ingress_route_crd::IngressRoute,
         ingress_route_tcp_crd::IngressRouteTCP,
         is_pod_ready,
         psql::PsqlOutput,
@@ -34,7 +35,7 @@ mod test {
             },
         },
         apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
-        apimachinery::pkg::{api::resource::Quantity, apis::meta::v1::ObjectMeta},
+        apimachinery::pkg::{api::resource::Quantity, apis::meta::v1::ObjectMeta, util::intstr::IntOrString},
     };
     use kube::{
         api::{AttachParams, DeleteParams, ListParams, Patch, PatchParams, PostParams},
@@ -352,6 +353,14 @@ mod test {
                 resource_list.extend(resources.items);
                 passed_retry = true;
                 break;
+            } else {
+                println!(
+                    "ns:{}.cdb:{} Found {}, expected {}",
+                    namespace,
+                    cdb_name,
+                    resources.items.len(),
+                    num_expected
+                );
             }
             thread::sleep(Duration::from_millis(2000));
         }
@@ -2683,8 +2692,11 @@ mod test {
                     {
                         "name": "test-app-0",
                         "image": "crccheck/hello-world:latest",
-                        "ports": [
-                            "80:8000"
+                        "routing": [
+                            {
+                                "port": 8000,
+                                "ingressPath": "/"
+                            }
                         ],
                         "resources": {
                             "requests": {
@@ -2771,6 +2783,22 @@ mod test {
         let app_0_resources = app_0_container.resources.unwrap();
         assert_eq!(app_0_resources, expected);
 
+        let ingresses: Result<Vec<IngressRoute>, errors::OperatorError> =
+            list_resources(client.clone(), cdb_name, &namespace, 1).await;
+        let ingress = ingresses.unwrap();
+        assert_eq!(ingress.len(), 1);
+        let ingress_route = ingress[0].clone();
+        let routes = ingress_route.spec.clone().routes.clone();
+        assert_eq!(routes.len(), 1);
+        let route = routes[0].clone();
+        assert_eq!(
+            route.r#match,
+            format!("Host(`{}.localhost`) && PathPrefix(`/`)", cdb_name)
+        );
+        let services = routes[0].services.clone().unwrap();
+        assert_eq!(services.len(), 1);
+        assert_eq!(services[0].name, format!("{}-test-app-0", cdb_name));
+        assert_eq!(services[0].port.clone().unwrap(), IntOrString::Int(8000));
 
         // Assert resources in second AppService
         let selector_map = app_1
@@ -2815,8 +2843,11 @@ mod test {
                     {
                         "name": "test-app-0",
                         "image": "crccheck/hello-world:latest",
-                        "ports": [
-                            "80:8000"
+                        "routing": [
+                            {
+                                "port": 8000,
+                                "ingressPath": "/"
+                            }
                         ],
                         "resources": {
                             "requests": {
@@ -2875,6 +2906,12 @@ mod test {
             .unwrap();
         assert!(service_items.is_empty());
         // should be no Services
+
+        // ingress must be gone
+        let ingresses: Vec<IngressRoute> = list_resources(client.clone(), cdb_name, &namespace, 0)
+            .await
+            .unwrap();
+        assert_eq!(ingresses.len(), 0);
 
         // CLEANUP TEST
         // Cleanup CoreDB

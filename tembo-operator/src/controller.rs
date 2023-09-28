@@ -810,7 +810,7 @@ mod test {
 
         let expected_time = NaiveDate::from_ymd_opt(2023, 9, 19)
             .and_then(|date| date.and_hms_opt(23, 14, 0))
-            .map(|naive_dt| DateTime::<Utc>::from_utc(naive_dt, Utc));
+            .map(|naive_dt| DateTime::from_naive_utc_and_offset(naive_dt, Utc));
 
         assert_eq!(oldest_backup_time, expected_time);
     }
@@ -898,7 +898,7 @@ mod test {
 
         let expected_time = NaiveDate::from_ymd_opt(2023, 9, 18)
             .and_then(|date| date.and_hms_opt(22, 12, 0))
-            .map(|naive_dt| DateTime::<Utc>::from_utc(naive_dt, Utc));
+            .map(|naive_dt| DateTime::from_naive_utc_and_offset(naive_dt, Utc));
 
         assert_eq!(oldest_backup_time, expected_time);
     }

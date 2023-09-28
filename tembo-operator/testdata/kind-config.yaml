@@ -8,13 +8,15 @@ nodes:
     hostPort: 5432
     listenAddress: "127.0.0.1"
     protocol: TCP
-  # Uncomment to access Traefik debugging endpoints
-  #
-  # - containerPort: 32431
-  #   hostPort: 9000
-  #   listenAddress: "127.0.0.1"
-  #   protocol: TCP
+  - containerPort: 32431
+    hostPort: 9000
+    listenAddress: "127.0.0.1"
+    protocol: TCP
   # - containerPort: 32430
   #   hostPort: 8080
   #   listenAddress: "127.0.0.1"
   #   protocol: TCP
+  - containerPort: 32443
+    hostPort: 8443
+    listenAddress: "127.0.0.1"
+    protocol: TCP

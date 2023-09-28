@@ -104,7 +104,7 @@ async fn apply_ingress_route_tcp(
     ingress_route_tcp_name: &String,
     ingress_route_tcp_to_apply: &IngressRouteTCP,
 ) -> Result<(), OperatorError> {
-    let patch = Patch::Apply(&ingress_route_tcp_to_apply);
+    let patch: Patch<&&IngressRouteTCP> = Patch::Apply(&ingress_route_tcp_to_apply);
     let patch_parameters = PatchParams::apply("cntrlr").force();
     match ingress_route_tcp_api
         .patch(&ingress_route_tcp_name.clone(), &patch_parameters, &patch)

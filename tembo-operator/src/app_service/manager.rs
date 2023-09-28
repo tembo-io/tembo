@@ -1,4 +1,11 @@
-use crate::{apis::coredb_types::CoreDB, Context, Error, Result};
+use crate::{
+    apis::coredb_types::CoreDB,
+    ingress_route_crd::{
+        IngressRoute, IngressRouteRoutes, IngressRouteRoutesKind, IngressRouteRoutesServices,
+        IngressRouteRoutesServicesKind, IngressRouteSpec,
+    },
+    Context, Error, Result,
+};
 use k8s_openapi::{
     api::{
         apps::v1::{Deployment, DeploymentSpec},
@@ -19,14 +26,18 @@ use kube::{
 };
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
+use tracing::{debug, error, warn};
+
+
 use super::types::AppService;
-use tracing::*;
 
 // private wrapper to hold the AppService Resources
+#[derive(Clone, Debug)]
 struct AppServiceResources {
     deployment: Deployment,
     name: String,
     service: Option<Service>,
+    ingress_routes: Option<Vec<IngressRouteRoutes>>,
 }
 
 
@@ -38,17 +49,99 @@ fn generate_resource(
     coredb_name: &str,
     namespace: &str,
     oref: OwnerReference,
+    domain: String,
 ) -> AppServiceResources {
     let resource_name = format!("{}-{}", coredb_name, appsvc.name.clone());
     let service = appsvc
-        .ports
+        .routing
         .as_ref()
         .map(|_| generate_service(appsvc, coredb_name, &resource_name, namespace, oref.clone()));
     let deployment = generate_deployment(appsvc, coredb_name, &resource_name, namespace, oref);
+
+    let host_matcher = format!(
+        "Host(`{subdomain}.{domain}`)",
+        subdomain = coredb_name,
+        domain = domain
+    );
+    let ingress_routes = generate_ingress_routes(appsvc, &resource_name, namespace, host_matcher);
     AppServiceResources {
         deployment,
         name: resource_name,
         service,
+        ingress_routes,
+    }
+}
+
+// generates Kubernetes IngressRoute template for an appService
+// maps the specified
+fn generate_ingress_routes(
+    appsvc: &AppService,
+    resource_name: &str,
+    namespace: &str,
+    host_matcher: String,
+) -> Option<Vec<IngressRouteRoutes>> {
+    match appsvc.routing.clone() {
+        Some(routings) => {
+            let mut routes: Vec<IngressRouteRoutes> = Vec::new();
+            for route in routings.iter() {
+                match route.ingress_path.clone() {
+                    Some(path) => {
+                        let matcher = format!("{host_matcher} && PathPrefix(`{}`)", path);
+                        let route = IngressRouteRoutes {
+                            kind: IngressRouteRoutesKind::Rule,
+                            r#match: matcher.clone(),
+                            services: Some(vec![IngressRouteRoutesServices {
+                                name: resource_name.to_string(),
+                                port: Some(IntOrString::Int(route.port as i32)),
+                                namespace: Some(namespace.to_owned()),
+                                kind: Some(IngressRouteRoutesServicesKind::Service),
+                                ..IngressRouteRoutesServices::default()
+                            }]),
+                            middlewares: None,
+                            priority: None,
+                        };
+                        routes.push(route);
+                    }
+                    None => {
+                        // do not create ingress when there is no path provided
+                        continue;
+                    }
+                }
+            }
+            Some(routes)
+        }
+        None => None,
+    }
+}
+
+fn generate_ingress(
+    coredb_name: &str,
+    namespace: &str,
+    oref: OwnerReference,
+    routes: Vec<IngressRouteRoutes>,
+) -> IngressRoute {
+    let mut selector_labels: BTreeMap<String, String> = BTreeMap::new();
+
+    selector_labels.insert("component".to_owned(), COMPONENT_NAME.to_string());
+    selector_labels.insert("coredb.io/name".to_owned(), coredb_name.to_string());
+
+    let mut labels = selector_labels.clone();
+    labels.insert("component".to_owned(), COMPONENT_NAME.to_owned());
+
+    IngressRoute {
+        metadata: ObjectMeta {
+            // using coredb name, since we'll have 1x ingress per coredb
+            name: Some(coredb_name.to_owned()),
+            namespace: Some(namespace.to_owned()),
+            owner_references: Some(vec![oref]),
+            labels: Some(labels.clone()),
+            ..ObjectMeta::default()
+        },
+        spec: IngressRouteSpec {
+            entry_points: Some(vec!["websecure".to_string()]),
+            routes,
+            tls: None,
+        },
     }
 }
 
@@ -61,6 +154,7 @@ fn generate_service(
     oref: OwnerReference,
 ) -> Service {
     let mut selector_labels: BTreeMap<String, String> = BTreeMap::new();
+
     selector_labels.insert("app".to_owned(), resource_name.to_string());
     selector_labels.insert("component".to_owned(), COMPONENT_NAME.to_string());
     selector_labels.insert("coredb.io/name".to_owned(), coredb_name.to_string());
@@ -68,14 +162,16 @@ fn generate_service(
     let mut labels = selector_labels.clone();
     labels.insert("component".to_owned(), COMPONENT_NAME.to_owned());
 
-    let ports = match appsvc.ports.as_ref() {
-        Some(ports) => {
-            let ports: Vec<ServicePort> = ports
+    let ports = match appsvc.routing.as_ref() {
+        Some(routing) => {
+            let ports: Vec<ServicePort> = routing
                 .iter()
-                .map(|pm| ServicePort {
-                    port: pm.container as i32,
-                    name: Some(appsvc.name.clone()),
-                    target_port: Some(IntOrString::String(appsvc.name.clone())),
+                .map(|r| ServicePort {
+                    port: r.port as i32,
+                    // there can be more than one ServicePort per Service
+                    // these must be unique, so we'll use the port number
+                    name: Some(format!("http-{}", r.port)),
+                    target_port: None,
                     ..ServicePort::default()
                 })
                 .collect();
@@ -144,21 +240,16 @@ fn generate_deployment(
             };
             (Some(readiness_probe), Some(liveness_probe))
         }
-        None => {
-            // are there default probes we could configure when none are provided?
-            (None, None)
-        }
+        None => (None, None),
     };
 
-    // container port mapping
-    let container_ports: Option<Vec<ContainerPort>> = match appsvc.ports.as_ref() {
+    // container ports
+    let container_ports: Option<Vec<ContainerPort>> = match appsvc.routing.as_ref() {
         Some(ports) => {
             let container_ports: Vec<ContainerPort> = ports
                 .iter()
                 .map(|pm| ContainerPort {
-                    container_port: pm.container as i32,
-                    host_port: Some(pm.host as i32),
-                    name: Some(appsvc.name.clone()),
+                    container_port: pm.port as i32,
                     protocol: Some("TCP".to_string()),
                     ..ContainerPort::default()
                 })
@@ -239,7 +330,8 @@ async fn get_appservice_deployments(
         .collect())
 }
 
-// gets all names of AppService Services in the namespace that have the label "component=AppService"
+// gets all names of AppService Services in the namespace
+// that that have the label "component=AppService" and belong to the coredb
 async fn get_appservice_services(
     client: &Client,
     namespace: &str,
@@ -332,20 +424,24 @@ pub async fn reconcile_app_services(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(
     let service_api: Api<Service> = Api::namespaced(client.clone(), &ns);
 
     let desired_deployments = match cdb.spec.app_services.clone() {
-        Some(appsvcs) => appsvcs.iter().map(|a| a.name.clone()).collect(),
+        Some(appsvcs) => appsvcs
+            .iter()
+            .map(|a| format!("{}-{}", coredb_name, a.name.clone()))
+            .collect(),
         None => {
             debug!("No AppServices found in Instance: {}", ns);
             vec![]
         }
     };
 
-    // only deploy the Kubernetes Service when there are port mappings
+    // only deploy the Kubernetes Service when there are routing configurations
     let desired_services = match cdb.spec.app_services.clone() {
         Some(appsvcs) => {
             let mut desired_svc: Vec<String> = Vec::new();
             for appsvc in appsvcs.iter() {
-                if appsvc.ports.as_ref().is_some() {
-                    desired_svc.push(appsvc.name.clone());
+                if appsvc.routing.as_ref().is_some() {
+                    let svc_name = format!("{}-{}", coredb_name, appsvc.name);
+                    desired_svc.push(svc_name.clone());
                 }
             }
             desired_svc
@@ -412,20 +508,100 @@ pub async fn reconcile_app_services(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(
         Some(appsvcs) => appsvcs,
         None => {
             debug!("ns: {}, No AppServices found in spec", ns);
-            return Ok(());
+            vec![]
         }
     };
 
+    let domain = match std::env::var("DATA_PLANE_BASEDOMAIN") {
+        Ok(domain) => domain,
+        Err(_) => {
+            warn!("`DATA_PLANE_BASEDOMAIN` not set -- assuming `localhost`");
+            "localhost".to_string()
+        }
+    };
     let resources: Vec<AppServiceResources> = appsvcs
         .iter()
-        .map(|appsvc| generate_resource(appsvc, &coredb_name, &ns, oref.clone()))
+        .map(|appsvc| generate_resource(appsvc, &coredb_name, &ns, oref.clone(), domain.to_owned()))
+        .collect();
+    let apply_errored = apply_resources(resources.clone(), &client, &ns).await;
+
+    let desired_routes: Vec<IngressRouteRoutes> = resources
+        .iter()
+        .filter_map(|r| r.ingress_routes.clone())
+        .flatten()
         .collect();
 
-
-    let apply_errored = apply_resources(resources, &client, &ns).await;
+    match reconcile_ingress(client.clone(), &coredb_name, &ns, oref.clone(), desired_routes).await {
+        Ok(_) => {
+            debug!("Updated/applied ingress for {}.{}", ns, coredb_name,);
+        }
+        Err(e) => {
+            error!(
+                "Failed to update/apply IngressRoute {}.{}: {}",
+                ns, coredb_name, e
+            );
+            has_errors = true;
+        }
+    }
 
     if has_errors || apply_errored {
         return Err(Action::requeue(Duration::from_secs(300)));
     }
     Ok(())
+}
+
+async fn reconcile_ingress(
+    client: Client,
+    coredb_name: &str,
+    ns: &str,
+    oref: OwnerReference,
+    desired_routes: Vec<IngressRouteRoutes>,
+) -> Result<(), kube::Error> {
+    let ingress_api: Api<IngressRoute> = Api::namespaced(client, ns);
+    let ingress = generate_ingress(coredb_name, ns, oref, desired_routes.clone());
+    if desired_routes.is_empty() {
+        // we don't need an IngressRoute when there are no routes
+        match ingress_api.get_opt(coredb_name).await {
+            Ok(Some(_)) => {
+                debug!("Deleting IngressRoute {}.{}", ns, coredb_name);
+                ingress_api.delete(coredb_name, &Default::default()).await?;
+                return Ok(());
+            }
+            Ok(None) => {
+                warn!("No IngressRoute {}.{} found to delete", ns, coredb_name);
+                return Ok(());
+            }
+            Err(e) => {
+                error!(
+                    "Error retrieving IngressRoute, {}.{}, error: {}",
+                    ns, coredb_name, e
+                );
+                return Err(e);
+            }
+        }
+    }
+    match apply_ingress_route(ingress_api, coredb_name, &ingress).await {
+        Ok(_) => {
+            debug!("Updated/applied ingress for {}.{}", ns, coredb_name,);
+            Ok(())
+        }
+        Err(e) => {
+            error!(
+                "Failed to update/apply IngressRoute {}.{}: {}",
+                ns, coredb_name, e
+            );
+            Err(e)
+        }
+    }
+}
+
+async fn apply_ingress_route(
+    ingress_api: Api<IngressRoute>,
+    ingress_name: &str,
+    ingress_route: &IngressRoute,
+) -> Result<IngressRoute, kube::Error> {
+    let patch_parameters = PatchParams::apply("cntrlr").force();
+    ingress_api
+        .patch(ingress_name, &patch_parameters, &Patch::Apply(&ingress_route))
+        .await
 }

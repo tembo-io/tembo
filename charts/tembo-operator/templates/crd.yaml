@@ -45,33 +45,14 @@ spec:
                       type: object
                     image:
                       type: string
-                    metrics:
-                      nullable: true
-                      properties:
-                        enabled:
-                          type: boolean
-                        path:
-                          type: string
-                        port:
-                          type: string
-                      required:
-                      - enabled
-                      - path
-                      - port
-                      type: object
                     name:
                       type: string
-                    ports:
-                      items:
-                        type: string
-                      nullable: true
-                      type: array
                     probes:
                       nullable: true
                       properties:
                         liveness:
                           properties:
-                            initial_delay_seconds:
+                            initialDelaySeconds:
                               format: uint32
                               minimum: 0.0
                               type: integer
@@ -80,13 +61,13 @@ spec:
                             port:
                               type: string
                           required:
-                          - initial_delay_seconds
+                          - initialDelaySeconds
                           - path
                           - port
                           type: object
                         readiness:
                           properties:
-                            initial_delay_seconds:
+                            initialDelaySeconds:
                               format: uint32
                               minimum: 0.0
                               type: integer
@@ -95,7 +76,7 @@ spec:
                             port:
                               type: string
                           required:
-                          - initial_delay_seconds
+                          - initialDelaySeconds
                           - path
                           - port
                           type: object
@@ -120,6 +101,21 @@ spec:
                           description: 'Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                           type: object
                       type: object
+                    routing:
+                      items:
+                        properties:
+                          ingressPath:
+                            nullable: true
+                            type: string
+                          port:
+                            format: uint16
+                            minimum: 0.0
+                            type: integer
+                        required:
+                        - port
+                        type: object
+                      nullable: true
+                      type: array
                   required:
                   - image
                   - name

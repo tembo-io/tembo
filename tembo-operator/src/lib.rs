@@ -23,6 +23,7 @@ pub mod cloudnativepg;
 mod deployment_postgres_exporter;
 #[cfg(test)] pub mod fixtures;
 mod ingress;
+pub mod ingress_route_crd;
 pub mod ingress_route_tcp_crd;
 pub mod psql;
 mod rbac;

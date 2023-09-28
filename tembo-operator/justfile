@@ -14,7 +14,7 @@ generate-crd:
 
 install-traefik:
 	kubectl create namespace traefik || true
-	helm upgrade --install --namespace=traefik --values=./testdata/traefik-values.yaml traefik traefik/traefik
+	helm upgrade --install --version=20.8.0 --namespace=traefik --values=./testdata/traefik-values.yaml traefik traefik/traefik
 
 install-kube-prometheus-stack:
 	kubectl create namespace monitoring || true
