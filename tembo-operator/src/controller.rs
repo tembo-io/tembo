@@ -36,7 +36,8 @@ use kube::{
 };
 
 use crate::{
-    extensions::reconcile_extensions,
+    apis::postgres_parameters::PgConfig,
+    extensions::{database_queries::list_config_params, reconcile_extensions},
     ingress::reconcile_extra_postgres_ing_route_tcp,
     postgres_exporter::reconcile_prom_configmap,
     trunk::{extensions_that_require_load, reconcile_trunk_configmap},
@@ -272,6 +273,7 @@ impl CoreDB {
 
                 let recovery_time = self.get_recovery_time(ctx.clone()).await?;
 
+                let current_config_values = get_current_config_values(self, ctx.clone()).await?;
                 CoreDBStatus {
                     running: true,
                     extensionsUpdating: false,
@@ -279,20 +281,23 @@ impl CoreDB {
                     extensions: Some(extensions),
                     trunk_installs: Some(trunk_installs),
                     resources: Some(self.spec.resources.clone()),
-                    runtime_config: self.spec.runtime_config.clone(),
+                    runtime_config: Some(current_config_values),
                     first_recoverability_time: recovery_time,
                 }
             }
-            true => CoreDBStatus {
-                running: false,
-                extensionsUpdating: false,
-                storage: Some(self.spec.storage.clone()),
-                extensions: self.status.clone().and_then(|f| f.extensions),
-                trunk_installs: self.status.clone().and_then(|f| f.trunk_installs),
-                resources: Some(self.spec.resources.clone()),
-                runtime_config: self.spec.runtime_config.clone(),
-                first_recoverability_time: self.status.as_ref().and_then(|f| f.first_recoverability_time),
-            },
+            true => {
+                let current_config_values = get_current_config_values(self, ctx.clone()).await?;
+                CoreDBStatus {
+                    running: false,
+                    extensionsUpdating: false,
+                    storage: Some(self.spec.storage.clone()),
+                    extensions: self.status.clone().and_then(|f| f.extensions),
+                    trunk_installs: self.status.clone().and_then(|f| f.trunk_installs),
+                    resources: Some(self.spec.resources.clone()),
+                    runtime_config: Some(current_config_values),
+                    first_recoverability_time: self.status.as_ref().and_then(|f| f.first_recoverability_time),
+                }
+            }
         };
 
         debug!("Updating CoreDB status to {:?} for {}", new_status, name.clone());
@@ -648,6 +653,12 @@ pub async fn get_current_coredb_resource(cdb: &CoreDB, ctx: Arc<Context>) -> Res
         Action::requeue(Duration::from_secs(10))
     })?;
     Ok(coredb.clone())
+}
+
+// Get current config values
+pub async fn get_current_config_values(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<PgConfig>, Action> {
+    let cfg = list_config_params(cdb, ctx.clone()).await?;
+    Ok(cfg)
 }
 
 pub async fn patch_cdb_status_merge(
