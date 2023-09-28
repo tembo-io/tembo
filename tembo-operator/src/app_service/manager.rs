@@ -2,7 +2,7 @@ use crate::{
     apis::coredb_types::CoreDB,
     ingress_route_crd::{
         IngressRoute, IngressRouteRoutes, IngressRouteRoutesKind, IngressRouteRoutesServices,
-        IngressRouteRoutesServicesKind, IngressRouteSpec,
+        IngressRouteRoutesServicesKind, IngressRouteSpec, IngressRouteTls,
     },
     Context, Error, Result,
 };
@@ -140,7 +140,7 @@ fn generate_ingress(
         spec: IngressRouteSpec {
             entry_points: Some(vec!["websecure".to_string()]),
             routes,
-            tls: None,
+            tls: Some(IngressRouteTls::default()),
         },
     }
 }
