@@ -6,6 +6,7 @@ use reqwest::header::HeaderMap;
 use reqwest::StatusCode;
 use rpassword::read_password;
 use serde_json::Value;
+use simplelog::*;
 use std::collections::HashMap;
 use std::error::Error;
 use std::io;
@@ -44,7 +45,7 @@ impl AuthClient {
             }
             Err(e) => {
                 // TODO: remind users to use service accounts, not their every day user account
-                eprintln!("there was an error signing in: {}", e);
+                error!("there was an error signing in: {}", e);
                 Err(e)
             }
         }
@@ -103,7 +104,7 @@ impl AuthClient {
                 Ok(response_id.unwrap().to_string())
             }
             status_code if status_code.is_client_error() => {
-                println!("{}", res.text()?);
+                info!("{}", res.text()?);
                 Err(From::from("Client error"))
             }
             _ => Err(From::from("Client error")),
@@ -131,8 +132,8 @@ impl AuthClient {
         match res.status() {
             StatusCode::OK => (),
             status_code if status_code.is_client_error() => {
-                println!("client error:");
-                println!("{}", &res.text()?);
+                error!("client error:");
+                error!("{}", &res.text()?);
                 return Err(From::from("Client error"));
             }
             _ => (),
@@ -168,8 +169,8 @@ impl AuthClient {
         match res.status() {
             StatusCode::OK => (),
             status_code if status_code.is_client_error() => {
-                println!("- client error:");
-                println!("- {}", &res.text()?);
+                error!("- client error:");
+                error!("- {}", &res.text()?);
                 return Err(From::from("Client error"));
             }
             _ => (),

@@ -3,6 +3,7 @@ use crate::cli::config::Config;
 use crate::cli::docker::DockerError;
 use crate::cli::instance::Instance;
 use clap::{Arg, ArgAction, ArgMatches, Command};
+use simplelog::*;
 use std::error::Error;
 
 // example usage: tembo extension list -n test
@@ -21,7 +22,7 @@ pub fn make_subcommand() -> Command {
 
 pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
     if cfg!(target_os = "windows") {
-        println!("{}", crate::WINDOWS_ERROR_MSG);
+        warn!("{}", crate::WINDOWS_ERROR_MSG);
 
         return Err(Box::new(DockerError::new(crate::WINDOWS_ERROR_MSG)));
     }
@@ -30,7 +31,7 @@ pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
     let name = args.try_get_one::<String>("name").unwrap();
 
     if config.instances.is_empty() {
-        println!("- No instances have been configured");
+        info!("No instances have been configured");
     } else {
         let mut instances = vec![];
 
@@ -44,13 +45,14 @@ pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
         }
 
         if instances.is_empty() {
-            println!("- No configuration found for {}", &name.unwrap());
+            info!("No configuration found for {}", &name.unwrap());
         }
     }
 
     Ok(())
 }
 
+// NOTE: uses println vs logging intentionally
 fn installed_extensions(instance: &Instance) {
     println!("- Installed extensions");
 
@@ -64,6 +66,7 @@ fn installed_extensions(instance: &Instance) {
     }
 }
 
+// NOTE: uses println vs logging intentionally
 fn enabled_extensions(instance: &Instance) {
     println!("- Enabled extensions (on databases)");
 

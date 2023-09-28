@@ -51,11 +51,11 @@ impl Docker {
             .unwrap()
             .contains("tembo-pg")
         {
-            println!("- existing container found");
+            info!("existing container found");
 
             instance.start();
         } else {
-            println!("- building and then running container");
+            info!("building and then running container");
 
             let _ = instance.init();
         };

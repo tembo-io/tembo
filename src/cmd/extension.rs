@@ -1,5 +1,6 @@
 use crate::cli::docker::DockerError;
 use clap::ArgMatches;
+use simplelog::*;
 use std::error::Error;
 
 pub mod list;
@@ -7,7 +8,7 @@ pub mod list;
 // handles all extension command calls
 pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
     if cfg!(target_os = "windows") {
-        println!("{}", crate::WINDOWS_ERROR_MSG);
+        warn!("{}", crate::WINDOWS_ERROR_MSG);
 
         return Err(Box::new(DockerError::new(crate::WINDOWS_ERROR_MSG)));
     }
@@ -19,7 +20,7 @@ pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
     };
 
     if res.is_err() {
-        println!("{}", res.err().unwrap());
+        error!("{}", res.err().unwrap());
 
         // TODO: adding logging, log error
         std::process::exit(101);

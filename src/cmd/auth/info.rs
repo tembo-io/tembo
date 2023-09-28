@@ -7,6 +7,7 @@ use dateparser::parse;
 use jwt::Claims;
 use jwt::Header;
 use jwt::Token;
+use simplelog::*;
 use std::error::Error;
 
 // example usage: tembo auth info
@@ -16,7 +17,7 @@ pub fn make_subcommand() -> Command {
 
 pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
     if cfg!(target_os = "windows") {
-        println!("{}", crate::WINDOWS_ERROR_MSG);
+        warn!("{}", crate::WINDOWS_ERROR_MSG);
 
         return Err(Box::new(DockerError::new(crate::WINDOWS_ERROR_MSG)));
     }
@@ -25,7 +26,7 @@ pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
     let jwt = config.jwt.unwrap();
 
     if jwt.is_empty() {
-        println!("- no auth info, to authenticate, run tembo auth login");
+        info!("No auth info, to authenticate, run tembo auth login");
     } else {
         let _ = print_jwt_info(&jwt);
     }
@@ -33,6 +34,7 @@ pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+// NOTE: uses println rather than logging intentionally
 fn print_jwt_info(jwt: &str) -> Result<(), Box<dyn Error>> {
     println!("Tembo auth information:");
 
