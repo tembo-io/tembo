@@ -878,57 +878,56 @@ pub async fn get_fenced_pods(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Option<V
         Action::requeue(Duration::from_secs(300))
     })?;
 
-    match co {
-        cluster_resource => {
-            let annotations = match cluster_resource.metadata.annotations {
-                Some(ann) => ann,
-                None => {
-                    info!("Cluster Status for {} is not set", instance_name);
-                    return Ok(None);
-                }
-            };
+    // Directly bind the value from co to cluster_resource
+    let cluster_resource = co;
 
-            // Handle the Result returned by get_fenced_instances_from_annotations
-            let fenced_instances = match get_fenced_instances_from_annotations(&annotations) {
-                Ok(fi) => fi,
-                Err(_) => {
-                    error!(
-                        "Error while parsing fenced instances for instance {}",
-                        instance_name
-                    );
-                    return Err(Action::requeue(Duration::from_secs(30)));
-                }
-            };
+    let annotations = match cluster_resource.metadata.annotations {
+        Some(ann) => ann,
+        None => {
+            info!("Cluster Status for {} is not set", instance_name);
+            return Ok(None);
+        }
+    };
 
-            // Check if fencedInstances annotation is present
-            if let Some(fenced_instances) = fenced_instances {
-                // Rest of your code
-                debug!(
-                    "Found fenced pods {:?} for instance {}",
-                    fenced_instances, instance_name
+    // Handle the Result returned by get_fenced_instances_from_annotations
+    let fenced_instances = match get_fenced_instances_from_annotations(&annotations) {
+        Ok(fi) => fi,
+        Err(_) => {
+            error!(
+                "Error while parsing fenced instances for instance {}",
+                instance_name
+            );
+            return Err(Action::requeue(Duration::from_secs(30)));
+        }
+    };
+
+    // Check if fencedInstances annotation is present
+    if let Some(fenced_instances) = fenced_instances {
+        // Rest of your code
+        debug!(
+            "Found fenced pods {:?} for instance {}",
+            fenced_instances, instance_name
+        );
+
+        // Check if all fenced pods are initialized
+        for pod_name in &fenced_instances {
+            let is_initialized = fenced_pods_initialized(cdb, ctx.clone(), pod_name).await?;
+            if !is_initialized {
+                info!(
+                    "Pod {} in {} is not yet initialized. Will requeue.",
+                    pod_name, instance_name
                 );
-
-                // Check if all fenced pods are initialized
-                for pod_name in &fenced_instances {
-                    let is_initialized = fenced_pods_initialized(cdb, ctx.clone(), pod_name).await?;
-                    if !is_initialized {
-                        info!(
-                            "Pod {} in {} is not yet initialized. Will requeue.",
-                            pod_name, instance_name
-                        );
-                        return Err(Action::requeue(Duration::from_secs(10)));
-                    }
-                }
-
-                Ok(Some(fenced_instances))
-            } else {
-                debug!(
-                    "The fencedInstances annotation for instance {} is not set in the Cluster Status",
-                    instance_name
-                );
-                Ok(None)
+                return Err(Action::requeue(Duration::from_secs(10)));
             }
         }
+
+        Ok(Some(fenced_instances))
+    } else {
+        debug!(
+            "The fencedInstances annotation for instance {} is not set in the Cluster Status",
+            instance_name
+        );
+        Ok(None)
     }
 }
 
@@ -1003,77 +1002,71 @@ pub async fn unfence_pod(cdb: &CoreDB, ctx: Arc<Context>, pod_name: &str) -> Res
         Action::requeue(Duration::from_secs(300))
     })?;
 
-    // get the annotations from the cluster object
-    if let mut cluster_resource = co {
-        let annotations_clone = cluster_resource.metadata.annotations.clone();
-        debug!(
-            "Instance initial annotations for instance {}: {:?}",
-            instance_name, annotations_clone
-        );
+    // Directly bind the value from co to cluster_resource
+    let mut cluster_resource = co;
 
-        if let Some(annotations) = annotations_clone {
-            // Use the remove_pod_from_fenced_instances function
-            let updated_annotations = remove_pod_from_fenced_instances_annotation(&annotations, pod_name);
+    let annotations_clone = cluster_resource.metadata.annotations.clone();
+    debug!(
+        "Instance initial annotations for instance {}: {:?}",
+        instance_name, annotations_clone
+    );
 
-            if let Ok(Some(updated_annotations)) = updated_annotations {
-                // Update the cluster object
-                cluster_resource.metadata.annotations = Some(updated_annotations.clone());
+    if let Some(annotations) = annotations_clone {
+        // Use the remove_pod_from_fenced_instances function
+        let updated_annotations = remove_pod_from_fenced_instances_annotation(&annotations, pod_name);
 
-                // Clear managedFields
-                cluster_resource.metadata.managed_fields = None;
+        if let Ok(Some(updated_annotations)) = updated_annotations {
+            // Update the cluster object
+            cluster_resource.metadata.annotations = Some(updated_annotations.clone());
 
-                // Patch the cluster object
-                debug!("Patching CoreDBSpec for instance {}", instance_name);
-                let ps = PatchParams::apply("cntrlr");
-                let _o = cluster
-                    .patch(instance_name, &ps, &Patch::Apply(&cluster_resource))
-                    .await
-                    .map_err(|e| {
-                        error!("Error patching cluster: {}", e);
-                        Action::requeue(Duration::from_secs(300))
-                    })?;
-                debug!("CoreDBSpec patched for instance {}", instance_name);
-                Ok(())
-            } else {
-                debug!("The fencedInstances annotation is not set in the Cluster Status for instance {}. Removing the key.", instance_name);
+            // Clear managedFields
+            cluster_resource.metadata.managed_fields = None;
 
-                // Remove the "cnpg.io/fencedInstances" annotation
-                let mut updated_annotations = annotations.clone();
-                updated_annotations.remove("cnpg.io/fencedInstances");
-
-                // Update the cluster object
-                cluster_resource.metadata.annotations = if updated_annotations.is_empty() {
-                    None
-                } else {
-                    Some(updated_annotations.clone())
-                };
-
-                // Clear managedFields
-                cluster_resource.metadata.managed_fields = None;
-
-                // Patch the cluster object
-                debug!("Patch CoreDBSpec for instance {}", instance_name);
-                let ps = PatchParams::apply("cntrlr");
-                let _o = cluster
-                    .patch(instance_name, &ps, &Patch::Apply(&cluster_resource))
-                    .await
-                    .map_err(|e| {
-                        error!("Error patching cluster: {}", e);
-                        Action::requeue(Duration::from_secs(300))
-                    })?;
-                debug!("CoreDBSpec patched for instance {}", instance_name);
-                Ok(())
-            }
+            // Patch the cluster object
+            debug!("Patching CoreDBSpec for instance {}", instance_name);
+            let ps = PatchParams::apply("cntrlr");
+            let _o = cluster
+                .patch(instance_name, &ps, &Patch::Apply(&cluster_resource))
+                .await
+                .map_err(|e| {
+                    error!("Error patching cluster: {}", e);
+                    Action::requeue(Duration::from_secs(300))
+                })?;
+            debug!("CoreDBSpec patched for instance {}", instance_name);
+            Ok(())
         } else {
-            info!("Cluster Status is not set for {}", instance_name);
+            debug!("The fencedInstances annotation is not set in the Cluster Status for instance {}. Removing the key.", instance_name);
+
+            // Remove the "cnpg.io/fencedInstances" annotation
+            let mut updated_annotations = annotations.clone();
+            updated_annotations.remove("cnpg.io/fencedInstances");
+
+            // Update the cluster object
+            cluster_resource.metadata.annotations = if updated_annotations.is_empty() {
+                None
+            } else {
+                Some(updated_annotations.clone())
+            };
+
+            // Clear managedFields
+            cluster_resource.metadata.managed_fields = None;
+
+            // Patch the cluster object
+            debug!("Patch CoreDBSpec for instance {}", instance_name);
+            let ps = PatchParams::apply("cntrlr");
+            let _o = cluster
+                .patch(instance_name, &ps, &Patch::Apply(&cluster_resource))
+                .await
+                .map_err(|e| {
+                    error!("Error patching cluster: {}", e);
+                    Action::requeue(Duration::from_secs(300))
+                })?;
+            debug!("CoreDBSpec patched for instance {}", instance_name);
             Ok(())
         }
     } else {
-        error!(
-            "Cluster {} not found, possible new cluster detected",
-            instance_name
-        );
-        Err(Action::requeue(Duration::from_secs(300)))
+        info!("Cluster Status is not set for {}", instance_name);
+        Ok(())
     }
 }
 
