@@ -446,6 +446,8 @@ async fn run(metrics: CustomMetrics) -> Result<(), Box<dyn std::error::Error>> {
                                 1,
                                 &[KeyValue::new("queue_duration", "short")],
                             );
+
+                            continue;
                         }
 
                         let as_json = serde_json::to_string(&coredb);
