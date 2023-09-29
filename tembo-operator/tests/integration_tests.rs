@@ -201,6 +201,36 @@ mod test {
         panic!("Timed out waiting for psql result of '{}'", query);
     }
 
+    async fn http_request_with_retry(url: &str, retries: usize, delay: usize) -> reqwest::Response {
+        let httpclient = reqwest::Client::builder()
+            .danger_accept_invalid_certs(true)
+            .build()
+            .unwrap();
+        println!("Sending request to '{}'", url);
+        for i in 1..retries {
+            let response = httpclient.get(url).send().await;
+            if response.is_err() {
+                tokio::time::sleep(Duration::from_secs(delay as u64)).await;
+                println!(
+                    "Retry {}/{} request -- error: {}",
+                    i,
+                    retries,
+                    response.err().unwrap()
+                );
+            } else {
+                let resp = response.unwrap();
+                if resp.status() == 200 {
+                    return resp;
+                } else {
+                    tokio::time::sleep(Duration::from_secs(delay as u64)).await;
+                    println!("Retry {}/{} request -- status: {}", i, retries, resp.status());
+                }
+            }
+        }
+        panic!("Timed out waiting for http response from '{}'", url);
+    }
+
+
     async fn wait_until_psql_contains(
         context: Arc<Context>,
         coredb_resource: CoreDB,
@@ -361,7 +391,7 @@ mod test {
         errors,
     };
     use k8s_openapi::NamespaceResourceScope;
-    use serde::de::DeserializeOwned;
+    use serde::{de::DeserializeOwned, Deserialize};
 
     // helper function retrieve all instances of a resource in namespace
     // used repeatedly in appService tests
@@ -2728,11 +2758,25 @@ mod test {
             "spec": {
                 "appServices": [
                     {
-                        "name": "test-app-0",
-                        "image": "crccheck/hello-world:latest",
+                        "name": "postgrest",
+                        "image": "postgrest/postgrest:v10.0.0",
+                        "env": [
+                            {
+                                "name": "PGRST_DB_URI",
+                                "valueFromPlatform": "ReadWriteConnection"
+                            },
+                            {
+                                "name": "PGRST_DB_SCHEMA",
+                                "value": "public"
+                            },
+                            {
+                                "name": "PGRST_DB_ANON_ROLE",
+                                "value": "postgres"
+                            }
+                        ],
                         "routing": [
                             {
-                                "port": 8000,
+                                "port": 3000,
                                 "ingressPath": "/"
                             }
                         ],
@@ -2784,7 +2828,7 @@ mod test {
 
         let app_0 = deployment_items[0].clone();
         let app_1 = deployment_items[1].clone();
-        assert_eq!(app_0.metadata.name.unwrap(), format!("{cdb_name}-test-app-0"));
+        assert_eq!(app_0.metadata.name.unwrap(), format!("{cdb_name}-postgrest"));
         assert_eq!(app_1.metadata.name.unwrap(), format!("{cdb_name}-test-app-1"));
 
         // Assert resources in first appService
@@ -2835,8 +2879,8 @@ mod test {
         );
         let services = routes[0].services.clone().unwrap();
         assert_eq!(services.len(), 1);
-        assert_eq!(services[0].name, format!("{}-test-app-0", cdb_name));
-        assert_eq!(services[0].port.clone().unwrap(), IntOrString::Int(8000));
+        assert_eq!(services[0].name, format!("{}-postgrest", cdb_name));
+        assert_eq!(services[0].port.clone().unwrap(), IntOrString::Int(3000));
 
         // Assert resources in second AppService
         let selector_map = app_1
@@ -2869,7 +2913,7 @@ mod test {
         let app_1_resources = app_1_container.resources.unwrap();
         assert_eq!(app_1_resources, expected);
 
-        // Delete the one without a service
+        // Delete the one without a service, but leave the postgrest appService
         let coredb_json = serde_json::json!({
             "apiVersion": API_VERSION,
             "kind": kind,
@@ -2879,25 +2923,29 @@ mod test {
             "spec": {
                 "appServices": [
                     {
-                        "name": "test-app-0",
-                        "image": "crccheck/hello-world:latest",
+                        "name": "postgrest",
+                        "image": "postgrest/postgrest:v10.0.0",
+                        "env": [
+                            {
+                                "name": "PGRST_DB_URI",
+                                "valueFromPlatform": "ReadWriteConnection"
+                            },
+                            {
+                                "name": "PGRST_DB_SCHEMA",
+                                "value": "public"
+                            },
+                            {
+                                "name": "PGRST_DB_ANON_ROLE",
+                                "value": "postgres"
+                            }
+                        ],
                         "routing": [
                             {
-                                "port": 8000,
+                                "port": 3000,
                                 "ingressPath": "/"
                             }
                         ],
-                        "resources": {
-                            "requests": {
-                                "cpu": "100m",
-                                "memory": "256Mi"
-                            },
-                            "limits": {
-                                "cpu": "100m",
-                                "memory": "256Mi"
-                            }
-                        }
-                    },
+                    }
                 ],
                 "postgresExporterEnabled": false
             }
@@ -2911,7 +2959,7 @@ mod test {
             .unwrap();
         assert!(deployment_items.len() == 1);
         let app_0 = deployment_items[0].clone();
-        assert_eq!(app_0.metadata.name.unwrap(), format!("{cdb_name}-test-app-0"));
+        assert_eq!(app_0.metadata.name.unwrap(), format!("{cdb_name}-postgrest"));
 
         // should still be just one Service
         let service_items: Vec<Service> = list_resources(client.clone(), cdb_name, &namespace, 1)
@@ -2919,6 +2967,23 @@ mod test {
             .unwrap();
         // One appService Services
         assert!(service_items.len() == 1);
+
+
+        // send a request to postgres
+        #[derive(Debug, Deserialize)]
+        struct ApiResponse {
+            info: ApiInfo,
+        }
+
+        #[derive(Debug, Deserialize)]
+        struct ApiInfo {
+            title: String,
+        }
+        let postgres_url = format!("https://{}.localhost:8443/", cdb_name);
+        let response = http_request_with_retry(&postgres_url, 100, 5).await;
+        let body: ApiResponse = response.json().await.unwrap();
+
+        assert_eq!(body.info.title, "PostgREST API");
 
         // Delete all of them
         let coredb_json = serde_json::json!({

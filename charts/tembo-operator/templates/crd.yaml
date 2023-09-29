@@ -39,10 +39,24 @@ spec:
                       nullable: true
                       type: array
                     env:
-                      additionalProperties:
-                        type: string
+                      items:
+                        properties:
+                          name:
+                            type: string
+                          value:
+                            nullable: true
+                            type: string
+                          valueFromPlatform:
+                            enum:
+                            - ReadOnlyConnection
+                            - ReadWriteConnection
+                            nullable: true
+                            type: string
+                        required:
+                        - name
+                        type: object
                       nullable: true
-                      type: object
+                      type: array
                     image:
                       type: string
                     name:

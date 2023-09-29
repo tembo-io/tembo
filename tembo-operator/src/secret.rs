@@ -51,7 +51,7 @@ pub async fn reconcile_secret(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Err
         }
     };
 
-    let data = secret_data(cdb, &name, &ns, password);
+    let data = secret_data(cdb, &ns, password);
 
     let secret: Secret = Secret {
         metadata: ObjectMeta {
@@ -73,7 +73,7 @@ pub async fn reconcile_secret(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Err
     Ok(())
 }
 
-fn secret_data(cdb: &CoreDB, name: &str, ns: &str, password: String) -> BTreeMap<String, ByteString> {
+fn secret_data(cdb: &CoreDB, ns: &str, password: String) -> BTreeMap<String, ByteString> {
     let mut data = BTreeMap::new();
 
     // encode and insert user into secret data
@@ -92,15 +92,32 @@ fn secret_data(cdb: &CoreDB, name: &str, ns: &str, password: String) -> BTreeMap
     let b64_port = b64_encode(&port);
     data.insert("port".to_owned(), b64_port);
 
+    // read only host
+    let r_host = format!("{}-r.{}.svc.cluster.local", &cdb.name_any(), &ns);
+    // read/write host
+    let rw_host = format!("{}-rw.{}.svc.cluster.local", &cdb.name_any(), &ns);
+    // read only host
+    let ro_host: String = format!("{}-ro.{}.svc.cluster.local", &cdb.name_any(), &ns);
+
+
     // encode and insert host into secret data
-    let host = format!("{}.{}.svc.cluster.local", &name, &ns);
-    let b64_host = b64_encode(&host);
+    let b64_host = b64_encode(&r_host);
     data.insert("host".to_owned(), b64_host);
 
     // encode and insert uri into secret data
-    let uri = format!("postgresql://{}:{}@{}:{}", &user, &password, &host, &port);
+    let uri = format!("postgresql://{}:{}@{}:{}", &user, &password, &r_host, &port);
     let b64_uri = b64_encode(&uri);
-    data.insert("uri".to_owned(), b64_uri);
+    data.insert("r_uri".to_owned(), b64_uri);
+
+    // encode and insert read-write uri into secret data
+    let rwuri = format!("postgresql://{}:{}@{}:{}", &user, &password, &rw_host, &port);
+    let b64_rwuri = b64_encode(&rwuri);
+    data.insert("rw_uri".to_owned(), b64_rwuri);
+
+    // encode and insert read-only uri into secret data
+    let rouri = format!("postgresql://{}:{}@{}:{}", &user, &password, &ro_host, &port);
+    let b64_rouri = b64_encode(&rouri);
+    data.insert("ro_uri".to_owned(), b64_rouri);
 
     data
 }

@@ -1,0 +1,18 @@
+apiVersion: coredb.io/v1alpha1
+kind: CoreDB
+metadata:
+  name: my-coredb
+spec:
+  appServices:
+    - name: postgrest
+      image: postgrest/postgrest:v10.0.0
+      routing:
+        - port: 3000
+          ingressPath: /
+      env:
+        - name: PGRST_DB_URI
+          valueFromPlatform: ReadWriteConnection
+        - name: PGRST_DB_SCHEMA
+          value: public
+        - name: PGRST_DB_ANON_ROLE
+          value: postgres
