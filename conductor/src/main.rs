@@ -420,7 +420,8 @@ async fn run(metrics: CustomMetrics) -> Result<(), Box<dyn std::error::Error>> {
                         error!("error restarting statefulset: {:?}", err);
                     }
                 }
-                match restart_cnpg(client.clone(), &namespace, &namespace).await {
+                let msg_enqueued_at = read_msg.enqueued_at;
+                match restart_cnpg(client.clone(), &namespace, &namespace, msg_enqueued_at).await {
                     Ok(_) => {}
                     Err(err) => {
                         error!("error restarting cnpg: {:?}", err);

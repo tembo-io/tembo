@@ -10,6 +10,7 @@
 
 #[cfg(test)]
 mod test {
+    use chrono::Utc;
     use k8s_openapi::{
         api::{core::v1::Namespace, core::v1::PersistentVolumeClaim, core::v1::Pod},
         apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
@@ -318,7 +319,7 @@ mod test {
 
         // Once CNPG is running we want to restart
         let cluster_name = namespace.clone();
-        restart_cnpg(client.clone(), &namespace, &cluster_name)
+        restart_cnpg(client.clone(), &namespace, &cluster_name, Utc::now())
             .await
             .expect("failed restarting cnpg pod");
 

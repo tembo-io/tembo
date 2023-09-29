@@ -14,7 +14,7 @@ use k8s_openapi::api::core::v1::{Namespace, Secret};
 use k8s_openapi::api::networking::v1::NetworkPolicy;
 use kube::api::{DeleteParams, ListParams, Patch, PatchParams};
 
-use chrono::{SecondsFormat, Utc};
+use chrono::{DateTime, SecondsFormat, Utc};
 use kube::{Api, Client};
 use log::{debug, info};
 use rand::Rng;
@@ -410,9 +410,10 @@ pub async fn restart_cnpg(
     client: Client,
     namespace: &str,
     cluster_name: &str,
+    msg_enqueued_at: DateTime<Utc>,
 ) -> Result<(), ConductorError> {
     let cluster: Api<CoreDB> = Api::namespaced(client, namespace);
-    let restart = Utc::now()
+    let restart = msg_enqueued_at
         .to_rfc3339_opts(SecondsFormat::Secs, true)
         .to_string();
 
