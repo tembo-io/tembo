@@ -23,8 +23,6 @@ use std::{thread, time};
 
 use crate::status_reporter::run_status_reporter;
 use conductor::routes::health::background_threads_running;
-use tokio_retry::strategy::FixedInterval;
-use tokio_retry::Retry;
 use types::{CRUDevent, Event};
 
 mod status_reporter;
@@ -427,25 +425,43 @@ async fn run(metrics: CustomMetrics) -> Result<(), Box<dyn std::error::Error>> {
                         error!("error restarting cnpg: {:?}", err);
                     }
                 }
-                let retry_strategy = FixedInterval::from_millis(5000).take(20);
-                let result = Retry::spawn(retry_strategy.clone(), || {
-                    get_coredb_error_without_status(client.clone(), &namespace)
-                })
-                .await;
-                if result.is_err() {
-                    error!(
-                        "error getting CoreDB status in {}: {:?}",
-                        namespace.clone(),
-                        result
-                    );
-                    metrics
-                        .conductor_errors
-                        .add(&opentelemetry::Context::current(), 1, &[]);
-                    continue;
-                }
-                let current_resource = result?;
-                let resource_json = serde_json::to_string(&current_resource).unwrap();
-                debug!("dbname: {}, current: {:?}", &namespace, resource_json);
+
+                let result = get_coredb_error_without_status(client.clone(), &namespace).await;
+
+                let current_resource = match result {
+                    Ok(coredb) => {
+                        // Safety: we know status exists due to get_coredb_error_without_status
+                        let status = coredb.status.as_ref().unwrap();
+                        if !status.running {
+                            // Instance is still rebooting, recheck this message later
+                            let _ = queue
+                                .set_vt::<CRUDevent>(
+                                    &control_plane_events_queue,
+                                    read_msg.msg_id,
+                                    REQUEUE_VT_SEC_SHORT,
+                                )
+                                .await?;
+                            metrics.conductor_requeues.add(
+                                &opentelemetry::Context::current(),
+                                1,
+                                &[KeyValue::new("queue_duration", "short")],
+                            );
+                        }
+
+                        let as_json = serde_json::to_string(&coredb);
+                        debug!("dbname: {}, current: {:?}", &namespace, as_json);
+
+                        coredb
+                    }
+                    Err(_) => {
+                        error!("error getting CoreDB status in {}: {:?}", namespace, result);
+                        metrics
+                            .conductor_errors
+                            .add(&opentelemetry::Context::current(), 1, &[]);
+
+                        continue;
+                    }
+                };
 
                 let conn_info =
                     get_pg_conn(client.clone(), &namespace, &data_plane_basedomain).await;
