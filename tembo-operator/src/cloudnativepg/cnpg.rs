@@ -777,6 +777,11 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
                 let mut cluster_annotations = cluster.metadata.annotations.unwrap_or_default();
                 cluster_annotations.insert(RESTARTED_AT.into(), restarted_at.to_owned());
 
+                {
+                    let name = cluster.metadata.name.as_deref().unwrap_or("unknown");
+                    info!("restartAt changed for cluster {name}, setting to {restarted_at}.");
+                }
+
                 cluster.metadata.annotations = Some(cluster_annotations);
                 true
             }
