@@ -172,7 +172,12 @@ pub async fn delete(client: Client, namespace: &str, name: &str) -> Result<(), C
     Ok(())
 }
 
-pub async fn create_namespace(client: Client, name: &str) -> Result<(), ConductorError> {
+pub async fn create_namespace(
+    client: Client,
+    name: &str,
+    organization_id: &str,
+    instance_id: &str,
+) -> Result<(), ConductorError> {
     let ns_api: Api<Namespace> = Api::all(client);
     // check if the namespace already exists
     let params = ListParams::default().fields(&format!("metadata.name={}", name));
@@ -190,6 +195,10 @@ pub async fn create_namespace(client: Client, name: &str) -> Result<(), Conducto
         "kind": "Namespace",
         "metadata": {
             "name": format!("{name}"),
+            "annotations": {
+                "tembo.io/instance_id": instance_id,
+                "tembo.io/organization_id": organization_id
+            },
             "labels": {
                 "tembo-pod-init.tembo.io/watch": "true"
             }
