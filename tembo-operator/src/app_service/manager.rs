@@ -1,11 +1,4 @@
-use crate::{
-    apis::coredb_types::CoreDB,
-    ingress_route_crd::{
-        IngressRoute, IngressRouteRoutes, IngressRouteRoutesKind, IngressRouteRoutesServices,
-        IngressRouteRoutesServicesKind, IngressRouteSpec, IngressRouteTls,
-    },
-    Context, Error, Result,
-};
+use crate::{apis::coredb_types::CoreDB, ingress_route_crd::IngressRouteRoutes, Context, Error, Result};
 use k8s_openapi::{
     api::{
         apps::v1::{Deployment, DeploymentSpec},
@@ -29,7 +22,10 @@ use std::{collections::BTreeMap, sync::Arc, time::Duration};
 use tracing::{debug, error, warn};
 
 
-use super::types::{AppService, EnvVarRef};
+use super::{
+    ingress::{generate_ingress_routes, reconcile_ingress},
+    types::{AppService, EnvVarRef, Middleware, COMPONENT_NAME},
+};
 
 // private wrapper to hold the AppService Resources
 #[derive(Clone, Debug)]
@@ -40,8 +36,6 @@ struct AppServiceResources {
     ingress_routes: Option<Vec<IngressRouteRoutes>>,
 }
 
-
-const COMPONENT_NAME: &str = "appService";
 
 // generates Kubernetes Deployment and Service templates for a AppService
 fn generate_resource(
@@ -63,7 +57,8 @@ fn generate_resource(
         subdomain = coredb_name,
         domain = domain
     );
-    let ingress_routes = generate_ingress_routes(appsvc, &resource_name, namespace, host_matcher);
+    let ingress_routes =
+        generate_ingress_routes(appsvc, &resource_name, namespace, host_matcher, coredb_name);
     AppServiceResources {
         deployment,
         name: resource_name,
@@ -72,78 +67,6 @@ fn generate_resource(
     }
 }
 
-// generates Kubernetes IngressRoute template for an appService
-// maps the specified
-fn generate_ingress_routes(
-    appsvc: &AppService,
-    resource_name: &str,
-    namespace: &str,
-    host_matcher: String,
-) -> Option<Vec<IngressRouteRoutes>> {
-    match appsvc.routing.clone() {
-        Some(routings) => {
-            let mut routes: Vec<IngressRouteRoutes> = Vec::new();
-            for route in routings.iter() {
-                match route.ingress_path.clone() {
-                    Some(path) => {
-                        let matcher = format!("{host_matcher} && PathPrefix(`{}`)", path);
-                        let route = IngressRouteRoutes {
-                            kind: IngressRouteRoutesKind::Rule,
-                            r#match: matcher.clone(),
-                            services: Some(vec![IngressRouteRoutesServices {
-                                name: resource_name.to_string(),
-                                port: Some(IntOrString::Int(route.port as i32)),
-                                namespace: Some(namespace.to_owned()),
-                                kind: Some(IngressRouteRoutesServicesKind::Service),
-                                ..IngressRouteRoutesServices::default()
-                            }]),
-                            middlewares: None,
-                            priority: None,
-                        };
-                        routes.push(route);
-                    }
-                    None => {
-                        // do not create ingress when there is no path provided
-                        continue;
-                    }
-                }
-            }
-            Some(routes)
-        }
-        None => None,
-    }
-}
-
-fn generate_ingress(
-    coredb_name: &str,
-    namespace: &str,
-    oref: OwnerReference,
-    routes: Vec<IngressRouteRoutes>,
-) -> IngressRoute {
-    let mut selector_labels: BTreeMap<String, String> = BTreeMap::new();
-
-    selector_labels.insert("component".to_owned(), COMPONENT_NAME.to_string());
-    selector_labels.insert("coredb.io/name".to_owned(), coredb_name.to_string());
-
-    let mut labels = selector_labels.clone();
-    labels.insert("component".to_owned(), COMPONENT_NAME.to_owned());
-
-    IngressRoute {
-        metadata: ObjectMeta {
-            // using coredb name, since we'll have 1x ingress per coredb
-            name: Some(coredb_name.to_owned()),
-            namespace: Some(namespace.to_owned()),
-            owner_references: Some(vec![oref]),
-            labels: Some(labels.clone()),
-            ..ObjectMeta::default()
-        },
-        spec: IngressRouteSpec {
-            entry_points: Some(vec!["websecure".to_string()]),
-            routes,
-            tls: Some(IngressRouteTls::default()),
-        },
-    }
-}
 
 // templates the Kubernetes Service for an AppService
 fn generate_service(
@@ -421,7 +344,7 @@ async fn get_appservice_deployments(
 }
 
 // gets all names of AppService Services in the namespace
-// that that have the label "component=AppService" and belong to the coredb
+// that have the label "component=AppService" and belong to the coredb
 async fn get_appservice_services(
     client: &Client,
     namespace: &str,
@@ -438,8 +361,9 @@ async fn get_appservice_services(
         .collect())
 }
 
+
 // determines AppService deployments
-fn appservice_to_delete(desired: Vec<String>, actual: Vec<String>) -> Option<Vec<String>> {
+pub fn to_delete(desired: Vec<String>, actual: Vec<String>) -> Option<Vec<String>> {
     let mut to_delete: Vec<String> = Vec::new();
     for a in actual {
         // if actual not in desired, put it in the delete vev
@@ -565,7 +489,7 @@ pub async fn reconcile_app_services(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(
     };
 
     // reap any AppService Deployments that are no longer desired
-    if let Some(to_delete) = appservice_to_delete(desired_deployments, actual_deployments) {
+    if let Some(to_delete) = to_delete(desired_deployments, actual_deployments) {
         for d in to_delete {
             match deployment_api.delete(&d, &Default::default()).await {
                 Ok(_) => {
@@ -580,7 +504,7 @@ pub async fn reconcile_app_services(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(
     }
 
     // reap any AppService  that are no longer desired
-    if let Some(to_delete) = appservice_to_delete(desired_services, actual_services) {
+    if let Some(to_delete) = to_delete(desired_services, actual_services) {
         for d in to_delete {
             match service_api.delete(&d, &Default::default()).await {
                 Ok(_) => {
@@ -621,7 +545,22 @@ pub async fn reconcile_app_services(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(
         .flatten()
         .collect();
 
-    match reconcile_ingress(client.clone(), &coredb_name, &ns, oref.clone(), desired_routes).await {
+    let desired_middlewares = appsvcs
+        .iter()
+        .filter_map(|appsvc| appsvc.middlewares.clone())
+        .flatten()
+        .collect::<Vec<Middleware>>();
+
+    match reconcile_ingress(
+        client.clone(),
+        &coredb_name,
+        &ns,
+        oref.clone(),
+        desired_routes,
+        desired_middlewares,
+    )
+    .await
+    {
         Ok(_) => {
             debug!("Updated/applied ingress for {}.{}", ns, coredb_name,);
         }
@@ -638,60 +577,4 @@ pub async fn reconcile_app_services(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(
         return Err(Action::requeue(Duration::from_secs(300)));
     }
     Ok(())
-}
-
-async fn reconcile_ingress(
-    client: Client,
-    coredb_name: &str,
-    ns: &str,
-    oref: OwnerReference,
-    desired_routes: Vec<IngressRouteRoutes>,
-) -> Result<(), kube::Error> {
-    let ingress_api: Api<IngressRoute> = Api::namespaced(client, ns);
-    let ingress = generate_ingress(coredb_name, ns, oref, desired_routes.clone());
-    if desired_routes.is_empty() {
-        // we don't need an IngressRoute when there are no routes
-        match ingress_api.get_opt(coredb_name).await {
-            Ok(Some(_)) => {
-                debug!("Deleting IngressRoute {}.{}", ns, coredb_name);
-                ingress_api.delete(coredb_name, &Default::default()).await?;
-                return Ok(());
-            }
-            Ok(None) => {
-                warn!("No IngressRoute {}.{} found to delete", ns, coredb_name);
-                return Ok(());
-            }
-            Err(e) => {
-                error!(
-                    "Error retrieving IngressRoute, {}.{}, error: {}",
-                    ns, coredb_name, e
-                );
-                return Err(e);
-            }
-        }
-    }
-    match apply_ingress_route(ingress_api, coredb_name, &ingress).await {
-        Ok(_) => {
-            debug!("Updated/applied ingress for {}.{}", ns, coredb_name,);
-            Ok(())
-        }
-        Err(e) => {
-            error!(
-                "Failed to update/apply IngressRoute {}.{}: {}",
-                ns, coredb_name, e
-            );
-            Err(e)
-        }
-    }
-}
-
-async fn apply_ingress_route(
-    ingress_api: Api<IngressRoute>,
-    ingress_name: &str,
-    ingress_route: &IngressRoute,
-) -> Result<IngressRoute, kube::Error> {
-    let patch_parameters = PatchParams::apply("cntrlr").force();
-    ingress_api
-        .patch(ingress_name, &patch_parameters, &Patch::Apply(&ingress_route))
-        .await
 }

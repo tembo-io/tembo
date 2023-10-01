@@ -15,6 +15,7 @@
 
 #[cfg(test)]
 mod test {
+    use anyhow::{Error as AnyError, Result};
     use chrono::{DateTime, SecondsFormat, Utc};
     use controller::{
         apis::coredb_types::CoreDB,
@@ -44,7 +45,15 @@ mod test {
         Api, Client, Config, Error,
     };
     use rand::Rng;
-    use std::{collections::BTreeSet, ops::Not, str, sync::Arc, thread, time::Duration};
+    use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
+    use std::{
+        collections::{BTreeMap, BTreeSet},
+        ops::Not,
+        str,
+        sync::Arc,
+        thread,
+        time::Duration,
+    };
 
     use tokio::io::AsyncReadExt;
 
@@ -201,9 +210,25 @@ mod test {
         panic!("Timed out waiting for psql result of '{}'", query);
     }
 
-    async fn http_request_with_retry(url: &str, retries: usize, delay: usize) -> reqwest::Response {
+    async fn http_get_with_retry(
+        url: &str,
+        headers: Option<BTreeMap<String, String>>,
+        retries: usize,
+        delay: usize,
+    ) -> Result<reqwest::Response> {
+        let mut headers_map = HeaderMap::new();
+        if let Some(h) = headers {
+            for (key, value) in h {
+                let header_name = HeaderName::from_bytes(key.as_bytes()).unwrap();
+                let header_value = HeaderValue::from_str(&value).unwrap();
+                headers_map.insert(header_name, header_value);
+            }
+        };
+
+
         let httpclient = reqwest::Client::builder()
             .danger_accept_invalid_certs(true)
+            .default_headers(headers_map)
             .build()
             .unwrap();
         println!("Sending request to '{}'", url);
@@ -220,14 +245,14 @@ mod test {
             } else {
                 let resp = response.unwrap();
                 if resp.status() == 200 {
-                    return resp;
+                    return Ok(resp);
                 } else {
                     tokio::time::sleep(Duration::from_secs(delay as u64)).await;
                     println!("Retry {}/{} request -- status: {}", i, retries, resp.status());
                 }
             }
         }
-        panic!("Timed out waiting for http response from '{}'", url);
+        Err(AnyError::msg(format!("Timed out waiting for http response from '{}'", url)).into())
     }
 
 
@@ -2980,10 +3005,81 @@ mod test {
             title: String,
         }
         let postgres_url = format!("https://{}.localhost:8443/", cdb_name);
-        let response = http_request_with_retry(&postgres_url, 100, 5).await;
+        // with no headers, request will succeed against postgREST
+        let response = http_get_with_retry(&postgres_url, None, 100, 5).await.unwrap();
         let body: ApiResponse = response.json().await.unwrap();
-
         assert_eq!(body.info.title, "PostgREST API");
+
+        // add an auth header and request will fail (have not configured server side JWT)
+        let headers: BTreeMap<String, String> =
+            [(String::from("Authrization"), String::from("Bearer SomeKey"))]
+                .iter()
+                .cloned()
+                .collect();
+        let response = http_get_with_retry(&postgres_url, Some(headers.clone()), 1, 0).await;
+        assert!(response.is_err());
+
+        // patch the postgREST appService with middleware modifying request header
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": cdb_name
+            },
+            "spec": {
+                "appServices": [
+                    {
+                        "name": "postgrest",
+                        "image": "postgrest/postgrest:v10.0.0",
+                        "env": [
+                            {
+                                "name": "PGRST_DB_URI",
+                                "valueFromPlatform": "ReadWriteConnection"
+                            },
+                            {
+                                "name": "PGRST_DB_SCHEMA",
+                                "value": "public"
+                            },
+                            {
+                                "name": "PGRST_DB_ANON_ROLE",
+                                "value": "postgres"
+                            }
+                        ],
+                        "middlewares": [
+                            {
+                                "customRequestHeaders": {
+                                    "name": "strip-auth-header",
+                                    "config": {
+                                        "Authorization": ""
+                                    }
+                                }
+                            }
+                        ],
+                        "routing": [
+                            {
+                                "port": 3000,
+                                "ingressPath": "/",
+                                "middlewares": [
+                                    "strip-auth-header"
+                                ]
+                            }
+                        ],
+                    }
+                ],
+                "postgresExporterEnabled": false
+            }
+        });
+        let params = PatchParams::apply("tembo-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        coredbs.patch(cdb_name, &params, &patch).await.unwrap();
+        // same request with auth header will now succeed
+        // add some retries to give change a chance to apply
+        let response = http_get_with_retry(&postgres_url, Some(headers), 2, 5)
+            .await
+            .unwrap();
+        let body: ApiResponse = response.json().await.unwrap();
+        assert_eq!(body.info.title, "PostgREST API");
+
 
         // Delete all of them
         let coredb_json = serde_json::json!({

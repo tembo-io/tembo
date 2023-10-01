@@ -59,6 +59,25 @@ spec:
                       type: array
                     image:
                       type: string
+                    middlewares:
+                      items:
+                        oneOf:
+                        - required:
+                          - customRequestHeaders
+                        properties:
+                          customRequestHeaders:
+                            properties:
+                              config:
+                                x-kubernetes-preserve-unknown-fields: true
+                              name:
+                                type: string
+                            required:
+                            - config
+                            - name
+                            type: object
+                        type: object
+                      nullable: true
+                      type: array
                     name:
                       type: string
                     probes:
@@ -121,6 +140,11 @@ spec:
                           ingressPath:
                             nullable: true
                             type: string
+                          middlewares:
+                            items:
+                              type: string
+                            nullable: true
+                            type: array
                           port:
                             format: uint16
                             minimum: 0.0

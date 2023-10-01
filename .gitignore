@@ -18,3 +18,4 @@ target/
 **/.idea
 temp.sh
 .idea
+**/*.DS_Store
