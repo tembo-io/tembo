@@ -1,11 +1,13 @@
 // Objects representing a user created local instance of a stack
 // (a local container that runs with certain attributes and properties)
 
+use crate::cli::config::Config;
 use crate::cli::docker::DockerError;
 use crate::cli::extension::Extension;
 use crate::cli::stacks;
 use crate::cli::stacks::{Stack, TrunkInstall};
 use chrono::prelude::*;
+use clap::ArgMatches;
 use serde::Deserialize;
 use serde::Serialize;
 use spinners::{Spinner, Spinners};
@@ -13,7 +15,7 @@ use std::cmp::PartialEq;
 use std::error::Error;
 use std::process::Command as ShellCommand;
 
-#[derive(Serialize, Deserialize, Debug, PartialEq)]
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct Instance {
     pub name: Option<String>,
     pub r#type: Option<String>,
@@ -44,6 +46,11 @@ pub struct ExtensionLocation {
     pub database: String,
     pub enabled: String,
     pub version: String,
+}
+
+#[derive(Debug)]
+pub struct InstanceError {
+    pub name: String,
 }
 
 impl Instance {
@@ -139,7 +146,7 @@ impl Instance {
         Ok(())
     }
 
-    fn install_extension(&self, extension: &TrunkInstall) -> Result<(), Box<dyn Error>> {
+    pub fn install_extension(&self, extension: &TrunkInstall) -> Result<(), Box<dyn Error>> {
         let mut sp = Spinner::new(Spinners::Dots12, "Installing extension".into());
 
         let mut command = String::from("cd tembo && docker exec ");
@@ -154,10 +161,7 @@ impl Instance {
             .output()
             .expect("failed to execute process");
 
-        let mut msg = String::from("- Stack extension installed: ");
-        msg.push_str(&extension.name.clone().unwrap());
-
-        sp.stop_with_message(msg);
+        sp.stop_with_newline();
 
         let stderr = String::from_utf8(output.stderr).unwrap();
 
@@ -166,6 +170,11 @@ impl Instance {
                 format!("There was an issue installing the extension: {}", stderr).as_str(),
             )));
         } else {
+            let mut msg = String::from("- Stack extension installed: ");
+            msg.push_str(&extension.name.clone().unwrap());
+
+            println!("{}", msg);
+
             Ok(())
         }
     }
@@ -208,5 +217,25 @@ impl Instance {
         } else {
             Ok(())
         }
+    }
+
+    pub fn find(args: &ArgMatches, name: &str) -> Result<Instance, InstanceError> {
+        let config = Config::new(args, &Config::full_path(args));
+
+        println!("finding config for instance {}", name);
+
+        for instance in &config.instances {
+            let i_name = instance.name.clone().unwrap();
+
+            if i_name.to_lowercase() == name.to_lowercase() {
+                let existing = Instance { ..instance.clone() };
+
+                return Ok(existing);
+            }
+        }
+
+        Err(InstanceError {
+            name: name.to_string(),
+        })
     }
 }

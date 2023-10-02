@@ -56,6 +56,13 @@ The `auth login` command allows users to authenticate as a service user and obta
 
 The `auth info` command allows users to see if they have authenticated and when their authentication token expires.
 
+## `tembo extension install`
+
+The `extension install` command allows users to install extensions on existing instances. Users will be prompted for the 
+name and version of the extension. Note this doesn't enable the extension. That is done via the `extension enable` command (WIP).
+
+List of supported extensions can be found on [Trunk](https://pgt.dev).
+
 # Contributing
 
 Before you start working on something, it's best to check if there is an existing plan 

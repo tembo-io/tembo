@@ -98,7 +98,8 @@ fn create_clap_command() -> Command {
         .subcommand(
             Command::new("extension")
                 .about("Commands used to manage local and cloud extensions")
-                .subcommand(cmd::extension::list::make_subcommand()),
+                .subcommand(cmd::extension::list::make_subcommand())
+                .subcommand(cmd::extension::install::make_subcommand()),
         )
         .subcommand(
             Command::new("completions")
