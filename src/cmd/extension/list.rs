@@ -1,6 +1,5 @@
 // extension list command
 use crate::cli::config::Config;
-use crate::cli::docker::DockerError;
 use crate::cli::instance::Instance;
 use clap::{Arg, ArgAction, ArgMatches, Command};
 use simplelog::*;
@@ -21,12 +20,6 @@ pub fn make_subcommand() -> Command {
 }
 
 pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
-    if cfg!(target_os = "windows") {
-        warn!("{}", crate::WINDOWS_ERROR_MSG);
-
-        return Err(Box::new(DockerError::new(crate::WINDOWS_ERROR_MSG)));
-    }
-
     let config = Config::new(args, &Config::full_path(args));
     let name = args.try_get_one::<String>("name").unwrap();
 

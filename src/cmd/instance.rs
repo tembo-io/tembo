@@ -1,4 +1,3 @@
-use crate::cli::docker::DockerError;
 use clap::ArgMatches;
 use simplelog::*;
 use std::error::Error;
@@ -10,12 +9,6 @@ pub mod stop;
 
 // handles all instance command calls
 pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
-    if cfg!(target_os = "windows") {
-        warn!("{}", crate::WINDOWS_ERROR_MSG);
-
-        return Err(Box::new(DockerError::new(crate::WINDOWS_ERROR_MSG)));
-    }
-
     // execute the instance subcommands
     let res = match args.subcommand() {
         Some(("create", sub_matches)) => create::execute(sub_matches),

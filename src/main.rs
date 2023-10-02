@@ -36,6 +36,13 @@ fn main() {
     ])
     .unwrap();
 
+    // Windows is not supported currently, will alert user and stop process immediately
+    if cfg!(target_os = "widows") {
+        warn!("{}", crate::WINDOWS_ERROR_MSG);
+
+        std::process::exit(101);
+    }
+
     let command = create_clap_command();
     let matches = command.get_matches();
 

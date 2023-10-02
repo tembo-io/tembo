@@ -1,6 +1,5 @@
 //  extension install command
 use crate::cli::config::Config;
-use crate::cli::docker::DockerError;
 use crate::cli::instance::{InstalledExtension, Instance, InstanceError};
 use crate::cli::stacks::TrunkInstall;
 use chrono::Utc;
@@ -24,12 +23,6 @@ pub fn make_subcommand() -> Command {
 }
 
 pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
-    if cfg!(target_os = "windows") {
-        println!("{}", crate::WINDOWS_ERROR_MSG);
-
-        return Err(Box::new(DockerError::new(crate::WINDOWS_ERROR_MSG)));
-    }
-
     let config = Config::new(args, &Config::full_path(args));
     let instance_arg = args.try_get_one::<String>("instance").unwrap();
 

@@ -1,6 +1,6 @@
 // instance create command
 use crate::cli::config::Config;
-use crate::cli::docker::{Docker, DockerError};
+use crate::cli::docker::Docker;
 use crate::cli::instance::{EnabledExtension, InstalledExtension, Instance};
 use crate::cli::stack_error::StackError;
 use crate::cli::stacks;
@@ -43,12 +43,6 @@ pub fn make_subcommand() -> Command {
 }
 
 pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
-    if cfg!(target_os = "windows") {
-        warn!("{}", crate::WINDOWS_ERROR_MSG);
-
-        return Err(Box::new(DockerError::new(crate::WINDOWS_ERROR_MSG)));
-    }
-
     let matches = args;
 
     // ensure the stack type provided is valid, if none given, default to the standard stack

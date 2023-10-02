@@ -1,6 +1,5 @@
 // auth login command
 // use crate::cli::config::Config;
-use crate::cli::docker::DockerError;
 use crate::cli::{auth_client::AuthClient, config::Config};
 use clap::{ArgMatches, Command};
 use std::error::Error;
@@ -11,12 +10,6 @@ pub fn make_subcommand() -> Command {
 }
 
 pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
-    if cfg!(target_os = "windows") {
-        println!("{}", crate::WINDOWS_ERROR_MSG);
-
-        return Err(Box::new(DockerError::new(crate::WINDOWS_ERROR_MSG)));
-    }
-
     match AuthClient::authenticate() {
         Ok(jwt) => {
             println!("- storing jwt in config file, it will be used in future requests");

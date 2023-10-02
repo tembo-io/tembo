@@ -1,7 +1,6 @@
 // auth info command
 // use crate::cli::config::Config;
 use crate::cli::config::Config;
-use crate::cli::docker::DockerError;
 use clap::{ArgMatches, Command};
 use dateparser::parse;
 use jwt::Claims;
@@ -16,12 +15,6 @@ pub fn make_subcommand() -> Command {
 }
 
 pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
-    if cfg!(target_os = "windows") {
-        warn!("{}", crate::WINDOWS_ERROR_MSG);
-
-        return Err(Box::new(DockerError::new(crate::WINDOWS_ERROR_MSG)));
-    }
-
     let config = Config::new(args, &Config::full_path(args));
     let jwt = config.jwt.unwrap();
 

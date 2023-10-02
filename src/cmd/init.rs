@@ -13,13 +13,6 @@ pub fn make_subcommand() -> Command {
 }
 
 pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
-    // alert that windows is not supported yet
-    if cfg!(target_os = "windows") {
-        info!("{}", crate::WINDOWS_ERROR_MSG);
-
-        return Err(Box::new(DockerError::new(crate::WINDOWS_ERROR_MSG)));
-    }
-
     // check the system requirements
     match check_requirements() {
         Ok(_) => info!("Docker was found and appears running"),
