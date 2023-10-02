@@ -28,8 +28,6 @@ trunk_installs:
     version: 0.5.0
   - name: pgml
     version: 2.7.1
-  - name: pg_embedding
-    version: 0.1.0
   - name: pg_cron
     version: 1.5.2
   - name: pgmq
@@ -51,12 +49,6 @@ extensions:
       - database: postgres
         enabled: true
         version: 2.7.1
-  # trunk project pg_embedding
-  - name: embedding
-    locations:
-      - database: postgres
-        enabled: false
-        version: 0.1.0
   - name: pg_cron
     description: pg_cron
     locations:
