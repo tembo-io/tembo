@@ -741,6 +741,49 @@ async fn pods_to_fence(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<String>, A
     }
 }
 
+fn update_restarted_at(cdb: &CoreDB, maybe_cluster: Option<&Cluster>, new_spec: &mut Cluster) -> bool {
+    let Some(cdb_restarted_at) = cdb.annotations().get(RESTARTED_AT) else {
+        // Avoid interacting with k8s if CoreDB does not have
+        // a restartedAt tag
+        return false;
+    };
+
+    let Some(current_cluster) = maybe_cluster else {
+        return true;
+    };
+
+    let restart_annotation_updated = did_restarted_at_change(cdb, current_cluster);
+
+    if restart_annotation_updated {
+        // Forward the `restartedAt` annotation from CoreDB over to the CNPG cluster
+        new_spec.metadata.annotations.as_mut().map(|cluster_annotations| {
+            cluster_annotations.insert(RESTARTED_AT.into(), cdb_restarted_at.to_owned())
+        });
+
+        let name = new_spec.metadata.name.as_deref().unwrap_or("unknown");
+        info!("restartAt changed for cluster {name}, setting to {cdb_restarted_at}.");
+    }
+
+    restart_annotation_updated
+}
+
+fn did_restarted_at_change(cdb: &CoreDB, cluster: &Cluster) -> bool {
+    let existing_restarted_at_annotation = cluster
+        .metadata
+        .annotations
+        .as_ref()
+        .and_then(|annotations| annotations.get(RESTARTED_AT));
+
+    let Some(cdb_restarted_at) = cdb.annotations().get(RESTARTED_AT) else {
+        return false;
+    };
+
+    match existing_restarted_at_annotation {
+        Some(cluster_timestamp) if cluster_timestamp == cdb_restarted_at => false,
+        Some(_) | None => true,
+    }
+}
+
 #[instrument(skip(cdb, ctx) fields(trace_id))]
 pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {
     let pods_to_fence = pods_to_fence(cdb, ctx.clone()).await?;
@@ -763,34 +806,10 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
         .clone()
         .expect("CNPG Cluster should always have a name");
 
-    let existing_restarted_at_annotation = cluster
-        .metadata
-        .annotations
-        .as_ref()
-        .and_then(|annotations| annotations.get(RESTARTED_AT));
-
-    let restart_annotation_updated = if let Some(restarted_at) = cdb.annotations().get(RESTARTED_AT) {
-        match existing_restarted_at_annotation {
-            Some(timestamp) if timestamp == restarted_at => false,
-            Some(_) | None => {
-                // Forward the `restartedAt` annotation from CoreDB over to the CNPG cluster
-                let mut cluster_annotations = cluster.metadata.annotations.unwrap_or_default();
-                cluster_annotations.insert(RESTARTED_AT.into(), restarted_at.to_owned());
-
-                {
-                    let name = cluster.metadata.name.as_deref().unwrap_or("unknown");
-                    info!("restartAt changed for cluster {name}, setting to {restarted_at}.");
-                }
-
-                cluster.metadata.annotations = Some(cluster_annotations);
-                true
-            }
-        }
-    } else {
-        false
-    };
-
     let cluster_api: Api<Cluster> = Api::namespaced(ctx.client.clone(), namespace.as_str());
+    let maybe_cluster = cluster_api.get(&name).await;
+
+    let restart_annotation_updated = update_restarted_at(cdb, maybe_cluster.as_ref().ok(), &mut cluster);
 
     let mut _restart_required = false;
 
@@ -806,7 +825,7 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
         }
         Some(new_libs) => {
             debug!("We are setting shared_preload_libraries, so we have to check if the files are already installed");
-            match cluster_api.get(&name).await {
+            match maybe_cluster {
                 Ok(current_cluster) => {
                     let current_shared_preload_libraries = match current_cluster
                         .spec
