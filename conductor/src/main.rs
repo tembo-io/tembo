@@ -74,7 +74,10 @@ async fn run(metrics: CustomMetrics) -> Result<(), Box<dyn std::error::Error>> {
             .await?;
         let read_msg: Message<CRUDevent> = match read_msg {
             Some(message) => {
-                info!("read_msg: {:?}", message);
+                info!(
+                    "msg_id: {}, enqueued_at: {}, vt: {}",
+                    message.msg_id, message.enqueued_at, message.vt
+                );
                 message
             }
             None => {
