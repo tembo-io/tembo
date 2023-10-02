@@ -9,18 +9,11 @@ use std::collections::BTreeMap;
 pub mod types;
 
 pub async fn get_secret_data_from_kubernetes(
+    kubernetes_client: Client,
     namespace: String,
     requested_secret: &AvailableSecret,
 ) -> HttpResponse {
     let kubernetes_secret_name = requested_secret.kube_secret_name(&namespace);
-
-    let kubernetes_client = match Client::try_default().await {
-        Ok(client) => client,
-        Err(_) => {
-            error!("Failed to create Kubernetes client");
-            return HttpResponse::InternalServerError().json("Failed to create Kubernetes client");
-        }
-    };
 
     let secrets_api: Api<k8s_openapi::api::core::v1::Secret> =
         Api::namespaced(kubernetes_client, &namespace);
