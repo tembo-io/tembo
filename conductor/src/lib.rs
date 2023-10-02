@@ -195,12 +195,10 @@ pub async fn create_namespace(
         "kind": "Namespace",
         "metadata": {
             "name": format!("{name}"),
-            "annotations": {
+            "labels": {
+                "tembo-pod-init.tembo.io/watch": "true",
                 "tembo.io/instance_id": instance_id,
                 "tembo.io/organization_id": organization_id
-            },
-            "labels": {
-                "tembo-pod-init.tembo.io/watch": "true"
             }
         }
     });
