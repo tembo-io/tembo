@@ -22,8 +22,7 @@ async fn index(c: Data<State>, _req: HttpRequest) -> impl Responder {
     HttpResponse::Ok().json(&d)
 }
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn app_main() -> anyhow::Result<()> {
     telemetry::init().await;
 
     // Prepare shared state for the kubernetes controller and web server
@@ -45,4 +44,12 @@ async fn main() -> anyhow::Result<()> {
     // Both runtimes implements graceful shutdown, so poll until both are done
     tokio::join!(controller, server.run()).1?;
     Ok(())
+}
+
+fn main() -> anyhow::Result<()> {
+    let rt = tokio::runtime::Builder::new_multi_thread()
+        .enable_all()
+        .thread_stack_size(4 * 1024 * 1024)
+        .build()?;
+    rt.block_on(app_main())
 }
