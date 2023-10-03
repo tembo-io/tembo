@@ -2,6 +2,7 @@ mode: standalone
 persistence:
   enabled: true
   size: 10Gi
+resources: {}
 users:
   - accessKey: tembo
     secretKey: tembo12345
