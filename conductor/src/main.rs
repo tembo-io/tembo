@@ -7,7 +7,7 @@ use conductor::{
     create_cloudformation, create_namespace, create_networkpolicy, create_or_update, delete,
     delete_cloudformation, delete_namespace, generate_rand_schedule, generate_spec,
     get_coredb_error_without_status, get_one, get_pg_conn, lookup_role_arn, parse_event_id,
-    restart_cnpg, restart_statefulset, types,
+    restart_cnpg, types,
 };
 use controller::apis::coredb_types::{Backup, CoreDBSpec, S3Credentials, ServiceAccountTemplate};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
@@ -417,12 +417,6 @@ async fn run(metrics: CustomMetrics) -> Result<(), Box<dyn std::error::Error>> {
                 // Restart and Update events share a lot of the same code.
                 // move some operations after the Event match
                 info!("{}: handling instance restart", read_msg.msg_id);
-                match restart_statefulset(client.clone(), &namespace, &namespace).await {
-                    Ok(_) => {}
-                    Err(err) => {
-                        error!("error restarting statefulset: {:?}", err);
-                    }
-                }
                 let msg_enqueued_at = read_msg.enqueued_at;
                 match restart_cnpg(client.clone(), &namespace, &namespace, msg_enqueued_at).await {
                     Ok(_) => {}

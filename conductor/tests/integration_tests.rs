@@ -126,10 +126,12 @@ mod test {
             serde_json::from_value(custom_metrics).expect("failed to deserialize");
 
         // conductor receives a CRUDevent from control plane
-        let mut install_location = ExtensionInstallLocation::default();
-        install_location.enabled = true;
-        install_location.version = Some("1.3.0".to_owned());
-        install_location.database = "postgres".to_owned();
+        let install_location = ExtensionInstallLocation {
+            enabled: true,
+            version: Some("1.3.0".to_owned()),
+            database: "postgres".to_owned(),
+            ..ExtensionInstallLocation::default()
+        };
         let install_location = install_location.clone();
         let spec_js = serde_json::json!({
             "extensions": Some(vec![Extension {
@@ -239,10 +241,13 @@ mod test {
         // conductor receives a CRUDevent from control plane
         // take note of number of extensions at this point in time
         let mut extensions_add = extensions.clone();
-        let mut install_location = ExtensionInstallLocation::default();
-        install_location.enabled = true;
-        install_location.version = Some("0.1.4".to_owned());
-        install_location.database = "postgres".to_owned();
+        let _install_location = ExtensionInstallLocation::default();
+        let install_location = ExtensionInstallLocation {
+            enabled: true,
+            version: Some("0.1.4".to_owned()),
+            database: "postgres".to_owned(),
+            ..ExtensionInstallLocation::default()
+        };
         let install_location = install_location.clone();
         extensions_add.push(Extension {
             name: "pg_jsonschema".to_owned(),

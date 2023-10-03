@@ -778,6 +778,9 @@ fn did_restarted_at_change(cdb: &CoreDB, cluster: &Cluster) -> bool {
         return false;
     };
 
+    let name = cdb.metadata.name.clone().unwrap();
+    info!("{name}: Checking for restartedAt: CNPG has {existing_restarted_at_annotation:?}, CoreDB has {cdb_restarted_at}");
+
     match existing_restarted_at_annotation {
         Some(cluster_timestamp) if cluster_timestamp == cdb_restarted_at => false,
         Some(_) | None => true,
