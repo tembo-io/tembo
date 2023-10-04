@@ -165,7 +165,7 @@ pub async fn get_secret_v1(
 
     if !is_valid_id(&org_id) || !is_valid_id(&instance_id) {
         return Ok(HttpResponse::BadRequest()
-            .json("org_id and instance_id must be lowercase alphanumeric or underscore only"));
+            .json("org_id and instance_id must be alphanumeric or underscore only"));
     }
 
     let requested_secret = match secrets::validate_requested_secret(&secret_name) {
@@ -225,6 +225,6 @@ pub async fn get_secret_v1(
 }
 
 fn is_valid_id(s: &str) -> bool {
-    let re = Regex::new(r"^[a-z0-9_]+$").unwrap();
+    let re = Regex::new(r"^[A-Za-z0-9_]+$").unwrap();
     re.is_match(s)
 }
