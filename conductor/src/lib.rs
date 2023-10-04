@@ -15,7 +15,7 @@ use k8s_openapi::api::networking::v1::NetworkPolicy;
 use kube::api::{DeleteParams, ListParams, Patch, PatchParams};
 
 use chrono::{DateTime, SecondsFormat, Utc};
-use kube::{Api, Client};
+use kube::{Api, Client, ResourceExt};
 use log::{debug, info};
 use rand::Rng;
 use serde_json::{from_str, to_string, Value};
@@ -394,16 +394,50 @@ pub async fn get_pg_conn(
     Ok(postgres_conn)
 }
 
-pub async fn restart_cnpg(
+pub async fn restart_coredb(
     client: Client,
     namespace: &str,
     cluster_name: &str,
     msg_enqueued_at: DateTime<Utc>,
-) -> Result<(), ConductorError> {
-    let cluster: Api<CoreDB> = Api::namespaced(client, namespace);
+) -> Result<bool, ConductorError> {
+    let coredb_api: Api<CoreDB> = Api::namespaced(client, namespace);
     let restart = msg_enqueued_at
         .to_rfc3339_opts(SecondsFormat::Secs, true)
         .to_string();
+
+    let current_coredb = coredb_api
+        .get(cluster_name)
+        .await
+        .map_err(ConductorError::KubeError)?;
+    let mut is_being_updated = false;
+    match current_coredb
+        .annotations()
+        .get("kubectl.kubernetes.io/restartedAt")
+    {
+        None => {
+            info!(
+                "No restart annotation found on the CoreDB resource, applying for first time: {}",
+                namespace
+            );
+            is_being_updated = true;
+        }
+        Some(annotation) => {
+            if annotation != &restart {
+                info!(
+                    "Annotation found on the CoreDB resource, updating from {} to {}: {}",
+                    annotation, restart, namespace
+                );
+                is_being_updated = true;
+            }
+        }
+    };
+    if !is_being_updated {
+        info!(
+            "CoreDB resource already has the correct restart annotation: {}",
+            namespace
+        );
+        return Ok(is_being_updated);
+    }
 
     // To restart the CNPG pod we need to annotate the Cluster resource with
     // kubectl.kubernetes.io/restartedAt: <timestamp>
@@ -419,11 +453,11 @@ pub async fn restart_cnpg(
 
     // Use the patch method to update the Cluster resource
     let params = PatchParams::default();
-    let _patch = cluster
+    let _patch = coredb_api
         .patch(cluster_name, &params, &Patch::Merge(patch_json))
         .await
         .map_err(ConductorError::KubeError)?;
-    Ok(())
+    Ok(true)
 }
 
 // Create a cloudformation stack for the database.

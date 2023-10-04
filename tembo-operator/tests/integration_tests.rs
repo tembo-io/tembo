@@ -252,7 +252,10 @@ mod test {
                 }
             }
         }
-        Err(AnyError::msg(format!("Timed out waiting for http response from '{}'", url)).into())
+        Err(AnyError::msg(format!(
+            "Timed out waiting for http response from '{}'",
+            url
+        )))
     }
 
 

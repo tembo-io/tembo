@@ -741,50 +741,32 @@ async fn pods_to_fence(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<String>, A
     }
 }
 
+// cdb: the CoreDB object
+// maybe_cluster, Option<Cluster> of the current CNPG cluster, if it exists
+// new_spec: the new Cluster spec to be applied
 fn update_restarted_at(cdb: &CoreDB, maybe_cluster: Option<&Cluster>, new_spec: &mut Cluster) -> bool {
     let Some(cdb_restarted_at) = cdb.annotations().get(RESTARTED_AT) else {
-        // Avoid interacting with k8s if CoreDB does not have
-        // a restartedAt tag
+        // No need to update the annotation if it's not present in the CoreDB
         return false;
     };
 
-    let Some(current_cluster) = maybe_cluster else {
-        return true;
-    };
+    // Remember the previous value of the annotation, if any
+    let previous_restarted_at = maybe_cluster.and_then(|cluster| cluster.annotations().get(RESTARTED_AT));
 
-    let restart_annotation_updated = did_restarted_at_change(cdb, current_cluster);
+    // Forward the `restartedAt` annotation from CoreDB over to the CNPG cluster,
+    // does not matter if changed or not.
+    new_spec.metadata.annotations.as_mut().map(|cluster_annotations| {
+        cluster_annotations.insert(RESTARTED_AT.into(), cdb_restarted_at.to_owned())
+    });
+
+    let restart_annotation_updated = previous_restarted_at != Some(cdb_restarted_at);
 
     if restart_annotation_updated {
-        // Forward the `restartedAt` annotation from CoreDB over to the CNPG cluster
-        new_spec.metadata.annotations.as_mut().map(|cluster_annotations| {
-            cluster_annotations.insert(RESTARTED_AT.into(), cdb_restarted_at.to_owned())
-        });
-
         let name = new_spec.metadata.name.as_deref().unwrap_or("unknown");
         info!("restartAt changed for cluster {name}, setting to {cdb_restarted_at}.");
     }
 
     restart_annotation_updated
-}
-
-fn did_restarted_at_change(cdb: &CoreDB, cluster: &Cluster) -> bool {
-    let existing_restarted_at_annotation = cluster
-        .metadata
-        .annotations
-        .as_ref()
-        .and_then(|annotations| annotations.get(RESTARTED_AT));
-
-    let Some(cdb_restarted_at) = cdb.annotations().get(RESTARTED_AT) else {
-        return false;
-    };
-
-    let name = cdb.metadata.name.clone().unwrap();
-    info!("{name}: Checking for restartedAt: CNPG has {existing_restarted_at_annotation:?}, CoreDB has {cdb_restarted_at}");
-
-    match existing_restarted_at_annotation {
-        Some(cluster_timestamp) if cluster_timestamp == cdb_restarted_at => false,
-        Some(_) | None => true,
-    }
 }
 
 #[instrument(skip(cdb, ctx) fields(trace_id))]
@@ -903,7 +885,6 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
         }
     }
 
-    debug!("Patching cluster");
     let ps = PatchParams::apply("cntrlr");
     let _o = cluster_api
         .patch(&name, &ps, &Patch::Apply(&cluster))
@@ -928,10 +909,13 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
             }),
         )
         .await?;
+        info!(
+            "Updated status.running to false in {}, requeuing 10 seconds",
+            &name
+        );
+        return Err(Action::requeue(Duration::from_secs(10)));
     }
 
-    debug!("Applied");
-    // If restart is required, then we should trigger the restart above
     Ok(())
 }
 

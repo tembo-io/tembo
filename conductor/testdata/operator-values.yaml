@@ -1,9 +1,10 @@
 image:
-  tag: latest
+  # Set this back to latest after merge
+  tag: 7d85ee4
 env:
   - name: ENABLE_INITIAL_BACKUP
     value: "false"
   - name: RUST_LOG
-    value: debug,kube=debug,controller=debug
+    value: info,kube=info,controller=debug
   - name: OPENTELEMETRY_ENDPOINT_URL
     value: http://tempo.monitoring.svc.cluster.local:4318
