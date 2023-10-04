@@ -405,7 +405,10 @@ pub fn cnpg_cluster_bootstrap_from_cdb(
 }
 
 // Get PGConfig from CoreDB and convert it to a postgres_parameters and shared_preload_libraries
-fn cnpg_postgres_config(cdb: &CoreDB, requires_load: Vec<String>) -> Result<PostgresConfig, MergeError> {
+fn cnpg_postgres_config(
+    cdb: &CoreDB,
+    requires_load: BTreeMap<String, String>,
+) -> Result<PostgresConfig, MergeError> {
     match cdb.spec.get_pg_configs(requires_load) {
         Ok(Some(pg_configs)) => {
             let mut postgres_parameters: BTreeMap<String, String> = BTreeMap::new();
@@ -486,7 +489,7 @@ fn cnpg_high_availability(cdb: &CoreDB) -> Option<ClusterReplicationSlots> {
 pub fn cnpg_cluster_from_cdb(
     cdb: &CoreDB,
     fenced_pods: Option<Vec<String>>,
-    requires_load: Vec<String>,
+    requires_load: BTreeMap<String, String>,
 ) -> Cluster {
     let cfg = Config::default();
     let name = cdb.name_any();

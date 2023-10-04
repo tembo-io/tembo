@@ -16,7 +16,7 @@ use crate::{
     },
     trunk::extensions_that_require_load,
 };
-use std::{sync::Arc, time::Duration};
+use std::{collections::BTreeMap, sync::Arc, time::Duration};
 use tracing::{error, warn};
 
 pub async fn reconcile_extension_toggle_state(
@@ -45,13 +45,17 @@ async fn toggle_extensions(
     let mut ext_status_updates = ext_status_updates.clone();
     for extension_to_toggle in toggle_these_extensions {
         for location_to_toggle in extension_to_toggle.locations {
+            let expected_library_name = match requires_load.get(&extension_to_toggle.name) {
+                None => &extension_to_toggle.name,
+                Some(expected_library_name) => expected_library_name,
+            };
             // If we are toggling on,
             // the extension is included in the REQUIRES_LOAD list,
             // and also is not present in shared_preload_libraries,
             // then requeue.
             if location_to_toggle.enabled
-                && requires_load.contains(&extension_to_toggle.name)
-                && !current_shared_preload_libraries.contains(&extension_to_toggle.name)
+                && requires_load.contains_key(&extension_to_toggle.name)
+                && !current_shared_preload_libraries.contains(expected_library_name)
             {
                 warn!(
                     "Extension {} requires load, but is not present in shared_preload_libraries for {}, checking if we should requeue.",
@@ -111,12 +115,16 @@ async fn toggle_extensions(
 fn requeue_if_expecting_shared_preload_library(
     cdb: &CoreDB,
     extension_to_toggle: &str,
-    requires_load: Vec<String>,
+    requires_load: BTreeMap<String, String>,
 ) -> Result<(), Action> {
+    let expected_library_name = match requires_load.get(extension_to_toggle) {
+        None => extension_to_toggle,
+        Some(expected_library_name) => expected_library_name,
+    };
     // Get config by name
     match cdb
         .spec
-        .get_pg_config_by_name("shared_preload_libraries", requires_load)
+        .get_pg_config_by_name("shared_preload_libraries", requires_load.clone())
     {
         // If there is not an error
         Ok(shared_preload_libraries_config_value) => match shared_preload_libraries_config_value {
@@ -127,7 +135,7 @@ fn requeue_if_expecting_shared_preload_library(
                      extension_to_toggle, cdb.metadata.name.clone().unwrap());
             }
             // If there is a value, then we are expecting a restart if the extension name is in the value
-            Some(value) => match value.value.to_string().contains(extension_to_toggle) {
+            Some(value) => match value.value.to_string().contains(expected_library_name) {
                 true => {
                     warn!(
                          "Extension {} requires load, and is present in shared_preload_libraries for {}, requeuing.",

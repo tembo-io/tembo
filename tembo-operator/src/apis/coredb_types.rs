@@ -18,6 +18,7 @@ use kube::CustomResource;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
+use tracing::error;
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize, JsonSchema)]
 pub struct Stack {
@@ -174,7 +175,10 @@ pub struct CoreDBSpec {
 impl CoreDBSpec {
     // extracts all postgres configurations
     // configs can be defined in several different places (from a stack, user override, from an extension installation, user overrides, etc)
-    pub fn get_pg_configs(&self, requires_load: Vec<String>) -> Result<Option<Vec<PgConfig>>, MergeError> {
+    pub fn get_pg_configs(
+        &self,
+        requires_load: BTreeMap<String, String>,
+    ) -> Result<Option<Vec<PgConfig>>, MergeError> {
         let stack_configs = self
             .stack
             .as_ref()
@@ -190,8 +194,16 @@ impl CoreDBSpec {
         let mut include_with_shared_preload_libraries = BTreeSet::new();
         for ext in self.extensions.iter() {
             'loc: for location in ext.locations.iter() {
-                if location.enabled && requires_load.contains(&ext.name) {
-                    include_with_shared_preload_libraries.insert(ext.name.clone());
+                if location.enabled && requires_load.contains_key(&ext.name) {
+                    if let Some(library_name) = requires_load.get(&ext.name) {
+                        include_with_shared_preload_libraries.insert(library_name.clone());
+                    } else {
+                        // coredb name not in scope, so can't be included in log
+                        error!(
+                            "Extension {} requires load but no library name was found",
+                            ext.name
+                        );
+                    }
                     break 'loc;
                 }
             }
@@ -275,7 +287,7 @@ impl CoreDBSpec {
     pub fn get_pg_config_by_name(
         &self,
         config_name: &str,
-        requires_load: Vec<String>,
+        requires_load: BTreeMap<String, String>,
     ) -> Result<Option<PgConfig>, MergeError> {
         let all_configs = self.get_pg_configs(requires_load)?;
         for config in all_configs.unwrap_or_default() {

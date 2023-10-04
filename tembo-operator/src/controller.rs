@@ -647,7 +647,7 @@ pub async fn get_current_coredb_resource(cdb: &CoreDB, ctx: Arc<Context>) -> Res
             .expect("CoreDB should have a namespace"),
     );
     let coredb_name = cdb.metadata.name.as_ref().expect("CoreDB should have a name");
-    let coredb = coredb_api.get(&coredb_name).await.map_err(|e| {
+    let coredb = coredb_api.get(coredb_name).await.map_err(|e| {
         error!("Error getting CoreDB resource: {:?}", e);
         Action::requeue(Duration::from_secs(10))
     })?;

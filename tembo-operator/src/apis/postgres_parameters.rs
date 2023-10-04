@@ -378,6 +378,7 @@ impl<'de> Deserialize<'de> for PgConfig {
 mod pg_param_tests {
     use super::*;
     use crate::apis::coredb_types::{CoreDBSpec, Stack};
+    use std::collections::BTreeMap;
 
     #[test]
     fn test_pg_config() {
@@ -432,7 +433,9 @@ mod pg_param_tests {
             }),
             ..Default::default()
         };
-        let requires_load: Vec<String> = vec!["pg_cron".to_string(), "pg_stat_statements".to_string()];
+        let mut requires_load: BTreeMap<String, String> = BTreeMap::new();
+        requires_load.insert("pg_cron".to_string(), "pg_cron".to_string());
+        requires_load.insert("pg_stat_statements".to_string(), "pg_stat_statements".to_string());
         let pg_configs = spec
             .get_pg_configs(requires_load)
             .expect("failed to get pg configs")

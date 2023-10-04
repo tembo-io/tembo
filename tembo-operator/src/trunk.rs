@@ -1,5 +1,6 @@
 use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{runtime::controller::Action, Api, Client};
+use lazy_static::lazy_static;
 use std::{collections::BTreeMap, env, time::Duration};
 
 use crate::configmap::apply_configmap;
@@ -11,7 +12,33 @@ const DEFAULT_TRUNK_REGISTRY_DOMAIN: &str = "registry.pgtrunk.io";
 // multiple DBs in the same namespace can share the same configmap
 const TRUNK_CONFIGMAP_NAME: &str = "trunk-metadata";
 
-pub async fn extensions_that_require_load(client: Client, namespace: &str) -> Result<Vec<String>, Action> {
+pub struct ExtensionRequiresLoad {
+    pub name: String,
+    pub library_name: String,
+}
+
+// This is a place to configure specific exceptions before
+// Trunk handles everything.
+// In terms of extensions that require load, we need to know
+// the library name in some cases where the extension name
+// and the library name do not match.
+// https://tembo.io/blog/four-types-of-extensions#load
+lazy_static! {
+    pub static ref EXTRA_EXTENSIONS_REQUIRE_LOAD: Vec<ExtensionRequiresLoad> = {
+        let mut extra_extensions_that_require_load = Vec::new();
+        let pg_partman = ExtensionRequiresLoad {
+            name: "pg_partman".to_string(),
+            library_name: "pg_partman_bgw".to_string(),
+        };
+        extra_extensions_that_require_load.push(pg_partman);
+        extra_extensions_that_require_load
+    };
+}
+
+pub async fn extensions_that_require_load(
+    client: Client,
+    namespace: &str,
+) -> Result<BTreeMap<String, String>, Action> {
     let cm_api: Api<ConfigMap> = Api::namespaced(client, namespace);
 
     // Get the ConfigMap
@@ -25,7 +52,17 @@ pub async fn extensions_that_require_load(client: Client, namespace: &str) -> Re
     if let Some(data) = cm.data {
         if let Some(libraries_str) = data.get("libraries") {
             let libraries: Vec<String> = libraries_str.split(',').map(|s| s.to_string()).collect();
-            Ok(libraries)
+            // Currently, all extensions returned from the trunk /extensions/libraries
+            // require load and have exact name match of the library name to the extension name
+            let mut libraries_map = BTreeMap::new();
+            for library in libraries {
+                libraries_map.insert(library.clone(), library);
+            }
+            // Add any extra extensions that require load
+            for extra_extension in EXTRA_EXTENSIONS_REQUIRE_LOAD.iter() {
+                libraries_map.insert(extra_extension.name.clone(), extra_extension.library_name.clone());
+            }
+            Ok(libraries_map)
         } else {
             error!(
                 "Invalid content of trunk metadata configmap in namespace {}",
