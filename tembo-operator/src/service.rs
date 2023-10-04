@@ -34,7 +34,7 @@ pub async fn reconcile_prometheus_exporter_service(cdb: &CoreDB, ctx: Arc<Contex
         metadata: ObjectMeta {
             name: Some(name.to_owned()),
             namespace: Some(ns.to_owned()),
-            labels: Some(labels.clone()),
+            labels: Some(labels),
             owner_references: Some(vec![oref]),
             ..ObjectMeta::default()
         },
@@ -45,7 +45,7 @@ pub async fn reconcile_prometheus_exporter_service(cdb: &CoreDB, ctx: Arc<Contex
                 target_port: Some(IntOrString::String("metrics".to_string())),
                 ..ServicePort::default()
             }]),
-            selector: Some(selector_labels.clone()),
+            selector: Some(selector_labels),
             ..ServiceSpec::default()
         }),
         ..Service::default()

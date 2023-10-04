@@ -73,7 +73,7 @@ async fn reconcile(cdb: Arc<CoreDB>, ctx: Arc<Context>) -> Result<Action> {
     let ns = cdb.namespace().unwrap(); // cdb is namespace scoped
     let coredbs: Api<CoreDB> = Api::namespaced(ctx.client.clone(), &ns);
     // Get metadata for the CoreDB object
-    let metadata = cdb.meta().clone();
+    let metadata = cdb.meta();
     // Get annotations from the metadata
     let annotations = metadata.annotations.clone().unwrap_or_default();
 
@@ -290,8 +290,8 @@ impl CoreDB {
                     running: false,
                     extensionsUpdating: false,
                     storage: Some(self.spec.storage.clone()),
-                    extensions: self.status.clone().and_then(|f| f.extensions),
-                    trunk_installs: self.status.clone().and_then(|f| f.trunk_installs),
+                    extensions: self.status.as_ref().and_then(|f| f.extensions.clone()),
+                    trunk_installs: self.status.as_ref().and_then(|f| f.trunk_installs.clone()),
                     resources: Some(self.spec.resources.clone()),
                     runtime_config: Some(current_config_values),
                     first_recoverability_time: self.status.as_ref().and_then(|f| f.first_recoverability_time),
@@ -299,7 +299,7 @@ impl CoreDB {
             }
         };
 
-        debug!("Updating CoreDB status to {:?} for {}", new_status, name.clone());
+        debug!("Updating CoreDB status to {:?} for {name}", new_status);
 
         let patch_status = json!({
             "apiVersion": "coredb.io/v1alpha1",
@@ -646,12 +646,12 @@ pub async fn get_current_coredb_resource(cdb: &CoreDB, ctx: Arc<Context>) -> Res
             .clone()
             .expect("CoreDB should have a namespace"),
     );
-    let coredb_name = cdb.metadata.name.clone().expect("CoreDB should have a name");
+    let coredb_name = cdb.metadata.name.as_ref().expect("CoreDB should have a name");
     let coredb = coredb_api.get(&coredb_name).await.map_err(|e| {
         error!("Error getting CoreDB resource: {:?}", e);
         Action::requeue(Duration::from_secs(10))
     })?;
-    Ok(coredb.clone())
+    Ok(coredb)
 }
 
 // Get current config values

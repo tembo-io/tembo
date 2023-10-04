@@ -76,13 +76,14 @@ pub async fn reconcile_extra_postgres_ing_route_tcp(
     let matcher_actual = matchers.join(" || ");
     let ingress_route_tcp_name = format!("extra-{}-rw", cdb.name_any());
     let owner_reference = cdb.controller_owner_ref(&()).unwrap();
+
     let ingress_route_tcp_to_apply = postgres_ingress_route_tcp(
         ingress_route_tcp_name.clone(),
         namespace.to_string(),
-        owner_reference.clone(),
-        matcher_actual.clone(),
+        owner_reference,
+        matcher_actual,
         service_name_read_write.to_string(),
-        port.clone(),
+        port,
     );
     let ingress_route_tcp_api: Api<IngressRouteTCP> = Api::namespaced(ctx.client.clone(), namespace);
     if !extra_domain_names.is_empty() {
@@ -244,13 +245,13 @@ pub async fn reconcile_postgres_ing_route_tcp(
 
         let service_name_actual = ingress_route_tcp.spec.routes[0]
             .services
-            .clone()
+            .as_ref()
             .expect("Ingress route has no services")[0]
             .name
             .clone();
         let service_port_actual = ingress_route_tcp.spec.routes[0]
             .services
-            .clone()
+            .as_ref()
             .expect("Ingress route has no services")[0]
             .port
             .clone();
@@ -277,7 +278,7 @@ pub async fn reconcile_postgres_ing_route_tcp(
                 ingress_route_tcp_name.clone(),
                 namespace.to_string(),
                 owner_reference.clone(),
-                matcher_actual.clone(),
+                matcher_actual,
                 service_name_read_write.to_string(),
                 port.clone(),
             );

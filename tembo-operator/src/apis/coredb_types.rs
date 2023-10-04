@@ -190,7 +190,7 @@ impl CoreDBSpec {
         let mut include_with_shared_preload_libraries = BTreeSet::new();
         for ext in self.extensions.iter() {
             'loc: for location in ext.locations.iter() {
-                if location.clone().enabled && requires_load.contains(&ext.name) {
+                if location.enabled && requires_load.contains(&ext.name) {
                     include_with_shared_preload_libraries.insert(ext.name.clone());
                     break 'loc;
                 }
