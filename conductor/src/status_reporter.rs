@@ -9,7 +9,9 @@ use std::env;
 
 use conductor::monitoring::CustomMetrics;
 use conductor::types::Event;
-use conductor::{get_data_plane_id_from_coredb, get_event_id_from_coredb, get_pg_conn, types};
+use conductor::{
+    get_data_plane_id_from_coredb, get_event_id_from_coredb, get_org_inst_id, get_pg_conn, types,
+};
 
 pub async fn run_status_reporter(
     _metrics: CustomMetrics,
@@ -83,6 +85,14 @@ async fn send_status_update(
             return Ok(());
         }
     };
+    let org_inst = match get_org_inst_id(&coredb) {
+        Ok(org_inst) => org_inst,
+        Err(_) => {
+            warn!("Could not get org_id and inst_id from CoreDB {}, needs to be updated with annotations, which will happen on the next update from control plane, skipping", coredb_name);
+            return Ok(());
+        }
+    };
+
     let event_id = match get_event_id_from_coredb(&coredb) {
         Ok(event_id) => event_id,
         Err(_) => {
@@ -90,6 +100,7 @@ async fn send_status_update(
             return Ok(());
         }
     };
+
     let data_plane_id = match get_data_plane_id_from_coredb(&coredb) {
         Ok(event_id) => event_id,
         Err(_) => {
@@ -107,6 +118,8 @@ async fn send_status_update(
     let response = types::StateToControlPlane {
         data_plane_id,
         event_id: event_id.clone(),
+        org_id: org_inst.org_id,
+        inst_id: org_inst.inst_id,
         event_type: Event::Updated,
         spec: Some(coredb.spec.clone()),
         status: coredb.status.clone(),

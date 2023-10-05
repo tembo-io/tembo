@@ -23,7 +23,6 @@ use serde_json::{from_str, to_string, Value};
 pub type Result<T, E = ConductorError> = std::result::Result<T, E>;
 
 pub async fn generate_spec(
-    workspace_id: &str,
     org_id: &str,
     entity_name: &str,
     instance_id: &str,
@@ -39,7 +38,6 @@ pub async fn generate_spec(
             "annotations": {
                 "tembo.io/org_id": org_id,
                 "tembo.io/instance_id": instance_id,
-                "tembo.io/workspace_id": workspace_id,
                 "tembo.io/entity_name": entity_name,
                 "tembo.io/data_plane_id": data_plane_id,
             }
@@ -47,6 +45,7 @@ pub async fn generate_spec(
         "spec": spec,
     })
 }
+
 pub fn get_data_plane_id_from_coredb(coredb: &CoreDB) -> Result<String, Box<ConductorError>> {
     let annotations = match coredb.metadata.annotations.as_ref() {
         None => {
@@ -61,6 +60,31 @@ pub fn get_data_plane_id_from_coredb(coredb: &CoreDB) -> Result<String, Box<Cond
         }
     };
     Ok(data_plane_id)
+}
+
+pub fn get_org_inst_id(coredb: &CoreDB) -> Result<types::OrgInstId, Box<ConductorError>> {
+    let annotations = match coredb.metadata.annotations.as_ref() {
+        None => {
+            return Err(Box::new(ConductorError::EventIDFormat));
+        }
+        Some(annotations) => annotations,
+    };
+    let org_id = match annotations.get("tembo.io/org_id") {
+        Some(org_id) => org_id.to_string(),
+        None => {
+            return Err(Box::new(ConductorError::EventIDFormat));
+        }
+    };
+    let instance_id = match annotations.get("tembo.io/instance_id") {
+        Some(instance_id) => instance_id.to_string(),
+        None => {
+            return Err(Box::new(ConductorError::EventIDFormat));
+        }
+    };
+    Ok(types::OrgInstId {
+        org_id,
+        inst_id: instance_id,
+    })
 }
 
 pub fn get_event_id_from_coredb(coredb: &CoreDB) -> Result<String, Box<ConductorError>> {
@@ -96,24 +120,6 @@ pub fn get_event_id_from_coredb(coredb: &CoreDB) -> Result<String, Box<Conductor
     };
     let event_id = [workspace_id, org_id, entity_name, instance_id].join(".");
     Ok(event_id)
-}
-
-pub fn parse_event_id(
-    event_id: &str,
-) -> Result<(String, String, String, String), Box<ConductorError>> {
-    let event_id_split = event_id.split('.').collect::<Vec<&str>>();
-
-    if event_id_split.len() < 4 {
-        return Err(Box::new(ConductorError::EventIDParsing(
-            event_id.to_string(),
-        )));
-    }
-    // "<workspace>.<organization>.<entity>.<instance>"
-    let workspace_id = event_id_split[0].to_string();
-    let org_id = event_id_split[1].to_string();
-    let entity_name = event_id_split[2].to_string();
-    let instance_id = event_id_split[3].to_string();
-    Ok((workspace_id, org_id, entity_name, instance_id))
 }
 
 pub async fn get_all(client: Client, namespace: &str) -> Vec<CoreDB> {

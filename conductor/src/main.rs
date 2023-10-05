@@ -6,8 +6,7 @@ use conductor::monitoring::CustomMetrics;
 use conductor::{
     create_cloudformation, create_namespace, create_networkpolicy, create_or_update, delete,
     delete_cloudformation, delete_namespace, generate_rand_schedule, generate_spec,
-    get_coredb_error_without_status, get_one, get_pg_conn, lookup_role_arn, parse_event_id,
-    restart_coredb, types,
+    get_coredb_error_without_status, get_one, get_pg_conn, lookup_role_arn, restart_coredb, types,
 };
 use controller::apis::coredb_types::{Backup, CoreDBSpec, S3Credentials, ServiceAccountTemplate};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
@@ -88,12 +87,16 @@ async fn run(metrics: CustomMetrics) -> Result<(), Box<dyn std::error::Error>> {
             }
         };
 
-        let (workspace_id, org_id, entity_name, instance_id) =
-            parse_event_id(read_msg.message.event_id.as_str())?;
+        let org_id = read_msg.message.org_id.clone();
+        let instance_id = read_msg.message.inst_id.clone();
 
         metrics
             .conductor_total
             .add(&opentelemetry::Context::current(), 1, &[]);
+
+        // workspace.org.entity_type.inst
+        // workspace and entity type are not used by control-plane, but are required by EventType schema
+        let entity_type_ph = format!("NA.{}.NA.{}", org_id, instance_id);
 
         // note: messages are recycled on purpose
         // but absurdly high read_ct means its probably never going to get processed
@@ -111,7 +114,9 @@ async fn run(metrics: CustomMetrics) -> Result<(), Box<dyn std::error::Error>> {
             // this is what we'll send back to control-plane
             let error_event = types::StateToControlPlane {
                 data_plane_id: read_msg.message.data_plane_id,
-                event_id: read_msg.message.event_id,
+                org_id: read_msg.message.org_id,
+                inst_id: read_msg.message.inst_id,
+                event_id: entity_type_ph,
                 event_type: Event::Error,
                 spec: None,
                 status: None,
@@ -270,11 +275,14 @@ async fn run(metrics: CustomMetrics) -> Result<(), Box<dyn std::error::Error>> {
                 create_networkpolicy(client.clone(), &namespace).await?;
 
                 info!("{}: Generating spec", read_msg.msg_id);
+                let stack_type = match coredb_spec.stack.as_ref() {
+                    Some(stack) => stack.name.clone(),
+                    None => String::from("NA"),
+                };
 
                 let spec = generate_spec(
-                    &workspace_id,
                     &org_id,
-                    &entity_name,
+                    &stack_type,
                     &instance_id,
                     &read_msg.message.data_plane_id,
                     &namespace,
@@ -379,7 +387,9 @@ async fn run(metrics: CustomMetrics) -> Result<(), Box<dyn std::error::Error>> {
                 };
                 types::StateToControlPlane {
                     data_plane_id: read_msg.message.data_plane_id,
-                    event_id: read_msg.message.event_id,
+                    event_id: entity_type_ph,
+                    org_id: read_msg.message.org_id,
+                    inst_id: read_msg.message.inst_id,
                     event_type: report_event,
                     spec: Some(current_spec.spec),
                     status: current_spec.status,
@@ -406,7 +416,9 @@ async fn run(metrics: CustomMetrics) -> Result<(), Box<dyn std::error::Error>> {
                 // report state
                 types::StateToControlPlane {
                     data_plane_id: read_msg.message.data_plane_id,
-                    event_id: read_msg.message.event_id,
+                    event_id: entity_type_ph,
+                    org_id: read_msg.message.org_id,
+                    inst_id: read_msg.message.inst_id,
                     event_type: Event::Deleted,
                     spec: None,
                     status: None,
@@ -465,7 +477,9 @@ async fn run(metrics: CustomMetrics) -> Result<(), Box<dyn std::error::Error>> {
 
                 types::StateToControlPlane {
                     data_plane_id: read_msg.message.data_plane_id,
-                    event_id: read_msg.message.event_id,
+                    event_id: entity_type_ph,
+                    org_id: read_msg.message.org_id,
+                    inst_id: read_msg.message.inst_id,
                     event_type: Event::Restarted,
                     spec: Some(current_resource.spec),
                     status: current_resource.status,
@@ -503,7 +517,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), Box<dyn std::error::Error>> {
 
 async fn requeue_short(
     metrics: &CustomMetrics,
-    control_plane_events_queue: &String,
+    control_plane_events_queue: &str,
     queue: &PGMQueueExt,
     read_msg: &Message<CRUDevent>,
 ) -> Result<(), Box<dyn Error>> {

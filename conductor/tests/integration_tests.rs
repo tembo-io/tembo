@@ -156,10 +156,8 @@ mod test {
         let msg = types::CRUDevent {
             organization_name: org_name.clone(),
             data_plane_id: "org_02s3owPQskuGXHE8vYsGSY".to_owned(),
-            event_id: format!(
-                "{name}.org_02s3owPQskuGXHE8vYsGSY.CoreDB.inst_02s4UKVbRy34SAYVSwZq2H",
-                name = dbname
-            ),
+            org_id: "org_02s3owPQskuGXHE8vYsGSY".to_owned(),
+            inst_id: "inst_02s4UKVbRy34SAYVSwZq2H".to_owned(),
             event_type: types::Event::Create,
             dbname: dbname.clone(),
             spec: Some(spec),
@@ -262,10 +260,8 @@ mod test {
         let msg = types::CRUDevent {
             organization_name: org_name.clone(),
             data_plane_id: "org_02s3owPQskuGXHE8vYsGSY".to_owned(),
-            event_id: format!(
-                "{name}.org_02s3owPQskuGXHE8vYsGSY.CoreDB.inst_02s4UKVbRy34SAYVSwZq2H",
-                name = dbname
-            ),
+            org_id: "org_02s3owPQskuGXHE8vYsGSY".to_owned(),
+            inst_id: "inst_02s4UKVbRy34SAYVSwZq2H".to_owned(),
             event_type: types::Event::Update,
             dbname: dbname.clone(),
             spec: Some(spec),
@@ -373,10 +369,8 @@ mod test {
         let msg = types::CRUDevent {
             organization_name: org_name.clone(),
             data_plane_id: "org_02s3owPQskuGXHE8vYsGSY".to_owned(),
-            event_id: format!(
-                "{name}.org_02s3owPQskuGXHE8vYsGSY.CoreDB.inst_02s4UKVbRy34SAYVSwZq2H",
-                name = dbname
-            ),
+            org_id: "org_02s3owPQskuGXHE8vYsGSY".to_owned(),
+            inst_id: "inst_02s4UKVbRy34SAYVSwZq2H".to_owned(),
             event_type: types::Event::Delete,
             dbname: dbname.clone(),
             spec: None,

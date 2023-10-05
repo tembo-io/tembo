@@ -8,7 +8,8 @@ use controller::apis::coredb_types::{CoreDBSpec, CoreDBStatus};
 pub struct CRUDevent {
     pub organization_name: String,
     pub data_plane_id: String,
-    pub event_id: String,
+    pub org_id: String,
+    pub inst_id: String,
     pub event_type: Event,
     pub dbname: String,
     pub spec: Option<CoreDBSpec>,
@@ -38,9 +39,17 @@ pub struct StateToControlPlane {
     pub data_plane_id: String, // unique identifier for the data plane
     pub event_id: String,      // pass through from event that triggered a data plane action
     pub event_type: Event,     // pass through from event that triggered a data plane action
+    pub org_id: String,
+    pub inst_id: String,
     pub spec: Option<CoreDBSpec>,
     pub status: Option<CoreDBStatus>,
     pub connection: Option<types::ConnectionInfo>,
+}
+
+#[derive(Debug)]
+pub struct OrgInstId {
+    pub org_id: String,
+    pub inst_id: String,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
