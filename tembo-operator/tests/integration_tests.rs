@@ -40,7 +40,7 @@ mod test {
         apimachinery::pkg::{api::resource::Quantity, apis::meta::v1::ObjectMeta, util::intstr::IntOrString},
     };
     use kube::{
-        api::{AttachParams, DeleteParams, ListParams, Patch, PatchParams, PostParams, WatchParams},
+        api::{AttachParams, DeleteParams, ListParams, Patch, PatchParams, PostParams},
         runtime::wait::{await_condition, conditions, Condition},
         Api, Client, Config, Error,
     };
@@ -65,7 +65,6 @@ mod test {
     const TIMEOUT_SECONDS_NS_DELETED: u64 = 300;
     const TIMEOUT_SECONDS_POD_DELETED: u64 = 300;
     const TIMEOUT_SECONDS_COREDB_DELETED: u64 = 300;
-    const TIMEOUT_SECONDS_BACKUP_COMPLETED: u64 = 600;
 
     async fn kube_client() -> Client {
         // Get the name of the currently selected namespace
@@ -332,41 +331,29 @@ mod test {
         println!("Found pod ready: {}", pod_name);
     }
 
-    async fn has_backup_completed(context: Arc<Context>, namespace: &str, name: &str) {
+    async fn wait_backup_completed(context: Arc<Context>, namespace: &str, name: &str) {
         println!("Waiting for backup to complete: {}", name);
         let backups: Api<Backup> = Api::namespaced(context.client.clone(), namespace);
 
-        let wp = WatchParams::default().labels(&format!("cnpg.io/cluster={}", name));
-        let stream_result = backups.watch(&wp, "0").await;
+        const TIMEOUT_SECONDS_BACKUP_COMPLETED: i64 = 200;
 
-        let mut stream = match stream_result {
-            Ok(s) => Box::pin(s),
-            Err(e) => panic!("Failed to watch backups: {}", e),
-        };
+        let start_time = Utc::now();
 
-        let watch_result =
-            tokio::time::timeout(Duration::from_secs(TIMEOUT_SECONDS_BACKUP_COMPLETED), async {
-                while let Some(event) = stream.next().await {
-                    match event {
-                        Ok(kube::api::WatchEvent::Modified(backup)) => {
-                            if let Some(status) = &backup.status {
-                                if status.phase.as_deref() == Some("completed") {
-                                    return;
-                                }
-                            }
-                        }
-                        Ok(_) => {} // For other events we do nothing
-                        Err(e) => panic!("Error watching Backup: {}", e),
-                    }
+        while Utc::now() - start_time < chrono::Duration::seconds(TIMEOUT_SECONDS_BACKUP_COMPLETED) {
+            let list_params = ListParams::default().labels(&format!("cnpg.io/cluster={}", name));
+            let backups = backups.list(&list_params).await.unwrap();
+            let backup = backups.items[0].clone();
+            if let Some(status) = &backup.status {
+                if status.phase.as_deref() == Some("completed") {
+                    return;
                 }
-                panic!("Watch stream ended prematurely");
-            })
-            .await;
-
-        if watch_result.is_err() {
-            panic!("Timed out waiting for Backup to complete");
+            }
+            thread::sleep(Duration::from_secs(1));
         }
-        println!("Found backup completed: {}", name);
+        panic!(
+            "Did not find the backup {} to be completed after waiting {} seconds",
+            name, TIMEOUT_SECONDS_BACKUP_COMPLETED
+        );
     }
 
     // Create namespace for the test to run in
@@ -3593,7 +3580,7 @@ mod test {
         assert!(result.stdout.clone().unwrap().contains("plpgsql"));
 
         // Check to make sure the initial backup has run and its completed
-        has_backup_completed(context.clone(), &namespace, name).await;
+        wait_backup_completed(context.clone(), &namespace, name).await;
 
         // Create a table and insert some data
         let result = psql_with_retry(
@@ -3641,7 +3628,7 @@ mod test {
         assert!(result.stdout.clone().unwrap().contains("plpgsql"));
 
         // Wait for backup to complete
-        has_backup_completed(context.clone(), &namespace, &backup_name).await;
+        wait_backup_completed(context.clone(), &namespace, &backup_name).await;
 
         // If the backup is complete, we can now restore to a new instance in a new namespace
         let suffix = rng.gen_range(0..100000);
