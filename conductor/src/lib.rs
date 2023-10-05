@@ -108,9 +108,8 @@ pub fn get_event_id_from_coredb(coredb: &CoreDB) -> Result<String, Box<Conductor
     };
     let workspace_id = match annotations.get("tembo.io/workspace_id") {
         Some(workspace_id) => workspace_id.to_string(),
-        None => {
-            return Err(Box::new(ConductorError::EventIDFormat));
-        }
+        // Left over-concept, to be removed
+        None => "NA".to_string(),
     };
     let entity_name = match annotations.get("tembo.io/entity_name") {
         Some(entity_name) => entity_name.to_string(),
