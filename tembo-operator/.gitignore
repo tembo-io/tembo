@@ -1,6 +1,8 @@
 .DS_Store
 
 temp.yaml
+# debugging pod
+ubuntu.yaml
 # VSCode
 .vscode
 ./.vscode

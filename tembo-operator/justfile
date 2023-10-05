@@ -12,6 +12,9 @@ default:
 generate-crd:
   cargo run --bin crdgen > ../charts/tembo-operator/templates/crd.yaml
 
+install-calico:
+	helm upgrade --install --create-namespace --namespace=tigera-operator --version=3.26.1 --values=./testdata/calico.yaml calico projectcalico/tigera-operator
+
 install-traefik:
 	kubectl create namespace traefik || true
 	helm upgrade --install --namespace=traefik --version=20.8.0 --values=./testdata/traefik-values.yaml traefik traefik/traefik
@@ -58,7 +61,7 @@ install-reflector:
 	helm upgrade --install \
 		reflector emberstack/reflector \
 	  --namespace reflector \
-		--create-namespace 
+		--create-namespace
 
 enable-cnpg-default-namespace:
 	kubectl label namespace default "tembo-pod-init.tembo.io/watch"="true"
@@ -78,6 +81,7 @@ update-helm-repos:
 	helm repo add grafana https://grafana.github.io/helm-charts
 	helm repo add minio https://charts.min.io/
 	helm repo add emberstack https://emberstack.github.io/helm-charts
+	helm repo add projectcalico https://docs.tigera.io/calico/charts
 	helm repo update
 
 # generate and install crd into the cluster
@@ -94,6 +98,7 @@ start-kind:
 	kind create cluster --image=kindest/node:v{{KUBE_VERSION}} --config testdata/kind-config.yaml
 	just update-helm-repos
 	just enable-cnpg-default-namespace
+	just install-calico
 	just install-reflector
 	just install-kube-prometheus-stack
 	just install-tempo

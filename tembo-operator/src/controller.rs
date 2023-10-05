@@ -39,6 +39,7 @@ use crate::{
     apis::postgres_parameters::PgConfig,
     extensions::{database_queries::list_config_params, reconcile_extensions},
     ingress::reconcile_extra_postgres_ing_route_tcp,
+    network_policies::reconcile_network_policies,
     postgres_exporter::reconcile_prom_configmap,
     trunk::{extensions_that_require_load, reconcile_trunk_configmap},
 };
@@ -119,6 +120,8 @@ impl CoreDB {
         let ns = self.namespace().unwrap();
         let name = self.name_any();
         let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &ns);
+
+        reconcile_network_policies(ctx.client.clone(), &ns).await?;
 
         // Fetch any metadata we need from Trunk
         reconcile_trunk_configmap(ctx.client.clone(), &ns).await?;

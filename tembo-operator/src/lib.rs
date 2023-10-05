@@ -25,6 +25,7 @@ mod deployment_postgres_exporter;
 mod ingress;
 pub mod traefik;
 pub use traefik::{ingress_route_crd, ingress_route_tcp_crd};
+mod network_policies;
 pub mod psql;
 mod rbac;
 mod secret;

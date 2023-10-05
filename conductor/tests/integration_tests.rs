@@ -472,7 +472,7 @@ mod test {
         name: &str,
         resource_type: &str,
     ) -> bool {
-        for _ in 0..10 {
+        for _ in 0..60 {
             let result: Result<(), kube::Error> = match resource_type {
                 "Namespace" => {
                     let api: Api<Namespace> = Api::all(client.clone());
@@ -501,7 +501,7 @@ mod test {
                 "Waiting for resource {} of type {} to be deleted...",
                 name, resource_type
             );
-            thread::sleep(time::Duration::from_secs(20));
+            thread::sleep(time::Duration::from_secs(5));
         }
         false
     }
