@@ -9,9 +9,7 @@ use std::env;
 
 use conductor::monitoring::CustomMetrics;
 use conductor::types::Event;
-use conductor::{
-    get_data_plane_id_from_coredb, get_event_id_from_coredb, get_org_inst_id, get_pg_conn, types,
-};
+use conductor::{get_data_plane_id_from_coredb, get_org_inst_id, get_pg_conn, types};
 
 pub async fn run_status_reporter(
     _metrics: CustomMetrics,
@@ -93,21 +91,14 @@ async fn send_status_update(
         }
     };
 
-    let event_id = match get_event_id_from_coredb(&coredb) {
-        Ok(event_id) => event_id,
-        Err(_) => {
-            warn!("Could not get event_id from CoreDB {}, needs to be updated with annotations, which will happen on the next update from control plane, skipping", coredb_name);
-            return Ok(());
-        }
-    };
-
     let data_plane_id = match get_data_plane_id_from_coredb(&coredb) {
-        Ok(event_id) => event_id,
+        Ok(dp_id) => dp_id,
         Err(_) => {
             warn!("Could not get data_plane_id from CoreDB {}, needs to be updated with annotations, which will happen on the next update from control plane, skipping", coredb_name);
             return Ok(());
         }
     };
+
     let conn_info = match get_pg_conn(client, &namespace, &data_plane_basedomain).await {
         Ok(conn_info) => conn_info,
         Err(_) => {
@@ -117,9 +108,8 @@ async fn send_status_update(
     };
     let response = types::StateToControlPlane {
         data_plane_id,
-        event_id: event_id.clone(),
-        org_id: org_inst.org_id,
-        inst_id: org_inst.inst_id,
+        org_id: org_inst.org_id.clone(),
+        inst_id: org_inst.inst_id.clone(),
         event_type: Event::Updated,
         spec: Some(coredb.spec.clone()),
         status: coredb.status.clone(),
@@ -129,8 +119,8 @@ async fn send_status_update(
         .send(&data_plane_events_queue, &response)
         .await?;
     info!(
-        "{}: Sent ad hoc update to control plane, message_id: {}",
-        event_id, msg_id
+        "{}.{}: Sent ad hoc update to control plane, message_id: {}",
+        org_inst.org_id, org_inst.inst_id, msg_id
     );
     Ok(())
 }

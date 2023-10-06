@@ -37,8 +37,7 @@ pub enum Event {
 #[derive(Debug, Serialize, Deserialize)]
 pub struct StateToControlPlane {
     pub data_plane_id: String, // unique identifier for the data plane
-    pub event_id: String,      // pass through from event that triggered a data plane action
-    pub event_type: Event,     // pass through from event that triggered a data plane action
+    pub event_type: Event,
     pub org_id: String,
     pub inst_id: String,
     pub spec: Option<CoreDBSpec>,

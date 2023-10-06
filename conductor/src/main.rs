@@ -94,10 +94,6 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
             .conductor_total
             .add(&opentelemetry::Context::current(), 1, &[]);
 
-        // workspace.org.entity_type.inst
-        // workspace and entity type are not used by control-plane, but are required by EventType schema
-        let entity_type_ph = format!("NA.{}.NA.{}", org_id, instance_id);
-
         // note: messages are recycled on purpose
         // but absurdly high read_ct means its probably never going to get processed
         if read_msg.read_ct >= max_read_ct {
@@ -116,7 +112,6 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                 data_plane_id: read_msg.message.data_plane_id,
                 org_id: read_msg.message.org_id,
                 inst_id: read_msg.message.inst_id,
-                event_id: entity_type_ph,
                 event_type: Event::Error,
                 spec: None,
                 status: None,
@@ -383,7 +378,6 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                 };
                 types::StateToControlPlane {
                     data_plane_id: read_msg.message.data_plane_id,
-                    event_id: entity_type_ph,
                     org_id: read_msg.message.org_id,
                     inst_id: read_msg.message.inst_id,
                     event_type: report_event,
@@ -412,7 +406,6 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                 // report state
                 types::StateToControlPlane {
                     data_plane_id: read_msg.message.data_plane_id,
-                    event_id: entity_type_ph,
                     org_id: read_msg.message.org_id,
                     inst_id: read_msg.message.inst_id,
                     event_type: Event::Deleted,
@@ -473,7 +466,6 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
 
                 types::StateToControlPlane {
                     data_plane_id: read_msg.message.data_plane_id,
-                    event_id: entity_type_ph,
                     org_id: read_msg.message.org_id,
                     inst_id: read_msg.message.inst_id,
                     event_type: Event::Restarted,

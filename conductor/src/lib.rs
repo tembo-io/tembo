@@ -87,40 +87,6 @@ pub fn get_org_inst_id(coredb: &CoreDB) -> Result<types::OrgInstId, Box<Conducto
     })
 }
 
-pub fn get_event_id_from_coredb(coredb: &CoreDB) -> Result<String, Box<ConductorError>> {
-    let annotations = match coredb.metadata.annotations.as_ref() {
-        None => {
-            return Err(Box::new(ConductorError::EventIDFormat));
-        }
-        Some(annotations) => annotations,
-    };
-    let org_id = match annotations.get("tembo.io/org_id") {
-        Some(org_id) => org_id.to_string(),
-        None => {
-            return Err(Box::new(ConductorError::EventIDFormat));
-        }
-    };
-    let instance_id = match annotations.get("tembo.io/instance_id") {
-        Some(instance_id) => instance_id.to_string(),
-        None => {
-            return Err(Box::new(ConductorError::EventIDFormat));
-        }
-    };
-    let workspace_id = match annotations.get("tembo.io/workspace_id") {
-        Some(workspace_id) => workspace_id.to_string(),
-        // Left over-concept, to be removed
-        None => "NA".to_string(),
-    };
-    let entity_name = match annotations.get("tembo.io/entity_name") {
-        Some(entity_name) => entity_name.to_string(),
-        None => {
-            return Err(Box::new(ConductorError::EventIDFormat));
-        }
-    };
-    let event_id = [workspace_id, org_id, entity_name, instance_id].join(".");
-    Ok(event_id)
-}
-
 pub async fn get_all(client: Client, namespace: &str) -> Vec<CoreDB> {
     let coredb_api: Api<CoreDB> = Api::namespaced(client, namespace);
     let pg_list = coredb_api
