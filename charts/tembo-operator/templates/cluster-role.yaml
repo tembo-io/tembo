@@ -26,7 +26,7 @@ rules:
     resources: ["roles", "rolebindings"]
     verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
   - apiGroups: ["traefik.containo.us"]
-    resources: ["ingressroutetcps", "ingressroutes", "middlewares"]
+    resources: ["ingressroutetcps", "ingressroutes", "middlewares", "middlewaretcps"]
     verbs: ["create", "get", "list", "patch", "update", "watch", "delete"]
   - apiGroups: ["postgresql.cnpg.io"]
     resources: ["clusters", "backups", "poolers", "scheduledbackups"]
