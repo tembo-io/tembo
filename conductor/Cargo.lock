@@ -819,13 +819,14 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "sqlx",
  "thiserror",
  "tokio",
 ]
 
 [[package]]
 name = "controller"
-version = "0.8.9"
+version = "0.8.10"
 dependencies = [
  "actix-web",
  "anyhow",

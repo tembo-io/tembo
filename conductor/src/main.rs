@@ -16,8 +16,8 @@ use opentelemetry::sdk::export::metrics::aggregation;
 use opentelemetry::sdk::metrics::{controllers, processors, selectors};
 use opentelemetry::{global, KeyValue};
 use pgmq::{Message, PGMQueueExt};
+use sqlx::error::Error;
 use std::env;
-use std::error::Error;
 use std::sync::{Arc, Mutex};
 use std::{thread, time};
 
@@ -35,7 +35,7 @@ const REQUEUE_VT_SEC_SHORT: i32 = 5;
 // that we would want to try again after awhile.
 const REQUEUE_VT_SEC_LONG: i32 = 300;
 
-async fn run(metrics: CustomMetrics) -> Result<(), Box<dyn std::error::Error>> {
+async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
     // Read connection info from environment variable
     let pg_conn_url =
         env::var("POSTGRES_QUEUE_CONNECTION").expect("POSTGRES_QUEUE_CONNECTION must be set");
@@ -516,7 +516,7 @@ async fn requeue_short(
     control_plane_events_queue: &str,
     queue: &PGMQueueExt,
     read_msg: &Message<CRUDevent>,
-) -> Result<(), Box<dyn Error>> {
+) -> Result<(), ConductorError> {
     let _ = queue
         .set_vt::<CRUDevent>(
             control_plane_events_queue,
@@ -562,10 +562,21 @@ async fn main() -> std::io::Result<()> {
     info!("Starting conductor");
     background_threads_locked.push(tokio::spawn({
         let custom_metrics_copy = custom_metrics.clone();
+
         async move {
             loop {
                 match run(custom_metrics_copy.clone()).await {
                     Ok(_) => {}
+                    Err(ConductorError::PgmqError(pgmq::errors::PgmqError::DatabaseError(
+                        Error::PoolTimedOut,
+                    ))) => {
+                        custom_metrics_copy.clone().conductor_errors.add(
+                            &opentelemetry::Context::current(),
+                            1,
+                            &[],
+                        );
+                        panic!("sqlx PoolTimedOut error -- forcing pod restart, error")
+                    }
                     Err(err) => {
                         custom_metrics_copy.clone().conductor_errors.add(
                             &opentelemetry::Context::current(),
