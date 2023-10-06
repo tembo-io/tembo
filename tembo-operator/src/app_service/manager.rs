@@ -3,8 +3,8 @@ use k8s_openapi::{
     api::{
         apps::v1::{Deployment, DeploymentSpec},
         core::v1::{
-            Container, ContainerPort, EnvVar, EnvVarSource, HTTPGetAction, PodSpec, PodTemplateSpec, Probe,
-            SecretKeySelector, SecurityContext, Service, ServicePort, ServiceSpec,
+            Capabilities, Container, ContainerPort, EnvVar, EnvVarSource, HTTPGetAction, PodSpec,
+            PodTemplateSpec, Probe, SecretKeySelector, SecurityContext, Service, ServicePort, ServiceSpec,
         },
     },
     apimachinery::pkg::{
@@ -182,9 +182,21 @@ fn generate_deployment(
         None => None,
     };
 
+    // https://tembo.io/docs/tembo-cloud/security/#tenant-isolation
+    // These configs are the same as CNPG configs
     let security_context = SecurityContext {
         run_as_user: Some(65534),
         allow_privilege_escalation: Some(false),
+        capabilities: Some(Capabilities {
+            drop: Some(vec!["ALL".to_string()]),
+            ..Capabilities::default()
+        }),
+        privileged: Some(false),
+        run_as_non_root: Some(true),
+        // This part maybe we disable if we need
+        // or we can mount ephemeral or persistent
+        // volumes if we need to write somewhere
+        read_only_root_filesystem: Some(true),
         ..SecurityContext::default()
     };
 
