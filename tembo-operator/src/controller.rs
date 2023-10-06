@@ -38,7 +38,7 @@ use kube::{
 use crate::{
     apis::postgres_parameters::PgConfig,
     extensions::{database_queries::list_config_params, reconcile_extensions},
-    ingress::{reconcile_extra_postgres_ing_route_tcp, reconcile_ip_allowlist_middleware},
+    ingress::reconcile_extra_postgres_ing_route_tcp,
     network_policies::reconcile_network_policies,
     postgres_exporter::reconcile_prom_configmap,
     trunk::{extensions_that_require_load, reconcile_trunk_configmap},
@@ -130,17 +130,9 @@ impl CoreDB {
         match std::env::var("DATA_PLANE_BASEDOMAIN") {
             Ok(basedomain) => {
                 debug!(
-                    "DATA_PLANE_BASEDOMAIN is set to {}, reconciling IngressRouteTCP and MiddlewareTCP for {}",
-                    basedomain, name.clone()
+                    "DATA_PLANE_BASEDOMAIN is set to {}, reconciling ingress route tcp",
+                    basedomain
                 );
-
-                let middleware_name = reconcile_ip_allowlist_middleware(self, ctx.clone())
-                    .await
-                    .map_err(|e| {
-                        error!("Error reconciling MiddlewareTCP for {}: {:?}", name, e);
-                        Action::requeue(Duration::from_secs(300))
-                    })?;
-
                 let service_name_read_write = format!("{}-rw", self.name_any().as_str());
                 reconcile_postgres_ing_route_tcp(
                     self,
@@ -150,7 +142,6 @@ impl CoreDB {
                     ns.as_str(),
                     service_name_read_write.as_str(),
                     IntOrString::Int(5432),
-                    vec![middleware_name.clone()],
                 )
                 .await
                 .map_err(|e| {
@@ -160,14 +151,12 @@ impl CoreDB {
                     // IngressRouteTCP does not have expected errors during reconciliation.
                     Action::requeue(Duration::from_secs(300))
                 })?;
-
                 reconcile_extra_postgres_ing_route_tcp(
                     self,
                     ctx.clone(),
                     ns.as_str(),
                     service_name_read_write.as_str(),
                     IntOrString::Int(5432),
-                    vec![middleware_name],
                 )
                 .await
                 .map_err(|e| {

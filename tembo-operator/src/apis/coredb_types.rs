@@ -160,10 +160,6 @@ pub struct CoreDBSpec {
 
     pub extra_domains_rw: Option<Vec<String>>,
 
-    /// List of IPv4 CIDR blocks
-    #[serde(rename = "ipAllowList")]
-    pub ip_allow_list: Option<Vec<String>>,
-
     pub stack: Option<Stack>,
     // dynamic runtime configs
     pub runtime_config: Option<Vec<PgConfig>>,

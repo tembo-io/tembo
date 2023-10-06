@@ -27,6 +27,7 @@ mod test {
         psql::PsqlOutput,
         Context, State,
     };
+    use futures_util::stream::StreamExt;
     use k8s_openapi::{
         api::{
             apps::v1::Deployment,
@@ -1428,10 +1429,6 @@ mod test {
         assert_eq!(&service_name, format!("{}-rw", name).as_str());
         let matcher = ing_route_tcp.spec.routes[0].r#match.clone();
         assert_eq!(matcher, "HostSNI(`new-domain.com`)");
-
-        // Check that a middleware was applied
-        let middlewares = ing_route_tcp.spec.routes[0].middlewares.clone().unwrap();
-        assert_eq!(middlewares.len(), 1);
 
         let coredb_json = serde_json::json!({
             "apiVersion": API_VERSION,
