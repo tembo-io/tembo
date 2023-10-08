@@ -28,6 +28,7 @@ use crate::{
             ClusterReplicationSlotsHighAvailability, ClusterResources, ClusterServiceAccountTemplate,
             ClusterServiceAccountTemplateMetadata, ClusterSpec, ClusterStorage, ClusterSuperuserSecret,
         },
+        poolers::{Pooler, PoolerCluster, PoolerPgbouncer, PoolerSpec, PoolerType},
         scheduledbackups::{
             ScheduledBackup, ScheduledBackupBackupOwnerReference, ScheduledBackupCluster, ScheduledBackupSpec,
         },
@@ -42,7 +43,7 @@ use crate::{
 use chrono::{DateTime, NaiveDateTime, Offset};
 use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
 use kube::{
-    api::{Patch, PatchParams},
+    api::{DeleteParams, Patch, PatchParams},
     runtime::controller::Action,
     Api, Resource, ResourceExt,
 };
@@ -919,6 +920,73 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
         return Err(Action::requeue(Duration::from_secs(10)));
     }
 
+    // Reconcile Pooler resource
+    reconcile_pooler(cdb, ctx.clone()).await?;
+
+    Ok(())
+}
+
+// Reconcile a Pooler
+async fn reconcile_pooler(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {
+    let client = ctx.client.clone();
+    let name = cdb.name_any() + "-pooler";
+    let namespace = cdb.namespace().unwrap();
+    let pooler_api: Api<Pooler> = Api::namespaced(client.clone(), namespace.as_str());
+
+    let owner_reference = cdb.controller_owner_ref(&()).unwrap();
+
+    // If pooler is enabled, create or update
+    if cdb.spec.connectionPooler.enabled {
+        let pooler = Pooler {
+            metadata: ObjectMeta {
+                name: Some(name.clone()),
+                namespace: Some(namespace.clone()),
+                owner_references: Some(vec![owner_reference]),
+                ..ObjectMeta::default()
+            },
+            spec: PoolerSpec {
+                cluster: PoolerCluster { name: cdb.name_any() },
+                deployment_strategy: None,
+                instances: 1,
+                monitoring: None,
+                pgbouncer: PoolerPgbouncer {
+                    auth_query: None,
+                    auth_query_secret: None,
+                    parameters: cdb.spec.connectionPooler.pooler.parameters.clone(),
+                    paused: None,
+                    pg_hba: None,
+                    pool_mode: cdb.spec.connectionPooler.pooler.poolMode.clone(),
+                },
+                template: None,
+                r#type: PoolerType::Rw,
+            },
+            status: None,
+        };
+
+        debug!("Patching Pooler {name}");
+        let ps = PatchParams::apply("cntrlr");
+        let _o = pooler_api
+            .patch(&name, &ps, &Patch::Apply(&pooler))
+            .await
+            .map_err(|e| {
+                error!("Error patching Pooler: {}", e);
+                Action::requeue(Duration::from_secs(300))
+            })?;
+    } else {
+        // If pooler is disabled and exists, delete
+        let pooler = pooler_api.get(&name).await;
+        if pooler.is_err() {
+            debug!("Pooler {name} does not exist. Skipping deletion");
+            return Ok(());
+        } else {
+            debug!("Found pooler {name} and pooler is disabled. Deleting Pooler {name}");
+            let dp = DeleteParams::default();
+            pooler_api.delete(&name, &dp).await.map_err(|e| {
+                error!("Error deleting Pooler: {}", e);
+                Action::requeue(Duration::from_secs(300))
+            })?;
+        }
+    }
     Ok(())
 }
 

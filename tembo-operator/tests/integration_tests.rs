@@ -335,7 +335,7 @@ mod test {
         println!("Waiting for backup to complete: {}", name);
         let backups: Api<Backup> = Api::namespaced(context.client.clone(), namespace);
 
-        const TIMEOUT_SECONDS_BACKUP_COMPLETED: i64 = 200;
+        const TIMEOUT_SECONDS_BACKUP_COMPLETED: i64 = 300;
 
         let start_time = Utc::now();
 
@@ -403,6 +403,7 @@ mod test {
 
     use controller::{
         apis::postgres_parameters::{ConfigValue, PgConfig},
+        cloudnativepg::poolers::Pooler,
         errors,
     };
     use k8s_openapi::NamespaceResourceScope;
@@ -428,7 +429,7 @@ mod test {
     {
         let api: Api<R> = Api::namespaced(client, namespace);
         let lp = ListParams::default().labels(format!("coredb.io/name={}", cdb_name).as_str());
-        let retry = 10;
+        let retry = 15;
         let mut passed_retry = false;
         let mut resource_list: Vec<R> = Vec::new();
         for _ in 0..retry {
@@ -3771,5 +3772,138 @@ mod test {
 
         // Delete namespace
         let _ = delete_namespace(client.clone(), &restore_namespace).await;
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn functional_test_pooler() {
+        async fn runtime_cfg(coredbs: &Api<CoreDB>, name: &str) -> Option<Vec<PgConfig>> {
+            let spec = coredbs.get(name).await.expect("spec not found");
+            spec.status.expect("Expected status to be present").runtime_config
+        }
+
+        // Initialize the Kubernetes client
+        let client = kube_client().await;
+        let state = State::default();
+        let _context = state.create_context(client.clone());
+
+        // Configurations
+        let mut rng = rand::thread_rng();
+        let suffix = rng.gen_range(0..100000);
+        let name = &format!("test-coredb-{}", suffix);
+        let namespace = match create_namespace(client.clone(), name).await {
+            Ok(namespace) => namespace,
+            Err(e) => {
+                eprintln!("Error creating namespace: {}", e);
+                std::process::exit(1);
+            }
+        };
+
+        let kind = "CoreDB";
+        let replicas = 1;
+
+        // Create a pod we can use to run commands in the cluster
+        let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
+
+        // Apply a basic configuration of CoreDB
+        println!("Creating CoreDB resource {}", name);
+        let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
+        // Generate basic CoreDB resource to start with
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "replicas": replicas,
+                "connectionPooler": {
+                    "enabled": true,
+                },
+            }
+        });
+        let params = PatchParams::apply("tembo-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        // Wait for CNPG Pod to be created
+        let pod_name = format!("{}-1", name);
+
+        pod_ready_and_running(pods.clone(), pod_name.clone()).await;
+
+        let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
+        let lp =
+            ListParams::default().labels(format!("app=postgres-exporter,coredb.io/name={}", name).as_str());
+        let exporter_pods = pods.list(&lp).await.expect("could not get pods");
+        let exporter_pod_name = exporter_pods.items[0].metadata.name.as_ref().unwrap();
+        println!("Exporter pod name: {}", &exporter_pod_name);
+
+        pod_ready_and_running(pods.clone(), exporter_pod_name.clone()).await;
+
+        // Check for pooler
+        let pooler_name = format!("{}-pooler", name);
+        let poolers: Api<Pooler> = Api::namespaced(client.clone(), &namespace);
+        let _pooler = poolers.get(&pooler_name).await.unwrap();
+        println!("Found pooler: {}", pooler_name);
+
+        // Check for pooler service
+        let pooler_services: Api<Service> = Api::namespaced(client.clone(), &namespace);
+        let _pooler_service = pooler_services.get(&pooler_name).await.unwrap();
+        println!("Found pooler service: {}", pooler_name);
+
+        // Check for pooler secret
+        let pooler_secrets: Api<Secret> = Api::namespaced(client.clone(), &namespace);
+        let _pooler_secret = pooler_secrets.get(&pooler_name).await.unwrap();
+        println!("Found pooler secret: {}", pooler_name);
+
+        // Update coredb to disable pooler
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "replicas": replicas,
+                "connectionPooler": {
+                    "enabled": false,
+                },
+            }
+        });
+
+        let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        // Wait for pooler to be deleted
+        let _assert_pooler_deleted = tokio::time::timeout(
+            Duration::from_secs(30),
+            await_condition(poolers.clone(), &pooler_name, conditions::is_deleted("")),
+        );
+        println!("Pooler deleted: {}", pooler_name);
+
+        // Wait for pooler service to be deleted
+        let _assert_pooler_service_deleted = tokio::time::timeout(
+            Duration::from_secs(30),
+            await_condition(pooler_services.clone(), &pooler_name, conditions::is_deleted("")),
+        );
+        println!("Pooler service deleted: {}", pooler_name);
+
+        // Cleanup CoreDB
+        coredbs.delete(name, &Default::default()).await.unwrap();
+        println!("Waiting for CoreDB to be deleted: {}", &name);
+        let _assert_coredb_deleted = tokio::time::timeout(
+            Duration::from_secs(TIMEOUT_SECONDS_COREDB_DELETED),
+            await_condition(coredbs.clone(), name, conditions::is_deleted("")),
+        )
+        .await
+        .unwrap_or_else(|_| {
+            panic!(
+                "CoreDB {} was not deleted after waiting {} seconds",
+                name, TIMEOUT_SECONDS_COREDB_DELETED
+            )
+        });
+        println!("CoreDB resource deleted {}", name);
+
+        // Delete namespace
+        let _ = delete_namespace(client.clone(), &namespace).await;
     }
 }

@@ -13,6 +13,7 @@ use k8s_openapi::{
     apimachinery::pkg::{api::resource::Quantity, apis::meta::v1::ObjectMeta},
 };
 
+use crate::cloudnativepg::poolers::PoolerPgbouncerPoolMode;
 use chrono::{DateTime, Utc};
 use kube::CustomResource;
 use schemars::JsonSchema;
@@ -102,6 +103,24 @@ pub struct Restore {
     pub s3_credentials: Option<S3Credentials>,
 }
 
+#[derive(Deserialize, Serialize, Clone, Debug, JsonSchema, Default)]
+#[allow(non_snake_case)]
+pub struct ConnectionPooler {
+    #[serde(default = "defaults::default_conn_pooler_enabled")]
+    pub enabled: bool,
+    #[serde(default = "defaults::default_pgbouncer")]
+    pub pooler: PgBouncer,
+}
+
+#[derive(Deserialize, Serialize, Clone, Debug, JsonSchema, Default)]
+#[allow(non_snake_case)]
+pub struct PgBouncer {
+    pub poolMode: PoolerPgbouncerPoolMode,
+    // Valid parameter values can be found at https://www.pgbouncer.org/config.html
+    pub parameters: Option<BTreeMap<String, String>>,
+    pub resources: Option<ResourceRequirements>,
+}
+
 /// Generate the Kubernetes wrapper struct `CoreDB` from our Spec and Status struct
 ///
 /// This provides a hook for generating the CRD yaml (in crdgen.rs)
@@ -165,6 +184,9 @@ pub struct CoreDBSpec {
     pub runtime_config: Option<Vec<PgConfig>>,
     // configuration overrides, typically defined by the user
     pub override_configs: Option<Vec<PgConfig>>,
+    // Connection pooler configuration
+    #[serde(default = "defaults::default_conn_pooler")]
+    pub connectionPooler: ConnectionPooler,
     #[serde(rename = "appServices")]
     pub app_services: Option<Vec<AppService>>,
 
