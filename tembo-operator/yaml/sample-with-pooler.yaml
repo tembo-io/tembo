@@ -22,7 +22,7 @@ spec:
       value: 'pg_cron,pg_stat_statements'
     - name: pg_stat_statements.track
       value: top
-  connPooler:
+  connectionPooler:
     enabled: true
     pooler:
       poolMode: transaction
@@ -30,4 +30,10 @@ spec:
       parameters:
         default_pool_size: "50"
         max_client_conn: "5000"
-      resources: ~
+      resources:
+        limits:
+          cpu: 200m
+          memory: 256Mi
+        requests:
+          cpu: 100m
+          memory: 128Mi

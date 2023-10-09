@@ -109,7 +109,7 @@ pub struct PoolerTemplateMetadata {
     pub labels: Option<BTreeMap<String, String>>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema, Default)]
 pub struct PoolerTemplateSpec {
     #[serde(
         default,
@@ -568,7 +568,7 @@ pub struct PoolerTemplateSpecAffinityPodAntiAffinityRequiredDuringSchedulingIgno
     pub values: Option<Vec<String>>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema, Default)]
 pub struct PoolerTemplateSpecContainers {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub args: Option<Vec<String>>,

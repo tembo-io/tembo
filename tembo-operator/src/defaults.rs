@@ -133,9 +133,13 @@ pub fn default_conn_pooler_enabled() -> bool {
     false
 }
 
+pub fn default_pool_mode() -> PoolerPgbouncerPoolMode {
+    PoolerPgbouncerPoolMode::Transaction
+}
+
 pub fn default_pgbouncer() -> PgBouncer {
     PgBouncer {
-        poolMode: PoolerPgbouncerPoolMode::Transaction,
+        poolMode: default_pool_mode(),
         parameters: None,
         // TODO(ianstanton): Add some sensible defaults for pgbouncer resources
         resources: None,

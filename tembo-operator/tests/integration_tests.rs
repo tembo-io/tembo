@@ -3801,6 +3801,16 @@ mod test {
 
         let kind = "CoreDB";
         let replicas = 1;
+        let resources = serde_json::json!({
+            "limits": {
+                "cpu": "200m",
+                "memory": "256Mi"
+            },
+            "requests": {
+                "cpu": "100m",
+                "memory": "128Mi"
+            }
+        });
 
         // Create a pod we can use to run commands in the cluster
         let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
@@ -3819,6 +3829,9 @@ mod test {
                 "replicas": replicas,
                 "connectionPooler": {
                     "enabled": true,
+                    "pooler": {
+                        "resources": resources,
+                    },
                 },
             }
         });
@@ -3855,6 +3868,21 @@ mod test {
         let pooler_secrets: Api<Secret> = Api::namespaced(client.clone(), &namespace);
         let _pooler_secret = pooler_secrets.get(&pooler_name).await.unwrap();
         println!("Found pooler secret: {}", pooler_name);
+
+        // Check for pooler deployment
+        let pooler_deployments: Api<Deployment> = Api::namespaced(client.clone(), &namespace);
+        let pooler_deployment = pooler_deployments.get(&pooler_name).await.unwrap();
+        println!("Found pooler deployment: {}", pooler_name);
+
+        // Check pooler_deployment for correct resources
+        let pooler_deployment_resources_json = serde_json::to_value(
+            pooler_deployment.spec.unwrap().template.spec.unwrap().containers[0]
+                .resources
+                .as_ref()
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(pooler_deployment_resources_json, resources);
 
         // Update coredb to disable pooler
         let coredb_json = serde_json::json!({
