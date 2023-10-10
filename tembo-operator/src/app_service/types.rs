@@ -28,8 +28,9 @@ pub struct AppService {
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, JsonSchema)]
 pub struct EnvVar {
     pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<String>,
-    #[serde(rename = "valueFromPlatform")]
+    #[serde(rename = "valueFromPlatform", skip_serializing_if = "Option::is_none")]
     pub value_from_platform: Option<EnvVarRef>,
 }
 
