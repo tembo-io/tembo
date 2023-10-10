@@ -20,6 +20,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, BTreeSet};
 use tracing::error;
+use utoipa::ToSchema;
 
 #[derive(Clone, Default, Debug, Serialize, Deserialize, JsonSchema)]
 pub struct Stack {
@@ -103,7 +104,7 @@ pub struct Restore {
     pub s3_credentials: Option<S3Credentials>,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, JsonSchema, Default)]
+#[derive(Deserialize, Serialize, Clone, Debug, JsonSchema, ToSchema, Default)]
 #[allow(non_snake_case)]
 pub struct ConnectionPooler {
     #[serde(default = "defaults::default_conn_pooler_enabled")]
@@ -112,7 +113,7 @@ pub struct ConnectionPooler {
     pub pooler: PgBouncer,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, JsonSchema, Default)]
+#[derive(Deserialize, Serialize, Clone, Debug, JsonSchema, ToSchema, Default)]
 #[allow(non_snake_case)]
 pub struct PgBouncer {
     #[serde(default = "defaults::default_pool_mode")]
