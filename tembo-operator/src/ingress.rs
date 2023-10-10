@@ -464,21 +464,18 @@ fn generate_ip_allow_list_middleware_tcp(cdb: &CoreDB) -> MiddlewareTCP {
         Some(ips) => ips,
     };
 
-    // Validate each IP address or CIDR block against the regex
-    let cidr_regex = Regex::new(VALID_IPV4_CIDR_BLOCK).expect("Failed to compile regex for IPv4 CIDR block");
-    let mut valid_ips = Vec::new();
-    for ip in source_range.iter() {
-        if !cidr_regex.is_match(ip) {
+    let mut valid_ips = valid_cidrs(&source_range);
+
+    for ip in &source_range {
+        if !valid_ips.contains(ip) {
             error!(
                 "Invalid IP address or CIDR block '{}' on DB {}, skipping",
                 ip,
                 cdb.name_any()
             );
-        } else {
-            valid_ips.push(ip.clone());
         }
     }
-    valid_ips.sort();
+
     if valid_ips.is_empty() {
         // If IP allow list is not specified, allow all IPs
         debug!(
@@ -504,6 +501,20 @@ fn generate_ip_allow_list_middleware_tcp(cdb: &CoreDB) -> MiddlewareTCP {
             ..Default::default()
         },
     }
+}
+
+pub fn valid_cidrs(source_range: &[String]) -> Vec<String> {
+    // Validate each IP address or CIDR block against the regex
+    let cidr_regex = Regex::new(VALID_IPV4_CIDR_BLOCK).expect("Failed to compile regex for IPv4 CIDR block");
+    let mut valid_ips = Vec::new();
+    for ip in source_range.iter() {
+        if !cidr_regex.is_match(ip) {
+        } else {
+            valid_ips.push(ip.clone());
+        }
+    }
+    valid_ips.sort();
+    valid_ips
 }
 
 

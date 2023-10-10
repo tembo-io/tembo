@@ -22,7 +22,7 @@ pub mod errors;
 pub mod cloudnativepg;
 mod deployment_postgres_exporter;
 #[cfg(test)] pub mod fixtures;
-mod ingress;
+pub mod ingress;
 pub mod traefik;
 pub use traefik::ingress_route_crd;
 mod network_policies;
