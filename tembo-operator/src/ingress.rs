@@ -113,14 +113,14 @@ async fn apply_ingress_route_tcp(
     {
         Ok(_) => {
             info!(
-                "Updated postgres read and write IngressRouteTCP {}.{}",
+                "Updated postgres IngressRouteTCP {}.{}",
                 ingress_route_tcp_name.clone(),
                 namespace
             );
         }
         Err(e) => {
             error!(
-                "Failed to update postgres read and write IngressRouteTCP {}.{}: {}",
+                "Failed to update postgres IngressRouteTCP {}.{}: {}",
                 ingress_route_tcp_name, namespace, e
             );
             return Err(OperatorError::IngressRouteTcpError);
@@ -188,7 +188,8 @@ pub async fn reconcile_postgres_ing_route_tcp(
     subdomain: &str,
     basedomain: &str,
     namespace: &str,
-    service_name_read_write: &str,
+    ingress_name_prefix: &str,
+    service_name: &str,
     port: IntOrString,
 ) -> Result<(), OperatorError> {
     let client = ctx.client.clone();
@@ -200,25 +201,21 @@ pub async fn reconcile_postgres_ing_route_tcp(
     // After CNPG migration is done, this can look for only ingress route tcp with the correct owner reference
     let ingress_route_tcps = ingress_route_tcp_api.list(&Default::default()).await?;
 
-    // Prefix by resource name allows multiple per namespace
-    let ingress_route_tcp_name_prefix_rw = format!("{}-rw-", cdb.name_any());
-    let ingress_route_tcp_name_prefix_rw = ingress_route_tcp_name_prefix_rw.as_str();
-
     // We will save information about the existing ingress route tcp(s) in these vectors
     let mut present_matchers_list: Vec<String> = vec![];
     let mut present_ing_route_tcp_names_list: Vec<String> = vec![];
 
     // Check for all existing IngressRouteTCPs in this namespace
-    // Filter out any that are not for this DB or are not read-write
+    // Filter out any that are not for this DB or do not have the correct prefix
     for ingress_route_tcp in ingress_route_tcps {
         let ingress_route_tcp_name = match ingress_route_tcp.metadata.name.clone() {
             Some(ingress_route_tcp_name) => {
-                if !(ingress_route_tcp_name.starts_with(ingress_route_tcp_name_prefix_rw)
+                if !(ingress_route_tcp_name.starts_with(ingress_name_prefix)
                     || ingress_route_tcp_name == cdb.name_any())
                 {
                     debug!(
-                        "Skipping non postgres-rw ingress route tcp: {}",
-                        ingress_route_tcp_name
+                        "Skipping ingress route tcp without prefix {}: {}",
+                        ingress_name_prefix, ingress_route_tcp_name
                     );
                     continue;
                 }
@@ -233,7 +230,7 @@ pub async fn reconcile_postgres_ing_route_tcp(
             }
         };
         debug!(
-            "Detected ingress route tcp read write endpoint {}.{}",
+            "Detected ingress route tcp endpoint {}.{}",
             ingress_route_tcp_name, namespace
         );
         // Save list of names so we can pick a name that doesn't exist,
@@ -264,11 +261,11 @@ pub async fn reconcile_postgres_ing_route_tcp(
         present_matchers_list.push(matcher_actual.clone());
 
         // Check if either the service name or port are mismatched
-        if !(service_name_actual == service_name_read_write && service_port_actual == port) {
+        if !(service_name_actual == service_name && service_port_actual == port) {
             // This situation should only occur when the service name or port is changed, for example during cut-over from
             // CoreDB operator managing the service to CNPG managing the service.
             warn!(
-                "Postgres read and write IngressRouteTCP {}.{}, does not match the service name or port. Updating service or port and leaving the match rule the same.",
+                "Postgres IngressRouteTCP {}.{}, does not match the service name or port. Updating service or port and leaving the match rule the same.",
                 ingress_route_tcp_name, namespace
             );
 
@@ -279,7 +276,7 @@ pub async fn reconcile_postgres_ing_route_tcp(
                 namespace.to_string(),
                 owner_reference.clone(),
                 matcher_actual,
-                service_name_read_write.to_string(),
+                service_name.to_string(),
                 port.clone(),
             );
             // Apply this ingress route tcp
@@ -305,10 +302,10 @@ pub async fn reconcile_postgres_ing_route_tcp(
 
         // Pick a name for a new ingress route tcp that doesn't already exist
         let mut index = 0;
-        let mut ingress_route_tcp_name_new = format!("{}{}", ingress_route_tcp_name_prefix_rw, index);
+        let mut ingress_route_tcp_name_new = format!("{}{}", ingress_name_prefix, index);
         while present_ing_route_tcp_names_list.contains(&ingress_route_tcp_name_new) {
             index += 1;
-            ingress_route_tcp_name_new = format!("{}{}", ingress_route_tcp_name_prefix_rw, index);
+            ingress_route_tcp_name_new = format!("{}{}", ingress_name_prefix, index);
         }
         let ingress_route_tcp_name_new = ingress_route_tcp_name_new;
 
@@ -317,7 +314,7 @@ pub async fn reconcile_postgres_ing_route_tcp(
             namespace.to_string(),
             owner_reference.clone(),
             newest_matcher.clone(),
-            service_name_read_write.to_string(),
+            service_name.to_string(),
             port.clone(),
         );
         // Apply this ingress route tcp

@@ -3884,6 +3884,14 @@ mod test {
         .unwrap();
         assert_eq!(pooler_deployment_resources_json, resources);
 
+        // Check for pooler IngressRouteTCP
+        let pooler_ingressroutetcps: Api<IngressRouteTCP> = Api::namespaced(client.clone(), &namespace);
+        let pooler_ingressroutetcp = pooler_ingressroutetcps
+            .get(format!("{pooler_name}-0").as_str())
+            .await
+            .unwrap();
+        println!("Found pooler IngressRouteTCP: {pooler_name}-0");
+
         // Update coredb to disable pooler
         let coredb_json = serde_json::json!({
             "apiVersion": API_VERSION,
