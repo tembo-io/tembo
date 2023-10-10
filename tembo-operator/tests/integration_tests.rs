@@ -21,13 +21,10 @@ mod test {
         apis::coredb_types::CoreDB,
         cloudnativepg::{backups::Backup, clusters::Cluster},
         defaults::{default_resources, default_storage},
-        ingress_route_crd::IngressRoute,
-        ingress_route_tcp_crd::IngressRouteTCP,
         is_pod_ready,
         psql::PsqlOutput,
         Context, State,
     };
-    use futures_util::stream::StreamExt;
     use k8s_openapi::{
         api::{
             apps::v1::Deployment,
@@ -405,6 +402,8 @@ mod test {
         apis::postgres_parameters::{ConfigValue, PgConfig},
         cloudnativepg::poolers::Pooler,
         errors,
+        ingress_route_crd::IngressRoute,
+        traefik::ingress_route_tcp_crd::IngressRouteTCP,
     };
     use k8s_openapi::NamespaceResourceScope;
     use serde::{de::DeserializeOwned, Deserialize};
@@ -1430,6 +1429,10 @@ mod test {
         assert_eq!(&service_name, format!("{}-rw", name).as_str());
         let matcher = ing_route_tcp.spec.routes[0].r#match.clone();
         assert_eq!(matcher, "HostSNI(`new-domain.com`)");
+
+        // Check that a middleware was applied
+        let middlewares = ing_route_tcp.spec.routes[0].middlewares.clone().unwrap();
+        assert_eq!(middlewares.len(), 1);
 
         let coredb_json = serde_json::json!({
             "apiVersion": API_VERSION,
@@ -3886,14 +3889,14 @@ mod test {
 
         // Check for pooler IngressRouteTCP
         let pooler_ingressroutetcps: Api<IngressRouteTCP> = Api::namespaced(client.clone(), &namespace);
-        let pooler_ingressroutetcp = pooler_ingressroutetcps
+        let _pooler_ingressroutetcp = pooler_ingressroutetcps
             .get(format!("{pooler_name}-0").as_str())
             .await
             .unwrap();
         println!("Found pooler IngressRouteTCP: {pooler_name}-0");
 
         // Update coredb to disable pooler
-        let coredb_json = serde_json::json!({
+        let _coredb_json = serde_json::json!({
             "apiVersion": API_VERSION,
             "kind": kind,
             "metadata": {

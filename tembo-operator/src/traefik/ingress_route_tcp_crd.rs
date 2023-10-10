@@ -45,7 +45,7 @@ pub struct IngressRouteTCPRoutes {
 }
 
 /// ObjectReference is a generic reference to a Traefik resource.
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct IngressRouteTCPRoutesMiddlewares {
     /// Name defines the name of the referenced Traefik resource.
     pub name: String,

@@ -24,7 +24,7 @@ mod deployment_postgres_exporter;
 #[cfg(test)] pub mod fixtures;
 mod ingress;
 pub mod traefik;
-pub use traefik::{ingress_route_crd, ingress_route_tcp_crd};
+pub use traefik::ingress_route_crd;
 mod network_policies;
 pub mod psql;
 mod rbac;
