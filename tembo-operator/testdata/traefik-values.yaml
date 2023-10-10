@@ -1,4 +1,7 @@
 image:
+  # This should exactly match the CRD version until
+  # Traefik v3 is released, because CRD is subject
+  # to breaking changes until it's released.
   tag: v3.0.0-beta2
 logs:
   general:

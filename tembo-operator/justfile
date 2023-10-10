@@ -18,6 +18,8 @@ install-calico:
 install-traefik:
 	kubectl create namespace traefik || true
 	helm upgrade --install --namespace=traefik --version=20.8.0 --values=./testdata/traefik-values.yaml traefik traefik/traefik
+	# https://github.com/traefik/traefik-helm-chart/issues/757#issuecomment-1753995542
+	kubectl apply -f https://raw.githubusercontent.com/traefik/traefik/v3.0.0-beta2/docs/content/reference/dynamic-configuration/kubernetes-crd-definition-v1.yml
 
 install-kube-prometheus-stack:
 	kubectl create namespace monitoring || true
@@ -70,7 +72,7 @@ enable-cnpg-default-namespace:
 connect-test-db:
 	echo "Please include a line in your /etc/hosts file: "
 	echo "127.0.0.1 test-coredb.localhost"
-	psql "postgres://postgres:$(kubectl get secrets -o json test-coredb-connection | jq -r '.data.password' | base64 --decode)@test-coredb.localhost:5432"
+	psql "postgres://postgres:$(kubectl get secrets -o json test-coredb-connection | jq -r '.data.password' | base64 --decode)@test-coredb.localhost:5432?sslmode=require"
 
 
 update-helm-repos:
