@@ -504,7 +504,7 @@
           "color": {
             "mode": "thresholds"
           },
-          "decimals": 2,
+          "decimals": 4,
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
