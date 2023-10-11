@@ -7,6 +7,7 @@ use kube::CustomResource;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use utoipa::ToSchema;
 
 #[derive(CustomResource, Serialize, Deserialize, Clone, Debug, JsonSchema)]
 #[kube(
@@ -84,7 +85,7 @@ pub struct PoolerPgbouncerAuthQuerySecret {
     pub name: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema, ToSchema, Default)]
 pub enum PoolerPgbouncerPoolMode {
     #[serde(rename = "session")]
     Session,
@@ -963,7 +964,7 @@ pub struct PoolerTemplateSpecContainersResizePolicy {
     pub restart_policy: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema, ToSchema)]
 pub struct PoolerTemplateSpecContainersResources {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub claims: Option<Vec<PoolerTemplateSpecContainersResourcesClaims>>,
@@ -973,7 +974,7 @@ pub struct PoolerTemplateSpecContainersResources {
     pub requests: Option<BTreeMap<String, IntOrString>>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema, ToSchema)]
 pub struct PoolerTemplateSpecContainersResourcesClaims {
     pub name: String,
 }
