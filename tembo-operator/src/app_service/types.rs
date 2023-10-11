@@ -7,7 +7,6 @@ use utoipa::ToSchema;
 
 pub const COMPONENT_NAME: &str = "appService";
 
-
 // defines a app container
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, JsonSchema)]
 pub struct AppService {
@@ -22,7 +21,6 @@ pub struct AppService {
     pub routing: Option<Vec<Routing>>,
 }
 
-
 // Secrets are injected into the container as environment variables
 // ths allows users to map these secrets to environment variable of their choice
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, JsonSchema)]
@@ -33,7 +31,6 @@ pub struct EnvVar {
     #[serde(rename = "valueFromPlatform", skip_serializing_if = "Option::is_none")]
     pub value_from_platform: Option<EnvVarRef>,
 }
-
 
 // we will map these from secrets to env vars, if desired
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, JsonSchema)]
@@ -52,7 +49,6 @@ pub struct Routing {
     // provide name of the middleware resources to apply to this route
     pub middlewares: Option<Vec<String>>,
 }
-
 
 #[allow(non_snake_case)]
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, JsonSchema, PartialEq)]
@@ -76,7 +72,6 @@ pub struct Ingress {
     pub path: Option<String>,
 }
 
-
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, JsonSchema, PartialEq)]
 pub enum Middleware {
     #[serde(rename = "customRequestHeaders")]
@@ -90,7 +85,6 @@ pub struct HeaderConfig {
     pub config: BTreeMap<String, String>,
 }
 
-
 // source: https://github.com/kube-rs/kube/issues/844
 fn preserve_arbitrary(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
     let mut obj = schemars::schema::SchemaObject::default();
@@ -98,7 +92,6 @@ fn preserve_arbitrary(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::sc
         .insert("x-kubernetes-preserve-unknown-fields".into(), true.into());
     schemars::schema::Schema::Object(obj)
 }
-
 
 #[cfg(test)]
 mod tests {

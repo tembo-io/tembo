@@ -221,7 +221,6 @@ mod test {
             }
         };
 
-
         let httpclient = reqwest::Client::builder()
             .danger_accept_invalid_certs(true)
             .default_headers(headers_map)
@@ -253,7 +252,6 @@ mod test {
             url
         )))
     }
-
 
     async fn wait_until_psql_contains(
         context: Arc<Context>,
@@ -2997,7 +2995,6 @@ mod test {
         // One appService Services
         assert!(service_items.len() == 1);
 
-
         // send a request to postgres
         #[derive(Debug, Deserialize)]
         struct ApiResponse {
@@ -3083,7 +3080,6 @@ mod test {
             .unwrap();
         let body: ApiResponse = response.json().await.unwrap();
         assert_eq!(body.info.title, "PostgREST API");
-
 
         // Delete all of them
         let coredb_json = serde_json::json!({

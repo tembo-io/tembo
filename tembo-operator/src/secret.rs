@@ -99,7 +99,6 @@ fn secret_data(cdb: &CoreDB, ns: &str, password: String) -> BTreeMap<String, Byt
     // read only host
     let ro_host: String = format!("{}-ro.{}.svc.cluster.local", &cdb.name_any(), &ns);
 
-
     // encode and insert host into secret data
     let b64_host = b64_encode(&r_host);
     data.insert("host".to_owned(), b64_host);

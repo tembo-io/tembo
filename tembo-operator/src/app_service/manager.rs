@@ -21,7 +21,6 @@ use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 use tracing::{debug, error, warn};
 
-
 use super::{
     ingress::{generate_ingress_routes, reconcile_ingress},
     types::{AppService, EnvVarRef, Middleware, COMPONENT_NAME},
@@ -35,7 +34,6 @@ struct AppServiceResources {
     service: Option<Service>,
     ingress_routes: Option<Vec<IngressRouteRoutes>>,
 }
-
 
 // generates Kubernetes Deployment and Service templates for a AppService
 fn generate_resource(
@@ -66,7 +64,6 @@ fn generate_resource(
         ingress_routes,
     }
 }
-
 
 // templates the Kubernetes Service for an AppService
 fn generate_service(
@@ -118,7 +115,6 @@ fn generate_service(
         ..Service::default()
     }
 }
-
 
 // templates a single Kubernetes Deployment for an AppService
 fn generate_deployment(
@@ -300,7 +296,6 @@ fn generate_deployment(
     // combine the secret env vars and those provided in spec by user
     env_vars.extend(secret_envs);
 
-
     let pod_spec = PodSpec {
         containers: vec![Container {
             args: appsvc.args.clone(),
@@ -373,7 +368,6 @@ async fn get_appservice_services(
         .collect())
 }
 
-
 // determines AppService deployments
 pub fn to_delete(desired: Vec<String>, actual: Vec<String>) -> Option<Vec<String>> {
     let mut to_delete: Vec<String> = Vec::new();
@@ -439,7 +433,6 @@ async fn apply_resources(resources: Vec<AppServiceResources>, client: &Client, n
     }
     has_errors
 }
-
 
 pub async fn reconcile_app_services(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {
     let client = ctx.client.clone();

@@ -9,6 +9,8 @@ use crate::{
     stacks::types::Stack,
 };
 
+const DEFAULT_MAINTENANCE_WORK_MEM_MB: i32 = 64;
+
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, JsonSchema, PartialEq)]
 #[serde(rename_all = "lowercase")]
 pub enum ConfigEngine {
@@ -64,30 +66,83 @@ pub fn standard_config_engine(stack: &Stack) -> Vec<PgConfig> {
 
 pub fn olap_config_engine(stack: &Stack) -> Vec<PgConfig> {
     let sys_mem_mb = parse_memory(stack).expect("no memory values");
+    let sys_storage_gb = parse_storage(stack).expect("no storage values");
+    let vcpu = parse_cpu(stack);
 
     let shared_buffer_val_mb = standard_shared_buffers(sys_mem_mb);
     let max_connections: i32 = olap_max_connections(sys_mem_mb as i32);
     let work_mem = dynamic_work_mem(sys_mem_mb as i32, shared_buffer_val_mb, max_connections);
     let effective_cache_size_mb = dynamic_effective_cache_size_mb(sys_mem_mb as i32);
-
+    let maintenance_work_mem_mb = olap_maintenance_work_mem_mb(sys_mem_mb as i32);
+    let max_wal_size_gb: i32 = dynamic_max_wal_size(sys_storage_gb as i32);
+    let max_parallel_workers = olap_max_parallel_workers(vcpu);
+    let max_parallel_workers_per_gather = olap_max_parallel_workers_per_gather(vcpu);
+    let max_worker_processes = olap_max_worker_processes(vcpu);
     vec![
         PgConfig {
-            name: "shared_buffers".to_owned(),
-            value: ConfigValue::Single(format!("{shared_buffer_val_mb}MB")),
+            name: "effective_cache_size".to_owned(),
+            value: ConfigValue::Single(format!("{effective_cache_size_mb}MB")),
+        },
+        PgConfig {
+            name: "maintenance_work_mem".to_owned(),
+            value: ConfigValue::Single(format!("{maintenance_work_mem_mb}MB")),
         },
         PgConfig {
             name: "max_connections".to_owned(),
             value: ConfigValue::Single(max_connections.to_string()),
         },
         PgConfig {
+            name: "max_parallel_workers".to_owned(),
+            value: ConfigValue::Single(max_parallel_workers.to_string()),
+        },
+        PgConfig {
+            name: "max_parallel_workers_per_gather".to_owned(),
+            value: ConfigValue::Single(max_parallel_workers_per_gather.to_string()),
+        },
+        PgConfig {
+            name: "max_wal_size".to_owned(),
+            value: ConfigValue::Single(format!("{max_wal_size_gb}GB")),
+        },
+        PgConfig {
+            name: "max_worker_processes".to_owned(),
+            value: ConfigValue::Single(max_worker_processes.to_string()),
+        },
+        PgConfig {
+            name: "shared_buffers".to_owned(),
+            value: ConfigValue::Single(format!("{shared_buffer_val_mb}MB")),
+        },
+        PgConfig {
             name: "work_mem".to_owned(),
             value: ConfigValue::Single(format!("{work_mem}MB")),
         },
-        PgConfig {
-            name: "effective_cache_size".to_owned(),
-            value: ConfigValue::Single(format!("{effective_cache_size_mb}MB")),
-        },
     ]
+}
+
+// olap formula for max_parallel_workers_per_gather
+fn olap_max_parallel_workers_per_gather(cpu: i32) -> i32 {
+    // higher of default (2) or 0.5 * cpu
+    let scaled = i32::max((cpu as f64 * 0.5).floor() as i32, 2);
+    // cap at 8
+    i32::max(scaled, 8)
+}
+
+fn olap_max_parallel_workers(cpu: i32) -> i32 {
+    // higher of the default (8) or cpu
+    i32::max(8, cpu)
+}
+
+fn olap_max_worker_processes(cpu: i32) -> i32 {
+    i32::max(1, cpu)
+}
+
+// olap formula for maintenance_work_mem
+fn olap_maintenance_work_mem_mb(sys_mem_mb: i32) -> i32 {
+    // max of the default 64MB and 10% of system memory
+    const MAINTENANCE_WORK_MEM_RATIO: f64 = 0.10;
+    i32::max(
+        DEFAULT_MAINTENANCE_WORK_MEM_MB,
+        (sys_mem_mb as f64 * MAINTENANCE_WORK_MEM_RATIO).floor() as i32,
+    )
 }
 
 // general purpose formula for maintenance_work_mem
@@ -208,6 +263,18 @@ fn split_string(input: &str) -> Result<(f64, String), ValueError> {
     }
 }
 
+// returns the vCPU count
+fn parse_cpu(stack: &Stack) -> i32 {
+    stack
+        .infrastructure
+        .as_ref()
+        .expect("infra required for a configuration engine")
+        .cpu
+        .to_string()
+        .parse::<i32>()
+        .expect("failed parsing cpu")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -325,5 +392,46 @@ mod tests {
         assert!(error_val.is_err());
         let error_val: Result<(f64, String), ValueError> = split_string("Gi10");
         assert!(error_val.is_err());
+    }
+
+    #[test]
+    fn test_olap_config_engine() {
+        let stack = Stack {
+            name: "test".to_owned(),
+            compute_templates: None,
+            infrastructure: Some(Infrastructure {
+                cpu: "4".to_string(),
+                memory: "16Gi".to_string(),
+                storage: "10Gi".to_string(),
+            }),
+            image: None,
+            extensions: None,
+            trunk_installs: None,
+            description: None,
+            stack_version: None,
+            postgres_config_engine: Some(ConfigEngine::Standard),
+            postgres_config: None,
+            postgres_metrics: None,
+        };
+        let configs = olap_config_engine(&stack);
+
+        assert_eq!(configs[0].name, "effective_cache_size");
+        assert_eq!(configs[0].value.to_string(), "11468MB");
+        assert_eq!(configs[1].name, "maintenance_work_mem");
+        assert_eq!(configs[1].value.to_string(), "1638MB");
+        assert_eq!(configs[2].name, "max_connections");
+        assert_eq!(configs[2].value.to_string(), "100");
+        assert_eq!(configs[3].name, "max_parallel_workers");
+        assert_eq!(configs[3].value.to_string(), "8");
+        assert_eq!(configs[4].name, "max_parallel_workers_per_gather");
+        assert_eq!(configs[4].value.to_string(), "8");
+        assert_eq!(configs[5].name, "max_wal_size");
+        assert_eq!(configs[5].value.to_string(), "2GB");
+        assert_eq!(configs[6].name, "max_worker_processes");
+        assert_eq!(configs[6].value.to_string(), "4");
+        assert_eq!(configs[7].name, "shared_buffers");
+        assert_eq!(configs[7].value.to_string(), "4096MB");
+        assert_eq!(configs[8].name, "work_mem");
+        assert_eq!(configs[8].value.to_string(), "90MB");
     }
 }

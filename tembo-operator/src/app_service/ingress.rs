@@ -16,7 +16,6 @@ use std::collections::BTreeMap;
 
 use tracing::{debug, error, warn};
 
-
 use super::{
     manager::to_delete,
     types::{AppService, Middleware, COMPONENT_NAME},
@@ -27,7 +26,6 @@ pub struct MiddleWareWrapper {
     pub name: String,
     pub mw: TraefikMiddleware,
 }
-
 
 fn generate_ingress(
     coredb_name: &str,
@@ -59,7 +57,6 @@ fn generate_ingress(
         },
     }
 }
-
 
 // creates traefik middleware objects
 // named `<coredb-name>-<specified-middleware-name>`
@@ -106,7 +103,6 @@ fn generate_middlewares(
     }
     traefik_middlwares
 }
-
 
 // generates Kubernetes IngressRoute template for an appService
 // maps the specified
@@ -161,7 +157,6 @@ pub fn generate_ingress_routes(
     }
 }
 
-
 pub async fn reconcile_ingress(
     client: Client,
     coredb_name: &str,
@@ -204,7 +199,6 @@ pub async fn reconcile_ingress(
             }
         }
     }
-
 
     let ingress = generate_ingress(coredb_name, ns, oref, desired_routes.clone());
     if desired_routes.is_empty() {
@@ -262,7 +256,6 @@ async fn apply_ingress_route(
         .patch(ingress_name, &patch_parameters, &Patch::Apply(&ingress_route))
         .await
 }
-
 
 async fn get_middlewares(
     client: Client,

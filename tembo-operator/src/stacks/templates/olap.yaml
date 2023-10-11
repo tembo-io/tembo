@@ -15,16 +15,24 @@ compute_templates:
     memory: 32Gi
 postgres_config_engine: olap
 postgres_config:
+  - name: autovacuum_vacuum_scale_factor
+    value: 0.05
+  - name: autovacuum_vacuum_insert_scale_factor
+    value: 0.05
+  - name: checkpoint_completion_target
+    value: 0.95
   - name: checkpoint_timeout
     value: 30min
-  - name: pg_stat_statements.track
-    value: all
-  - name: track_io_timing
-    value: 'on'
   - name: cron.host
     value: /controller/run
+  - name: pg_stat_statements.track
+    value: top
   - name: shared_preload_libraries
     value: pg_stat_statements,pg_cron
+  - name: track_io_timing
+    value: 'on'
+  - name: wal_level
+    value: logical
 trunk_installs:
   - name: pg_stat_statements
     version: 1.10.0
