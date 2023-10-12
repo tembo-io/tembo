@@ -54,7 +54,9 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         .parse()
         .expect("error parsing MAX_READ_CT");
     let is_cloud_formation: bool = env::var("IS_CLOUD_FORMATION")
-    .unwrap_or_else(|_| "true".to_owned()).parse().expect("error parsing IS_CLOUD_FORMATION");
+        .unwrap_or_else(|_| "true".to_owned())
+        .parse()
+        .expect("error parsing IS_CLOUD_FORMATION");
 
     // Connect to pgmq
     let queue = PGMQueueExt::new(pg_conn_url, 5).await?;
@@ -166,7 +168,15 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                 // Merge backup and service_account_template into spec
                 let mut coredb_spec = msg_spec;
 
-                match init_cloud_perms(backup_archive_bucket.clone(), cf_template_bucket.clone(), &read_msg, &mut coredb_spec, is_cloud_formation).await {
+                match init_cloud_perms(
+                    backup_archive_bucket.clone(),
+                    cf_template_bucket.clone(),
+                    &read_msg,
+                    &mut coredb_spec,
+                    is_cloud_formation,
+                )
+                .await
+                {
                     Ok(arn) => {
                         info!(
                             "{}: CloudFormation stack outputs ready, got outputs.",
@@ -211,7 +221,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                             );
                             continue;
                         }
-                    }
+                    },
                 };
 
                 info!("{}: Creating namespace", read_msg.msg_id);
@@ -561,7 +571,10 @@ async fn main() -> std::io::Result<()> {
 
     std::mem::drop(background_threads_locked);
 
-    let server_port = env::var("PORT").unwrap_or_else(|_| String::from("8080")).parse::<u16>().unwrap_or(8080);
+    let server_port = env::var("PORT")
+        .unwrap_or_else(|_| String::from("8080"))
+        .parse::<u16>()
+        .unwrap_or(8080);
 
     HttpServer::new(move || {
         App::new()
@@ -580,8 +593,13 @@ async fn main() -> std::io::Result<()> {
     .await
 }
 
-
-async fn init_cloud_perms(backup_archive_bucket: String, cf_template_bucket: String, read_msg: &Message<CRUDevent>, coredb_spec: &mut CoreDBSpec, is_cloud_formation: bool) -> Result<(), ConductorError> {
+async fn init_cloud_perms(
+    backup_archive_bucket: String,
+    cf_template_bucket: String,
+    read_msg: &Message<CRUDevent>,
+    coredb_spec: &mut CoreDBSpec,
+    is_cloud_formation: bool,
+) -> Result<(), ConductorError> {
     if !is_cloud_formation {
         return Ok(());
     }
@@ -599,7 +617,8 @@ async fn init_cloud_perms(backup_archive_bucket: String, cf_template_bucket: Str
     let role_arn = lookup_role_arn(
         String::from("us-east-1"),
         &read_msg.message.organization_name,
-        &read_msg.message.dbname)
+        &read_msg.message.dbname,
+    )
     .await?;
 
     info!("{}: Adding backup configuration to spec", read_msg.msg_id);
@@ -634,7 +653,7 @@ async fn init_cloud_perms(backup_archive_bucket: String, cf_template_bucket: Str
     };
 
     coredb_spec.backup = backup;
-    coredb_spec.serviceAccountTemplate =service_account_template;
+    coredb_spec.serviceAccountTemplate = service_account_template;
 
     Ok(())
 }
