@@ -23,7 +23,7 @@ const WINDOWS_ERROR_MSG: &str = "Windows is not supported at this time";
 fn main() {
     CombinedLogger::init(vec![
         TermLogger::new(
-            LevelFilter::Trace,
+            LevelFilter::Info,
             Config::default(),
             TerminalMode::Mixed,
             ColorChoice::Auto,

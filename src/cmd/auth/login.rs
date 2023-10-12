@@ -10,7 +10,7 @@ pub fn make_subcommand() -> Command {
 }
 
 pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
-    match AuthClient::authenticate() {
+    match AuthClient::authenticate(args) {
         Ok(jwt) => {
             println!("- storing jwt in config file, it will be used in future requests");
 

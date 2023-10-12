@@ -1,5 +1,9 @@
 extern crate rpassword;
 
+use crate::cli::cloud_account::CloudAccount;
+use crate::cli::config::Config;
+use chrono::prelude::*;
+use clap::ArgMatches;
 use reqwest::cookie::Jar;
 use reqwest::header;
 use reqwest::header::HeaderMap;
@@ -20,7 +24,7 @@ const CLERK_SIGN_IN_SLUG: &str = "/v1/client/sign_ins?_clerk_js_version=4.53.0";
 pub struct AuthClient {}
 
 impl AuthClient {
-    pub fn authenticate() -> Result<String, Box<dyn Error>> {
+    pub fn authenticate(args: &ArgMatches) -> Result<String, Box<dyn Error>> {
         println!("Please enter the email address for a service user (https://tembo.io/docs/tembo-cloud/api):");
         let user = Self::get_input();
 
@@ -36,7 +40,7 @@ impl AuthClient {
                 let sign_in_token = token;
                 // TODO: match in case this fails
                 let session_id =
-                    Self::attempt_first_factor(&client, clerk_url, &sign_in_token, &password)
+                    Self::attempt_first_factor(&client, clerk_url, &sign_in_token, &password, args)
                         .unwrap();
 
                 let jwt = Self::get_expiring_api_token(&client, clerk_url, &session_id).unwrap();
@@ -116,6 +120,7 @@ impl AuthClient {
         url: &str,
         id: &str,
         pw: &str,
+        args: &ArgMatches,
     ) -> Result<String, Box<dyn Error>> {
         let request_url = format!(
             "{}/v1/client/sign_ins/{}/attempt_first_factor?_clerk_js_version=4.53.0",
@@ -144,6 +149,9 @@ impl AuthClient {
             .as_str()
             .ok_or("Failed to parse jwt")?
             .to_string();
+
+        // set or update the user's org ids
+        let _ = Self::set_org_ids(json.clone(), args);
 
         Ok(session_id)
     }
@@ -183,5 +191,42 @@ impl AuthClient {
             .to_string();
 
         Ok(jwt)
+    }
+
+    // stores the user's organization id(s) in the config
+    fn set_org_ids(json: Value, args: &ArgMatches) -> Result<(), Box<dyn Error>> {
+        let mut config = Config::new(args, &Config::full_path(args));
+        let mut org_ids = vec![];
+
+        if let Some(organization_memberships) =
+            json["client"]["sessions"][0]["user"]["organization_memberships"].as_array()
+        {
+            for organization in organization_memberships {
+                let org_id: String = (organization["id"]).to_string();
+
+                org_ids.push(org_id);
+            }
+        }
+
+        let user = &json["client"]["sessions"][0]["user"];
+        let first_name = &user["first_name"];
+        let last_name = &user["last_name"];
+        let name = format!("{} {}", &first_name, &last_name);
+        let username = (user["username"]).to_string();
+        let clerk_id = (user["id"]).to_string();
+
+        let created_at = Utc::now();
+        let cloud_account = CloudAccount {
+            name: Some(name),
+            username: Some(username),
+            clerk_id: Some(clerk_id),
+            organizations: org_ids, // NOTE: we want to reset/update this with every login
+            created_at: Some(created_at),
+        };
+        config.cloud_account = Some(cloud_account);
+
+        config.write(&Config::full_path(args))?;
+
+        Ok(())
     }
 }
