@@ -452,7 +452,6 @@ pub async fn reconcile_postgres_ing_route_tcp(
         }
     }
 
-
     Ok(())
 }
 
@@ -516,7 +515,6 @@ pub fn valid_cidrs(source_range: &[String]) -> Vec<String> {
     valid_ips.sort();
     valid_ips
 }
-
 
 #[cfg(test)]
 mod tests {

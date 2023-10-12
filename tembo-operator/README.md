@@ -5,6 +5,7 @@
 - A Kubernetes cluster: [kind](https://github.com/kubernetes-sigs/kind)
 - [rust](https://www.rust-lang.org/)
 - [just](https://github.com/casey/just)
+- [helm](https://helm.sh/)
 - Opentelemetry collector (**optional**)
 
 ### Rust Linting
@@ -75,12 +76,14 @@ NAMESPACE=<namespace> just annotate
 ```
 
 - Start or install the controller you want to test (see the following sections), do this in a separate shell from where you will run the tests
+
 ```
 export DATA_PLANE_BASEDOMAIN=localhost
 cargo run
 ```
 
 - Run the integration tests
+  > Note: for integration tests to work you will need to be logged in on `plat-dev` via CLI under the "PowerUserAccess" role found here: https://d-9067aa6f32.awsapps.com/start (click "Command line or programmatic access")
 
 ```bash
 cargo test -- --ignored
@@ -115,7 +118,6 @@ Setup an OpenTelemetry Collector in your cluster. [Tempo](https://github.com/gra
 ```sh
 cargo run
 ```
-
 
 - Or, with optional telemetry (change as per requirements):
 

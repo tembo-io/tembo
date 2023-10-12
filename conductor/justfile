@@ -70,7 +70,6 @@ start-kind:
 	just annotate
 	kubectl wait pods --for=condition=Ready --timeout=300s --all --all-namespaces
 
-
 annotate:
 	kubectl label namespace {{NAMESPACE}} safe-to-run-coredb-tests=true
 	kubectl patch storageclass standard -p '{"allowVolumeExpansion": true}'
@@ -79,7 +78,7 @@ fmt:
 	cargo clippy --fix
 	cargo +nightly fmt
 
-run-local:
+watch:
 	POSTGRES_QUEUE_CONNECTION=postgresql://postgres:postgres@0.0.0.0:5431/postgres \
 	RUST_BACKTRACE=1 \
 	RUST_LOG={{RUST_LOG}} \

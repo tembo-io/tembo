@@ -29,6 +29,11 @@ async fn app_main() -> anyhow::Result<()> {
     let state = State::default();
     let controller = controller::run(state.clone());
 
+    let server_port = std::env::var("PORT")
+        .unwrap_or_else(|_| String::from("8080"))
+        .parse::<u16>()
+        .unwrap_or(8080);
+
     // Start web server
     let server = HttpServer::new(move || {
         App::new()
@@ -38,7 +43,7 @@ async fn app_main() -> anyhow::Result<()> {
             .service(health)
             .service(metrics)
     })
-    .bind("0.0.0.0:8080")?
+    .bind(("0.0.0.0", server_port))?
     .shutdown_timeout(5);
 
     // Both runtimes implements graceful shutdown, so poll until both are done

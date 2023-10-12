@@ -16,9 +16,9 @@ on:
     branches:
       - main
     paths:
-    - '.github/workflows/conductor.yaml'
-    - 'conductor/**'
-    - 'charts/tembo-operator/templates/crd.yaml'
+      - ".github/workflows/conductor.yaml"
+      - "conductor/**"
+      - "charts/tembo-operator/templates/crd.yaml"
 
 jobs:
   functional_test:
@@ -32,7 +32,7 @@ jobs:
       fail-fast: false
       matrix:
         kube_version:
-          - '1.25.8'
+          - "1.25.8"
     steps:
       - uses: actions/checkout@v2
       - name: Install system dependencies
@@ -74,7 +74,7 @@ jobs:
           cargo install cargo-watch
           cargo build
           # Start conductor in the background
-          just run-local > conductor-output.txt 2>&1 &
+          just watch > conductor-output.txt 2>&1 &
           # Wait long enough that the server build grabs the cargo build lock file
           # before the test does
           sleep 5
