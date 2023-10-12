@@ -87,8 +87,12 @@ mod test {
 
         // Configurations
         let mut rng = rand::thread_rng();
-        let org_name = "coredb-test-org".to_owned();
-        let dbname = format!("test-coredb-{}", rng.gen_range(0..100000));
+        let org_name = "coredb-test-org-1234".to_owned();
+        // Use the max allowed org name length
+        assert_eq!(org_name.len(), 20);
+        let dbname = format!("test-coredb-{}", rng.gen_range(10000000..99999999));
+        // Use the max allowed instance name length
+        assert_eq!(dbname.len(), 20);
         let namespace = format!("org-{}-inst-{}", org_name, dbname);
 
         let limits: BTreeMap<String, String> = BTreeMap::from([
