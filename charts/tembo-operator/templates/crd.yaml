@@ -64,11 +64,25 @@ spec:
                         oneOf:
                         - required:
                           - customRequestHeaders
+                        - required:
+                          - stripPrefix
                         properties:
                           customRequestHeaders:
                             properties:
                               config:
                                 x-kubernetes-preserve-unknown-fields: true
+                              name:
+                                type: string
+                            required:
+                            - config
+                            - name
+                            type: object
+                          stripPrefix:
+                            properties:
+                              config:
+                                items:
+                                  type: string
+                                type: array
                               name:
                                 type: string
                             required:

@@ -76,6 +76,8 @@ pub struct Ingress {
 pub enum Middleware {
     #[serde(rename = "customRequestHeaders")]
     CustomRequestHeaders(HeaderConfig),
+    #[serde(rename = "stripPrefix")]
+    StripPrefix(StripPrefixConfig),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, JsonSchema, PartialEq)]
@@ -84,6 +86,14 @@ pub struct HeaderConfig {
     #[schemars(schema_with = "preserve_arbitrary")]
     pub config: BTreeMap<String, String>,
 }
+
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, JsonSchema, PartialEq)]
+pub struct StripPrefixConfig {
+    pub name: String,
+    pub config: Vec<String>,
+}
+
 
 // source: https://github.com/kube-rs/kube/issues/844
 fn preserve_arbitrary(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
@@ -99,7 +109,8 @@ mod tests {
 
     #[test]
     fn test_middleware_config() {
-        let middleware = serde_json::json!({
+        let middleware = serde_json::json!([
+        {
             "customRequestHeaders": {
                 "name": "my-custom-headers",
                 "config":
@@ -110,15 +121,59 @@ mod tests {
                         "My-New-Header": "yolo"
                     }
             },
-        });
+        },
+        {
+            "stripPrefix": {
+                "name": "strip-my-prefix",
+                "config": [
+                    "/removeMe"
+                ]
+            },
+        }
+        ]);
 
-        let mw = serde_json::from_value::<Middleware>(middleware).unwrap();
-        match mw {
-            Middleware::CustomRequestHeaders(mw) => {
-                assert_eq!(mw.name, "my-custom-headers");
-                assert_eq!(mw.config["My-New-Header"], "yolo");
-                assert_eq!(mw.config["Authorization"], "");
+        let mws = serde_json::from_value::<Vec<Middleware>>(middleware).unwrap();
+        for mw in mws {
+            match mw {
+                Middleware::CustomRequestHeaders(mw) => {
+                    assert_eq!(mw.name, "my-custom-headers");
+                    assert_eq!(mw.config["My-New-Header"], "yolo");
+                    assert_eq!(mw.config["Authorization"], "");
+                }
+                Middleware::StripPrefix(mw) => {
+                    assert_eq!(mw.name, "strip-my-prefix");
+                    assert_eq!(mw.config[0], "/removeMe");
+                }
             }
         }
+
+        // malformed middlewares
+        let unsupported_mw = serde_json::json!({
+            "unsupportedMiddlewareType": {
+                "name": "my-custom-headers",
+                "config":
+                    {
+                        //remove a header
+                        "Authorization": "",
+                        // add a header
+                        "My-New-Header": "yolo"
+                    }
+            },
+        });
+        let failed = serde_json::from_value::<Middleware>(unsupported_mw);
+        assert!(failed.is_err());
+
+        // provide a supported middleware but with malformed configuration
+        let supported_bad_config = serde_json::json!({
+            "replacePath": {
+                "name": "my-custom-headers",
+                "config":
+                    {
+                        "replacePath": "expects_a_vec<string>",
+                    }
+            },
+        });
+        let failed = serde_json::from_value::<Middleware>(supported_bad_config);
+        assert!(failed.is_err());
     }
 }

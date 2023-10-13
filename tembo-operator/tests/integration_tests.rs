@@ -3020,7 +3020,8 @@ mod test {
         let response = http_get_with_retry(&postgres_url, Some(headers.clone()), 1, 0).await;
         assert!(response.is_err());
 
-        // patch the postgREST appService with middleware modifying request header
+        // patch the postgREST appService with required middlewares for header and prefix
+        // service it at /rest, but route traffic to container at /
         let coredb_json = serde_json::json!({
             "apiVersion": API_VERSION,
             "kind": kind,
@@ -3054,14 +3055,23 @@ mod test {
                                         "Authorization": ""
                                     }
                                 }
+                            },
+                            {
+                                "stripPrefix": {
+                                    "name": "strip-prefix",
+                                    "config": [
+                                        "/rest"
+                                    ]
+                                }
                             }
                         ],
                         "routing": [
                             {
                                 "port": 3000,
-                                "ingressPath": "/",
+                                "ingressPath": "/rest",
                                 "middlewares": [
-                                    "strip-auth-header"
+                                    "strip-auth-header",
+                                    "strip-prefix"
                                 ]
                             }
                         ],
@@ -3776,11 +3786,6 @@ mod test {
     #[tokio::test]
     #[ignore]
     async fn functional_test_pooler() {
-        async fn runtime_cfg(coredbs: &Api<CoreDB>, name: &str) -> Option<Vec<PgConfig>> {
-            let spec = coredbs.get(name).await.expect("spec not found");
-            spec.status.expect("Expected status to be present").runtime_config
-        }
-
         // Initialize the Kubernetes client
         let client = kube_client().await;
         let state = State::default();

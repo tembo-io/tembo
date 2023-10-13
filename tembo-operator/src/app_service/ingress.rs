@@ -3,7 +3,9 @@ use crate::{
         IngressRoute, IngressRouteRoutes, IngressRouteRoutesKind, IngressRouteRoutesMiddlewares,
         IngressRouteRoutesServices, IngressRouteRoutesServicesKind, IngressRouteSpec, IngressRouteTls,
     },
-    traefik::middlewares_crd::{Middleware as TraefikMiddleware, MiddlewareHeaders, MiddlewareSpec},
+    traefik::middlewares_crd::{
+        Middleware as TraefikMiddleware, MiddlewareHeaders, MiddlewareSpec, MiddlewareStripPrefix,
+    },
     Result,
 };
 use k8s_openapi::apimachinery::pkg::{apis::meta::v1::OwnerReference, util::intstr::IntOrString};
@@ -98,6 +100,29 @@ fn generate_middlewares(
                     mw: tmw,
                 }
             }
+            Middleware::StripPrefix(mw) => {
+                let mw_name = format!("{}-{}", coredb_name, mw.name);
+                let mwsp = MiddlewareStripPrefix {
+                    prefixes: Some(mw.config),
+                };
+                let tmw = TraefikMiddleware {
+                    metadata: ObjectMeta {
+                        name: Some(mw_name.clone()),
+                        namespace: Some(namespace.to_owned()),
+                        owner_references: Some(vec![oref.clone()]),
+                        labels: Some(labels.clone()),
+                        ..ObjectMeta::default()
+                    },
+                    spec: MiddlewareSpec {
+                        strip_prefix: Some(mwsp),
+                        ..MiddlewareSpec::default()
+                    },
+                };
+                MiddleWareWrapper {
+                    name: mw_name,
+                    mw: tmw,
+                }
+            }
         };
         traefik_middlwares.push(traefik_mw);
     }
@@ -136,7 +161,10 @@ pub fn generate_ingress_routes(
                             services: Some(vec![IngressRouteRoutesServices {
                                 name: resource_name.to_string(),
                                 port: Some(IntOrString::Int(route.port as i32)),
-                                namespace: Some(namespace.to_owned()),
+                                // namespace attribute is NOT a kubernetes namespace
+                                // it is the Traefik provider namespace: https://doc.traefik.io/traefik/v3.0/providers/overview/#provider-namespace
+                                // https://doc.traefik.io/traefik/v3.0/routing/providers/kubernetes-crd/#kind-middleware
+                                namespace: None,
                                 kind: Some(IngressRouteRoutesServicesKind::Service),
                                 ..IngressRouteRoutesServices::default()
                             }]),

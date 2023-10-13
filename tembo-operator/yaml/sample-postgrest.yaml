@@ -8,17 +8,20 @@ spec:
       image: postgrest/postgrest:v10.0.0
       routing:
         - port: 3000
-          ingressPath: /
+          ingressPath: /rest/v1
           middlewares:
             - my-headers
+            - my-strip-prefix
       middlewares:
         - customRequestHeaders:
             name: my-headers
             config:
               # removes auth header from request
               Authorization: ""
-              # adds a header to the request
-              MyOtherHeader: "MyValue"
+        - stripPrefix:
+            name: my-strip-prefix
+            config:
+              - /rest/v1
       env:
         - name: PGRST_DB_URI
           valueFromPlatform: ReadWriteConnection
