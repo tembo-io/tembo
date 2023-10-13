@@ -5,5 +5,6 @@ pub mod database;
 pub mod docker;
 pub mod extension;
 pub mod instance;
+pub mod schema;
 pub mod stack_error;
 pub mod stacks;

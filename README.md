@@ -63,6 +63,14 @@ name and version of the extension. Note this doesn't enable the extension. That 
 
 List of supported extensions can be found on [Trunk](https://pgt.dev).
 
+## `tembo db create`
+
+The `db create` command allows users to create databases, by name, for a given existing instance.
+
+## `tembo schema create`
+
+The `schema create` command allows users to create schemas, by name, for existing databases on existing isntances.
+
 # Contributing
 
 Before you start working on something, it's best to check if there is an existing plan 

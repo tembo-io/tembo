@@ -50,6 +50,7 @@ fn main() {
         Some(("init", sub_matches)) => cmd::init::execute(sub_matches),
         Some(("instance", sub_matches)) => cmd::instance::execute(sub_matches),
         Some(("db", sub_matches)) => cmd::database::execute(sub_matches),
+        Some(("schema", sub_matches)) => cmd::schema::execute(sub_matches),
         Some(("extension", sub_matches)) => cmd::extension::execute(sub_matches),
         Some(("auth", sub_matches)) => cmd::auth::execute(sub_matches),
         Some(("completions", sub_matches)) => (|| {
@@ -107,6 +108,11 @@ fn create_clap_command() -> Command {
             Command::new("db")
                 .about("Commands used to manage local and cloud databases")
                 .subcommand(cmd::database::create::make_subcommand()),
+        )
+        .subcommand(
+            Command::new("schema")
+                .about("Commands used to manage local and cloud schemas")
+                .subcommand(cmd::schema::create::make_subcommand()),
         )
         .subcommand(
             Command::new("extension")
