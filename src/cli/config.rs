@@ -19,6 +19,8 @@ use std::path::PathBuf;
 const CONFIG_FILE_NAME: &str = "configuration.toml";
 const CONFIG_FILE_PATH: &str = ".config/tembo/";
 
+// TODO: look into swapping this out for https://crates.io/crates/config
+
 // NOTE: modifying the struct determines what gets persisted in the configuration file
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Config {
@@ -253,6 +255,7 @@ mod tests {
                 created_at: Some(Utc::now()),
                 locations: vec![],
             }],
+            databases: vec![],
         };
         config.instances = vec![instance];
 

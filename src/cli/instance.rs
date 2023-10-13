@@ -2,6 +2,7 @@
 // (a local container that runs with certain attributes and properties)
 
 use crate::cli::config::Config;
+use crate::cli::database::Database;
 use crate::cli::docker::DockerError;
 use crate::cli::extension::Extension;
 use crate::cli::stacks;
@@ -10,6 +11,7 @@ use chrono::prelude::*;
 use clap::ArgMatches;
 use serde::Deserialize;
 use serde::Serialize;
+use simplelog::*;
 use spinners::{Spinner, Spinners};
 use std::cmp::PartialEq;
 use std::error::Error;
@@ -24,6 +26,7 @@ pub struct Instance {
     pub created_at: Option<DateTime<Utc>>,
     pub installed_extensions: Vec<InstalledExtension>,
     pub enabled_extensions: Vec<EnabledExtension>,
+    pub databases: Vec<Database>,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -222,7 +225,7 @@ impl Instance {
     pub fn find(args: &ArgMatches, name: &str) -> Result<Instance, InstanceError> {
         let config = Config::new(args, &Config::full_path(args));
 
-        println!("finding config for instance {}", name);
+        info!("finding config for instance {}", name);
 
         for instance in &config.instances {
             let i_name = instance.name.clone().unwrap();

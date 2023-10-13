@@ -96,6 +96,7 @@ fn persist_instance_config(matches: &ArgMatches) -> Result<(), Box<dyn Error>> {
         version: None,
         installed_extensions: vec![],
         enabled_extensions: vec![],
+        databases: vec![],
     };
 
     let stacks: Stacks = stacks::define_stacks();
