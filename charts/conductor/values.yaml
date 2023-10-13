@@ -1,6 +1,6 @@
 logLevel: info
 
-replicas: 2
+replicas: 1
 
 podMonitor:
   enabled: true
