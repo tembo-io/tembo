@@ -227,7 +227,7 @@ fn generate_deployment(
             value_from: Some(EnvVarSource {
                 secret_key_ref: Some(SecretKeySelector {
                     name: Some(format!("{}-connection", coredb_name)),
-                    key: "rw_uri".to_string(),
+                    key: "ro_uri".to_string(),
                     ..SecretKeySelector::default()
                 }),
                 ..EnvVarSource::default()
@@ -239,7 +239,7 @@ fn generate_deployment(
             value_from: Some(EnvVarSource {
                 secret_key_ref: Some(SecretKeySelector {
                     name: Some(format!("{}-connection", coredb_name)),
-                    key: "ro_uri".to_string(),
+                    key: "rw_uri".to_string(),
                     ..SecretKeySelector::default()
                 }),
                 ..EnvVarSource::default()
