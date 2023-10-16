@@ -262,8 +262,16 @@ spec:
                   enabled: false
                   pooler:
                     poolMode: transaction
-                    parameters: null
-                    resources: null
+                    parameters:
+                      default_pool_size: '50'
+                      max_client_conn: '5000'
+                    resources:
+                      limits:
+                        cpu: '1'
+                        memory: 1Gi
+                      requests:
+                        cpu: 500m
+                        memory: 512Mi
                 properties:
                   enabled:
                     default: false
@@ -271,8 +279,16 @@ spec:
                   pooler:
                     default:
                       poolMode: transaction
-                      parameters: null
-                      resources: null
+                      parameters:
+                        default_pool_size: '50'
+                        max_client_conn: '5000'
+                      resources:
+                        limits:
+                          cpu: '1'
+                          memory: 1Gi
+                        requests:
+                          cpu: 500m
+                          memory: 512Mi
                     properties:
                       parameters:
                         additionalProperties:

@@ -1,9 +1,12 @@
-use k8s_openapi::{api::core::v1::ResourceRequirements, apimachinery::pkg::api::resource::Quantity};
+use k8s_openapi::{
+    api::core::v1::ResourceRequirements,
+    apimachinery::pkg::{api::resource::Quantity, util::intstr::IntOrString},
+};
 use std::collections::BTreeMap;
 
 use crate::{
     apis::coredb_types::{Backup, ConnectionPooler, PgBouncer, S3Credentials, ServiceAccountTemplate},
-    cloudnativepg::poolers::PoolerPgbouncerPoolMode,
+    cloudnativepg::poolers::{PoolerPgbouncerPoolMode, PoolerTemplateSpecContainersResources},
     extensions::types::{Extension, TrunkInstall},
 };
 
@@ -137,12 +140,32 @@ pub fn default_pool_mode() -> PoolerPgbouncerPoolMode {
     PoolerPgbouncerPoolMode::Transaction
 }
 
+pub fn default_pooler_parameters() -> BTreeMap<String, String> {
+    BTreeMap::from([
+        ("default_pool_size".to_string(), "50".to_string()),
+        ("max_client_conn".to_string(), "5000".to_string()),
+    ])
+}
+
+pub fn default_pooler_resources() -> PoolerTemplateSpecContainersResources {
+    PoolerTemplateSpecContainersResources {
+        claims: None,
+        limits: Some(BTreeMap::from([
+            ("cpu".to_owned(), IntOrString::String("1".to_owned())),
+            ("memory".to_owned(), IntOrString::String("1Gi".to_owned())),
+        ])),
+        requests: Some(BTreeMap::from([
+            ("cpu".to_owned(), IntOrString::String("500m".to_owned())),
+            ("memory".to_owned(), IntOrString::String("512Mi".to_owned())),
+        ])),
+    }
+}
+
 pub fn default_pgbouncer() -> PgBouncer {
     PgBouncer {
         poolMode: default_pool_mode(),
-        parameters: None,
-        // TODO(ianstanton): Add some sensible defaults for pgbouncer resources
-        resources: None,
+        parameters: Some(default_pooler_parameters()),
+        resources: Some(default_pooler_resources()),
     }
 }
 
