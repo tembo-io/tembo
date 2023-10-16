@@ -288,16 +288,6 @@ impl CoreDB {
 
         let new_status = match self.spec.stop {
             false => {
-                let primary_pod_cnpg = self.primary_pod_cnpg(ctx.client.clone()).await?;
-
-                if !is_postgres_ready().matches_object(Some(&primary_pod_cnpg)) {
-                    debug!(
-                        "Did not find postgres ready {}, waiting a short period",
-                        self.name_any()
-                    );
-                    return Ok(Action::requeue(Duration::from_secs(5)));
-                }
-
                 let patch_status = json!({
                     "apiVersion": "coredb.io/v1alpha1",
                     "kind": "CoreDB",
@@ -306,7 +296,6 @@ impl CoreDB {
                     }
                 });
                 patch_cdb_status_merge(&coredbs, &name, patch_status).await?;
-
                 let (trunk_installs, extensions) =
                     reconcile_extensions(self, ctx.clone(), &coredbs, &name).await?;
 
@@ -386,7 +375,11 @@ impl CoreDB {
     }
 
     #[instrument(skip(self, client))]
-    pub async fn primary_pod_cnpg(&self, client: Client) -> Result<Pod, Action> {
+    async fn primary_pod_cnpg_conditional_readiness(
+        &self,
+        client: Client,
+        wait_for_ready: bool,
+    ) -> Result<Pod, Action> {
         let requires_load =
             extensions_that_require_load(client.clone(), &self.metadata.namespace.clone().unwrap()).await?;
         let cluster = cnpg_cluster_from_cdb(self, None, requires_load);
@@ -394,17 +387,13 @@ impl CoreDB {
             .metadata
             .name
             .expect("CNPG Cluster should always have a name");
-        let namespace = self
-            .metadata
-            .namespace
-            .clone()
-            .expect("Operator should always be namespaced");
-        let cluster_selector = format!("cnpg.io/cluster={cluster_name}");
-        let role_selector = "role=primary".to_string();
+        let namespace = self.metadata.namespace.as_deref().unwrap_or_default();
+        let cluster_selector = format!("cnpg.io/cluster={}", cluster_name);
+        let role_selector = "role=primary";
         let list_params = ListParams::default()
             .labels(&cluster_selector)
-            .labels(&role_selector);
-        let pods: Api<Pod> = Api::namespaced(client, &namespace);
+            .labels(role_selector);
+        let pods: Api<Pod> = Api::namespaced(client, namespace);
         let pods = pods.list(&list_params);
         // Return an error if the query fails
         let pod_list = pods.await.map_err(|_e| {
@@ -419,8 +408,8 @@ impl CoreDB {
             return Err(Action::requeue(Duration::from_secs(5)));
         }
         let primary = pod_list.items[0].clone();
-        // check if the pod is ready
-        if !is_postgres_ready().matches_object(Some(&primary)) {
+
+        if wait_for_ready && !is_postgres_ready().matches_object(Some(&primary)) {
             // It's expected to sometimes be empty, we should retry after a short duration
             warn!(
                 "Found CNPG primary pod of {}, but it is not ready",
@@ -428,11 +417,26 @@ impl CoreDB {
             );
             return Err(Action::requeue(Duration::from_secs(5)));
         }
+
         Ok(primary)
     }
 
     #[instrument(skip(self, client))]
-    pub async fn pods_by_cluster(&self, client: Client) -> Result<Vec<Pod>, Action> {
+    pub async fn primary_pod_cnpg(&self, client: Client) -> Result<Pod, Action> {
+        self.primary_pod_cnpg_conditional_readiness(client, true).await
+    }
+
+    #[instrument(skip(self, client))]
+    pub async fn primary_pod_cnpg_ready_or_not(&self, client: Client) -> Result<Pod, Action> {
+        self.primary_pod_cnpg_conditional_readiness(client, false).await
+    }
+
+    #[instrument(skip(self, client))]
+    async fn pods_by_cluster_conditional_readiness(
+        &self,
+        client: Client,
+        wait_for_ready: bool,
+    ) -> Result<Vec<Pod>, Action> {
         let requires_load =
             extensions_that_require_load(client.clone(), &self.metadata.namespace.clone().unwrap()).await?;
         let cluster = cnpg_cluster_from_cdb(self, None, requires_load);
@@ -489,12 +493,23 @@ impl CoreDB {
             })
             .collect();
 
-        if ready_pods.is_empty() {
+        // If the instance has a pod that is not ready and is not a restore instance, requeue
+        if wait_for_ready && ready_pods.is_empty() {
             warn!("Failed to find ready CNPG pods of {}", &self.name_any());
             return Err(Action::requeue(Duration::from_secs(30)));
         }
 
         Ok(ready_pods)
+    }
+
+    #[instrument(skip(self, client))]
+    pub async fn pods_by_cluster(&self, client: Client) -> Result<Vec<Pod>, Action> {
+        self.pods_by_cluster_conditional_readiness(client, true).await
+    }
+
+    #[instrument(skip(self, client))]
+    pub async fn pods_by_cluster_ready_or_not(&self, client: Client) -> Result<Vec<Pod>, Action> {
+        self.pods_by_cluster_conditional_readiness(client, false).await
     }
 
     #[instrument(skip(self, client))]
@@ -560,13 +575,7 @@ impl CoreDB {
                 );
                 Ok(())
             }
-            Err(e) => {
-                error!(
-                    "Failed to get pod {} in namespace {}: {:?}",
-                    pod_name, namespace, e
-                );
-                Err(e)
-            }
+            Err(e) => Err(e),
         }
     }
 
@@ -577,10 +586,8 @@ impl CoreDB {
         database: String,
         context: Arc<Context>,
     ) -> Result<PsqlOutput, Action> {
-        let client = context.client.clone();
-
         let pod_name_cnpg = self
-            .primary_pod_cnpg(client.clone())
+            .primary_pod_cnpg(context.client.clone())
             .await?
             .metadata
             .name
@@ -591,7 +598,7 @@ impl CoreDB {
             self.metadata.namespace.clone().unwrap(),
             command,
             database,
-            context,
+            context.clone(),
         );
         debug!("Running exec command in {}", pod_name_cnpg);
         cnpg_psql_command.execute().await
@@ -709,8 +716,7 @@ pub async fn patch_cdb_status_merge(
         field_manager: Some("cntrlr".to_string()),
         ..PatchParams::default()
     };
-    let patch_status = Patch::Merge(patch.clone()); // clone to log later if needed
-
+    let patch_status = Patch::Merge(patch.clone());
     match cdb.patch_status(name, &pp, &patch_status).await {
         Ok(_) => {
             debug!("Successfully updated CoreDB status for {}", name);

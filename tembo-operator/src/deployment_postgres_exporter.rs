@@ -21,9 +21,11 @@ use kube::{
     Resource,
 };
 use std::{collections::BTreeMap, sync::Arc};
+use tracing::instrument;
 
 const PROM_CFG_DIR: &str = "/prometheus";
 
+#[instrument(skip(cdb, ctx), fields(instance_name = %cdb.name_any()))]
 pub async fn reconcile_prometheus_exporter_deployment(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
     let client = ctx.client.clone();
     let coredb_name = cdb.metadata.name.clone().expect("should always have a name");
@@ -209,6 +211,7 @@ pub async fn reconcile_prometheus_exporter_deployment(cdb: &CoreDB, ctx: Arc<Con
 }
 
 // Generate the PolicyRules for the Role
+#[instrument(fields(instance_name = %name))]
 async fn create_policy_rules(name: String) -> Vec<PolicyRule> {
     vec![
         // This policy allows get, watch access to a secret in the namespace

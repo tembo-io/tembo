@@ -51,14 +51,15 @@ install-tempo:
 install-minio:
 	helm upgrade --install \
 		minio minio/minio \
-	  --namespace minio \
+		--version 5.0.13 \
+		--namespace minio \
 		--create-namespace \
 		--values=./testdata/minio.yaml \
-		&& kubectl wait pods --for=condition=Ready --timeout=300s --all --all-namespaces \
-		&& kubectl apply -f ./testdata/minio-secret.yaml \
-		&& kubectl apply -f ./testdata/minio-bucket-job.yaml \
-		&& kubectl -n minio wait --for=condition=complete job/minio-create-backup-bucket --timeout=300s\
-		&& kubectl -n minio delete job/minio-create-backup-bucket
+	&& kubectl wait pods --for=condition=Ready --timeout=300s --all --all-namespaces \
+	&& kubectl apply -f ./testdata/minio-secret.yaml \
+	&& kubectl apply -f ./testdata/minio-bucket-job.yaml \
+	&& kubectl -n minio wait --for=condition=complete job/minio-create-backup-bucket --timeout=300s\
+	&& kubectl -n minio delete job/minio-create-backup-bucket
 
 install-reflector:
 	helm upgrade --install \

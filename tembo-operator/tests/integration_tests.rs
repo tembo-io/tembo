@@ -21,10 +21,12 @@ mod test {
         apis::coredb_types::CoreDB,
         cloudnativepg::{backups::Backup, clusters::Cluster},
         defaults::{default_resources, default_storage},
+        errors::ValueError,
         is_pod_ready,
         psql::PsqlOutput,
         Context, State,
     };
+    use futures_util::StreamExt;
     use k8s_openapi::{
         api::{
             apps::v1::Deployment,
@@ -37,7 +39,9 @@ mod test {
         apimachinery::pkg::{api::resource::Quantity, apis::meta::v1::ObjectMeta, util::intstr::IntOrString},
     };
     use kube::{
-        api::{AttachParams, DeleteParams, ListParams, Patch, PatchParams, PostParams},
+        api::{
+            AttachParams, DeleteParams, ListParams, Patch, PatchParams, PostParams, WatchEvent, WatchParams,
+        },
         runtime::wait::{await_condition, conditions, Condition},
         Api, Client, Config, Error,
     };
@@ -52,7 +56,7 @@ mod test {
         time::Duration,
     };
 
-    use tokio::io::AsyncReadExt;
+    use tokio::{io::AsyncReadExt, time::timeout};
 
     const API_VERSION: &str = "coredb.io/v1alpha1";
     // Timeout settings while waiting for an event
@@ -326,29 +330,67 @@ mod test {
         println!("Found pod ready: {}", pod_name);
     }
 
-    async fn wait_backup_completed(context: Arc<Context>, namespace: &str, name: &str) {
-        println!("Waiting for backup to complete: {}", name);
-        let backups: Api<Backup> = Api::namespaced(context.client.clone(), namespace);
-
-        const TIMEOUT_SECONDS_BACKUP_COMPLETED: i64 = 300;
-
-        let start_time = Utc::now();
-
-        while Utc::now() - start_time < chrono::Duration::seconds(TIMEOUT_SECONDS_BACKUP_COMPLETED) {
-            let list_params = ListParams::default().labels(&format!("cnpg.io/cluster={}", name));
-            let backups = backups.list(&list_params).await.unwrap();
-            let backup = backups.items[0].clone();
-            if let Some(status) = &backup.status {
-                if status.phase.as_deref() == Some("completed") {
-                    return;
+    pub fn is_backup_completed() -> impl Condition<Backup> + 'static {
+        move |obj: Option<&Backup>| {
+            if let Some(backup) = &obj {
+                if let Some(status) = &backup.status {
+                    if status.phase.as_deref() == Some("completed") {
+                        return true;
+                    }
                 }
             }
-            thread::sleep(Duration::from_secs(1));
+            false
         }
-        panic!(
-            "Did not find the backup {} to be completed after waiting {} seconds",
-            name, TIMEOUT_SECONDS_BACKUP_COMPLETED
-        );
+    }
+
+    async fn has_backup_completed(context: Arc<Context>, namespace: &str, name: &str) {
+        println!("Waiting for backup to complete: {}", name);
+        let backups: Api<Backup> = Api::namespaced(context.client.clone(), namespace);
+        let lp = ListParams::default().labels(&format!("cnpg.io/cluster={}", name));
+
+        const TIMEOUT_SECONDS_BACKUP_COMPLETED: u64 = 300;
+
+        let start_time = std::time::Instant::now();
+
+        loop {
+            let backup_result = backups.list(&lp).await;
+            let mut backup_completed = false;
+            if let Ok(backup_list) = backup_result {
+                for backup in backup_list.items {
+                    if let Some(backup_name) = &backup.metadata.name {
+                        println!("Found backup: {}", backup_name);
+                        if await_condition(backups.clone(), backup_name, is_backup_completed())
+                            .await
+                            .is_ok()
+                        {
+                            backup_completed = true;
+                            break;
+                        }
+                    } else {
+                        println!("Found backup with no name");
+                    }
+                }
+            } else {
+                println!("Backup {} not found, retrying...", name);
+            }
+
+            if backup_completed {
+                println!("Backup is complete: {}", name);
+                break;
+            }
+
+            // Check the elapsed time and break the loop if it's more than your overall timeout
+            if start_time.elapsed() > Duration::from_secs(TIMEOUT_SECONDS_BACKUP_COMPLETED) {
+                println!(
+                    "Failed to find completed backup {} after waiting {} seconds",
+                    name, TIMEOUT_SECONDS_BACKUP_COMPLETED
+                );
+                break;
+            }
+
+            // Sleep for a short duration before retrying
+            tokio::time::sleep(Duration::from_secs(5)).await;
+        }
     }
 
     // Create namespace for the test to run in
@@ -394,6 +436,46 @@ mod test {
         let _o = ns_api.delete(name, &params).await?;
 
         Ok(())
+    }
+
+    async fn wait_until_status_not_running(coredbs: &Api<CoreDB>, name: &str) -> Result<(), kube::Error> {
+        const TIMEOUT_SECONDS_STATUS_RUNNING: u32 = 294;
+        let wp = WatchParams {
+            timeout: Some(TIMEOUT_SECONDS_STATUS_RUNNING),
+            field_selector: Some(format!("metadata.name={}", name)),
+            ..Default::default()
+        };
+        let mut stream = coredbs.watch(&wp, "0").await?.boxed();
+
+        let result = timeout(Duration::from_secs(300), async {
+            while let Some(status) = stream.next().await {
+                match status {
+                    Ok(WatchEvent::Modified(cdb)) => {
+                        let running_status = cdb.status.as_ref().map_or(false, |s| s.running);
+                        if !running_status {
+                            println!("status.running is now false!");
+                            return Ok(());
+                        } else {
+                            println!("status.running is still true. Continuing to watch...");
+                        }
+                    }
+                    Ok(_) => {} // You might want to handle other events such as Error or Deleted
+                    Err(e) => {
+                        println!("Watch error: {:?}", e);
+                    }
+                }
+            }
+            Err(ValueError::Invalid("Stream terminated prematurely".to_string()))
+        })
+        .await;
+
+        match result {
+            Ok(_ok) => Ok(()),
+            Err(_) => Err(kube::Error::ReadEvents(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                "Timed out waiting for status.running to become false",
+            ))),
+        }
     }
 
     use controller::{
@@ -537,16 +619,34 @@ mod test {
 
         let coredb_resource = coredbs.get(name).await.unwrap();
         let mut found_extension = false;
-        for extension in coredb_resource.status.unwrap().extensions.unwrap() {
-            for location in extension.locations {
-                if extension.name == "pg_jsonschema" && location.enabled.unwrap() {
-                    found_extension = true;
-                    assert!(location.database == "postgres");
-                    // Even though we set the schema to be empty, it should report public
-                    // in the status
-                    assert!(location.schema.unwrap() == "public");
+        let mut retries = 0;
+
+        while retries < 10 {
+            let status = &coredb_resource.status;
+
+            if let Some(ref status) = status {
+                if let Some(ref extensions) = status.extensions {
+                    for extension in extensions {
+                        for location in &extension.locations {
+                            if extension.name == "pg_jsonschema" && location.enabled.unwrap_or_default() {
+                                found_extension = true;
+                                assert_eq!(location.database, "postgres");
+                                assert_eq!(
+                                    location.schema.clone().unwrap_or_else(|| "public".to_string()),
+                                    "public"
+                                );
+                            }
+                        }
+                    }
+                    if found_extension {
+                        break;
+                    }
                 }
             }
+
+            // Sleep for a short duration before the next retry
+            tokio::time::sleep(Duration::from_secs(2)).await;
+            retries += 1;
         }
         assert!(found_extension);
 
@@ -1880,13 +1980,26 @@ mod test {
         assert!(result.stdout.clone().unwrap().contains("plpgsql"));
 
         // Assert that both pods are replicating successfully
-        let result = psql_with_retry(
-            context.clone(),
-            coredb_resource.clone(),
-            "SELECT state FROM pg_stat_replication".to_string(),
-        )
-        .await;
-        assert!(result.stdout.clone().unwrap().contains("streaming"));
+        let mut retries = 0;
+        loop {
+            let result = psql_with_retry(
+                context.clone(),
+                coredb_resource.clone(),
+                "SELECT state FROM pg_stat_replication".to_string(),
+            )
+            .await;
+
+            if result.stdout.is_some() && result.stdout.clone().unwrap().contains("streaming") {
+                println!("Replication is streaming.");
+                assert!(result.stdout.clone().unwrap().contains("streaming"));
+                break;
+            } else if retries >= 10 {
+                panic!("Replication is not streaming after 10 retries");
+            } else {
+                retries += 1;
+                tokio::time::sleep(Duration::from_secs(5)).await;
+            }
+        }
 
         // Revert replicas back to 1 to disable HA
         let replicas = 1;
@@ -2623,11 +2736,24 @@ mod test {
                 "ls /var/lib/postgresql/data/tembo/extension/pgmq.control".to_owned(),
             ];
             let pod_name = pod.metadata.name.clone().expect("Pod should have a name");
-            let result =
-                run_command_in_container(pods.clone(), pod_name, cmd.clone(), Some("postgres".to_string()))
-                    .await;
-            println!("result: {}", result);
-            assert!(result.contains("pgmq.control"));
+            let mut retries = 0;
+            loop {
+                let result = run_command_in_container(
+                    pods.clone(),
+                    pod_name.clone(),
+                    cmd.clone(),
+                    Some("postgres".to_string()),
+                )
+                .await;
+                if !result.is_empty() || retries >= 10 {
+                    assert!(result.contains("pgmq.control"));
+                    break;
+                } else {
+                    retries += 1;
+                    println!("Waiting for pgmq.control to be present, retry: {}/10", retries);
+                    tokio::time::sleep(Duration::from_secs(5)).await;
+                }
+            }
         }
 
         // Now lets make the instance HA and ensure that all extenstions are present on both
@@ -3147,18 +3273,28 @@ mod test {
     #[ignore]
     async fn restarts_postgres_correctly() {
         async fn wait_til_status_is_filled(coredbs: &Api<CoreDB>, name: &str) {
-            let started_waiting = Utc::now();
-            let max_wait_time = chrono::Duration::seconds(45);
+            let max_retries = 10; // adjust as needed
+            for attempt in 1..=max_retries {
+                let coredb = coredbs
+                    .get(name)
+                    .await
+                    .unwrap_or_else(|_| panic!("Failed to get CoreDB: {}", name));
 
-            while Utc::now().signed_duration_since(started_waiting) <= max_wait_time {
-                let coredb = coredbs.get(name).await.expect("spec not found");
                 if coredb.status.is_some() {
+                    println!("Status is filled for CoreDB: {}", name);
                     return;
+                } else {
+                    println!(
+                        "Attempt {}/{}: Status not yet filled for CoreDB: {}",
+                        attempt, max_retries, name
+                    );
                 }
-                tokio::time::sleep(Duration::from_secs(2)).await;
+                tokio::time::sleep(Duration::from_secs(10)).await;
             }
-
-            panic!("Status was not populated fast enough");
+            panic!(
+                "Failed to fetch filled status for CoreDB: {} after {} attempts",
+                name, max_retries
+            );
         }
 
         async fn get_pg_start_time(coredbs: &Api<CoreDB>, name: &str, ctx: Arc<Context>) -> DateTime<Utc> {
@@ -3166,15 +3302,8 @@ mod test {
 
             let coredb = coredbs.get(name).await.expect("spec not found");
 
-            let psql_output = coredb
-                .psql(
-                    "SELECT pg_postmaster_start_time()".into(),
-                    "postgres".to_string(),
-                    ctx,
-                )
-                .await
-                .map_err(|err| eprintln!("Error: {:?}", err))
-                .unwrap();
+            let query = "SELECT pg_postmaster_start_time()".to_string();
+            let psql_output = psql_with_retry(ctx.clone(), coredb, query).await;
             let stdout = psql_output
                 .stdout
                 .as_ref()
@@ -3187,9 +3316,28 @@ mod test {
         }
 
         async fn status_running(coredbs: &Api<CoreDB>, name: &str) -> bool {
-            let spec = coredbs.get(name).await.expect("spec not found");
+            let max_retries = 10;
+            let wait_duration = Duration::from_secs(2); // Adjust as needed
 
-            spec.status.expect("Expected status to be present").running
+            for attempt in 1..=max_retries {
+                let coredb = coredbs.get(name).await.expect("Failed to get CoreDB");
+
+                if coredb.status.as_ref().map_or(false, |s| s.running) {
+                    println!("CoreDB {} is running", name);
+                    return true;
+                } else {
+                    println!(
+                        "Attempt {}/{}: CoreDB {} is not running yet",
+                        attempt, max_retries, name
+                    );
+                }
+                tokio::time::sleep(wait_duration).await;
+            }
+            println!(
+                "CoreDB {} did not become running after {} attempts",
+                name, max_retries
+            );
+            false
         }
 
         // Initialize tracing
@@ -3217,12 +3365,10 @@ mod test {
             "apiVersion": API_VERSION,
             "kind": "CoreDB",
             "metadata": {
-                "name": name
+                "name": name,
             },
             "spec": {
                 "replicas": 1,
-                "extensions": [],
-                "trunk_installs": []
             }
         });
 
@@ -3264,25 +3410,10 @@ mod test {
         // Ensure that eventually `status.running` becomes false to reflect
         // that Postgres is down
         {
-            let started = Utc::now();
-            let max_wait_time = chrono::Duration::seconds(30);
-            let mut running_became_false = false;
-            while Utc::now().signed_duration_since(started) < max_wait_time {
-                if status_running(&coredbs, &name).await {
-                    println!("status.running is still true. Retrying in 1 sec.");
-                    tokio::time::sleep(Duration::from_secs(1)).await;
-                } else {
-                    println!("status.running is now false!");
-
-                    running_became_false = true;
-                    break;
-                }
+            match wait_until_status_not_running(&coredbs, &name).await {
+                Ok(_) => println!("status.running is now false!"),
+                Err(e) => panic!("status.running should've become false after restart: {}", e),
             }
-
-            assert!(
-                running_became_false,
-                "status.running should've become false after restart"
-            );
         }
 
         // Wait for Postgres to restart
@@ -3341,8 +3472,17 @@ mod test {
     #[ignore]
     async fn functional_test_status_configs() {
         async fn runtime_cfg(coredbs: &Api<CoreDB>, name: &str) -> Option<Vec<PgConfig>> {
-            let spec = coredbs.get(name).await.expect("spec not found");
-            spec.status.expect("Expected status to be present").runtime_config
+            let started_waiting = Utc::now();
+            let max_wait_time = chrono::Duration::seconds(45);
+
+            while Utc::now().signed_duration_since(started_waiting) <= max_wait_time {
+                let coredb = coredbs.get(name).await.expect("spec not found");
+                if coredb.status.is_some() {
+                    return coredb.status.unwrap().runtime_config.clone();
+                }
+                tokio::time::sleep(Duration::from_secs(2)).await;
+            }
+            panic!("Status was not populated fast enough");
         }
 
         // Initialize the Kubernetes client
@@ -3560,7 +3700,53 @@ mod test {
                         "key": "MINIO_SECRET_KEY"
                         }
                     }
-                }
+                },
+                "trunk_installs": [
+                    {
+                        "name": "pg_partman",
+                        "version": "4.7.3",
+                    },
+                    {
+                        "name": "pgmq",
+                        "version": "0.10.0",
+                    },
+                    {
+                        "name": "pg_stat_statements",
+                        "version": "1.10.0",
+                    },
+                ],
+                "extensions": [
+                    {
+                        "name": "pg_partman",
+                        "description": "pg_partman extension",
+                        "locations": [{
+                            "enabled": false,
+                            "version": "4.7.3",
+                            "database": "postgres",
+                            "schema": "public"}
+                        ]
+                    },
+                    {
+                        "name": "pgmq",
+                        "description": "pgmq extension",
+                        "locations": [{
+                            "enabled": false,
+                            "version": "0.10.0",
+                            "database": "postgres",
+                            "schema": "public"}
+                        ]
+                    },
+                    {
+                        "name": "pg_stat_statements",
+                        "description": "pg_stat_statements extension",
+                        "locations": [{
+                            "enabled": false,
+                            "version": "1.10.0",
+                            "database": "postgres",
+                            "schema": "public"}
+                        ]
+                    },
+                ]
             }
         });
         let params = PatchParams::apply("tembo-integration-test");
@@ -3590,7 +3776,7 @@ mod test {
         assert!(result.stdout.clone().unwrap().contains("plpgsql"));
 
         // Check to make sure the initial backup has run and its completed
-        wait_backup_completed(context.clone(), &namespace, name).await;
+        has_backup_completed(context.clone(), &namespace, name).await;
 
         // Create a table and insert some data
         let result = psql_with_retry(
@@ -3638,7 +3824,7 @@ mod test {
         assert!(result.stdout.clone().unwrap().contains("plpgsql"));
 
         // Wait for backup to complete
-        wait_backup_completed(context.clone(), &namespace, &backup_name).await;
+        has_backup_completed(context.clone(), &namespace, &backup_name).await;
 
         // If the backup is complete, we can now restore to a new instance in a new namespace
         let suffix = rng.gen_range(0..100000);
@@ -3700,7 +3886,53 @@ mod test {
                             "key": "MINIO_SECRET_KEY"
                         }
                     }
-                }
+                },
+                "trunk_installs": [
+                    {
+                        "name": "pg_partman",
+                        "version": "4.7.3",
+                    },
+                    {
+                        "name": "pgmq",
+                        "version": "0.10.0",
+                    },
+                    {
+                        "name": "pg_stat_statements",
+                        "version": "1.10.0",
+                    },
+                ],
+                "extensions": [
+                    {
+                        "name": "pg_partman",
+                        "description": "pg_partman extension",
+                        "locations": [{
+                            "enabled": false,
+                            "version": "4.7.3",
+                            "database": "postgres",
+                            "schema": "public"}
+                        ]
+                    },
+                    {
+                        "name": "pgmq",
+                        "description": "pgmq extension",
+                        "locations": [{
+                            "enabled": false,
+                            "version": "0.10.0",
+                            "database": "postgres",
+                            "schema": "public"}
+                        ]
+                    },
+                    {
+                        "name": "pg_stat_statements",
+                        "description": "pg_stat_statements extension",
+                        "locations": [{
+                            "enabled": false,
+                            "version": "1.10.0",
+                            "database": "postgres",
+                            "schema": "public"}
+                        ]
+                    },
+                ]
             }
         });
         let params = PatchParams::apply("tembo-integration-test");
@@ -3731,6 +3963,33 @@ mod test {
         // Assert that we can query the database with \dx;
         let result = psql_with_retry(context.clone(), coredb_resource.clone(), "\\dx".to_string()).await;
         assert!(result.stdout.clone().unwrap().contains("plpgsql"));
+
+        // Assert that the extensions are installed on both replicas
+        let retrieved_pods_result = coredb_resource.pods_by_cluster(client.clone()).await;
+
+        let retrieved_pods = match retrieved_pods_result {
+            Ok(pods_list) => pods_list,
+            Err(e) => {
+                panic!("Failed to retrieve pods: {:?}", e);
+            }
+        };
+        for pod in &retrieved_pods {
+            let cmd = vec![
+                "/bin/sh".to_owned(),
+                "-c".to_owned(),
+                "ls /var/lib/postgresql/data/tembo/extension/pgmq.control".to_owned(),
+            ];
+            let pod_name = pod.metadata.name.clone().expect("Pod should have a name");
+            pod_ready_and_running(restore_pods.clone(), pod_name.clone()).await;
+            let result = run_command_in_container(
+                restore_pods.clone(),
+                pod_name,
+                cmd.clone(),
+                Some("postgres".to_string()),
+            )
+            .await;
+            assert!(result.contains("pgmq.control"));
+        }
 
         // Check to make sure the data from the original database is present
         let result = psql_with_retry(

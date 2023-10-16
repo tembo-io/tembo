@@ -57,7 +57,7 @@ async fn all_fenced_and_non_fenced_pods(cdb: &CoreDB, ctx: Arc<Context>) -> Resu
     let pods_fenced = get_fenced_pods(cdb, ctx.clone()).await?;
 
     // Get all non-fenced pods
-    let non_fenced_pods = cdb.pods_by_cluster(ctx.client.clone()).await?;
+    let non_fenced_pods = cdb.pods_by_cluster_ready_or_not(ctx.client.clone()).await?;
 
     // Merge and deduplicate pod names
     let all_pods = merge_and_deduplicate_pods(non_fenced_pods, pods_fenced);
@@ -149,7 +149,7 @@ fn find_trunk_installs_to_pod<'a>(cdb: &'a CoreDB, pod_name: &str) -> Vec<&'a Tr
 }
 
 // is_pod_fenced function checks if a pod is fenced and returns a bool or requeue action
-#[instrument(skip(cdb, ctx, pod_name) fields(trace_id))]
+#[instrument(skip(cdb, ctx, pod_name) fields(trace_id, pod_name))]
 async fn is_pod_fenced(cdb: &CoreDB, ctx: Arc<Context>, pod_name: &str) -> Result<bool, Action> {
     let coredb_name = cdb.metadata.name.as_deref().unwrap_or_default();
 
@@ -171,7 +171,7 @@ async fn is_pod_fenced(cdb: &CoreDB, ctx: Arc<Context>, pod_name: &str) -> Resul
     Ok(false)
 }
 
-#[instrument(skip(ctx, cdb) fields(trace_id))]
+#[instrument(skip(ctx, cdb))]
 pub async fn reconcile_trunk_installs(
     cdb: &CoreDB,
     ctx: Arc<Context>,
@@ -315,11 +315,13 @@ async fn execute_extension_install_command(
         version,
     ];
 
+    // If the pod is not up yet, do not try and install the extension
     if let Err(e) = cdb.log_pod_status(client.clone(), pod_name).await {
         warn!(
             "Could not fetch or log pod status for instance {}: {:?}",
             coredb_name, e
         );
+        return Err(true);
     }
 
     let result = cdb.exec(pod_name.to_string(), client.clone(), &cmd).await;

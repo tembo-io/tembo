@@ -6,6 +6,7 @@ spec:
   image: "quay.io/tembo/standard-cnpg:15.3.0-1-45c2054"
   backup:
     destinationPath: s3://tembo-backup/sample-standard-backup
+    encryption: ""
     retentionPolicy: "30"
     schedule: 17 9 * * *
     endpointURL: http://minio.minio.svc.cluster.local:9000

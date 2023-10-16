@@ -18,7 +18,7 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info, instrument, trace, warn};
 
 lazy_static! {
     static ref VALID_INPUT: Regex = Regex::new(r"^[a-zA-Z]([a-zA-Z0-9]*[-_]?)*[a-zA-Z0-9]+$").unwrap();
@@ -104,6 +104,7 @@ pub struct ExtRow {
     pub schema: String,
 }
 
+#[instrument(skip(cdb, ctx), fields(cdb_name = %cdb.name_any()))]
 pub async fn list_shared_preload_libraries(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<String>, Action> {
     let psql_out = cdb
         .psql(
@@ -136,6 +137,7 @@ pub async fn list_shared_preload_libraries(cdb: &CoreDB, ctx: Arc<Context>) -> R
 }
 
 /// lists all extensions in a single database
+#[instrument(skip(cdb, ctx), fields(cdb_name = %cdb.name_any()))]
 pub async fn list_extensions(cdb: &CoreDB, ctx: Arc<Context>, database: &str) -> Result<Vec<ExtRow>, Action> {
     let psql_out = cdb
         .psql(LIST_EXTENSIONS_QUERY.to_owned(), database.to_owned(), ctx)
@@ -145,6 +147,7 @@ pub async fn list_extensions(cdb: &CoreDB, ctx: Arc<Context>, database: &str) ->
 }
 
 /// List all configuration parameters
+#[instrument(skip(cdb, ctx), fields(cdb_name = %cdb.name_any()))]
 pub async fn list_config_params(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<PgConfig>, Action> {
     let psql_out = cdb
         .psql("SHOW ALL;".to_owned(), "postgres".to_owned(), ctx)
@@ -163,6 +166,7 @@ pub async fn list_config_params(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<P
 }
 
 /// Returns Ok if the given database is running (i.e. not restarting)
+#[instrument(skip(cdb, ctx), fields(cdb_name = %cdb.name_any()))]
 pub async fn is_not_restarting(cdb: &CoreDB, ctx: Arc<Context>, database: &str) -> Result<(), Action> {
     // chrono strftime declaration to parse Postgres timestamps
     const PG_TIMESTAMP_DECL: &str = "%Y-%m-%d %H:%M:%S.%f%#z";
@@ -179,7 +183,7 @@ pub async fn is_not_restarting(cdb: &CoreDB, ctx: Arc<Context>, database: &str) 
 
     let restarted_requested_at: DateTime<Utc> = DateTime::parse_from_rfc3339(restarted_at)
         .map_err(|err| {
-            tracing::error!("{cdb_name}: Failed to deserialize DateTime from `restartedAt`: {err}");
+            error!("{cdb_name}: Failed to deserialize DateTime from `restartedAt`: {err}");
 
             Action::requeue(Duration::from_secs(300))
         })?
@@ -194,13 +198,13 @@ pub async fn is_not_restarting(cdb: &CoreDB, ctx: Arc<Context>, database: &str) 
         .await?
         .stdout
         .ok_or_else(|| {
-            tracing::error!("{cdb_name}: select pg_postmaster_start_time() had no stdout");
+            error!("{cdb_name}: select pg_postmaster_start_time() had no stdout");
 
             Action::requeue(Duration::from_secs(300))
         })?;
 
     let pg_postmaster_start_time = parse_psql_output(&pg_postmaster).ok_or_else(|| {
-        tracing::error!("{cdb_name}: failed to parse pg_postmaster_start_time() output");
+        error!("{cdb_name}: failed to parse pg_postmaster_start_time() output");
 
         Action::requeue(Duration::from_secs(300))
     })?;
@@ -218,13 +222,16 @@ pub async fn is_not_restarting(cdb: &CoreDB, ctx: Arc<Context>, database: &str) 
     if server_started_at >= restarted_requested_at {
         // Server started after the moment we requested it to restart,
         // meaning the restart is done
+        debug!("Restart is complete for {}", cdb_name);
         Ok(())
     } else {
         // Server hasn't even started restarting yet
+        error!("Restart is not complete for {}, requeuing", cdb_name);
         Err(Action::requeue(Duration::from_secs(5)))
     }
 }
 
+#[instrument(skip(psql_str))]
 pub fn parse_extensions(psql_str: &str) -> Vec<ExtRow> {
     let mut extensions = vec![];
     for line in psql_str.lines().skip(2) {
@@ -248,6 +255,7 @@ pub fn parse_extensions(psql_str: &str) -> Vec<ExtRow> {
 }
 
 /// returns all the databases in an instance
+#[instrument(skip(cdb, ctx), fields(cdb_name = %cdb.name_any()))]
 pub async fn list_databases(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<String>, Action> {
     let _client = ctx.client.clone();
     let psql_out = cdb
@@ -257,6 +265,7 @@ pub async fn list_databases(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<Strin
     Ok(parse_sql_output(&result_string))
 }
 
+#[instrument(skip(psql_str))]
 pub fn parse_sql_output(psql_str: &str) -> Vec<String> {
     let mut results = vec![];
     for line in psql_str.lines().skip(2) {
@@ -277,6 +286,7 @@ pub fn parse_sql_output(psql_str: &str) -> Vec<String> {
 }
 
 /// Parse the output of `SHOW ALL` to get the parameter and its value. Return Vec<PgConfig>
+#[instrument(skip(psql_str))]
 pub fn parse_config_params(psql_str: &str) -> Vec<PgConfig> {
     let mut results = vec![];
     for line in psql_str.lines().skip(2) {
@@ -305,12 +315,13 @@ pub fn parse_config_params(psql_str: &str) -> Vec<PgConfig> {
     debug!("Found {} config values", num_results);
     // Log config values to debug
     for result in &results {
-        debug!("Config value: {:?}", result);
+        trace!("Config value: {:?}", result);
     }
     results
 }
 
 /// list databases then get all extensions from each database
+#[instrument(skip(cdb, ctx), fields(cdb_name = %cdb.name_any()))]
 pub async fn get_all_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<ExtensionStatus>, Action> {
     let databases = list_databases(cdb, ctx.clone()).await?;
     debug!("databases: {:?}", databases);
@@ -352,6 +363,7 @@ pub async fn get_all_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<E
 
 /// Handles create/drop an extension location
 /// On failure, returns an error message
+#[instrument(skip(cdb, ctx), fields(cdb_name = %cdb.name_any(), ext_name, ext_loc))]
 pub async fn toggle_extension(
     cdb: &CoreDB,
     ext_name: &str,

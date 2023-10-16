@@ -2090,7 +2090,7 @@ pub struct ClusterStatusConditions {
     pub r#type: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
 pub enum ClusterStatusConditionsStatus {
     True,
     False,

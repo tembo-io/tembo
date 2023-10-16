@@ -8,7 +8,9 @@ use kube::{
     Api, Resource, ResourceExt,
 };
 use std::{collections::BTreeMap, sync::Arc};
+use tracing::instrument;
 
+#[instrument(skip(cdb, ctx), fields(instance_name = %cdb.name_any()))]
 pub async fn reconcile_prometheus_exporter_service(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
     let client = ctx.client.clone();
     let ns = cdb.namespace().unwrap();

@@ -665,12 +665,34 @@ fn extend_with_fenced_pods(pod_names_to_fence: &mut Vec<String>, fenced_pods: Op
 
 // pods_to_fence determines a list of pod names that should be fenced when we detect that new replicas are being created
 async fn pods_to_fence(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<String>, Action> {
+    // Check if a restore is requested
+    if cdb.spec.restore.is_some()
+        && cdb
+            .status
+            .clone()
+            .unwrap_or_default()
+            .first_recoverability_time
+            .is_none()
+    {
+        // If restore is requested, fence all the pods based on the cdb.spec.replicas value
+        let mut pod_names_to_fence = Vec::new();
+        for i in 1..=cdb.spec.replicas {
+            let pod_name = format!("{}-{}", &cdb.name_any(), i);
+            pod_names_to_fence.push(pod_name);
+        }
+
+        debug!(
+            "Restore requested. Pods to be fenced during restore: {:?}",
+            pod_names_to_fence
+        );
+        return Ok(pod_names_to_fence);
+    }
+
     // Get replica count from CoreDBSpec
     let cdb_replica = cdb.spec.replicas;
 
     // using get_cluster_replicas function to lookup current replica count from Cluster object
-    let cluster_replica_result: Result<i64, Action> =
-        get_instance_replicas(cdb, ctx.clone(), &cdb.name_any()).await;
+    let cluster_replica_result = get_instance_replicas(cdb, ctx.clone()).await;
 
     let mut pod_names_to_fence = Vec::new();
 
@@ -776,7 +798,7 @@ fn update_restarted_at(cdb: &CoreDB, maybe_cluster: Option<&Cluster>, new_spec: 
     restart_annotation_updated
 }
 
-#[instrument(skip(cdb, ctx) fields(trace_id))]
+#[instrument(skip(cdb, ctx) fields(trace_id, instance_name = %cdb.name_any()))]
 pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {
     let pods_to_fence = pods_to_fence(cdb, ctx.clone()).await?;
     let requires_load =
@@ -836,7 +858,7 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
                     if current_shared_preload_libraries != new_libs {
                         let mut libs_that_are_installed: Vec<String> = vec![];
                         // If we can't find the existing primary pod, returns a requeue
-                        let primary_pod_cnpg = cdb.primary_pod_cnpg(ctx.client.clone()).await?;
+                        let primary_pod_cnpg = cdb.primary_pod_cnpg_ready_or_not(ctx.client.clone()).await?;
                         // Check if the file is already installed
                         let command = vec![
                             "/bin/sh".to_string(),
@@ -1061,6 +1083,7 @@ fn cnpg_scheduled_backup(cdb: &CoreDB) -> ScheduledBackup {
 }
 
 // Reconcile a SheduledBackup
+#[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any()))]
 pub async fn reconcile_cnpg_scheduled_backup(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {
     let scheduledbackup = cnpg_scheduled_backup(cdb);
     let client = ctx.client.clone();
@@ -1130,7 +1153,7 @@ pub async fn get_latest_generated_node(
 
 /// fenced_pods_initialized checks if fenced pods are initialized and retuns a bool or action in a
 /// result
-#[instrument(skip(cdb, ctx), fields(trace_id))]
+#[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any()))]
 async fn fenced_pods_initialized(cdb: &CoreDB, ctx: Arc<Context>, pod_name: &str) -> Result<bool, Action> {
     let instance_name = cdb.name_any();
     let namespace = cdb.namespace().ok_or_else(|| {
@@ -1169,8 +1192,8 @@ async fn fenced_pods_initialized(cdb: &CoreDB, ctx: Arc<Context>, pod_name: &str
 
 // get_fenced_instances_from_annotations returns a list of fenced instances from the annotations as
 // a BTreeMap of String, String
-#[instrument(fields(trace_id))]
-fn get_fenced_instances_from_annotations(
+#[instrument(fields(trace_id, annotations))]
+pub fn get_fenced_instances_from_annotations(
     annotations: &BTreeMap<String, String>,
 ) -> Result<Option<Vec<String>>, serde_json::Error> {
     if let Some(fenced_instances) = annotations.get("cnpg.io/fencedInstances") {
@@ -1182,7 +1205,7 @@ fn get_fenced_instances_from_annotations(
 }
 
 // get_fenced_nodes returns a list of nodes that are fenced only after all the pods are initialized
-#[instrument(skip(cdb, ctx), fields(trace_id))]
+#[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any()))]
 pub async fn get_fenced_pods(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Option<Vec<String>>, Action> {
     let instance_name = cdb.metadata.name.as_deref().unwrap_or_default();
     let namespace = cdb.namespace().ok_or_else(|| {
@@ -1221,18 +1244,45 @@ pub async fn get_fenced_pods(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Option<V
 
     // Check if fencedInstances annotation is present
     if let Some(fenced_instances) = fenced_instances {
-        // Rest of your code
         debug!(
             "Found fenced pods {:?} for instance {}",
             fenced_instances, instance_name
         );
 
-        // Check if all fenced pods are initialized
+        let primary_pod_name = cdb
+            .primary_pod_cnpg_ready_or_not(ctx.client.clone())
+            .await?
+            .name_any();
+
+        // Check if primary pod is initialized
+        let is_primary_initialized = fenced_pods_initialized(cdb, ctx.clone(), &primary_pod_name).await?;
+        if is_primary_initialized {
+            debug!(
+                "Primary pod {} is initialized for instance {}",
+                primary_pod_name, instance_name
+            );
+            // Return early to get the primary pod unfenced first
+            return Ok(Some(fenced_instances));
+        }
+        warn!(
+            "Primary pod {} is not yet initialized for instance {}",
+            primary_pod_name, instance_name
+        );
+
+        // Check if other fenced pods (excluding primary) are initialized
         for pod_name in &fenced_instances {
+            if pod_name == &primary_pod_name {
+                debug!(
+                    "Primary pod {} is initialized for instance {}",
+                    primary_pod_name, instance_name
+                );
+                continue;
+            }
+
             let is_initialized = fenced_pods_initialized(cdb, ctx.clone(), pod_name).await?;
             if !is_initialized {
                 info!(
-                    "Pod {} in {} is not yet initialized. Will requeue.",
+                    "Pod {} in {} is not yet initialized. Will requeue, but work continues on primary.",
                     pod_name, instance_name
                 );
                 return Err(Action::requeue(Duration::from_secs(10)));
@@ -1250,34 +1300,32 @@ pub async fn get_fenced_pods(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Option<V
 }
 
 // get_instance_replicas will look up cluster.spec.instances from Kubernetes and return i64 value
-#[instrument(skip(cdb, ctx), fields(trace_id))]
-async fn get_instance_replicas(cdb: &CoreDB, ctx: Arc<Context>, instance_name: &str) -> Result<i64, Action> {
+#[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any()))]
+async fn get_instance_replicas(cdb: &CoreDB, ctx: Arc<Context>) -> Result<i64, Action> {
     let namespace = match cdb.namespace() {
         Some(ns) => ns,
         None => {
-            error!("Namespace is not set for CoreDB instance {}", instance_name);
+            error!("Namespace is not set for CoreDB instance {}", cdb.name_any());
             return Err(Action::requeue(Duration::from_secs(300)));
         }
     };
 
     let cluster: Api<Cluster> = Api::namespaced(ctx.client.clone(), &namespace);
-    let co = cluster.get(instance_name).await;
-
-    if let Ok(cluster_resource) = co {
-        let spec = cluster_resource.spec; // Assuming that this is not an Option
-        Ok(spec.instances) // Assuming that instances is an i64
-    } else {
+    let co = cluster.get(&cdb.name_any()).await.map_err(|e| {
         info!(
-            "Cluster {} not found, possible new cluster detected",
-            instance_name
+            "Cluster is missing, instance {} maybe starting: {}",
+            cdb.name_any(),
+            e
         );
-        Err(Action::requeue(Duration::from_secs(30)))
-    }
+        Action::requeue(Duration::from_secs(30))
+    })?;
+
+    Ok(co.spec.instances)
 }
 
 // remove_pod_from_fenced_instances_annotation function will remove the pod name from the fencedInstances annotation
 // and return the updated annotations as a BTreeMap
-#[instrument(fields(trace_id))]
+#[instrument(fields(trace_id, annotations, pod_name))]
 fn remove_pod_from_fenced_instances_annotation(
     annotations: &BTreeMap<String, String>,
     pod_name: &str,
@@ -1303,7 +1351,7 @@ fn remove_pod_from_fenced_instances_annotation(
 }
 
 // unfence_pod function will remove the fencing annotation from the cluster object
-#[instrument(skip(cdb, ctx), fields(trace_id))]
+#[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any(), pod_name))]
 pub async fn unfence_pod(cdb: &CoreDB, ctx: Arc<Context>, pod_name: &str) -> Result<(), Action> {
     let instance_name = cdb.metadata.name.as_deref().unwrap_or_default();
     let namespace = match cdb.namespace() {
@@ -1341,16 +1389,19 @@ pub async fn unfence_pod(cdb: &CoreDB, ctx: Arc<Context>, pod_name: &str) -> Res
             cluster_resource.metadata.managed_fields = None;
 
             // Patch the cluster object
-            debug!("Patching CoreDBSpec for instance {}", instance_name);
+            debug!("Patching Cluster resource for instance {}", instance_name);
             let ps = PatchParams::apply("cntrlr");
             let _o = cluster
                 .patch(instance_name, &ps, &Patch::Apply(&cluster_resource))
                 .await
                 .map_err(|e| {
-                    error!("Error patching cluster: {}", e);
-                    Action::requeue(Duration::from_secs(300))
+                    warn!(
+                        "Issue patching annotation for instance {}, will requeue: {}",
+                        instance_name, e
+                    );
+                    Action::requeue(Duration::from_secs(30))
                 })?;
-            debug!("CoreDBSpec patched for instance {}", instance_name);
+            debug!("Cluster annotations patched for instance {}", instance_name);
             Ok(())
         } else {
             debug!("The fencedInstances annotation is not set in the Cluster Status for instance {}. Removing the key.", instance_name);
@@ -1370,16 +1421,19 @@ pub async fn unfence_pod(cdb: &CoreDB, ctx: Arc<Context>, pod_name: &str) -> Res
             cluster_resource.metadata.managed_fields = None;
 
             // Patch the cluster object
-            debug!("Patch CoreDBSpec for instance {}", instance_name);
+            debug!("Patch Cluster annotation for instance {}", instance_name);
             let ps = PatchParams::apply("cntrlr");
             let _o = cluster
                 .patch(instance_name, &ps, &Patch::Apply(&cluster_resource))
                 .await
                 .map_err(|e| {
-                    error!("Error patching cluster: {}", e);
-                    Action::requeue(Duration::from_secs(300))
+                    warn!(
+                        "Issue patching annotation for instance {}, will requeue: {}",
+                        instance_name, e
+                    );
+                    Action::requeue(Duration::from_secs(30))
                 })?;
-            debug!("CoreDBSpec patched for instance {}", instance_name);
+            debug!("Cluster annotations patched for instance {}", instance_name);
             Ok(())
         }
     } else {
@@ -1390,6 +1444,7 @@ pub async fn unfence_pod(cdb: &CoreDB, ctx: Arc<Context>, pod_name: &str) -> Res
 
 // generate_restore_destination_path function will generate the restore destination path from the backup
 // object and return a string
+#[instrument(fields(trace_id, path))]
 fn generate_restore_destination_path(path: &str) -> String {
     let mut parts: Vec<&str> = path.split('/').collect();
     parts.pop();
@@ -1398,6 +1453,7 @@ fn generate_restore_destination_path(path: &str) -> String {
 
 // generate_s3_backup_credentials function will generate the s3 backup credentials from
 // S3Credentials object and return a ClusterBackupBarmanObjectStoreS3Credentials object
+#[instrument(fields(trace_id, creds))]
 fn generate_s3_backup_credentials(
     creds: Option<&S3Credentials>,
 ) -> ClusterBackupBarmanObjectStoreS3Credentials {
@@ -1447,6 +1503,7 @@ fn generate_s3_backup_credentials(
 
 // generate_s3_restore_credentials function will generate the s3 restore credentials from
 // S3Credentials object and return a ClusterExternalClustersBarmanObjectStoreS3Credentials object
+#[instrument(fields(trace_id, creds))]
 fn generate_s3_restore_credentials(
     creds: Option<&S3Credentials>,
 ) -> ClusterExternalClustersBarmanObjectStoreS3Credentials {

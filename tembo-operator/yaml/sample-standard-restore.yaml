@@ -8,6 +8,7 @@ spec:
   backup:
     destinationPath: s3://tembo-backup/sample-standard-restore
     retentionPolicy: "30"
+    encryption: ""
     schedule: 17 9 * * *
     endpointURL: http://minio.minio.svc.cluster.local:9000
     s3Credentials:
@@ -19,7 +20,6 @@ spec:
         key: MINIO_SECRET_KEY
   restore:
     serverName: sample-standard-backup
-    recoveryTargetTime: "2023-09-26T23:30:29Z"
     endpointURL: http://minio.minio.svc.cluster.local:9000
     s3Credentials:
       accessKeyId:
