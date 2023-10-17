@@ -333,6 +333,8 @@ pub fn cnpg_cluster_bootstrap_from_cdb(
         ClusterBootstrap {
             recovery: Some(ClusterBootstrapRecovery {
                 source: Some("tembo-recovery".to_string()),
+                database: Some("app".to_string()),
+                owner: Some("app".to_string()),
                 recovery_target: parsed_target_time.map(|target_time| {
                     ClusterBootstrapRecoveryRecoveryTarget {
                         target_time: Some(target_time),
