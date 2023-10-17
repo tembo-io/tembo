@@ -98,6 +98,8 @@ fn secret_data(cdb: &CoreDB, ns: &str, password: String) -> BTreeMap<String, Byt
     let rw_host = format!("{}-rw.{}.svc.cluster.local", &cdb.name_any(), &ns);
     // read only host
     let ro_host: String = format!("{}-ro.{}.svc.cluster.local", &cdb.name_any(), &ns);
+    // pooler host
+    let pooler_host = format!("{}-pooler.{}.svc.cluster.local", &cdb.name_any(), &ns);
 
     // encode and insert host into secret data
     let b64_host = b64_encode(&r_host);
@@ -117,6 +119,13 @@ fn secret_data(cdb: &CoreDB, ns: &str, password: String) -> BTreeMap<String, Byt
     let rouri = format!("postgresql://{}:{}@{}:{}", &user, &password, &ro_host, &port);
     let b64_rouri = b64_encode(&rouri);
     data.insert("ro_uri".to_owned(), b64_rouri);
+
+    // encode and insert pooler uri into secret data
+    if cdb.spec.connectionPooler.enabled {
+        let pooler_uri = format!("postgresql://{}:{}@{}:{}", &user, &password, &pooler_host, &port);
+        let b64_pooler_uri = b64_encode(&pooler_uri);
+        data.insert("pooler_uri".to_owned(), b64_pooler_uri);
+    }
 
     data
 }
