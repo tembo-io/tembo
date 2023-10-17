@@ -255,6 +255,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     client.clone(),
                     &namespace,
                     &data_plane_basedomain,
+                    &coredb_spec,
                 )
                 .await
                 {
@@ -428,8 +429,13 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     }
                 };
 
-                let conn_info =
-                    get_pg_conn(client.clone(), &namespace, &data_plane_basedomain).await;
+                let conn_info = get_pg_conn(
+                    client.clone(),
+                    &namespace,
+                    &data_plane_basedomain,
+                    &current_resource.spec,
+                )
+                .await;
 
                 types::StateToControlPlane {
                     data_plane_id: read_msg.message.data_plane_id,

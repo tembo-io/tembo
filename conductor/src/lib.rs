@@ -256,6 +256,7 @@ pub async fn get_pg_conn(
     client: Client,
     name: &str,
     basedomain: &str,
+    spec: &CoreDBSpec,
 ) -> Result<types::ConnectionInfo, ConductorError> {
     let (postgres_user_secret, app_user_secret) = get_secret_for_db(client, name).await?;
 
@@ -278,10 +279,23 @@ pub async fn get_pg_conn(
 
     let host = format!("{name}.{basedomain}");
 
+    // If connectionPooler is enabled, set the pooler_host
+    let pooler_host = match spec.connectionPooler.enabled {
+        true => {
+            if spec.connectionPooler.enabled {
+                Some(format!("{name}-pooler.{basedomain}"))
+            } else {
+                None
+            }
+        }
+        _ => None,
+    };
+
     // Create ConnectionInfo for the postgres user
     // The user and password are base64 encoded when passed back to the control-plane
     let postgres_conn = types::ConnectionInfo {
         host: host.clone(),
+        pooler_host,
         port: 5432,
         user: postgres_user,
         password: postgres_pw,
