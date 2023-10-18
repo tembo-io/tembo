@@ -9,6 +9,15 @@ pub struct TrunkInstall {
     pub version: Option<String>,
 }
 
+impl From<TrunkInstallStatus> for TrunkInstall {
+    fn from(status: TrunkInstallStatus) -> Self {
+        TrunkInstall {
+            name: status.name,
+            version: status.version,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, Hash, JsonSchema, Serialize, PartialEq, ToSchema)]
 pub struct TrunkInstallStatus {
     pub name: String,
@@ -38,6 +47,22 @@ impl Default for Extension {
     }
 }
 
+impl From<ExtensionStatus> for Extension {
+    fn from(status: ExtensionStatus) -> Self {
+        let locations = status
+            .locations
+            .into_iter()
+            .map(ExtensionInstallLocation::from)
+            .collect();
+
+        Extension {
+            name: status.name,
+            description: status.description,
+            locations,
+        }
+    }
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, Hash, JsonSchema, Serialize, PartialEq, ToSchema)]
 pub struct ExtensionInstallLocation {
     pub enabled: bool,
@@ -54,6 +79,17 @@ impl Default for ExtensionInstallLocation {
             database: "postgres".to_string(),
             version: None,
             schema: None,
+        }
+    }
+}
+
+impl From<ExtensionInstallLocationStatus> for ExtensionInstallLocation {
+    fn from(status: ExtensionInstallLocationStatus) -> Self {
+        ExtensionInstallLocation {
+            enabled: status.enabled.unwrap_or(false),
+            database: status.database,
+            schema: status.schema,
+            version: status.version,
         }
     }
 }
@@ -728,5 +764,39 @@ mod tests {
         assert_eq!(result[1].locations[0].database, "db1".to_string());
         assert_eq!(result[1].locations[0].schema, Some("schema1".to_string()));
         assert_eq!(result[1].locations[0].enabled, Some(false));
+    }
+    #[test]
+    fn test_extension_conversion() {
+        let status = ExtensionStatus {
+            name: "pgmq".to_string(),
+            description: Some("description".to_string()),
+            locations: vec![ExtensionInstallLocationStatus {
+                database: "postgres".to_string(),
+                schema: Some("schema".to_string()),
+                version: Some("1.0".to_string()),
+                enabled: Some(true),
+                error: Some(false),
+                error_message: None,
+            }],
+        };
+        let extension: Extension = status.into();
+        assert_eq!(extension.name, "pgmq");
+        assert_eq!(extension.description, Some("description".to_string()));
+        assert_eq!(extension.locations[0].database, "postgres");
+        assert_eq!(extension.locations[0].schema, Some("schema".to_string()));
+    }
+
+    #[test]
+    fn test_trunk_install_conversion() {
+        let status = TrunkInstallStatus {
+            name: "pgmq".to_string(),
+            version: Some("1.0".to_string()),
+            error: false,
+            error_message: None,
+            installed_to_pods: None,
+        };
+        let trunk_install: TrunkInstall = status.into();
+        assert_eq!(trunk_install.name, "pgmq");
+        assert_eq!(trunk_install.version, Some("1.0".to_string()));
     }
 }
