@@ -207,3 +207,29 @@ Updating the CRD:
 - Edit the [CoreDBSpec struct](./src/controller.rs) as needed.
 
 - `> just generate-crd`
+
+### Connecting to Postgres locally
+
+Start a tembo instance
+
+```
+kubectl apply -f yaml/sample-coredb.yaml
+```
+
+Get the connection password and save it as an environment variable.
+
+```bash
+export PGPASSWORD=$(kubectl get secrets/sample-coredb-connection --template={{.data.password}} | base64 -D)
+```
+
+Add the following line to `/etc/hosts`
+
+```bash
+127.0.0.1 sample-coredb.localhost
+```
+
+Connect to the running Postgres instance:
+
+```bash
+psql postgres://postgres:$PGPASSWORD@sample-coredb.localhost:5432
+```
