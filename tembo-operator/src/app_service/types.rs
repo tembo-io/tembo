@@ -78,6 +78,8 @@ pub enum Middleware {
     CustomRequestHeaders(HeaderConfig),
     #[serde(rename = "stripPrefix")]
     StripPrefix(StripPrefixConfig),
+    #[serde(rename = "replacePathRegex")]
+    ReplacePathRegex(ReplacePathRegexConfig),
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, JsonSchema, PartialEq)]
@@ -92,6 +94,17 @@ pub struct HeaderConfig {
 pub struct StripPrefixConfig {
     pub name: String,
     pub config: Vec<String>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, JsonSchema, PartialEq)]
+pub struct ReplacePathRegexConfig {
+    pub name: String,
+    pub config: ReplacePathRegexConfigType,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, JsonSchema, PartialEq)]
+pub struct ReplacePathRegexConfigType {
+    pub regex: String,
+    pub replacement: String,
 }
 
 
@@ -129,6 +142,16 @@ mod tests {
                     "/removeMe"
                 ]
             },
+        },
+        {
+            "replacePathRegex": {
+                "name": "replace-my-regex",
+                "config":
+                    {
+                        "regex": "/replace/me",
+                        "replacement": "/with/me"
+                    }
+            },
         }
         ]);
 
@@ -143,6 +166,11 @@ mod tests {
                 Middleware::StripPrefix(mw) => {
                     assert_eq!(mw.name, "strip-my-prefix");
                     assert_eq!(mw.config[0], "/removeMe");
+                }
+                Middleware::ReplacePathRegex(mw) => {
+                    assert_eq!(mw.name, "replace-my-regex");
+                    assert_eq!(mw.config.regex, "/replace/me");
+                    assert_eq!(mw.config.replacement, "/with/me");
                 }
             }
         }

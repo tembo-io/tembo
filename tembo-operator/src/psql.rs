@@ -6,6 +6,7 @@ use tracing::warn;
 
 use crate::exec::ExecCommand;
 
+#[derive(Debug)]
 pub struct PsqlOutput {
     pub stdout: Option<String>,
     pub stderr: Option<String>,

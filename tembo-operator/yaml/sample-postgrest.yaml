@@ -3,29 +3,53 @@ kind: CoreDB
 metadata:
   name: my-coredb
 spec:
+  trunk_installs:
+  - name: pg_graphql
+    version: 1.2.0
+  extensions:
+  - name: pg_graphql
+    locations:
+      - database: postgres
+        enabled: true
+  
   appServices:
     - name: postgrest
       image: postgrest/postgrest:v10.0.0
       routing:
+        # only expose /rest/v1 and /graphql/v1
         - port: 3000
           ingressPath: /rest/v1
           middlewares:
             - my-headers
-            - my-strip-prefix
+        - port: 3000
+          ingressPath: /graphql/v1
+          middlewares:
+            - map-gql
+            - my-headers
       middlewares:
         - customRequestHeaders:
             name: my-headers
             config:
               # removes auth header from request
               Authorization: ""
+              Content-Profile: graphql
+              Accept-Profile: graphql
         - stripPrefix:
             name: my-strip-prefix
             config:
               - /rest/v1
+        # reroute gql and rest requests
+        - replacePathRegex:
+            name: map-gql
+            config:
+              regex: \/graphql\/v1\/?
+              replacement: /rpc/resolve
       env:
         - name: PGRST_DB_URI
           valueFromPlatform: ReadWriteConnection
         - name: PGRST_DB_SCHEMA
-          value: public
+          value: "public, graphql"
         - name: PGRST_DB_ANON_ROLE
           value: postgres
+        - name: PGRST_LOG_LEVEL
+          value: info

@@ -2909,6 +2909,23 @@ mod test {
                 "name": cdb_name
             },
             "spec": {
+                "extensions": [
+                    {
+                        "name": "pg_graphql",
+                        "locations": [
+                            {
+                                "database": "postgres",
+                                "enabled": true
+                            }
+                        ]
+                    }
+                ],
+                "trunk_installs": [
+                    {
+                        "name": "pg_graphql",
+                        "version": "1.4.1"
+                    }
+                ],
                 "appServices": [
                     {
                         "name": "postgrest",
@@ -3146,7 +3163,7 @@ mod test {
         let response = http_get_with_retry(&postgres_url, Some(headers.clone()), 1, 0).await;
         assert!(response.is_err());
 
-        // patch the postgREST appService with required middlewares for header and prefix
+        // patch the postgREST/graphql appService with required middlewares for header and prefix
         // service it at /rest, but route traffic to container at /
         let coredb_json = serde_json::json!({
             "apiVersion": API_VERSION,
@@ -3155,6 +3172,23 @@ mod test {
                 "name": cdb_name
             },
             "spec": {
+                "extensions": [
+                    {
+                        "name": "pg_graphql",
+                        "locations": [
+                            {
+                                "database": "postgres",
+                                "enabled": true
+                            }
+                        ]
+                    }
+                ],
+                "trunk_installs": [
+                    {
+                        "name": "pg_graphql",
+                        "version": "1.4.1"
+                    }
+                ],
                 "appServices": [
                     {
                         "name": "postgrest",
@@ -3166,7 +3200,7 @@ mod test {
                             },
                             {
                                 "name": "PGRST_DB_SCHEMA",
-                                "value": "public"
+                                "value": "public, graphql"
                             },
                             {
                                 "name": "PGRST_DB_ANON_ROLE",
@@ -3176,9 +3210,11 @@ mod test {
                         "middlewares": [
                             {
                                 "customRequestHeaders": {
-                                    "name": "strip-auth-header",
+                                    "name": "my-header",
                                     "config": {
-                                        "Authorization": ""
+                                        "Authorization": "",
+                                        "Content-Profile": "graphql",
+                                        "Accept-Profile": "graphql"
                                     }
                                 }
                             },
@@ -3189,6 +3225,16 @@ mod test {
                                         "/rest"
                                     ]
                                 }
+                            },
+                            {
+                                "replacePathRegex": {
+                                    "name": "map-gql",
+                                    "config":
+                                        {
+                                            "regex": "/graphql",
+                                            "replacement": "/rpc/resolve"
+                                        }
+                                },
                             }
                         ],
                         "routing": [
@@ -3196,10 +3242,18 @@ mod test {
                                 "port": 3000,
                                 "ingressPath": "/rest",
                                 "middlewares": [
-                                    "strip-auth-header",
+                                    "my-header",
                                     "strip-prefix"
                                 ]
-                            }
+                            },
+                            {
+                                "port": 3000,
+                                "ingressPath": "/graphql",
+                                "middlewares": [
+                                    "my-header",
+                                    "map-gql"
+                                ]
+                            },
                         ],
                     }
                 ],
@@ -3208,14 +3262,49 @@ mod test {
         });
         let params = PatchParams::apply("tembo-integration-test");
         let patch = Patch::Apply(&coredb_json);
-        coredbs.patch(cdb_name, &params, &patch).await.unwrap();
+        let cdb = coredbs.patch(cdb_name, &params, &patch).await.unwrap();
         // same request with auth header will now succeed
         // add some retries to give change a chance to apply
-        let response = http_get_with_retry(&postgres_url, Some(headers), 2, 5)
+        let response = http_get_with_retry(&postgres_url, Some(headers.clone()), 30, 5)
             .await
             .unwrap();
         let body: ApiResponse = response.json().await.unwrap();
         assert_eq!(body.info.title, "PostgREST API");
+
+        let trigger = "
+        CREATE OR REPLACE FUNCTION pgrst_watch() RETURNS event_trigger
+  LANGUAGE plpgsql
+  AS $$
+BEGIN
+  NOTIFY pgrst, 'reload schema';
+END;
+$$;
+
+CREATE EVENT TRIGGER pgrst_watch
+  ON ddl_command_end
+  EXECUTE PROCEDURE pgrst_watch();
+";
+        //
+        let state = State::default();
+        let context = state.create_context(client.clone());
+        // hard sleep to give operator time to apply change
+        // tokio::time::sleep(Duration::from_secs(5)).await;
+        let result = psql_with_retry(context.clone(), cdb.clone(), trigger.to_string()).await;
+        println!("result: {:#?}", result);
+        assert!(result.success);
+        // create a table for gql to inflect
+        let _result = psql_with_retry(
+            context.clone(),
+            cdb.clone(),
+            "create table book (id serial primary key, name text);".to_string(),
+        )
+        .await;
+
+        // send a request to graphql route
+        let gql_uri = format!("{}graphql?query=%7B%20bookCollection%20%7B%20edges%20%7B%20node%20%7B%20id%20%7D%20%7D%20%7D%20%7D", postgres_url);
+        // panics if its a non-200 response
+        let _response = http_get_with_retry(&gql_uri, Some(headers), 10, 5).await.unwrap();
+
 
         // Delete all of them
         let coredb_json = serde_json::json!({

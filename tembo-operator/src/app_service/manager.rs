@@ -84,13 +84,20 @@ fn generate_service(
 
     let ports = match appsvc.routing.as_ref() {
         Some(routing) => {
-            let ports: Vec<ServicePort> = routing
+            // de-dupe any ports because we can have multiple appService routing configs for the same port
+            // but we only need one ServicePort per port
+            let distinct_ports = routing
                 .iter()
-                .map(|r| ServicePort {
-                    port: r.port as i32,
+                .map(|r| r.port)
+                .collect::<std::collections::HashSet<u16>>();
+
+            let ports: Vec<ServicePort> = distinct_ports
+                .into_iter()
+                .map(|p| ServicePort {
+                    port: p as i32,
                     // there can be more than one ServicePort per Service
                     // these must be unique, so we'll use the port number
-                    name: Some(format!("http-{}", r.port)),
+                    name: Some(format!("http-{}", p)),
                     target_port: None,
                     ..ServicePort::default()
                 })
@@ -163,20 +170,24 @@ fn generate_deployment(
     };
 
     // container ports
-    let container_ports: Option<Vec<ContainerPort>> = match appsvc.routing.as_ref() {
-        Some(ports) => {
-            let container_ports: Vec<ContainerPort> = ports
-                .iter()
-                .map(|pm| ContainerPort {
-                    container_port: pm.port as i32,
-                    protocol: Some("TCP".to_string()),
-                    ..ContainerPort::default()
-                })
-                .collect();
-            Some(container_ports)
-        }
-        None => None,
+    let container_ports = if let Some(routings) = appsvc.routing.as_ref() {
+        let distinct_ports = routings
+            .iter()
+            .map(|r| r.port)
+            .collect::<std::collections::HashSet<u16>>();
+        let container_ports: Vec<ContainerPort> = distinct_ports
+            .into_iter()
+            .map(|p| ContainerPort {
+                container_port: p as i32,
+                protocol: Some("TCP".to_string()),
+                ..ContainerPort::default()
+            })
+            .collect();
+        Some(container_ports)
+    } else {
+        None
     };
+
 
     // https://tembo.io/docs/tembo-cloud/security/#tenant-isolation
     // These configs are the same as CNPG configs
@@ -454,6 +465,7 @@ pub async fn reconcile_app_services(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(
     };
 
     // only deploy the Kubernetes Service when there are routing configurations
+    // we need one service per PORT, not necessarily 1 per AppService route
     let desired_services = match cdb.spec.app_services.clone() {
         Some(appsvcs) => {
             let mut desired_svc: Vec<String> = Vec::new();

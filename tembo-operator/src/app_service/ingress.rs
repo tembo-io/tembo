@@ -4,7 +4,8 @@ use crate::{
         IngressRouteRoutesServices, IngressRouteRoutesServicesKind, IngressRouteSpec, IngressRouteTls,
     },
     traefik::middlewares_crd::{
-        Middleware as TraefikMiddleware, MiddlewareHeaders, MiddlewareSpec, MiddlewareStripPrefix,
+        Middleware as TraefikMiddleware, MiddlewareHeaders, MiddlewareReplacePathRegex, MiddlewareSpec,
+        MiddlewareStripPrefix,
     },
     Result,
 };
@@ -75,7 +76,6 @@ fn generate_middlewares(
 
     for mw in middlewares {
         let traefik_mw = match mw {
-            // only supports CustomRequestHeaders middleware for now
             Middleware::CustomRequestHeaders(mw) => {
                 let mw_name = format!("{}-{}", coredb_name, mw.name);
                 let mwh = MiddlewareHeaders {
@@ -115,6 +115,30 @@ fn generate_middlewares(
                     },
                     spec: MiddlewareSpec {
                         strip_prefix: Some(mwsp),
+                        ..MiddlewareSpec::default()
+                    },
+                };
+                MiddleWareWrapper {
+                    name: mw_name,
+                    mw: tmw,
+                }
+            }
+            Middleware::ReplacePathRegex(mw) => {
+                let mw_name = format!("{}-{}", coredb_name, mw.name);
+                let mwrpr = MiddlewareReplacePathRegex {
+                    regex: Some(mw.config.regex),
+                    replacement: Some(mw.config.replacement),
+                };
+                let tmw = TraefikMiddleware {
+                    metadata: ObjectMeta {
+                        name: Some(mw_name.clone()),
+                        namespace: Some(namespace.to_owned()),
+                        owner_references: Some(vec![oref.clone()]),
+                        labels: Some(labels.clone()),
+                        ..ObjectMeta::default()
+                    },
+                    spec: MiddlewareSpec {
+                        replace_path_regex: Some(mwrpr),
                         ..MiddlewareSpec::default()
                     },
                 };

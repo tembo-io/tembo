@@ -66,11 +66,31 @@ spec:
                           - customRequestHeaders
                         - required:
                           - stripPrefix
+                        - required:
+                          - replacePathRegex
                         properties:
                           customRequestHeaders:
                             properties:
                               config:
                                 x-kubernetes-preserve-unknown-fields: true
+                              name:
+                                type: string
+                            required:
+                            - config
+                            - name
+                            type: object
+                          replacePathRegex:
+                            properties:
+                              config:
+                                properties:
+                                  regex:
+                                    type: string
+                                  replacement:
+                                    type: string
+                                required:
+                                - regex
+                                - replacement
+                                type: object
                               name:
                                 type: string
                             required:
