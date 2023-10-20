@@ -34,6 +34,7 @@ install-tembo-pod-init:
 	  --create-namespace \
 		--values=./testdata/cert-manager.yaml && \
 	helm upgrade --install --namespace=tembo-pod-init --values=./testdata/pod-init.yaml tembo-pod-init ../charts/tembo-pod-init
+	kubectl apply -f ./testdata/local-postgres-issuer.yaml
 
 install-cnpg:
 	helm upgrade --install cnpg \
@@ -76,6 +77,11 @@ connect-test-db:
 	echo "127.0.0.1 test-coredb.localhost"
 	psql "postgres://postgres:$(kubectl get secrets -o json test-coredb-connection | jq -r '.data.password' | base64 --decode)@test-coredb.localhost:5432?sslmode=require"
 
+connect-test-db-verify-full:
+	echo "Please include a line in your /etc/hosts file: "
+	echo "127.0.0.1 test-coredb.localhost"
+	kubectl get secrets -n default -o json test-coredb-ca1 | jq -r '.data."ca.crt"' | base64 --decode > /tmp/local.crt
+	psql "postgres://postgres:$(kubectl get secrets -o json test-coredb-connection | jq -r '.data.password' | base64 --decode)@test-coredb.localhost:5432?sslmode=verify-full&sslrootcert=/tmp/local.crt"
 
 update-helm-repos:
 	helm repo add cnpg https://cloudnative-pg.github.io/charts
@@ -135,11 +141,11 @@ install-chart:
 
 # run with opentelemetry
 run-telemetry: run-jaeger
-	DATA_PLANE_BASEDOMAIN=localhost OPENTELEMETRY_ENDPOINT_URL=http://localhost:4317 RUST_LOG=debug,kube=debug,controller=debug ENABLE_BACKUP=false cargo run --features=telemetry
+	USE_SHARED_CA=1 DATA_PLANE_BASEDOMAIN=localhost OPENTELEMETRY_ENDPOINT_URL=http://localhost:4317 RUST_LOG=debug,kube=debug,controller=debug ENABLE_BACKUP=false cargo run --features=telemetry
 
 # run without opentelemetry
 run:
-  DATA_PLANE_BASEDOMAIN=localhost ENABLE_BACKUP=false RUST_LOG=info,kube=info,controller=info cargo run
+  USE_SHARED_CA=1 DATA_PLANE_BASEDOMAIN=localhost ENABLE_BACKUP=false RUST_LOG=info,kube=info,controller=info cargo run
 
 run-jaeger:
 	docker run --rm -d --name jaeger -e COLLECTOR_OTLP_ENABLED=true -p 16686:16686 -p 4317:4317 -p 4318:4318 jaegertracing/all-in-one:latest
@@ -160,7 +166,7 @@ test:
 
 # run cargo watch
 watch:
-	DATA_PLANE_BASEDOMAIN=localhost ENABLE_BACKUP=false RUST_LOG=info,kube=info,controller=info cargo watch -x 'run'
+	USE_SHARED_CA=1 DATA_PLANE_BASEDOMAIN=localhost ENABLE_BACKUP=false RUST_LOG=info,kube=info,controller=info cargo watch -x 'run'
 
 # watch with opentelemetry
 watch-telemetry:

@@ -14,7 +14,7 @@ use crate::{
             ClusterBackupBarmanObjectStoreS3CredentialsSessionToken, ClusterBackupBarmanObjectStoreWal,
             ClusterBackupBarmanObjectStoreWalCompression, ClusterBackupBarmanObjectStoreWalEncryption,
             ClusterBootstrap, ClusterBootstrapInitdb, ClusterBootstrapRecovery,
-            ClusterBootstrapRecoveryRecoveryTarget, ClusterExternalClusters,
+            ClusterBootstrapRecoveryRecoveryTarget, ClusterCertificates, ClusterExternalClusters,
             ClusterExternalClustersBarmanObjectStore, ClusterExternalClustersBarmanObjectStoreS3Credentials,
             ClusterExternalClustersBarmanObjectStoreS3CredentialsAccessKeyId,
             ClusterExternalClustersBarmanObjectStoreS3CredentialsRegion,
@@ -112,6 +112,32 @@ fn create_cluster_backup_barman_object_store(
         s3_credentials: Some(s3_credentials.clone()),
         wal: create_cluster_backup_barman_wal(cdb),
         ..ClusterBackupBarmanObjectStore::default()
+    }
+}
+
+fn create_cluster_certificates(cdb: &CoreDB) -> Option<ClusterCertificates> {
+    let name = cdb.metadata.name.clone().unwrap();
+    match std::env::var("USE_SHARED_CA") {
+        Ok(_) => {
+            debug!(
+                "USE_SHARED_CA is set, including certificate in CNPG spec: {}",
+                name
+            );
+            Some(ClusterCertificates {
+                client_ca_secret: Some(format!("{}-ca1", name)),
+                server_ca_secret: Some(format!("{}-ca1", name)),
+                replication_tls_secret: Some(format!("{}-replication1", name)),
+                server_tls_secret: Some(format!("{}-server1", name)),
+                ..ClusterCertificates::default()
+            })
+        }
+        Err(_) => {
+            debug!(
+                "USE_SHARED_CA not set, not including certificate in CNPG spec: {}",
+                name
+            );
+            None
+        }
     }
 }
 
@@ -540,6 +566,8 @@ pub fn cnpg_cluster_from_cdb(
         cdb.spec.image.clone()
     };
 
+    let certificates = create_cluster_certificates(cdb);
+
     Cluster {
         metadata: ObjectMeta {
             name: Some(name.clone()),
@@ -557,6 +585,7 @@ pub fn cnpg_cluster_from_cdb(
             backup,
             service_account_template,
             bootstrap,
+            certificates,
             superuser_secret,
             external_clusters,
             enable_superuser_access: Some(true),

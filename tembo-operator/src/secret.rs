@@ -4,7 +4,7 @@ use base64::{engine::general_purpose, Engine as _};
 use k8s_openapi::{api::core::v1::Secret, apimachinery::pkg::apis::meta::v1::ObjectMeta, ByteString};
 use kube::{
     api::{ListParams, Patch, PatchParams},
-    Api, Client, Resource, ResourceExt,
+    Api, Resource, ResourceExt,
 };
 use passwords::PasswordGenerator;
 use std::{collections::BTreeMap, sync::Arc};
@@ -149,7 +149,9 @@ pub async fn reconcile_postgres_role_secret(
     // Get secret by name
     if secret_api.get(secret_name).await.is_ok() {
         debug!("skipping secret creation: secret {} exists", &name);
-        let secret_data = fetch_secret_data(client.clone(), name, &ns).await?;
+        let secret_api: Api<Secret> = Api::namespaced(client.clone(), &ns);
+        let password = fetch_decoded_data_key_from_secret(secret_api, name, "password").await?;
+        let secret_data = RolePassword { password };
         return Ok(Some(secret_data));
     };
 
@@ -191,21 +193,24 @@ fn generate_role_secret_data(role_name: &str) -> (BTreeMap<String, ByteString>, 
 }
 
 // Lookup secret data for postgres-exporter
-async fn fetch_secret_data(client: Client, name: String, ns: &str) -> Result<RolePassword, Error> {
-    let secret_api: Api<Secret> = Api::namespaced(client, ns);
+pub async fn fetch_decoded_data_key_from_secret(
+    secrets_api: Api<Secret>,
+    name: String,
+    key_name: &str,
+) -> Result<String, Error> {
     let secret_name = name.to_string();
 
-    match secret_api.get(&secret_name).await {
+    match secrets_api.get(&secret_name).await {
         Ok(secret) => {
             if let Some(data_map) = secret.data {
-                if let Some(password_bytes) = data_map.get("password") {
-                    let password = String::from_utf8(password_bytes.0.clone()).unwrap();
-                    let secret_data = RolePassword { password };
+                if let Some(password_bytes) = data_map.get(key_name) {
+                    let secret_data = String::from_utf8(password_bytes.0.clone()).unwrap();
                     Ok(secret_data)
                 } else {
-                    Err(Error::MissingSecretError(
-                        "No password found in secret".to_owned(),
-                    ))
+                    Err(Error::MissingSecretError(format!(
+                        "Key {} not found in secret",
+                        key_name
+                    )))
                 }
             } else {
                 Err(Error::MissingSecretError("No data found in secret".to_owned()))
@@ -215,7 +220,7 @@ async fn fetch_secret_data(client: Client, name: String, ns: &str) -> Result<Rol
     }
 }
 
-fn b64_encode(string: &str) -> ByteString {
+pub fn b64_encode(string: &str) -> ByteString {
     let bytes_vec = string.as_bytes().to_vec();
     ByteString(bytes_vec)
 }

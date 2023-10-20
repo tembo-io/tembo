@@ -13,6 +13,7 @@ use crate::{
     exec::{ExecCommand, ExecOutput},
     extensions::database_queries::is_not_restarting,
     ingress::reconcile_postgres_ing_route_tcp,
+    postgres_certificates::reconcile_certificates,
     psql::{PsqlCommand, PsqlOutput},
     secret::{reconcile_postgres_role_secret, reconcile_secret},
     service::reconcile_prometheus_exporter_service,
@@ -125,6 +126,8 @@ impl CoreDB {
 
         // Fetch any metadata we need from Trunk
         reconcile_trunk_configmap(ctx.client.clone(), &ns).await?;
+
+        reconcile_certificates(ctx.client.clone(), &self.metadata.name.clone().unwrap(), &ns).await?;
 
         // Ingress
         match std::env::var("DATA_PLANE_BASEDOMAIN") {
