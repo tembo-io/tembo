@@ -79,6 +79,7 @@ pub async fn reconcile_certificates(
         }
     };
 
+    let mut common_name = format!("{}-rw", coredb_name);
     let mut dns_names = vec![
         format!("{}-rw", coredb_name),
         format!("{}-rw.{}", coredb_name, namespace),
@@ -94,7 +95,8 @@ pub async fn reconcile_certificates(
     match std::env::var("DATA_PLANE_BASEDOMAIN") {
         Ok(basedomain) => {
             let extra_domain_name = format!("{}.{}", coredb_name, basedomain);
-            dns_names.push(extra_domain_name);
+            dns_names.push(extra_domain_name.clone());
+            common_name = extra_domain_name;
         }
         Err(_) => {
             debug!("DATA_PLANE_BASEDOMAIN not set, not adding custom DNS name");
@@ -113,6 +115,7 @@ pub async fn reconcile_certificates(
             "secretName": format!("{}-server1", coredb_name),
             "usages": ["server auth"],
             "dnsNames": dns_names,
+            "commonName": common_name,
             "issuerRef": {
                 "name": POSTGRES_CERTIFICATE_ISSUER_NAME,
                 "kind": "ClusterIssuer",
