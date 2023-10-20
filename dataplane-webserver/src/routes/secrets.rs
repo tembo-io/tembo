@@ -38,7 +38,7 @@ lazy_static! {
                 name: "certificate".to_string(),
                 // Don't return the private key
                 possible_keys: vec!["ca.crt".to_string()],
-                formatter: Box::new(|instance_name| format!("{}-ca", instance_name)),
+                formatter: Box::new(|instance_name| format!("{}-ca1", instance_name)),
             }
         );
         secrets_allow_list
