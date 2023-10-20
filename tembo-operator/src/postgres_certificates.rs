@@ -79,7 +79,7 @@ pub async fn reconcile_certificates(
         }
     };
 
-    let mut common_name = format!("{}-rw", coredb_name);
+    let common_name = format!("{}-rw", coredb_name);
     let mut dns_names = vec![
         format!("{}-rw", coredb_name),
         format!("{}-rw.{}", coredb_name, namespace),
@@ -95,7 +95,6 @@ pub async fn reconcile_certificates(
         Ok(basedomain) => {
             let extra_domain_name = format!("{}.{}", coredb_name, basedomain);
             dns_names.push(extra_domain_name.clone());
-            common_name = extra_domain_name;
         }
         Err(_) => {
             debug!("DATA_PLANE_BASEDOMAIN not set, not adding custom DNS name");
