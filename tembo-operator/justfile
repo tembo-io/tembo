@@ -30,6 +30,7 @@ install-tembo-pod-init:
 	kubectl create namespace tembo-pod-init || true
 	helm upgrade --install \
 	  cert-manager jetstack/cert-manager \
+		--version=1.12.1 \
 	  --namespace cert-manager \
 	  --create-namespace \
 		--values=./testdata/cert-manager.yaml && \

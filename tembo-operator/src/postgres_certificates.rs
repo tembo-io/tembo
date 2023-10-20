@@ -90,7 +90,6 @@ pub async fn reconcile_certificates(
         format!("{}-ro", coredb_name),
         format!("{}-ro.{}", coredb_name, namespace),
         format!("{}-ro.{}.svc", coredb_name, namespace),
-        format!("{}-rw", coredb_name),
     ];
     match std::env::var("DATA_PLANE_BASEDOMAIN") {
         Ok(basedomain) => {
@@ -172,8 +171,11 @@ async fn apply_certificate(
     debug!("\nApplying Certificate {} in namespace {}", name, namespace);
     let _o: Certificate = match cert_api.patch(&name, &params, &Patch::Apply(&certificate)).await {
         Ok(cert) => cert,
-        Err(_) => {
-            error!("Failed to create Certificate {} in namespace {}", name, namespace);
+        Err(e) => {
+            error!(
+                "Failed to create Certificate {} in namespace {}. {:?}",
+                name, namespace, e
+            );
             return Err(Action::requeue(Duration::from_secs(300)));
         }
     };

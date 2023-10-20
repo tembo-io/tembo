@@ -12,6 +12,12 @@ metadata:
   name: postgres-selfsigned-ca
   namespace: cert-manager
 spec:
+  commonName: local.tembo-development.com
+  subject:
+    organizations:
+      - tembo
+    organizationalUnits:
+      - engineering
   dnsNames:
   - localhost
   - local.tembo-development.com
