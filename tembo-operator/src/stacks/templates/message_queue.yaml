@@ -15,7 +15,7 @@ compute_templates:
     memory: 32Gi
 trunk_installs:
   - name: pgmq
-    version: 0.19.0
+    version: 0.31.0
   - name: pg_partman
     version: 4.7.3
 extensions:
@@ -23,7 +23,7 @@ extensions:
     locations:
       - database: postgres
         enabled: true
-        version: 0.19.0
+        version: 0.31.0
   - name: pg_partman
     locations:
       - database: postgres
