@@ -16,7 +16,7 @@ spec:
     - name: pgmq
       version: 0.31.0
     - name: vectorize
-      version: 0.1.1
+      version: 0.2.0
     - name: pg_later
       version: 0.0.11
   extensions:
@@ -44,7 +44,7 @@ spec:
       locations:
         - database: postgres
           enabled: true
-          version: 0.1.1
+          version: 0.2.0
     - name: pg_later
       locations:
         - database: postgres
