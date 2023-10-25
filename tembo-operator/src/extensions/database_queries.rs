@@ -342,7 +342,8 @@ pub async fn get_all_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<E
             };
             ext_hashmap
                 .entry((ext.name, ext.description))
-                .or_insert_with(Vec::new)
+                // .or_insert_with(Vec::new)
+                .or_default()
                 .push(extlocation);
         }
     }

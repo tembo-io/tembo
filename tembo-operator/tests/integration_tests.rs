@@ -3305,7 +3305,6 @@ CREATE EVENT TRIGGER pgrst_watch
         // panics if its a non-200 response
         let _response = http_get_with_retry(&gql_uri, Some(headers), 10, 5).await.unwrap();
 
-
         // Delete all of them
         let coredb_json = serde_json::json!({
             "apiVersion": API_VERSION,
@@ -4137,7 +4136,7 @@ CREATE EVENT TRIGGER pgrst_watch
         // Initialize the Kubernetes client
         let client = kube_client().await;
         let state = State::default();
-        let _context = state.create_context(client.clone());
+        let context = state.create_context(client.clone());
 
         // Configurations
         let mut rng = rand::thread_rng();
@@ -4189,7 +4188,7 @@ CREATE EVENT TRIGGER pgrst_watch
         });
         let params = PatchParams::apply("tembo-integration-test");
         let patch = Patch::Apply(&coredb_json);
-        let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+        let coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
 
         // Wait for CNPG Pod to be created
         let pod_name = format!("{}-1", name);
@@ -4243,6 +4242,16 @@ CREATE EVENT TRIGGER pgrst_watch
             .await
             .unwrap();
         println!("Found pooler IngressRouteTCP: {pooler_name}-0");
+
+        // Query the database to make sure the pgbouncer role was created
+        let _pgb_query = wait_until_psql_contains(
+            context.clone(),
+            coredb_resource.clone(),
+            "SELECT rolname FROM pg_roles;".to_string(),
+            "cnpg_pooler_pgbouncer".to_string(),
+            false,
+        )
+        .await;
 
         // Update coredb to disable pooler
         let _coredb_json = serde_json::json!({

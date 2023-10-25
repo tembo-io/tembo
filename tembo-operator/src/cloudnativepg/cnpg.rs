@@ -40,6 +40,7 @@ use crate::{
     defaults::{default_image, default_llm_image},
     errors::ValueError,
     patch_cdb_status_merge,
+    psql::PsqlOutput,
     trunk::extensions_that_require_load,
     Context, RESTARTED_AT,
 };
@@ -976,14 +977,11 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
         return Err(Action::requeue(Duration::from_secs(10)));
     }
 
-    // Reconcile Pooler resource
-    reconcile_pooler(cdb, ctx.clone()).await?;
-
     Ok(())
 }
 
 // Reconcile a Pooler
-async fn reconcile_pooler(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {
+pub async fn reconcile_pooler(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {
     let client = ctx.client.clone();
     let name = cdb.name_any() + "-pooler";
     let namespace = cdb.namespace().unwrap();
@@ -1038,6 +1036,24 @@ async fn reconcile_pooler(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action>
                 error!("Error patching Pooler: {}", e);
                 Action::requeue(Duration::from_secs(300))
             })?;
+
+        match setup_pgbouncer_function(cdb, ctx.clone()).await {
+            Ok(_) => debug!(
+                "Successfully created setup_pgbouncer function on instance {}",
+                cdb.name_any()
+            ),
+            Err(e) => {
+                warn!("Did not create setup_pgbouncer function, will requeue: {:?}", e);
+                return Err(Action::requeue(Duration::from_secs(30)));
+            }
+        }
+        // Run the setup_pgbouncer function
+        cdb.psql(
+            "SELECT setup_pgbouncer();".to_string(),
+            "postgres".to_string(),
+            ctx.clone(),
+        )
+        .await?;
     } else {
         // If pooler is disabled and exists, delete
         let pooler = pooler_api.get(&name).await;
@@ -1053,7 +1069,83 @@ async fn reconcile_pooler(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action>
             })?;
         }
     }
+
     Ok(())
+}
+
+// This function was created from the instructions that CNPG gives when you have to setup pgbouncer
+// manually.  You can read more here: https://cloudnative-pg.io/documentation/1.20/connection_pooling/#authentication
+const PGBOUNCER_SETUP_FUNCTION: &str = r#"
+CREATE OR REPLACE FUNCTION setup_pgbouncer() RETURNS VOID LANGUAGE plpgsql AS $$
+DECLARE
+    db_name TEXT;
+    db_list CURSOR FOR SELECT datname FROM pg_database WHERE datistemplate = false;
+BEGIN
+    -- Check if the role exists, if not create it
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'cnpg_pooler_pgbouncer') THEN
+        EXECUTE 'CREATE ROLE cnpg_pooler_pgbouncer WITH LOGIN;';
+    END IF;
+
+    -- Iterate through all databases and set up permissions
+    OPEN db_list;
+    LOOP
+        FETCH db_list INTO db_name;
+        EXIT WHEN NOT FOUND;
+
+        -- Check if the role has CONNECT permission on the database, if not grant it
+        IF NOT EXISTS (
+            SELECT 1
+            FROM pg_database db
+            JOIN pg_auth_members am ON db.datdba = am.roleid
+            JOIN pg_roles r ON am.member = r.oid
+            WHERE db.datname = db_name AND r.rolname = 'cnpg_pooler_pgbouncer'
+        ) THEN
+            EXECUTE format('GRANT CONNECT ON DATABASE %I TO cnpg_pooler_pgbouncer;', db_name);
+        END IF;
+    END LOOP;
+    CLOSE db_list;
+
+    -- Check if the function exists, if not create it
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_proc p
+        JOIN pg_namespace n ON p.pronamespace = n.oid
+        WHERE n.nspname = 'public' AND p.proname = 'user_search'
+    ) THEN
+        EXECUTE '
+            CREATE OR REPLACE FUNCTION user_search(uname TEXT)
+            RETURNS TABLE (usename name, passwd text)
+            LANGUAGE sql SECURITY DEFINER AS
+            ''SELECT usename, passwd FROM pg_shadow WHERE usename=$1;'';';
+    END IF;
+
+    -- Check if the role has EXECUTE permission on the function, if not grant it
+    IF NOT EXISTS (
+        SELECT 1
+        FROM pg_proc p
+        JOIN pg_namespace n ON p.pronamespace = n.oid
+        JOIN pg_auth_members am ON p.proowner = am.roleid
+        JOIN pg_roles r ON am.member = r.oid
+        WHERE n.nspname = 'public' AND p.proname = 'user_search' AND r.rolname = 'cnpg_pooler_pgbouncer'
+    ) THEN
+        EXECUTE 'REVOKE ALL ON FUNCTION user_search(text) FROM public;';
+        EXECUTE 'GRANT EXECUTE ON FUNCTION user_search(text) TO cnpg_pooler_pgbouncer;';
+    END IF;
+    
+END;
+$$;"#;
+
+async fn setup_pgbouncer_function(coredb: &CoreDB, ctx: Arc<Context>) -> Result<PsqlOutput, Action> {
+    // execute the PGBOUNCER_SETUP_FUNCTION to install/update the function
+    // on the instance
+    let query = coredb
+        .psql(
+            PGBOUNCER_SETUP_FUNCTION.to_string(),
+            "postgres".to_string(),
+            ctx.clone(),
+        )
+        .await?;
+    Ok(query)
 }
 
 fn schedule_expression_from_cdb(cdb: &CoreDB) -> String {

@@ -1,4 +1,5 @@
 use crate::{
+    apis::coredb_types::CoreDB,
     certmanager::certificates::Certificate,
     secret::{b64_encode, fetch_decoded_data_key_from_secret},
 };
@@ -16,11 +17,7 @@ const POSTGRES_CA_SECRET_NAME: &str = "postgres-ca-secret";
 const POSTGRES_CA_SECRET_CERT_KEY_NAME: &str = "ca.crt";
 const POSTGRES_CERTIFICATE_ISSUER_NAME: &str = "postgres-server-issuer";
 
-pub async fn reconcile_certificates(
-    client: Client,
-    coredb_name: &str,
-    namespace: &str,
-) -> Result<(), Action> {
+pub async fn reconcile_certificates(client: Client, coredb: &CoreDB, namespace: &str) -> Result<(), Action> {
     match std::env::var("USE_SHARED_CA") {
         Ok(_) => {}
         Err(_) => {
@@ -29,6 +26,7 @@ pub async fn reconcile_certificates(
         }
     }
 
+    let coredb_name = coredb.metadata.name.as_ref().unwrap();
     let secrets_api_cert_manager_namespace: Api<Secret> = Api::namespaced(client.clone(), "cert-manager");
     let secrets_api: Api<Secret> = Api::namespaced(client.clone(), namespace);
     let certificates_api: Api<Certificate> = Api::namespaced(client, namespace);
@@ -90,11 +88,16 @@ pub async fn reconcile_certificates(
         format!("{}-ro", coredb_name),
         format!("{}-ro.{}", coredb_name, namespace),
         format!("{}-ro.{}.svc", coredb_name, namespace),
+        format!("{}-pooler", coredb_name),
+        format!("{}-pooler.{}", coredb_name, namespace),
+        format!("{}-pooler.{}.svc", coredb_name, namespace),
     ];
     match std::env::var("DATA_PLANE_BASEDOMAIN") {
         Ok(basedomain) => {
             let extra_domain_name = format!("{}.{}", coredb_name, basedomain);
-            dns_names.push(extra_domain_name.clone());
+            let extra_pooler_domain_name = format!("{}-pooler.{}", coredb_name, basedomain);
+            dns_names.push(extra_domain_name);
+            dns_names.push(extra_pooler_domain_name);
         }
         Err(_) => {
             debug!("DATA_PLANE_BASEDOMAIN not set, not adding custom DNS name");
@@ -144,6 +147,30 @@ pub async fn reconcile_certificates(
     });
 
     apply_certificate(namespace, &certificates_api, replication_certificate).await?;
+
+    if coredb.spec.connectionPooler.enabled {
+        // Create the third Certificate
+        let pooler_certificate = json!({
+            "apiVersion": "cert-manager.io/v1",
+            "kind": "Certificate",
+            "metadata": {
+                "name": format!("{}-pooler", coredb_name),
+                "namespace": namespace,
+            },
+            "spec": {
+                "secretName": format!("{}-pooler", coredb_name),
+                "commonName": "cnpg_pooler_pgbouncer".to_string(),
+                "issuerRef": {
+                    "name": POSTGRES_CERTIFICATE_ISSUER_NAME,
+                    "kind": "ClusterIssuer",
+                    "group": "cert-manager.io",
+                "usages": ["client auth"]
+                }
+            }
+        });
+
+        apply_certificate(namespace, &certificates_api, pooler_certificate).await?;
+    }
 
     Ok(())
 }
