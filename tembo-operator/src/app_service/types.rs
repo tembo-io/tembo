@@ -8,7 +8,7 @@ use utoipa::ToSchema;
 pub const COMPONENT_NAME: &str = "appService";
 
 // defines a app container
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, JsonSchema, PartialEq)]
 pub struct AppService {
     pub name: String,
     pub image: String,
@@ -23,7 +23,7 @@ pub struct AppService {
 
 // Secrets are injected into the container as environment variables
 // ths allows users to map these secrets to environment variable of their choice
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, JsonSchema, PartialEq)]
 pub struct EnvVar {
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -33,7 +33,7 @@ pub struct EnvVar {
 }
 
 // we will map these from secrets to env vars, if desired
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, JsonSchema)]
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, JsonSchema, PartialEq)]
 pub enum EnvVarRef {
     ReadOnlyConnection,
     ReadWriteConnection,

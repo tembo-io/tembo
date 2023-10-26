@@ -1,5 +1,6 @@
 use crate::{
     apis::postgres_parameters::PgConfig,
+    app_service::types::AppService,
     defaults::default_image,
     extensions::types::{Extension, TrunkInstall},
     postgres_exporter::QueryConfig,
@@ -65,6 +66,8 @@ pub struct Stack {
     pub postgres_config_engine: Option<ConfigEngine>,
     // external application services
     pub infrastructure: Option<Infrastructure>,
+    #[serde(rename = "appServices")]
+    pub app_services: Option<Vec<AppService>>,
 }
 
 impl Stack {

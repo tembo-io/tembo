@@ -3,7 +3,7 @@ kind: CoreDB
 metadata:
   name: sample-message-queue
 spec:
-  image: "quay.io/tembo/standard-cnpg:15.3.0-1-45c2054"
+  image: "quay.io/tembo/standard-cnpg:15.3.0-1-1096aeb"
   stop: false
   stack:
     name: MessageQueue
@@ -36,7 +36,7 @@ spec:
         value: all
   trunk_installs:
     - name: pgmq
-      version: 0.31.0
+      version: 0.32.1
     - name: pg_partman
       version: 4.7.3
   extensions:
@@ -44,7 +44,7 @@ spec:
       locations:
         - database: postgres
           enabled: true
-          version: 0.31.0
+          version: 0.32.1
     - name: pg_partman
       locations:
         - database: postgres
@@ -88,3 +88,38 @@ spec:
       value: "204MB"
     - name: max_wal_size
       value: "2GB"
+  appServices:
+    - name: postgrest
+      image: postgrest/postgrest:v10.0.0
+      routing:
+        - port: 3000
+          ingressPath: /pgmq/v1
+          middlewares:
+            - map-pgmq
+            - strip-prefix
+            - headers
+      middlewares:
+        - customRequestHeaders:
+            name: headers
+            config:
+              Authorization: ""
+              Content-Profile: pgmq
+              Accept-Profile: pgmq
+        - stripPrefix:
+            name: strip-prefix
+            config:
+              - /rest/v1
+        - replacePathRegex:
+            name: map-pgmq
+            config:
+              regex: \/pgmq\/v1\/?
+              replacement: /rpc/
+      env:
+        - name: PGRST_DB_URI
+          valueFromPlatform: ReadWriteConnection
+        - name: PGRST_DB_SCHEMA
+          value: "public, pgmq"
+        - name: PGRST_DB_ANON_ROLE
+          value: postgres
+        - name: PGRST_LOG_LEVEL
+          value: info

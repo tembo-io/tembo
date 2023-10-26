@@ -1,7 +1,42 @@
 name: MessageQueue
 description: A Tembo Postgres Stack optimized for Message Queue workloads.
 image: "quay.io/tembo/standard-cnpg:15.3.0-1-1096aeb"
-stack_version: 0.2.0
+stack_version: 0.3.0
+appServices:
+  - name: postgrest
+    image: postgrest/postgrest:v10.0.0
+    routing:
+      - port: 3000
+        ingressPath: /pgmq/v1
+        middlewares:
+          - map-pgmq
+          - strip-prefix
+          - headers
+    middlewares:
+      - !customRequestHeaders
+          name: headers
+          config:
+            Authorization: ""
+            Content-Profile: pgmq
+            Accept-Profile: pgmq
+      - !stripPrefix
+          name: strip-prefix
+          config:
+            - /rest/v1
+      - !replacePathRegex
+          name: map-pgmq
+          config:
+            regex: \/pgmq\/v1\/?
+            replacement: /rpc/
+    env:
+      - name: PGRST_DB_URI
+        valueFromPlatform: ReadWriteConnection
+      - name: PGRST_DB_SCHEMA
+        value: "public, pgmq"
+      - name: PGRST_DB_ANON_ROLE
+        value: postgres
+      - name: PGRST_LOG_LEVEL
+        value: info
 compute_templates:
   - cpu: 1
     memory: 4Gi
@@ -31,7 +66,7 @@ extensions:
         version: 4.7.3
 postgres_metrics:
   pgmq:
-      query: select queue_name, queue_length, oldest_msg_age_sec, newest_msg_age_sec, total_messages from public.pgmq_metrics_all()
+      query: select queue_name, queue_length, oldest_msg_age_sec, newest_msg_age_sec, total_messages from pgmq.metrics_all()
       master: true
       metrics:
         - queue_name:

@@ -404,6 +404,7 @@ mod tests {
                 memory: "16Gi".to_string(),
                 storage: "10Gi".to_string(),
             }),
+            app_services: None,
             image: None,
             extensions: None,
             trunk_installs: None,
