@@ -152,8 +152,14 @@ spec:
                       - readiness
                       type: object
                     resources:
+                      default:
+                        limits:
+                          cpu: 400m
+                          memory: 256Mi
+                        requests:
+                          cpu: 100m
+                          memory: 256Mi
                       description: ResourceRequirements describes the compute resource requirements.
-                      nullable: true
                       properties:
                         limits:
                           additionalProperties:

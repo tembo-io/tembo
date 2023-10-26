@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
-use k8s_openapi::api::core::v1::ResourceRequirements;
+use k8s_openapi::{api::core::v1::ResourceRequirements, apimachinery::pkg::api::resource::Quantity};
+
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -15,10 +16,26 @@ pub struct AppService {
     pub args: Option<Vec<String>>,
     pub command: Option<Vec<String>>,
     pub env: Option<Vec<EnvVar>>,
-    pub resources: Option<ResourceRequirements>,
+    #[serde(default = "default_resources")]
+    pub resources: ResourceRequirements,
     pub probes: Option<Probes>,
     pub middlewares: Option<Vec<Middleware>>,
     pub routing: Option<Vec<Routing>>,
+}
+
+pub fn default_resources() -> ResourceRequirements {
+    let limits: BTreeMap<String, Quantity> = BTreeMap::from([
+        ("cpu".to_owned(), Quantity("400m".to_string())),
+        ("memory".to_owned(), Quantity("256Mi".to_string())),
+    ]);
+    let requests: BTreeMap<String, Quantity> = BTreeMap::from([
+        ("cpu".to_owned(), Quantity("100m".to_string())),
+        ("memory".to_owned(), Quantity("256Mi".to_string())),
+    ]);
+    ResourceRequirements {
+        limits: Some(limits),
+        requests: Some(requests),
+    }
 }
 
 // Secrets are injected into the container as environment variables

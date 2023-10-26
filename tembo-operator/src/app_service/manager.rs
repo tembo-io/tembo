@@ -315,7 +315,7 @@ fn generate_deployment(
             image: Some(appsvc.image.clone()),
             name: appsvc.name.clone(),
             ports: container_ports,
-            resources: appsvc.resources.clone(),
+            resources: Some(appsvc.resources.clone()),
             readiness_probe,
             liveness_probe,
             security_context: Some(security_context),
