@@ -519,6 +519,16 @@ fn cnpg_high_availability(cdb: &CoreDB) -> Option<ClusterReplicationSlots> {
     }
 }
 
+fn default_cluster_annotations(cdb: &CoreDB) -> BTreeMap<String, String> {
+    let mut annotations = cdb.metadata.annotations.clone().unwrap_or_default();
+    annotations.insert("tembo-pod-init.tembo.io/inject".to_string(), "true".to_string());
+    // If the annotation tembo.io/org_id is present, rename it to tembo.io/organization_id
+    if let Some(org_id) = annotations.remove("tembo.io/org_id") {
+        annotations.insert("tembo.io/organization_id".to_string(), org_id);
+    }
+    annotations
+}
+
 pub fn cnpg_cluster_from_cdb(
     cdb: &CoreDB,
     fenced_pods: Option<Vec<String>>,
@@ -528,8 +538,7 @@ pub fn cnpg_cluster_from_cdb(
     let name = cdb.name_any();
     let namespace = cdb.namespace().unwrap();
     let owner_reference = cdb.controller_owner_ref(&()).unwrap();
-    let mut annotations = BTreeMap::new();
-    annotations.insert("tembo-pod-init.tembo.io/inject".to_string(), "true".to_string());
+    let mut annotations = default_cluster_annotations(cdb);
     let (bootstrap, external_clusters, superuser_secret) = cnpg_cluster_bootstrap_from_cdb(cdb);
     let (backup, service_account_template) = cnpg_backup_configuration(cdb, &cfg);
     let storage = cnpg_cluster_storage(cdb);
