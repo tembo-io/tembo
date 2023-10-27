@@ -37,6 +37,13 @@ appServices:
         value: postgres
       - name: PGRST_LOG_LEVEL
         value: info
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 400m
+        memory: 256Mi
 compute_templates:
   - cpu: 1
     memory: 4Gi
