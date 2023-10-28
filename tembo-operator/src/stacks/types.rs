@@ -18,6 +18,7 @@ pub enum StackType {
     OLAP,
     #[default]
     OLTP,
+    VectorDB,
 }
 
 impl std::str::FromStr for StackType {
@@ -31,6 +32,7 @@ impl std::str::FromStr for StackType {
             "MachineLearning" => Ok(StackType::MachineLearning),
             "OLAP" => Ok(StackType::OLAP),
             "OLTP" => Ok(StackType::OLTP),
+            "VectorDB" => Ok(StackType::VectorDB),
             _ => Err("invalid value"),
         }
     }
@@ -44,6 +46,7 @@ impl StackType {
             StackType::MachineLearning => "MachineLearning",
             StackType::OLAP => "OLAP",
             StackType::OLTP => "OLTP",
+            StackType::VectorDB => "VectorDB",
         }
     }
 }
