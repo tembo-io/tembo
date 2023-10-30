@@ -6,7 +6,7 @@ trunk_installs:
   - name: pgmq
     version: 0.32.3
   - name: vectorize
-    version: 0.3.0
+    version: 0.4.0
   - name: pgvector
     version: 0.5.1
   - name: pg_stat_statements
@@ -31,7 +31,7 @@ extensions:
     locations:
     - database: postgres
       enabled: true
-      version: 0.3.0
+      version: 0.4.0
   - name: pg_stat_statements
     locations:
       - database: postgres
@@ -52,6 +52,8 @@ postgres_config_engine: standard
 postgres_config:
   - name: cron.host
     value: /controller/run
+  - name: vectorize.host
+    value: postgresql:///postgres?host=/controller/run
   - name: autovacuum_vacuum_cost_limit
     value: -1
   - name: autovacuum_vacuum_scale_factor
