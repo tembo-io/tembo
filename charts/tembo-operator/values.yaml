@@ -12,3 +12,12 @@ prometheusRule:
   enabled: true
 
 env: []
+
+# https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector
+nodeSelector: {}
+
+# https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
+tolerations: []
+
+# https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#affinity-and-anti-affinity
+affinity: {}
