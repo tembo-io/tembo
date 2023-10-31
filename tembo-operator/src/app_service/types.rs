@@ -9,7 +9,7 @@ use utoipa::ToSchema;
 pub const COMPONENT_NAME: &str = "appService";
 
 // defines a app container
-#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, JsonSchema, PartialEq)]
+#[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema, JsonSchema, PartialEq)]
 pub struct AppService {
     pub name: String,
     pub image: String,
