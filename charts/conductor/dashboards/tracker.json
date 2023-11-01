@@ -116,7 +116,7 @@
           "refId": "A"
         }
       ],
-      "title": "Hypothetical monthly revenue per org",
+      "title": "Hypothetical monthly revenue per org, top 100",
       "type": "barchart"
     },
     {
@@ -124,10 +124,31 @@
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "description": "",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "thresholds"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
           "mappings": [],
           "thresholds": {
@@ -142,30 +163,37 @@
                 "value": 80
               }
             ]
-          }
+          },
+          "unit": "million"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
+        "h": 16,
         "w": 12,
         "x": 12,
         "y": 0
       },
-      "id": 9,
+      "id": 11,
       "options": {
-        "displayMode": "gradient",
-        "minVizHeight": 10,
-        "minVizWidth": 0,
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
         },
-        "showUnfilled": true
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
       },
       "pluginVersion": "9.3.6",
       "targets": [
@@ -176,7 +204,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "topk(10,sum(\n  sum(kube_pod_container_resource_limits{resource=\"cpu\"}) by (namespace)\n  * on(namespace) group_left(label_tembo_io_organization_id)\n  kube_namespace_labels{label_tembo_io_organization_id!=\"\"}\n) by (label_tembo_io_organization_id))\n",
+          "expr": "topk(100,sum by (label_tembo_io_organization_id) (\n  sum by (namespace) (increase(pg_stat_database_xact_commit{}[1w]))\n  * on(namespace) group_left(label_tembo_io_organization_id)\n  kube_namespace_labels{label_tembo_io_organization_id!=\"\"}\n)) / 1000000\n",
           "hide": false,
           "instant": true,
           "legendFormat": "__auto",
@@ -184,18 +212,39 @@
           "refId": "A"
         }
       ],
-      "title": "Top 10 orgs by CPU count",
-      "type": "bargauge"
+      "title": "Total transactions, past week, per org, top 100",
+      "type": "barchart"
     },
     {
       "datasource": {
         "type": "prometheus",
         "uid": "prometheus"
       },
+      "description": "",
       "fieldConfig": {
         "defaults": {
           "color": {
-            "mode": "thresholds"
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
           },
           "mappings": [],
           "thresholds": {
@@ -204,37 +253,39 @@
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
           },
-          "unit": "bytes"
+          "unit": "TPS"
         },
         "overrides": []
       },
       "gridPos": {
-        "h": 8,
+        "h": 16,
         "w": 12,
-        "x": 12,
-        "y": 8
+        "x": 0,
+        "y": 16
       },
-      "id": 8,
+      "id": 12,
       "options": {
-        "displayMode": "gradient",
-        "minVizHeight": 10,
-        "minVizWidth": 0,
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
         },
-        "showUnfilled": true
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
       },
       "pluginVersion": "9.3.6",
       "targets": [
@@ -245,7 +296,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "topk(10,sum(\n  sum(kube_pod_container_resource_limits{resource=\"memory\"}) by (namespace)\n  * on(namespace) group_left(label_tembo_io_organization_id)\n  kube_namespace_labels{label_tembo_io_organization_id!=\"\"}\n) by (label_tembo_io_organization_id))\n",
+          "expr": "topk(100, sum by (label_tembo_io_organization_id) (\n  sum by (namespace) (max_over_time(rate(pg_stat_database_xact_commit{}[5m])[1d:5m]))\n  * on(namespace) group_left(label_tembo_io_organization_id)\n  kube_namespace_labels{label_tembo_io_organization_id!=\"\"}\n))\n",
           "hide": false,
           "instant": true,
           "legendFormat": "__auto",
@@ -253,8 +304,100 @@
           "refId": "A"
         }
       ],
-      "title": "Top 10 orgs by memory",
-      "type": "bargauge"
+      "title": "Peak TPS in the last week, per org",
+      "type": "barchart"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "prometheus"
+      },
+      "description": "includes replicas",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          },
+          "unit": "none"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 16,
+        "w": 12,
+        "x": 12,
+        "y": 16
+      },
+      "id": 13,
+      "options": {
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
+      },
+      "pluginVersion": "9.3.6",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "prometheus"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "topk(100,sum by (label_tembo_io_organization_id) (\n  count by (namespace) (kube_pod_container_info{container=\"postgres\"})\n  * on(namespace) group_left(label_tembo_io_organization_id)\n  kube_namespace_labels{label_tembo_io_organization_id!=\"\"}\n))\n",
+          "hide": false,
+          "instant": true,
+          "legendFormat": "__auto",
+          "range": false,
+          "refId": "A"
+        }
+      ],
+      "title": "Total postgres servers",
+      "type": "barchart"
     },
     {
       "datasource": {
@@ -317,7 +460,7 @@
         "h": 14,
         "w": 24,
         "x": 0,
-        "y": 16
+        "y": 32
       },
       "id": 6,
       "options": {
@@ -350,103 +493,6 @@
         }
       ],
       "title": "Hypothetical monthly bill over time",
-      "type": "timeseries"
-    },
-    {
-      "datasource": {
-        "type": "prometheus",
-        "uid": "prometheus"
-      },
-      "description": "",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 0,
-            "gradientMode": "none",
-            "hideFrom": {
-              "legend": false,
-              "tooltip": false,
-              "viz": false
-            },
-            "lineInterpolation": "linear",
-            "lineWidth": 1,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "auto",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 16,
-        "w": 24,
-        "x": 0,
-        "y": 30
-      },
-      "id": 10,
-      "options": {
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "9.3.6",
-      "targets": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "prometheus"
-          },
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "avg by (label_tembo_io_organization_id) (\n  avg by (namespace) (rate(pg_stat_database_xact_commit{}[5m]))\n  * on(namespace) group_left(label_tembo_io_organization_id)\n  kube_namespace_labels{label_tembo_io_organization_id!=\"\"}\n)\n",
-          "hide": false,
-          "instant": false,
-          "legendFormat": "__auto",
-          "range": true,
-          "refId": "A"
-        }
-      ],
-      "title": "Average TPS per instance, per org, over time",
       "type": "timeseries"
     }
   ],
@@ -522,7 +568,7 @@
     ]
   },
   "time": {
-    "from": "now-30m",
+    "from": "now-3h",
     "to": "now"
   },
   "timepicker": {},
