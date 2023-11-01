@@ -38,6 +38,26 @@
           "color": {
             "mode": "thresholds"
           },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "fillOpacity": 80,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineWidth": 1,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
           "mappings": [],
           "thresholds": {
             "mode": "absolute",
@@ -45,10 +65,6 @@
               {
                 "color": "green",
                 "value": null
-              },
-              {
-                "color": "red",
-                "value": 80
               }
             ]
           },
@@ -64,18 +80,24 @@
       },
       "id": 7,
       "options": {
-        "displayMode": "gradient",
-        "minVizHeight": 10,
-        "minVizWidth": 0,
-        "orientation": "auto",
-        "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": "",
-          "values": false
+        "barRadius": 0,
+        "barWidth": 0.97,
+        "groupWidth": 0.7,
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
         },
-        "showUnfilled": true
+        "orientation": "auto",
+        "showValue": "auto",
+        "stacking": "none",
+        "tooltip": {
+          "mode": "single",
+          "sort": "none"
+        },
+        "xTickLabelRotation": 0,
+        "xTickLabelSpacing": 0
       },
       "pluginVersion": "9.3.6",
       "targets": [
@@ -86,7 +108,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "topk(10,(\n  $percent_billed * $cpu_billing * (\n    sum(\n      kube_pod_container_resource_limits{container=\"postgres\", resource=\"cpu\"} \n      * on(namespace) group_left(label_tembo_io_organization_id)\n      kube_namespace_labels{label_tembo_io_organization_id!=\"\"}\n    ) by (label_tembo_io_organization_id)\n  ) / 100\n)\n+\n(\n  $percent_billed * (\n    sum(\n      $mem_billing * kube_pod_container_resource_limits{container=\"postgres\", resource=\"memory\"} / 1073741824\n      * on(namespace) group_left(label_tembo_io_organization_id)\n      kube_namespace_labels{label_tembo_io_organization_id!=\"\"}\n    ) by (label_tembo_io_organization_id)\n  ) / 100\n))\n",
+          "expr": "topk(100,(\n  $percent_billed * $cpu_billing * (\n    sum(\n      kube_pod_container_resource_limits{container=\"postgres\", resource=\"cpu\"} \n      * on(namespace) group_left(label_tembo_io_organization_id)\n      kube_namespace_labels{label_tembo_io_organization_id!=\"\"}\n    ) by (label_tembo_io_organization_id)\n  ) / 100\n)\n+\n(\n  $percent_billed * (\n    sum(\n      $mem_billing * kube_pod_container_resource_limits{container=\"postgres\", resource=\"memory\"} / 1073741824\n      * on(namespace) group_left(label_tembo_io_organization_id)\n      kube_namespace_labels{label_tembo_io_organization_id!=\"\"}\n    ) by (label_tembo_io_organization_id)\n  ) / 100\n))\n",
           "hide": false,
           "instant": true,
           "legendFormat": "__auto",
@@ -94,8 +116,8 @@
           "refId": "A"
         }
       ],
-      "title": "Hypothetical monthly revenue per org, top 10",
-      "type": "bargauge"
+      "title": "Hypothetical monthly revenue per org",
+      "type": "barchart"
     },
     {
       "datasource": {
@@ -500,13 +522,13 @@
     ]
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-30m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "Who is using tembo cloud?",
   "uid": "CjTotN4Sz",
-  "version": 2,
+  "version": 4,
   "weekStart": ""
 }
