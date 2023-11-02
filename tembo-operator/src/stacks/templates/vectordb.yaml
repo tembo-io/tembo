@@ -4,7 +4,7 @@ image: "quay.io/tembo/standard-cnpg:15.3.0-1-1096aeb"
 stack_version: 0.1.0
 trunk_installs:
   - name: pgmq
-    version: 0.32.3
+    version: 0.33.0
   - name: vectorize
     version: 0.4.0
   - name: pgvector
@@ -26,7 +26,7 @@ extensions:
     locations:
     - database: postgres
       enabled: true
-      version: 0.32.3
+      version: 0.33.0
   - name: vectorize
     locations:
     - database: postgres
