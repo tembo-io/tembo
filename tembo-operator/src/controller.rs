@@ -12,6 +12,7 @@ use crate::{
     deployment_postgres_exporter::reconcile_prometheus_exporter_deployment,
     exec::{ExecCommand, ExecOutput},
     extensions::database_queries::is_not_restarting,
+    heartbeat::reconcile_heartbeat,
     ingress::reconcile_postgres_ing_route_tcp,
     postgres_certificates::reconcile_certificates,
     psql::{PsqlCommand, PsqlOutput},
@@ -347,6 +348,7 @@ impl CoreDB {
 
         patch_cdb_status_merge(&coredbs, &name, patch_status).await?;
 
+        reconcile_heartbeat(self, ctx.clone()).await?;
         info!("Fully reconciled {}", self.name_any());
         // Check back every 60-90 seconds
         let jitter = rand::thread_rng().gen_range(0..30);

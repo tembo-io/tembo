@@ -650,6 +650,17 @@ mod test {
         }
         assert!(found_extension);
 
+        // Check for heartbeat table and values
+        let sql_result = wait_until_psql_contains(
+            context.clone(),
+            coredb_resource.clone(),
+            "SELECT latest_heartbeat FROM tembo.heartbeat_table LIMIT 1".to_string(),
+            "postgres".to_string(),
+            true,
+        )
+        .await;
+        assert!(sql_result.success);
+
         // CLEANUP TEST
         // Cleanup CoreDB
         coredbs.delete(name, &Default::default()).await.unwrap();
