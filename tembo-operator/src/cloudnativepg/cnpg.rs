@@ -39,7 +39,7 @@ use crate::{
     config::Config,
     defaults::{default_image, default_llm_image},
     errors::ValueError,
-    patch_cdb_status_merge,
+    is_postgres_ready, patch_cdb_status_merge,
     psql::PsqlOutput,
     trunk::extensions_that_require_load,
     Context, RESTARTED_AT,
@@ -48,7 +48,7 @@ use chrono::{DateTime, NaiveDateTime, Offset};
 use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
 use kube::{
     api::{DeleteParams, Patch, PatchParams},
-    runtime::controller::Action,
+    runtime::{controller::Action, wait::Condition},
     Api, Resource, ResourceExt,
 };
 use serde_json::json;
@@ -990,6 +990,7 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
 }
 
 // Reconcile a Pooler
+#[instrument(skip(cdb, ctx) fields(trace_id, instance_name = %cdb.name_any()))]
 pub async fn reconcile_pooler(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {
     let client = ctx.client.clone();
     let name = cdb.name_any() + "-pooler";
@@ -1045,6 +1046,14 @@ pub async fn reconcile_pooler(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Act
                 error!("Error patching Pooler: {}", e);
                 Action::requeue(Duration::from_secs(300))
             })?;
+
+        // Check to see if the primary pod is ready, if it is the setup pgbouncer.  If the pod is
+        // not ready then just continue on and wait for the next reconcile.
+        let primary_pod = cdb.primary_pod_cnpg_ready_or_not(client.clone()).await?;
+        if !is_postgres_ready().matches_object(Some(&primary_pod)) {
+            debug!("Primary pod is not ready, skipping setup_pgbouncer");
+            return Ok(());
+        }
 
         match setup_pgbouncer_function(cdb, ctx.clone()).await {
             Ok(_) => debug!(
@@ -1144,6 +1153,7 @@ BEGIN
 END;
 $$;"#;
 
+#[instrument(skip(coredb, ctx) fields(trace_id, instance_name = %coredb.name_any()))]
 async fn setup_pgbouncer_function(coredb: &CoreDB, ctx: Arc<Context>) -> Result<PsqlOutput, Action> {
     // execute the PGBOUNCER_SETUP_FUNCTION to install/update the function
     // on the instance
@@ -1157,6 +1167,7 @@ async fn setup_pgbouncer_function(coredb: &CoreDB, ctx: Arc<Context>) -> Result<
     Ok(query)
 }
 
+#[instrument(skip(cdb) fields(trace_id, instance_name = %cdb.name_any()))]
 fn schedule_expression_from_cdb(cdb: &CoreDB) -> String {
     // Default to daily at midnight
     let default = "0 0 0 * * *".to_string();
