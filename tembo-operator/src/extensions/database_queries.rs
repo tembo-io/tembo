@@ -243,8 +243,8 @@ pub async fn is_not_restarting(cdb: &CoreDB, ctx: Arc<Context>, database: &str) 
                 }
                 return Err(Action::requeue(Duration::from_secs(10)));
             }
-
-            return Err(Action::requeue(Duration::from_secs(300)));
+            
+            return Err(Action::requeue(Duration::from_secs(15)));
         }
     };
 
