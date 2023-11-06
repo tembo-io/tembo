@@ -10,7 +10,8 @@ use crate::{
     Context, RESTARTED_AT,
 };
 use chrono::{DateTime, Utc};
-use kube::{runtime::controller::Action, ResourceExt};
+use k8s_openapi::api::core::v1::Pod;
+use kube::{api::DeleteParams, runtime::controller::Action, Api, ResourceExt};
 use lazy_static::lazy_static;
 use regex::Regex;
 use std::{
@@ -189,19 +190,63 @@ pub async fn is_not_restarting(cdb: &CoreDB, ctx: Arc<Context>, database: &str) 
         })?
         .into();
 
-    let pg_postmaster = cdb
+    let pg_postmaster_result = cdb
         .psql(
             "select pg_postmaster_start_time();".to_owned(),
             database.to_owned(),
-            ctx,
+            ctx.clone(),
         )
-        .await?
-        .stdout
-        .ok_or_else(|| {
-            error!("{cdb_name}: select pg_postmaster_start_time() had no stdout");
+        .await;
 
+    let pg_postmaster = match pg_postmaster_result {
+        Ok(result) => result.stdout.ok_or_else(|| {
+            error!("{cdb_name}: select pg_postmaster_start_time() had no stdout");
             Action::requeue(Duration::from_secs(300))
-        })?;
+        })?,
+        Err(_) => {
+            let pod = cdb.primary_pod_cnpg_ready_or_not(ctx.client.clone()).await?;
+
+            let pod_not_ready_duration = match get_pod_not_ready_duration(pod.clone()) {
+                Ok(Some(duration)) => {
+                    warn!("Primary pod has not been ready for {:?}", duration);
+                    duration
+                }
+                Ok(None) => {
+                    warn!("{cdb_name}: Primary pod is ready or doesn't have a Ready condition, but we could not execute a command.");
+                    return Err(Action::requeue(Duration::from_secs(5)));
+                }
+                Err(_e) => {
+                    error!("{cdb_name}: Failed to determine how long the primary has not been ready");
+                    return Err(Action::requeue(Duration::from_secs(300)));
+                }
+            };
+
+            let pod_creation_timestamp = pod.metadata.creation_timestamp.ok_or_else(|| {
+                error!("{cdb_name}: Pod has no creation timestamp");
+                Action::requeue(Duration::from_secs(300))
+            })?;
+
+            let pod_age = Utc::now() - pod_creation_timestamp.0;
+
+            // Check if the pod is older than restarted_at, and the pod has been not ready for over 30 seconds
+            if pod_age > restarted_requested_at - Utc::now()
+                && pod_not_ready_duration > Duration::from_secs(30)
+            {
+                error!("{cdb_name}: Primary pod is older than restarted_at and has been not ready for over 30 seconds. Deleting the pod");
+                let pods_api = Api::<Pod>::namespaced(ctx.client.clone(), &pod.metadata.namespace.unwrap());
+                let delete_result = pods_api
+                    .delete(&pod.metadata.name.unwrap(), &DeleteParams::default())
+                    .await;
+                if let Err(e) = delete_result {
+                    error!("{cdb_name}: Failed to delete primary pod: {:?}", e);
+                    return Err(Action::requeue(Duration::from_secs(300)));
+                }
+                return Err(Action::requeue(Duration::from_secs(10)));
+            }
+
+            return Err(Action::requeue(Duration::from_secs(300)));
+        }
+    };
 
     let pg_postmaster_start_time = parse_psql_output(&pg_postmaster).ok_or_else(|| {
         error!("{cdb_name}: failed to parse pg_postmaster_start_time() output");
@@ -229,6 +274,36 @@ pub async fn is_not_restarting(cdb: &CoreDB, ctx: Arc<Context>, database: &str) 
         error!("Restart is not complete for {}, requeuing", cdb_name);
         Err(Action::requeue(Duration::from_secs(5)))
     }
+}
+
+fn get_pod_not_ready_duration(pod: Pod) -> Result<Option<Duration>, Box<dyn std::error::Error>> {
+    let status = pod.status.ok_or("Pod has no status information")?;
+    if let Some(conditions) = status.conditions {
+        for condition in conditions {
+            if condition.type_ == "Ready" {
+                if condition.status == "False" {
+                    // Extract the last transition time when the pod was not ready
+                    let last_transition = condition
+                        .last_transition_time
+                        .ok_or("No last transition time for Ready condition")?;
+                    let last_not_ready_time = last_transition.0;
+                    let duration_since_not_ready = Utc::now() - last_not_ready_time;
+
+                    let std_duration = match duration_since_not_ready.to_std() {
+                        Ok(duration) => duration,
+                        Err(_) => {
+                            error!("Failed to convert duration to std::time::Duration");
+                            return Ok(None);
+                        }
+                    };
+
+                    return Ok(Some(std_duration));
+                }
+                break;
+            }
+        }
+    }
+    Ok(None)
 }
 
 #[instrument(skip(psql_str))]

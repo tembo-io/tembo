@@ -1159,6 +1159,7 @@ mod test {
             }
         });
 
+
         // Use the patch method to update the Cluster resource
         let params = PatchParams::default();
         let patch = Patch::Merge(patch_json);
@@ -3473,7 +3474,7 @@ CREATE EVENT TRIGGER pgrst_watch
 
         let params = PatchParams::apply("tembo-integration-test");
         let patch = Patch::Apply(&coredb_json);
-        coredbs.patch(&name, &params, &patch).await.unwrap();
+        let coredb_resource = coredbs.patch(&name, &params, &patch).await.unwrap();
 
         // Wait for CNPG Pod to be created
         {
@@ -3486,6 +3487,33 @@ CREATE EVENT TRIGGER pgrst_watch
         // Ensure status.running is true
         assert!(status_running(&coredbs, &name).await);
         let initial_start_time = get_pg_start_time(&coredbs, &name, context.clone()).await;
+
+        // Initialize uninterruptible query
+        let _ = psql_with_retry(
+            context.clone(),
+            coredb_resource.clone(),
+            "\
+                CREATE EXTENSION IF NOT EXISTS plpython3u;
+                CREATE FUNCTION slow_fibonacci (n integer)
+                  RETURNS integer
+                AS $$
+                  def recur_fibo(n):
+                    if n <= 1:
+                      return n
+                    else:
+                      return(recur_fibo(n-1) + recur_fibo(n-2))
+                  return recur_fibo(n)
+                $$ LANGUAGE plpython3u;
+            "
+            .to_string(),
+        )
+        .await;
+
+        let _stuck_query = coredb_resource.psql(
+            "SELECT slow_fibonacci(100);".to_string(),
+            "postgres".to_string(),
+            context.clone(),
+        );
 
         // Apply the annotation to restart Postgres
         {
