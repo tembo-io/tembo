@@ -25,7 +25,7 @@ pub async fn query_prometheus(
         Err(http_response) => return http_response,
     };
 
-    let start = range_query.start;
+    let mut start = range_query.start;
     // If 'end' query parameter was provided, use it. Otherwise use current time.
     let end = match range_query.end {
         Some(end) => end,
@@ -49,6 +49,9 @@ pub async fn query_prometheus(
         );
         return HttpResponse::BadRequest()
             .json("Query time range too large, must be less than or equal to 1 day");
+    }
+    if end < start {
+        start = end.clone();
     }
 
     // Get timeout from config
