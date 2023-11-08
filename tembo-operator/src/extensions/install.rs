@@ -299,6 +299,7 @@ async fn execute_extension_install_command(
                 name: ext.name.clone(),
                 version: None,
                 error: true,
+                loading: false,
                 error_message: Some("Missing version".to_string()),
                 installed_to_pods: Some(vec![pod_name.to_string()]),
             });
@@ -346,6 +347,7 @@ async fn execute_extension_install_command(
                     name: ext.name.clone(),
                     version: ext.version.clone(),
                     error: false,
+                    loading: false,
                     error_message: None,
                     installed_to_pods: Some(vec![pod_name.to_string()]),
                 }
@@ -359,6 +361,7 @@ async fn execute_extension_install_command(
                     version: ext.version.clone(),
                     error: true,
                     error_message: Some(output),
+                    loading: false,
                     installed_to_pods: Some(vec![pod_name.to_string()]),
                 }
             };
@@ -501,6 +504,7 @@ mod tests {
             version: Some("1.0".to_string()),
             error: false,
             error_message: None,
+            loading: false,
             installed_to_pods: Some(vec!["test-coredb-24631-1".to_string()]),
         };
 
@@ -509,6 +513,7 @@ mod tests {
             version: Some("1.0".to_string()),
             error: false,
             error_message: None,
+            loading: false,
             installed_to_pods: Some(vec!["test-coredb-24631-1".to_string()]),
         };
 
@@ -516,6 +521,7 @@ mod tests {
             name: "install3".to_string(),
             version: Some("1.0".to_string()),
             error: false,
+            loading: false,
             error_message: None,
             installed_to_pods: Some(vec!["test-coredb-24631-1".to_string()]),
         };
@@ -568,6 +574,7 @@ mod tests {
             version: Some("1.0".to_string()),
             error: false,
             error_message: None,
+            loading: false,
             installed_to_pods: Some(vec!["test-coredb-24631-1".to_string()]),
         };
 
@@ -616,6 +623,7 @@ mod tests {
             name: "install1".to_string(),
             version: Some("1.0".to_string()),
             error: false,
+            loading: false,
             error_message: None,
             installed_to_pods: Some(vec!["test-coredb-24631-1".to_string()]),
         };
@@ -624,6 +632,7 @@ mod tests {
             name: "install2".to_string(),
             version: Some("1.0".to_string()),
             error: false,
+            loading: false,
             error_message: None,
             installed_to_pods: Some(vec!["test-coredb-24631-1".to_string()]),
         };

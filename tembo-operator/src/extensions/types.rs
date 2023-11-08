@@ -23,6 +23,8 @@ pub struct TrunkInstallStatus {
     pub name: String,
     pub version: Option<String>,
     pub error: bool,
+    #[serde(default)]
+    pub loading: bool,
     pub error_message: Option<String>,
     pub installed_to_pods: Option<Vec<String>>,
 }
@@ -794,6 +796,7 @@ mod tests {
             error: false,
             error_message: None,
             installed_to_pods: None,
+            loading: false,
         };
         let trunk_install: TrunkInstall = status.into();
         assert_eq!(trunk_install.name, "pgmq");

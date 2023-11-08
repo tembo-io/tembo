@@ -310,6 +310,7 @@ mod tests {
             version: Some("1.0".to_string()),
             error: false,
             error_message: None,
+            loading: false,
             installed_to_pods: None,
         }];
         let new_trunk_install = TrunkInstallStatus {
@@ -317,6 +318,7 @@ mod tests {
             version: Some("1.0".to_string()),
             error: false,
             error_message: None,
+            loading: false,
             installed_to_pods: Some(vec!["pod-1".to_string(), "pod-2".to_string()]),
         };
 
@@ -336,6 +338,7 @@ mod tests {
             installed_to_pods: Some(vec!["test-coredb-24631-1".to_string()]),
             name: "test_name".to_string(),
             version: Some("1.0.0".to_string()),
+            loading: false,
             error_message: None,
         }];
 
@@ -344,6 +347,7 @@ mod tests {
             installed_to_pods: Some(vec!["test-coredb-24631-2".to_string()]),
             name: "test_name".to_string(),
             version: Some("1.0.0".to_string()),
+            loading: false,
             error_message: None,
         };
 
@@ -370,6 +374,7 @@ mod tests {
                 ]),
                 name: "test_name".to_string(),
                 version: Some("1.0.0".to_string()),
+                loading: false,
                 error_message: None,
             },
             TrunkInstallStatus {
@@ -377,6 +382,7 @@ mod tests {
                 installed_to_pods: Some(vec!["test-coredb-24631-1".to_string()]),
                 name: "test_name2".to_string(),
                 version: Some("1.0.0".to_string()),
+                loading: false,
                 error_message: None,
             },
         ];
@@ -386,6 +392,7 @@ mod tests {
             installed_to_pods: Some(vec!["test-coredb-24631-2".to_string()]),
             name: "test_name2".to_string(),
             version: Some("1.0.0".to_string()),
+            loading: false,
             error_message: None,
         };
 
@@ -417,6 +424,7 @@ mod tests {
                 name: "pg_partman".to_string(),
                 version: Some("4.7.3".to_string()),
                 error_message: None,
+                loading: false,
             },
             TrunkInstallStatus {
                 error: false,
@@ -424,6 +432,7 @@ mod tests {
                 name: "pg_stat_statements".to_string(),
                 version: Some("1.10.0".to_string()),
                 error_message: None,
+                loading: false,
             },
             TrunkInstallStatus {
                 error: false,
@@ -431,6 +440,7 @@ mod tests {
                 name: "pgmq".to_string(),
                 version: Some("0.10.0".to_string()),
                 error_message: None,
+                loading: false,
             },
         ];
 
@@ -440,6 +450,7 @@ mod tests {
             name: "pg_partman".to_string(),
             version: Some("4.7.3".to_string()),
             error_message: None,
+            loading: false,
         };
 
         let updated_trunk_installs =
@@ -461,6 +472,7 @@ mod tests {
             name: "pg_stat_statements".to_string(),
             version: Some("1.10.0".to_string()),
             error_message: None,
+            loading: false,
         };
 
         let updated_trunk_installs =
@@ -482,6 +494,7 @@ mod tests {
             name: "pgmq".to_string(),
             version: Some("0.10.0".to_string()),
             error_message: None,
+            loading: false,
         };
 
         let updated_trunk_installs =

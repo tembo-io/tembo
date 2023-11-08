@@ -839,6 +839,9 @@ spec:
                         type: string
                       nullable: true
                       type: array
+                    loading:
+                      default: false
+                      type: boolean
                     name:
                       type: string
                     version:
