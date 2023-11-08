@@ -4,11 +4,12 @@ use crate::{
     defaults::default_image,
     extensions::types::{Extension, TrunkInstall},
     postgres_exporter::QueryConfig,
-    stacks::config_engines::{olap_config_engine, standard_config_engine, ConfigEngine},
+    stacks::config_engines::{mq_config_engine, olap_config_engine, standard_config_engine, ConfigEngine},
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema, PartialEq, ToSchema)]
 pub enum StackType {
@@ -79,6 +80,7 @@ impl Stack {
         match &self.postgres_config_engine {
             Some(ConfigEngine::Standard) => Some(standard_config_engine(self)),
             Some(ConfigEngine::OLAP) => Some(olap_config_engine(self)),
+            Some(ConfigEngine::MQ) => Some(mq_config_engine(self)),
             None => Some(standard_config_engine(self)),
         }
     }
@@ -123,6 +125,7 @@ pub struct ComputeTemplate {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::stacks::{get_stack, types::Infrastructure, StackType};
 
     #[test]
@@ -137,10 +140,15 @@ mod tests {
 
         // testing the default instance configurations
         let runtime_configs = mq.runtime_config().expect("expected configs");
-        assert_eq!(runtime_configs[0].name, "shared_buffers");
-        assert_eq!(runtime_configs[0].value.to_string(), "256MB");
-        assert_eq!(runtime_configs[1].name, "max_connections");
-        assert_eq!(runtime_configs[1].value.to_string(), "107");
+        // convert to vec to hashmap because order is not guaranteed
+        let hm: std::collections::HashMap<String, PgConfig> =
+            runtime_configs.into_iter().map(|c| (c.name.clone(), c)).collect();
+        let shared_buffers = hm.get("shared_buffers").unwrap();
+        assert_eq!(shared_buffers.name, "shared_buffers");
+        assert_eq!(shared_buffers.value.to_string(), "614MB");
+        let max_connections = hm.get("max_connections").unwrap();
+        assert_eq!(max_connections.name, "max_connections");
+        assert_eq!(max_connections.value.to_string(), "107");
         assert!(mq.postgres_metrics.is_some());
         assert!(mq.postgres_config.is_some());
         let mq_metrics = mq.postgres_metrics.unwrap();
@@ -159,7 +167,10 @@ mod tests {
         println!("STD: {:#?}", std);
 
         let runtime_configs = std.runtime_config().expect("expected configs");
-        assert_eq!(runtime_configs[0].name, "shared_buffers");
-        assert_eq!(runtime_configs[0].value.to_string(), "512MB");
+        let hm: std::collections::HashMap<String, PgConfig> =
+            runtime_configs.into_iter().map(|c| (c.name.clone(), c)).collect();
+        let shared_buffers = hm.get("shared_buffers").unwrap();
+        assert_eq!(shared_buffers.name, "shared_buffers");
+        assert_eq!(shared_buffers.value.to_string(), "512MB");
     }
 }

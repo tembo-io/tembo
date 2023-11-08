@@ -16,6 +16,7 @@ const DEFAULT_MAINTENANCE_WORK_MEM_MB: i32 = 64;
 pub enum ConfigEngine {
     Standard,
     OLAP,
+    MQ,
 }
 
 // The standard configuration engine
@@ -117,6 +118,28 @@ pub fn olap_config_engine(stack: &Stack) -> Vec<PgConfig> {
         },
     ]
 }
+
+// the MQ config engine is essentially the standard OLTP config engine, with a few tweaks
+pub fn mq_config_engine(stack: &Stack) -> Vec<PgConfig> {
+    let sys_mem_mb = parse_memory(stack).expect("no memory values");
+    let shared_buffer_val_mb = mq_shared_buffers(sys_mem_mb);
+
+    // start with the output from the standard config engine
+    let configs = standard_config_engine(stack);
+    let mut hm: std::collections::HashMap<String, PgConfig> =
+        configs.into_iter().map(|c| (c.name.clone(), c)).collect();
+
+    // replace shared_buffers with a higher percentage
+    let shared_buffers = PgConfig {
+        name: "shared_buffers".to_owned(),
+        value: ConfigValue::Single(format!("{shared_buffer_val_mb}MB")),
+    };
+    // overwrite existing shared_buffer value with the new one
+    hm.insert(shared_buffers.name.clone(), shared_buffers);
+    // convert to vec and return
+    hm.into_iter().map(|(_, v)| v).collect()
+}
+
 
 // olap formula for max_parallel_workers_per_gather
 fn olap_max_parallel_workers_per_gather(cpu: i32) -> i32 {
@@ -220,6 +243,12 @@ fn parse_storage(stack: &Stack) -> Result<f64, ValueError> {
             storage_str
         ))),
     }
+}
+
+// Standard formula for shared buffers, 25% of system memory
+// returns the value as string including units, e.g. 128MB
+fn mq_shared_buffers(mem_mb: f64) -> i32 {
+    (mem_mb * 0.6).floor() as i32
 }
 
 // Standard formula for shared buffers, 25% of system memory
@@ -362,7 +391,13 @@ mod tests {
         let shared_buff = standard_shared_buffers(1024.0);
         assert_eq!(shared_buff, 256);
         let shared_buff = standard_shared_buffers(10240.0);
-        assert_eq!(shared_buff, 2560)
+        assert_eq!(shared_buff, 2560);
+
+        let shared_buff = mq_shared_buffers(1024.0);
+        assert_eq!(shared_buff, 614);
+
+        let shared_buff = mq_shared_buffers(10240.0);
+        assert_eq!(shared_buff, 6144);
     }
 
     #[test]
