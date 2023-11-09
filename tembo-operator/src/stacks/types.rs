@@ -13,6 +13,7 @@ use utoipa::ToSchema;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema, PartialEq, ToSchema)]
 pub enum StackType {
+    DataWarehouse,
     Standard,
     MessageQueue,
     MachineLearning,
@@ -27,7 +28,7 @@ impl std::str::FromStr for StackType {
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
-            "CoreDB" => Ok(StackType::Standard),
+            "DataWarehouse" => Ok(StackType::DataWarehouse),
             "Standard" => Ok(StackType::Standard),
             "MessageQueue" => Ok(StackType::MessageQueue),
             "MachineLearning" => Ok(StackType::MachineLearning),
@@ -42,6 +43,7 @@ impl std::str::FromStr for StackType {
 impl StackType {
     pub fn as_str(&self) -> &str {
         match self {
+            StackType::DataWarehouse => "DataWarehouse",
             StackType::Standard => "Standard",
             StackType::MessageQueue => "MessageQueue",
             StackType::MachineLearning => "MachineLearning",

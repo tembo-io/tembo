@@ -6,6 +6,8 @@ use types::{Stack, StackType};
 use lazy_static::lazy_static;
 
 lazy_static! {
+    pub static ref DATAWAREHOUSE: Stack = serde_yaml::from_str(include_str!("templates/data_warehouse.yaml"))
+        .expect("data_warehouse.yaml not found");
     pub static ref MQ: Stack = serde_yaml::from_str(include_str!("templates/message_queue.yaml"))
         .expect("message_queue.yaml not found");
     pub static ref STANDARD: Stack =
@@ -22,6 +24,7 @@ lazy_static! {
 
 pub fn get_stack(entity: StackType) -> types::Stack {
     match entity {
+        StackType::DataWarehouse => DATAWAREHOUSE.clone(),
         StackType::MessageQueue => MQ.clone(),
         StackType::Standard => STANDARD.clone(),
         StackType::MachineLearning => ML.clone(),
