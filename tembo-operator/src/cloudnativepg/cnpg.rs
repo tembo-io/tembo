@@ -20,8 +20,10 @@ use crate::{
             ClusterExternalClustersBarmanObjectStoreS3CredentialsRegion,
             ClusterExternalClustersBarmanObjectStoreS3CredentialsSecretAccessKey,
             ClusterExternalClustersBarmanObjectStoreS3CredentialsSessionToken,
-            ClusterExternalClustersBarmanObjectStoreWal, ClusterExternalClustersPassword, ClusterLogLevel,
-            ClusterManaged, ClusterManagedRoles, ClusterManagedRolesEnsure,
+            ClusterExternalClustersBarmanObjectStoreWal,
+            ClusterExternalClustersBarmanObjectStoreWalCompression,
+            ClusterExternalClustersBarmanObjectStoreWalEncryption, ClusterExternalClustersPassword,
+            ClusterLogLevel, ClusterManaged, ClusterManagedRoles, ClusterManagedRolesEnsure,
             ClusterManagedRolesPasswordSecret, ClusterMonitoring, ClusterMonitoringCustomQueriesConfigMap,
             ClusterNodeMaintenanceWindow, ClusterPostgresql, ClusterPostgresqlSyncReplicaElectionConstraint,
             ClusterPrimaryUpdateMethod, ClusterPrimaryUpdateStrategy, ClusterReplicationSlots,
@@ -72,7 +74,7 @@ fn create_cluster_backup_barman_data(cdb: &CoreDB) -> Option<ClusterBackupBarman
     };
 
     Some(ClusterBackupBarmanObjectStoreData {
-        compression: Some(ClusterBackupBarmanObjectStoreDataCompression::Bzip2),
+        compression: Some(ClusterBackupBarmanObjectStoreDataCompression::Snappy),
         encryption,
         immediate_checkpoint: Some(true),
         ..ClusterBackupBarmanObjectStoreData::default()
@@ -91,7 +93,7 @@ fn create_cluster_backup_barman_wal(cdb: &CoreDB) -> Option<ClusterBackupBarmanO
 
     if encryption.is_some() {
         Some(ClusterBackupBarmanObjectStoreWal {
-            compression: Some(ClusterBackupBarmanObjectStoreWalCompression::Bzip2),
+            compression: Some(ClusterBackupBarmanObjectStoreWalCompression::Snappy),
             encryption,
             max_parallel: Some(5),
         })
@@ -404,6 +406,8 @@ pub fn cnpg_cluster_bootstrap_from_cdb(
                 s3_credentials: Some(s3_credentials),
                 wal: Some(ClusterExternalClustersBarmanObjectStoreWal {
                     max_parallel: Some(5),
+                    encryption: Some(ClusterExternalClustersBarmanObjectStoreWalEncryption::Aes256),
+                    compression: Some(ClusterExternalClustersBarmanObjectStoreWalCompression::Snappy),
                     ..ClusterExternalClustersBarmanObjectStoreWal::default()
                 }),
                 server_name: Some(restore.server_name.clone()),
