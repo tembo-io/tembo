@@ -125,19 +125,15 @@ pub fn mq_config_engine(stack: &Stack) -> Vec<PgConfig> {
     let shared_buffer_val_mb = mq_shared_buffers(sys_mem_mb);
 
     // start with the output from the standard config engine
-    let configs = standard_config_engine(stack);
-    let mut hm: std::collections::HashMap<String, PgConfig> =
-        configs.into_iter().map(|c| (c.name.clone(), c)).collect();
+    let mut configs = standard_config_engine(stack);
 
-    // replace shared_buffers with a higher percentage
-    let shared_buffers = PgConfig {
-        name: "shared_buffers".to_owned(),
-        value: ConfigValue::Single(format!("{shared_buffer_val_mb}MB")),
-    };
-    // overwrite existing shared_buffer value with the new one
-    hm.insert(shared_buffers.name.clone(), shared_buffers);
-    // convert to vec and return
-    hm.into_iter().map(|(_, v)| v).collect()
+    for config in configs.iter_mut() {
+        if config.name == "shared_buffers" {
+            config.value = ConfigValue::Single(format!("{shared_buffer_val_mb}MB"))
+        }
+    }
+
+    configs
 }
 
 
