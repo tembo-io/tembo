@@ -6,7 +6,7 @@ WORKDIR /build
 
 COPY . .
 
-RUN cargo build --release --features=telemetry --target=x86_64-unknown-linux-musl
+RUN cargo build --release --target=x86_64-unknown-linux-musl
 
 FROM --platform=linux/amd64 quay.io/tembo/alpine:3.18.2
 
