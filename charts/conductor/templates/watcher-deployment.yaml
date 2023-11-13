@@ -1,14 +1,14 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "conductor.fullname" . }}
+  name: {{ include "conductor.fullname" . }}-watcher
   labels:
-    {{- include "conductor.labels" . | nindent 4 }}
+    {{- include "conductor.watcherLabels" . | nindent 4 }}
 spec:
   replicas: {{ .Values.replicas }}
   selector:
     matchLabels:
-      {{- include "conductor.selectorLabels" . | nindent 6 }}
+      {{- include "conductor.watcherSelectorLabels" . | nindent 6 }}
   strategy:
     rollingUpdate:
       maxSurge: 25%
@@ -45,9 +45,9 @@ spec:
                 name: data-plane
                 key: _data-plane_postgres_connection_string
           - name: CONDUCTOR_ENABLED
-            value: "true"
-          - name: WATCHER_ENABLED
             value: "false"
+          - name: WATCHER_ENABLED
+            value: "true"
           - name: RUST_LOG
             value: {{ .Values.logLevel }}
           {{- if .Values.env }}{{ .Values.env | default list | toYaml | nindent 10 }}{{- end }}

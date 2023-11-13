@@ -1,4 +1,5 @@
 {{- if .Values.podMonitor.enabled -}}
+---
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
@@ -14,4 +15,20 @@ spec:
   selector:
     matchLabels:
     {{- include "conductor.selectorLabels" . | nindent 6 }}
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: {{ .Release.Name }}-watcher
+  namespace: {{ .Release.Namespace }}
+spec:
+  podMetricsEndpoints:
+  - path: {{ .Values.podMonitor.path }}
+    port: {{ .Values.podMonitor.port }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+  selector:
+    matchLabels:
+    {{- include "conductor.watcherSelectorLabels" . | nindent 6 }}
 {{- end }}

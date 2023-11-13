@@ -524,60 +524,67 @@ async fn main() -> std::io::Result<()> {
         .lock()
         .expect("Failed to remember our background threads");
 
-    info!("Starting conductor");
-    background_threads_locked.push(tokio::spawn({
-        let custom_metrics_copy = custom_metrics.clone();
+    let conductor_enabled = from_env_default("CONDUCTOR_ENABLED", "true");
+    let watcher_enabled = from_env_default("WATCHER_ENABLED", "true");
 
-        async move {
-            loop {
-                match run(custom_metrics_copy.clone()).await {
-                    Ok(_) => {}
-                    Err(ConductorError::PgmqError(pgmq::errors::PgmqError::DatabaseError(
-                        Error::PoolTimedOut,
-                    ))) => {
-                        custom_metrics_copy.clone().conductor_errors.add(
-                            &opentelemetry::Context::current(),
-                            1,
-                            &[],
-                        );
-                        panic!("sqlx PoolTimedOut error -- forcing pod restart, error")
-                    }
-                    Err(err) => {
-                        custom_metrics_copy.clone().conductor_errors.add(
-                            &opentelemetry::Context::current(),
-                            1,
-                            &[],
-                        );
-                        error!("error in conductor: {:?}", err);
-                    }
-                }
-                warn!("conductor exited, sleeping for 1 second");
-                thread::sleep(time::Duration::from_secs(1));
-            }
-        }
-    }));
+    if conductor_enabled != "false" {
+        info!("Starting conductor");
+        background_threads_locked.push(tokio::spawn({
+            let custom_metrics_copy = custom_metrics.clone();
 
-    info!("Starting status reporter");
-    background_threads_locked.push(tokio::spawn({
-        let custom_metrics_copy = custom_metrics.clone();
-        async move {
-            loop {
-                match run_status_reporter(custom_metrics_copy.clone()).await {
-                    Ok(_) => {}
-                    Err(err) => {
-                        custom_metrics_copy.clone().conductor_errors.add(
-                            &opentelemetry::Context::current(),
-                            1,
-                            &[],
-                        );
-                        error!("error in conductor: {:?}", err);
+            async move {
+                loop {
+                    match run(custom_metrics_copy.clone()).await {
+                        Ok(_) => {}
+                        Err(ConductorError::PgmqError(pgmq::errors::PgmqError::DatabaseError(
+                            Error::PoolTimedOut,
+                        ))) => {
+                            custom_metrics_copy.clone().conductor_errors.add(
+                                &opentelemetry::Context::current(),
+                                1,
+                                &[],
+                            );
+                            panic!("sqlx PoolTimedOut error -- forcing pod restart, error")
+                        }
+                        Err(err) => {
+                            custom_metrics_copy.clone().conductor_errors.add(
+                                &opentelemetry::Context::current(),
+                                1,
+                                &[],
+                            );
+                            error!("error in conductor: {:?}", err);
+                        }
                     }
+                    warn!("conductor exited, sleeping for 1 second");
+                    thread::sleep(time::Duration::from_secs(1));
                 }
-                warn!("conductor exited, sleeping for 1 second");
-                thread::sleep(time::Duration::from_secs(1));
             }
-        }
-    }));
+        }));
+    }
+
+    if watcher_enabled != "false" {
+        info!("Starting status reporter");
+        background_threads_locked.push(tokio::spawn({
+            let custom_metrics_copy = custom_metrics.clone();
+            async move {
+                loop {
+                    match run_status_reporter(custom_metrics_copy.clone()).await {
+                        Ok(_) => {}
+                        Err(err) => {
+                            custom_metrics_copy.clone().conductor_errors.add(
+                                &opentelemetry::Context::current(),
+                                1,
+                                &[],
+                            );
+                            error!("error in conductor: {:?}", err);
+                        }
+                    }
+                    warn!("conductor exited, sleeping for 1 second");
+                    thread::sleep(time::Duration::from_secs(1));
+                }
+            }
+        }));
+    }
 
     std::mem::drop(background_threads_locked);
 
@@ -666,4 +673,8 @@ async fn init_cloud_perms(
     coredb_spec.serviceAccountTemplate = service_account_template;
 
     Ok(())
+}
+
+fn from_env_default(key: &str, default: &str) -> String {
+    env::var(key).unwrap_or_else(|_| default.to_owned())
 }

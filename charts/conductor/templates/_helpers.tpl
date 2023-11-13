@@ -50,6 +50,21 @@ app.kubernetes.io/name: {{ include "conductor.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
+{{- define "conductor.watcherSelectorLabels" -}}
+app.kubernetes.io/name: {{ include "conductor.name" . }}-watcher
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
+
+{{- define "conductor.watcherLabels" -}}
+helm.sh/chart: {{ include "conductor.chart" . }}
+{{ include "conductor.watcherSelectorLabels" . }}
+{{- if .Chart.AppVersion }}
+app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+{{- end }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end }}
+
+
 {{/*
 Create the name of the service account to use
 */}}
