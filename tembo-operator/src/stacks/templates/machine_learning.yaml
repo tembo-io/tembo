@@ -31,9 +31,9 @@ trunk_installs:
   - name: pg_cron
     version: 1.5.2
   - name: pgmq
-    version: 0.33.0
+    version: 0.33.1
   - name: vectorize
-    version: 0.3.0
+    version: 0.5.0
   - name: pg_later
     version: 0.0.11
 extensions:
@@ -58,12 +58,12 @@ extensions:
     locations:
     - database: postgres
       enabled: true
-      version: 0.33.0
+      version: 0.33.1
   - name: vectorize
     locations:
     - database: postgres
       enabled: true
-      version: 0.3.0
+      version: 0.5.0
   - name: pg_later
     locations:
     - database: postgres
