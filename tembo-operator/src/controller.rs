@@ -371,9 +371,9 @@ impl CoreDB {
 
         reconcile_heartbeat(self, ctx.clone()).await?;
         info!("Fully reconciled {}", self.name_any());
-        // Check back every 120-90 seconds
-        let jitter = rand::thread_rng().gen_range(0..30);
-        Ok(Action::requeue(Duration::from_secs(120 + jitter)))
+        // Check back every 90-150 seconds
+        let jitter = rand::thread_rng().gen_range(0..60);
+        Ok(Action::requeue(Duration::from_secs(90 + jitter)))
     }
 
     // Finalizer cleanup (the object was deleted, ensure nothing is orphaned)
