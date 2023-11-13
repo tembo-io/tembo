@@ -1,3 +1,5 @@
+.vscode
+.idea/**
 target/**
 tests/.config/tembo/*
 tembo.log

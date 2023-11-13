@@ -1,82 +1,109 @@
-use crate::cli::config::Config;
-use crate::cli::docker::{Docker, DockerError};
 use clap::{ArgMatches, Command};
 use simplelog::*;
-use spinners::{Spinner, Spinners};
 use std::error::Error;
-use std::process::Command as ShellCommand;
+use std::fs::{self, File};
+use std::io::Write;
+use std::path::Path;
 
-// Create clap subcommand arguments
+const CONTEXT_DEFAULT_TEXT: &str = "version = \"1.0\"
+
+[local]
+target: docker
+
+[prod]
+target: tembo-cloud
+org_id: ORG_ID_GOES_HERE
+";
+
+fn tembo_home_dir() -> String {
+    let mut tembo_home = home::home_dir().unwrap().as_path().display().to_string();
+    tembo_home.push_str("/.tembo");
+    tembo_home
+}
+
+// Create init subcommand arguments
 pub fn make_subcommand() -> Command {
     Command::new("init")
         .about("Initializes a local environment; generates configuration and pulls Docker image")
 }
 
-pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
-    // check the system requirements
-    match check_requirements() {
-        Ok(_) => info!("Docker was found and appears running"),
+pub fn execute(_args: &ArgMatches) -> Result<(), Box<dyn Error>> {
+    match create_dir("home directory".to_string(), tembo_home_dir()) {
+        Ok(t) => t,
         Err(e) => {
             return Err(e);
         }
     }
 
-    // create the configuration file in the default location
-    let config = Config::new(args, &Config::full_path(args));
+    let context_file_path = tembo_home_dir() + &String::from("/context");
+    match create_file(
+        "context".to_string(),
+        context_file_path,
+        CONTEXT_DEFAULT_TEXT.to_string(),
+    ) {
+        Ok(t) => t,
+        Err(e) => {
+            return Err(e);
+        }
+    }
 
-    info!("Config file created at: {}", &config.created_at.to_string());
+    match create_file(
+        "config".to_string(),
+        "tembo.toml".to_string(),
+        "".to_string(),
+    ) {
+        Ok(t) => t,
+        Err(e) => {
+            return Err(e);
+        }
+    }
 
-    // pull the Tembo image
-    build_image()
+    match create_dir(
+        "migrations directory".to_string(),
+        "tembo-migrations".to_string(),
+    ) {
+        Ok(t) => t,
+        Err(e) => {
+            return Err(e);
+        }
+    }
+
+    Ok(())
 }
 
-fn check_requirements() -> Result<(), Box<dyn Error>> {
-    Docker::installed_and_running()
-}
-
-fn build_image() -> Result<(), Box<dyn Error>> {
-    if image_exist() {
-        info!("Tembo image already exists, proceeding");
+fn create_dir(dir_name: String, dir_path: String) -> Result<(), Box<dyn Error>> {
+    if Path::new(&dir_path).exists() {
+        info!("Tembo {} path exists", dir_name);
         return Ok(());
     }
 
-    info!("Installing Tembo image");
-    let mut sp = Spinner::new(Spinners::Line, String::new());
-    let mut command = String::from("cd tembo"); // TODO: does this work for installed crates?
-    command.push_str("&& docker build -t tembo-pg . ");
-    command.push_str(" --quiet");
+    match fs::create_dir_all(dir_path) {
+        Err(why) => panic!("Couldn't create {}: {}", dir_name, why),
+        Ok(_) => info!("Tembo {} created", dir_name),
+    };
 
-    let output = ShellCommand::new("sh")
-        .arg("-c")
-        .arg(&command)
-        .output()
-        .expect("failed to execute process");
-
-    sp.stop_with_newline();
-
-    let stderr = String::from_utf8(output.stderr).unwrap();
-
-    if !stderr.is_empty() {
-        return Err(Box::new(DockerError::new(
-            format!("There was an issue pulling the image: {}", stderr).as_str(),
-        )));
-    } else {
-        info!("Tembo image was installed");
-        Ok(())
-    }
+    Ok(())
 }
 
-fn image_exist() -> bool {
-    let command = String::from("docker images");
-    let output = ShellCommand::new("sh")
-        .arg("-c")
-        .arg(&command)
-        .output()
-        .expect("failed to execute process");
+fn create_file(
+    file_name: String,
+    file_path: String,
+    file_content: String,
+) -> Result<(), Box<dyn Error>> {
+    let path = Path::new(&file_path);
+    if path.exists() {
+        info!("Tembo {} file exists", file_name);
+        return Ok(());
+    }
+    let display = path.display();
+    let mut file: File = match File::create(&path) {
+        Err(why) => panic!("Couldn't create {}: {}", display, why),
+        Ok(file) => file,
+    };
+    info!("Tembo {} file created", file_name);
 
-    let stdout = String::from_utf8(output.stdout).unwrap();
-    let image_name = String::from("tembo-pg-cnpg");
-    let image = stdout.find(&image_name);
-
-    image.is_some()
+    if let Err(e) = file.write_all(file_content.as_bytes()) {
+        panic!("Couldn't write to context file: {}", e);
+    }
+    Ok(())
 }

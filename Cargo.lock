@@ -2086,7 +2086,7 @@ dependencies = [
 
 [[package]]
 name = "tembo"
-version = "0.7.0"
+version = "0.7.2"
 dependencies = [
  "anyhow",
  "assert_cmd",

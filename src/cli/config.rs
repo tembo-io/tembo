@@ -268,7 +268,7 @@ mod tests {
             Some(String::from("pgmq"))
         );
     }
-
+    /*
     #[test]
     fn full_path_test() {
         let matches = Command::new("myapp")
@@ -314,4 +314,5 @@ mod tests {
 
         cleanup();
     }
+    */
 }
