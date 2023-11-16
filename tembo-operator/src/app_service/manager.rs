@@ -25,6 +25,7 @@ use super::{
     ingress::{generate_ingress_routes, reconcile_ingress},
     types::{AppService, EnvVarRef, Middleware, COMPONENT_NAME},
 };
+use k8s_openapi::api::core::v1::Volume;
 
 // private wrapper to hold the AppService Resources
 #[derive(Clone, Debug)]
@@ -188,7 +189,6 @@ fn generate_deployment(
         None
     };
 
-
     // https://tembo.io/docs/tembo-cloud/security/#tenant-isolation
     // These configs are the same as CNPG configs
     let security_context = SecurityContext {
@@ -319,8 +319,10 @@ fn generate_deployment(
             readiness_probe,
             liveness_probe,
             security_context: Some(security_context),
+            volume_mounts: appsvc.storage.clone().and_then(|s| s.volume_mounts),
             ..Container::default()
         }],
+        volumes: appsvc.storage.clone().and_then(|s| s.volumes),
         ..PodSpec::default()
     };
 

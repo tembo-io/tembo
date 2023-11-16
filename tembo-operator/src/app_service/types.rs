@@ -1,12 +1,22 @@
 use std::collections::BTreeMap;
 
-use k8s_openapi::{api::core::v1::ResourceRequirements, apimachinery::pkg::api::resource::Quantity};
+use k8s_openapi::{
+    api::core::v1::{ResourceRequirements, Volume, VolumeMount},
+    apimachinery::pkg::api::resource::Quantity,
+};
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 pub const COMPONENT_NAME: &str = "appService";
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, JsonSchema, PartialEq)]
+pub struct StorageConfig {
+    pub volumes: Option<Vec<Volume>>,
+    #[serde(rename = "volumeMounts")]
+    pub volume_mounts: Option<Vec<VolumeMount>>,
+}
 
 // defines a app container
 #[derive(Clone, Debug, Default, Serialize, Deserialize, ToSchema, JsonSchema, PartialEq)]
@@ -21,6 +31,7 @@ pub struct AppService {
     pub probes: Option<Probes>,
     pub middlewares: Option<Vec<Middleware>>,
     pub routing: Option<Vec<Routing>>,
+    pub storage: Option<StorageConfig>,
 }
 
 pub fn default_resources() -> ResourceRequirements {
@@ -106,7 +117,6 @@ pub struct HeaderConfig {
     pub config: BTreeMap<String, String>,
 }
 
-
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, JsonSchema, PartialEq)]
 pub struct StripPrefixConfig {
     pub name: String,
@@ -123,7 +133,6 @@ pub struct ReplacePathRegexConfigType {
     pub regex: String,
     pub replacement: String,
 }
-
 
 // source: https://github.com/kube-rs/kube/issues/844
 fn preserve_arbitrary(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
