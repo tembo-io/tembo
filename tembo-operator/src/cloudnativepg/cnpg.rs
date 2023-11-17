@@ -1005,6 +1005,7 @@ pub async fn reconcile_pooler(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Act
 
     // If pooler is enabled, create or update
     if cdb.spec.connectionPooler.enabled {
+        debug!("Configuraing pooler instance for {}", cdb.name_any());
         let pooler = Pooler {
             metadata: ObjectMeta {
                 name: Some(name.clone()),

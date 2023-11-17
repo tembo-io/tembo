@@ -287,11 +287,8 @@ impl CoreDB {
                 Action::requeue(Duration::from_secs(300))
             })?;
 
-        if self.spec.connectionPooler.enabled {
-            debug!("Configuraing pooler instance for {}", name);
-            // Reconcile Pooler resource
-            reconcile_pooler(self, ctx.clone()).await?;
-        }
+        // Reconcile Pooler resource
+        reconcile_pooler(self, ctx.clone()).await?;
 
         // Check if Postgres is already running
         let pg_postmaster_start_time = is_not_restarting(self, ctx.clone(), "postgres").await?;
