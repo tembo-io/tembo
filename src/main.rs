@@ -48,6 +48,7 @@ fn main() {
 
     let res = match matches.subcommand() {
         Some(("init", sub_matches)) => cmd::init::execute(sub_matches),
+        Some(("context", sub_matches)) => cmd::context::execute(sub_matches),
         Some(("instance", sub_matches)) => cmd::instance::execute(sub_matches),
         Some(("db", sub_matches)) => cmd::database::execute(sub_matches),
         Some(("schema", sub_matches)) => cmd::schema::execute(sub_matches),
@@ -97,6 +98,12 @@ fn create_clap_command() -> Command {
                 .subcommand(cmd::instance::list::make_subcommand())
                 .subcommand(cmd::instance::start::make_subcommand())
                 .subcommand(cmd::instance::stop::make_subcommand()),
+        )
+        .subcommand(
+            Command::new("context")
+                .about("Commands used to list/get/set context")
+                .subcommand(cmd::context::list::make_subcommand())
+                .subcommand(cmd::context::set::make_subcommand()),
         )
         .subcommand(
             Command::new("auth")

@@ -5,26 +5,15 @@ use std::fs::{self, File};
 use std::io::Write;
 use std::path::Path;
 
-const CONTEXT_DEFAULT_TEXT: &str = "version = \"1.0\"
-
-[local]
-target: docker
-
-[prod]
-target: tembo-cloud
-org_id: ORG_ID_GOES_HERE
-";
-
-fn tembo_home_dir() -> String {
-    let mut tembo_home = home::home_dir().unwrap().as_path().display().to_string();
-    tembo_home.push_str("/.tembo");
-    tembo_home
-}
+use crate::cli::context::{
+    tembo_context_file_path, tembo_credentials_file_path, tembo_home_dir, CONTEXT_DEFAULT_TEXT,
+    CREDENTIALS_DEFAULT_TEXT,
+};
 
 // Create init subcommand arguments
 pub fn make_subcommand() -> Command {
     Command::new("init")
-        .about("Initializes a local environment; generates configuration and pulls Docker image")
+        .about("Initializes a local environment; creates needed context & config files/directories")
 }
 
 pub fn execute(_args: &ArgMatches) -> Result<(), Box<dyn Error>> {
@@ -35,11 +24,21 @@ pub fn execute(_args: &ArgMatches) -> Result<(), Box<dyn Error>> {
         }
     }
 
-    let context_file_path = tembo_home_dir() + &String::from("/context");
     match create_file(
         "context".to_string(),
-        context_file_path,
+        tembo_context_file_path(),
         CONTEXT_DEFAULT_TEXT.to_string(),
+    ) {
+        Ok(t) => t,
+        Err(e) => {
+            return Err(e);
+        }
+    }
+
+    match create_file(
+        "credentials".to_string(),
+        tembo_credentials_file_path(),
+        CREDENTIALS_DEFAULT_TEXT.to_string(),
     ) {
         Ok(t) => t,
         Err(e) => {
