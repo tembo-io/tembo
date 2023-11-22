@@ -51,7 +51,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: nightly
+          toolchain: nightly-2023-11-18
           components: rustfmt, clippy
       - name: Install minimal stable with clippy and rustfmt
         uses: actions-rs/toolchain@v1
@@ -64,10 +64,13 @@ jobs:
           prefix-key: "${{ matrix.name }}-lint"
           workspaces: |
             ${{ matrix.path }}
-      - name: Cargo format
-        run: cd ${{ matrix.path }} && cargo +nightly fmt --all --check
-      - name: Clippy
-        run: cd ${{ matrix.path }} && cargo +stable clippy
+      - name: Cargo format and clippy
+        run: |
+          set -xe
+          cd ${{ matrix.path }}
+          cargo +nightly-2023-11-18 --version
+          cargo +nightly-2023-11-18 fmt --all --check
+          cargo +nightly-2023-11-18 clippy
 
   test:
     name: Run tests

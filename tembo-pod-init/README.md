@@ -1,6 +1,5 @@
 # tembo-pod-init
 
-
 This initContainer will then allow us to bootstrap the folder structure needed to add our required mutability,
 while leveraging vanilla CloudNativePG.
 

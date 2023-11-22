@@ -1,5 +1,6 @@
 # Conductor
 
+
 Dataplanes receive the desired state of databases from the control plane. The dataplanes report back the actual status of database to the control plane.
 
 Conductor is responsible for:
