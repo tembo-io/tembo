@@ -44,7 +44,7 @@ spec:
       for: 1m
       labels:
         severity: warning
-    - alert: LastFailedArchiveTime 
+    - alert: LastFailedArchiveTime
       annotations:
         description: Archiving failed for {{`{{`}} $labels.pod {{`}}`}}
         summary: Checks the last time archiving failed. Will be < 0 when it has not failed.
@@ -53,7 +53,7 @@ spec:
       for: 1m
       labels:
         severity: warning
-    - alert: DatabaseDeadlockConflicts 
+    - alert: DatabaseDeadlockConflicts
       annotations:
         description: There are over 10 deadlock conflicts in {{`{{`}} $labels.pod {{`}}`}}
         summary: Checks the number of database conflicts
@@ -70,11 +70,11 @@ spec:
       annotations:
         summary: "PostgreSQL instance failover detected"
         description: "The PostgreSQL instance in {{`{{`}} $labels.namespace {{`}}`}}/{{`{{`}} $labels.pod {{`}}`}} transitioned its recovery state, indicating a potential failover."
-    - alert: NoBackupInLast2Hours
-      expr: (time() - cnpg_collector_last_available_backup_timestamp) 
-        > 7200
+    - alert: NoBackupInLast30Hours
+      expr: (time() - cnpg_collector_last_available_backup_timestamp)
+        > 108000
       annotations:
-        summary: "No PostgreSQL backup in the last 2 hours"
+        summary: "No PostgreSQL backup in the last 30 hours"
         description: "The PostgreSQL in {{`{{`}} $labels.namespace {{`}}`}}/{{`{{`}} $labels.pod {{`}}`}} has not taken a backup in the last 2 hours."
       labels:
         severity: critical
