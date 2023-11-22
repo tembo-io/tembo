@@ -390,12 +390,8 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                 let msg_enqueued_at = read_msg.enqueued_at;
                 match restart_coredb(client.clone(), &namespace, &namespace, msg_enqueued_at).await
                 {
-                    Ok(is_being_updated) => {
-                        if is_being_updated {
-                            requeue_short(&metrics, &control_plane_events_queue, &queue, &read_msg)
-                                .await?;
-                            continue;
-                        }
+                    Ok(_) => {
+                        info!("{}: Instance requested to be restarted", read_msg.msg_id);
                     }
                     Err(_) => {
                         error!("{}: Error restarting instance", read_msg.msg_id);
@@ -409,17 +405,8 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
 
                 let current_resource = match result {
                     Ok(coredb) => {
-                        // Safety: we know status exists due to get_coredb_error_without_status
-                        let status = coredb.status.as_ref().unwrap();
-                        if !status.running {
-                            requeue_short(&metrics, &control_plane_events_queue, &queue, &read_msg)
-                                .await?;
-                            continue;
-                        }
-
                         let as_json = serde_json::to_string(&coredb);
                         debug!("dbname: {}, current: {:?}", &namespace, as_json);
-
                         coredb
                     }
                     Err(_) => {
