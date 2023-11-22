@@ -75,7 +75,8 @@ spec:
         > 108000
       annotations:
         summary: "No PostgreSQL backup in the last 30 hours"
-        description: "The PostgreSQL in {{`{{`}} $labels.namespace {{`}}`}}/{{`{{`}} $labels.pod {{`}}`}} has not taken a backup in the last 2 hours."
+        description: "The PostgreSQL in {{`{{`}} $labels.namespace {{`}}`}}/{{`{{`}} $labels.pod {{`}}`}} has not taken a backup in the last 30 hours."
+      for: 15m
       labels:
         severity: critical
 {{- end }}
