@@ -151,12 +151,12 @@ pub fn default_pooler_resources() -> PoolerTemplateSpecContainersResources {
     PoolerTemplateSpecContainersResources {
         claims: None,
         limits: Some(BTreeMap::from([
-            ("cpu".to_owned(), IntOrString::String("1".to_owned())),
-            ("memory".to_owned(), IntOrString::String("1Gi".to_owned())),
+            ("cpu".to_owned(), IntOrString::String("100m".to_owned())),
+            ("memory".to_owned(), IntOrString::String("128Mi".to_owned())),
         ])),
         requests: Some(BTreeMap::from([
-            ("cpu".to_owned(), IntOrString::String("500m".to_owned())),
-            ("memory".to_owned(), IntOrString::String("512Mi".to_owned())),
+            ("cpu".to_owned(), IntOrString::String("50m".to_owned())),
+            ("memory".to_owned(), IntOrString::String("64Mi".to_owned())),
         ])),
     }
 }

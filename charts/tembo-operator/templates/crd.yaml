@@ -1381,11 +1381,11 @@ spec:
                       max_client_conn: '5000'
                     resources:
                       limits:
-                        cpu: '1'
-                        memory: 1Gi
+                        cpu: 100m
+                        memory: 128Mi
                       requests:
-                        cpu: 500m
-                        memory: 512Mi
+                        cpu: 50m
+                        memory: 64Mi
                 properties:
                   enabled:
                     default: false
@@ -1398,11 +1398,11 @@ spec:
                         max_client_conn: '5000'
                       resources:
                         limits:
-                          cpu: '1'
-                          memory: 1Gi
+                          cpu: 100m
+                          memory: 128Mi
                         requests:
-                          cpu: 500m
-                          memory: 512Mi
+                          cpu: 50m
+                          memory: 64Mi
                     properties:
                       parameters:
                         additionalProperties:
