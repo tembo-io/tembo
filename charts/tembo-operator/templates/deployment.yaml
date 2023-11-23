@@ -21,13 +21,7 @@ spec:
       - name: coredb-controller
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
-        resources:
-          limits:
-            cpu: 1000m
-            memory: 256Mi
-          requests:
-            cpu: 250m
-            memory: 100Mi
+        resources: {{ toYaml .Values.resources | nindent 10 }}
         ports:
         - name: http
           containerPort: 8080

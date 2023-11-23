@@ -13,6 +13,15 @@ prometheusRule:
 
 env: []
 
+## Configure resource requests and limits
+resources:
+  limits:
+    cpu: 1000m
+    memory: 256Mi
+  requests:
+    cpu: 250m
+    memory: 100Mi
+
 # https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector
 nodeSelector: {}
 
