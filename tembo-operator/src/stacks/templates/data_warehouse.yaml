@@ -48,6 +48,8 @@ trunk_installs:
     version: 1.0.0
   - name: wrappers
     version: 0.1.15
+  - name: multicorn 
+    version: 2.5.0
 extensions:
   - name: pg_stat_statements
     locations:
@@ -88,3 +90,9 @@ extensions:
     - database: postgres
       enabled: true
       version:  0.1.15
+  - name: multicorn 
+    description: multicorn 
+    locations:
+    - database: postgres
+      enabled: true
+      version:  2.5.0
