@@ -29,8 +29,8 @@ pub fn execute(_args: &ArgMatches) -> Result<(), Box<dyn Error>> {
     println!("-------------- -------------- -------------- -------------- --------------");
 
     for e in data.environment {
-        let mut org_id = String::new();
-        let mut profile = String::new();
+        let mut org_id = String::from("           ");
+        let mut profile = String::from("   ");
         let mut set = false;
         if !e.org_id.is_none() {
             org_id = e.org_id.unwrap();
@@ -42,7 +42,7 @@ pub fn execute(_args: &ArgMatches) -> Result<(), Box<dyn Error>> {
             set = e.set.unwrap();
         }
         println!(
-            "{}           {}        {:?}         {:?}          {:?}",
+            "{}           {}     {:?}      {:?}          {:?}",
             e.name, e.target, org_id, profile, set
         );
     }

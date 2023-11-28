@@ -49,6 +49,7 @@ fn main() {
     let res = match matches.subcommand() {
         Some(("init", sub_matches)) => cmd::init::execute(sub_matches),
         Some(("context", sub_matches)) => cmd::context::execute(sub_matches),
+        Some(("apply", sub_matches)) => cmd::apply::execute(sub_matches),
         Some(("instance", sub_matches)) => cmd::instance::execute(sub_matches),
         Some(("db", sub_matches)) => cmd::database::execute(sub_matches),
         Some(("schema", sub_matches)) => cmd::schema::execute(sub_matches),
@@ -91,6 +92,7 @@ fn create_clap_command() -> Command {
              The source code for tembo is available at: https://github.com/tembo-io/tembo-cli",
         )
         .subcommand(cmd::init::make_subcommand())
+        .subcommand(cmd::apply::make_subcommand())
         .subcommand(
             Command::new("instance")
                 .about("Commands used to manage local and cloud instances")

@@ -37,6 +37,8 @@ rpassword = "7.2.0"
 jwt = "0.16.0"
 dateparser = "0.2.0"
 log = "0.4.20"
+tera = "1.0"
+curl = "0.4.44"
 
 [dev-dependencies]
 assert_cmd = "2.0.8"

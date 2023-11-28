@@ -1,0 +1,11 @@
+FROM quay.io/tembo/tembo-local:latest
+
+# Optional:
+# Install any extensions you want with Trunk
+{% for key, value in extensions %}
+RUN trunk install --version {{value.trunk_project_version}} {{value.trunk_project}}
+{% endfor %}
+
+# Optional:
+# Specify extra Postgres configurations by copying into this directory
+COPY postgres.conf $PGDATA/extra-configs
