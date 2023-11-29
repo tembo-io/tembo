@@ -47,8 +47,20 @@ impl Docker {
 
     // Build & run docker image
     pub fn build_run() -> Result<(), Box<dyn Error>> {
-        let command = "docker build . -t postgres && docker run -p 5432:5432 -d postgres";
-        run_command(&command)?;
+        let container_name = "tembo-pg";
+
+        if Self::container_list_filtered(container_name)
+            .unwrap()
+            .contains(container_name)
+        {
+            info!("existing container found");
+        } else {
+            let command = format!(
+                "docker build . -t postgres && docker run --name {} -p 5432:5432 -d postgres",
+                container_name
+            );
+            run_command(&command)?;
+        }
 
         Ok(())
     }
@@ -122,11 +134,7 @@ impl Docker {
     }
 
     pub fn container_list_filtered(name: &str) -> Result<String, Box<dyn Error>> {
-        let filter = format!("docker container ls --all -f name={}", name);
-
-        let mut ls_command = String::from("cd tembo "); // TODO: does this work for installed crates?
-        ls_command.push_str("&& ");
-        ls_command.push_str(&filter);
+        let ls_command = format!("docker container ls --all -f name={}", name);
 
         let output = ShellCommand::new("sh")
             .arg("-c")

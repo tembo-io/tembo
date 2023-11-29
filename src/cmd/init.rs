@@ -27,6 +27,7 @@ pub fn execute(_args: &ArgMatches) -> Result<(), Box<dyn Error>> {
         "context".to_string(),
         tembo_context_file_path(),
         CONTEXT_DEFAULT_TEXT.to_string(),
+        false,
     ) {
         Ok(t) => t,
         Err(e) => {
@@ -38,6 +39,7 @@ pub fn execute(_args: &ArgMatches) -> Result<(), Box<dyn Error>> {
         "credentials".to_string(),
         tembo_credentials_file_path(),
         CREDENTIALS_DEFAULT_TEXT.to_string(),
+        false,
     ) {
         Ok(t) => t,
         Err(e) => {
@@ -49,6 +51,7 @@ pub fn execute(_args: &ArgMatches) -> Result<(), Box<dyn Error>> {
         "config".to_string(),
         "tembo.toml".to_string(),
         "".to_string(),
+        false,
     ) {
         Ok(t) => t,
         Err(e) => {

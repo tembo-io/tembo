@@ -27,9 +27,10 @@ impl FileUtils {
         file_name: String,
         file_path: String,
         file_content: String,
+        recreate: bool,
     ) -> Result<(), Box<dyn Error>> {
         let path = Path::new(&file_path);
-        if path.exists() {
+        if !recreate && path.exists() {
             info!("Tembo {} file exists", file_name);
             return Ok(());
         }
