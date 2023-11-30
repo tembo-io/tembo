@@ -1,12 +1,12 @@
+use crate::Result;
 use clap::ArgMatches;
 use simplelog::*;
-use std::error::Error;
 
 pub mod install;
 pub mod list;
 
 // handles all extension command calls
-pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
+pub fn execute(args: &ArgMatches) -> Result<()> {
     // execute the instance subcommands
     let res = match args.subcommand() {
         Some(("list", sub_matches)) => list::execute(sub_matches),

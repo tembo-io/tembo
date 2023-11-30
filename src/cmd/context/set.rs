@@ -1,10 +1,8 @@
 use crate::cli::context::{tembo_context_file_path, Context};
+use crate::Result;
 use clap::{Arg, ArgAction, ArgMatches, Command};
+use std::fs::{self, File};
 use std::io::Write;
-use std::{
-    error::Error,
-    fs::{self, File},
-};
 use toml::to_string;
 
 pub fn make_subcommand() -> Command {
@@ -20,7 +18,7 @@ pub fn make_subcommand() -> Command {
         .about("Command used to set context")
 }
 
-pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
+pub fn execute(args: &ArgMatches) -> Result<()> {
     let filename = tembo_context_file_path();
 
     let contents = match fs::read_to_string(&filename) {
@@ -54,10 +52,7 @@ pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn write_config_to_file(
-    config: &Context,
-    file_path: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn write_config_to_file(config: &Context, file_path: &str) -> Result<()> {
     let toml_string = to_string(config)?;
     let mut file = File::create(file_path)?;
 

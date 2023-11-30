@@ -7,7 +7,7 @@ extern crate serde;
 extern crate serde_yaml;
 extern crate simplelog;
 
-use anyhow::anyhow;
+use anyhow::Context;
 use clap::{Arg, Command};
 use clap_complete::Shell;
 use serde::{Deserialize, Serialize};
@@ -16,6 +16,8 @@ use std::fs::File;
 
 mod cli;
 mod cmd;
+
+pub type Result<T = ()> = anyhow::Result<T>;
 
 const VERSION: &str = concat!("v", crate_version!());
 const WINDOWS_ERROR_MSG: &str = "Windows is not supported at this time";
@@ -58,7 +60,7 @@ fn main() {
         Some(("completions", sub_matches)) => (|| {
             let shell = sub_matches
                 .get_one::<Shell>("shell")
-                .ok_or_else(|| anyhow!("Shell name missing."))?;
+                .with_context(|| "Shell name missing.")?;
 
             let mut complete_app = create_clap_command();
             clap_complete::generate(
@@ -72,8 +74,8 @@ fn main() {
         _ => unreachable!(),
     };
 
-    if res.is_err() {
-        error!("{}", res.err().unwrap());
+    if let Err(err) = res {
+        error!("{err}");
 
         std::process::exit(101);
     }

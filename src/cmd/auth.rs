@@ -1,12 +1,13 @@
+use crate::Result;
+
 use clap::ArgMatches;
 use simplelog::*;
-use std::error::Error;
 
 pub mod info;
 pub mod login;
 
 // handles all instance command calls
-pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
+pub fn execute(args: &ArgMatches) -> Result<()> {
     // execute the instance subcommands
     let res = match args.subcommand() {
         Some(("login", sub_matches)) => login::execute(sub_matches),

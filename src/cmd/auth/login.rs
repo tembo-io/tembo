@@ -1,15 +1,15 @@
-// auth login command
-// use crate::cli::config::Config;
+//! auth login command
+
 use crate::cli::{auth_client::AuthClient, config::Config};
+use crate::Result;
 use clap::{ArgMatches, Command};
-use std::error::Error;
 
 // example usage: tembo auth login
 pub fn make_subcommand() -> Command {
     Command::new("login").about("Command used to login/authenticate")
 }
 
-pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
+pub fn execute(args: &ArgMatches) -> Result<()> {
     match AuthClient::authenticate(args) {
         Ok(jwt) => {
             println!("- storing jwt in config file, it will be used in future requests");

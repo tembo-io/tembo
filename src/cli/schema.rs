@@ -1,4 +1,4 @@
-// Objects representing a user created local database
+//! Objects representing a user created local database
 use chrono::prelude::*;
 use serde::Deserialize;
 use serde::Serialize;

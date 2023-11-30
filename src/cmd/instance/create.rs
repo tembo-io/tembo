@@ -1,14 +1,15 @@
-// instance create command
+//! instance create command
+
 use crate::cli::config::Config;
 use crate::cli::docker::Docker;
 use crate::cli::instance::{EnabledExtension, InstalledExtension, Instance};
-use crate::cli::stack_error::StackError;
 use crate::cli::stacks;
 use crate::cli::stacks::Stacks;
+use crate::Result;
+use anyhow::bail;
 use chrono::prelude::*;
 use clap::{Arg, ArgAction, ArgMatches, Command};
 use simplelog::*;
-use std::error::Error;
 
 // example usage: tembo instance create -t oltp -n my_app_db -p 5432
 pub fn make_subcommand() -> Command {
@@ -42,7 +43,7 @@ pub fn make_subcommand() -> Command {
         )
 }
 
-pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
+pub fn execute(args: &ArgMatches) -> Result<()> {
     let matches = args;
 
     // ensure the stack type provided is valid, if none given, default to the standard stack
@@ -70,17 +71,17 @@ pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
 
         info!("Instance configuration created, you can start the instance using the command 'tembo start -i <name>'");
     } else {
-        return Err(Box::new(StackError::new("- Given Stack type is not valid")));
+        bail!("- Given Stack type is not valid");
     }
 
     Ok(())
 }
 
-fn check_requirements() -> Result<(), Box<dyn Error>> {
+fn check_requirements() -> Result<()> {
     Docker::installed_and_running()
 }
 
-fn persist_instance_config(matches: &ArgMatches) -> Result<(), Box<dyn Error>> {
+fn persist_instance_config(matches: &ArgMatches) -> Result<()> {
     let path = Config::full_path(matches);
     let mut config = Config::new(matches, &path); // calls init and writes the file
 

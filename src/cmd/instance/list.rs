@@ -1,15 +1,16 @@
-// instance list command
+//! instance list command
+
 use crate::cli::config::Config;
+use crate::Result;
 use clap::{ArgMatches, Command};
 use simplelog::*;
-use std::error::Error;
 
 // example usage: tembo instance create -t oltp -n my_app_db -p 5432
 pub fn make_subcommand() -> Command {
     Command::new("list").about("Command used to list local instances")
 }
 
-pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
+pub fn execute(args: &ArgMatches) -> Result<()> {
     let config = Config::new(args, &Config::full_path(args));
 
     if config.instances.is_empty() {

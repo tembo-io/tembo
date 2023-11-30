@@ -2,13 +2,13 @@
 
 use crate::cli::cloud_account::CloudAccount;
 use crate::cli::instance::Instance;
+use crate::Result;
 use chrono::prelude::*;
 use clap::ArgMatches;
 use serde::Deserialize;
 use serde::Serialize;
 use simplelog::*;
 use std::env;
-use std::error::Error;
 use std::fmt;
 use std::fs;
 use std::fs::File;
@@ -63,7 +63,7 @@ impl Config {
     }
 
     // Reads the contents of an existing config file and returns contents as a string
-    pub fn read_to_string(file_path: &PathBuf) -> Result<String, Box<dyn Error>> {
+    pub fn read_to_string(file_path: &PathBuf) -> Result<String> {
         let mut file = File::open(file_path)?;
         let mut contents = String::new();
 
@@ -81,7 +81,7 @@ impl Config {
     }
 
     // Writes the current Config to the config file, overwriting anything else that was there
-    pub fn write(&self, file_path: &PathBuf) -> Result<(), Box<dyn Error>> {
+    pub fn write(&self, file_path: &PathBuf) -> Result<()> {
         let mut file = File::create(file_path)?;
         let _delete = file.set_len(0); // this deletes all contents from the file
 
@@ -108,21 +108,21 @@ impl Config {
     }
 
     // Creates the config directory
-    fn create_config_dir(dir_path: &str) -> Result<(), Box<dyn Error>> {
+    fn create_config_dir(dir_path: &str) -> Result<()> {
         fs::create_dir_all(dir_path)?;
 
         Ok(())
     }
 
     // Creates the config file in the config directory
-    fn create_config_file(path: &str) -> Result<(), Box<dyn Error>> {
+    fn create_config_file(path: &str) -> Result<()> {
         File::create_new(path)?; // don't overwrite existing file at path
 
         Ok(())
     }
 
     // Initializes the config file, creating the directories and files as needed
-    fn init(&self, file_path: &Path) -> Result<(), Box<dyn Error>> {
+    fn init(&self, file_path: &Path) -> Result<()> {
         let mut dir_path = file_path.to_path_buf();
         dir_path.pop(); // removes any filename and extension
 

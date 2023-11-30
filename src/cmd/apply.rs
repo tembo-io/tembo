@@ -1,8 +1,8 @@
+use crate::Result;
 use clap::{ArgMatches, Command};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
-    error::Error,
     fs::{self},
 };
 use toml::Value;
@@ -48,7 +48,7 @@ pub fn make_subcommand() -> Command {
     Command::new("apply").about("Applies changes to the context set using the tembo config file")
 }
 
-pub fn execute(_args: &ArgMatches) -> Result<(), Box<dyn Error>> {
+pub fn execute(_args: &ArgMatches) -> Result<()> {
     Docker::installed_and_running()?;
 
     let instance_settings: HashMap<String, InstanceSettings> = get_instance_settings()?;
@@ -85,7 +85,7 @@ pub fn execute(_args: &ArgMatches) -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn get_instance_settings() -> Result<HashMap<String, InstanceSettings>, Box<dyn Error>> {
+pub fn get_instance_settings() -> Result<HashMap<String, InstanceSettings>> {
     let mut file_path = FileUtils::get_current_working_dir();
     file_path.push_str("/tembo.toml");
 
@@ -108,7 +108,7 @@ pub fn get_instance_settings() -> Result<HashMap<String, InstanceSettings>, Box<
 
 pub fn get_rendered_dockerfile(
     instance_settings: HashMap<String, InstanceSettings>,
-) -> Result<String, Box<dyn Error>> {
+) -> Result<String> {
     let filename = "Dockerfile.template";
     let filepath =
         "https://raw.githubusercontent.com/tembo-io/tembo-cli/main/tembo/Dockerfile.template";
@@ -135,7 +135,7 @@ pub fn get_rendered_dockerfile(
 
 pub fn get_rendered_migrations_file(
     instance_settings: HashMap<String, InstanceSettings>,
-) -> Result<String, Box<dyn Error>> {
+) -> Result<String> {
     let filename = "migrations.sql.template";
     let filepath =
         "https://raw.githubusercontent.com/tembo-io/tembo-cli/main/tembo/migrations.sql.template";

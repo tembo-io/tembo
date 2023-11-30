@@ -1,5 +1,6 @@
+use crate::Result;
 use clap::{ArgMatches, Command};
-use std::{error::Error, fs};
+use std::fs;
 
 use crate::cli::context::{tembo_context_file_path, Context};
 
@@ -7,7 +8,7 @@ pub fn make_subcommand() -> Command {
     Command::new("list").about("Command used to list context")
 }
 
-pub fn execute(_args: &ArgMatches) -> Result<(), Box<dyn Error>> {
+pub fn execute(_args: &ArgMatches) -> Result<()> {
     let filename = tembo_context_file_path();
 
     let contents = match fs::read_to_string(&filename) {

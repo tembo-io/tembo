@@ -1,11 +1,13 @@
-//  extension install command
+//!  extension install command
+
 use crate::cli::config::Config;
-use crate::cli::instance::{InstalledExtension, Instance, InstanceError};
+use crate::cli::instance::{InstalledExtension, Instance};
 use crate::cli::stacks::TrunkInstall;
+use crate::Result;
+use anyhow::bail;
 use chrono::Utc;
 use clap::{Arg, ArgAction, ArgMatches, Command};
 use simplelog::*;
-use std::error::Error;
 use std::io;
 
 // example usage: tembo extension install -n pgmq -i my_instance
@@ -22,7 +24,7 @@ pub fn make_subcommand() -> Command {
         )
 }
 
-pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
+pub fn execute(args: &ArgMatches) -> Result<()> {
     let config = Config::new(args, &Config::full_path(args));
     let instance_arg = args.try_get_one::<String>("instance").unwrap();
 
@@ -43,20 +45,15 @@ pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
     if config.instances.is_empty() {
         println!("- No instances have been configured");
     } else {
-        let _ = match Instance::find(args, instance_arg.unwrap()) {
-            Ok(instance) => install_extension(instance, &name_str, args),
-            Err(e) => Err(Box::new(e)),
-        };
+        let instance = Instance::find(args, instance_arg.unwrap())?;
+
+        install_extension(instance, &name_str, args)?;
     }
 
     Ok(())
 }
 
-fn install_extension(
-    instance: Instance,
-    name: &str,
-    args: &ArgMatches,
-) -> Result<(), Box<InstanceError>> {
+fn install_extension(instance: Instance, name: &str, args: &ArgMatches) -> Result<()> {
     println!("What version would you like to install? Example: 2.1.0");
     let mut version_str = String::from("");
 
@@ -100,7 +97,7 @@ fn install_extension(
     Ok(())
 }
 
-fn persist_config(args: &ArgMatches, trunk_install: TrunkInstall) -> Result<(), Box<dyn Error>> {
+fn persist_config(args: &ArgMatches, trunk_install: TrunkInstall) -> Result<()> {
     let mut config = Config::new(args, &Config::full_path(args));
     let target_instance = args.try_get_one::<String>("instance");
     let installed_extension = InstalledExtension {
@@ -123,7 +120,7 @@ fn persist_config(args: &ArgMatches, trunk_install: TrunkInstall) -> Result<(), 
         Ok(_) => Ok(()),
         Err(e) => {
             error!("there was an error: {}", e);
-            Err("there was an error writing the config".into())
+            bail!("there was an error writing the config: {e}")
         }
     }
 }

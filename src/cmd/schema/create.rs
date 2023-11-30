@@ -1,13 +1,14 @@
-//  database create command
+//!  database create command
+
 use crate::cli::config::Config;
 use crate::cli::instance::Instance;
-use crate::cli::instance::InstanceError;
 use crate::cli::schema::Schema;
+use crate::Result;
+use anyhow::bail;
 use chrono::Utc;
 use clap::{Arg, ArgAction, ArgMatches, Command};
 use simplelog::*;
 use spinners::{Spinner, Spinners};
-use std::error::Error;
 use std::process::Command as ShellCommand;
 
 // example usage: tembo schema create -n my_schema -d my_database -i my_instance
@@ -40,7 +41,7 @@ pub fn make_subcommand() -> Command {
         )
 }
 
-pub fn execute(args: &ArgMatches) -> Result<(), Box<InstanceError>> {
+pub fn execute(args: &ArgMatches) -> Result<()> {
     let config = Config::new(args, &Config::full_path(args));
     let name_arg = args.try_get_one::<String>("name").unwrap();
     let database_arg = args.try_get_one::<String>("database").unwrap();
@@ -56,20 +57,14 @@ pub fn execute(args: &ArgMatches) -> Result<(), Box<InstanceError>> {
     if config.instances.is_empty() {
         warn!("- No instances have been configured");
     } else {
-        let _ = match Instance::find(args, instance_arg.unwrap()) {
-            Ok(instance) => create_schema(instance, name_arg.unwrap(), args),
-            Err(e) => Err(Box::new(e)),
-        };
+        let instance = Instance::find(args, instance_arg.unwrap())?;
+        create_schema(instance, name_arg.unwrap(), args)?;
     }
 
     Ok(())
 }
 
-fn create_schema(
-    instance: Instance,
-    name: &str,
-    args: &ArgMatches,
-) -> Result<(), Box<InstanceError>> {
+fn create_schema(instance: Instance, name: &str, args: &ArgMatches) -> Result<()> {
     instance.start();
 
     let mut sp = Spinner::new(Spinners::Dots12, "Creating schema".into());
@@ -92,9 +87,7 @@ fn create_schema(
     let stderr = String::from_utf8(output.stderr).unwrap();
 
     if !stderr.is_empty() {
-        Err(Box::new(InstanceError {
-            name: format!("There was an issue creating the schema: {}", stderr),
-        }))
+        bail!("There was an issue creating the schema: {stderr}");
     } else {
         info!("schema created");
 
@@ -104,7 +97,7 @@ fn create_schema(
     }
 }
 
-fn persist_config(args: &ArgMatches, target_instance: Instance) -> Result<(), Box<dyn Error>> {
+fn persist_config(args: &ArgMatches, target_instance: Instance) -> Result<()> {
     let mut config = Config::new(args, &Config::full_path(args));
     let name_arg = args.try_get_one::<String>("name");
     let database_arg = args.try_get_one::<String>("database");
@@ -134,7 +127,7 @@ fn persist_config(args: &ArgMatches, target_instance: Instance) -> Result<(), Bo
         Ok(_) => Ok(()),
         Err(e) => {
             error!("there was an error: {}", e);
-            Err("there was an error writing the config".into())
+            bail!("there was an error writing the config: {e}")
         }
     }
 }

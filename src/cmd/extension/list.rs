@@ -1,9 +1,10 @@
-// extension list command
+//! extension list command
+
 use crate::cli::config::Config;
 use crate::cli::instance::Instance;
+use crate::Result;
 use clap::{Arg, ArgAction, ArgMatches, Command};
 use simplelog::*;
-use std::error::Error;
 
 // example usage: tembo extension list -n test
 pub fn make_subcommand() -> Command {
@@ -19,7 +20,7 @@ pub fn make_subcommand() -> Command {
         )
 }
 
-pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
+pub fn execute(args: &ArgMatches) -> Result<()> {
     let config = Config::new(args, &Config::full_path(args));
     let name = args.try_get_one::<String>("name").unwrap();
 

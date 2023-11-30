@@ -1,7 +1,7 @@
+use crate::Result;
 use curl::easy::Easy;
 use simplelog::*;
 use std::env;
-use std::error::Error;
 use std::fs::{self, File};
 use std::io::Write;
 use std::path::Path;
@@ -9,7 +9,7 @@ use std::path::Path;
 pub struct FileUtils {}
 
 impl FileUtils {
-    pub fn create_dir(dir_name: String, dir_path: String) -> Result<(), Box<dyn Error>> {
+    pub fn create_dir(dir_name: String, dir_path: String) -> Result<()> {
         if Path::new(&dir_path).exists() {
             info!("Tembo {} path exists", dir_name);
             return Ok(());
@@ -28,7 +28,7 @@ impl FileUtils {
         file_path: String,
         file_content: String,
         recreate: bool,
-    ) -> Result<(), Box<dyn Error>> {
+    ) -> Result<()> {
         let path = Path::new(&file_path);
         if !recreate && path.exists() {
             info!("Tembo {} file exists", file_name);

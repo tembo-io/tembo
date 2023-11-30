@@ -1,4 +1,4 @@
-use std::error::Error;
+use crate::Result;
 
 use clap::ArgMatches;
 use simplelog::*;
@@ -7,7 +7,7 @@ pub mod list;
 pub mod set;
 
 // handles all context command calls
-pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
+pub fn execute(args: &ArgMatches) -> Result<()> {
     // execute the context subcommands
     let res = match args.subcommand() {
         Some(("list", sub_matches)) => list::execute(sub_matches),

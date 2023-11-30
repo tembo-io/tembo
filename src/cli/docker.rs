@@ -1,8 +1,8 @@
 use crate::cli::instance::Instance;
+use crate::Result;
+use anyhow::bail;
 use simplelog::*;
 use spinners::{Spinner, Spinners};
-use std::error::Error;
-use std::fmt;
 use std::process::Command as ShellCommand;
 use std::process::Output;
 
@@ -17,7 +17,7 @@ impl Docker {
             .expect("failed to execute process")
     }
 
-    pub fn installed_and_running() -> Result<(), Box<dyn Error>> {
+    pub fn installed_and_running() -> Result {
         info!("Checking requirements: [Docker]");
 
         let output = Self::info();
@@ -26,18 +26,14 @@ impl Docker {
 
         // determine if docker is installed
         if stdout.is_empty() && !stderr.is_empty() {
-            return Err(Box::new(DockerError::new(
-                "- Docker is not installed, please visit docker.com to install",
-            )));
+            bail!("- Docker is not installed, please visit docker.com to install")
         } else {
             // determine if docker is running
             if !stdout.is_empty() && !stderr.is_empty() {
                 let connection_err = stderr.find("Cannot connect to the Docker daemon");
 
                 if connection_err.is_some() {
-                    return Err(Box::new(DockerError::new(
-                        "- Docker is not running, please start it and try again",
-                    )));
+                    bail!("- Docker is not running, please start it and try again")
                 }
             }
         }
@@ -46,7 +42,7 @@ impl Docker {
     }
 
     // Build & run docker image
-    pub fn build_run() -> Result<(), Box<dyn Error>> {
+    pub fn build_run() -> Result {
         let container_name = "tembo-pg";
 
         if Self::container_list_filtered(container_name)
@@ -66,7 +62,7 @@ impl Docker {
     }
 
     // run sqlx migrate
-    pub fn run_sqlx_migrate() -> Result<(), Box<dyn Error>> {
+    pub fn run_sqlx_migrate() -> Result {
         let command = "DATABASE_URL=postgres://postgres:postgres@localhost:5432 sqlx migrate run";
         run_command(&command)?;
 
@@ -74,7 +70,7 @@ impl Docker {
     }
 
     // start container if exists for name otherwise build container and start
-    pub fn start(name: &str, instance: &Instance) -> Result<(), Box<dyn Error>> {
+    pub fn start(name: &str, instance: &Instance) -> Result {
         if Self::container_list_filtered(name)
             .unwrap()
             .contains("tembo-pg")
@@ -92,7 +88,7 @@ impl Docker {
     }
 
     // stop container for given name
-    pub fn stop(name: &str) -> Result<(), Box<dyn Error>> {
+    pub fn stop(name: &str) -> Result {
         let mut sp = Spinner::new(Spinners::Line, "Stopping instance".into());
         let mut command = String::from("cd tembo ");
         command.push_str("&& docker stop ");
@@ -110,16 +106,14 @@ impl Docker {
         let stderr = String::from_utf8(output.stderr).unwrap();
 
         if !stderr.is_empty() {
-            return Err(Box::new(DockerError::new(
-                format!("There was an issue stopping the instance: {}", stderr).as_str(),
-            )));
+            bail!("There was an issue stopping the instance: {}", stderr)
         }
 
         Ok(())
     }
 
     #[allow(dead_code)]
-    pub fn container_list() -> Result<String, Box<dyn Error>> {
+    pub fn container_list() -> Result<String> {
         let mut ls_command = String::from("cd tembo "); // TODO: does this work for installed crates?
         ls_command.push_str("&& docker ls --all");
 
@@ -133,7 +127,7 @@ impl Docker {
         Ok(stdout.unwrap())
     }
 
-    pub fn container_list_filtered(name: &str) -> Result<String, Box<dyn Error>> {
+    pub fn container_list_filtered(name: &str) -> Result<String> {
         let ls_command = format!("docker container ls --all -f name={}", name);
 
         let output = ShellCommand::new("sh")
@@ -147,7 +141,7 @@ impl Docker {
     }
 }
 
-pub fn run_command(command: &str) -> Result<(), Box<dyn Error>> {
+pub fn run_command(command: &str) -> Result<()> {
     let mut sp = Spinner::new(Spinners::Line, "Running Docker Build & Run".into());
 
     let output = ShellCommand::new("sh")
@@ -159,38 +153,10 @@ pub fn run_command(command: &str) -> Result<(), Box<dyn Error>> {
     let stderr = String::from_utf8(output.stderr).unwrap();
 
     if !stderr.is_empty() {
-        return Err(Box::new(DockerError::new(
-            format!("There was an issue building & running docker: {}", stderr).as_str(),
-        )));
+        bail!("There was an issue building & running docker: {}", stderr)
     }
 
     Ok(())
-}
-
-// Define Docker not installed Error
-#[derive(Debug)]
-pub struct DockerError {
-    details: String,
-}
-
-impl DockerError {
-    pub fn new(msg: &str) -> DockerError {
-        DockerError {
-            details: msg.to_string(),
-        }
-    }
-}
-
-impl fmt::Display for DockerError {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.details)
-    }
-}
-
-impl Error for DockerError {
-    fn description(&self) -> &str {
-        &self.details
-    }
 }
 
 #[cfg(test)]

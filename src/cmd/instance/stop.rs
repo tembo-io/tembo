@@ -1,12 +1,12 @@
-// instance stop command
-use crate::cli::config::Config;
+//! instance stop command
+
 use crate::cli::docker::Docker;
-use anyhow::anyhow;
+use crate::{cli::config::Config, Result};
+use anyhow::Context;
 use clap::{Arg, ArgAction, ArgMatches, Command};
 use simplelog::*;
-use std::error::Error;
 
-// example usage: tembo instance stop -n my_app_db
+/// example usage: tembo instance stop -n my_app_db
 pub fn make_subcommand() -> Command {
     Command::new("stop")
         .about("Command used to stop local instances")
@@ -20,11 +20,11 @@ pub fn make_subcommand() -> Command {
         )
 }
 
-pub fn execute(args: &ArgMatches) -> Result<(), Box<dyn Error>> {
+pub fn execute(args: &ArgMatches) -> Result {
     let config = Config::new(args, &Config::full_path(args));
     let name = args
         .get_one::<String>("name")
-        .ok_or_else(|| anyhow!("Name is missing."))?;
+        .with_context(|| "Name is missing.")?;
 
     if config.instances.is_empty() {
         info!("No instances have been configured");

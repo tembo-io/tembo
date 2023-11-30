@@ -2,6 +2,8 @@ extern crate rpassword;
 
 use crate::cli::cloud_account::CloudAccount;
 use crate::cli::config::Config;
+use crate::Result;
+use anyhow::{bail, Context};
 use chrono::prelude::*;
 use clap::ArgMatches;
 use reqwest::cookie::Jar;
@@ -12,7 +14,6 @@ use rpassword::read_password;
 use serde_json::Value;
 use simplelog::*;
 use std::collections::HashMap;
-use std::error::Error;
 use std::io;
 use std::io::Write;
 use std::sync::Arc;
@@ -24,7 +25,7 @@ const CLERK_SIGN_IN_SLUG: &str = "/v1/client/sign_ins?_clerk_js_version=4.53.0";
 pub struct AuthClient {}
 
 impl AuthClient {
-    pub fn authenticate(args: &ArgMatches) -> Result<String, Box<dyn Error>> {
+    pub fn authenticate(args: &ArgMatches) -> Result<String> {
         println!("Please enter the email address for a service user (https://tembo.io/docs/tembo-cloud/api):");
         let user = Self::get_input();
 
@@ -91,7 +92,7 @@ impl AuthClient {
         url: &str,
         user: &str,
         _pw: &str,
-    ) -> Result<String, Box<dyn Error>> {
+    ) -> Result<String> {
         let request_url = format!("{}/{}", url, CLERK_SIGN_IN_SLUG);
 
         let mut map = HashMap::new();
@@ -109,9 +110,9 @@ impl AuthClient {
             }
             status_code if status_code.is_client_error() => {
                 info!("{}", res.text()?);
-                Err(From::from("Client error"))
+                bail!("Client error")
             }
-            _ => Err(From::from("Client error")),
+            _ => bail!("Client error"),
         }
     }
 
@@ -121,7 +122,7 @@ impl AuthClient {
         id: &str,
         pw: &str,
         args: &ArgMatches,
-    ) -> Result<String, Box<dyn Error>> {
+    ) -> Result<String> {
         let request_url = format!(
             "{}/v1/client/sign_ins/{}/attempt_first_factor?_clerk_js_version=4.53.0",
             url, id
@@ -137,9 +138,10 @@ impl AuthClient {
         match res.status() {
             StatusCode::OK => (),
             status_code if status_code.is_client_error() => {
+                let error = res.text()?;
                 error!("client error:");
-                error!("{}", &res.text()?);
-                return Err(From::from("Client error"));
+                error!("{error}");
+                bail!("Client error: {error}");
             }
             _ => (),
         };
@@ -147,7 +149,7 @@ impl AuthClient {
         let json: &Value = &res.json()?;
         let session_id = json["client"]["sessions"][0]["id"]
             .as_str()
-            .ok_or("Failed to parse jwt")?
+            .with_context(|| "Failed to parse jwt")?
             .to_string();
 
         // set or update the user's org ids
@@ -160,7 +162,7 @@ impl AuthClient {
         client: &reqwest::blocking::Client,
         url: &str,
         session_id: &str,
-    ) -> Result<String, Box<dyn Error>> {
+    ) -> Result<String> {
         println!(
             "Please enter the number of days you would like this token to valid for [1, 30, 365]:"
         );
@@ -179,7 +181,7 @@ impl AuthClient {
             status_code if status_code.is_client_error() => {
                 error!("- client error:");
                 error!("- {}", &res.text()?);
-                return Err(From::from("Client error"));
+                bail!("Client error");
             }
             _ => (),
         };
@@ -187,14 +189,14 @@ impl AuthClient {
         let json: &Value = &res.json()?;
         let jwt = json["jwt"]
             .as_str()
-            .ok_or("Failed to parse jwt")?
+            .with_context(|| "Failed to parse jwt")?
             .to_string();
 
         Ok(jwt)
     }
 
     // stores the user's organization id(s) in the config
-    fn set_org_ids(json: Value, args: &ArgMatches) -> Result<(), Box<dyn Error>> {
+    fn set_org_ids(json: Value, args: &ArgMatches) -> Result<()> {
         let mut config = Config::new(args, &Config::full_path(args));
         let mut org_ids = vec![];
 

@@ -1,12 +1,12 @@
-// Stacks are defined templates provided by Tembo containing attributes and extensions
-// (templates contain configuration information tailored to a specific use case)
+//! Stacks are defined templates provided by Tembo containing attributes and extensions
+//! (templates contain configuration information tailored to a specific use case)
 
 use crate::cli::extension::Extension;
-use crate::cli::stack_error::StackError;
+use crate::Result;
 use crate::{Deserialize, Serialize};
+use anyhow::bail;
 use chrono::{DateTime, Utc};
 use clap::ArgMatches;
-use std::error::Error;
 use std::fs::File;
 use std::io::Read;
 
@@ -34,7 +34,7 @@ pub struct TrunkInstall {
 }
 
 // returns a result containing the stack name
-pub fn define_stack(args: &ArgMatches) -> Result<String, Box<dyn Error>> {
+pub fn define_stack(args: &ArgMatches) -> Result<String> {
     let stacks: Stacks = define_stacks();
     let names: Vec<String> = stacks
         .stacks
@@ -49,7 +49,7 @@ pub fn define_stack(args: &ArgMatches) -> Result<String, Box<dyn Error>> {
         let given_stack = stack_option.to_lowercase();
 
         if !names.contains(&given_stack) {
-            return Err(Box::new(StackError::new("- Given Stack type not valid")));
+            bail!("- Given Stack type not valid");
         }
 
         Ok(given_stack)
@@ -100,7 +100,7 @@ mod tests {
 
         let matches = app.get_matches_from(vec!["myapp", "unknown"]);
 
-        let expected = Box::new(StackError::new("- Given Stack type not valid")).details;
+        let expected = anyhow::anyhow!("- Given Stack type not valid").to_string();
         let result = define_stack(&matches).err().unwrap().to_string();
         assert_eq!(expected, result);
     }

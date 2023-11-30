@@ -1,12 +1,13 @@
-// Objects representing a user created local instance of a stack
-// (a local container that runs with certain attributes and properties)
+//! Objects representing a user created local instance of a stack
+//! (a local container that runs with certain attributes and properties)
 
 use crate::cli::config::Config;
 use crate::cli::database::Database;
-use crate::cli::docker::DockerError;
 use crate::cli::extension::Extension;
 use crate::cli::stacks;
 use crate::cli::stacks::{Stack, TrunkInstall};
+use crate::Result;
+use anyhow::bail;
 use chrono::prelude::*;
 use clap::ArgMatches;
 use serde::Deserialize;
@@ -14,7 +15,6 @@ use serde::Serialize;
 use simplelog::*;
 use spinners::{Spinner, Spinners};
 use std::cmp::PartialEq;
-use std::error::Error;
 use std::process::Command as ShellCommand;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
@@ -57,7 +57,7 @@ pub struct InstanceError {
 }
 
 impl Instance {
-    pub fn init(&self) -> Result<(), Box<dyn Error>> {
+    pub fn init(&self) -> Result<()> {
         let stack = self.stack();
 
         self.build();
@@ -123,7 +123,7 @@ impl Instance {
         let _ = self.run_command(&command);
     }
 
-    fn run_command(&self, command: &str) -> Result<(), Box<dyn Error>> {
+    fn run_command(&self, command: &str) -> Result<()> {
         let mut sp = Spinner::new(Spinners::Line, "Starting instance".into());
 
         let output = ShellCommand::new("sh")
@@ -141,15 +141,13 @@ impl Instance {
         let stderr = String::from_utf8(output.stderr).unwrap();
 
         if !stderr.is_empty() {
-            return Err(Box::new(DockerError::new(
-                format!("There was an issue starting the instance: {}", stderr).as_str(),
-            )));
+            bail!("There was an issue starting the instance: {}", stderr)
         }
 
         Ok(())
     }
 
-    pub fn install_extension(&self, extension: &TrunkInstall) -> Result<(), Box<dyn Error>> {
+    pub fn install_extension(&self, extension: &TrunkInstall) -> Result<()> {
         let mut sp = Spinner::new(Spinners::Dots12, "Installing extension".into());
 
         let mut command = String::from("cd tembo && docker exec ");
@@ -169,9 +167,7 @@ impl Instance {
         let stderr = String::from_utf8(output.stderr).unwrap();
 
         if !stderr.is_empty() {
-            return Err(Box::new(DockerError::new(
-                format!("There was an issue installing the extension: {}", stderr).as_str(),
-            )));
+            bail!("There was an issue installing the extension: {}", stderr)
         } else {
             let mut msg = String::from("- Stack extension installed: ");
             msg.push_str(&extension.name.clone().unwrap());
@@ -182,7 +178,7 @@ impl Instance {
         }
     }
 
-    fn enable_extension(&self, extension: &Extension) -> Result<(), Box<dyn Error>> {
+    fn enable_extension(&self, extension: &Extension) -> Result<()> {
         let mut sp = Spinner::new(Spinners::Dots12, "Enabling extension".into());
 
         let locations = extension
@@ -214,15 +210,13 @@ impl Instance {
         let stderr = String::from_utf8(output.stderr).unwrap();
 
         if !stderr.is_empty() {
-            return Err(Box::new(DockerError::new(
-                format!("There was an issue enabling the extension: {}", stderr).as_str(),
-            )));
+            bail!("There was an issue enabling the extension: {}", stderr)
         } else {
             Ok(())
         }
     }
 
-    pub fn find(args: &ArgMatches, name: &str) -> Result<Instance, InstanceError> {
+    pub fn find(args: &ArgMatches, name: &str) -> Result<Instance> {
         let config = Config::new(args, &Config::full_path(args));
 
         info!("finding config for instance {}", name);
@@ -237,8 +231,6 @@ impl Instance {
             }
         }
 
-        Err(InstanceError {
-            name: name.to_string(),
-        })
+        bail!("Instance {name} not found");
     }
 }
