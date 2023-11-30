@@ -87,11 +87,12 @@ impl Docker {
         Ok(())
     }
 
-    // stop container for given name
-    pub fn stop(name: &str) -> Result {
-        let mut sp = Spinner::new(Spinners::Line, "Stopping instance".into());
-        let mut command = String::from("cd tembo ");
-        command.push_str("&& docker stop ");
+    // stop & remove container for given name
+    pub fn stop_remove(name: &str) -> Result {
+        let mut sp = Spinner::new(Spinners::Line, "Stopping & Removing instance".into());
+        let mut command: String = String::from("docker stop ");
+        command.push_str(name);
+        command.push_str(" && docker rm ");
         command.push_str(name);
 
         let output = ShellCommand::new("sh")
@@ -100,7 +101,7 @@ impl Docker {
             .output()
             .expect("failed to execute process");
 
-        let message = format!("- Tembo instance {} stopped", &name);
+        let message = format!("- Tembo instance {} stopped & removed", &name);
         sp.stop_with_message(message);
 
         let stderr = String::from_utf8(output.stderr).unwrap();

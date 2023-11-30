@@ -9,3 +9,4 @@ pub mod file_utils;
 pub mod instance;
 pub mod schema;
 pub mod stacks;
+pub mod tembo_config;

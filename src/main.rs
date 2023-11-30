@@ -52,6 +52,7 @@ fn main() {
         Some(("init", sub_matches)) => cmd::init::execute(sub_matches),
         Some(("context", sub_matches)) => cmd::context::execute(sub_matches),
         Some(("apply", sub_matches)) => cmd::apply::execute(sub_matches),
+        Some(("delete", sub_matches)) => cmd::delete::execute(sub_matches),
         Some(("instance", sub_matches)) => cmd::instance::execute(sub_matches),
         Some(("db", sub_matches)) => cmd::database::execute(sub_matches),
         Some(("schema", sub_matches)) => cmd::schema::execute(sub_matches),
@@ -95,13 +96,13 @@ fn create_clap_command() -> Command {
         )
         .subcommand(cmd::init::make_subcommand())
         .subcommand(cmd::apply::make_subcommand())
+        .subcommand(cmd::delete::make_subcommand())
         .subcommand(
             Command::new("instance")
                 .about("Commands used to manage local and cloud instances")
                 .subcommand(cmd::instance::create::make_subcommand())
                 .subcommand(cmd::instance::list::make_subcommand())
-                .subcommand(cmd::instance::start::make_subcommand())
-                .subcommand(cmd::instance::stop::make_subcommand()),
+                .subcommand(cmd::instance::start::make_subcommand()),
         )
         .subcommand(
             Command::new("context")

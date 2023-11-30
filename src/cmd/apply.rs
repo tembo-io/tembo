@@ -1,47 +1,15 @@
 use crate::Result;
 use clap::{ArgMatches, Command};
-use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
     fs::{self},
 };
-use toml::Value;
 
-use crate::cli::{docker::Docker, file_utils::FileUtils};
+use crate::cli::{docker::Docker, file_utils::FileUtils, tembo_config::InstanceSettings};
 use tera::Tera;
 
 const DOCKERFILE_NAME: &str = "Dockerfile";
 const POSTGRESCONF_NAME: &str = "postgres.conf";
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct TemboConfig {
-    pub version: String,
-    pub defaults: InstanceSettings,
-}
-
-// Config struct holds to data from the `[config]` section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct InstanceSettings {
-    pub cpu: String,
-    pub memory: String,
-    pub storage: String,
-    pub replicas: u32,
-    pub postgres_configurations: HashMap<String, Value>,
-    pub extensions: HashMap<String, Extension>,
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct PostgresConfig {
-    // TODO: Change this to a generic type
-    pub statement_timeout: String,
-}
-
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
-pub struct Extension {
-    pub enabled: bool,
-    pub trunk_project: Option<String>,
-    pub trunk_project_version: Option<String>,
-}
 
 // Create init subcommand arguments
 pub fn make_subcommand() -> Command {
