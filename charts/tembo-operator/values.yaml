@@ -8,9 +8,6 @@ podMonitor:
   port: http
   path: /metrics
 
-prometheusRule:
-  enabled: true
-
 env: []
 
 ## Configure resource requests and limits
