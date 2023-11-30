@@ -39,7 +39,7 @@ fn main() {
     .unwrap();
 
     // Windows is not supported currently, will alert user and stop process immediately
-    if cfg!(target_os = "widows") {
+    if cfg!(windows) {
         warn!("{}", crate::WINDOWS_ERROR_MSG);
 
         std::process::exit(101);
