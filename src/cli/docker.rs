@@ -43,19 +43,21 @@ impl Docker {
 
     // Build & run docker image
     pub fn build_run() -> Result {
+        let mut sp = Spinner::new(Spinners::Line, "Running Docker Build & Run".into());
         let container_name = "tembo-pg";
 
         if Self::container_list_filtered(container_name)
             .unwrap()
             .contains(container_name)
         {
-            info!("existing container found");
+            sp.stop_with_message(format!("- Existing container found"));
         } else {
             let command = format!(
                 "docker build . -t postgres && docker run --name {} -p 5432:5432 -d postgres",
                 container_name
             );
             run_command(&command)?;
+            sp.stop_with_message(format!("- Docker Build & Run completed"));
         }
 
         Ok(())
@@ -63,8 +65,12 @@ impl Docker {
 
     // run sqlx migrate
     pub fn run_sqlx_migrate() -> Result {
+        let mut sp = Spinner::new(Spinners::Line, "Running SQL migration".into());
+
         let command = "DATABASE_URL=postgres://postgres:postgres@localhost:5432 sqlx migrate run";
         run_command(&command)?;
+
+        sp.stop_with_message(format!("- SQL migration completed"));
 
         Ok(())
     }
@@ -90,24 +96,31 @@ impl Docker {
     // stop & remove container for given name
     pub fn stop_remove(name: &str) -> Result {
         let mut sp = Spinner::new(Spinners::Line, "Stopping & Removing instance".into());
-        let mut command: String = String::from("docker stop ");
-        command.push_str(name);
-        command.push_str(" && docker rm ");
-        command.push_str(name);
 
-        let output = ShellCommand::new("sh")
-            .arg("-c")
-            .arg(&command)
-            .output()
-            .expect("failed to execute process");
+        if !Self::container_list_filtered(name)
+            .unwrap()
+            .contains("tembo-pg")
+        {
+            sp.stop_with_message(format!("- Tembo instance {} doesn't exist", "tembo-pg"));
+        } else {
+            let mut command: String = String::from("docker stop ");
+            command.push_str(name);
+            command.push_str(" && docker rm ");
+            command.push_str(name);
 
-        let message = format!("- Tembo instance {} stopped & removed", &name);
-        sp.stop_with_message(message);
+            let output = ShellCommand::new("sh")
+                .arg("-c")
+                .arg(&command)
+                .output()
+                .expect("failed to execute process");
 
-        let stderr = String::from_utf8(output.stderr).unwrap();
+            sp.stop_with_message(format!("- Tembo instance {} stopped & removed", &name));
 
-        if !stderr.is_empty() {
-            bail!("There was an issue stopping the instance: {}", stderr)
+            let stderr = String::from_utf8(output.stderr).unwrap();
+
+            if !stderr.is_empty() {
+                bail!("There was an issue stopping the instance: {}", stderr)
+            }
         }
 
         Ok(())
@@ -143,8 +156,6 @@ impl Docker {
 }
 
 pub fn run_command(command: &str) -> Result<()> {
-    let mut sp = Spinner::new(Spinners::Line, "Running Docker Build & Run".into());
-
     let output = ShellCommand::new("sh")
         .arg("-c")
         .arg(command)
@@ -153,8 +164,8 @@ pub fn run_command(command: &str) -> Result<()> {
 
     let stderr = String::from_utf8(output.stderr).unwrap();
 
-    if !stderr.is_empty() {
-        bail!("There was an issue building & running docker: {}", stderr)
+    if !output.status.success() {
+        bail!("There was an issue running command: {}", stderr);
     }
 
     Ok(())
