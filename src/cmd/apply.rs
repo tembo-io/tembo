@@ -144,7 +144,7 @@ fn get_postgres_config(instance_settings: HashMap<String, InstanceSettings>) -> 
                 for row in value.as_table().iter() {
                     for (t, v) in row.iter() {
                         postgres_config.push_str(key.as_str());
-                        postgres_config.push_str(".");
+                        postgres_config.push('.');
                         postgres_config.push_str(t.as_str());
                         postgres_config.push_str(equal_to_qoute);
                         postgres_config.push_str(v.as_str().unwrap());
@@ -154,5 +154,6 @@ fn get_postgres_config(instance_settings: HashMap<String, InstanceSettings>) -> 
             }
         }
     }
-    return postgres_config.to_string();
+
+    postgres_config
 }

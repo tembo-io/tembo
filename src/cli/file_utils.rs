@@ -35,7 +35,7 @@ impl FileUtils {
             return Ok(());
         }
         let display = path.display();
-        let mut file: File = match File::create(&path) {
+        let mut file: File = match File::create(path) {
             Err(why) => panic!("Couldn't create {}: {}", display, why),
             Ok(file) => file,
         };

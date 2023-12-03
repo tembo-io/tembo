@@ -33,14 +33,14 @@ pub fn execute(_args: &ArgMatches) -> Result<()> {
         let mut org_id = String::from("           ");
         let mut profile = String::from("   ");
         let mut set = false;
-        if !e.org_id.is_none() {
-            org_id = e.org_id.unwrap();
+        if let Some(env_org) = e.org_id {
+            org_id = env_org;
         }
-        if !e.profile.is_none() {
-            profile = e.profile.unwrap();
+        if let Some(env_profile) = e.profile {
+            profile = env_profile;
         }
-        if !e.set.is_none() {
-            set = e.set.unwrap();
+        if let Some(env_set) = e.set {
+            set = env_set;
         }
         println!(
             "{}           {}     {:?}      {:?}          {:?}",

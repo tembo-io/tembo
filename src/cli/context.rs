@@ -30,11 +30,11 @@ pub fn tembo_home_dir() -> String {
 }
 
 pub fn tembo_context_file_path() -> String {
-    return tembo_home_dir() + &String::from("/context");
+    tembo_home_dir() + "/context"
 }
 
 pub fn tembo_credentials_file_path() -> String {
-    return tembo_home_dir() + &String::from("/credentials");
+    tembo_home_dir() + "/credentials"
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
