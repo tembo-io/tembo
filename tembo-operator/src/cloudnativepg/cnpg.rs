@@ -2287,7 +2287,7 @@ mod tests {
     #[test]
     fn test_generate_restore_destination_path() {
         // Define test cases
-        let test_cases = vec![
+        let test_cases = [
             (
                 "s3://cdb-plat-use1-dev-instance-backups/coredb/coredb/org-coredb-inst-test-testing-test-1",
                 "s3://cdb-plat-use1-dev-instance-backups/coredb/coredb",

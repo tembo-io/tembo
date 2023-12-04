@@ -1,8 +1,22 @@
 use crate::{apis::coredb_types::CoreDB, defaults, extensions::database_queries::check_input};
+use lazy_static::lazy_static;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use tracing::warn;
 use utoipa::ToSchema;
+
+lazy_static! {
+    static ref EXTRA_COMMANDS_TO_ENABLE_EXTENSION: HashMap<String, String> = {
+        let mut m = HashMap::new();
+        m.insert(
+            "pg_cron".to_string(),
+            "UPDATE cron.job SET nodename = '';".to_string(),
+        );
+        m
+    };
+}
+
 #[derive(Clone, Debug, Deserialize, Eq, Hash, JsonSchema, Serialize, PartialEq, ToSchema)]
 pub struct TrunkInstall {
     pub name: String,
@@ -110,16 +124,23 @@ pub fn generate_extension_enable_cmd(
         );
         return Err("Schema name is not formatted properly".to_string());
     }
+    let mut command_suffix: String = "".to_string();
+    if EXTRA_COMMANDS_TO_ENABLE_EXTENSION.contains_key(ext_name) {
+        command_suffix = EXTRA_COMMANDS_TO_ENABLE_EXTENSION.get(ext_name).unwrap().clone();
+    }
     // only specify the schema if it provided
     let command = match ext_loc.enabled {
         true => match ext_loc.schema.as_ref() {
             Some(schema) => {
                 format!(
-                    "CREATE EXTENSION IF NOT EXISTS \"{}\" SCHEMA {} CASCADE;",
-                    ext_name, schema
+                    "CREATE EXTENSION IF NOT EXISTS \"{}\" SCHEMA {} CASCADE;{}",
+                    ext_name, schema, command_suffix
                 )
             }
-            None => format!("CREATE EXTENSION IF NOT EXISTS \"{}\" CASCADE;", ext_name),
+            None => format!(
+                "CREATE EXTENSION IF NOT EXISTS \"{}\" CASCADE;{}",
+                ext_name, command_suffix
+            ),
         },
         false => format!("DROP EXTENSION IF EXISTS \"{}\" CASCADE;", ext_name),
     };

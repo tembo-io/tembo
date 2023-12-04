@@ -25,7 +25,6 @@ use super::{
     ingress::{generate_ingress_routes, reconcile_ingress},
     types::{AppService, EnvVarRef, Middleware, COMPONENT_NAME},
 };
-use k8s_openapi::api::core::v1::Volume;
 
 // private wrapper to hold the AppService Resources
 #[derive(Clone, Debug)]
