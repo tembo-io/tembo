@@ -16,60 +16,145 @@ If the install path is in your shell path, you can then run `tembo help` and oth
 
 ## `tembo init`
 
-The `init` command initializes your environment and can be used to generate configuration files. It will
-also alert you to any missing requirements. Currently, the only requirement is Docker be running. After 
-ensuring the requirements are met, the command will pull the Tembo Docker image.
+The `tembo init` command initializes your environment with following files:
 
-The default configuration file path is $HOME/.config/tembo.
+* `tembo.toml` configuration file
+* `migrations` directory for sql migrations
+* `~/.tembo/context` file with various contexts user can connect to
 
 For more information: `tembo init --help`
 
-## `tembo instance create`
+## `tembo context list/set`
 
-The `instance create` command creates an instance of a Tembo stack locally. It includes the Tembo flavored 
-version of Postgres and an additional items like extensions. You can specify the 
-type of instance you want to create. You'll also need to provide a name and port number.
+tembo context works like [kubectl context](https://www.notion.so/abee0b15119343e4947692feb740e892?pvs=21). User can set context for local docker environment or tembo cloud (dev/qa/prod) with org_id. When they run any of the other commands it will run in the context selected. Default context will be local.
 
-Currently supported types include: 
+## `tembo apply`
 
-* standard
-* data-warehouse
+Validates Tembo.toml (same as `tembo validate`) and applies the changes to the context selected.
 
-More stack types will be added shortly.
+* applies changes and runs migration for all dbs
+    * **local docker:** wraps docker build/run + sqlx migration
+    * **tembo-cloud:** calls the api in appropriate environment
 
-## `tembo instance list`
+## `tembo delete`
 
-The `instance list` command simply lists all of the instances that have been created. It lists key attributes such as name, type and port.
+- **local docker:** runs `docker stop & rm` command
+- **tembo-cloud:** calls delete tembo api endpoint
 
-## `tembo instance start`
+## Generating Rust Client from API
 
-The `instance start` command allows users to start their instances. It requires the name as a parameter and Docker to be running. No two 
-instances can be started that share a port number.
+[OpenAPI Generator](https://openapi-generator.tech/) tool is used to generate Rust Client.
 
-Each instance runs as a Docker container.
+Install OpenAPI Generator if not already by following steps [here](https://openapi-generator.tech/docs/installation)
 
-## `tembo auth login`
+### Control plane API client
 
-The `auth login` command allows users to authenticate as a service user and obtain an API token that can be used on future authenticated requests.
+Go to `temboclient` directory in your terminal.
 
-## `tembo auth info`
+Delete the contents of the directory first and then run following command to re-generate the rust client code for the API.
 
-The `auth info` command allows users to see if they have authenticated and when their authentication token expires.
+```bash
+openapi-generator generate -i https://api.tembo.io/api-docs/openapi.json  -g rust -o . --additional-properties=packageName=temboclient
+```
 
-## `tembo extension install`
+* Go to `temboclient/src/lib.rs` & add followng line at the top to disable clippy for the generated code
 
-The `extension install` command allows users to install extensions on existing instances. Users will be prompted for the 
-name and version of the extension. Note this doesn't enable the extension. That is done via the `extension enable` command (WIP).
+```
+#![allow(clippy::all)]
+```
 
-List of supported extensions can be found on [Trunk](https://pgt.dev).
+* Create `/temboclient/src/models/impls.rs` file & add following code to it:
 
-## `tembo db create`
+**TODO:** Find a better way to do this.
 
-The `db create` command allows users to create databases, by name, for a given existing instance.
+```
 
-## `tembo schema create`
+use std::str::FromStr;
 
-The `schema create` command allows users to create schemas, by name, for existing databases on existing isntances.
+use super::{Cpu, Storage, StackType, Memory, Environment};
+
+impl FromStr for Cpu {
+	type Err = ();
+
+	fn from_str(input: &str) -> core::result::Result<Cpu, Self::Err> {
+			match input {
+					"1"  => Ok(Cpu::Variant1),
+					"2"  => Ok(Cpu::Variant2),
+					"4"  => Ok(Cpu::Variant4),
+					"8" => Ok(Cpu::Variant8),
+					"16" => Ok(Cpu::Variant16),
+					"32" => Ok(Cpu::Variant32),
+					_      => Err(()),
+			}
+	}
+}
+
+impl FromStr for Memory {
+	type Err = ();
+
+	fn from_str(input: &str) -> core::result::Result<Memory, Self::Err> {
+			match input {
+					"1Gi"  => Ok(Memory::Variant1Gi),
+					"2Gi"  => Ok(Memory::Variant2Gi),
+					"4Gi"  => Ok(Memory::Variant4Gi),
+					"8Gi" => Ok(Memory::Variant8Gi),
+					"16Gi" => Ok(Memory::Variant16Gi),
+					"32Gi" => Ok(Memory::Variant32Gi),
+					_      => Err(()),
+			}
+	}
+}
+
+impl FromStr for Environment {
+	type Err = ();
+
+	fn from_str(input: &str) -> core::result::Result<Environment, Self::Err> {
+			match input {
+					"dev"  => Ok(Environment::Dev),
+					"test"  => Ok(Environment::Test),
+					"prod"  => Ok(Environment::Prod),
+					_      => Err(()),
+			}
+	}
+}
+
+impl FromStr for Storage {
+	type Err = ();
+
+	fn from_str(input: &str) -> core::result::Result<Storage, Self::Err> {
+			match input {
+					"10Gi" => Ok(Storage::Variant10Gi),
+					"50Gi" => Ok(Storage::Variant50Gi),
+					"100Gi" => Ok(Storage::Variant100Gi),
+					"200Gi" => Ok(Storage::Variant200Gi),
+					"300Gi" => Ok(Storage::Variant300Gi),
+					"400Gi" => Ok(Storage::Variant400Gi),
+					"500Gi" => Ok(Self::Variant500Gi),
+					_ => Err(()),
+			}
+	}
+}
+
+impl ToString for StackType {
+	fn to_string(&self) -> String {
+			match self {
+					Self::Standard => String::from("Standard"),
+					Self::MessageQueue => String::from("MessageQueue"),
+					Self::MachineLearning => String::from("MachineLearning"),
+					Self::Olap => String::from("OLAP"),
+					Self::Oltp => String::from("OLTP"),
+					Self::VectorDb => String::from("VectorDB"),
+					Self::DataWarehouse => String::from("DataWarehouse"),
+			}
+	}
+}
+```
+
+* Add following line towards the end of `/temboclient/src/models/mod.rs`
+
+```
+pub mod impls;
+```
 
 # Contributing
 

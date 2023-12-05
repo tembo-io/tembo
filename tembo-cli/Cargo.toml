@@ -1,6 +1,7 @@
+workspace = { members = ["temboclient"] }
 [package]
 name = "tembo"
-version = "0.7.2"
+version = "0.8.0"
 edition = "2021"
 authors = ["Tembo.io"]
 description = "The CLI for Tembo"
@@ -39,6 +40,13 @@ dateparser = "0.2.0"
 log = "0.4.20"
 tera = "1.0"
 curl = "0.4.44"
+temboclient = { version = "1.0.0", path = "temboclient" }
+tokio = { version = "1.26.0", features = [
+    "rt",
+    "rt-multi-thread",
+    "macros",
+    "sync",
+] }
 
 [dev-dependencies]
 assert_cmd = "2.0.8"
