@@ -215,7 +215,6 @@ pub async fn is_not_restarting(
         })?
         .into();
 
-
     let pg_postmaster = match pg_postmaster_result {
         Ok(result) => result.stdout.ok_or_else(|| {
             error!("{cdb_name}: select pg_postmaster_start_time() had no stdout");
