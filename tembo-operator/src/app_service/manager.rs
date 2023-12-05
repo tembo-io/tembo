@@ -19,6 +19,10 @@ use kube::{
 };
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
+use crate::{
+    app_service::ingress::{generate_ingress_tcp_routes, reconcile_ingress_tcp},
+    traefik::ingress_route_tcp_crd::IngressRouteTCPRoutes,
+};
 use tracing::{debug, error, warn};
 
 use super::{
@@ -33,6 +37,9 @@ struct AppServiceResources {
     name: String,
     service: Option<Service>,
     ingress_routes: Option<Vec<IngressRouteRoutes>>,
+    ingress_tcp_routes: Option<Vec<IngressRouteTCPRoutes>>,
+    entry_points: Option<Vec<String>>,
+    entry_points_tcp: Option<Vec<String>>,
 }
 
 // generates Kubernetes Deployment and Service templates for a AppService
@@ -55,13 +62,50 @@ fn generate_resource(
         subdomain = coredb_name,
         domain = domain
     );
-    let ingress_routes =
-        generate_ingress_routes(appsvc, &resource_name, namespace, host_matcher, coredb_name);
+    let ingress_routes = generate_ingress_routes(
+        appsvc,
+        &resource_name,
+        namespace,
+        host_matcher.clone(),
+        coredb_name,
+    );
+    let ingress_tcp_routes =
+        generate_ingress_tcp_routes(appsvc, &resource_name, namespace, host_matcher, coredb_name);
+    // fetch entry points from routing
+    let entry_points: Option<Vec<String>> = appsvc.routing.as_ref().map(|routes| {
+        routes
+            .iter()
+            .filter_map(|route| route.entry_points.clone())
+            .flatten()
+            .collect()
+    });
+    // fetch tcp entry points where entrypoint is ferretdb
+    let entry_points_tcp: Option<Vec<String>> = appsvc.routing.as_ref().map(|routes| {
+        routes
+            .iter()
+            .filter_map(|route| {
+                if route
+                    .entry_points
+                    .clone()
+                    .unwrap_or_default()
+                    .contains(&"ferretdb".to_string())
+                {
+                    Some("ferretdb".to_string())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    });
+
     AppServiceResources {
         deployment,
         name: resource_name,
         service,
         ingress_routes,
+        ingress_tcp_routes,
+        entry_points,
+        entry_points_tcp,
     }
 }
 
@@ -563,11 +607,29 @@ pub async fn reconcile_app_services(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(
         .flatten()
         .collect();
 
+    let desired_tcp_routes: Vec<IngressRouteTCPRoutes> = resources
+        .iter()
+        .filter_map(|r| r.ingress_tcp_routes.clone())
+        .flatten()
+        .collect();
+
     let desired_middlewares = appsvcs
         .iter()
         .filter_map(|appsvc| appsvc.middlewares.clone())
         .flatten()
         .collect::<Vec<Middleware>>();
+
+    let desired_entry_points = resources
+        .iter()
+        .filter_map(|r| r.entry_points.clone())
+        .flatten()
+        .collect::<Vec<String>>();
+
+    let desired_entry_points_tcp = resources
+        .iter()
+        .filter_map(|r| r.entry_points_tcp.clone())
+        .flatten()
+        .collect::<Vec<String>>();
 
     match reconcile_ingress(
         client.clone(),
@@ -575,16 +637,40 @@ pub async fn reconcile_app_services(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(
         &ns,
         oref.clone(),
         desired_routes,
-        desired_middlewares,
+        desired_middlewares.clone(),
+        // desired_entry_points,
     )
     .await
     {
         Ok(_) => {
-            debug!("Updated/applied ingress for {}.{}", ns, coredb_name,);
+            debug!("Updated/applied IngressRoute for {}.{}", ns, coredb_name,);
         }
         Err(e) => {
             error!(
                 "Failed to update/apply IngressRoute {}.{}: {}",
+                ns, coredb_name, e
+            );
+            has_errors = true;
+        }
+    }
+
+    match reconcile_ingress_tcp(
+        client.clone(),
+        &coredb_name,
+        &ns,
+        oref.clone(),
+        desired_tcp_routes,
+        desired_middlewares,
+        desired_entry_points_tcp,
+    )
+    .await
+    {
+        Ok(_) => {
+            debug!("Updated/applied IngressRouteTCP for {}.{}", ns, coredb_name,);
+        }
+        Err(e) => {
+            error!(
+                "Failed to update/apply IngressRouteTCP {}.{}: {}",
                 ns, coredb_name, e
             );
             has_errors = true;

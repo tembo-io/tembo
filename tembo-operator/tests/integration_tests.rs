@@ -1159,7 +1159,6 @@ mod test {
             }
         });
 
-
         // Use the patch method to update the Cluster resource
         let params = PatchParams::default();
         let patch = Patch::Merge(patch_json);
@@ -2959,7 +2958,10 @@ mod test {
                         "routing": [
                             {
                                 "port": 3000,
-                                "ingressPath": "/"
+                                "ingressPath": "/",
+                                "entryPoints": [
+                                    "websecure"
+                                ]
                             }
                         ],
                         "resources": {
@@ -2986,6 +2988,37 @@ mod test {
                                 "memory": "128Mi"
                             }
                         }
+                    },
+                    {
+                        "name": "ferretdb",
+                        "image": "ghcr.io/ferretdb/ferretdb",
+                        "routing": [
+                            {
+                                "port": 27018,
+                                "ingressPath": "/ferretdb/v1",
+                                "entryPoints": [
+                                    "ferretdb"
+                                ]
+                            }
+                        ],
+                        "env": [
+                            {
+                                "name": "FERRETDB_POSTGRESQL_URL",
+                                "valueFromPlatform": "ReadWriteConnection"
+                            },
+                            {
+                                "name": "FERRETDB_LOG_LEVEL",
+                                "value": "debug"
+                            },
+                            {
+                                "name": "FERRETDB_STATE_DIR",
+                                "value": "-"
+                            },
+                            {
+                                "name": "FERRETDB_LISTEN_TLS_CERT_FILE",
+                                "value": "/certs/tls.crt"
+                            },
+                        ],
                     }
                 ],
                 "postgresExporterEnabled": false
@@ -2996,26 +3029,28 @@ mod test {
         coredbs.patch(cdb_name, &params, &patch).await.unwrap();
 
         // assert we created two Deployments, with the names we provided
-        let deployment_items: Vec<Deployment> = list_resources(client.clone(), cdb_name, &namespace, 2)
+        let deployment_items: Vec<Deployment> = list_resources(client.clone(), cdb_name, &namespace, 3)
             .await
             .unwrap();
         // two AppService deployments. the postgres exporter is disabled
-        assert!(deployment_items.len() == 2);
+        assert!(deployment_items.len() == 3);
 
-        let service_items: Vec<Service> = list_resources(client.clone(), cdb_name, &namespace, 1)
+        let service_items: Vec<Service> = list_resources(client.clone(), cdb_name, &namespace, 2)
             .await
             .unwrap();
         // one AppService Service, since only ports exposed on one
-        assert!(service_items.len() == 1);
+        assert!(service_items.len() == 2);
 
         let app_0 = deployment_items[0].clone();
         let app_1 = deployment_items[1].clone();
-        assert_eq!(app_0.metadata.name.unwrap(), format!("{cdb_name}-postgrest"));
-        assert_eq!(app_1.metadata.name.unwrap(), format!("{cdb_name}-test-app-1"));
+        let app_2 = deployment_items[2].clone();
+        assert_eq!(app_0.metadata.name.unwrap(), format!("{cdb_name}-ferretdb"));
+        assert_eq!(app_1.metadata.name.unwrap(), format!("{cdb_name}-postgrest"));
+        assert_eq!(app_2.metadata.name.unwrap(), format!("{cdb_name}-test-app-1"));
 
         // Assert resources in first appService
         // select the pod
-        let selector_map = app_0
+        let selector_map = app_1
             .spec
             .as_ref()
             .and_then(|s| s.selector.match_labels.as_ref())
@@ -3030,8 +3065,8 @@ mod test {
         // Fetch and print all the pods matching the label selector
         let pod_list = pods.list(&lp).await.unwrap();
         assert_eq!(pod_list.items.len(), 1);
-        let app_0_pod = pod_list.items[0].clone();
-        let app_0_container = app_0_pod.spec.unwrap().containers[0].clone();
+        let app_1_pod = pod_list.items[0].clone();
+        let app_1_container = app_1_pod.spec.unwrap().containers[0].clone();
 
         let expected: ResourceRequirements = serde_json::from_value(serde_json::json!({
             "requests": {
@@ -3044,8 +3079,8 @@ mod test {
             }
         }))
         .unwrap();
-        let app_0_resources = app_0_container.resources.unwrap();
-        assert_eq!(app_0_resources, expected);
+        let app_1_resources = app_1_container.resources.unwrap();
+        assert_eq!(app_1_resources, expected);
 
         let ingresses: Result<Vec<IngressRoute>, errors::OperatorError> =
             list_resources(client.clone(), cdb_name, &namespace, 1).await;
@@ -3059,13 +3094,28 @@ mod test {
             route.r#match,
             format!("Host(`{}.localhost`) && PathPrefix(`/`)", cdb_name)
         );
+
+        // Check for IngressRouteTCP
+        let ingresses_tcp: Result<Vec<IngressRouteTCP>, errors::OperatorError> =
+            list_resources(client.clone(), cdb_name, &namespace, 1).await;
+        let ingress_tcp = ingresses_tcp.unwrap();
+        assert_eq!(ingress_tcp.len(), 1);
+        let ingress_route_tcp = ingress_tcp[0].clone();
+        let routes_tcp = ingress_route_tcp.spec.clone().routes.clone();
+        assert_eq!(routes.len(), 1);
+        let route_tcp = routes_tcp[0].clone();
+        assert_eq!(
+            route_tcp.r#match,
+            format!("Host(`{}.localhost`) && PathPrefix(`/ferretdb/v1`)", cdb_name)
+        );
+
         let services = routes[0].services.clone().unwrap();
         assert_eq!(services.len(), 1);
         assert_eq!(services[0].name, format!("{}-postgrest", cdb_name));
         assert_eq!(services[0].port.clone().unwrap(), IntOrString::Int(3000));
 
         // Assert resources in second AppService
-        let selector_map = app_1
+        let selector_map = app_2
             .spec
             .as_ref()
             .and_then(|s| s.selector.match_labels.as_ref())
@@ -3078,8 +3128,8 @@ mod test {
         let lp = ListParams::default().labels(&selector);
         let pod_list = pods.list(&lp).await.unwrap();
         assert_eq!(pod_list.items.len(), 1);
-        let app_1_pod = pod_list.items[0].clone();
-        let app_1_container = app_1_pod.spec.unwrap().containers[0].clone();
+        let app_2_pod = pod_list.items[0].clone();
+        let app_2_container = app_2_pod.spec.unwrap().containers[0].clone();
 
         let expected: ResourceRequirements = serde_json::from_value(serde_json::json!({
             "requests": {
@@ -3092,8 +3142,8 @@ mod test {
             }
         }))
         .unwrap();
-        let app_1_resources = app_1_container.resources.unwrap();
-        assert_eq!(app_1_resources, expected);
+        let app_2_resources = app_2_container.resources.unwrap();
+        assert_eq!(app_2_resources, expected);
 
         // Delete the one without a service, but leave the postgrest appService
         let coredb_json = serde_json::json!({

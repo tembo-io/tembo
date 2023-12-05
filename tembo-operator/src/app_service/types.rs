@@ -76,6 +76,13 @@ pub struct Routing {
     pub ingress_path: Option<String>,
     // provide name of the middleware resources to apply to this route
     pub middlewares: Option<Vec<String>>,
+    #[serde(rename = "entryPoints")]
+    #[serde(default = "default_entry_points")]
+    pub entry_points: Option<Vec<String>>,
+}
+
+pub fn default_entry_points() -> Option<Vec<String>> {
+    Some(vec!["websecure".to_owned()])
 }
 
 #[allow(non_snake_case)]
