@@ -1,0 +1,39 @@
+apiVersion: coredb.io/v1alpha1
+kind: CoreDB
+metadata:
+  name: sample-with-pooler
+spec:
+  stop: false
+  extensions:
+    - name: pg_stat_statements
+      locations:
+        - enabled: true
+          database: postgres
+          schema: public
+          version: "1.10.0"
+    - name: pg_cron
+      locations:
+        - enabled: true
+          database: postgres
+          schema: public
+          version: "1.5.2"
+  runtime_config:
+    - name: shared_preload_libraries
+      value: 'pg_cron,pg_stat_statements'
+    - name: pg_stat_statements.track
+      value: top
+  connectionPooler:
+    enabled: true
+    pooler:
+      poolMode: transaction
+      # Valid parameter values can be found at https://www.pgbouncer.org/config.html
+      parameters:
+        default_pool_size: "50"
+        max_client_conn: "5000"
+      resources:
+        limits:
+          cpu: 200m
+          memory: 256Mi
+        requests:
+          cpu: 100m
+          memory: 128Mi

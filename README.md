@@ -1,7 +1,7 @@
 # Tembo
 
 Tembo aims to improve the experience developers have with deploying, managing, and scaling
-Postgres. Tembo is under active development that you are free to use anything that we have 
+Postgres. Tembo is under active development that you are free to use anything that we have
 open-sourced.
 
 ## Why Postgres?

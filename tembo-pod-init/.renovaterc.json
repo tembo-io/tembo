@@ -1,0 +1,17 @@
+{
+  "extends": ["config:base"],
+  "packageRules": [
+    {
+      "packagePatterns": [
+        "^cargo\\.toml$"
+      ],
+      "updateTypes": [
+        "minor",
+        "patch"
+      ],
+      "automerge": true,
+      "automergeType": "pr",
+      "commitMessage": "chore(deps): update crate dependencies"
+    }
+  ]
+}

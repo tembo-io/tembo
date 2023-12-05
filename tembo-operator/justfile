@@ -1,0 +1,223 @@
+NAME := "controller"
+ORG := "localhost:5001"
+VERSION := `git rev-parse HEAD`
+SEMVER_VERSION := `grep version Cargo.toml | awk -F"\"" '{print $2}' | head -n 1`
+NAMESPACE := "default"
+KUBE_VERSION := env_var_or_default('KUBE_VERSION', '1.25.8')
+STORAGE_CLASS_NAME := "standard"
+
+default:
+  @just --list --unsorted --color=always | rg -v "    default"
+
+# generate crd
+generate-crd:
+  cargo run --bin crdgen > ../charts/tembo-operator/templates/crd.yaml
+
+install-calico:
+	helm upgrade --install --create-namespace --namespace=tigera-operator --version=3.26.1 --values=./testdata/calico.yaml calico projectcalico/tigera-operator
+
+install-traefik:
+	kubectl create namespace traefik || true
+	helm upgrade --install --namespace=traefik --version=20.8.0 --values=./testdata/traefik-values.yaml traefik traefik/traefik
+	# https://github.com/traefik/traefik-helm-chart/issues/757#issuecomment-1753995542
+	kubectl apply -f https://raw.githubusercontent.com/traefik/traefik/v3.0.0-beta2/docs/content/reference/dynamic-configuration/kubernetes-crd-definition-v1.yml
+
+install-kube-prometheus-stack:
+	kubectl create namespace monitoring || true
+	helm upgrade --install --namespace=monitoring --values=./testdata/prometheus-stack.yaml monitoring prometheus-community/kube-prometheus-stack
+
+install-tembo-pod-init:
+	kubectl create namespace tembo-pod-init || true
+	helm upgrade --install \
+	  cert-manager jetstack/cert-manager \
+		--version=1.12.1 \
+	  --namespace cert-manager \
+	  --create-namespace \
+		--values=./testdata/cert-manager.yaml && \
+	helm upgrade --install --namespace=tembo-pod-init --values=./testdata/pod-init.yaml tembo-pod-init ../charts/tembo-pod-init
+	kubectl apply -f ./testdata/local-postgres-issuer.yaml
+
+install-cnpg:
+	helm upgrade --install cnpg \
+	  --namespace cnpg-system \
+	  --create-namespace \
+		--values=./testdata/cnpg.yaml \
+		--version=0.18.2 \
+	  cnpg/cloudnative-pg
+
+install-tempo:
+	helm upgrade --install \
+		tempo grafana/tempo \
+	  --namespace monitoring
+
+install-minio:
+	helm upgrade --install \
+		minio minio/minio \
+		--version 5.0.13 \
+		--namespace minio \
+		--create-namespace \
+		--values=./testdata/minio.yaml \
+	&& kubectl wait pods --for=condition=Ready --timeout=300s --all --all-namespaces \
+	&& kubectl apply -f ./testdata/minio-secret.yaml \
+	&& kubectl apply -f ./testdata/minio-bucket-job.yaml \
+	&& kubectl -n minio wait --for=condition=complete job/minio-create-backup-bucket --timeout=300s\
+	&& kubectl -n minio delete job/minio-create-backup-bucket
+
+install-reflector:
+	helm upgrade --install \
+		reflector emberstack/reflector \
+	  --namespace reflector \
+		--create-namespace
+
+enable-cnpg-default-namespace:
+	kubectl label namespace default "tembo-pod-init.tembo.io/watch"="true"
+	kubectl delete pods -n tembo-pod-init --all
+
+connect-test-db:
+	echo "Please include a line in your /etc/hosts file: "
+	echo "127.0.0.1 test-coredb.localhost"
+	psql "postgres://postgres:$(kubectl get secrets -o json test-coredb-connection | jq -r '.data.password' | base64 --decode)@test-coredb.localhost:5432?sslmode=require"
+
+connect-test-db-verify-full:
+	echo "Please include a line in your /etc/hosts file: "
+	echo "127.0.0.1 test-coredb.localhost"
+	kubectl get secrets -n default -o json test-coredb-ca1 | jq -r '.data."ca.crt"' | base64 --decode > /tmp/local.crt
+	psql "postgres://postgres:$(kubectl get secrets -o json test-coredb-connection | jq -r '.data.password' | base64 --decode)@test-coredb.localhost:5432?sslmode=verify-full&sslrootcert=/tmp/local.crt"
+
+update-helm-repos:
+	helm repo add cnpg https://cloudnative-pg.github.io/charts
+	helm repo add jetstack https://charts.jetstack.io
+	helm repo add traefik https://traefik.github.io/charts
+	helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+	helm repo add grafana https://grafana.github.io/helm-charts
+	helm repo add minio https://charts.min.io/
+	helm repo add emberstack https://emberstack.github.io/helm-charts
+	helm repo add projectcalico https://docs.tigera.io/calico/charts
+	helm repo update
+
+# generate and install crd into the cluster
+install-crd: generate-crd
+  kubectl apply -f ../charts/tembo-operator/templates/crd.yaml
+
+# delete kind
+delete-kind:
+	kind delete cluster && sleep 5
+
+# start kind
+start-kind:
+	kind delete cluster || true
+	kind create cluster --image=kindest/node:v{{KUBE_VERSION}} --config testdata/kind-config.yaml
+	just update-helm-repos
+	just enable-cnpg-default-namespace
+	just install-calico
+	just install-reflector
+	just install-kube-prometheus-stack
+	just install-tempo
+	just install-traefik
+	just install-minio
+	just install-crd
+	just install-cnpg
+	just install-tembo-pod-init
+	just annotate {{STORAGE_CLASS_NAME}}
+	kubectl wait pods --for=condition=Ready --timeout=300s --all --all-namespaces
+
+# install dependencies on a cluster
+install-dependencies:
+	just update-helm-repos
+	just enable-cnpg-default-namespace
+	just install-kube-prometheus-stack
+	just install-tempo
+	just install-traefik
+	just install-crd
+	just install-cnpg
+	just install-tembo-pod-init
+	just annotate {{STORAGE_CLASS_NAME}}
+	kubectl wait pods --for=condition=Ready --timeout=300s --all --all-namespaces
+
+# deploy the controller on a cluster
+install-chart:
+    kubectl create ns coredb-operator || true
+    kubectl delete crd coredbs.coredb.io || true
+    helm upgrade tembo-operator ../charts/tembo-operator --install --namespace=coredb-operator --values=testdata/tembo-operator.yaml
+
+# run with opentelemetry
+run-telemetry: run-jaeger
+	USE_SHARED_CA=1 DATA_PLANE_BASEDOMAIN=localhost OPENTELEMETRY_ENDPOINT_URL=http://localhost:4317 RUST_LOG=debug,kube=debug,controller=debug ENABLE_BACKUP=false cargo run --features=telemetry
+
+# run without opentelemetry
+run:
+  USE_SHARED_CA=1 DATA_PLANE_BASEDOMAIN=localhost ENABLE_BACKUP=false RUST_LOG=info,kube=info,controller=info cargo run
+
+run-jaeger:
+	docker run --rm -d --name jaeger -e COLLECTOR_OTLP_ENABLED=true -p 16686:16686 -p 4317:4317 -p 4318:4318 jaegertracing/all-in-one:latest
+
+# annotate namespace to allow for tests
+annotate STORAGE_CLASS_NAME:
+	kubectl label namespace {{NAMESPACE}} safe-to-run-coredb-tests=true
+	kubectl create namespace cnpg-test || true
+	kubectl label namespace cnpg-test safe-to-run-coredb-tests=true
+	kubectl label namespace cnpg-test "tembo-pod-init.tembo.io/watch"="true"
+	kubectl delete pods -n tembo-pod-init --all
+	kubectl patch storageclass {{STORAGE_CLASS_NAME}} -p '{"allowVolumeExpansion": true}'
+
+
+# run tests
+test:
+	cargo test -- --ignored --nocapture
+
+# run cargo watch
+watch:
+	USE_SHARED_CA=1 DATA_PLANE_BASEDOMAIN=localhost ENABLE_BACKUP=false RUST_LOG=info,kube=info,controller=info cargo watch -x 'run'
+
+# watch with opentelemetry
+watch-telemetry:
+	DATA_PLANE_BASEDOMAIN=localhost OPENTELEMETRY_ENDPOINT_URL=http://localhost:4317 RUST_LOG=debug,kube=debug,controller=debug ENABLE_BACKUP=false cargo watch -x 'run --features=telemetry'
+
+# format with nightly rustfmt
+fmt:
+  cargo +nightly fmt
+
+# compile for musl (for docker image)
+compile features="":
+  #!/usr/bin/env bash
+  docker run --rm \
+    -v cargo-cache:/root/.cargo \
+    -v $PWD:/volume \
+    -w /volume \
+    -t clux/muslrust:stable \
+    cargo build --release --features={{features}} --bin controller
+  cp target/x86_64-unknown-linux-musl/release/controller .
+
+# docker build (requires compile step first)
+build:
+  docker build -t {{ORG}}/{{NAME}}:{{VERSION}} .
+
+# retag the current git versioned docker tag as latest, and publish both
+tag-latest:
+  docker tag {{ORG}}/{{NAME}}:{{VERSION}} {{ORG}}/{{NAME}}:latest
+  docker push {{ORG}}/{{NAME}}:{{VERSION}}
+  docker push {{ORG}}/{{NAME}}:latest
+
+# retag the current git versioned docker tag as the current semver and publish
+tag-semver:
+  #!/usr/bin/env bash
+  if curl -sSL https://registry.hub.docker.com/v1/ORGsitories/{{ORG}}/{{NAME}}/tags | jq -r ".[].name" | grep -q {{SEMVER_VERSION}}; then
+    echo "Tag {{SEMVER_VERSION}} already exists - not publishing"
+  else
+    docker tag {{ORG}}/{{NAME}}:{{VERSION}} {{ORG}}/{{NAME}}:{{SEMVER_VERSION}} .
+    docker push {{ORG}}/{{NAME}}:{{SEMVER_VERSION}}
+  fi
+
+# local helpers for debugging traces
+
+# forward grpc otel port from svc/promstack-tempo in monitoring
+forward-tempo:
+  kubectl port-forward -n monitoring svc/promstack-tempo 55680:55680
+
+# forward http port from svc/promstack-grafana in monitoring
+forward-grafana:
+  kubectl port-forward -n monitoring svc/promstack-grafana 8000:80
+
+# mode: makefile
+# End:
+# vim: set ft=make :

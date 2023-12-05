@@ -1,0 +1,43 @@
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: {{ include "tembo-pod-init.fullname" . }}
+  namespace: {{ template "tembo-pod-init.namespace" . }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade,post-delete
+    cert-manager.io/inject-ca-from: {{ printf "%s/%s-certificate" (include "tembo-pod-init.namespace" .) (include "tembo-pod-init.fullname" .)}}
+  labels:
+{{ include "tembo-pod-init-helm.labels" . | indent 4 }}
+webhooks:
+  - name: {{ printf "%s.%s.svc" (include "tembo-pod-init.fullname" .) (include "tembo-pod-init.namespace" .) }}
+    clientConfig:
+      service:
+        name: {{ include "tembo-pod-init.fullname" . }}
+        namespace: {{ template "tembo-pod-init.namespace" . }}
+        path: "/mutate"
+    rules:
+      - operations: ["CREATE", "UPDATE"]
+        apiGroups: [""]
+        apiVersions: ["v1"]
+        resources: ["pods"]
+    sideEffects: None
+    admissionReviewVersions: ["v1"]
+    namespaceSelector:
+      matchLabels:
+        tembo-pod-init.tembo.io/watch: "true"
+  - name: {{ printf "%s.%s.svc.cluster.local" (include "tembo-pod-init.fullname" .) (include "tembo-pod-init.namespace" .) }}
+    clientConfig:
+      service:
+        name: {{ include "tembo-pod-init.fullname" . }}
+        namespace: {{ template "tembo-pod-init.namespace" . }}
+        path: "/mutate"
+    rules:
+      - operations: ["CREATE", "UPDATE"]
+        apiGroups: [""]
+        apiVersions: ["v1"]
+        resources: ["pods"]
+    sideEffects: None
+    admissionReviewVersions: ["v1"]
+    namespaceSelector:
+      matchLabels:
+        tembo-pod-init.tembo.io/watch: "true"

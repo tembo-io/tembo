@@ -1,0 +1,78 @@
+name: VectorDB
+description: A Tembo Postgres Stack configured to support vector data types, storage, and operations.
+image: "quay.io/tembo/standard-cnpg:15.3.0-1-1096aeb"
+stack_version: 0.1.0
+trunk_installs:
+  - name: pgmq
+    version: 0.33.0
+  - name: vectorize
+    version: 0.6.1
+  - name: pgvector
+    version: 0.5.1
+  - name: pg_stat_statements
+    version: 1.10.0
+extensions:
+  - name: vector
+    locations:
+      - database: postgres
+        enabled: true
+        version: 0.5.1
+  - name: pg_cron
+    locations:
+    - database: postgres
+      enabled: true
+      version: 1.5.2
+  - name: pgmq
+    locations:
+    - database: postgres
+      enabled: true
+      version: 0.33.0
+  - name: vectorize
+    locations:
+    - database: postgres
+      enabled: true
+      version: 0.6.1
+  - name: pg_stat_statements
+    locations:
+      - database: postgres
+        enabled: true
+        version: 1.10.0
+compute_templates:
+  - cpu: 1
+    memory: 4Gi
+  - cpu: 2
+    memory: 8Gi
+  - cpu: 4
+    memory: 16Gi
+  - cpu: 8
+    memory: 32Gi
+  - cpu: 16
+    memory: 32Gi
+postgres_config_engine: standard
+postgres_config:
+  - name: cron.host
+    value: /controller/run
+  - name: vectorize.host
+    value: postgresql:///postgres?host=/controller/run
+  - name: autovacuum_vacuum_cost_limit
+    value: -1
+  - name: autovacuum_vacuum_scale_factor
+    value: 0.05
+  - name: autovacuum_vacuum_insert_scale_factor
+    value: 0.05
+  - name: autovacuum_analyze_scale_factor
+    value: 0.05
+  - name: checkpoint_timeout
+    value: 10min
+  - name: track_activity_query_size
+    value: 2048
+  - name: wal_compression
+    value: 'on'
+  - name: track_io_timing
+    value: 'on'
+  - name: log_min_duration_statement # https://www.postgresql.org/docs/15/runtime-config-logging.html
+    value: 1000
+  - name: pg_stat_statements.track
+    value: all
+  - name: shared_preload_libraries
+    value: vectorize,pg_stat_statements,pg_cron

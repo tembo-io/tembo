@@ -1,0 +1,71 @@
+name: MachineLearning
+description: A Postgres instance equipped with machine learning extensions and optimized for machine learning workloads.
+image: "quay.io/tembo/ml-cnpg:15.3.0-1-93dae54"
+stack_version: 0.3.0
+compute_templates:
+  - cpu: 2
+    memory: 4Gi
+  - cpu: 4
+    memory: 8Gi
+  - cpu: 8
+    memory: 16Gi
+  - cpu: 16
+    memory: 32Gi
+  - cpu: 32
+    memory: 32Gi
+postgres_config_engine: standard
+postgres_config:
+  - name: pg_stat_statements.track
+    value: all
+  - name: cron.host
+    value: /controller/run
+  - name: track_io_timing
+    value: 'on'
+  - name: shared_preload_libraries
+    value: vectorize,pg_stat_statements,pgml,pg_cron,pg_later
+trunk_installs:
+  - name: pgvector
+    version: 0.5.1
+  - name: pgml
+    version: 2.7.1
+  - name: pg_cron
+    version: 1.5.2
+  - name: pgmq
+    version: 0.33.1
+  - name: vectorize
+    version: 0.6.1
+  - name: pg_later
+    version: 0.0.11
+extensions:
+  # trunk project pg_vector
+  - name: vector
+    locations:
+      - database: postgres
+        enabled: true
+        version: 0.5.1
+  # trunk project postgresml
+  - name: pgml
+    locations:
+      - database: postgres
+        enabled: true
+        version: 2.7.1
+  - name: pg_cron
+    locations:
+    - database: postgres
+      enabled: true
+      version: 1.5.2
+  - name: pgmq
+    locations:
+    - database: postgres
+      enabled: true
+      version: 0.33.1
+  - name: vectorize
+    locations:
+    - database: postgres
+      enabled: true
+      version: 0.6.1
+  - name: pg_later
+    locations:
+    - database: postgres
+      enabled: true
+      version: 0.0.11

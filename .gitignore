@@ -4,3 +4,13 @@
 poetry.lock
 site/
 .vscode/*
+target/
+**/*.rs.bk
+**/*.iml
+/target
+.idea/**
+.idea
+**/.idea/**
+**/.idea
+temp.sh
+**/*.DS_Store

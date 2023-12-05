@@ -1,0 +1,6 @@
+apiVersion: v2
+name: tembo-pod-init
+description: Helm chart to deploy the tembo-pod-init Admission Controller
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
