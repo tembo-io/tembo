@@ -115,14 +115,15 @@ pub fn get_current_context() -> Result<Environment> {
 
     for mut e in context.environment {
         if e.set.is_some() && e.set.unwrap() {
-            let credential = profiles
-                .iter()
-                .filter(|c| &c.name == e.profile.as_ref().unwrap())
-                .last()
-                .unwrap();
+            if e.profile != None {
+                let credential = profiles
+                    .iter()
+                    .filter(|c| &c.name == e.profile.as_ref().unwrap())
+                    .last()
+                    .unwrap();
 
-            e.selected_profile = Some(credential.to_owned());
-
+                e.selected_profile = Some(credential.to_owned());
+            }
             return Ok(e);
         }
     }
