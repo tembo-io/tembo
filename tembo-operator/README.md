@@ -1,6 +1,5 @@
 # Tembo Operator
 
-
 ## Requirements
 
 - A Kubernetes cluster: [kind](https://github.com/kubernetes-sigs/kind)

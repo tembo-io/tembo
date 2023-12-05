@@ -61,7 +61,7 @@ jobs:
             echo "fail_if_version_published=false" >> $GITHUB_OUTPUT
           else
             echo "dry_run=true" >> $GITHUB_OUTPUT
-            echo "fail_if_version_published=true" >> $GITHUB_OUTPUT
+            echo "fail_if_version_published=false" >> $GITHUB_OUTPUT
           fi
       - uses: Swatinem/rust-cache@v2
         with:
