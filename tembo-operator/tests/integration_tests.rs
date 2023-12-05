@@ -1159,7 +1159,6 @@ mod test {
             }
         });
 
-
         // Use the patch method to update the Cluster resource
         let params = PatchParams::default();
         let patch = Patch::Merge(patch_json);

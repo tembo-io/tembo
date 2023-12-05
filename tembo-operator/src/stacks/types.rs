@@ -10,7 +10,6 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-
 #[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema, PartialEq, ToSchema)]
 pub enum StackType {
     DataWarehouse,
@@ -21,6 +20,7 @@ pub enum StackType {
     #[default]
     OLTP,
     VectorDB,
+    Geospatial,
 }
 
 impl std::str::FromStr for StackType {
@@ -35,6 +35,7 @@ impl std::str::FromStr for StackType {
             "OLAP" => Ok(StackType::OLAP),
             "OLTP" => Ok(StackType::OLTP),
             "VectorDB" => Ok(StackType::VectorDB),
+            "Geospatial" => Ok(StackType::Geospatial),
             _ => Err("invalid value"),
         }
     }
@@ -50,6 +51,7 @@ impl StackType {
             StackType::OLAP => "OLAP",
             StackType::OLTP => "OLTP",
             StackType::VectorDB => "VectorDB",
+            StackType::Geospatial => "Geospatial",
         }
     }
 }

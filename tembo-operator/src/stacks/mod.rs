@@ -20,6 +20,8 @@ lazy_static! {
         serde_yaml::from_str(include_str!("templates/oltp.yaml")).expect("oltp.yaml not found");
     pub static ref VECTOR_DB: Stack =
         serde_yaml::from_str(include_str!("templates/vectordb.yaml")).expect("vectordb.yaml not found");
+    pub static ref GEOSPATIAL: Stack =
+        serde_yaml::from_str(include_str!("templates/gis.yaml")).expect("gis.yaml not found");
 }
 
 pub fn get_stack(entity: StackType) -> types::Stack {
@@ -31,5 +33,6 @@ pub fn get_stack(entity: StackType) -> types::Stack {
         StackType::OLAP => OLAP.clone(),
         StackType::OLTP => OLTP.clone(),
         StackType::VectorDB => VECTOR_DB.clone(),
+        StackType::Geospatial => GEOSPATIAL.clone(),
     }
 }
