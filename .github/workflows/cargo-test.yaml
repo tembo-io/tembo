@@ -15,19 +15,13 @@ jobs:
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
-      - name: Check out the coredb repo to reuse some actions
-        uses: actions/checkout@v3
-        with:
-          repository: coredb-io/coredb
-          path: ./.coredb
-          ref: 84664df742ce9774a3029e08111940f9f1fb345e
       - name: Find directories with Dockerfiles that changed
         id: find_directories
-        uses: ./.coredb/.github/actions/find-changed-directories
+        uses: ./.github/actions/find-changed-directories
         with:
           contains_the_file: Cargo.toml
           changed_relative_to_branch: ${{ github.base_ref || 'not-a-branch' }}
-          ignore_dirs: ".coredb"
+          ignore_dirs: ".coredb examples"
 
   lint:
     name: Run linters

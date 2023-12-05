@@ -22,15 +22,9 @@ jobs:
         run: |
           echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
           echo "BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_OUTPUT
-      - name: Check out the coredb repo to reuse some actions
-        uses: actions/checkout@v3
-        with:
-          repository: coredb-io/coredb
-          path: ./.coredb
-          ref: 84664df742ce9774a3029e08111940f9f1fb345e
       - name: Find directories with Dockerfiles that changed
         id: find_directories
-        uses: ./.coredb/.github/actions/find-changed-directories
+        uses: ./.github/actions/find-changed-directories
         with:
           contains_the_file: Dockerfile
           # If the branch does not exist, then it will not
@@ -39,7 +33,7 @@ jobs:
           # in a pull request, and using all directories on the release
           # or main branches.
           changed_relative_to_branch: ${{ github.base_ref || 'not-a-branch' }}
-          ignore_dirs: ".coredb"
+          ignore_dirs: ".coredb examples"
 
   build_and_push_images:
     name: Build and push images
