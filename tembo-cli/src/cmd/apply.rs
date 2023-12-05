@@ -1,9 +1,18 @@
-use crate::Result;
+use crate::{
+    cli::context::{get_current_context, Environment, Target},
+    Result,
+};
 use clap::{ArgMatches, Command};
 use std::{
     collections::HashMap,
     fs::{self},
+    str::FromStr,
 };
+use temboclient::{
+    apis::{configuration::Configuration, instance_api::create_instance},
+    models::{Cpu, CreateInstance, Memory, Storage},
+};
+use tokio::runtime::Runtime;
 
 use crate::cli::{docker::Docker, file_utils::FileUtils, tembo_config::InstanceSettings};
 use tera::Tera;
@@ -17,6 +26,18 @@ pub fn make_subcommand() -> Command {
 }
 
 pub fn execute(_args: &ArgMatches) -> Result<()> {
+    let env = get_current_context()?;
+
+    if env.target == Target::Docker.to_string() {
+        return execute_docker();
+    } else if env.target == Target::TemboCloud.to_string() {
+        return execute_tembo_cloud(env);
+    }
+
+    Ok(())
+}
+
+fn execute_docker() -> Result<()> {
     Docker::installed_and_running()?;
 
     let instance_settings: HashMap<String, InstanceSettings> = get_instance_settings()?;
@@ -49,6 +70,57 @@ pub fn execute(_args: &ArgMatches) -> Result<()> {
     Docker::build_run()?;
 
     Docker::run_sqlx_migrate()?;
+
+    Ok(())
+}
+
+pub fn execute_tembo_cloud(env: Environment) -> Result<()> {
+    let instance_settings: HashMap<String, InstanceSettings> = get_instance_settings()?;
+
+    let profile = env.selected_profile.unwrap();
+    let config = Configuration {
+        base_path: profile.tembo_host,
+        bearer_access_token: Some(profile.tembo_access_token),
+        ..Default::default()
+    };
+
+    let mut instance: CreateInstance;
+
+    for (_key, value) in instance_settings.iter() {
+        instance = CreateInstance {
+            cpu: Cpu::from_str(value.cpu.as_str()).unwrap(),
+            memory: Memory::from_str(value.memory.as_str()).unwrap(),
+            environment: temboclient::models::Environment::from_str(value.environment.as_str())
+                .unwrap(),
+            instance_name: value.instance_name.clone(),
+            stack_type: temboclient::models::StackType::Standard,
+            storage: Storage::from_str(value.storage.as_str()).unwrap(),
+            replicas: Some(value.replicas),
+            app_services: None,
+            connection_pooler: None,
+            extensions: None,
+            extra_domains_rw: None,
+            ip_allow_list: None,
+            trunk_installs: None,
+            postgres_configs: None,
+        };
+
+        let v = Runtime::new().unwrap().block_on(create_instance(
+            &config,
+            env.org_id.clone().unwrap().as_str(),
+            instance,
+        ));
+
+        match v {
+            Ok(result) => {
+                println!(
+                    "Instance creation started for Instance Name: {}",
+                    result.instance_name
+                )
+            }
+            Err(error) => eprintln!("Error creating instance: {}", error),
+        };
+    }
 
     Ok(())
 }

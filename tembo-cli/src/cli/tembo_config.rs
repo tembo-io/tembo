@@ -11,10 +11,12 @@ pub struct TemboConfig {
 // Config struct holds to data from the `[config]` section.
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct InstanceSettings {
+    pub environment: String,
+    pub instance_name: String,
     pub cpu: String,
     pub memory: String,
     pub storage: String,
-    pub replicas: u32,
+    pub replicas: i32,
     pub postgres_configurations: HashMap<String, Value>,
     pub extensions: HashMap<String, Extension>,
 }
