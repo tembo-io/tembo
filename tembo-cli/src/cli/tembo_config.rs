@@ -1,0 +1,27 @@
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use toml::Value;
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct TemboConfig {
+    pub version: String,
+    pub defaults: InstanceSettings,
+}
+
+// Config struct holds to data from the `[config]` section.
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct InstanceSettings {
+    pub cpu: String,
+    pub memory: String,
+    pub storage: String,
+    pub replicas: u32,
+    pub postgres_configurations: HashMap<String, Value>,
+    pub extensions: HashMap<String, Extension>,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct Extension {
+    pub enabled: bool,
+    pub trunk_project: Option<String>,
+    pub trunk_project_version: Option<String>,
+}

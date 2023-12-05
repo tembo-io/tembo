@@ -1,0 +1,41 @@
+name: Tembo CLI workflow
+
+defaults:
+  run:
+    shell: bash
+    working-directory: ./
+
+on:
+  pull_request:
+    branches:
+      - main
+  # Always run tests on main or release branches
+  push:
+    branches:
+      - main
+
+jobs:
+  lint:
+    name: Run linters
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install minimal nightly with clippy and rustfmt
+        uses: moonrepo/setup-rust@v0
+        with:
+          channel: nightly
+          components: rustfmt, clippy
+      - name: Cargo format
+        run: cargo fmt --check
+      - name: Clippy
+        run: cargo clippy -- -D warnings
+  test:
+    name: Run tests
+    runs-on: ubuntu-20.04
+    steps:
+      - uses: actions/checkout@v3
+      - uses: moonrepo/setup-rust@v0
+        with:
+          channel: nightly
+      - name: Run tests
+        run: cargo test

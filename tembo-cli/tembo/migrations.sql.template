@@ -1,0 +1,3 @@
+{% for key, value in extensions %}
+CREATE EXTENSION IF NOT EXISTS {{key}} CASCADE;
+{% endfor %}
