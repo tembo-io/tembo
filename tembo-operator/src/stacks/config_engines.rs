@@ -136,7 +136,6 @@ pub fn mq_config_engine(stack: &Stack) -> Vec<PgConfig> {
     configs
 }
 
-
 // olap formula for max_parallel_workers_per_gather
 fn olap_max_parallel_workers_per_gather(cpu: i32) -> i32 {
     // higher of default (2) or 0.5 * cpu
