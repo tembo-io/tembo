@@ -89,7 +89,6 @@ pub struct Routing {
 pub enum IngressType {
     http,
     tcp,
-    udp,
 }
 
 pub fn default_ingress_type() -> Option<IngressType> {

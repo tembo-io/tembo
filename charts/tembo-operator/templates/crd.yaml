@@ -194,7 +194,6 @@ spec:
                             enum:
                             - http
                             - tcp
-                            - udp
                             nullable: true
                             type: string
                           middlewares:
