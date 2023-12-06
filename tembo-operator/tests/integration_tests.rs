@@ -3030,17 +3030,17 @@ mod test {
         let patch = Patch::Apply(&coredb_json);
         coredbs.patch(cdb_name, &params, &patch).await.unwrap();
 
-        // assert we created two Deployments, with the names we provided
+        // assert we created three Deployments, with the names we provided
         let deployment_items: Vec<Deployment> = list_resources(client.clone(), cdb_name, &namespace, 3)
             .await
             .unwrap();
-        // two AppService deployments. the postgres exporter is disabled
+        // three AppService deployments. the postgres exporter is disabled
         assert!(deployment_items.len() == 3);
 
         let service_items: Vec<Service> = list_resources(client.clone(), cdb_name, &namespace, 2)
             .await
             .unwrap();
-        // one AppService Service, since only ports exposed on one
+        // two AppService Services, because two of the AppServices expose ports
         assert!(service_items.len() == 2);
 
         let app_0 = deployment_items[0].clone();
@@ -3097,7 +3097,7 @@ mod test {
             format!("Host(`{}.localhost`) && PathPrefix(`/`)", cdb_name)
         );
 
-        // Assert entrypoints includes only websecure
+        // Assert entry_points includes only websecure
         assert_eq!(
             ingress_route.spec.entry_points,
             Some(vec!["websecure".to_string()])
@@ -3117,7 +3117,7 @@ mod test {
             format!("Host(`{}.localhost`) && PathPrefix(`/ferretdb/v1`)", cdb_name)
         );
 
-        // Assert entrypoints includes only websecure
+        // Assert entry_points includes only ferretdb
         assert_eq!(
             ingress_route_tcp.spec.entry_points,
             Some(vec!["ferretdb".to_string()])

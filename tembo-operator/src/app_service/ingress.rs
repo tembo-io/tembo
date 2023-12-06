@@ -264,8 +264,8 @@ pub fn generate_ingress_tcp_routes(
                 match route.ingress_path.clone() {
                     Some(path) => {
                         if !route.ingress_type.clone()?.eq(&IngressType::tcp) {
-                            // Do not create IngressRouteRoutes for TCP ingress type
-                            debug!("Skipping IngressRouteRoutes for TCP ingress type");
+                            // Do not create IngressRouteTCPRoutes for non-TCP ingress type
+                            debug!("Skipping IngressRouteTCPRoutes for non-TCP ingress type");
                             continue;
                         }
 
@@ -285,9 +285,6 @@ pub fn generate_ingress_tcp_routes(
                             services: Some(vec![IngressRouteTCPRoutesServices {
                                 name: resource_name.to_string(),
                                 port: IntOrString::Int(route.port as i32),
-                                // namespace attribute is NOT a kubernetes namespace
-                                // it is the Traefik provider namespace: https://doc.traefik.io/traefik/v3.0/providers/overview/#provider-namespace
-                                // https://doc.traefik.io/traefik/v3.0/routing/providers/kubernetes-crd/#kind-middleware
                                 namespace: None,
                                 ..IngressRouteTCPRoutesServices::default()
                             }]),
