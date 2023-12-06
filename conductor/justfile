@@ -1,64 +1,90 @@
-POSTGRES_PASSWORD := 'postgres'
-DATABASE_URL := 'postgres://postgres:postgres@cp-pgmq-pg:5432'
-CONDUCTOR_DATABASE_URL := 'postgresql://postgres:postgres@0.0.0.0:5431/postgres'
-CLERK_SECRET_KEY := 'clerk-tembo-dev-secret-key'
-RUST_LOG := 'info'
-KUBE_VERSION := '1.25'
-CERT_MANAGER_VERSION := '1.13.2'
+NAME := "conductor"
+VERSION := `git rev-parse HEAD`
+SEMVER_VERSION := `grep version Cargo.toml | awk -F"\"" '{print $2}' | head -n 1`
+NAMESPACE := "default"
+KUBE_VERSION := env_var_or_default('KUBE_VERSION', '1.25.8')
+RUST_LOG := "info"
 
-watch-operator:
-    docker container rm kind-control-plane --force || true
-    docker container rm kind-worker --force || true
-    just -f ./tembo-operator/justfile start-kind
-    DATA_PLANE_BASEDOMAIN=local.tembo-development.com \
-    ENABLE_BACKUP=false RUST_LOG=info,kube=info,controller=info \
-    PORT=6000 \
-    cargo watch --workdir ./tembo-operator -x 'run'
+default:
+  @just --list --unsorted --color=always | rg -v "    default"
 
-watch-conductor:
-    POSTGRES_QUEUE_CONNECTION={{CONDUCTOR_DATABASE_URL}} \
-    PORT=8000 \
-    RUST_BACKTRACE=1 \
-    RUST_LOG={{RUST_LOG}} \
-    CONTROL_PLANE_EVENTS_QUEUE=saas_queue \
-    DATA_PLANE_EVENTS_QUEUE=data_plane_events \
-    DATA_PLANE_BASEDOMAIN=local.tembo-development.com \
-    CF_TEMPLATE_BUCKET=cdb-plat-use1-dev-eks-data-1-conductor-cf-templates \
-    BACKUP_ARCHIVE_BUCKET=cdb-plat-use1-dev-instance-backups \
-    IS_CLOUD_FORMATION=false \
-    cargo watch --workdir ./conductor -x run
+install-traefik:
+	kubectl create namespace traefik || true
+	helm upgrade --install --namespace=traefik --values=./testdata/traefik-values.yaml traefik traefik/traefik
 
-run-control-plane:
-    docker run -d -p 8080:8080 --network temboDevSuite --env POSTGRES_CONNECTION='{{DATABASE_URL}}' --env POSTGRES_QUEUE_CONNECTION='{{DATABASE_URL}}' --env CLERK_SECRET_KEY='{{CLERK_SECRET_KEY}}' -it --entrypoint /usr/local/bin/cp-webserver --rm quay.io/coredb/cp-service
-    docker run -d -p 8081:8081 --network temboDevSuite --env POSTGRES_CONNECTION='{{DATABASE_URL}}' --env POSTGRES_QUEUE_CONNECTION='{{DATABASE_URL}}' --env CLERK_SECRET_KEY='{{CLERK_SECRET_KEY}}' -it --entrypoint /usr/local/bin/cp-service --rm quay.io/coredb/cp-service
+install-operator:
+  just install-cert-manager
+  helm upgrade --install --create-namespace --namespace=tembo-system --values=./testdata/operator-values.yaml tembo ../charts/tembo-operator
 
-run-dbs:
-    docker network create temboDevSuite || true
-    docker rm --force cp-pgmq-pg || true
-    docker run --network temboDevSuite -d --name cp-pgmq-pg -e POSTGRES_PASSWORD={{POSTGRES_PASSWORD}} -p 5431:5432 quay.io/tembo/pgmq-pg:v0.14.2
+install-kube-prometheus-stack:
+	kubectl create namespace monitoring || true
+	helm upgrade --install --namespace=monitoring monitoring prometheus-community/kube-prometheus-stack
 
-dbs-cleanup:
-	docker stop cp-pgmq-pg
+install-cert-manager:
+  helm upgrade --install \
+    cert-manager jetstack/cert-manager \
+    --namespace cert-manager \
+    --create-namespace \
+    --set installCRDs=true
 
-dbs-start:
-    just run-dbs
+install-tempo:
+	helm upgrade --install \
+		tempo grafana/tempo \
+	  --namespace monitoring
 
-helm-lint:
-  ct lint --config ./charts/tembo-operator/ct.yaml
+enable-cnpg-default-namespace:
+	kubectl label namespace default "tembo-pod-init.tembo.io/watch"="true"
+	kubectl delete pods -n tembo-system -l app=tembo-pod-init
 
-helm-repo:
+update-helm-repos:
 	helm repo add cnpg https://cloudnative-pg.github.io/charts
-
-cert-manager:
 	helm repo add jetstack https://charts.jetstack.io
+	helm repo add traefik https://traefik.github.io/charts
+	helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+	helm repo add grafana https://grafana.github.io/helm-charts
 	helm repo update
-	helm upgrade --install cert-manager jetstack/cert-manager --version={{CERT_MANAGER_VERSION}} --namespace cert-manager --create-namespace --values=tembo-operator/testdata/cert-manager.yaml
-	sleep 5
-	kubectl wait --timeout=120s --for=condition=ready pod -l app.kubernetes.io/instance=cert-manager -n cert-manager
 
+# delete kind
+delete-kind:
+	kind delete cluster && sleep 5
+
+# start kind
 start-kind:
-  kind delete cluster
-  kind create cluster --config testdata/kind-{{KUBE_VERSION}}.yaml
-  sleep 5
-  kubectl wait pods --for=condition=Ready --timeout=300s --all --all-namespaces
-  just cert-manager
+	kind delete cluster || true
+	kind create cluster --image=kindest/node:v{{KUBE_VERSION}} --config testdata/kind-config.yaml
+	just update-helm-repos
+	just install-kube-prometheus-stack
+	just install-tempo
+	just install-traefik
+	just install-operator
+	just annotate
+	kubectl wait pods --for=condition=Ready --timeout=300s --all --all-namespaces
+
+annotate:
+	kubectl label namespace {{NAMESPACE}} safe-to-run-coredb-tests=true
+	kubectl patch storageclass standard -p '{"allowVolumeExpansion": true}'
+
+fmt:
+	cargo clippy --fix
+	cargo +nightly fmt
+
+watch:
+	POSTGRES_QUEUE_CONNECTION=postgresql://postgres:postgres@0.0.0.0:5431/postgres \
+	RUST_BACKTRACE=1 \
+	RUST_LOG={{RUST_LOG}} \
+	CONTROL_PLANE_EVENTS_QUEUE=myqueue_control_plane \
+	DATA_PLANE_EVENTS_QUEUE=myqueue_data_plane \
+	DATA_PLANE_BASEDOMAIN=coredb-development.com \
+	CF_TEMPLATE_BUCKET=cdb-plat-use1-dev-eks-data-1-conductor-cf-templates \
+	BACKUP_ARCHIVE_BUCKET=cdb-plat-use1-dev-instance-backups \
+	cargo watch -x run
+
+run-postgres:
+	docker rm --force pgmq-pg || true
+	docker run -d --name pgmq-pg -e POSTGRES_PASSWORD=postgres -p 5431:5432 quay.io/tembo/pgmq-pg:v0.14.2
+
+run-tests:
+	echo "Running unit tests"
+	cargo test -- --nocapture
+	echo "Running functional tests"
+	cargo test -- --nocapture --ignored
