@@ -36,4 +36,4 @@ The team at Tembo is building Tembo Cloud, a dev-first, fully-extensible, fully-
 scalable Postgres service. The managed service will provide a growing ecosystem of easily-installed
 extensions, allowing you to expand the capabilities of your database.
 
-The service is in private beta, but you can join the waitlist at [https://tembo.io](https://tembo.io).
+Signup and deploy a free Postgres database with ~200 extensions at [https://cloud.tembo.io](https://cloud.tembo.io).
