@@ -3097,6 +3097,12 @@ mod test {
             format!("Host(`{}.localhost`) && PathPrefix(`/`)", cdb_name)
         );
 
+        // Assert entrypoints includes only websecure
+        assert_eq!(
+            ingress_route.spec.entry_points,
+            Some(vec!["websecure".to_string()])
+        );
+
         // Check for IngressRouteTCP
         let ingresses_tcp: Result<Vec<IngressRouteTCP>, errors::OperatorError> =
             list_resources(client.clone(), cdb_name, &namespace, 1).await;
@@ -3109,6 +3115,12 @@ mod test {
         assert_eq!(
             route_tcp.r#match,
             format!("Host(`{}.localhost`) && PathPrefix(`/ferretdb/v1`)", cdb_name)
+        );
+
+        // Assert entrypoints includes only websecure
+        assert_eq!(
+            ingress_route_tcp.spec.entry_points,
+            Some(vec!["ferretdb".to_string()])
         );
 
         let services = routes[0].services.clone().unwrap();

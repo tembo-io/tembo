@@ -42,6 +42,7 @@ fn generate_ingress(
     namespace: &str,
     oref: OwnerReference,
     routes: Vec<IngressRouteRoutes>,
+    entry_points: Vec<String>,
 ) -> IngressRoute {
     let mut labels: BTreeMap<String, String> = BTreeMap::new();
     labels.insert("component".to_owned(), COMPONENT_NAME.to_string());
@@ -57,7 +58,7 @@ fn generate_ingress(
             ..ObjectMeta::default()
         },
         spec: IngressRouteSpec {
-            entry_points: Some(vec!["websecure".to_string()]),
+            entry_points: Some(entry_points),
             routes,
             tls: Some(IngressRouteTls::default()),
         },
@@ -314,6 +315,7 @@ pub async fn reconcile_ingress(
     oref: OwnerReference,
     desired_routes: Vec<IngressRouteRoutes>,
     desired_middlewares: Vec<Middleware>,
+    entry_points: Vec<String>,
 ) -> Result<(), kube::Error> {
     let ingress_api: Api<IngressRoute> = Api::namespaced(client.clone(), ns);
 
@@ -350,7 +352,7 @@ pub async fn reconcile_ingress(
         }
     }
 
-    let ingress = generate_ingress(coredb_name, ns, oref, desired_routes.clone());
+    let ingress = generate_ingress(coredb_name, ns, oref, desired_routes.clone(), entry_points);
     if desired_routes.is_empty() {
         // we don't need an IngressRoute when there are no routes
         let lp = ListParams::default().labels(&format!("component=appService"));

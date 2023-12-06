@@ -73,14 +73,21 @@ fn generate_resource(
     );
     let ingress_tcp_routes =
         generate_ingress_tcp_routes(appsvc, &resource_name, namespace, host_matcher, coredb_name);
-    // fetch entry points from routing
+    // fetch entry points where ingress type is http
     let entry_points: Option<Vec<String>> = appsvc.routing.as_ref().map(|routes| {
         routes
             .iter()
-            .filter_map(|route| route.entry_points.clone())
+            .filter_map(|route| {
+                if route.ingress_type == Some(IngressType::http) {
+                    route.entry_points.clone()
+                } else {
+                    None
+                }
+            })
             .flatten()
             .collect()
     });
+
     // fetch tcp entry points where ingress type is tcp
     let entry_points_tcp: Option<Vec<String>> = appsvc.routing.as_ref().map(|routes| {
         routes
@@ -636,7 +643,7 @@ pub async fn reconcile_app_services(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(
         oref.clone(),
         desired_routes,
         desired_middlewares.clone(),
-        // desired_entry_points,
+        desired_entry_points,
     )
     .await
     {
