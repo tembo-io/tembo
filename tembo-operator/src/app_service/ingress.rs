@@ -380,6 +380,7 @@ pub async fn reconcile_ingress(
                 }
             }
         }
+        return Ok(());
     }
     match apply_ingress_route(ingress_api, coredb_name, &ingress).await {
         Ok(_) => {
@@ -468,6 +469,7 @@ pub async fn reconcile_ingress_tcp(
                 }
             }
         }
+        return Ok(());
     }
     match apply_ingress_route_tcp(ingress_api, coredb_name, &ingress).await {
         Ok(_) => {
