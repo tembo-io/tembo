@@ -35,7 +35,7 @@ release-chart:
         run: |
           mv code/charts/tembo-operator/*.tgz gh-pages/
           cd gh-pages
-          helm repo index . --merge --url https://tembo-io.github.io/tembo-stacks
+          helm repo index . --merge --url https://tembo-io.github.io/tembo
 
       - name: Commit and Push
         run: |
