@@ -39,6 +39,7 @@ use crate::{
         },
     },
     config::Config,
+    configmap::custom_metrics_configmap_settings,
     defaults::{default_image, default_llm_image},
     errors::ValueError,
     is_postgres_ready, patch_cdb_status_merge,
@@ -581,6 +582,18 @@ pub fn cnpg_cluster_from_cdb(
     };
 
     let certificates = create_cluster_certificates(cdb);
+    let mut metrics = vec![ClusterMonitoringCustomQueriesConfigMap {
+        key: "queries".to_string(),
+        name: "cnpg-default-monitoring".to_string(),
+    }];
+
+    if custom_metrics_configmap_settings().is_some() {
+        let configmap_name = format!("{}-custom", cdb.name_any());
+        metrics.push(ClusterMonitoringCustomQueriesConfigMap {
+            key: "custom-queries".to_string(),
+            name: configmap_name,
+        })
+    }
 
     Cluster {
         metadata: ObjectMeta {
@@ -611,10 +624,7 @@ pub fn cnpg_cluster_from_cdb(
             max_sync_replicas: Some(0),
             min_sync_replicas: Some(0),
             monitoring: Some(ClusterMonitoring {
-                custom_queries_config_map: Some(vec![ClusterMonitoringCustomQueriesConfigMap {
-                    key: "queries".to_string(),
-                    name: "cnpg-default-monitoring".to_string(),
-                }]),
+                custom_queries_config_map: Some(metrics),
                 disable_default_queries: Some(false),
                 enable_pod_monitor: Some(true),
                 ..ClusterMonitoring::default()
@@ -842,6 +852,7 @@ fn update_restarted_at(cdb: &CoreDB, maybe_cluster: Option<&Cluster>, new_spec: 
 
     restart_annotation_updated
 }
+
 
 #[instrument(skip(cdb, ctx) fields(trace_id, instance_name = %cdb.name_any()))]
 pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {
