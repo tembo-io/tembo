@@ -120,6 +120,13 @@ pub async fn reconcile_network_policies(client: Client, namespace: &str) -> Resu
                       "kubernetes.io/metadata.name": "traefik"
                     }
                   }
+                },
+                {
+                  "namespaceSelector": {
+                    "matchLabels": {
+                      "kubernetes.io/metadata.name": "tembo-system"
+                    }
+                  }
                 }
               ]
             }

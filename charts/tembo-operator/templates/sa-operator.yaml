@@ -1,0 +1,12 @@
+{{- if (index .Values "controller").enabled }}
+{{- $namespace := include "component.namespace" (list (list "controller" .Values .)) -}}
+{{- $fullname := include "controller.fullname" . -}}
+apiVersion: v1
+kind: ServiceAccount
+automountServiceAccountToken: true
+metadata:
+  name: {{ $fullname }}
+  namespace: {{ $namespace }}
+  labels:
+{{ include "controller-helm.labels" . | indent 4 }}
+{{- end }}

@@ -1,0 +1,12 @@
+{{- if (index .Values "pod-init").enabled }}
+{{- $namespace := include "component.namespace" (list (list "pod-init" .Values .)) -}}
+{{- $fullname := include "pod-init.fullname" . -}}
+apiVersion: v1
+kind: ServiceAccount
+automountServiceAccountToken: true
+metadata:
+  name: {{ $fullname }}
+  namespace: {{ $namespace }}
+  labels:
+{{ include "pod-init-helm.labels" . | indent 4 }}
+{{- end }}
