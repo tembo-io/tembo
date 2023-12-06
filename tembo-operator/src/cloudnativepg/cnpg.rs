@@ -39,7 +39,7 @@ use crate::{
         },
     },
     config::Config,
-    configmap::{custom_metrics_configmap_settings},
+    configmap::custom_metrics_configmap_settings,
     defaults::{default_image, default_llm_image},
     errors::ValueError,
     is_postgres_ready, patch_cdb_status_merge,
@@ -48,10 +48,7 @@ use crate::{
     Context, RESTARTED_AT,
 };
 use chrono::{DateTime, NaiveDateTime, Offset};
-use k8s_openapi::{
-    api::core::v1::{Pod},
-    apimachinery::pkg::apis::meta::v1::ObjectMeta,
-};
+use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
 use kube::{
     api::{DeleteParams, Patch, PatchParams},
     runtime::{controller::Action, wait::Condition},
