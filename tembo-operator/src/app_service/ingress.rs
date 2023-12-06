@@ -41,13 +41,9 @@ fn generate_ingress(
     oref: OwnerReference,
     routes: Vec<IngressRouteRoutes>,
 ) -> IngressRoute {
-    let mut selector_labels: BTreeMap<String, String> = BTreeMap::new();
-
-    selector_labels.insert("component".to_owned(), COMPONENT_NAME.to_string());
-    selector_labels.insert("coredb.io/name".to_owned(), coredb_name.to_string());
-
-    let mut labels = selector_labels.clone();
-    labels.insert("component".to_owned(), COMPONENT_NAME.to_owned());
+    let mut labels: BTreeMap<String, String> = BTreeMap::new();
+    labels.insert("component".to_owned(), COMPONENT_NAME.to_string());
+    labels.insert("coredb.io/name".to_owned(), coredb_name.to_string());
 
     IngressRoute {
         metadata: ObjectMeta {
@@ -73,13 +69,9 @@ fn generate_ingress_tcp(
     routes: Vec<IngressRouteTCPRoutes>,
     entry_points: Vec<String>,
 ) -> IngressRouteTCP {
-    let mut selector_labels: BTreeMap<String, String> = BTreeMap::new();
-
-    selector_labels.insert("component".to_owned(), COMPONENT_NAME.to_string());
-    selector_labels.insert("coredb.io/name".to_owned(), coredb_name.to_string());
-
-    let mut labels = selector_labels.clone();
-    labels.insert("component".to_owned(), COMPONENT_NAME.to_owned());
+    let mut labels: BTreeMap<String, String> = BTreeMap::new();
+    labels.insert("component".to_owned(), COMPONENT_NAME.to_string());
+    labels.insert("coredb.io/name".to_owned(), coredb_name.to_string());
 
     IngressRouteTCP {
         metadata: ObjectMeta {
@@ -210,9 +202,7 @@ pub fn generate_ingress_routes(
                     Some(path) => {
                         if route.entry_points.clone()?.contains(&"ferretdb".to_string()) {
                             // Do not create IngressRouteRoutes for ferretdb. Needs IngressRouteTCPRoute.
-                            println!("Skipping IngressRouteRoutes for ferretdb");
-                            println!("ENTRY POINTS: {:?}", route.entry_points.clone()?);
-                            println!("ROUTE: {:?}", route);
+                            debug!("Skipping IngressRouteRoutes for ferretdb");
                             continue;
                         }
                         let matcher = format!("{host_matcher} && PathPrefix(`{}`)", path);
@@ -355,7 +345,6 @@ pub async fn reconcile_ingress(
         }
     }
 
-
     let ingress = generate_ingress(coredb_name, ns, oref, desired_routes.clone());
     if desired_routes.is_empty() {
         // we don't need an IngressRoute when there are no routes
@@ -440,7 +429,6 @@ pub async fn reconcile_ingress_tcp(
             }
         }
     }
-
 
     let ingress = generate_ingress_tcp(coredb_name, ns, oref, desired_routes.clone(), entry_points_tcp);
     if desired_routes.is_empty() {
