@@ -15,6 +15,7 @@ spec:
           ingressPath: /ferretdb/v1
           entryPoints:
             - ferretdb
+          ingressType: tcp
       env:
         - name: FERRETDB_POSTGRESQL_URL
           valueFromPlatform: ReadWriteConnection

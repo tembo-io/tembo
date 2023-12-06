@@ -30,6 +30,8 @@ use super::{
     types::{AppService, EnvVarRef, Middleware, COMPONENT_NAME},
 };
 
+use crate::app_service::types::IngressType;
+
 // private wrapper to hold the AppService Resources
 #[derive(Clone, Debug)]
 struct AppServiceResources {
@@ -79,22 +81,18 @@ fn generate_resource(
             .flatten()
             .collect()
     });
-    // fetch tcp entry points where entrypoint is ferretdb
+    // fetch tcp entry points where ingress type is tcp
     let entry_points_tcp: Option<Vec<String>> = appsvc.routing.as_ref().map(|routes| {
         routes
             .iter()
             .filter_map(|route| {
-                if route
-                    .entry_points
-                    .clone()
-                    .unwrap_or_default()
-                    .contains(&"ferretdb".to_string())
-                {
-                    Some("ferretdb".to_string())
+                if route.ingress_type == Some(IngressType::tcp) {
+                    route.entry_points.clone()
                 } else {
                     None
                 }
             })
+            .flatten()
             .collect()
     });
 

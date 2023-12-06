@@ -2961,7 +2961,8 @@ mod test {
                                 "ingressPath": "/",
                                 "entryPoints": [
                                     "websecure"
-                                ]
+                                ],
+                                "ingressType": "http"
                             }
                         ],
                         "resources": {
@@ -2998,7 +2999,8 @@ mod test {
                                 "ingressPath": "/ferretdb/v1",
                                 "entryPoints": [
                                     "ferretdb"
-                                ]
+                                ],
+                                "ingressType": "tcp"
                             }
                         ],
                         "env": [

@@ -29,6 +29,8 @@ use crate::traefik::ingress_route_tcp_crd::{
     IngressRouteTCPSpec, IngressRouteTCPTls,
 };
 
+use crate::app_service::types::IngressType;
+
 #[derive(Clone, Debug)]
 pub struct MiddleWareWrapper {
     pub name: String,
@@ -200,11 +202,12 @@ pub fn generate_ingress_routes(
             for route in routings.iter() {
                 match route.ingress_path.clone() {
                     Some(path) => {
-                        if route.entry_points.clone()?.contains(&"ferretdb".to_string()) {
-                            // Do not create IngressRouteRoutes for ferretdb. Needs IngressRouteTCPRoute.
-                            debug!("Skipping IngressRouteRoutes for ferretdb");
+                        if route.ingress_type.clone()?.eq(&IngressType::tcp) {
+                            // Do not create IngressRouteRoutes for TCP ingress type
+                            debug!("Skipping IngressRouteRoutes for TCP ingress type");
                             continue;
                         }
+
                         let matcher = format!("{host_matcher} && PathPrefix(`{}`)", path);
                         let middlewares: Option<Vec<IngressRouteRoutesMiddlewares>> =
                             route.middlewares.clone().map(|names| {
@@ -259,10 +262,12 @@ pub fn generate_ingress_tcp_routes(
             for route in routings.iter() {
                 match route.ingress_path.clone() {
                     Some(path) => {
-                        if !route.entry_points.clone()?.contains(&"ferretdb".to_string()) {
-                            // Do not create IngressRouteTCPRoutes for non-ferretdb routes.
+                        if !route.ingress_type.clone()?.eq(&IngressType::tcp) {
+                            // Do not create IngressRouteRoutes for TCP ingress type
+                            debug!("Skipping IngressRouteRoutes for TCP ingress type");
                             continue;
                         }
+
                         let matcher = format!("{host_matcher} && PathPrefix(`{}`)", path);
                         let middlewares: Option<Vec<IngressRouteTCPRoutesMiddlewares>> =
                             route.middlewares.clone().map(|names| {
