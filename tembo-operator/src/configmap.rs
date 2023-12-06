@@ -52,14 +52,14 @@ pub fn custom_metrics_configmap_settings() -> Option<(String, String)> {
     let custom_metrics_namespace = match std::env::var("CUSTOM_METRICS_CONFIGMAP_NAMESPACE") {
         Ok(namespace) => namespace,
         Err(_) => {
-            debug!("CUSTOM_METRICS_NAMESPACE not set, skipping adding custom metrics");
+            debug!("CUSTOM_METRICS_CONFIGMAP_NAMESPACE not set, skipping adding custom metrics");
             return None;
         }
     };
     let custom_metrics_name = match std::env::var("CUSTOM_METRICS_CONFIGMAP_NAME") {
         Ok(name) => name,
         Err(_) => {
-            debug!("CUSTOM_METRICS_NAME not set, skipping adding custom metrics");
+            debug!("CUSTOM_METRICS_CONFIGMAP_NAME not set, skipping adding custom metrics");
             return None;
         }
     };
