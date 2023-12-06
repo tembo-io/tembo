@@ -1791,7 +1791,7 @@ mod test {
         let ingress_route_tcp = ingress_route_tcp_api
             .get(ing_route_tcp_name.as_str())
             .await
-            .unwrap_or_else(|_| panic!("Expected to find ingress route TCP {}", name));
+            .unwrap_or_else(|_| panic!("Expected to find ingress route TCP {}", ing_route_tcp_name));
 
         let actual_matcher_new_route = ingress_route_tcp.spec.routes[0].r#match.clone();
         assert_eq!(actual_matcher_new_route, new_matcher);
@@ -3397,6 +3397,11 @@ CREATE EVENT TRIGGER pgrst_watch
             .await
             .unwrap();
         assert_eq!(ingresses.len(), 0);
+
+        // Assert IngressRouteTCP is gone
+        let ingresses_tcp: Vec<IngressRouteTCP> =
+            list_resources(client.clone(), cdb_name, &namespace, 0).await.unwrap();
+        assert_eq!(ingresses_tcp.len(), 0);
 
         // CLEANUP TEST
         // Cleanup CoreDB

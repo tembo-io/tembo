@@ -359,22 +359,19 @@ pub async fn reconcile_ingress(
     let ingress = generate_ingress(coredb_name, ns, oref, desired_routes.clone());
     if desired_routes.is_empty() {
         // we don't need an IngressRoute when there are no routes
-        match ingress_api.get_opt(coredb_name).await {
-            Ok(Some(_)) => {
-                debug!("Deleting IngressRoute {}.{}", ns, coredb_name);
-                ingress_api.delete(coredb_name, &Default::default()).await?;
-                return Ok(());
-            }
-            Ok(None) => {
-                warn!("No IngressRoute {}.{} found to delete", ns, coredb_name);
-                return Ok(());
-            }
-            Err(e) => {
-                error!(
-                    "Error retrieving IngressRoute, {}.{}, error: {}",
-                    ns, coredb_name, e
-                );
-                return Err(e);
+        let lp = ListParams::default().labels(&format!("component=appService"));
+        // Check if there are any IngressRoute objects with the label component=appService and delete them
+        let ingress_routes = ingress_api.list(&lp).await?;
+        for ingress_route in ingress_routes.items {
+            match ingress_api.delete(&ingress_route.metadata.name.unwrap(), &Default::default()).await {
+                Ok(_) => {
+                    debug!("ns: {}, successfully deleted IngressRoute: {}", ns, coredb_name);
+                    return Ok(());
+                }
+                Err(e) => {
+                    error!("ns: {}, Failed to delete IngressRoute: {}, error: {}", ns, coredb_name, e);
+                    return Err(e);
+                }
             }
         }
     }
@@ -441,22 +438,19 @@ pub async fn reconcile_ingress_tcp(
     let ingress = generate_ingress_tcp(coredb_name, ns, oref, desired_routes.clone(), entry_points_tcp);
     if desired_routes.is_empty() {
         // we don't need an IngressRouteTCP when there are no routes
-        match ingress_api.get_opt(coredb_name).await {
-            Ok(Some(_)) => {
-                debug!("Deleting IngressRouteTCP {}.{}", ns, coredb_name);
-                ingress_api.delete(coredb_name, &Default::default()).await?;
-                return Ok(());
-            }
-            Ok(None) => {
-                warn!("No IngressRouteTCP {}.{} found to delete", ns, coredb_name);
-                return Ok(());
-            }
-            Err(e) => {
-                error!(
-                    "Error retrieving IngressRouteTCP, {}.{}, error: {}",
-                    ns, coredb_name, e
-                );
-                return Err(e);
+        let lp = ListParams::default().labels(&format!("component=appService"));
+        // Check if there are any IngressRouteTCP objects with the label component=appService and delete them
+        let ingress_tcp_routes = ingress_api.list(&lp).await?;
+        for ingress_tcp_route in ingress_tcp_routes.items {
+            match ingress_api.delete(&ingress_tcp_route.metadata.name.unwrap(), &Default::default()).await {
+                Ok(_) => {
+                    debug!("ns: {}, successfully deleted IngressRouteTCP: {}", ns, coredb_name);
+                    return Ok(());
+                }
+                Err(e) => {
+                    error!("ns: {}, Failed to delete IngressRouteTCP: {}, error: {}", ns, coredb_name, e);
+                    return Err(e);
+                }
             }
         }
     }
