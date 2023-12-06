@@ -363,13 +363,19 @@ pub async fn reconcile_ingress(
         // Check if there are any IngressRoute objects with the label component=appService and delete them
         let ingress_routes = ingress_api.list(&lp).await?;
         for ingress_route in ingress_routes.items {
-            match ingress_api.delete(&ingress_route.metadata.name.unwrap(), &Default::default()).await {
+            match ingress_api
+                .delete(&ingress_route.metadata.name.unwrap(), &Default::default())
+                .await
+            {
                 Ok(_) => {
                     debug!("ns: {}, successfully deleted IngressRoute: {}", ns, coredb_name);
                     return Ok(());
                 }
                 Err(e) => {
-                    error!("ns: {}, Failed to delete IngressRoute: {}, error: {}", ns, coredb_name, e);
+                    error!(
+                        "ns: {}, Failed to delete IngressRoute: {}, error: {}",
+                        ns, coredb_name, e
+                    );
                     return Err(e);
                 }
             }
@@ -442,13 +448,22 @@ pub async fn reconcile_ingress_tcp(
         // Check if there are any IngressRouteTCP objects with the label component=appService and delete them
         let ingress_tcp_routes = ingress_api.list(&lp).await?;
         for ingress_tcp_route in ingress_tcp_routes.items {
-            match ingress_api.delete(&ingress_tcp_route.metadata.name.unwrap(), &Default::default()).await {
+            match ingress_api
+                .delete(&ingress_tcp_route.metadata.name.unwrap(), &Default::default())
+                .await
+            {
                 Ok(_) => {
-                    debug!("ns: {}, successfully deleted IngressRouteTCP: {}", ns, coredb_name);
+                    debug!(
+                        "ns: {}, successfully deleted IngressRouteTCP: {}",
+                        ns, coredb_name
+                    );
                     return Ok(());
                 }
                 Err(e) => {
-                    error!("ns: {}, Failed to delete IngressRouteTCP: {}, error: {}", ns, coredb_name, e);
+                    error!(
+                        "ns: {}, Failed to delete IngressRouteTCP: {}, error: {}",
+                        ns, coredb_name, e
+                    );
                     return Err(e);
                 }
             }

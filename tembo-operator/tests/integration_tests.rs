@@ -3399,8 +3399,9 @@ CREATE EVENT TRIGGER pgrst_watch
         assert_eq!(ingresses.len(), 0);
 
         // Assert IngressRouteTCP is gone
-        let ingresses_tcp: Vec<IngressRouteTCP> =
-            list_resources(client.clone(), cdb_name, &namespace, 0).await.unwrap();
+        let ingresses_tcp: Vec<IngressRouteTCP> = list_resources(client.clone(), cdb_name, &namespace, 0)
+            .await
+            .unwrap();
         assert_eq!(ingresses_tcp.len(), 0);
 
         // CLEANUP TEST
