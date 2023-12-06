@@ -2959,9 +2959,6 @@ mod test {
                             {
                                 "port": 3000,
                                 "ingressPath": "/",
-                                "entryPoints": [
-                                    "websecure"
-                                ],
                                 "ingressType": "http"
                             }
                         ],
