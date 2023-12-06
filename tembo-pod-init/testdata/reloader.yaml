@@ -1,3 +1,0 @@
-reloader:
-  podMonitor:
-    enabled: true

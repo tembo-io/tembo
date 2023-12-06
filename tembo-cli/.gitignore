@@ -1,6 +1,0 @@
-.vscode
-.idea/**
-target/**
-tests/.config/tembo/*
-tembo.log
-.DS_Store

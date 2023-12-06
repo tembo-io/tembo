@@ -1,4 +1,0 @@
-installation:
-  registry: quay.io
-  imagePath: tembo
-  imagePrefix: "calico/"
