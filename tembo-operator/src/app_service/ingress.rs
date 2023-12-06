@@ -447,10 +447,7 @@ pub async fn reconcile_ingress_tcp(
                 .await
             {
                 Ok(_) => {
-                    debug!(
-                        "ns: {}, successfully deleted IngressRouteTCP: {}",
-                        ns, &name
-                    );
+                    debug!("ns: {}, successfully deleted IngressRouteTCP: {}", ns, &name);
                     return Ok(());
                 }
                 Err(e) => {
@@ -470,10 +467,7 @@ pub async fn reconcile_ingress_tcp(
             Ok(())
         }
         Err(e) => {
-            error!(
-                "Failed to update/apply IngressRouteTCP {}.{}: {}",
-                ns, &name, e
-            );
+            error!("Failed to update/apply IngressRouteTCP {}.{}: {}", ns, &name, e);
             Err(e)
         }
     }
