@@ -79,7 +79,7 @@ fn generate_ingress_tcp(
     IngressRouteTCP {
         metadata: ObjectMeta {
             // using coredb name, since we'll have 1x ingress per coredb
-            name: Some(coredb_name.to_owned()),
+            name: Some(format!("{}-apps", coredb_name)),
             namespace: Some(namespace.to_owned()),
             owner_references: Some(vec![oref]),
             labels: Some(labels.clone()),
