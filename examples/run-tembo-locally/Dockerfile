@@ -1,6 +1,7 @@
 FROM quay.io/tembo/tembo-pg-cnpg:latest
 
 USER root
+
 RUN chown -R postgres:postgres $PGDATA && \
     chmod -R 0700 $PGDATA
 ENV PGDATA /var/lib/postgresql/data2
