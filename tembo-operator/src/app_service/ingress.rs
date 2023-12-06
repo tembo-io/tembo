@@ -362,7 +362,7 @@ pub async fn reconcile_ingress(
         let lp = ListParams::default().labels(&format!("component=appService"));
         // Check if there are any IngressRoute objects with the label component=appService and delete them
         let ingress_routes = ingress_api.list(&lp).await?;
-        for ingress_route in ingress_routes.items {
+        if let Some(ingress_route) = ingress_routes.into_iter().next() {
             match ingress_api
                 .delete(&ingress_route.metadata.name.unwrap(), &Default::default())
                 .await
@@ -447,7 +447,7 @@ pub async fn reconcile_ingress_tcp(
         let lp = ListParams::default().labels(&format!("component=appService"));
         // Check if there are any IngressRouteTCP objects with the label component=appService and delete them
         let ingress_tcp_routes = ingress_api.list(&lp).await?;
-        for ingress_tcp_route in ingress_tcp_routes.items {
+        if let Some(ingress_tcp_route) = ingress_tcp_routes.into_iter().next() {
             match ingress_api
                 .delete(&ingress_tcp_route.metadata.name.unwrap(), &Default::default())
                 .await
