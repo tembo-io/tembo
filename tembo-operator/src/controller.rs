@@ -39,6 +39,7 @@ use kube::{
 
 use crate::{
     apis::postgres_parameters::PgConfig,
+    configmap::reconcile_generic_metrics_configmap,
     extensions::{database_queries::list_config_params, reconcile_extensions},
     ingress::{reconcile_extra_postgres_ing_route_tcp, reconcile_ip_allowlist_middleware},
     network_policies::reconcile_network_policies,
@@ -262,7 +263,9 @@ impl CoreDB {
                     Action::requeue(Duration::from_secs(300))
                 })?;
 
-        // Deploy cluster
+
+        reconcile_generic_metrics_configmap(self, ctx.clone()).await?;
+
         reconcile_cnpg(self, ctx.clone()).await?;
         if cfg.enable_backup {
             reconcile_cnpg_scheduled_backup(self, ctx.clone()).await?;
