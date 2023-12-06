@@ -3101,8 +3101,9 @@ mod test {
         );
 
         // Check for IngressRouteTCP
+        let ing_name = format!("{}-apps", cdb_name);
         let ingresses_tcp: Result<Vec<IngressRouteTCP>, errors::OperatorError> =
-            list_resources(client.clone(), cdb_name, &namespace, 1).await;
+            list_resources(client.clone(), &ing_name, &namespace, 1).await;
         let ingress_tcp = ingresses_tcp.unwrap();
         assert_eq!(ingress_tcp.len(), 1);
         let ingress_route_tcp = ingress_tcp[0].clone();

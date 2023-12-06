@@ -66,7 +66,7 @@ fn generate_ingress(
 }
 
 fn generate_ingress_tcp(
-    coredb_name: &str,
+    name: &str,
     namespace: &str,
     oref: OwnerReference,
     routes: Vec<IngressRouteTCPRoutes>,
@@ -74,12 +74,12 @@ fn generate_ingress_tcp(
 ) -> IngressRouteTCP {
     let mut labels: BTreeMap<String, String> = BTreeMap::new();
     labels.insert("component".to_owned(), COMPONENT_NAME.to_string());
-    labels.insert("coredb.io/name".to_owned(), coredb_name.to_string());
+    labels.insert("coredb.io/name".to_owned(), name.to_string());
 
     IngressRouteTCP {
         metadata: ObjectMeta {
             // using coredb name, since we'll have 1x ingress per coredb
-            name: Some(format!("{}-apps", coredb_name)),
+            name: Some(format!("{}", name)),
             namespace: Some(namespace.to_owned()),
             owner_references: Some(vec![oref]),
             labels: Some(labels.clone()),
@@ -400,10 +400,11 @@ pub async fn reconcile_ingress_tcp(
     entry_points_tcp: Vec<String>,
 ) -> Result<(), kube::Error> {
     let ingress_api: Api<IngressRouteTCP> = Api::namespaced(client.clone(), ns);
+    let name = format!("{}-apps", coredb_name);
 
     let middleware_api: Api<TraefikMiddleware> = Api::namespaced(client.clone(), ns);
-    let desired_middlewares = generate_middlewares(coredb_name, ns, oref.clone(), desired_middlewares);
-    let actual_mw_names = get_middlewares(client.clone(), ns, coredb_name).await?;
+    let desired_middlewares = generate_middlewares(&name, ns, oref.clone(), desired_middlewares);
+    let actual_mw_names = get_middlewares(client.clone(), ns, &name).await?;
     let desired_mw_names = desired_middlewares
         .iter()
         .map(|mw| mw.name.clone())
@@ -434,7 +435,7 @@ pub async fn reconcile_ingress_tcp(
         }
     }
 
-    let ingress = generate_ingress_tcp(coredb_name, ns, oref, desired_routes.clone(), entry_points_tcp);
+    let ingress = generate_ingress_tcp(&name, ns, oref, desired_routes.clone(), entry_points_tcp);
     if desired_routes.is_empty() {
         // we don't need an IngressRouteTCP when there are no routes
         let lp = ListParams::default().labels(&format!("component=appService"));
@@ -448,14 +449,14 @@ pub async fn reconcile_ingress_tcp(
                 Ok(_) => {
                     debug!(
                         "ns: {}, successfully deleted IngressRouteTCP: {}",
-                        ns, coredb_name
+                        ns, &name
                     );
                     return Ok(());
                 }
                 Err(e) => {
                     error!(
                         "ns: {}, Failed to delete IngressRouteTCP: {}, error: {}",
-                        ns, coredb_name, e
+                        ns, &name, e
                     );
                     return Err(e);
                 }
@@ -463,15 +464,15 @@ pub async fn reconcile_ingress_tcp(
         }
         return Ok(());
     }
-    match apply_ingress_route_tcp(ingress_api, coredb_name, &ingress).await {
+    match apply_ingress_route_tcp(ingress_api, &name, &ingress).await {
         Ok(_) => {
-            debug!("Updated/applied IngressRouteTCP for {}.{}", ns, coredb_name,);
+            debug!("Updated/applied IngressRouteTCP for {}.{}", ns, &name,);
             Ok(())
         }
         Err(e) => {
             error!(
                 "Failed to update/apply IngressRouteTCP {}.{}: {}",
-                ns, coredb_name, e
+                ns, &name, e
             );
             Err(e)
         }
