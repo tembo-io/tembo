@@ -189,6 +189,14 @@ spec:
                           ingressPath:
                             nullable: true
                             type: string
+                          ingressType:
+                            default: http
+                            enum:
+                            - http
+                            - tcp
+                            - udp
+                            nullable: true
+                            type: string
                           middlewares:
                             items:
                               type: string
