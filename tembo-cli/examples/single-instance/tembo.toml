@@ -9,7 +9,7 @@ cpu = "1"
 memory = "2Gi"
 storage = "10Gi"
 replicas = 1
-stack = "OLTP"
+stack_type = "OLTP"
 
 [defaults.postgres_configurations]
 shared_preload_libraries = 'pg_stat_statements'
