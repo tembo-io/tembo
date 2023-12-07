@@ -49,6 +49,8 @@ pub fn execute(args: &ArgMatches) -> Result<()> {
         eprintln!("Error: {}", e);
     }
 
+    println!("Tembo context set to: {}", name);
+
     Ok(())
 }
 
