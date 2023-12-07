@@ -179,7 +179,21 @@ spec:
                     routing:
                       items:
                         properties:
+                          entryPoints:
+                            default:
+                            - websecure
+                            items:
+                              type: string
+                            nullable: true
+                            type: array
                           ingressPath:
+                            nullable: true
+                            type: string
+                          ingressType:
+                            default: http
+                            enum:
+                            - http
+                            - tcp
                             nullable: true
                             type: string
                           middlewares:

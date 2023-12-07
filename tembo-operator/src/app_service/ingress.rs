@@ -24,6 +24,13 @@ use super::{
     types::{AppService, Middleware, COMPONENT_NAME},
 };
 
+use crate::traefik::ingress_route_tcp_crd::{
+    IngressRouteTCP, IngressRouteTCPRoutes, IngressRouteTCPRoutesMiddlewares, IngressRouteTCPRoutesServices,
+    IngressRouteTCPSpec, IngressRouteTCPTls,
+};
+
+use crate::app_service::types::IngressType;
+
 #[derive(Clone, Debug)]
 pub struct MiddleWareWrapper {
     pub name: String,
@@ -35,14 +42,11 @@ fn generate_ingress(
     namespace: &str,
     oref: OwnerReference,
     routes: Vec<IngressRouteRoutes>,
+    entry_points: Vec<String>,
 ) -> IngressRoute {
-    let mut selector_labels: BTreeMap<String, String> = BTreeMap::new();
-
-    selector_labels.insert("component".to_owned(), COMPONENT_NAME.to_string());
-    selector_labels.insert("coredb.io/name".to_owned(), coredb_name.to_string());
-
-    let mut labels = selector_labels.clone();
-    labels.insert("component".to_owned(), COMPONENT_NAME.to_owned());
+    let mut labels: BTreeMap<String, String> = BTreeMap::new();
+    labels.insert("component".to_owned(), COMPONENT_NAME.to_string());
+    labels.insert("coredb.io/name".to_owned(), coredb_name.to_string());
 
     IngressRoute {
         metadata: ObjectMeta {
@@ -54,9 +58,40 @@ fn generate_ingress(
             ..ObjectMeta::default()
         },
         spec: IngressRouteSpec {
-            entry_points: Some(vec!["websecure".to_string()]),
+            entry_points: Some(entry_points),
             routes,
             tls: Some(IngressRouteTls::default()),
+        },
+    }
+}
+
+fn generate_ingress_tcp(
+    name: &str,
+    namespace: &str,
+    oref: OwnerReference,
+    routes: Vec<IngressRouteTCPRoutes>,
+    entry_points: Vec<String>,
+) -> IngressRouteTCP {
+    let mut labels: BTreeMap<String, String> = BTreeMap::new();
+    labels.insert("component".to_owned(), COMPONENT_NAME.to_string());
+    labels.insert("coredb.io/name".to_owned(), name.to_string());
+
+    IngressRouteTCP {
+        metadata: ObjectMeta {
+            // using coredb name, since we'll have 1x ingress per coredb
+            name: Some(format!("{}", name)),
+            namespace: Some(namespace.to_owned()),
+            owner_references: Some(vec![oref]),
+            labels: Some(labels.clone()),
+            ..ObjectMeta::default()
+        },
+        spec: IngressRouteTCPSpec {
+            entry_points: Some(entry_points),
+            routes,
+            tls: Some(IngressRouteTCPTls {
+                passthrough: Some(true),
+                ..IngressRouteTCPTls::default()
+            }),
         },
     }
 }
@@ -168,6 +203,12 @@ pub fn generate_ingress_routes(
             for route in routings.iter() {
                 match route.ingress_path.clone() {
                     Some(path) => {
+                        if route.ingress_type.clone()?.eq(&IngressType::tcp) {
+                            // Do not create IngressRouteRoutes for TCP ingress type
+                            debug!("Skipping IngressRouteRoutes for TCP ingress type");
+                            continue;
+                        }
+
                         let matcher = format!("{host_matcher} && PathPrefix(`{}`)", path);
                         let middlewares: Option<Vec<IngressRouteRoutesMiddlewares>> =
                             route.middlewares.clone().map(|names| {
@@ -209,6 +250,61 @@ pub fn generate_ingress_routes(
     }
 }
 
+pub fn generate_ingress_tcp_routes(
+    appsvc: &AppService,
+    resource_name: &str,
+    namespace: &str,
+    host_matcher: String,
+    coredb_name: &str,
+) -> Option<Vec<IngressRouteTCPRoutes>> {
+    match appsvc.routing.clone() {
+        Some(routings) => {
+            let mut routes: Vec<IngressRouteTCPRoutes> = Vec::new();
+            for route in routings.iter() {
+                match route.ingress_path.clone() {
+                    Some(path) => {
+                        if !route.ingress_type.clone()?.eq(&IngressType::tcp) {
+                            // Do not create IngressRouteTCPRoutes for non-TCP ingress type
+                            debug!("Skipping IngressRouteTCPRoutes for non-TCP ingress type");
+                            continue;
+                        }
+
+                        let matcher = format!("{host_matcher} && PathPrefix(`{}`)", path);
+                        let middlewares: Option<Vec<IngressRouteTCPRoutesMiddlewares>> =
+                            route.middlewares.clone().map(|names| {
+                                names
+                                    .into_iter()
+                                    .map(|m| IngressRouteTCPRoutesMiddlewares {
+                                        name: format!("{}-{}", &coredb_name, m),
+                                        namespace: Some(namespace.to_owned()),
+                                    })
+                                    .collect()
+                            });
+                        let route = IngressRouteTCPRoutes {
+                            r#match: matcher.clone(),
+                            services: Some(vec![IngressRouteTCPRoutesServices {
+                                name: resource_name.to_string(),
+                                port: IntOrString::Int(route.port as i32),
+                                namespace: None,
+                                ..IngressRouteTCPRoutesServices::default()
+                            }]),
+                            middlewares,
+                            priority: None,
+                        };
+                        routes.push(route);
+                    }
+                    None => {
+                        // do not create ingress when there is no path provided
+                        continue;
+                    }
+                }
+            }
+            Some(routes)
+        }
+        None => None,
+    }
+}
+
 pub async fn reconcile_ingress(
     client: Client,
     coredb_name: &str,
@@ -216,6 +312,7 @@ pub async fn reconcile_ingress(
     oref: OwnerReference,
     desired_routes: Vec<IngressRouteRoutes>,
     desired_middlewares: Vec<Middleware>,
+    entry_points: Vec<String>,
 ) -> Result<(), kube::Error> {
     let ingress_api: Api<IngressRoute> = Api::namespaced(client.clone(), ns);
 
@@ -252,31 +349,35 @@ pub async fn reconcile_ingress(
         }
     }
 
-    let ingress = generate_ingress(coredb_name, ns, oref, desired_routes.clone());
+    let ingress = generate_ingress(coredb_name, ns, oref, desired_routes.clone(), entry_points);
     if desired_routes.is_empty() {
         // we don't need an IngressRoute when there are no routes
-        match ingress_api.get_opt(coredb_name).await {
-            Ok(Some(_)) => {
-                debug!("Deleting IngressRoute {}.{}", ns, coredb_name);
-                ingress_api.delete(coredb_name, &Default::default()).await?;
-                return Ok(());
-            }
-            Ok(None) => {
-                warn!("No IngressRoute {}.{} found to delete", ns, coredb_name);
-                return Ok(());
-            }
-            Err(e) => {
-                error!(
-                    "Error retrieving IngressRoute, {}.{}, error: {}",
-                    ns, coredb_name, e
-                );
-                return Err(e);
+        let lp = ListParams::default().labels(&format!("component=appService"));
+        // Check if there are any IngressRoute objects with the label component=appService and delete them
+        let ingress_routes = ingress_api.list(&lp).await?;
+        if let Some(ingress_route) = ingress_routes.into_iter().next() {
+            match ingress_api
+                .delete(&ingress_route.metadata.name.unwrap(), &Default::default())
+                .await
+            {
+                Ok(_) => {
+                    debug!("ns: {}, successfully deleted IngressRoute: {}", ns, coredb_name);
+                    return Ok(());
+                }
+                Err(e) => {
+                    error!(
+                        "ns: {}, Failed to delete IngressRoute: {}, error: {}",
+                        ns, coredb_name, e
+                    );
+                    return Err(e);
+                }
             }
         }
+        return Ok(());
     }
     match apply_ingress_route(ingress_api, coredb_name, &ingress).await {
         Ok(_) => {
-            debug!("Updated/applied ingress for {}.{}", ns, coredb_name,);
+            debug!("Updated/applied IngressRoute for {}.{}", ns, coredb_name,);
             Ok(())
         }
         Err(e) => {
@@ -284,6 +385,89 @@ pub async fn reconcile_ingress(
                 "Failed to update/apply IngressRoute {}.{}: {}",
                 ns, coredb_name, e
             );
+            Err(e)
+        }
+    }
+}
+
+pub async fn reconcile_ingress_tcp(
+    client: Client,
+    coredb_name: &str,
+    ns: &str,
+    oref: OwnerReference,
+    desired_routes: Vec<IngressRouteTCPRoutes>,
+    desired_middlewares: Vec<Middleware>,
+    entry_points_tcp: Vec<String>,
+) -> Result<(), kube::Error> {
+    let ingress_api: Api<IngressRouteTCP> = Api::namespaced(client.clone(), ns);
+    let name = format!("{}-apps", coredb_name);
+
+    let middleware_api: Api<TraefikMiddleware> = Api::namespaced(client.clone(), ns);
+    let desired_middlewares = generate_middlewares(&name, ns, oref.clone(), desired_middlewares);
+    let actual_mw_names = get_middlewares(client.clone(), ns, &name).await?;
+    let desired_mw_names = desired_middlewares
+        .iter()
+        .map(|mw| mw.name.clone())
+        .collect::<Vec<String>>();
+    if let Some(to_delete) = to_delete(desired_mw_names, actual_mw_names) {
+        for d in to_delete {
+            match middleware_api.delete(&d, &Default::default()).await {
+                Ok(_) => {
+                    debug!("ns: {}, successfully deleted Middleware: {}", ns, d);
+                }
+                Err(e) => {
+                    error!("ns: {}, Failed to delete Middleware: {}, error: {}", ns, d, e);
+                }
+            }
+        }
+    }
+    for desired_mw in desired_middlewares {
+        match apply_middleware(middleware_api.clone(), &desired_mw.name, &desired_mw.mw).await {
+            Ok(_) => {
+                debug!("ns: {}, successfully applied Middleware: {}", ns, desired_mw.name);
+            }
+            Err(e) => {
+                error!(
+                    "ns: {}, Failed to apply Middleware: {}, error: {}",
+                    ns, desired_mw.name, e
+                );
+            }
+        }
+    }
+
+    let ingress = generate_ingress_tcp(&name, ns, oref, desired_routes.clone(), entry_points_tcp);
+    if desired_routes.is_empty() {
+        // we don't need an IngressRouteTCP when there are no routes
+        let lp = ListParams::default().labels(&format!("component=appService"));
+        // Check if there are any IngressRouteTCP objects with the label component=appService and delete them
+        let ingress_tcp_routes = ingress_api.list(&lp).await?;
+        if let Some(ingress_tcp_route) = ingress_tcp_routes.into_iter().next() {
+            match ingress_api
+                .delete(&ingress_tcp_route.metadata.name.unwrap(), &Default::default())
+                .await
+            {
+                Ok(_) => {
+                    debug!("ns: {}, successfully deleted IngressRouteTCP: {}", ns, &name);
+                    return Ok(());
+                }
+                Err(e) => {
+                    error!(
+                        "ns: {}, Failed to delete IngressRouteTCP: {}, error: {}",
+                        ns, &name, e
+                    );
+                    return Err(e);
+                }
+            }
+        }
+        return Ok(());
+    }
+    match apply_ingress_route_tcp(ingress_api, &name, &ingress).await {
+        Ok(_) => {
+            debug!("Updated/applied IngressRouteTCP for {}.{}", ns, &name,);
+            Ok(())
+        }
+        Err(e) => {
+            error!("Failed to update/apply IngressRouteTCP {}.{}: {}", ns, &name, e);
             Err(e)
         }
     }
@@ -306,6 +490,17 @@ async fn apply_ingress_route(
     let patch_parameters = PatchParams::apply("cntrlr").force();
     ingress_api
         .patch(ingress_name, &patch_parameters, &Patch::Apply(&ingress_route))
+        .await
+}
+
+async fn apply_ingress_route_tcp(
+    ingress_api: Api<IngressRouteTCP>,
+    ingress_name: &str,
+    ingress_route_tcp: &IngressRouteTCP,
+) -> Result<IngressRouteTCP, kube::Error> {
+    let patch_parameters = PatchParams::apply("cntrlr").force();
+    ingress_api
+        .patch(ingress_name, &patch_parameters, &Patch::Apply(&ingress_route_tcp))
         .await
 }
 

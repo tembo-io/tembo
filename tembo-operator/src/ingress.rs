@@ -15,6 +15,7 @@ use std::sync::Arc;
 
 use crate::{
     apis::coredb_types::CoreDB,
+    app_service::types::COMPONENT_NAME,
     errors::OperatorError,
     traefik::middleware_tcp_crd::{MiddlewareTCP, MiddlewareTCPIpAllowList, MiddlewareTCPSpec},
     Context,
@@ -270,8 +271,24 @@ pub async fn reconcile_postgres_ing_route_tcp(
     // Check for all existing IngressRouteTCPs in this namespace
     // Filter out any that are not for this DB or do not have the correct prefix
     for ingress_route_tcp in &ingress_route_tcps {
+        // Get labels for this ingress route tcp
+        let labels = ingress_route_tcp.metadata.labels.clone().unwrap_or_default();
+        // Check whether labels includes component=appService
+        let app_svc_label = labels
+            .get("component")
+            .map(|component| component == COMPONENT_NAME)
+            .unwrap_or(false);
+
         let ingress_route_tcp_name = match ingress_route_tcp.metadata.name.clone() {
             Some(ingress_route_tcp_name) => {
+                if app_svc_label {
+                    debug!(
+                        "Skipping ingress route tcp with appService label: {}",
+                        ingress_route_tcp_name
+                    );
+                    continue;
+                }
+
                 if !(ingress_route_tcp_name.starts_with(ingress_name_prefix)
                     || ingress_route_tcp_name == cdb.name_any())
                 {
@@ -323,7 +340,7 @@ pub async fn reconcile_postgres_ing_route_tcp(
         present_matchers_list.push(matcher_actual.clone());
 
         // Check if either the service name or port are mismatched
-        if !(service_name_actual == service_name && service_port_actual == port) {
+        if !(service_name_actual == service_name && service_port_actual == port) && !app_svc_label {
             // This situation should only occur when the service name or port is changed, for example during cut-over from
             // CoreDB operator managing the service to CNPG managing the service.
             warn!(
@@ -416,6 +433,13 @@ pub async fn reconcile_postgres_ing_route_tcp(
     };
 
     for ingress_route_tcp in ingress_route_tcps {
+        // Get labels for this ingress route tcp
+        let labels = ingress_route_tcp.metadata.labels.clone().unwrap_or_default();
+        // Check whether labels includes component=appService
+        let app_svc_label = labels
+            .get("component")
+            .map(|component| component == COMPONENT_NAME)
+            .unwrap_or(false);
         let ingress_route_tcp_name = ingress_route_tcp.metadata.name.clone().unwrap();
         if present_ing_route_tcp_names_list.contains(&ingress_route_tcp_name) {
             // Skip any ingress route tcp that is not matched for this database
@@ -429,7 +453,7 @@ pub async fn reconcile_postgres_ing_route_tcp(
                 break;
             }
         }
-        if needs_middleware_update {
+        if needs_middleware_update && !app_svc_label {
             info!(
                 "Adding middleware to existing IngressRouteTCP {} for db {}",
                 &ingress_route_tcp_name,

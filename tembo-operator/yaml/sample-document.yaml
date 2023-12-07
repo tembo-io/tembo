@@ -11,11 +11,24 @@ spec:
     - name: fdb-api
       image: ghcr.io/ferretdb/ferretdb
       routing:
-        - port: 27017
+        - port: 27018
           ingressPath: /ferretdb/v1
+          entryPoints:
+            - ferretdb
+          ingressType: tcp
       env:
         - name: FERRETDB_POSTGRESQL_URL
           valueFromPlatform: ReadWriteConnection
+        - name: FERRETDB_LOG_LEVEL
+          value: debug
+        - name: FERRETDB_STATE_DIR
+          value: '-'
+        - name: FERRETDB_LISTEN_TLS_CERT_FILE
+          value: /certs/tls.crt
+        - name: FERRETDB_LISTEN_TLS_KEY_FILE
+          value: /certs/tls.key
+        - name: FERRETDB_LISTEN_TLS
+          value: :27018
       storage:
         volumes:
           - name: ferretdb-data
@@ -27,6 +40,12 @@ spec:
                   resources:
                     requests:
                       storage: 1Gi
+          - name: ferretdb-certs
+            secret:
+              secretName: sample-document-server1
         volumeMounts:
             - name: ferretdb-data
               mountPath: /state
+            - name: ferretdb-certs
+              mountPath: /certs
+              readOnly: true
