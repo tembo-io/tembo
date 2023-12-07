@@ -24,7 +24,7 @@ profile = 'prod'
 // TODO: Move this to a template file
 pub const CREDENTIALS_DEFAULT_TEXT: &str = "version = \"1.0\"
 
-[[environment]]
+[[profile]]
 name = 'prod'
 tembo_access_token = 'ACCESS_TOKEN'
 tembo_host = 'https://api.coredb.io'

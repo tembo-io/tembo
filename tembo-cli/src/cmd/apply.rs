@@ -1,5 +1,8 @@
 use crate::{
-    cli::context::{get_current_context, Environment, Target},
+    cli::{
+        context::{get_current_context, Environment, Target},
+        tembo_config,
+    },
     Result,
 };
 use clap::{ArgMatches, Command};
@@ -10,7 +13,9 @@ use std::{
 };
 use temboclient::{
     apis::{configuration::Configuration, instance_api::create_instance},
-    models::{Cpu, CreateInstance, Memory, Storage},
+    models::{
+        Cpu, CreateInstance, Extension, ExtensionInstallLocation, Memory, Storage, TrunkInstall,
+    },
 };
 use tokio::runtime::Runtime;
 
@@ -90,23 +95,7 @@ pub fn execute_tembo_cloud(env: Environment) -> Result<()> {
     let mut instance: CreateInstance;
 
     for (_key, value) in instance_settings.iter() {
-        instance = CreateInstance {
-            cpu: Cpu::from_str(value.cpu.as_str()).unwrap(),
-            memory: Memory::from_str(value.memory.as_str()).unwrap(),
-            environment: temboclient::models::Environment::from_str(value.environment.as_str())
-                .unwrap(),
-            instance_name: value.instance_name.clone(),
-            stack_type: temboclient::models::StackType::Standard,
-            storage: Storage::from_str(value.storage.as_str()).unwrap(),
-            replicas: Some(value.replicas),
-            app_services: None,
-            connection_pooler: None,
-            extensions: None,
-            extra_domains_rw: None,
-            ip_allow_list: None,
-            trunk_installs: None,
-            postgres_configs: None,
-        };
+        instance = get_instance(value);
 
         let v = Runtime::new().unwrap().block_on(create_instance(
             &config,
@@ -126,6 +115,72 @@ pub fn execute_tembo_cloud(env: Environment) -> Result<()> {
     }
 
     Ok(())
+}
+
+fn get_instance(instance_settings: &InstanceSettings) -> CreateInstance {
+    return CreateInstance {
+        cpu: Cpu::from_str(instance_settings.cpu.as_str()).unwrap(),
+        memory: Memory::from_str(instance_settings.memory.as_str()).unwrap(),
+        environment: temboclient::models::Environment::from_str(
+            instance_settings.environment.as_str(),
+        )
+        .unwrap(),
+        instance_name: instance_settings.instance_name.clone(),
+        stack_type: temboclient::models::StackType::Standard,
+        storage: Storage::from_str(instance_settings.storage.as_str()).unwrap(),
+        replicas: Some(instance_settings.replicas),
+        app_services: None,
+        connection_pooler: None,
+        extensions: Some(Some(get_extensions(instance_settings.extensions.clone()))),
+        extra_domains_rw: None,
+        ip_allow_list: None,
+        trunk_installs: Some(Some(get_trunk_installs(
+            instance_settings.extensions.clone(),
+        ))),
+        postgres_configs: None,
+    };
+}
+
+fn get_extensions(extensions: Option<HashMap<String, tembo_config::Extension>>) -> Vec<Extension> {
+    let mut vec_extensions: Vec<Extension> = vec![];
+    let mut vec_extension_location: Vec<ExtensionInstallLocation> = vec![];
+
+    if extensions.is_some() {
+        for (name, extension) in extensions.unwrap().iter() {
+            vec_extension_location.push(ExtensionInstallLocation {
+                database: None,
+                schema: None,
+                version: None,
+                enabled: extension.enabled,
+            });
+
+            vec_extensions.push(Extension {
+                name: name.to_owned(),
+                description: None,
+                locations: vec_extension_location.clone(),
+            });
+        }
+    }
+
+    vec_extensions
+}
+
+fn get_trunk_installs(
+    extensions: Option<HashMap<String, tembo_config::Extension>>,
+) -> Vec<TrunkInstall> {
+    let mut vec_trunk_installs: Vec<TrunkInstall> = vec![];
+
+    if extensions.is_some() {
+        for (_, extension) in extensions.unwrap().iter() {
+            if extension.trunk_project.is_some() {
+                vec_trunk_installs.push(TrunkInstall {
+                    name: extension.trunk_project.clone().unwrap(),
+                    version: Some(extension.trunk_project_version.clone()),
+                });
+            }
+        }
+    }
+    vec_trunk_installs
 }
 
 pub fn get_instance_settings() -> Result<HashMap<String, InstanceSettings>> {
@@ -208,22 +263,29 @@ fn get_postgres_config(instance_settings: HashMap<String, InstanceSettings>) -> 
     let qoute_new_line = "\'\n";
     let equal_to_qoute = " = \'";
     for (_, instance_setting) in instance_settings.iter() {
-        for (key, value) in instance_setting.postgres_configurations.iter() {
-            if value.is_str() {
-                postgres_config.push_str(key.as_str());
-                postgres_config.push_str(equal_to_qoute);
-                postgres_config.push_str(value.as_str().unwrap());
-                postgres_config.push_str(qoute_new_line);
-            }
-            if value.is_table() {
-                for row in value.as_table().iter() {
-                    for (t, v) in row.iter() {
-                        postgres_config.push_str(key.as_str());
-                        postgres_config.push('.');
-                        postgres_config.push_str(t.as_str());
-                        postgres_config.push_str(equal_to_qoute);
-                        postgres_config.push_str(v.as_str().unwrap());
-                        postgres_config.push_str(qoute_new_line);
+        if instance_setting.postgres_configurations.is_some() {
+            for (key, value) in instance_setting
+                .postgres_configurations
+                .as_ref()
+                .unwrap()
+                .iter()
+            {
+                if value.is_str() {
+                    postgres_config.push_str(key.as_str());
+                    postgres_config.push_str(equal_to_qoute);
+                    postgres_config.push_str(value.as_str().unwrap());
+                    postgres_config.push_str(qoute_new_line);
+                }
+                if value.is_table() {
+                    for row in value.as_table().iter() {
+                        for (t, v) in row.iter() {
+                            postgres_config.push_str(key.as_str());
+                            postgres_config.push('.');
+                            postgres_config.push_str(t.as_str());
+                            postgres_config.push_str(equal_to_qoute);
+                            postgres_config.push_str(v.as_str().unwrap());
+                            postgres_config.push_str(qoute_new_line);
+                        }
                     }
                 }
             }
