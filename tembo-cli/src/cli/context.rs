@@ -115,7 +115,7 @@ pub fn get_current_context() -> Result<Environment> {
 
     for mut e in context.environment {
         if e.set.is_some() && e.set.unwrap() {
-            if e.profile != None {
+            if e.profile.is_some() {
                 let credential = profiles
                     .iter()
                     .filter(|c| &c.name == e.profile.as_ref().unwrap())

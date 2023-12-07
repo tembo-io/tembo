@@ -1,0 +1,12 @@
+version = "1.0"
+
+[[environment]]
+name = "local"
+target = "docker"
+
+[[environment]]
+name = "prod"
+target = "tembo-cloud"
+org_id = "ORG_ID_GOES_HERE"
+profile = "prod"
+set = true
