@@ -1,0 +1,70 @@
+{{- if (index .Values "controller").enabled }}
+{{- $namespace := include "component.namespace" (list (list "controller" .Values .)) -}}
+{{- $fullname := include "controller.fullname" . -}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $fullname }}
+  namespace: {{ $namespace }}
+  labels:
+{{ include "controller-helm.labels" . | nindent 4 }}
+  {{- if (index .Values "controller").annotations }}
+  annotations: {{ toYaml (index .Values "controller").annotations | nindent 4 }}
+  {{- end }}
+spec:
+  replicas: {{ default 1 (index .Values "controller").replicas }}
+  selector:
+    matchLabels:
+      app: {{ $fullname }}
+      release: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+{{ include "controller-helm.labels" . | indent 8 }}
+      annotations:
+        {{- if (index .Values "controller").podAnnotations }}
+        {{- range $key, $value := (index .Values "controller").podAnnotations }}
+        {{ $key }}: {{ $value | quote }}
+        {{- end }}
+        {{- end }}
+    spec:
+      containers:
+        - image: {{ (index .Values "controller").image.repository }}:{{ tpl (index .Values "controller").image.tag . }}
+          imagePullPolicy: {{ (index .Values "controller").image.pullPolicy }}
+          name: tembo-controller
+          {{- with (index .Values "controller").extraEnv }}
+          env:
+            {{- range . }}
+            - name: {{ .name }}
+              value: {{ tpl (.value | quote) $ }}
+            {{- end }}
+          {{- end }}
+          {{- if (index .Values "controller").resources }}
+          resources:
+            {{- toYaml (index .Values "controller").resources | nindent 12 }}
+          {{- end }}
+          ports:
+          - name: http
+            containerPort: 8080
+            protocol: TCP
+          {{- with (index .Values "controller").readinessProbe }}
+          readinessProbe:
+          {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- with (index .Values "controller").livenessProbe }}
+          livenessProbe:
+          {{- toYaml . | nindent 12 }}
+          {{- end }}
+      serviceAccountName: {{ $fullname }}
+      automountServiceAccountToken: true
+      {{- with (index .Values "controller").nodeSelector }}
+      nodeSelector:
+      {{ toYaml . | indent 2 }}
+      {{- end }}
+      {{- with (index .Values "controller").tolerations }}
+      tolerations: {{ toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with (index .Values "controller").affinity }}
+      affinity: {{ toYaml . | nindent 8 }}
+      {{- end }}
+{{- end }}

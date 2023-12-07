@@ -1,0 +1,22 @@
+{{- if (index .Values "controller").enabled }}
+{{- if (index .Values "controller").monitoring.podMonitor.enabled -}}
+{{- $namespace := include "component.namespace" (list (list "controller" .Values .)) -}}
+{{- $fullname := include "controller.fullname" . -}}
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: {{ $fullname }}
+  namespace: {{ $namespace }}
+spec:
+  podMetricsEndpoints:
+  - path: {{ (index .Values "controller").podMonitor.path }}
+    port: {{ (index .Values "controller").podMonitor.port }}
+  namespaceSelector:
+    matchNames:
+      - {{ $namespace }}
+  selector:
+    matchLabels:
+      app: {{ $fullname }}
+      release: {{ .Release.Name }}
+{{- end }}
+{{- end }}

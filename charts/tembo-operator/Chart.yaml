@@ -1,6 +1,22 @@
 apiVersion: v2
-name: coredb-operator
-description: Helm chart to deploy coredb operator
+name: tembo-operator
+description: 'Helm chart to deploy the tembo-operator'
 type: application
-version: 0.1.1
-appVersion: "0.1.0"
+icon: https://cloud.tembo.io/images/TemboElephant.png
+version: 0.2.0
+home: https://tembo.io
+sources:
+  - https://github.com/tembo-io/tembo-stacks
+  - https://github.com/cloudnative-pg/cloudnative-pg
+keywords:
+  - postgresql
+  - postgres
+  - database
+maintainers:
+  - name: Tembo
+    url: https://tembocommunity.slack.com
+dependencies:
+  - name: cloudnative-pg
+    version: 0.18.2
+    repository: https://cloudnative-pg.github.io/charts
+    condition: cloudnative-pg.enabled
