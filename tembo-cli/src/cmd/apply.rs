@@ -71,6 +71,9 @@ fn execute_docker() -> Result<()> {
 
     Docker::run_sqlx_migrate()?;
 
+    // If all of the above was successful, we can print the url to user
+    println!(">>> Tembo instance is now running on: postgres://postgres:postgres@localhost:5432");
+
     Ok(())
 }
 
