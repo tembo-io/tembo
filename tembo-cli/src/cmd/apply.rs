@@ -14,7 +14,8 @@ use std::{
 use temboclient::{
     apis::{configuration::Configuration, instance_api::create_instance},
     models::{
-        Cpu, CreateInstance, Extension, ExtensionInstallLocation, Memory, Storage, TrunkInstall,
+        Cpu, CreateInstance, Extension, ExtensionInstallLocation, Memory, PgConfig, StackType,
+        Storage, TrunkInstall,
     },
 };
 use tokio::runtime::Runtime;
@@ -126,7 +127,7 @@ fn get_instance(instance_settings: &InstanceSettings) -> CreateInstance {
         )
         .unwrap(),
         instance_name: instance_settings.instance_name.clone(),
-        stack_type: temboclient::models::StackType::Standard,
+        stack_type: StackType::from_str(instance_settings.stack_type.as_str()).unwrap(),
         storage: Storage::from_str(instance_settings.storage.as_str()).unwrap(),
         replicas: Some(instance_settings.replicas),
         app_services: None,
@@ -137,8 +138,39 @@ fn get_instance(instance_settings: &InstanceSettings) -> CreateInstance {
         trunk_installs: Some(Some(get_trunk_installs(
             instance_settings.extensions.clone(),
         ))),
-        postgres_configs: None,
+        postgres_configs: Some(Some(get_postgres_config_cloud(instance_settings))),
     };
+}
+
+fn get_postgres_config_cloud(instance_settings: &InstanceSettings) -> Vec<PgConfig> {
+    let mut pg_configs: Vec<PgConfig> = vec![];
+
+    if instance_settings.postgres_configurations.is_some() {
+        for (key, value) in instance_settings
+            .postgres_configurations
+            .clone()
+            .unwrap()
+            .iter()
+        {
+            if value.is_str() {
+                pg_configs.push(PgConfig {
+                    name: key.to_owned(),
+                    value: value.to_string(),
+                })
+            } else if value.is_table() {
+                for row in value.as_table().iter() {
+                    for (k, v) in row.iter() {
+                        pg_configs.push(PgConfig {
+                            name: key.to_owned() + "." + k,
+                            value: v.to_string(),
+                        })
+                    }
+                }
+            }
+        }
+    }
+
+    pg_configs
 }
 
 fn get_extensions(extensions: Option<HashMap<String, tembo_config::Extension>>) -> Vec<Extension> {
