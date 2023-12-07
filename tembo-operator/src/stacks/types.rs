@@ -21,7 +21,7 @@ pub enum StackType {
     OLTP,
     VectorDB,
     Geospatial,
-    Document,
+    MongoAdapter,
 }
 
 impl std::str::FromStr for StackType {
@@ -37,7 +37,7 @@ impl std::str::FromStr for StackType {
             "OLTP" => Ok(StackType::OLTP),
             "VectorDB" => Ok(StackType::VectorDB),
             "Geospatial" => Ok(StackType::Geospatial),
-            "Document" => Ok(StackType::Document),
+            "MongoAdapter" => Ok(StackType::MongoAdapter),
             _ => Err("invalid value"),
         }
     }
@@ -54,7 +54,7 @@ impl StackType {
             StackType::OLTP => "OLTP",
             StackType::VectorDB => "VectorDB",
             StackType::Geospatial => "Geospatial",
-            StackType::Document => "Document",
+            StackType::MongoAdapter => "MongoAdapter",
         }
     }
 }

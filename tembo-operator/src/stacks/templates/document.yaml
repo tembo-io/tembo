@@ -1,4 +1,4 @@
-name: Document
+name: MongoAdapter
 description: Document-facing workloads on Postgres.
 image: "quay.io/tembo/standard-cnpg:15.3.0-1-1096aeb"
 stack_version: 0.1.0
@@ -37,7 +37,7 @@ appServices:
                     storage: 1Gi
         - name: ferretdb-certs
           secret:
-            secretName: sample-document-server1
+            secretName: sample-mongo-adapter-server1
         volumeMounts:
           - name: ferretdb-data
             mountPath: /state

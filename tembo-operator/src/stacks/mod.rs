@@ -36,6 +36,6 @@ pub fn get_stack(entity: StackType) -> types::Stack {
         StackType::OLTP => OLTP.clone(),
         StackType::VectorDB => VECTOR_DB.clone(),
         StackType::Geospatial => GEOSPATIAL.clone(),
-        StackType::Document => DOCUMENT.clone(),
+        StackType::MongoAdapter => MONGO_ADAPTER.clone(),
     }
 }
