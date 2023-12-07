@@ -7,7 +7,7 @@ on:
       - 'charts/**'
 
 jobs:
-release-chart:
+  release-chart:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Code
