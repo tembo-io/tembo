@@ -12,7 +12,7 @@ metadata:
   annotations: {{ toYaml (index .Values "pod-init").annotations | nindent 4 }}
   {{- end }}
 spec:
-  replicas: {{ default 1 (index .Values "operator").replicas }}
+  replicas: {{ default 1 (index .Values "pod-init").replicas }}
   strategy:
     type: {{ (index .Values "pod-init").upgradeStrategy }}
   selector:
