@@ -5,6 +5,7 @@ on:
     branches: [ "main" ]
     paths:
       - 'charts/**'
+  workflow_dispatch:
 
 jobs:
   release-chart:
