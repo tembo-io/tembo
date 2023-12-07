@@ -17,8 +17,8 @@ pub struct InstanceSettings {
     pub memory: String,
     pub storage: String,
     pub replicas: i32,
-    pub postgres_configurations: HashMap<String, Value>,
-    pub extensions: HashMap<String, Extension>,
+    pub postgres_configurations: Option<HashMap<String, Value>>,
+    pub extensions: Option<HashMap<String, Extension>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]

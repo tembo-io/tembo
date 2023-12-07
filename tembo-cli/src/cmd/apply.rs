@@ -141,12 +141,12 @@ fn get_instance(instance_settings: &InstanceSettings) -> CreateInstance {
     };
 }
 
-fn get_extensions(extensions: HashMap<String, tembo_config::Extension>) -> Vec<Extension> {
+fn get_extensions(extensions: Option<HashMap<String, tembo_config::Extension>>) -> Vec<Extension> {
     let mut vec_extensions: Vec<Extension> = vec![];
     let mut vec_extension_location: Vec<ExtensionInstallLocation> = vec![];
 
-    if !extensions.is_empty() {
-        for (name, extension) in extensions.iter() {
+    if extensions.is_some() {
+        for (name, extension) in extensions.unwrap().iter() {
             vec_extension_location.push(ExtensionInstallLocation {
                 database: None,
                 schema: None,
@@ -165,11 +165,13 @@ fn get_extensions(extensions: HashMap<String, tembo_config::Extension>) -> Vec<E
     vec_extensions
 }
 
-fn get_trunk_installs(extensions: HashMap<String, tembo_config::Extension>) -> Vec<TrunkInstall> {
+fn get_trunk_installs(
+    extensions: Option<HashMap<String, tembo_config::Extension>>,
+) -> Vec<TrunkInstall> {
     let mut vec_trunk_installs: Vec<TrunkInstall> = vec![];
 
-    if !extensions.is_empty() {
-        for (_, extension) in extensions.iter() {
+    if extensions.is_some() {
+        for (_, extension) in extensions.unwrap().iter() {
             if extension.trunk_project.is_some() {
                 vec_trunk_installs.push(TrunkInstall {
                     name: extension.trunk_project.clone().unwrap(),
@@ -178,7 +180,6 @@ fn get_trunk_installs(extensions: HashMap<String, tembo_config::Extension>) -> V
             }
         }
     }
-
     vec_trunk_installs
 }
 
@@ -262,22 +263,29 @@ fn get_postgres_config(instance_settings: HashMap<String, InstanceSettings>) -> 
     let qoute_new_line = "\'\n";
     let equal_to_qoute = " = \'";
     for (_, instance_setting) in instance_settings.iter() {
-        for (key, value) in instance_setting.postgres_configurations.iter() {
-            if value.is_str() {
-                postgres_config.push_str(key.as_str());
-                postgres_config.push_str(equal_to_qoute);
-                postgres_config.push_str(value.as_str().unwrap());
-                postgres_config.push_str(qoute_new_line);
-            }
-            if value.is_table() {
-                for row in value.as_table().iter() {
-                    for (t, v) in row.iter() {
-                        postgres_config.push_str(key.as_str());
-                        postgres_config.push('.');
-                        postgres_config.push_str(t.as_str());
-                        postgres_config.push_str(equal_to_qoute);
-                        postgres_config.push_str(v.as_str().unwrap());
-                        postgres_config.push_str(qoute_new_line);
+        if instance_setting.postgres_configurations.is_some() {
+            for (key, value) in instance_setting
+                .postgres_configurations
+                .as_ref()
+                .unwrap()
+                .iter()
+            {
+                if value.is_str() {
+                    postgres_config.push_str(key.as_str());
+                    postgres_config.push_str(equal_to_qoute);
+                    postgres_config.push_str(value.as_str().unwrap());
+                    postgres_config.push_str(qoute_new_line);
+                }
+                if value.is_table() {
+                    for row in value.as_table().iter() {
+                        for (t, v) in row.iter() {
+                            postgres_config.push_str(key.as_str());
+                            postgres_config.push('.');
+                            postgres_config.push_str(t.as_str());
+                            postgres_config.push_str(equal_to_qoute);
+                            postgres_config.push_str(v.as_str().unwrap());
+                            postgres_config.push_str(qoute_new_line);
+                        }
                     }
                 }
             }
