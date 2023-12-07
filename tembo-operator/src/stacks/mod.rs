@@ -22,7 +22,7 @@ lazy_static! {
         serde_yaml::from_str(include_str!("templates/vectordb.yaml")).expect("vectordb.yaml not found");
     pub static ref GEOSPATIAL: Stack =
         serde_yaml::from_str(include_str!("templates/gis.yaml")).expect("gis.yaml not found");
-    pub static ref DOCUMENT: Stack =
+    pub static ref MONGO_ADAPTER: Stack =
         serde_yaml::from_str(include_str!("templates/document.yaml")).expect("document.yaml not found");
 }
 
