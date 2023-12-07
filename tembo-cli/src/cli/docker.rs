@@ -162,9 +162,10 @@ pub fn run_command(command: &str) -> Result<()> {
         .output()
         .expect("failed to execute process");
 
-    let stderr = String::from_utf8(output.stderr).unwrap();
-
-    if !stderr.is_empty() {
+    // Using output status to determine whether there is an error or not
+    // because stderr returns a value even when there is no error
+    if !output.status.success() {
+        let stderr = String::from_utf8(output.stderr).unwrap();
         bail!("There was an issue running command: {}", stderr)
     }
 
