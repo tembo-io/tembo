@@ -45,6 +45,10 @@ appServices:
         cpu: 400m
         memory: 256Mi
 compute_templates:
+  - cpu: 0.25
+    memory: 1Gi
+  - cpu: 0.5
+    memory: 2Gi
   - cpu: 1
     memory: 4Gi
   - cpu: 2
