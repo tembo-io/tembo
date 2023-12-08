@@ -263,7 +263,6 @@ impl CoreDB {
                     Action::requeue(Duration::from_secs(300))
                 })?;
 
-
         reconcile_generic_metrics_configmap(self, ctx.clone()).await?;
 
         reconcile_cnpg(self, ctx.clone()).await?;
