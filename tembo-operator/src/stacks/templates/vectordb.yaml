@@ -4,9 +4,9 @@ image: "quay.io/tembo/standard-cnpg:15.3.0-1-1096aeb"
 stack_version: 0.1.0
 trunk_installs:
   - name: pgmq
-    version: 0.33.0
+    version: 1.1.0
   - name: vectorize
-    version: 0.6.1
+    version: 0.7.0
   - name: pgvector
     version: 0.5.1
   - name: pg_stat_statements
@@ -26,18 +26,22 @@ extensions:
     locations:
     - database: postgres
       enabled: true
-      version: 0.33.0
+      version: 1.1.0
   - name: vectorize
     locations:
     - database: postgres
       enabled: true
-      version: 0.6.1
+      version: 0.7.0
   - name: pg_stat_statements
     locations:
       - database: postgres
         enabled: true
         version: 1.10.0
 compute_templates:
+  - cpu: 0.25
+    memory: 1Gi
+  - cpu: 0.5
+    memory: 2Gi
   - cpu: 1
     memory: 4Gi
   - cpu: 2
@@ -76,3 +80,5 @@ postgres_config:
     value: all
   - name: shared_preload_libraries
     value: vectorize,pg_stat_statements,pg_cron
+  - name: vectorize.embedding_service_url
+    value: http://${NAMESPACE}-embeddings.${NAMESPACE}.svc.cluster.local:3000/v1/embeddings

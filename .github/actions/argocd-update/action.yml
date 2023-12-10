@@ -50,22 +50,18 @@ runs:
     uses: mikefarah/yq@v4.33.3
     with:
       cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/dataplane-webserver.yaml
-  - name: Update coredb operator helm chart
+  - name: Update operator helm chart
     uses: mikefarah/yq@v4.33.3
     with:
-      cmd: yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/coredb-operator.yaml
-  - name: Update coredb operator image
+      cmd: yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator.yaml
+  - name: Update operator image
     uses: mikefarah/yq@v4.33.3
     with:
-      cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/coredb-operator.yaml
-  - name: Update tembo-pod-init image
-    uses: mikefarah/yq@v4.34.1
+      cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "controller.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator.yaml
+  - name: Update pod-init image
+    uses: mikefarah/yq@v4.33.3
     with:
-      cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-pod-init.yaml
-  - name: Update tembo-pod-init helm chart
-    uses: mikefarah/yq@v4.34.1
-    with:
-      cmd: yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-pod-init.yaml
+      cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "pod-init.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator.yaml
   - name: Git commit and push to remote
     shell: bash
     run: |

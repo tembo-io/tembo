@@ -13,27 +13,19 @@ install-traefik:
 	helm upgrade --install --namespace=traefik --values=./testdata/traefik-values.yaml traefik traefik/traefik
 
 install-operator:
-	helm upgrade --install --create-namespace --namespace=coredb-operator --values=./testdata/operator-values.yaml tembo-operator ../charts/tembo-operator
+  just install-cert-manager
+  helm upgrade --install --create-namespace --namespace=tembo-system --values=./testdata/operator-values.yaml tembo ../charts/tembo-operator
 
 install-kube-prometheus-stack:
 	kubectl create namespace monitoring || true
 	helm upgrade --install --namespace=monitoring monitoring prometheus-community/kube-prometheus-stack
 
-install-tembo-pod-init:
-	kubectl create namespace tembo-pod-init || true
-	helm upgrade --install \
-	  cert-manager jetstack/cert-manager \
-	  --namespace cert-manager \
-	  --create-namespace \
-	  --set installCRDs=true && \
-	helm upgrade --install --namespace=tembo-pod-init --values=./testdata/pod-init.yaml tembo-pod-init ../charts/tembo-pod-init
-
-install-cnpg:
-	helm upgrade --install cnpg \
-	  --namespace cnpg-system \
-	  --create-namespace \
-	  --set config.data.INHERITED_ANNOTATIONS="tembo-pod-init.tembo.io/*"  \
-	  cnpg/cloudnative-pg
+install-cert-manager:
+  helm upgrade --install \
+    cert-manager jetstack/cert-manager \
+    --namespace cert-manager \
+    --create-namespace \
+    --set installCRDs=true
 
 install-tempo:
 	helm upgrade --install \
@@ -42,7 +34,7 @@ install-tempo:
 
 enable-cnpg-default-namespace:
 	kubectl label namespace default "tembo-pod-init.tembo.io/watch"="true"
-	kubectl delete pods -n tembo-pod-init --all
+	kubectl delete pods -n tembo-system -l app=tembo-pod-init
 
 update-helm-repos:
 	helm repo add cnpg https://cloudnative-pg.github.io/charts
@@ -64,9 +56,7 @@ start-kind:
 	just install-kube-prometheus-stack
 	just install-tempo
 	just install-traefik
-	just install-cnpg
 	just install-operator
-	just install-tembo-pod-init
 	just annotate
 	kubectl wait pods --for=condition=Ready --timeout=300s --all --all-namespaces
 

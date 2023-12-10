@@ -1,3 +1,5 @@
+{{- if (index .Values "controller").enabled }}
+{{- if (index .Values "controller").crds.create }}
 apiVersion: apiextensions.k8s.io/v1
 kind: CustomResourceDefinition
 metadata:
@@ -1974,3 +1976,5 @@ spec:
     storage: true
     subresources:
       status: {}
+{{- end }}
+{{- end }}

@@ -1,0 +1,25 @@
+{{- if (index .Values "controller").enabled }}
+{{- $namespace := include "component.namespace" (list (list "controller" .Values .)) -}}
+{{- $fullname := include "controller.fullname" . -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}
+  namespace: {{ $namespace }}
+  labels:
+{{ include "controller-helm.labels" . | indent 4 }}
+  {{ if (index .Values "controller").service.annotations }}
+  annotations:
+    {{- (index .Values "controller").service.annotations | toYaml | nindent 4 }}
+  {{- end }}
+spec:
+  selector:
+    app: {{ $fullname }}
+    release: {{ .Release.Name }}
+  type: {{ (index .Values "controller").service.type }}
+  ports:
+  - name: http
+    port: {{ (index .Values "controller").service.port }}
+    targetPort: {{ (index .Values "controller").service.targetPort }}
+    protocol: TCP
+{{- end }}

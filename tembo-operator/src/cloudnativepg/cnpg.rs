@@ -853,7 +853,6 @@ fn update_restarted_at(cdb: &CoreDB, maybe_cluster: Option<&Cluster>, new_spec: 
     restart_annotation_updated
 }
 
-
 #[instrument(skip(cdb, ctx) fields(trace_id, instance_name = %cdb.name_any()))]
 pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {
     let pods_to_fence = pods_to_fence(cdb, ctx.clone()).await?;

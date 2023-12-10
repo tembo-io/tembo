@@ -23,6 +23,8 @@ postgres_config:
     value: 'on'
   - name: shared_preload_libraries
     value: vectorize,pg_stat_statements,pgml,pg_cron,pg_later
+  - name: vectorize.embedding_service_url
+    value: http://${NAMESPACE}-embeddings.${NAMESPACE}.svc.cluster.local:3000/v1/embeddings
 trunk_installs:
   - name: pgvector
     version: 0.5.1
@@ -31,9 +33,9 @@ trunk_installs:
   - name: pg_cron
     version: 1.5.2
   - name: pgmq
-    version: 0.33.1
+    version: 1.1.0
   - name: vectorize
-    version: 0.6.1
+    version: 0.7.0
   - name: pg_later
     version: 0.0.11
 extensions:
@@ -58,12 +60,12 @@ extensions:
     locations:
     - database: postgres
       enabled: true
-      version: 0.33.1
+      version: 1.1.0
   - name: vectorize
     locations:
     - database: postgres
       enabled: true
-      version: 0.6.1
+      version: 0.7.0
   - name: pg_later
     locations:
     - database: postgres
