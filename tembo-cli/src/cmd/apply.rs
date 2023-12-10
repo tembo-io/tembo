@@ -109,7 +109,7 @@ pub fn execute_tembo_cloud(env: Environment) -> Result<()> {
     Ok(())
 }
 
-fn get_instance_id_from_state(instance_name: String) -> Result<Option<String>> {
+pub fn get_instance_id_from_state(instance_name: String) -> Result<Option<String>> {
     let contents = match fs::read_to_string(tembo_state_file_path()) {
         Ok(c) => c,
         Err(e) => {
