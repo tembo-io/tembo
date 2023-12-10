@@ -1,4 +1,7 @@
-use crate::Result;
+use crate::{
+    cli::context::{dot_tembo_folder, tembo_state_file_path},
+    Result,
+};
 use clap::{ArgMatches, Command};
 
 use crate::cli::{
@@ -60,6 +63,25 @@ pub fn execute(_args: &ArgMatches) -> Result<()> {
     }
 
     match FileUtils::create_dir("migrations directory".to_string(), "migrations".to_string()) {
+        Ok(t) => t,
+        Err(e) => {
+            return Err(e);
+        }
+    }
+
+    match FileUtils::create_dir(".tembo directory".to_string(), dot_tembo_folder()) {
+        Ok(t) => t,
+        Err(e) => {
+            return Err(e);
+        }
+    }
+
+    match FileUtils::create_file(
+        tembo_state_file_path(),
+        tembo_state_file_path(),
+        "".to_string(),
+        false,
+    ) {
         Ok(t) => t,
         Err(e) => {
             return Err(e);
