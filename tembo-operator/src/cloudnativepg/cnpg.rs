@@ -409,7 +409,6 @@ pub fn cnpg_cluster_bootstrap_from_cdb(
                     max_parallel: Some(5),
                     encryption: Some(ClusterExternalClustersBarmanObjectStoreWalEncryption::Aes256),
                     compression: Some(ClusterExternalClustersBarmanObjectStoreWalCompression::Snappy),
-                    ..ClusterExternalClustersBarmanObjectStoreWal::default()
                 }),
                 server_name: Some(restore.server_name.clone()),
                 ..ClusterExternalClustersBarmanObjectStore::default()
@@ -493,14 +492,20 @@ fn cnpg_postgres_config(
 
 fn cnpg_cluster_storage(cdb: &CoreDB) -> Option<ClusterStorage> {
     let storage = cdb.spec.storage.clone().0;
+    let storage_class = cnpg_cluster_storage_class(cdb);
     Some(ClusterStorage {
         resize_in_use_volumes: Some(true),
         size: Some(storage),
-        // TODO: pass storage class from cdb
-        // storage_class: Some("gp3-enc".to_string()),
-        storage_class: None,
+        storage_class,
         ..ClusterStorage::default()
     })
+}
+
+fn cnpg_cluster_storage_class(cdb: &CoreDB) -> Option<String> {
+    match &cdb.spec.storage_class {
+        Some(storage_class) if !storage_class.is_empty() => Some(storage_class.clone()),
+        _ => None,
+    }
 }
 
 // Check replica count to enable HA
@@ -2346,5 +2351,68 @@ mod tests {
     fn test_invalid_format() {
         let result = parse_target_time(Some("invalid-format"));
         assert!(result.is_err()); // check for error
+    }
+
+    #[test]
+    fn test_cnpg_cluster_storage_class() {
+        let cdb_storage_class_yaml = r#"
+        apiVersion: coredb.io/v1alpha1
+        kind: CoreDB
+        metadata:
+          name: test
+          namespace: default
+        spec:
+          image: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e 
+          port: 5432
+          postgresExporterEnabled: true
+          postgresExporterImage: quay.io/prometheuscommunity/postgres-exporter:v0.12.1
+          replicas: 1
+          resources:
+            limits:
+              cpu: "1"
+              memory: 0.5Gi
+          serviceAccountTemplate:
+            metadata:
+              annotations:
+                eks.amazonaws.com/role-arn: arn:aws:iam::012345678901:role/aws-iam-role-iam
+          sharedirStorage: 1Gi
+          stop: false
+          storage: 1Gi
+          storageClass: "gp3-enc"
+          uid: 999
+        "#;
+        let cdb_storage_class: CoreDB = from_str(cdb_storage_class_yaml).unwrap();
+        assert_eq!(
+            cnpg_cluster_storage_class(&cdb_storage_class),
+            Some("gp3-enc".to_string())
+        );
+
+        let cdb_no_storage_class_yaml = r#"
+        apiVersion: coredb.io/v1alpha1
+        kind: CoreDB
+        metadata:
+          name: test
+          namespace: default
+        spec:
+          image: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e 
+          port: 5432
+          postgresExporterEnabled: true
+          postgresExporterImage: quay.io/prometheuscommunity/postgres-exporter:v0.12.1
+          replicas: 1
+          resources:
+            limits:
+              cpu: "1"
+              memory: 0.5Gi
+          serviceAccountTemplate:
+            metadata:
+              annotations:
+                eks.amazonaws.com/role-arn: arn:aws:iam::012345678901:role/aws-iam-role-iam
+          sharedirStorage: 1Gi
+          stop: false
+          storage: 1Gi
+          uid: 999
+        "#;
+        let cdb_no_storage_class: CoreDB = from_str(cdb_no_storage_class_yaml).unwrap();
+        assert_eq!(cnpg_cluster_storage_class(&cdb_no_storage_class), None);
     }
 }
