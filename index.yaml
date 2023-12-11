@@ -2,14 +2,14 @@ apiVersion: v1
 entries:
   tembo-operator:
   - apiVersion: v2
-    created: "2023-12-07T22:35:45.256185931Z"
+    created: "2023-12-11T16:49:50.870077947Z"
     dependencies:
     - condition: cloudnative-pg.enabled
       name: cloudnative-pg
       repository: https://cloudnative-pg.github.io/charts
       version: 0.18.2
     description: Helm chart to deploy the tembo-operator
-    digest: 503de63c4e3af8fc0b92cd8a1d3f36f04a6c9ce72d46a2d77acba4701be85989
+    digest: f04f7772866782c1dfffa02101ae2a99611991b760866e22eb342a77829fdc35
     home: https://tembo.io
     icon: https://cloud.tembo.io/images/TemboElephant.png
     keywords:
@@ -27,4 +27,4 @@ entries:
     urls:
     - https://tembo-io.github.io/tembo/tembo-operator-0.2.0.tgz
     version: 0.2.0
-generated: "2023-12-07T22:35:45.248019609Z"
+generated: "2023-12-11T16:49:50.864803769Z"
