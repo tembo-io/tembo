@@ -198,6 +198,10 @@ pub struct CoreDBSpec {
 
     // instance restore from backup
     pub restore: Option<Restore>,
+
+    // Expose storage class to allow user to specify a custom storage class
+    #[serde(rename = "storageClass")]
+    pub storage_class: Option<String>,
 }
 
 impl CoreDBSpec {

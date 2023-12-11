@@ -340,7 +340,7 @@ pub async fn reconcile_postgres_ing_route_tcp(
         present_matchers_list.push(matcher_actual.clone());
 
         // Check if either the service name or port are mismatched
-        if !(service_name_actual == service_name && service_port_actual == port) && !app_svc_label {
+        if !(app_svc_label || service_name_actual == service_name && service_port_actual == port) {
             // This situation should only occur when the service name or port is changed, for example during cut-over from
             // CoreDB operator managing the service to CNPG managing the service.
             warn!(

@@ -17,7 +17,7 @@ use kube::{
 
 use std::collections::BTreeMap;
 
-use tracing::{debug, error, warn};
+use tracing::{debug, error};
 
 use super::{
     manager::to_delete,
@@ -79,7 +79,7 @@ fn generate_ingress_tcp(
     IngressRouteTCP {
         metadata: ObjectMeta {
             // using coredb name, since we'll have 1x ingress per coredb
-            name: Some(format!("{}", name)),
+            name: Some(name.to_string()),
             namespace: Some(namespace.to_owned()),
             owner_references: Some(vec![oref]),
             labels: Some(labels.clone()),
@@ -352,7 +352,7 @@ pub async fn reconcile_ingress(
     let ingress = generate_ingress(coredb_name, ns, oref, desired_routes.clone(), entry_points);
     if desired_routes.is_empty() {
         // we don't need an IngressRoute when there are no routes
-        let lp = ListParams::default().labels(&format!("component=appService"));
+        let lp = ListParams::default().labels("component=appService");
         // Check if there are any IngressRoute objects with the label component=appService and delete them
         let ingress_routes = ingress_api.list(&lp).await?;
         if let Some(ingress_route) = ingress_routes.into_iter().next() {
@@ -438,7 +438,7 @@ pub async fn reconcile_ingress_tcp(
     let ingress = generate_ingress_tcp(&name, ns, oref, desired_routes.clone(), entry_points_tcp);
     if desired_routes.is_empty() {
         // we don't need an IngressRouteTCP when there are no routes
-        let lp = ListParams::default().labels(&format!("component=appService"));
+        let lp = ListParams::default().labels("component=appService");
         // Check if there are any IngressRouteTCP objects with the label component=appService and delete them
         let ingress_tcp_routes = ingress_api.list(&lp).await?;
         if let Some(ingress_tcp_route) = ingress_tcp_routes.into_iter().next() {
