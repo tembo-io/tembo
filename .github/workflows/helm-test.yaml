@@ -55,12 +55,12 @@ jobs:
           echo -n "Current version: ${CURR_VERSION}\n"
           echo -n "Previous version: ${MAIN_VERSION}\n"
 
-          if [ "$CURRENT_VERSION" = "$MAIN_VERSION" ]; then
+          if [ "$CURR_VERSION" = "$MAIN_VERSION" ]; then
             echo "Helm chart version is unchanged and needs to be bumped!"
             exit 1
           fi
 
-          LOWEST_VERSION=$(printf "%s\n%s" "$CURRENT_VERSION" "$MAIN_VERSION" | sort -V | head -n1)
+          LOWEST_VERSION=$(printf "%s\n%s" "$CURR_VERSION" "$MAIN_VERSION" | sort -V | head -n1)
           if [ "$LOWEST_VERSION" != "$MAIN_VERSION" ]; then
             echo "Helm chart version has been downgraded, please bump it!"
             exit 1
