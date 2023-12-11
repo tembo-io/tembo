@@ -88,6 +88,12 @@ pub fn tembo_credentials_file_path() -> String {
     tembo_home_dir() + "/credentials"
 }
 
+pub const DOT_TEMBO_FOLDER: &str = ".tembo";
+
+pub fn tembo_state_file_path() -> String {
+    DOT_TEMBO_FOLDER.to_string() + "/tembo.state"
+}
+
 pub fn list_context() -> Result<Context> {
     let filename = tembo_context_file_path();
 

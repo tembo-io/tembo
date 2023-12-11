@@ -1,21 +1,25 @@
 use crate::{
     cli::{
-        context::{get_current_context, Environment, Target},
+        context::{get_current_context, tembo_state_file_path, Environment, Target},
         tembo_config,
     },
     Result,
 };
 use clap::{ArgMatches, Command};
+use std::io::Write;
 use std::{
     collections::HashMap,
-    fs::{self},
+    fs::{self, OpenOptions},
     str::FromStr,
 };
 use temboclient::{
-    apis::{configuration::Configuration, instance_api::create_instance},
+    apis::{
+        configuration::Configuration,
+        instance_api::{create_instance, put_instance},
+    },
     models::{
         Cpu, CreateInstance, Extension, ExtensionInstallLocation, Memory, PgConfig, StackType,
-        Storage, TrunkInstall,
+        Storage, TrunkInstall, UpdateInstance,
     },
 };
 use tokio::runtime::Runtime;
@@ -86,39 +90,97 @@ fn execute_docker() -> Result<()> {
 pub fn execute_tembo_cloud(env: Environment) -> Result<()> {
     let instance_settings: HashMap<String, InstanceSettings> = get_instance_settings()?;
 
-    let profile = env.selected_profile.unwrap();
+    let profile = env.clone().selected_profile.unwrap();
     let config = Configuration {
         base_path: profile.tembo_host,
         bearer_access_token: Some(profile.tembo_access_token),
         ..Default::default()
     };
 
-    let mut instance: CreateInstance;
-
     for (_key, value) in instance_settings.iter() {
-        instance = get_instance(value);
-
-        let v = Runtime::new().unwrap().block_on(create_instance(
-            &config,
-            env.org_id.clone().unwrap().as_str(),
-            instance,
-        ));
-
-        match v {
-            Ok(result) => {
-                println!(
-                    "Instance creation started for Instance Name: {}",
-                    result.instance_name
-                )
-            }
-            Err(error) => eprintln!("Error creating instance: {}", error),
-        };
+        let instance_id = get_instance_id_from_state(value.instance_name.clone())?;
+        if let Some(env_instance_id) = instance_id {
+            update_existing_instance(env_instance_id, value, &config, env.clone());
+        } else {
+            create_new_instance(value, &config, env.clone());
+        }
     }
 
     Ok(())
 }
 
-fn get_instance(instance_settings: &InstanceSettings) -> CreateInstance {
+pub fn get_instance_id_from_state(instance_name: String) -> Result<Option<String>> {
+    let contents = fs::read_to_string(tembo_state_file_path())?;
+
+    let tembo_state_map: HashMap<String, String> = toml::from_str(&contents)?;
+
+    let tembo_state = tembo_state_map.get(&instance_name);
+    if tembo_state.is_none() {
+        Ok(None)
+    } else {
+        let instance_id = tembo_state.unwrap().clone();
+        Ok(Some(instance_id))
+    }
+}
+
+fn update_existing_instance(
+    instance_id: String,
+    value: &InstanceSettings,
+    config: &Configuration,
+    env: Environment,
+) {
+    let instance = get_update_instance(value);
+
+    let v = Runtime::new().unwrap().block_on(put_instance(
+        config,
+        env.org_id.clone().unwrap().as_str(),
+        &instance_id,
+        instance,
+    ));
+
+    match v {
+        Ok(result) => {
+            println!(
+                "Instance update started for Instance Id: {}",
+                result.instance_id
+            )
+        }
+        Err(error) => eprintln!("Error updating instance: {}", error),
+    };
+}
+
+fn create_new_instance(value: &InstanceSettings, config: &Configuration, env: Environment) {
+    let instance = get_create_instance(value);
+
+    let v = Runtime::new().unwrap().block_on(create_instance(
+        config,
+        env.org_id.clone().unwrap().as_str(),
+        instance,
+    ));
+
+    match v {
+        Ok(result) => {
+            println!(
+                "Instance creation started for instance_name: {} with instance_id: {}",
+                result.instance_name, result.instance_id
+            );
+
+            let mut state_file = OpenOptions::new()
+                .append(true)
+                .open(tembo_state_file_path())
+                .expect("cannot open file");
+
+            let state = format!("{} = \"{}\"\n", result.instance_name, result.instance_id);
+
+            state_file
+                .write_all(state.as_bytes())
+                .expect("write failed");
+        }
+        Err(error) => eprintln!("Error creating instance: {}", error),
+    };
+}
+
+fn get_create_instance(instance_settings: &InstanceSettings) -> CreateInstance {
     return CreateInstance {
         cpu: Cpu::from_str(instance_settings.cpu.as_str()).unwrap(),
         memory: Memory::from_str(instance_settings.memory.as_str()).unwrap(),
@@ -130,6 +192,28 @@ fn get_instance(instance_settings: &InstanceSettings) -> CreateInstance {
         stack_type: StackType::from_str(instance_settings.stack_type.as_str()).unwrap(),
         storage: Storage::from_str(instance_settings.storage.as_str()).unwrap(),
         replicas: Some(instance_settings.replicas),
+        app_services: None,
+        connection_pooler: None,
+        extensions: Some(Some(get_extensions(instance_settings.extensions.clone()))),
+        extra_domains_rw: None,
+        ip_allow_list: None,
+        trunk_installs: Some(Some(get_trunk_installs(
+            instance_settings.extensions.clone(),
+        ))),
+        postgres_configs: Some(Some(get_postgres_config_cloud(instance_settings))),
+    };
+}
+
+fn get_update_instance(instance_settings: &InstanceSettings) -> UpdateInstance {
+    return UpdateInstance {
+        cpu: Cpu::from_str(instance_settings.cpu.as_str()).unwrap(),
+        memory: Memory::from_str(instance_settings.memory.as_str()).unwrap(),
+        environment: temboclient::models::Environment::from_str(
+            instance_settings.environment.as_str(),
+        )
+        .unwrap(),
+        storage: Storage::from_str(instance_settings.storage.as_str()).unwrap(),
+        replicas: instance_settings.replicas,
         app_services: None,
         connection_pooler: None,
         extensions: Some(Some(get_extensions(instance_settings.extensions.clone()))),
