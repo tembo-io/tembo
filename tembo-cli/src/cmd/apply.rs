@@ -110,16 +110,7 @@ pub fn execute_tembo_cloud(env: Environment) -> Result<()> {
 }
 
 pub fn get_instance_id_from_state(instance_name: String) -> Result<Option<String>> {
-    let contents = match fs::read_to_string(tembo_state_file_path()) {
-        Ok(c) => c,
-        Err(e) => {
-            panic!(
-                "Couldn't read context file {}: {}",
-                tembo_state_file_path(),
-                e
-            );
-        }
-    };
+    let contents = fs::read_to_string(tembo_state_file_path())?;
 
     let tembo_state_map: HashMap<String, String> = toml::from_str(&contents)?;
 
