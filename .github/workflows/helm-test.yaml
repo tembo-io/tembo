@@ -29,11 +29,38 @@ jobs:
           changed_relative_to_branch: ${{ github.base_ref || 'not-a-branch' }}
           ignore_dirs: ".tembo"
 
+  # We can check versions using ct, but there is a bug checking 1 chart. So lets
+  # just do it this way for now.
+  # https://github.com/helm/chart-testing/pull/594
+  check_version:
+    name: Check Helm chart version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          path: 'code'
+
+      - name: Fetch main branch
+        run: git fetch origin main:main
+
+      - name: Check chart version
+        run: |
+          CURR_VERSION=$(cat code/charts/tembo-operator/Chart.yaml | grep version: | cut -d ' ' -f 2)
+          MAIN_VERSION=$(git show main:charts/tembo-operator/Chart.yaml | grep version: | cut -d ' ' -f 2)
+
+          if [ "$CURR_VERSION" = "$MAIN_VERSION" ]; then
+            echo "Helm chart version needs to be bumped!"
+            exit 1
+          fi
+
   lint:
     name: Lint charts
     runs-on: ubuntu-latest
     needs:
       - find_directories
+      - check_version
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.find_directories.outputs.directories) }}
@@ -51,6 +78,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - find_directories
+      - check_version
     steps:
       - name: Checkout
         uses: actions/checkout@v3
