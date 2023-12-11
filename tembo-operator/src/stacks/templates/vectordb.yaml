@@ -2,6 +2,27 @@ name: VectorDB
 description: A Tembo Postgres Stack configured to support vector data types, storage, and operations.
 image: "quay.io/tembo/standard-cnpg:15.3.0-1-1096aeb"
 stack_version: 0.1.0
+appServices:
+  - image: quay.io/tembo/vector-serve:d24aae4
+    name: embeddings
+    routing:
+      - port: 3000
+        ingressPath: /embeddings
+        middlewares:
+          - map-embeddings
+    middlewares:
+      - !replacePathRegex
+          name: map-embeddings
+          config:
+            regex: \/embeddings\/?
+            replacement: /
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1024Mi
+      limits:
+        cpu: 2000m
+        memory: 1024Mi
 trunk_installs:
   - name: pgmq
     version: 1.1.0
