@@ -43,11 +43,14 @@ jobs:
           path: 'code'
 
       - name: Fetch main branch
-        run: git fetch origin main:main
+        run: |
+          cd code
+          git fetch origin main
 
       - name: Check chart version
         run: |
-          CURR_VERSION=$(cat code/charts/tembo-operator/Chart.yaml | grep version: | cut -d ' ' -f 2)
+          cd code
+          CURR_VERSION=$(cat charts/tembo-operator/Chart.yaml | grep version: | cut -d ' ' -f 2)
           MAIN_VERSION=$(git show main:charts/tembo-operator/Chart.yaml | grep version: | cut -d ' ' -f 2)
 
           if [ "$CURR_VERSION" = "$MAIN_VERSION" ]; then
