@@ -1,5 +1,5 @@
 use crate::{
-    cli::context::{dot_tembo_folder, tembo_state_file_path},
+    cli::context::{tembo_state_file_path, DOT_TEMBO_FOLDER},
     Result,
 };
 use clap::{ArgMatches, Command};
@@ -69,7 +69,7 @@ pub fn execute(_args: &ArgMatches) -> Result<()> {
         }
     }
 
-    match FileUtils::create_dir(".tembo directory".to_string(), dot_tembo_folder()) {
+    match FileUtils::create_dir(".tembo directory".to_string(), DOT_TEMBO_FOLDER.to_string()) {
         Ok(t) => t,
         Err(e) => {
             return Err(e);
