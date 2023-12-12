@@ -8,7 +8,6 @@ ENV PGDATA /var/lib/postgresql/data2
 RUN mkdir -p $PGDATA
 RUN chown -R postgres:postgres $PGDATA && \
     chmod -R 0700 $PGDATA
-
 USER postgres
 RUN pg_ctl init
 # Set permissive authentication
