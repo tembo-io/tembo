@@ -4,6 +4,7 @@ use crate::{
         postgres_parameters::MergeError,
     },
     cloudnativepg::{
+        backups::Backup,
         clusters::{
             Cluster, ClusterAffinity, ClusterBackup, ClusterBackupBarmanObjectStore,
             ClusterBackupBarmanObjectStoreData, ClusterBackupBarmanObjectStoreDataCompression,
@@ -50,7 +51,7 @@ use crate::{
 use chrono::{DateTime, NaiveDateTime, Offset};
 use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
 use kube::{
-    api::{DeleteParams, Patch, PatchParams},
+    api::{DeleteParams, ListParams, Patch, PatchParams},
     runtime::{controller::Action, wait::Condition},
     Api, Resource, ResourceExt,
 };
@@ -729,9 +730,8 @@ async fn pods_to_fence(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<String>, A
     if cdb.spec.restore.is_some()
         && cdb
             .status
-            .clone()
-            .unwrap_or_default()
-            .first_recoverability_time
+            .as_ref()
+            .and_then(|s| s.first_recoverability_time.as_ref())
             .is_none()
     {
         // If restore is requested, fence all the pods based on the cdb.spec.replicas value
@@ -1709,6 +1709,52 @@ fn generate_s3_restore_credentials(
         ClusterExternalClustersBarmanObjectStoreS3Credentials {
             inherit_from_iam_role: Some(true),
             ..Default::default()
+        }
+    }
+}
+
+fn is_backup_completed(backup: &Backup) -> bool {
+    match &backup.status {
+        Some(status) => status.phase.as_deref() == Some("completed"),
+        None => false,
+    }
+}
+
+// Lookup the Backup status of the instance we are deploying.  If the backup isn't
+// complete, we will requeue until it is.
+pub async fn check_backups_status(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {
+    let instance_name = cdb.name_any();
+    let namespace = cdb.namespace().ok_or_else(|| {
+        error!("Namespace is not set for CoreDB for instance {}", instance_name);
+        Action::requeue(Duration::from_secs(300))
+    })?;
+
+    let backups_api: Api<Backup> = Api::namespaced(ctx.client.clone(), &namespace);
+    let label_selector = format!("cnpg.io/cluster={},cnpg.io/immediateBackup=true", instance_name);
+    let lp = ListParams::default().labels(&label_selector);
+    let backup_result = backups_api.list(&lp).await;
+
+    match backup_result {
+        Ok(backup_list) => {
+            if backup_list.items.is_empty() {
+                error!("No backups found for {}, requeuing", instance_name);
+                return Err(Action::requeue(Duration::from_secs(30)));
+            }
+
+            for backup_item in backup_list.items {
+                if let Some(backup_name) = &backup_item.metadata.name {
+                    if !is_backup_completed(&backup_item) {
+                        info!("Backup {} is not completed, requeuing", backup_name);
+                        return Err(Action::requeue(Duration::from_secs(30)));
+                    }
+                    info!("Backup {} completed", backup_name);
+                }
+            }
+            Ok(())
+        }
+        Err(e) => {
+            error!("Error listing backups: {}", e);
+            Err(Action::requeue(Duration::from_secs(300)))
         }
     }
 }
