@@ -3,6 +3,8 @@ DATABASE_URL := 'postgres://postgres:postgres@cp-pgmq-pg:5432'
 CONDUCTOR_DATABASE_URL := 'postgresql://postgres:postgres@0.0.0.0:5431/postgres'
 CLERK_SECRET_KEY := 'clerk-tembo-dev-secret-key'
 RUST_LOG := 'info'
+KUBE_VERSION := '1.25'
+CERT_MANAGER_VERSION := '1.13.2'
 
 watch-operator:
     docker container rm kind-control-plane --force || true
@@ -40,3 +42,23 @@ dbs-cleanup:
 
 dbs-start:
     just run-dbs
+
+helm-lint:
+  ct lint --config ct.yaml
+
+helm-repo:
+	helm repo add cnpg https://cloudnative-pg.github.io/charts
+
+cert-manager:
+	helm repo add jetstack https://charts.jetstack.io
+	helm repo update
+	helm upgrade --install cert-manager jetstack/cert-manager --version={{CERT_MANAGER_VERSION}} --namespace cert-manager --create-namespace --values=tembo-operator/testdata/cert-manager.yaml
+	sleep 5
+	kubectl wait --timeout=120s --for=condition=ready pod -l app.kubernetes.io/instance=cert-manager -n cert-manager
+
+start-kind:
+  kind delete cluster
+  kind create cluster --config testdata/kind-{{KUBE_VERSION}}.yaml
+  sleep 5
+  kubectl wait pods --for=condition=Ready --timeout=300s --all --all-namespaces
+  just cert-manager

@@ -45,6 +45,10 @@ appServices:
         cpu: 400m
         memory: 256Mi
 compute_templates:
+  - cpu: 0.25
+    memory: 1Gi
+  - cpu: 0.5
+    memory: 2Gi
   - cpu: 1
     memory: 4Gi
   - cpu: 2
@@ -57,7 +61,7 @@ compute_templates:
     memory: 32Gi
 trunk_installs:
   - name: pgmq
-    version: 0.33.1
+    version: 1.1.0
   - name: pg_partman
     version: 4.7.3
 extensions:
@@ -65,7 +69,7 @@ extensions:
     locations:
       - database: postgres
         enabled: true
-        version: 0.33.1
+        version: 1.1.0
   - name: pg_partman
     locations:
       - database: postgres

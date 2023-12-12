@@ -1,0 +1,47 @@
+{{- if (index .Values "pod-init").enabled }}
+{{- $namespace := include "component.namespace" (list (list "pod-init" .Values .)) -}}
+{{- $fullname := include "pod-init.fullname" . -}}
+apiVersion: admissionregistration.k8s.io/v1
+kind: MutatingWebhookConfiguration
+metadata:
+  name: {{ $fullname }}
+  namespace: {{ $namespace }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade,post-delete
+    cert-manager.io/inject-ca-from: {{ printf "%s/%s-certificate" $namespace $fullname }}
+  labels:
+{{ include "pod-init-helm.labels" . | indent 4 }}
+webhooks:
+  - name: {{ printf "%s.%s.svc" $fullname $namespace }}
+    clientConfig:
+      service:
+        name: {{ $fullname }}
+        namespace: {{ $namespace }}
+        path: "/mutate"
+    rules:
+      - operations: ["CREATE", "UPDATE"]
+        apiGroups: [""]
+        apiVersions: ["v1"]
+        resources: ["pods"]
+    sideEffects: None
+    admissionReviewVersions: ["v1"]
+    namespaceSelector:
+      matchLabels:
+        {{- toYaml (index (index .Values "pod-init") "namespaceSelector" "matchLabels") | nindent 8 }}
+  - name: {{ printf "%s.%s.svc.cluster.local" $fullname $namespace }}
+    clientConfig:
+      service:
+        name: {{ $fullname }}
+        namespace: {{ $namespace }}
+        path: "/mutate"
+    rules:
+      - operations: ["CREATE", "UPDATE"]
+        apiGroups: [""]
+        apiVersions: ["v1"]
+        resources: ["pods"]
+    sideEffects: None
+    admissionReviewVersions: ["v1"]
+    namespaceSelector:
+      matchLabels:
+        {{- toYaml (index (index .Values "pod-init") "namespaceSelector" "matchLabels") | nindent 8 }}
+{{- end }}
