@@ -3081,6 +3081,16 @@ mod test {
         let app_1_resources = app_1_container.resources.unwrap();
         assert_eq!(app_1_resources, expected);
 
+        // Assert /tembo/certs is included in volume mounts
+        let volume_mounts = app_1_container.volume_mounts.unwrap();
+        let mut found = false;
+        for mount in volume_mounts {
+            if mount.mount_path == "/tembo/certs" {
+                found = true;
+            }
+        }
+        assert!(found);
+
         let ingresses: Result<Vec<IngressRoute>, errors::OperatorError> =
             list_resources(client.clone(), cdb_name, &namespace, 1).await;
         let ingress = ingresses.unwrap();
@@ -3156,6 +3166,16 @@ mod test {
         .unwrap();
         let app_2_resources = app_2_container.resources.unwrap();
         assert_eq!(app_2_resources, expected);
+
+        // Assert /tembo/certs is included in volume mounts
+        let volume_mounts = app_2_container.volume_mounts.unwrap();
+        let mut found = false;
+        for mount in volume_mounts {
+            if mount.mount_path == "/tembo/certs" {
+                found = true;
+            }
+        }
+        assert!(found);
 
         // Delete the one without a service, but leave the postgrest appService
         let coredb_json = serde_json::json!({
