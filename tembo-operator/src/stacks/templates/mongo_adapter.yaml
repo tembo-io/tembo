@@ -37,7 +37,7 @@ appServices:
                     storage: 1Gi
         - name: ferretdb-certs
           secret:
-            secretName: sample-mongo-adapter-server1
+            secretName: <coredb-name>-server1
         volumeMounts:
           - name: ferretdb-data
             mountPath: /state

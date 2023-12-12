@@ -53,6 +53,7 @@ fn generate_resource(
     domain: String,
 ) -> AppServiceResources {
     let resource_name = format!("{}-{}", coredb_name, appsvc.name.clone());
+    let secret_name = format!("{}-server1", coredb_name);
     let service = appsvc
         .routing
         .as_ref()
