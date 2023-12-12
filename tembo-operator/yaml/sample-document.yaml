@@ -24,9 +24,9 @@ spec:
         - name: FERRETDB_STATE_DIR
           value: '-'
         - name: FERRETDB_LISTEN_TLS_CERT_FILE
-          value: /certs/tls.crt
+          value: /tembo/certs/tls.crt
         - name: FERRETDB_LISTEN_TLS_KEY_FILE
-          value: /certs/tls.key
+          value: /tembo/certs/tls.key
         - name: FERRETDB_LISTEN_TLS
           value: :27018
       storage:
@@ -40,12 +40,6 @@ spec:
                   resources:
                     requests:
                       storage: 1Gi
-          - name: ferretdb-certs
-            secret:
-              secretName: sample-document-server1
         volumeMounts:
             - name: ferretdb-data
               mountPath: /state
-            - name: ferretdb-certs
-              mountPath: /certs
-              readOnly: true

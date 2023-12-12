@@ -4,7 +4,8 @@ use k8s_openapi::{
         apps::v1::{Deployment, DeploymentSpec},
         core::v1::{
             Capabilities, Container, ContainerPort, EnvVar, EnvVarSource, HTTPGetAction, PodSpec,
-            PodTemplateSpec, Probe, SecretKeySelector, SecurityContext, Service, ServicePort, ServiceSpec,
+            PodTemplateSpec, Probe, SecretKeySelector, SecretVolumeSource, SecurityContext, Service,
+            ServicePort, ServiceSpec, Volume, VolumeMount,
         },
     },
     apimachinery::pkg::{
@@ -355,6 +356,38 @@ fn generate_deployment(
     // combine the secret env vars and those provided in spec by user
     env_vars.extend(secret_envs);
 
+    // Create volume vec and add certs volume from secret
+    let mut volumes: Vec<Volume> = Vec::new();
+    let certs_volume = Volume {
+        name: "tembo-certs".to_string(),
+        secret: Some(SecretVolumeSource {
+            secret_name: Some(format!("{}-server1", coredb_name)),
+            ..SecretVolumeSource::default()
+        }),
+        ..Volume::default()
+    };
+    volumes.push(certs_volume);
+
+    // Create volume mounts vec and add certs volume mount
+    let mut volume_mounts: Vec<VolumeMount> = Vec::new();
+    let certs_volume_mount = VolumeMount {
+        name: "tembo-certs".to_string(),
+        mount_path: "/tembo/certs".to_string(),
+        read_only: Some(true),
+        ..VolumeMount::default()
+    };
+    volume_mounts.push(certs_volume_mount);
+
+    // Add any user provided volumes / volume mounts
+    if let Some(storage) = appsvc.storage.clone() {
+        if let Some(vols) = storage.volumes {
+            volumes.extend(vols);
+        }
+        if let Some(vols) = storage.volume_mounts {
+            volume_mounts.extend(vols);
+        }
+    }
+
     let pod_spec = PodSpec {
         containers: vec![Container {
             args: appsvc.args.clone(),
@@ -367,10 +400,10 @@ fn generate_deployment(
             readiness_probe,
             liveness_probe,
             security_context: Some(security_context),
-            volume_mounts: appsvc.storage.clone().and_then(|s| s.volume_mounts),
+            volume_mounts: Some(volume_mounts),
             ..Container::default()
         }],
-        volumes: appsvc.storage.clone().and_then(|s| s.volumes),
+        volumes: Some(volumes),
         ..PodSpec::default()
     };
 
