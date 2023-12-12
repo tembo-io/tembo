@@ -1,0 +1,22 @@
+{{- if (index .Values "pod-init").enabled }}
+{{- $namespace := include "component.namespace" (list (list "pod-init" .Values .)) -}}
+{{- $fullname := include "pod-init.fullname" . -}}
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: {{ $fullname }}-certificate
+  namespace: {{ $namespace }}
+  annotations:
+    "helm.sh/hook": pre-install
+  labels:
+{{ include "pod-init-helm.labels" . | indent 4 }}
+spec:
+  dnsNames:
+  - {{ printf "%s.%s.svc" $fullname $namespace }}
+  - {{ printf "%s.%s.svc.cluster.local" $fullname $namespace }}
+  issuerRef:
+    name: {{ printf "%s-issuer" $fullname }}
+  secretName: {{ printf "%s-tls" $fullname }}
+  privateKey:
+    rotationPolicy: Always
+{{- end }}

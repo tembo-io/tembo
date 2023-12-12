@@ -1,0 +1,86 @@
+{{/*
+Create a default fully qualified app name.
+We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
+If release name contains chart name it will be used as a full name.
+*/}}
+{{- define "pod-init.fullname" -}}
+{{- $defaultName := "pod-init" -}}
+{{- $name := default $defaultName (index .Values "pod-init").nameOverride -}}
+{{- if contains $name .Release.Name -}}
+{{- .Release.Name | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "controller.fullname" -}}
+{{- $defaultName := "controller" -}}
+{{- $name := default $defaultName (index .Values "controller").nameOverride -}}
+{{- if contains $name .Release.Name -}}
+{{- .Release.Name | trunc 63 | trimSuffix "-" -}}
+{{- else -}}
+{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Create chart name and version as used by the chart label.
+*/}}
+{{- define "pod-init.chart" -}}
+{{- $defaultName := "pod-init" -}}
+{{- printf "%s-%s" $defaultName .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{- define "controller.chart" -}}
+{{- $defaultName := .Chart.Name -}}
+{{- printf "%s-%s" $defaultName .Chart.Version | replace "+" "_" | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{/*
+Determine the namespace for a given component. If the component's namespaceOverride is set, use that;
+otherwise, use the release namespace.
+*/}}
+{{- define "component.namespace" -}}
+  {{- $args := index . 0 -}}
+  {{- $componentName := index $args 0 -}}
+  {{- $values := index $args 1 -}}
+  {{- $context := index $args 2 -}}
+  {{- $namespaceOverride := index $values $componentName "namespaceOverride" -}}
+  {{- if and $namespaceOverride (ne $namespaceOverride "") -}}
+    {{- $namespaceOverride -}}
+  {{- else -}}
+    {{- $context.Release.Namespace -}}
+  {{- end -}}
+{{- end -}}
+
+
+{{/*
+Generate labels to be used
+*/}}
+{{- define "pod-init.labels" -}}
+app: {{ include "pod-init.fullname" . }}
+chart: {{ template "pod-init.chart" . }}
+release: {{ .Release.Name }}
+heritage: {{ .Release.Service }}
+{{- end }}
+
+{{- define "pod-init-helm.labels" -}}
+{{ include "pod-init.labels" . }}
+app.kubernetes.io/name: {{ include "pod-init.fullname" . | quote }}
+app.kubernetes.io/version: {{ default (index .Values "pod-init").image.tag .Chart.Version }}
+app.kubernetes.io/component: "admission"
+{{- end }}
+
+{{- define "controller.labels" -}}
+app: {{ include "controller.fullname" . }}
+chart: {{ template "controller.chart" . }}
+release: {{ .Release.Name }}
+heritage: {{ .Release.Service }}
+{{- end }}
+
+{{- define "controller-helm.labels" -}}
+{{ include "controller.labels" . }}
+app.kubernetes.io/name: {{ include "controller.fullname" . | quote }}
+app.kubernetes.io/version: {{ default (index .Values "controller").image.tag .Chart.Version }}
+app.kubernetes.io/component: "controller"
+{{- end }}

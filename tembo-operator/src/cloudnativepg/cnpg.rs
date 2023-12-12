@@ -4,6 +4,7 @@ use crate::{
         postgres_parameters::MergeError,
     },
     cloudnativepg::{
+        backups::Backup,
         clusters::{
             Cluster, ClusterAffinity, ClusterBackup, ClusterBackupBarmanObjectStore,
             ClusterBackupBarmanObjectStoreData, ClusterBackupBarmanObjectStoreDataCompression,
@@ -50,7 +51,7 @@ use crate::{
 use chrono::{DateTime, NaiveDateTime, Offset};
 use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
 use kube::{
-    api::{DeleteParams, Patch, PatchParams},
+    api::{DeleteParams, ListParams, Patch, PatchParams},
     runtime::{controller::Action, wait::Condition},
     Api, Resource, ResourceExt,
 };
@@ -409,7 +410,6 @@ pub fn cnpg_cluster_bootstrap_from_cdb(
                     max_parallel: Some(5),
                     encryption: Some(ClusterExternalClustersBarmanObjectStoreWalEncryption::Aes256),
                     compression: Some(ClusterExternalClustersBarmanObjectStoreWalCompression::Snappy),
-                    ..ClusterExternalClustersBarmanObjectStoreWal::default()
                 }),
                 server_name: Some(restore.server_name.clone()),
                 ..ClusterExternalClustersBarmanObjectStore::default()
@@ -493,14 +493,20 @@ fn cnpg_postgres_config(
 
 fn cnpg_cluster_storage(cdb: &CoreDB) -> Option<ClusterStorage> {
     let storage = cdb.spec.storage.clone().0;
+    let storage_class = cnpg_cluster_storage_class(cdb);
     Some(ClusterStorage {
         resize_in_use_volumes: Some(true),
         size: Some(storage),
-        // TODO: pass storage class from cdb
-        // storage_class: Some("gp3-enc".to_string()),
-        storage_class: None,
+        storage_class,
         ..ClusterStorage::default()
     })
+}
+
+fn cnpg_cluster_storage_class(cdb: &CoreDB) -> Option<String> {
+    match &cdb.spec.storage_class {
+        Some(storage_class) if !storage_class.is_empty() => Some(storage_class.clone()),
+        _ => None,
+    }
 }
 
 // Check replica count to enable HA
@@ -724,9 +730,8 @@ async fn pods_to_fence(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<String>, A
     if cdb.spec.restore.is_some()
         && cdb
             .status
-            .clone()
-            .unwrap_or_default()
-            .first_recoverability_time
+            .as_ref()
+            .and_then(|s| s.first_recoverability_time.as_ref())
             .is_none()
     {
         // If restore is requested, fence all the pods based on the cdb.spec.replicas value
@@ -852,7 +857,6 @@ fn update_restarted_at(cdb: &CoreDB, maybe_cluster: Option<&Cluster>, new_spec: 
 
     restart_annotation_updated
 }
-
 
 #[instrument(skip(cdb, ctx) fields(trace_id, instance_name = %cdb.name_any()))]
 pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {
@@ -1709,6 +1713,52 @@ fn generate_s3_restore_credentials(
     }
 }
 
+fn is_backup_completed(backup: &Backup) -> bool {
+    match &backup.status {
+        Some(status) => status.phase.as_deref() == Some("completed"),
+        None => false,
+    }
+}
+
+// Lookup the Backup status of the instance we are deploying.  If the backup isn't
+// complete, we will requeue until it is.
+pub async fn check_backups_status(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {
+    let instance_name = cdb.name_any();
+    let namespace = cdb.namespace().ok_or_else(|| {
+        error!("Namespace is not set for CoreDB for instance {}", instance_name);
+        Action::requeue(Duration::from_secs(300))
+    })?;
+
+    let backups_api: Api<Backup> = Api::namespaced(ctx.client.clone(), &namespace);
+    let label_selector = format!("cnpg.io/cluster={},cnpg.io/immediateBackup=true", instance_name);
+    let lp = ListParams::default().labels(&label_selector);
+    let backup_result = backups_api.list(&lp).await;
+
+    match backup_result {
+        Ok(backup_list) => {
+            if backup_list.items.is_empty() {
+                error!("No backups found for {}, requeuing", instance_name);
+                return Err(Action::requeue(Duration::from_secs(30)));
+            }
+
+            for backup_item in backup_list.items {
+                if let Some(backup_name) = &backup_item.metadata.name {
+                    if !is_backup_completed(&backup_item) {
+                        info!("Backup {} is not completed, requeuing", backup_name);
+                        return Err(Action::requeue(Duration::from_secs(30)));
+                    }
+                    info!("Backup {} completed", backup_name);
+                }
+            }
+            Ok(())
+        }
+        Err(e) => {
+            error!("Error listing backups: {}", e);
+            Err(Action::requeue(Duration::from_secs(300)))
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2347,5 +2397,68 @@ mod tests {
     fn test_invalid_format() {
         let result = parse_target_time(Some("invalid-format"));
         assert!(result.is_err()); // check for error
+    }
+
+    #[test]
+    fn test_cnpg_cluster_storage_class() {
+        let cdb_storage_class_yaml = r#"
+        apiVersion: coredb.io/v1alpha1
+        kind: CoreDB
+        metadata:
+          name: test
+          namespace: default
+        spec:
+          image: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e 
+          port: 5432
+          postgresExporterEnabled: true
+          postgresExporterImage: quay.io/prometheuscommunity/postgres-exporter:v0.12.1
+          replicas: 1
+          resources:
+            limits:
+              cpu: "1"
+              memory: 0.5Gi
+          serviceAccountTemplate:
+            metadata:
+              annotations:
+                eks.amazonaws.com/role-arn: arn:aws:iam::012345678901:role/aws-iam-role-iam
+          sharedirStorage: 1Gi
+          stop: false
+          storage: 1Gi
+          storageClass: "gp3-enc"
+          uid: 999
+        "#;
+        let cdb_storage_class: CoreDB = from_str(cdb_storage_class_yaml).unwrap();
+        assert_eq!(
+            cnpg_cluster_storage_class(&cdb_storage_class),
+            Some("gp3-enc".to_string())
+        );
+
+        let cdb_no_storage_class_yaml = r#"
+        apiVersion: coredb.io/v1alpha1
+        kind: CoreDB
+        metadata:
+          name: test
+          namespace: default
+        spec:
+          image: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e 
+          port: 5432
+          postgresExporterEnabled: true
+          postgresExporterImage: quay.io/prometheuscommunity/postgres-exporter:v0.12.1
+          replicas: 1
+          resources:
+            limits:
+              cpu: "1"
+              memory: 0.5Gi
+          serviceAccountTemplate:
+            metadata:
+              annotations:
+                eks.amazonaws.com/role-arn: arn:aws:iam::012345678901:role/aws-iam-role-iam
+          sharedirStorage: 1Gi
+          stop: false
+          storage: 1Gi
+          uid: 999
+        "#;
+        let cdb_no_storage_class: CoreDB = from_str(cdb_no_storage_class_yaml).unwrap();
+        assert_eq!(cnpg_cluster_storage_class(&cdb_no_storage_class), None);
     }
 }

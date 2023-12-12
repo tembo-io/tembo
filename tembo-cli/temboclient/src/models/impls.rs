@@ -64,16 +64,20 @@ impl FromStr for Storage {
 	}
 }
 
-impl ToString for StackType {
-	fn to_string(&self) -> String {
-			match self {
-					Self::Standard => String::from("Standard"),
-					Self::MessageQueue => String::from("MessageQueue"),
-					Self::MachineLearning => String::from("MachineLearning"),
-					Self::Olap => String::from("OLAP"),
-					Self::Oltp => String::from("OLTP"),
-					Self::VectorDb => String::from("VectorDB"),
-					Self::DataWarehouse => String::from("DataWarehouse"),
-			}
-	}
+impl FromStr for StackType {
+	type Err = ();
+
+	fn from_str(input: &str) -> core::result::Result<StackType, Self::Err> {
+		match input {
+				"Standard" => Ok(StackType::Standard),
+				"MessageQueue" => Ok(StackType::MessageQueue),
+				"MachineLearning" => Ok(StackType::MachineLearning),
+				"OLAP" => Ok(StackType::Olap),
+				"VectorDB" => Ok(StackType::VectorDb),
+				"OLTP" => Ok(StackType::Oltp),
+				"DataWarehouse" => Ok(StackType::DataWarehouse),
+				_ => Err(()),
+		}
+}
+
 }

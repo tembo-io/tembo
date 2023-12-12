@@ -24,7 +24,7 @@ profile = 'prod'
 // TODO: Move this to a template file
 pub const CREDENTIALS_DEFAULT_TEXT: &str = "version = \"1.0\"
 
-[[environment]]
+[[profile]]
 name = 'prod'
 tembo_access_token = 'ACCESS_TOKEN'
 tembo_host = 'https://api.coredb.io'
@@ -86,6 +86,12 @@ pub fn tembo_context_file_path() -> String {
 
 pub fn tembo_credentials_file_path() -> String {
     tembo_home_dir() + "/credentials"
+}
+
+pub const DOT_TEMBO_FOLDER: &str = ".tembo";
+
+pub fn tembo_state_file_path() -> String {
+    DOT_TEMBO_FOLDER.to_string() + "/tembo.state"
 }
 
 pub fn list_context() -> Result<Context> {

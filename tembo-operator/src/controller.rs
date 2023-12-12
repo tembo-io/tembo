@@ -6,7 +6,10 @@ use crate::{
     app_service::manager::reconcile_app_services,
     cloudnativepg::{
         backups::Backup,
-        cnpg::{cnpg_cluster_from_cdb, reconcile_cnpg, reconcile_cnpg_scheduled_backup, reconcile_pooler},
+        cnpg::{
+            check_backups_status, cnpg_cluster_from_cdb, reconcile_cnpg, reconcile_cnpg_scheduled_backup,
+            reconcile_pooler,
+        },
     },
     config::Config,
     deployment_postgres_exporter::reconcile_prometheus_exporter_deployment,
@@ -263,7 +266,6 @@ impl CoreDB {
                     Action::requeue(Duration::from_secs(300))
                 })?;
 
-
         reconcile_generic_metrics_configmap(self, ctx.clone()).await?;
 
         reconcile_cnpg(self, ctx.clone()).await?;
@@ -309,6 +311,19 @@ impl CoreDB {
                 patch_cdb_status_merge(&coredbs, &name, patch_status).await?;
                 let (trunk_installs, extensions) =
                     reconcile_extensions(self, ctx.clone(), &coredbs, &name).await?;
+
+                // Make sure the initial backup has completed if enabled before finishing
+                // reconciliation of the CoreDB resource that is being restored
+                if cfg.enable_backup
+                    && self.spec.restore.is_some()
+                    && self
+                        .status
+                        .as_ref()
+                        .and_then(|s| s.first_recoverability_time)
+                        .is_none()
+                {
+                    check_backups_status(self, ctx.clone()).await?;
+                }
 
                 let recovery_time = self.get_recovery_time(ctx.clone()).await?;
 

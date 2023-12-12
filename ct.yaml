@@ -1,0 +1,16 @@
+remote: origin
+target-branch: main
+check-version-infrement: true
+process-all-charts: false
+charts:
+  - charts/tembo-operator
+chart-repos:
+  - cloudnative-pg=https://cloudnative-pg.github.io/charts
+chart-dirs:
+  - charts
+helm-extra-args: --timeout 10m
+debug: false
+kubectl-timeout: 0s
+print-logs: true
+# Disable upgrade testing due to CNPG CRD annotation "helm.sh/resource-policy: keep"
+upgrade: false

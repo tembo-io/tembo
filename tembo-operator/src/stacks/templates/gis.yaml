@@ -3,6 +3,10 @@ description: Postgres for geospatial workloads.
 image: "quay.io/tembo/standard-cnpg:15.3.0-1-1096aeb"
 stack_version: 0.1.0
 compute_templates:
+  - cpu: 0.25
+    memory: 1Gi
+  - cpu: 0.5
+    memory: 2Gi
   - cpu: 1
     memory: 4Gi
   - cpu: 2

@@ -1,0 +1,15 @@
+{{- if (index .Values "pod-init").enabled }}
+{{- $namespace := include "component.namespace" (list (list "pod-init" .Values .)) -}}
+{{- $fullname := include "pod-init.fullname" . -}}
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata:
+  name: {{ $fullname }}-issuer
+  namespace: {{ $namespace }}
+  annotations:
+    "helm.sh/hook": pre-install,pre-upgrade
+  labels:
+{{ include "pod-init-helm.labels" . | indent 4 }}
+spec:
+  selfSigned: {}
+{{- end }}

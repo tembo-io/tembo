@@ -1,0 +1,159 @@
+name: Lint/Test Helm charts
+
+on:
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'charts/**'
+
+jobs:
+  find_directories:
+    name: Find changed helm charts
+    runs-on: ubuntu-latest
+    outputs:
+      directories: ${{ steps.find_directories.outputs.build_matrix }}
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v3
+      - name: Check out the coredb repo to reuse some actions
+        uses: actions/checkout@v3
+        with:
+          repository: tembo-io/tembo
+          path: ./.tembo
+          ref: 84664df742ce9774a3029e08111940f9f1fb345e
+      - name: Find directories with Chart.yaml that changed
+        id: find_directories
+        uses: ./.tembo/.github/actions/find-changed-directories
+        with:
+          contains_the_file: Chart.yaml
+          changed_relative_to_branch: ${{ github.base_ref || 'not-a-branch' }}
+          ignore_dirs: ".tembo"
+
+  # We can check versions using ct, but there is a bug checking 1 chart. So lets
+  # just do it this way for now.
+  # https://github.com/helm/chart-testing/pull/594
+  check_version:
+    name: Check Helm chart version
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          path: 'code'
+
+      - name: Fetch main branch
+        run: |
+          cd code
+          git fetch origin main:main
+
+      - name: Check chart version
+        run: |
+          cd code
+          CURR_VERSION=$(cat charts/tembo-operator/Chart.yaml | grep version: | cut -d ' ' -f 2)
+          MAIN_VERSION=$(git show main:charts/tembo-operator/Chart.yaml | grep version: | cut -d ' ' -f 2)
+
+          echo -n "Current version: ${CURR_VERSION}\n"
+          echo -n "Previous version: ${MAIN_VERSION}\n"
+
+          if [ "$CURR_VERSION" = "$MAIN_VERSION" ]; then
+            echo "Helm chart version is unchanged and needs to be bumped!"
+            exit 1
+          fi
+
+          LOWEST_VERSION=$(printf "%s\n%s" "$CURR_VERSION" "$MAIN_VERSION" | sort -V | head -n1)
+          if [ "$LOWEST_VERSION" != "$MAIN_VERSION" ]; then
+            echo "Helm chart version has been downgraded, please bump it!"
+            exit 1
+          fi
+
+  lint:
+    name: Lint charts
+    runs-on: ubuntu-latest
+    needs:
+      - find_directories
+      - check_version
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.find_directories.outputs.directories) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Helm lint
+        run: helm lint ${{ matrix.path }}
+
+  lint-ct:
+    name: Lint using chart-testing
+    runs-on: ubuntu-latest
+    needs:
+      - find_directories
+      - check_version
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      # Python is required because `ct lint` runs Yamale (https://github.com/23andMe/Yamale) and
+      # yamllint (https://github.com/adrienverge/yamllint) which require Python
+      - name: Set up Python
+        uses: actions/setup-python@v4 #
+        with:
+          python-version: 3.x
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v3.5
+        with:
+          version: 3.13.2
+
+      - name: Set up chart-testing
+        uses: helm/chart-testing-action@v2.6.1
+
+      - name: Install just
+        uses: extractions/setup-just@v1
+      - run: just helm-repo
+
+      - name: Run chart-testing (list-changed)
+        id: list-changed
+        run: |
+          changed=$(ct list-changed --target-branch main)
+          if [[ -n "$changed" ]]; then
+            echo "changed=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run chart-testing linter
+        if: steps.list-changed.outputs.changed == 'true'
+        run: ct lint --config ct.yaml
+
+  test:
+    name: Test using chart-testing
+    runs-on: ubuntu-latest
+    needs: lint-ct
+    # if: needs.lint-ct.outputs.changed == 'true'
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v3.5
+        with:
+          version: 3.13.2
+
+      - name: Set up chart-testing
+        uses: helm/chart-testing-action@v2.6.1
+
+      - uses: extractions/setup-just@v1
+      - run: just helm-repo
+      - name: Install kind cluster
+        uses: helm/kind-action@v1.8.0
+        with:
+          install_only: true
+      - name: Start kind cluster
+        run: just start-kind
+
+      - name: Run helm chart tests
+        run: ct install --config ct.yaml

@@ -1,28 +1,199 @@
-image:
-  repository: quay.io/tembo/tembo-operator
-  pullPolicy: Always
-  tag: latest
+#
+# The PostgreSQL License
+#
+# Copyright (c) 2023, Tembo
+#
+# Permission to use, copy, modify, and distribute this software and its documentation for any purpose, without fee, and without a written agreement is hereby granted, provided that the above copyright notice and this paragraph and the following two paragraphs appear in all copies.
+#
+# IN NO EVENT SHALL TEMBO BE LIABLE TO ANY PARTY FOR DIRECT, INDIRECT, SPECIAL, INCIDENTAL, OR CONSEQUENTIAL DAMAGES, INCLUDING LOST PROFITS, ARISING OUT OF THE USE OF THIS SOFTWARE AND ITS DOCUMENTATION, EVEN IF TEMBO HAS BEEN ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+# TEMBO SPECIFICALLY DISCLAIMS ANY WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE. THE SOFTWARE PROVIDED HEREUNDER IS ON AN "AS IS" BASIS, AND TEMBO HAS NO OBLIGATIONS TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS, OR MODIFICATIONS.
+#
+# Default values for the Tembo Operator.
+# This is a YAML-formatted file.
+# Please declare variables to be passed to your templates.
 
-podMonitor:
+# -- The controller configuration
+controller:
   enabled: true
-  port: http
-  path: /metrics
+  nameOverride:
+  namespaceOverride:
 
-env: []
+  # -- The log level to set inside the tembo-controller, default is info
+  logLevel: info
 
-resources:
-  limits:
-    cpu: 1000m
-    memory: 256Mi
-  requests:
-    cpu: 250m
-    memory: 100Mi
+  # -- The number of replicas to set for the tembo-controller
+  replicas: 1
 
-# https://kubernetes.io/docs/concepts/configuration/assign-pod-node/#nodeselector
-nodeSelector: {}
+  rbac:
+    # -- Specifies whether ClusterRole and ClusterRoleBinding should be created.
+    create: true
 
-# https://kubernetes.io/docs/concepts/configuration/taint-and-toleration/
-tolerations: []
+  # -- The default image for the controller
+  image:
+    repository: quay.io/tembo/tembo-operator
+    pullPolicy: Always
+    # -- Overrides the image tag whose default is latest
+    tag: latest
 
-# https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#affinity-and-anti-affinity
-affinity: {}
+  crds:
+    # -- Specifies whether the CRDs should be created when installing the chart.
+    create: true
+
+  monitoring:
+    # -- Specifies whether the monitoring should be enabled. Requires Prometheus Operator CRDs.
+    prometheusRule:
+      enabled: false
+    # -- Specifies whether to enable the PodMonitor.  Requires Prometheus Operator CRDs
+    podMonitor:
+      enabled: false
+      port: http
+      path: /metrics
+
+  extraEnv: []
+
+  # -- Annotations to be added to the deployment
+  annotations: {}
+
+  # -- Annotations to be added to the pod.
+  podAnnotations: {}
+
+  resources: {}
+  # If you want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  #
+  # limits:
+  #   cpu: 1000m
+  #   memory: 256Mi
+  # requests:
+  #   cpu: 250m
+  #   memory: 100Mi
+
+  # -- Deployment upgradeStrategy configuration
+  upgradeStrategy: RollingUpdate
+
+  # -- Service configuraton
+  service:
+    type: "ClusterIP"
+    port: 80
+    targetPort: 8080
+    annotations: {}
+
+  # -- ReadinessProbe configuration
+  readinessProbe:
+    httpGet:
+      path: /health
+      port: http
+      scheme: HTTP
+    initialDelaySeconds: 5
+    periodSeconds: 5
+
+  # -- LivenessProbe configuration
+  livenessProbe: {}
+
+  # -- Nodeselector for the controller to be installed.
+  nodeSelector: {}
+
+  # -- Tolerations for the controller to be installed.
+  tolerations: []
+
+  # -- Affinity for the controller to be installed.
+  affinity: {}
+
+# -- The pod-init configuration
+pod-init:
+  enabled: true
+  nameOverride:
+  namespaceOverride:
+
+  # -- The log level to set inside the tembo-controller, default is info
+  logLevel: info
+
+  # -- The number of replicas to set for the tembo-controller
+  replicas: 1
+
+  rbac:
+    # -- Specifies whether ClusterRole and ClusterRoleBinding should be created.
+    create: true
+
+  # -- The default image for the pod-init deployment
+  image:
+    repository: quay.io/tembo/tembo-pod-init
+    pullPolicy: IfNotPresent
+    # -- Overrides the image tag whose default is latest
+    tag: latest
+
+  extraEnv: []
+
+  # -- Namespace Selector Label confguration
+  namespaceSelector:
+    # -- Labels to match namespaces for the Mutating Webhook configuation
+    matchLabels:
+      tembo-pod-init.tembo.io/watch: "true"
+
+  # -- Annotations to be added to the deployment
+  annotations: {}
+
+  # -- Annotations to be added to the pod
+  podAnnotations: {}
+
+  resources: {}
+  # If you want to specify resources, uncomment the following
+  # lines, adjust them as necessary, and remove the curly braces after 'resources:'.
+  #
+  # limits:
+  #   cpu: 1000m
+  #   memory: 256Mi
+  # requests:
+  #   cpu: 250m
+  #   memory: 100Mi
+
+  # -- Deployment upgradeStrategy configuration
+  upgradeStrategy: RollingUpdate
+
+  # -- Service configuraton
+  service:
+    type: "ClusterIP"
+    port: 443
+    targetPort: 8443
+    annotations: {}
+
+  # -- LivenessProbe configuration
+  livenessProbe:
+    httpGet:
+      path: /health/liveness
+      port: 8443
+      scheme: HTTPS
+    initialDelaySeconds: 15
+
+  # -- ReadinessProbe configuration
+  readinessProbe:
+    httpGet:
+      path: /health/readiness
+      port: 8443
+      scheme: HTTPS
+    failureThreshold: 3
+    timeoutSeconds: 15
+    periodSeconds: 15
+
+  # -- Nodeselector for the deployment to be installed.
+  nodeSelector: {}
+
+  # -- Tolerations for the deployment to be installed.
+  tolerations: []
+
+  # -- Affinity for the deployment to be installed.
+  affinity: {}
+
+# -- Cloudnative-PG configuration
+cloudnative-pg:
+  enabled: true
+  config:
+    create: true
+    data:
+      # -- INHERITED_ANNOTATIONS needs to match what is set in pod-init namespaceSelector.matchLabels
+      INHERITED_ANNOTATIONS: "tembo-pod-init.tembo.io/*, tembo.io/*"
+  monitoring:
+    podMonitorEnabled: false
+  service:
+    type: ClusterIP

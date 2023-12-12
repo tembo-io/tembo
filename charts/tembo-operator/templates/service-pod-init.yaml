@@ -1,0 +1,24 @@
+{{- if (index .Values "pod-init").enabled }}
+{{- $namespace := include "component.namespace" (list (list "pod-init" .Values .)) -}}
+{{- $fullname := include "pod-init.fullname" . -}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $fullname }}
+  namespace: {{ $namespace }}
+  labels:
+{{ include "pod-init-helm.labels" . | indent 4 }}
+  {{- if (index .Values "pod-init").service.annotations }}
+  annotations:
+  {{- (index .Values "pod-init").service.annotations | toYaml | nindent 4 }}
+  {{- end }}
+spec:
+  selector:
+    app: {{ $fullname }}
+  type: {{ (index .Values "pod-init").service.type }}
+  ports:
+  - name: https
+    port: {{ (index .Values "pod-init").service.port }}
+    targetPort: {{ (index .Values "pod-init").service.targetPort }}
+    protocol: TCP
+{{- end }}
