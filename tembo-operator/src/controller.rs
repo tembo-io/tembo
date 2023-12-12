@@ -313,8 +313,9 @@ impl CoreDB {
                     reconcile_extensions(self, ctx.clone(), &coredbs, &name).await?;
 
                 // Make sure the initial backup has completed if enabled before finishing
-                // reconciliation of the CoreDB resource
+                // reconciliation of the CoreDB resource that is being restored
                 if cfg.enable_backup
+                    && self.spec.restore.is_some()
                     && self
                         .status
                         .as_ref()
@@ -322,10 +323,6 @@ impl CoreDB {
                         .is_none()
                 {
                     check_backups_status(self, ctx.clone()).await?;
-                    // if let Err(e) = check_backups_status(self, ctx.clone()).await {
-                    //     error!("Error checking backups status: {:?}", e);
-                    //     return Err(Action::requeue(Duration::from_secs(300)));
-                    // }
                 }
 
                 let recovery_time = self.get_recovery_time(ctx.clone()).await?;
