@@ -33,61 +33,86 @@ pub struct ServiceAccountTemplate {
     pub metadata: Option<ObjectMeta>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+/// S3Credentials is the type for the credentials to be used to upload files to S3.
+/// It can be provided in two alternative ways:
+/// * explicitly passing accessKeyId and secretAccessKey
+/// * inheriting the role from the pod environment by setting inheritFromIAMRole to true
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, ToSchema)]
 pub struct S3Credentials {
+    /// The reference to the access key id
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "accessKeyId")]
     pub access_key_id: Option<S3CredentialsAccessKeyId>,
+
+    /// Use the role based authentication without providing explicitly the keys.
     #[serde(
         default,
         skip_serializing_if = "Option::is_none",
         rename = "inheritFromIAMRole"
     )]
     pub inherit_from_iam_role: Option<bool>,
+
+    /// The reference to the secret containing the region name
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub region: Option<S3CredentialsRegion>,
+
+    /// The reference to the secret access key
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "secretAccessKey")]
     pub secret_access_key: Option<S3CredentialsSecretAccessKey>,
+
+    /// The references to the session key
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "sessionToken")]
     pub session_token: Option<S3CredentialsSessionToken>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, ToSchema)]
 pub struct S3CredentialsAccessKeyId {
     pub key: String,
     pub name: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, ToSchema)]
 pub struct S3CredentialsRegion {
     pub key: String,
     pub name: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, ToSchema)]
 pub struct S3CredentialsSecretAccessKey {
     pub key: String,
     pub name: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, ToSchema)]
 pub struct S3CredentialsSessionToken {
     pub key: String,
     pub name: String,
 }
 
-#[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
+/// CoreDB Backup configuration
+#[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema, ToSchema)]
 #[allow(non_snake_case)]
 pub struct Backup {
+    /// The S3 bucket path to store backups in
     #[serde(default = "defaults::default_destination_path")]
     pub destinationPath: Option<String>,
+
+    /// The S3 encryption algorithm to use for backups
     #[serde(default = "defaults::default_encryption")]
     pub encryption: Option<String>,
+
+    /// The number of days to retain backups for
     #[serde(default = "defaults::default_retention_policy")]
     pub retentionPolicy: Option<String>,
+
+    /// The backup schedule set with cron syntax
     #[serde(default = "defaults::default_backup_schedule")]
     pub schedule: Option<String>,
+
+    /// The S3 compatable endpoint URL
     #[serde(default, rename = "endpointURL")]
     pub endpoint_url: Option<String>,
+
+    /// The S3 credentials to use for backups (if not using IAM Role)
     #[serde(default = "defaults::default_s3_credentials", rename = "s3Credentials")]
     pub s3_credentials: Option<S3Credentials>,
 }
@@ -126,12 +151,16 @@ pub struct PgBouncer {
 /// Generate the Kubernetes wrapper struct `CoreDB` from our Spec and Status struct
 ///
 /// This provides a hook for generating the CRD yaml (in crdgen.rs)
-#[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
+
+/// This struct represents the specification for a CoreDB instance. It defines
+/// various configuration options for deploying and managing the database.
+#[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema, ToSchema)]
 #[cfg_attr(test, derive(Default))]
 #[kube(kind = "CoreDB", group = "coredb.io", version = "v1alpha1", namespaced)]
 #[kube(status = "CoreDBStatus", shortname = "cdb")]
 #[allow(non_snake_case)]
 pub struct CoreDBSpec {
+    /// Number of CoreDB replicas to deploy. Defaults to 1.
     #[serde(default = "defaults::default_replicas")]
     pub replicas: i32,
 

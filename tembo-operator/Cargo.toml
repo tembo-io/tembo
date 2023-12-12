@@ -1,7 +1,7 @@
 [package]
 name = "controller"
 description = "Tembo Operator for Postgres"
-version = "0.25.1"
+version = "0.25.3"
 edition = "2021"
 default-run = "controller"
 license = "Apache-2.0"
@@ -52,7 +52,10 @@ semver = "1.0.18"
 anyhow = "1.0.72"
 rand = "0.8.5"
 reqwest = { version = "0.11.20", features = ["json", "trust-dns"] }
-utoipa = "3.5.0"
+utoipa = { version = "4", features = ["actix_extras", "chrono"] }
+utoipa-rapidoc = { version = "2", features = ["actix-web"] }
+utoipa-redoc = { version = "2", features = ["actix-web"] }
+utoipa-swagger-ui = { version = "5", features = ["actix-web"]}
 
 [dev-dependencies]
 assert-json-diff = "2.0.2"

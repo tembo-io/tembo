@@ -1,6 +1,8 @@
 use actix_web::{get, middleware, web::Data, App, HttpRequest, HttpResponse, HttpServer, Responder};
-pub use controller::{self, telemetry, State};
+pub use controller::{self, doc::ApiDocv1, telemetry, State};
 use prometheus::{Encoder, TextEncoder};
+use utoipa::{openapi::info::LicenseBuilder, OpenApi};
+use utoipa_redoc::*;
 
 #[get("/metrics")]
 async fn metrics(c: Data<State>, _req: HttpRequest) -> impl Responder {
@@ -34,6 +36,17 @@ async fn app_main() -> anyhow::Result<()> {
         .parse::<u16>()
         .unwrap_or(8080);
 
+    let mut v1doc = ApiDocv1::openapi();
+    let license = LicenseBuilder::new()
+        .name("Postgres")
+        .url(Some("https://www.postgresql.org/about/licence"))
+        .build();
+    v1doc.info.title = "tembo-controller CoreDB API".to_string();
+    v1doc.info.license = Some(license);
+
+    let openapi_json = serde_json::to_string(&v1doc.clone())?;
+    println!("{}", openapi_json);
+
     // Start web server
     let server = HttpServer::new(move || {
         App::new()
@@ -42,6 +55,7 @@ async fn app_main() -> anyhow::Result<()> {
             .service(index)
             .service(health)
             .service(metrics)
+            .service(Redoc::with_url("/redoc", v1doc.clone()))
     })
     .bind(("0.0.0.0", server_port))?
     .shutdown_timeout(5);
