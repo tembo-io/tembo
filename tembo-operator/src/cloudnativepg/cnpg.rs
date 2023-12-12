@@ -1736,6 +1736,11 @@ pub async fn check_backups_status(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(),
 
     match backup_result {
         Ok(backup_list) => {
+            if backup_list.items.is_empty() {
+                error!("No backups found for {}, requeuing", instance_name);
+                return Err(Action::requeue(Duration::from_secs(30)));
+            }
+
             for backup_item in backup_list.items {
                 if let Some(backup_name) = &backup_item.metadata.name {
                     if !is_backup_completed(&backup_item) {
@@ -1743,8 +1748,6 @@ pub async fn check_backups_status(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(),
                         return Err(Action::requeue(Duration::from_secs(30)));
                     }
                     info!("Backup {} completed", backup_name);
-                } else {
-                    warn!("Found backup with no name");
                 }
             }
             Ok(())
