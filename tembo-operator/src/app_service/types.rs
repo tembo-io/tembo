@@ -122,8 +122,6 @@ pub struct AppService {
 
     /// Defines the ingress middeware configuration for the appService.
     /// This is specifically configured for the ingress controller Traefik.
-    ///
-    /// See the [Traefik docs](https://doc.traefik.io/traefik/middlewares/overview/).
     pub middlewares: Option<Vec<Middleware>>,
 
     /// Defines the routing configuration for the appService.
@@ -225,6 +223,10 @@ pub struct Ingress {
     pub path: Option<String>,
 }
 
+/// Midddleware is used to configure the middleware for the appService.
+/// This is specifically configured for the ingress controller Traefik.
+///
+/// Please refer to the example in the `AppService` documentation.
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, JsonSchema, PartialEq)]
 pub enum Middleware {
     #[serde(rename = "customRequestHeaders")]
