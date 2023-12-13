@@ -3018,6 +3018,33 @@ mod test {
                                 "value": "/certs/tls.crt"
                             },
                         ],
+                        "storage": {
+                            "volumes": [
+                                {
+                                    "name": "ferretdb-data",
+                                    "ephemeral": {
+                                        "volumeClaimTemplate": {
+                                            "spec": {
+                                                "accessModes": [
+                                                    "ReadWriteOnce"
+                                                ],
+                                                "resources": {
+                                                    "requests": {
+                                                        "storage": "1Gi"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ],
+                            "volumeMounts": [
+                                {
+                                    "name": "ferretdb-data",
+                                    "mountPath": "/state"
+                                }
+                            ]
+                        },
                     }
                 ],
                 "postgresExporterEnabled": false
@@ -3046,6 +3073,38 @@ mod test {
         assert_eq!(app_0.metadata.name.unwrap(), format!("{cdb_name}-ferretdb"));
         assert_eq!(app_1.metadata.name.unwrap(), format!("{cdb_name}-postgrest"));
         assert_eq!(app_2.metadata.name.unwrap(), format!("{cdb_name}-test-app-1"));
+
+        let selector_map = app_0
+            .spec
+            .as_ref()
+            .and_then(|s| s.selector.match_labels.as_ref())
+            .expect("Deployment should have a selector");
+        let selector = selector_map
+            .iter()
+            .map(|(k, v)| format!("{}={}", k, v))
+            .collect::<Vec<_>>()
+            .join(",");
+        let lp = ListParams::default().labels(&selector);
+        let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
+        let pod_list = pods.list(&lp).await.unwrap();
+        assert_eq!(pod_list.items.len(), 1);
+        let app_0_pod = pod_list.items[0].clone();
+        let app_0_container = app_0_pod.spec.unwrap().containers[0].clone();
+
+        // Assert app_0 volume mounts include ferretdb-data and tembo-certs
+        let volume_mounts = app_0_container.volume_mounts.unwrap();
+        let mut found_ferretdb_data = false;
+        let mut found_tembo_certs = false;
+        for mount in volume_mounts {
+            if mount.mount_path == "/state" {
+                found_ferretdb_data = true;
+            }
+            if mount.mount_path == "/tembo/certs" {
+                found_tembo_certs = true;
+            }
+        }
+        assert!(found_ferretdb_data);
+        assert!(found_tembo_certs);
 
         // Assert resources in first appService
         // select the pod
@@ -3080,6 +3139,16 @@ mod test {
         .unwrap();
         let app_1_resources = app_1_container.resources.unwrap();
         assert_eq!(app_1_resources, expected);
+
+        // Assert /tembo/certs is included in volume mounts
+        let volume_mounts = app_1_container.volume_mounts.unwrap();
+        let mut found = false;
+        for mount in volume_mounts {
+            if mount.mount_path == "/tembo/certs" {
+                found = true;
+            }
+        }
+        assert!(found);
 
         let ingresses: Result<Vec<IngressRoute>, errors::OperatorError> =
             list_resources(client.clone(), cdb_name, &namespace, 1).await;
@@ -3156,6 +3225,16 @@ mod test {
         .unwrap();
         let app_2_resources = app_2_container.resources.unwrap();
         assert_eq!(app_2_resources, expected);
+
+        // Assert /tembo/certs is included in volume mounts
+        let volume_mounts = app_2_container.volume_mounts.unwrap();
+        let mut found = false;
+        for mount in volume_mounts {
+            if mount.mount_path == "/tembo/certs" {
+                found = true;
+            }
+        }
+        assert!(found);
 
         // Delete the one without a service, but leave the postgrest appService
         let coredb_json = serde_json::json!({
