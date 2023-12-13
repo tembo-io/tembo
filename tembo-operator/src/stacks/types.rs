@@ -69,7 +69,7 @@ pub struct Stack {
     pub stack_version: Option<String>,
     pub trunk_installs: Option<Vec<TrunkInstall>>,
     pub extensions: Option<Vec<Extension>>,
-    /// postgres metric definition specific to the Stack
+    /// Postgres metric definition specific to the Stack
     pub postgres_metrics: Option<QueryConfig>,
     /// configs are strongly typed so that they can be programmatically transformed
     pub postgres_config: Option<Vec<PgConfig>>,

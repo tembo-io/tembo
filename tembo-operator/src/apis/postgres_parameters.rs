@@ -125,10 +125,10 @@ pub const TEMBO_POSTGRESQL_CONFIGMAP: &str = "tembo-postgresql-conf";
 /// ```
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, JsonSchema, ToSchema)]
 pub struct PgConfig {
-    /// The name of the Postgresql configuration parameter.
+    /// The name of the Postgres configuration parameter.
     pub name: String,
 
-    // The value of the Postgresql configuration parameter.
+    // The value of the Postgres configuration parameter.
     pub value: ConfigValue,
 }
 

@@ -55,7 +55,7 @@ pub struct Stack {
     /// The name of the stack to deploy.
     pub name: String,
 
-    /// The specific postgres configuration settings needed for the stack.
+    /// The specific Postgres configuration settings needed for the stack.
     pub postgres_config: Option<Vec<PgConfig>>,
 }
 
@@ -370,7 +370,7 @@ pub struct CoreDBSpec {
     #[serde(default = "defaults::default_postgres_exporter_enabled")]
     pub postgresExporterEnabled: bool,
 
-    /// The postgres image to use for the CoreDB instance deployment.
+    /// The Postgres image to use for the CoreDB instance deployment.
     /// This should be a valid Postgres image that is compatible with the
     /// [https://tembo.io](https://tembo.io) platform. For more information
     /// please visit our [tembo-images](https://github.com/tembo-io/tembo-images) repository.
@@ -438,20 +438,20 @@ pub struct CoreDBSpec {
     #[serde(default = "defaults::default_backup")]
     pub backup: Backup,
 
-    /// The metrics configuration to allow for custom Postgresql metrics to be
+    /// The metrics configuration to allow for custom Postgres metrics to be
     /// exposed in postgres-exporter and Prometheus.
     ///
     /// **Default**: disabled
     pub metrics: Option<PostgresMetrics>,
 
     /// The list of domains to add to the IngressRouteTCP generated in the
-    /// tembo-controller to route traffic to the Postgresql instance using SNI
+    /// tembo-controller to route traffic to the Postgres instance using SNI
     /// based routing of encrypted TLS traffic into the correct instance.
     ///
     /// **Default**: disabled
     pub extra_domains_rw: Option<Vec<String>>,
 
-    /// List of IPv4 CIDR blocks to allow access to the Postgresql instance.
+    /// List of IPv4 CIDR blocks to allow access to the Postgres instance.
     ///
     /// **Default**: Allow all
     #[serde(rename = "ipAllowList")]
@@ -462,8 +462,8 @@ pub struct CoreDBSpec {
     /// pre-configured Postgres instances.
     pub stack: Option<Stack>,
 
-    /// The runtime_config is a way to set the postgres configuration at runtime.
-    /// This is a list of PgConfig objects that define the postgres configuration
+    /// The runtime_config is a way to set the Postgres configuration at runtime.
+    /// This is a list of PgConfig objects that define the Postgres configuration
     ///
     /// For more information on what you can set, please refer to the cloudnative-pg
     /// documentation on setting [Postgres Parameters](https://cloudnative-pg.io/documentation/1.20/postgresql_conf/#postgresql-configuration)
@@ -472,7 +472,7 @@ pub struct CoreDBSpec {
     pub runtime_config: Option<Vec<PgConfig>>,
 
     /// The override_configs configuration is typically used by the [https://cloud.tembo.io](https://cloud.tembo.io)
-    /// platform to allow the user to override the postgres configuration at runtime.
+    /// platform to allow the user to override the Postgres configuration at runtime.
     ///
     /// **Default**: disabled
     pub override_configs: Option<Vec<PgConfig>>,
@@ -511,7 +511,7 @@ pub struct CoreDBSpec {
 }
 
 impl CoreDBSpec {
-    // extracts all postgres configurations
+    // extracts all Postgres configurations
     // configs can be defined in several different places (from a stack, user override, from an extension installation, user overrides, etc)
     pub fn get_pg_configs(
         &self,

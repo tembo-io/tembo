@@ -21,8 +21,7 @@ pub mod errors;
 
 pub mod cloudnativepg;
 mod deployment_postgres_exporter;
-#[cfg(test)]
-pub mod fixtures;
+#[cfg(test)] pub mod fixtures;
 pub mod heartbeat;
 pub mod ingress;
 pub mod traefik;

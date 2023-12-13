@@ -70,7 +70,7 @@ pub struct TrunkInstallStatus {
 /// used.  The extension must also be installed on the instance.  To install
 /// extensions, please refer to the `TrunkInstall` resource.
 ///
-/// This example will enable the pg_stat_statements extension on the postgres database
+/// This example will enable the pg_stat_statements extension on the Postgres database
 /// in the public schema.
 ///
 /// ```yaml
