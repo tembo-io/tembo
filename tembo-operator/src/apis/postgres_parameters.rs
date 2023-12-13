@@ -101,10 +101,34 @@ pub const TEMBO_POSTGRESQL_CONF: &str = "tembo.postgresql.conf";
 pub const TEMBO_POSTGRESQL_CONF_VOLUME_PATH: &str = "/tembo/config";
 pub const TEMBO_POSTGRESQL_CONFIGMAP: &str = "tembo-postgresql-conf";
 
-// defines the postgresql configuration
+/// PgConfig allows a user to define postgresql configuration settings in the
+/// postgres configuration file.  This is a subset of the postgresql.conf
+/// configuration settings.  The full list of settings that we currently **DO NOT**
+/// support can be found [here](https://cloudnative-pg.io/documentation/1.20/postgresql_conf/#fixed-parameters).
+///
+/// **Example**: The following example shows how to set the `max_connections`,
+/// `shared_buffers` and `max_wal_size` configuration settings.
+///
+/// ```yaml
+/// apiVersion: coredb.io/v1alpha1
+/// kind: CoreDB
+/// metadata:
+///   name: test-db
+/// spec:
+///   runtime_config:
+///     - name: max_connections
+///       value: 100
+///     - name: shared_buffers
+///       value: 2048MB
+///     - name: max_wal_size
+///       value: 2GB
+/// ```
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Serialize, JsonSchema, ToSchema)]
 pub struct PgConfig {
+    /// The name of the Postgres configuration parameter.
     pub name: String,
+
+    // The value of the Postgres configuration parameter.
     pub value: ConfigValue,
 }
 

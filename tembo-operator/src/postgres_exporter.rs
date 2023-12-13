@@ -9,14 +9,62 @@ pub const QUERIES_YAML: &str = "queries.yaml";
 pub const EXPORTER_VOLUME: &str = "postgres-exporter";
 pub const EXPORTER_CONFIGMAP_PREFIX: &str = "metrics-";
 
+/// PostgresExporter is the configuration for the postgres-exporter to expose
+/// custom metrics from the database.
+///
+/// **Example:** This example exposes specific metrics from a query to a
+/// [pgmq](https://github.com/tembo-io/pgmq) queue enabled database.
+///
+/// ```yaml
+/// apiVersion: coredb.io/v1alpha1
+/// kind: CoreDB
+/// metadata:
+///   name: test-db
+/// spec:
+/// metrics:
+///   enabled: true
+///   image: quay.io/prometheuscommunity/postgres-exporter:v0.12.0
+///   queries:
+///     pgmq:
+///       query: select queue_name, queue_length, oldest_msg_age_sec, newest_msg_age_sec, total_messages from public.pgmq_metrics_all()
+///       master: true
+///       metrics:
+///         - queue_name:
+///             description: Name of the queue
+///             usage: LABEL
+///         - queue_length:
+///             description: Number of messages in the queue
+///             usage: GAUGE
+///         - oldest_msg_age_sec:
+///             description: Age of the oldest message in the queue, in seconds.
+///             usage: GAUGE
+///         - newest_msg_age_sec:
+///             description: Age of the newest message in the queue, in seconds.
+///             usage: GAUGE
+///         - total_messages:
+///             description: Total number of messages that have passed into the queue.
+///             usage: GAUGE
+/// ````
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema, Default)]
 #[allow(non_snake_case)]
 pub struct PostgresMetrics {
+    /// The image to use for the postgres-exporter container.
+    ///
+    /// **Default:** `quay.io/prometheuscommunity/postgres-exporter:v0.12.0`
     #[serde(default = "defaults::default_postgres_exporter_image")]
     pub image: String,
+
+    /// To enable or disable the metric.
+    ///
+    /// **Default:** `true`
     #[serde(default = "defaults::default_postgres_exporter_enabled")]
     pub enabled: bool,
 
+    /// The SQL query to run.
+    ///
+    /// **Example:** `select queue_name, queue_length, oldest_msg_age_sec, newest_msg_age_sec, total_messages from public.pgmq_metrics_all()`
+    ///
+    /// **Default**: `None`
     #[schemars(schema_with = "preserve_arbitrary")]
     pub queries: Option<QueryConfig>,
 }
