@@ -27,22 +27,41 @@ spec:
             description: |-
               Generate the Kubernetes wrapper struct `CoreDB` from our Spec and Status struct
 
-              This provides a hook for generating the CRD yaml (in crdgen.rs)
+              This provides a hook for generating the CRD yaml (in crdgen.rs) CoreDBSpec represents the specification for a CoreDB instance. It defines various configuration options for deploying and managing the database. with the tembo-controller
+
+              # Basic CoreDB Configuration
+
+              ```yaml apiVersion: coredb.io/v1alpha1 kind: CoreDB metadata: name: test-db spec: {} ````
             properties:
               appServices:
+                description: |-
+                  app_service is a way to define a service that is deployed alongside the Postgres instance.  This is typically used to deploy a service that is used to connect to the Postgres instance in some manner.
+
+                  **Default**: disabled
                 items:
+                  description: |-
+                    AppService significantly extends the functionality of your Tembo Postgres instance by running tools and software built by the Postgres open source community.
+
+                    **Example**: This will configure and install a Postgrest container along side the Postgres instance, install pg_graphql extension, and configure the ingress routing to expose the Postgrest service.
+
+                    ```yaml apiVersion: coredb.io/v1alpha1 kind: CoreDB metadata: name: test-db spec: trunk_installs: - name: pg_graphql version: 1.2.0 extensions: - name: pg_graphql locations: - database: postgres enabled: true
+
+                    appServices: - name: postgrest image: postgrest/postgrest:v10.0.0 routing: # only expose /rest/v1 and /graphql/v1 - port: 3000 ingressPath: /rest/v1 middlewares: - my-headers - port: 3000 ingressPath: /graphql/v1 middlewares: - map-gql - my-headers middlewares: - customRequestHeaders: name: my-headers config: # removes auth header from request Authorization: "" Content-Profile: graphql Accept-Profile: graphql - stripPrefix: name: my-strip-prefix config: - /rest/v1 # reroute gql and rest requests - replacePathRegex: name: map-gql config: regex: \/graphql\/v1\/? replacement: /rpc/resolve env: - name: PGRST_DB_URI valueFromPlatform: ReadWriteConnection - name: PGRST_DB_SCHEMA value: "public, graphql" - name: PGRST_DB_ANON_ROLE value: postgres - name: PGRST_LOG_LEVEL value: info ```
                   properties:
                     args:
+                      description: Defines the arguments to pass into the container if needed. You define this in the same manner as you would for all Kubernetes containers. See the [Kubernetes docs](https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container).
                       items:
                         type: string
                       nullable: true
                       type: array
                     command:
+                      description: Defines the command into the container if needed. You define this in the same manner as you would for all Kubernetes containers. See the [Kubernetes docs](https://kubernetes.io/docs/tasks/inject-data-application/define-command-argument-container).
                       items:
                         type: string
                       nullable: true
                       type: array
                     env:
+                      description: Defines the environment variables to pass into the container if needed. You define this in the same manner as you would for all Kubernetes containers. See the [Kubernetes docs](https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container).
                       items:
                         properties:
                           name:
@@ -62,9 +81,15 @@ spec:
                       nullable: true
                       type: array
                     image:
+                      description: Defines the container image to use for the appService.
                       type: string
                     middlewares:
+                      description: Defines the ingress middeware configuration for the appService. This is specifically configured for the ingress controller Traefik.
                       items:
+                        description: |-
+                          Midddleware is used to configure the middleware for the appService. This is specifically configured for the ingress controller Traefik.
+
+                          Please refer to the example in the `AppService` documentation.
                         oneOf:
                         - required:
                           - customRequestHeaders
@@ -117,8 +142,10 @@ spec:
                       nullable: true
                       type: array
                     name:
+                      description: Defines the name of the appService.
                       type: string
                     probes:
+                      description: Defines the probes to use for the container. You define this in the same manner as you would for all Kubernetes containers. See the [Kubernetes docs](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/).
                       nullable: true
                       properties:
                         liveness:
@@ -163,7 +190,7 @@ spec:
                         requests:
                           cpu: 100m
                           memory: 256Mi
-                      description: ResourceRequirements describes the compute resource requirements.
+                      description: Defines the resources to allocate to the container. You define this in the same manner as you would for all Kubernetes containers. See the [Kubernetes docs](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/).
                       properties:
                         limits:
                           additionalProperties:
@@ -179,7 +206,9 @@ spec:
                           type: object
                       type: object
                     routing:
+                      description: Defines the routing configuration for the appService.
                       items:
+                        description: Routing is used if there is a routing port, then a service is created using that Port when ingress_path is present, an ingress is created. Otherwise, no ingress is created
                         properties:
                           entryPoints:
                             default:
@@ -199,6 +228,7 @@ spec:
                             nullable: true
                             type: string
                           middlewares:
+                            description: provide name of the middleware resources to apply to this route
                             items:
                               type: string
                             nullable: true
@@ -213,6 +243,7 @@ spec:
                       nullable: true
                       type: array
                     storage:
+                      description: Defines the storage configuration for the appService.
                       nullable: true
                       properties:
                         volumeMounts:
@@ -1313,28 +1344,38 @@ spec:
                   endpointURL: null
                   s3Credentials:
                     inheritFromIAMRole: true
+                description: |-
+                  The backup configuration for the CoreDB instance to facilitate database backups and WAL archive uploads to an S3 compatible object store.
+
+                  **Default**: disabled
                 properties:
                   destinationPath:
                     default: s3://
+                    description: The S3 bucket path to store backups in
                     nullable: true
                     type: string
                   encryption:
                     default: AES256
+                    description: The S3 encryption algorithm to use for backups
                     nullable: true
                     type: string
                   endpointURL:
+                    description: The S3 compatable endpoint URL
                     nullable: true
                     type: string
                   retentionPolicy:
                     default: '30'
+                    description: The number of days to retain backups for
                     nullable: true
                     type: string
                   s3Credentials:
                     default:
                       inheritFromIAMRole: true
+                    description: The S3 credentials to use for backups (if not using IAM Role)
                     nullable: true
                     properties:
                       accessKeyId:
+                        description: The reference to the access key id
                         nullable: true
                         properties:
                           key:
@@ -1346,9 +1387,11 @@ spec:
                         - name
                         type: object
                       inheritFromIAMRole:
+                        description: Use the role based authentication without providing explicitly the keys.
                         nullable: true
                         type: boolean
                       region:
+                        description: The reference to the secret containing the region name
                         nullable: true
                         properties:
                           key:
@@ -1360,6 +1403,7 @@ spec:
                         - name
                         type: object
                       secretAccessKey:
+                        description: The reference to the secret access key
                         nullable: true
                         properties:
                           key:
@@ -1371,6 +1415,7 @@ spec:
                         - name
                         type: object
                       sessionToken:
+                        description: The references to the session key
                         nullable: true
                         properties:
                           key:
@@ -1384,6 +1429,7 @@ spec:
                     type: object
                   schedule:
                     default: 0 0 * * *
+                    description: The backup schedule set with cron syntax
                     nullable: true
                     type: string
                 type: object
@@ -1402,9 +1448,17 @@ spec:
                       requests:
                         cpu: 50m
                         memory: 64Mi
+                description: |-
+                  Connection pooler configuration used to manage database connections, sitting between your application and Postgres instance.  Currently when configured this will configure a PgBouncer instance in the namespace of your deployment
+
+                  **Default**: disabled
                 properties:
                   enabled:
                     default: false
+                    description: |-
+                      Enable the connection pooler
+
+                      **Default**: false.
                     type: boolean
                   pooler:
                     default:
@@ -1419,19 +1473,28 @@ spec:
                         requests:
                           cpu: 50m
                           memory: 64Mi
+                    description: The PGBouncer pooler configuration
                     properties:
                       parameters:
                         additionalProperties:
                           type: string
+                        description: Valid pgbouncer parameter values can be found at [https://www.pgbouncer.org/config.html](https://www.pgbouncer.org/config.html)
                         nullable: true
                         type: object
                       poolMode:
                         default: transaction
+                        description: |-
+                          The pool mode to use for the PGBouncer instance Specifies when a server connection can be reused by other clients.
+
+                          Valid values are: **session**: Server is released back to pool after client disconnects. Default. **transaction**: Server is released back to pool after transaction finishes. **statement**: Server is released back to pool after query finishes. Transactions spanning multiple statements are disallowed in this mode.
+
+                          **Default**: transaction
                         enum:
                         - session
                         - transaction
                         type: string
                       resources:
+                        description: The resource requirements (CPU/Memory) for the PGBouncer instance. This is the same format as what is set for a Kubernetes Pod. See [https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/)
                         nullable: true
                         properties:
                           claims:
@@ -1463,24 +1526,47 @@ spec:
                 type: object
               extensions:
                 default: []
+                description: |-
+                  A list of extensions to enable on the CoreDB instance. This list should be a lits of extension names that are already available on the Postgres instance you are running.  To install extensions at runtime please see the `trunk_installs` field.
+
+                  **Default**: []
                 items:
+                  description: |-
+                    Extension lets you define a list of extensions to enable on the instance. To enable extensions, you must specify the name of the extension and the database, schema, and version to enable it on. If the version is not specified, the latest version will be used.  The extension must also be installed on the instance.  To install extensions, please refer to the `TrunkInstall` resource.
+
+                    This example will enable the pg_stat_statements extension on the Postgres database in the public schema.
+
+                    ```yaml apiVersion: coredb.io/v1alpha1 kind: CoreDB metadata: name: test-db spec: extensions: - name: pg_stat_statements locations: - database: postgres enabled: true schema: public version: 1.10.0 ````
                   properties:
                     description:
                       default: No description provided
+                      description: |-
+                        A description of the extension. (Optional)
+
+                        **Default**: "No description provided"
                       nullable: true
                       type: string
                     locations:
+                      description: A list of locations (databases) to enabled the extension on.
                       items:
+                        description: ExtensionInstallLocation lets you specify the database, schema, and version to enable an extension on.
                         properties:
                           database:
                             default: postgres
+                            description: |-
+                              The database to enable the extension on.
+
+                              **Default**: "postgres"
                             type: string
                           enabled:
+                            description: Enable or disable the extension on this Postgres instance.
                             type: boolean
                           schema:
+                            description: 'The schema to enable the extension on. (eg: "public")'
                             nullable: true
                             type: string
                           version:
+                            description: The extension version to install. If not specified, the latest version will be used.
                             nullable: true
                             type: string
                         required:
@@ -1488,6 +1574,7 @@ spec:
                         type: object
                       type: array
                     name:
+                      description: The name of the extension to enable.
                       type: string
                   required:
                   - locations
@@ -1495,36 +1582,76 @@ spec:
                   type: object
                 type: array
               extra_domains_rw:
+                description: |-
+                  The list of domains to add to the IngressRouteTCP generated in the tembo-controller to route traffic to the Postgres instance using SNI based routing of encrypted TLS traffic into the correct instance.
+
+                  **Default**: disabled
                 items:
                   type: string
                 nullable: true
                 type: array
               image:
                 default: quay.io/tembo/standard-cnpg:15.3.0-1-0c19c7e
+                description: |-
+                  The Postgres image to use for the CoreDB instance deployment. This should be a valid Postgres image that is compatible with the [https://tembo.io](https://tembo.io) platform. For more information please visit our [tembo-images](https://github.com/tembo-io/tembo-images) repository.
+
+                  **Default**: quay.io/tembo/standard-cnpg:15.3.0-1-0c19c7e
                 type: string
               ipAllowList:
-                description: List of IPv4 CIDR blocks
+                description: |-
+                  List of IPv4 CIDR blocks to allow access to the Postgres instance.
+
+                  **Default**: Allow all
                 items:
                   type: string
                 nullable: true
                 type: array
               metrics:
+                description: |-
+                  The metrics configuration to allow for custom Postgres metrics to be exposed in postgres-exporter and Prometheus.
+
+                  **Default**: disabled
                 nullable: true
                 properties:
                   enabled:
                     default: true
+                    description: |-
+                      To enable or disable the metric.
+
+                      **Default:** `true`
                     type: boolean
                   image:
                     default: quay.io/prometheuscommunity/postgres-exporter:v0.12.0
+                    description: |-
+                      The image to use for the postgres-exporter container.
+
+                      **Default:** `quay.io/prometheuscommunity/postgres-exporter:v0.12.0`
                     type: string
                   queries:
+                    description: |-
+                      The SQL query to run.
+
+                      **Example:** `select queue_name, queue_length, oldest_msg_age_sec, newest_msg_age_sec, total_messages from public.pgmq_metrics_all()`
+
+                      **Default**: `None`
                     x-kubernetes-preserve-unknown-fields: true
                 
                 type: object
               override_configs:
+                description: |-
+                  The override_configs configuration is typically used by the [https://cloud.tembo.io](https://cloud.tembo.io) platform to allow the user to override the Postgres configuration at runtime.
+
+                  **Default**: disabled
                 items:
+                  description: |-
+                    PgConfig allows a user to define postgresql configuration settings in the postgres configuration file.  This is a subset of the postgresql.conf configuration settings.  The full list of settings that we currently **DO NOT** support can be found [here](https://cloudnative-pg.io/documentation/1.20/postgresql_conf/#fixed-parameters).
+
+                    **Example**: The following example shows how to set the `max_connections`, `shared_buffers` and `max_wal_size` configuration settings.
+
+                    ```yaml apiVersion: coredb.io/v1alpha1 kind: CoreDB metadata: name: test-db spec: runtime_config: - name: max_connections value: 100 - name: shared_buffers value: 2048MB - name: max_wal_size value: 2GB ```
                   properties:
                     name:
+                      description: The name of the Postgres configuration parameter.
                       type: string
                     value:
                       description: A postgresql.conf configuration value
@@ -1537,20 +1664,36 @@ spec:
                 type: array
               pkglibdirStorage:
                 default: 1Gi
-                description: "Quantity is a fixed-point representation of a number. It provides convenient marshaling/unmarshaling in JSON and YAML, in addition to String() and AsInt64() accessors.\n\nThe serialization format is:\n\n``` <quantity>        ::= <signedNumber><suffix>\n\n\t(Note that <suffix> may be empty, from the \"\" case in <decimalSI>.)\n\n<digit>           ::= 0 | 1 | ... | 9 <digits>          ::= <digit> | <digit><digits> <number>          ::= <digits> | <digits>.<digits> | <digits>. | .<digits> <sign>            ::= \"+\" | \"-\" <signedNumber>    ::= <number> | <sign><number> <suffix>          ::= <binarySI> | <decimalExponent> | <decimalSI> <binarySI>        ::= Ki | Mi | Gi | Ti | Pi | Ei\n\n\t(International System of units; See: http://physics.nist.gov/cuu/Units/binary.html)\n\n<decimalSI>       ::= m | \"\" | k | M | G | T | P | E\n\n\t(Note that 1024 = 1Ki but 1000 = 1k; I didn't choose the capitalization.)\n\n<decimalExponent> ::= \"e\" <signedNumber> | \"E\" <signedNumber> ```\n\nNo matter which of the three exponent forms is used, no quantity may represent a number greater than 2^63-1 in magnitude, nor may it have more than 3 decimal places. Numbers larger or more precise will be capped or rounded up. (E.g.: 0.1m will rounded up to 1m.) This may be extended in the future if we require larger or smaller quantities.\n\nWhen a Quantity is parsed from a string, it will remember the type of suffix it had, and will use the same type again when it is serialized.\n\nBefore serializing, Quantity will be put in \"canonical form\". This means that Exponent/suffix will be adjusted up or down (with a corresponding increase or decrease in Mantissa) such that:\n\n- No precision is lost - No fractional digits will be emitted - The exponent (or suffix) is as large as possible.\n\nThe sign will be omitted unless the number is negative.\n\nExamples:\n\n- 1.5 will be serialized as \"1500m\" - 1.5Gi will be serialized as \"1536Mi\"\n\nNote that the quantity will NEVER be internally represented by a floating point number. That is the whole point of this exercise.\n\nNon-canonical values will still parse as long as they are well formed, but will be re-emitted in their canonical form. (So always use canonical form, or don't diff.)\n\nThis format is intended to make it difficult to use these numbers without writing some sort of special handling code in the hopes that that will cause implementors to also use a fixed point implementation."
+                description: '**DEPRECATED** The storage size for the pkglibdir volume. This is no longer used and will be removed in a future release.'
                 type: string
               port:
                 default: 5432
+                description: |-
+                  The port to expose the Postgres service on.
+
+                  **Default**: 5432.
                 format: int32
                 type: integer
               postgresExporterEnabled:
                 default: true
+                description: |-
+                  Enable the use of the Postgres Exporter deployment for metrics collection
+
+                  **Default**: true.
                 type: boolean
               postgresExporterImage:
                 default: quay.io/prometheuscommunity/postgres-exporter:v0.12.0
+                description: |-
+                  The postgres-exporter image you want to use for the postgres-exporter deployment.
+
+                  **Default**: quay.io/prometheuscommunity/postgres-exporter:v0.12.0
                 type: string
               replicas:
                 default: 1
+                description: |-
+                  Number of CoreDB replicas to deploy.
+
+                  **Default**: 1.
                 format: int32
                 type: integer
               resources:
@@ -1561,7 +1704,12 @@ spec:
                   requests:
                     cpu: 500m
                     memory: 512Mi
-                description: ResourceRequirements describes the compute resource requirements.
+                description: |-
+                  The resource requirements (CPU/Memory) for the CoreDB instance. This is the same format as what is set for a Kubernetes Pod. See [https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/)
+
+                  **Limits Default**: 2 CPU and 2Gi memory.
+
+                  **Requests Default**: 500m CPU and 512Mi memory.
                 properties:
                   limits:
                     additionalProperties:
@@ -1577,18 +1725,26 @@ spec:
                     type: object
                 type: object
               restore:
+                description: |-
+                  The restore configuration provides a way to restore a database from a backup stored in an S3 compatible object store.
+
+                  **Default**: disabled
                 nullable: true
                 properties:
                   endpointURL:
+                    description: endpointURL is the S3 compatable endpoint URL
                     nullable: true
                     type: string
                   recoveryTargetTime:
+                    description: recovery_target_time is the time base target for point-in-time recovery.
                     nullable: true
                     type: string
                   s3Credentials:
+                    description: s3Credentials is the S3 credentials to use for backups.
                     nullable: true
                     properties:
                       accessKeyId:
+                        description: The reference to the access key id
                         nullable: true
                         properties:
                           key:
@@ -1600,9 +1756,11 @@ spec:
                         - name
                         type: object
                       inheritFromIAMRole:
+                        description: Use the role based authentication without providing explicitly the keys.
                         nullable: true
                         type: boolean
                       region:
+                        description: The reference to the secret containing the region name
                         nullable: true
                         properties:
                           key:
@@ -1614,6 +1772,7 @@ spec:
                         - name
                         type: object
                       secretAccessKey:
+                        description: The reference to the secret access key
                         nullable: true
                         properties:
                           key:
@@ -1625,6 +1784,7 @@ spec:
                         - name
                         type: object
                       sessionToken:
+                        description: The references to the session key
                         nullable: true
                         properties:
                           key:
@@ -1637,14 +1797,33 @@ spec:
                         type: object
                     type: object
                   serverName:
+                    description: |-
+                      The name of the instance you wish to restore.  This maps to the `Backup` `destinationPath` field for the original instance.
+
+                      **Example**: If you have an instance with `spec.backup.destinationPath` set to `s3://my-bucket/test-db` then you would set `serverName` to `test-db`.
+
+                      This assumes you are keeping the backups in the new instance in the same root bucket path of `s3://my-bucket/`.
                     type: string
                 required:
                 - serverName
                 type: object
               runtime_config:
+                description: |-
+                  The runtime_config is a way to set the Postgres configuration at runtime. This is a list of PgConfig objects that define the Postgres configuration
+
+                  For more information on what you can set, please refer to the cloudnative-pg documentation on setting [Postgres Parameters](https://cloudnative-pg.io/documentation/1.20/postgresql_conf/#postgresql-configuration)
+
+                  **Default**: disabled
                 items:
+                  description: |-
+                    PgConfig allows a user to define postgresql configuration settings in the postgres configuration file.  This is a subset of the postgresql.conf configuration settings.  The full list of settings that we currently **DO NOT** support can be found [here](https://cloudnative-pg.io/documentation/1.20/postgresql_conf/#fixed-parameters).
+
+                    **Example**: The following example shows how to set the `max_connections`, `shared_buffers` and `max_wal_size` configuration settings.
+
+                    ```yaml apiVersion: coredb.io/v1alpha1 kind: CoreDB metadata: name: test-db spec: runtime_config: - name: max_connections value: 100 - name: shared_buffers value: 2048MB - name: max_wal_size value: 2GB ```
                   properties:
                     name:
+                      description: The name of the Postgres configuration parameter.
                       type: string
                     value:
                       description: A postgresql.conf configuration value
@@ -1658,9 +1837,15 @@ spec:
               serviceAccountTemplate:
                 default:
                   metadata: null
+                description: |-
+                  The serviceAccountTemplate contains the template needed to generate the service accounts to be used by the underlying Postgres instance
+
+                  For more information on service accounts please see the [Kubernetes documentation](https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/) and the cloudnative-pg docs on [ServiceAccountTemplates](https://cloudnative-pg.io/documentation/1.20/cloudnative-pg.v1/#postgresql-cnpg-io-v1-ServiceAccountTemplate)
+
+                  **Default**: `ServiceAccountTemplate { metadata: None }`
                 properties:
                   metadata:
-                    description: ObjectMeta is metadata that all persisted resources must have, which includes all objects users must create.
+                    description: Metadata are the metadata to be used for the generated service account (Optional)
                     nullable: true
                     properties:
                       annotations:
@@ -1795,17 +1980,27 @@ spec:
                 type: object
               sharedirStorage:
                 default: 1Gi
-                description: "Quantity is a fixed-point representation of a number. It provides convenient marshaling/unmarshaling in JSON and YAML, in addition to String() and AsInt64() accessors.\n\nThe serialization format is:\n\n``` <quantity>        ::= <signedNumber><suffix>\n\n\t(Note that <suffix> may be empty, from the \"\" case in <decimalSI>.)\n\n<digit>           ::= 0 | 1 | ... | 9 <digits>          ::= <digit> | <digit><digits> <number>          ::= <digits> | <digits>.<digits> | <digits>. | .<digits> <sign>            ::= \"+\" | \"-\" <signedNumber>    ::= <number> | <sign><number> <suffix>          ::= <binarySI> | <decimalExponent> | <decimalSI> <binarySI>        ::= Ki | Mi | Gi | Ti | Pi | Ei\n\n\t(International System of units; See: http://physics.nist.gov/cuu/Units/binary.html)\n\n<decimalSI>       ::= m | \"\" | k | M | G | T | P | E\n\n\t(Note that 1024 = 1Ki but 1000 = 1k; I didn't choose the capitalization.)\n\n<decimalExponent> ::= \"e\" <signedNumber> | \"E\" <signedNumber> ```\n\nNo matter which of the three exponent forms is used, no quantity may represent a number greater than 2^63-1 in magnitude, nor may it have more than 3 decimal places. Numbers larger or more precise will be capped or rounded up. (E.g.: 0.1m will rounded up to 1m.) This may be extended in the future if we require larger or smaller quantities.\n\nWhen a Quantity is parsed from a string, it will remember the type of suffix it had, and will use the same type again when it is serialized.\n\nBefore serializing, Quantity will be put in \"canonical form\". This means that Exponent/suffix will be adjusted up or down (with a corresponding increase or decrease in Mantissa) such that:\n\n- No precision is lost - No fractional digits will be emitted - The exponent (or suffix) is as large as possible.\n\nThe sign will be omitted unless the number is negative.\n\nExamples:\n\n- 1.5 will be serialized as \"1500m\" - 1.5Gi will be serialized as \"1536Mi\"\n\nNote that the quantity will NEVER be internally represented by a floating point number. That is the whole point of this exercise.\n\nNon-canonical values will still parse as long as they are well formed, but will be re-emitted in their canonical form. (So always use canonical form, or don't diff.)\n\nThis format is intended to make it difficult to use these numbers without writing some sort of special handling code in the hopes that that will cause implementors to also use a fixed point implementation."
+                description: '**DEPRECATED** The storage size for the sharedir volume. This is no longer used and will be removed in a future release.'
                 type: string
               stack:
+                description: The stack configuration for the CoreDB instance.  This is mainly used for the [https://tembo.io](https://tembo.io) platform to allow for the deployment of pre-configured Postgres instances.
                 nullable: true
                 properties:
                   name:
+                    description: The name of the stack to deploy.
                     type: string
                   postgres_config:
+                    description: The specific Postgres configuration settings needed for the stack.
                     items:
+                      description: |-
+                        PgConfig allows a user to define postgresql configuration settings in the postgres configuration file.  This is a subset of the postgresql.conf configuration settings.  The full list of settings that we currently **DO NOT** support can be found [here](https://cloudnative-pg.io/documentation/1.20/postgresql_conf/#fixed-parameters).
+
+                        **Example**: The following example shows how to set the `max_connections`, `shared_buffers` and `max_wal_size` configuration settings.
+
+                        ```yaml apiVersion: coredb.io/v1alpha1 kind: CoreDB metadata: name: test-db spec: runtime_config: - name: max_connections value: 100 - name: shared_buffers value: 2048MB - name: max_wal_size value: 2GB ```
                       properties:
                         name:
+                          description: The name of the Postgres configuration parameter.
                           type: string
                         value:
                           description: A postgresql.conf configuration value
@@ -1821,21 +2016,43 @@ spec:
                 type: object
               stop:
                 default: false
+                description: |-
+                  This option allows you to stop the database instance.
+
+                  **Default**: false.
                 type: boolean
               storage:
                 default: 8Gi
                 description: "Quantity is a fixed-point representation of a number. It provides convenient marshaling/unmarshaling in JSON and YAML, in addition to String() and AsInt64() accessors.\n\nThe serialization format is:\n\n``` <quantity>        ::= <signedNumber><suffix>\n\n\t(Note that <suffix> may be empty, from the \"\" case in <decimalSI>.)\n\n<digit>           ::= 0 | 1 | ... | 9 <digits>          ::= <digit> | <digit><digits> <number>          ::= <digits> | <digits>.<digits> | <digits>. | .<digits> <sign>            ::= \"+\" | \"-\" <signedNumber>    ::= <number> | <sign><number> <suffix>          ::= <binarySI> | <decimalExponent> | <decimalSI> <binarySI>        ::= Ki | Mi | Gi | Ti | Pi | Ei\n\n\t(International System of units; See: http://physics.nist.gov/cuu/Units/binary.html)\n\n<decimalSI>       ::= m | \"\" | k | M | G | T | P | E\n\n\t(Note that 1024 = 1Ki but 1000 = 1k; I didn't choose the capitalization.)\n\n<decimalExponent> ::= \"e\" <signedNumber> | \"E\" <signedNumber> ```\n\nNo matter which of the three exponent forms is used, no quantity may represent a number greater than 2^63-1 in magnitude, nor may it have more than 3 decimal places. Numbers larger or more precise will be capped or rounded up. (E.g.: 0.1m will rounded up to 1m.) This may be extended in the future if we require larger or smaller quantities.\n\nWhen a Quantity is parsed from a string, it will remember the type of suffix it had, and will use the same type again when it is serialized.\n\nBefore serializing, Quantity will be put in \"canonical form\". This means that Exponent/suffix will be adjusted up or down (with a corresponding increase or decrease in Mantissa) such that:\n\n- No precision is lost - No fractional digits will be emitted - The exponent (or suffix) is as large as possible.\n\nThe sign will be omitted unless the number is negative.\n\nExamples:\n\n- 1.5 will be serialized as \"1500m\" - 1.5Gi will be serialized as \"1536Mi\"\n\nNote that the quantity will NEVER be internally represented by a floating point number. That is the whole point of this exercise.\n\nNon-canonical values will still parse as long as they are well formed, but will be re-emitted in their canonical form. (So always use canonical form, or don't diff.)\n\nThis format is intended to make it difficult to use these numbers without writing some sort of special handling code in the hopes that that will cause implementors to also use a fixed point implementation."
                 type: string
               storageClass:
+                description: |-
+                  A StorageClass provides a way to describe the "classes" of storage offered in a cluster, including their provisioning, replication, and durability.
+
+                  For more information on StorageClasses please see the [Kubernetes documentation](https://kubernetes.io/docs/concepts/storage/storage-classes/)
+
+                  **Default**: `None` (uses the `default` StorageClass in your cluster)
                 nullable: true
                 type: string
               trunk_installs:
                 default: []
+                description: |-
+                  A list of extensions to install from the [pgtrunk](https://pgt.dev) registry. This list should be a list of extension names and versions that you wish to install at runtime using the pgtrunk API.
+
+                  **Default**: []
                 items:
+                  description: |-
+                    TrunkInstall allows installation of extensions from the [pgtrunk](https://pgt.dev) registry.  This list should be a list of extension names and versions that you wish to install at runtime using the pgtrunk API.
+
+                    This example will install the pg_stat_statements extension at version 1.10.0.
+
+                    ```yaml apiVersion: coredb.io/v1alpha1 kind: CoreDB metadata: name: test-db spec: trunk_installs: - name: pg_stat_statements version: 1.10.0 ```
                   properties:
                     name:
+                      description: The name of the extension to install. This must be the name of the extension as it appears in the [pgtrunk](https://pgt.dev) registry.
                       type: string
                     version:
+                      description: The version of the extension to install. If not specified, the latest version will be used. (Optional)
                       nullable: true
                       type: string
                   required:
@@ -1844,6 +2061,10 @@ spec:
                 type: array
               uid:
                 default: 999
+                description: |-
+                  **DEPRECATED** The UID to run the Postgres container as. This is no longer used and will be removed in a future release.
+
+                  We currently run the Postgres container with UID 26.
                 format: int32
                 type: integer
             type: object
@@ -1925,8 +2146,15 @@ spec:
                 type: boolean
               runtime_config:
                 items:
+                  description: |-
+                    PgConfig allows a user to define postgresql configuration settings in the postgres configuration file.  This is a subset of the postgresql.conf configuration settings.  The full list of settings that we currently **DO NOT** support can be found [here](https://cloudnative-pg.io/documentation/1.20/postgresql_conf/#fixed-parameters).
+
+                    **Example**: The following example shows how to set the `max_connections`, `shared_buffers` and `max_wal_size` configuration settings.
+
+                    ```yaml apiVersion: coredb.io/v1alpha1 kind: CoreDB metadata: name: test-db spec: runtime_config: - name: max_connections value: 100 - name: shared_buffers value: 2048MB - name: max_wal_size value: 2GB ```
                   properties:
                     name:
+                      description: The name of the Postgres configuration parameter.
                       type: string
                     value:
                       description: A postgresql.conf configuration value
