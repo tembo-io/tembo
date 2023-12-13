@@ -17,9 +17,30 @@ lazy_static! {
     };
 }
 
+/// TrunkInstall allows installation of extensions from the [pgtrunk](https://pgt.dev)
+/// registry.  This list should be a list of extension names and versions that you wish to
+/// install at runtime using the pgtrunk API.
+///
+/// This example will install the pg_stat_statements extension at version 1.10.0.
+///
+/// ```yaml
+/// apiVersion: coredb.io/v1alpha1
+/// kind: CoreDB
+/// metadata:
+///  name: test-db
+/// spec:
+///   trunk_installs:
+///   - name: pg_stat_statements
+///     version: 1.10.0
+/// ```
 #[derive(Clone, Debug, Deserialize, Eq, Hash, JsonSchema, Serialize, PartialEq, ToSchema)]
 pub struct TrunkInstall {
+    /// The name of the extension to install. This must be the name of the extension as it
+    /// appears in the [pgtrunk](https://pgt.dev) registry.
     pub name: String,
+
+    /// The version of the extension to install. If not specified, the latest version will
+    /// be used. (Optional)
     pub version: Option<String>,
 }
 
@@ -43,11 +64,41 @@ pub struct TrunkInstallStatus {
     pub installed_to_pods: Option<Vec<String>>,
 }
 
+/// Extension lets you define a list of extensions to enable on the instance. To enable
+/// extensions, you must specify the name of the extension and the database, schema, and
+/// version to enable it on. If the version is not specified, the latest version will be
+/// used.  The extension must also be installed on the instance.  To install
+/// extensions, please refer to the `TrunkInstall` resource.
+///
+/// This example will enable the pg_stat_statements extension on the postgres database
+/// in the public schema.
+///
+/// ```yaml
+/// apiVersion: coredb.io/v1alpha1
+/// kind: CoreDB
+/// metadata:
+///   name: test-db
+/// spec:
+///   extensions:
+///   - name: pg_stat_statements
+///     locations:
+///     - database: postgres
+///       enabled: true
+///       schema: public
+///       version: 1.10.0
+/// ````
 #[derive(Clone, Debug, Deserialize, Eq, Hash, JsonSchema, Serialize, PartialEq, ToSchema)]
 pub struct Extension {
+    /// The name of the extension to enable.
     pub name: String,
+
+    /// A description of the extension. (Optional)
+    ///
+    /// **Default**: "No description provided"
     #[serde(default = "defaults::default_description")]
     pub description: Option<String>,
+
+    /// A list of locations (databases) to enabled the extension on.
     pub locations: Vec<ExtensionInstallLocation>,
 }
 
@@ -79,12 +130,23 @@ impl From<ExtensionStatus> for Extension {
     }
 }
 
+/// ExtensionInstallLocation lets you specify the database, schema, and version to enable
+/// an extension on.
 #[derive(Clone, Debug, Deserialize, Eq, Hash, JsonSchema, Serialize, PartialEq, ToSchema)]
 pub struct ExtensionInstallLocation {
+    /// Enable or disable the extension on this Postgres instance.
     pub enabled: bool,
+
+    /// The database to enable the extension on.
+    ///
+    /// **Default**: "postgres"
     #[serde(default = "defaults::default_database")]
     pub database: String,
+
+    /// The extension version to install. If not specified, the latest version will be used.
     pub version: Option<String>,
+
+    /// The schema to enable the extension on. (eg: "public")
     pub schema: Option<String>,
 }
 

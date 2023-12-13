@@ -5,7 +5,6 @@ pub mod apis;
 
 pub mod app_service;
 pub mod configmap;
-pub mod doc;
 pub mod extensions;
 pub mod postgres_exporter;
 pub mod stacks;
@@ -22,7 +21,8 @@ pub mod errors;
 
 pub mod cloudnativepg;
 mod deployment_postgres_exporter;
-#[cfg(test)] pub mod fixtures;
+#[cfg(test)]
+pub mod fixtures;
 pub mod heartbeat;
 pub mod ingress;
 pub mod traefik;

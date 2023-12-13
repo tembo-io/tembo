@@ -66,13 +66,13 @@ pub struct Stack {
     pub stack_version: Option<String>,
     pub trunk_installs: Option<Vec<TrunkInstall>>,
     pub extensions: Option<Vec<Extension>>,
-    // postgres metric definition specific to the Stack
+    /// postgres metric definition specific to the Stack
     pub postgres_metrics: Option<QueryConfig>,
-    // configs are strongly typed so that they can be programmatically transformed
+    /// configs are strongly typed so that they can be programmatically transformed
     pub postgres_config: Option<Vec<PgConfig>>,
     #[serde(default = "default_config_engine")]
     pub postgres_config_engine: Option<ConfigEngine>,
-    // external application services
+    /// external application services
     pub infrastructure: Option<Infrastructure>,
     #[serde(rename = "appServices")]
     pub app_services: Option<Vec<AppService>>,

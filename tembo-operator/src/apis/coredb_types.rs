@@ -22,14 +22,65 @@ use std::collections::{BTreeMap, BTreeSet};
 use tracing::error;
 use utoipa::ToSchema;
 
+/// Stack type defines the stack configuration for the CoreDB instance.  This is
+/// mainly used for the [https://tembo.io](https://tembo.io) platform to allow
+/// for the deployment of pre-configured Postgres instances.
+///
+/// Standard, OLAP and the MessageQueue stacks are some of the common stacks configured
+///
+/// **Example**: Deploy a OLAP stack
+///
+/// ```yaml
+/// apiVersion: coredb.io/v1alpha1
+/// kind: CoreDB
+/// metadata:
+///   name: test-db
+/// spec:
+/// stack:
+///   name: OLAP
+///   postgres_config:
+///     - name: checkpoint_timeout
+///       value: "30min"
+///     - name: pg_stat_statements.track
+///       value: all
+///     - name: track_io_timing
+///       value: 'on'
+///     - name: cron.host
+///       value: /controller/run
+///     - name: shared_preload_libraries
+///       value: pg_stat_statements,pg_cron
+/// ```
 #[derive(Clone, Default, Debug, Serialize, Deserialize, JsonSchema)]
 pub struct Stack {
+    /// The name of the stack to deploy.
     pub name: String,
+
+    /// The specific postgres configuration settings needed for the stack.
     pub postgres_config: Option<Vec<PgConfig>>,
 }
 
+/// The ServiceAccountTemplate contains the template metadata needed to generate
+/// the service accounts to be used by the underlying Postgres instance
+///
+/// For more information on service accounts please see the [Kubernetes documentation](https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/)
+/// and the Cloudnative-PG docs on [ServiceAccountTemplates](https://cloudnative-pg.io/documentation/1.20/cloudnative-pg.v1/#postgresql-cnpg-io-v1-ServiceAccountTemplate)
+///
+/// **Example**:
+///
+/// ```yaml
+/// apiVersion: coredb.io/v1alpha1
+/// kind: CoreDB
+/// metadata:
+///  name: test-db
+/// spec:
+///   serviceAccountTemplate:
+///     metadata:
+///       annotations:
+///         eks.amazonaws.com/role-arn: arn:aws:iam::123456789012:role/pod-eks-role
+/// ```
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema, Default)]
 pub struct ServiceAccountTemplate {
+    /// Metadata are the metadata to be used for the generated service account (Optional)
     pub metadata: Option<ObjectMeta>,
 }
 
@@ -37,7 +88,7 @@ pub struct ServiceAccountTemplate {
 /// It can be provided in two alternative ways:
 /// * explicitly passing accessKeyId and secretAccessKey
 /// * inheriting the role from the pod environment by setting inheritFromIAMRole to true
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, ToSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
 pub struct S3Credentials {
     /// The reference to the access key id
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "accessKeyId")]
@@ -64,32 +115,57 @@ pub struct S3Credentials {
     pub session_token: Option<S3CredentialsSessionToken>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, ToSchema)]
+/// S3CredentialsAccessKeyId is the type for the reference to the access key id
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
 pub struct S3CredentialsAccessKeyId {
     pub key: String,
     pub name: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, ToSchema)]
+/// S3CredentialsRegion is the type for the reference to the secret containing the region name
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
 pub struct S3CredentialsRegion {
     pub key: String,
     pub name: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, ToSchema)]
+/// S3CredentialsSecretAccessKey is the type for the reference to the secret access key
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
 pub struct S3CredentialsSecretAccessKey {
     pub key: String,
     pub name: String,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, ToSchema)]
+/// S3CredentialsSessionToken is the type for the reference to the session key
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
 pub struct S3CredentialsSessionToken {
     pub key: String,
     pub name: String,
 }
 
 /// CoreDB Backup configuration
-#[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema, ToSchema)]
+/// The backup configuration for the CoreDB instance to facilitate database
+/// backups and WAL archive uploads to an S3 compatible object store.
+///
+/// **Example**: A typical S3 backup configuration using IAM Role for authentication
+///
+/// See `ServiceAccountTemplate` for to map the IAM role ARN to a Kubernetes service account.
+///
+/// ```yaml
+/// apiVersion: coredb.io/v1alpha1
+/// kind: CoreDB
+/// metadata:
+///  name: test-db
+/// spec:
+///   backup:
+///     destinationPath: s3://my-bucket/my-backups
+///     encryption: AES256
+///     retentionPolicy: "30" #30 days
+///     s3Credentials:
+///       inheritFromIAMRole: true
+///     schedule: "0 0 * * *" #every day at midnight
+/// ```
+#[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
 #[allow(non_snake_case)]
 pub struct Backup {
     /// The S3 bucket path to store backups in
@@ -117,34 +193,117 @@ pub struct Backup {
     pub s3_credentials: Option<S3Credentials>,
 }
 
+/// Restore configuration provides a way to restore a database from a backup
+/// stored in an S3 compatible object store.
+///
+/// **Example**: A typical S3 restore configuration using IAM Role for authentication
+///
+/// ```yaml
+/// apiVersion: coredb.io/v1alpha1
+/// kind: CoreDB
+/// metadata:
+///   name: test-db-restore
+/// spec:
+///   restore:
+///     serverName: test-db
+///     s3Credentials:
+///       inheritFromIAMRole: true
+/// ```
+///
+/// For more information plese read through the [cloudnative-pg documentation](https://cloudnative-pg.io/documentation/1.20/recovery/#pitr-from-an-object-store)
 #[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
 pub struct Restore {
+    /// The name of the instance you wish to restore.  This maps to the `Backup`
+    /// `destinationPath` field for the original instance.
+    ///
+    /// **Example**: If you have an instance with `spec.backup.destinationPath`
+    /// set to `s3://my-bucket/test-db` then you would set `serverName` to `test-db`.
+    ///
+    /// This assumes you are keeping the backups in the new instance in the same
+    /// root bucket path of `s3://my-bucket/`.
     #[serde(rename = "serverName")]
     pub server_name: String,
+
+    /// recovery_target_time is the time base target for point-in-time recovery.
     #[serde(rename = "recoveryTargetTime")]
     pub recovery_target_time: Option<String>,
+
+    /// endpointURL is the S3 compatable endpoint URL
     #[serde(default, rename = "endpointURL")]
     pub endpoint_url: Option<String>,
+
+    /// s3Credentials is the S3 credentials to use for backups.
     #[serde(rename = "s3Credentials")]
     pub s3_credentials: Option<S3Credentials>,
 }
 
+/// A connection pooler is a tool used to manage database connections, sitting
+/// between your application and Postgres instance. Because of the way Postgres
+/// handles connections, the server may encounter resource constraint issues
+/// when managing a few thousand connections. Using a pooler can alleviate these
+/// issues by using actual Postgres connections only when necessary
+///
+/// **Example**: A typical connection pooler configuration
+///
+/// ```yaml
+/// apiVersion: coredb.io/v1alpha1
+/// kind: CoreDB
+/// metadata:
+///   name: test-db
+/// spec:
+///   connectionPooler:
+///     enabled: true
+///     pooler:
+///       poolMode: transaction
+///       # Valid parameter values can be found at https://www.pgbouncer.org/config.html
+///       parameters:
+///         default_pool_size: "50"
+///         max_client_conn: "5000"
+///       resources:
+///         limits:
+///           cpu: 200m
+///           memory: 256Mi
+///         requests:
+///           cpu: 100m
+///           memory: 128Mi
+/// ```
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema, ToSchema, Default)]
 #[allow(non_snake_case)]
 pub struct ConnectionPooler {
+    /// Enable the connection pooler
+    ///
+    /// **Default**: false.
     #[serde(default = "defaults::default_conn_pooler_enabled")]
     pub enabled: bool,
+
+    /// The PGBouncer pooler configuration
     #[serde(default = "defaults::default_pgbouncer")]
     pub pooler: PgBouncer,
 }
 
+/// PgBouncer is the type for the PGBouncer configuration
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema, ToSchema, Default)]
 #[allow(non_snake_case)]
 pub struct PgBouncer {
+    /// The pool mode to use for the PGBouncer instance
+    /// Specifies when a server connection can be reused by other clients.
+    ///
+    /// Valid values are:
+    /// **session**: Server is released back to pool after client disconnects. Default.
+    /// **transaction**: Server is released back to pool after transaction finishes.
+    /// **statement**: Server is released back to pool after query finishes.
+    /// Transactions spanning multiple statements are disallowed in this mode.
+    ///
+    /// **Default**: transaction
     #[serde(default = "defaults::default_pool_mode")]
     pub poolMode: PoolerPgbouncerPoolMode,
-    // Valid parameter values can be found at https://www.pgbouncer.org/config.html
+
+    /// Valid pgbouncer parameter values can be found at [https://www.pgbouncer.org/config.html](https://www.pgbouncer.org/config.html)
     pub parameters: Option<BTreeMap<String, String>>,
+
+    /// The resource requirements (CPU/Memory) for the PGBouncer instance.
+    /// This is the same format as what is set for a Kubernetes Pod.
+    /// See [https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/)
     pub resources: Option<PoolerTemplateSpecContainersResources>,
 }
 
@@ -152,83 +311,201 @@ pub struct PgBouncer {
 ///
 /// This provides a hook for generating the CRD yaml (in crdgen.rs)
 
-/// This struct represents the specification for a CoreDB instance. It defines
+/// CoreDBSpec represents the specification for a CoreDB instance. It defines
 /// various configuration options for deploying and managing the database.
-#[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema, ToSchema)]
+/// with the tembo-controller
+///
+/// # Basic CoreDB Configuration
+///
+/// ```yaml
+/// apiVersion: coredb.io/v1alpha1
+/// kind: CoreDB
+/// metadata:
+///   name: test-db
+/// spec: {}
+/// ````
+#[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
 #[cfg_attr(test, derive(Default))]
 #[kube(kind = "CoreDB", group = "coredb.io", version = "v1alpha1", namespaced)]
 #[kube(status = "CoreDBStatus", shortname = "cdb")]
 #[allow(non_snake_case)]
 pub struct CoreDBSpec {
-    /// Number of CoreDB replicas to deploy. Defaults to 1.
+    /// Number of CoreDB replicas to deploy.
+    ///
+    /// **Default**: 1.
+    ///
     #[serde(default = "defaults::default_replicas")]
     pub replicas: i32,
 
+    /// The resource requirements (CPU/Memory) for the CoreDB instance.
+    /// This is the same format as what is set for a Kubernetes Pod.
+    /// See [https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/](https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/)
+    ///
+    /// **Limits Default**: 2 CPU and 2Gi memory.
+    ///
+    /// **Requests Default**: 500m CPU and 512Mi memory.
+    ///
     #[serde(default = "defaults::default_resources")]
     pub resources: ResourceRequirements,
 
+    // The storage size for the Postgres data volume (PGDATA).
+    //
+    // **Default**: 8Gi.
     #[serde(default = "defaults::default_storage")]
     pub storage: Quantity,
 
+    /// **DEPRECATED** The storage size for the sharedir volume.
+    /// This is no longer used and will be removed in a future release.
     #[serde(default = "defaults::default_sharedir_storage")]
     pub sharedirStorage: Quantity,
 
+    /// **DEPRECATED** The storage size for the pkglibdir volume.
+    /// This is no longer used and will be removed in a future release.
     #[serde(default = "defaults::default_pkglibdir_storage")]
     pub pkglibdirStorage: Quantity,
 
+    /// Enable the use of the Postgres Exporter deployment for metrics collection
+    ///
+    /// **Default**: true.
     #[serde(default = "defaults::default_postgres_exporter_enabled")]
     pub postgresExporterEnabled: bool,
 
+    /// The postgres image to use for the CoreDB instance deployment.
+    /// This should be a valid Postgres image that is compatible with the
+    /// [https://tembo.io](https://tembo.io) platform. For more information
+    /// please visit our [tembo-images](https://github.com/tembo-io/tembo-images) repository.
+    ///
+    /// **Default**: quay.io/tembo/standard-cnpg:15.3.0-1-0c19c7e
     #[serde(default = "defaults::default_image")]
     pub image: String,
 
+    /// The postgres-exporter image you want to use for the postgres-exporter deployment.
+    ///
+    /// **Default**: quay.io/prometheuscommunity/postgres-exporter:v0.12.0
     #[serde(default = "defaults::default_postgres_exporter_image")]
     pub postgresExporterImage: String,
 
+    /// The port to expose the Postgres service on.
+    ///
+    /// **Default**: 5432.
     #[serde(default = "defaults::default_port")]
     pub port: i32,
 
+    /// **DEPRECATED** The UID to run the Postgres container as.
+    /// This is no longer used and will be removed in a future release.
+    ///
+    /// We currently run the Postgres container with UID 26.
     #[serde(default = "defaults::default_uid")]
     pub uid: i32,
 
+    /// A list of extensions to enable on the CoreDB instance.
+    /// This list should be a lits of extension names that are already available
+    /// on the Postgres instance you are running.  To install extensions at runtime
+    /// please see the `trunk_installs` field.
+    ///
+    /// **Default**: []
     #[serde(default = "defaults::default_extensions")]
     pub extensions: Vec<Extension>,
 
+    /// A list of extensions to install from the [pgtrunk](https://pgt.dev) registry.
+    /// This list should be a list of extension names and versions that you wish to
+    /// install at runtime using the pgtrunk API.
+    ///
+    /// **Default**: []
     #[serde(default = "defaults::default_trunk_installs")]
     pub trunk_installs: Vec<TrunkInstall>,
 
+    /// This option allows you to stop the database instance.
+    ///
+    /// **Default**: false.
     #[serde(default = "defaults::default_stop")]
     pub stop: bool,
 
+    /// The serviceAccountTemplate contains the template needed to generate
+    /// the service accounts to be used by the underlying Postgres instance
+    ///
+    /// For more information on service accounts please see the [Kubernetes documentation](https://kubernetes.io/docs/tasks/configure-pod-container/configure-service-account/)
+    /// and the cloudnative-pg docs on [ServiceAccountTemplates](https://cloudnative-pg.io/documentation/1.20/cloudnative-pg.v1/#postgresql-cnpg-io-v1-ServiceAccountTemplate)
+    ///
+    /// **Default**: `ServiceAccountTemplate { metadata: None }`
     #[serde(default = "defaults::default_service_account_template")]
     pub serviceAccountTemplate: ServiceAccountTemplate,
 
+    /// The backup configuration for the CoreDB instance to facilitate database
+    /// backups and WAL archive uploads to an S3 compatible object store.
+    ///
+    /// **Default**: disabled
     #[serde(default = "defaults::default_backup")]
     pub backup: Backup,
 
+    /// The metrics configuration to allow for custom Postgresql metrics to be
+    /// exposed in postgres-exporter and Prometheus.
+    ///
+    /// **Default**: disabled
     pub metrics: Option<PostgresMetrics>,
 
+    /// The list of domains to add to the IngressRouteTCP generated in the
+    /// tembo-controller to route traffic to the Postgresql instance using SNI
+    /// based routing of encrypted TLS traffic into the correct instance.
+    ///
+    /// **Default**: disabled
     pub extra_domains_rw: Option<Vec<String>>,
 
-    /// List of IPv4 CIDR blocks
+    /// List of IPv4 CIDR blocks to allow access to the Postgresql instance.
+    ///
+    /// **Default**: Allow all
     #[serde(rename = "ipAllowList")]
     pub ip_allow_list: Option<Vec<String>>,
 
+    /// The stack configuration for the CoreDB instance.  This is mainly used for the
+    /// [https://tembo.io](https://tembo.io) platform to allow for the deployment of
+    /// pre-configured Postgres instances.
     pub stack: Option<Stack>,
-    // dynamic runtime configs
+
+    /// The runtime_config is a way to set the postgres configuration at runtime.
+    /// This is a list of PgConfig objects that define the postgres configuration
+    ///
+    /// For more information on what you can set, please refer to the cloudnative-pg
+    /// documentation on setting [Postgres Parameters](https://cloudnative-pg.io/documentation/1.20/postgresql_conf/#postgresql-configuration)
+    ///
+    /// **Default**: disabled
     pub runtime_config: Option<Vec<PgConfig>>,
-    // configuration overrides, typically defined by the user
+
+    /// The override_configs configuration is typically used by the [https://cloud.tembo.io](https://cloud.tembo.io)
+    /// platform to allow the user to override the postgres configuration at runtime.
+    ///
+    /// **Default**: disabled
     pub override_configs: Option<Vec<PgConfig>>,
-    // Connection pooler configuration
+
+    /// Connection pooler configuration used to manage database connections,
+    /// sitting between your application and Postgres instance.  Currently when
+    /// configured this will configure a PgBouncer instance in the namespace
+    /// of your deployment
+    ///
+    /// **Default**: disabled
     #[serde(default = "defaults::default_conn_pooler")]
     pub connectionPooler: ConnectionPooler,
+
+    /// app_service is a way to define a service that is deployed alongside the
+    /// Postgres instance.  This is typically used to deploy a service that
+    /// is used to connect to the Postgres instance in some manner.
+    ///
+    /// **Default**: disabled
     #[serde(rename = "appServices")]
     pub app_services: Option<Vec<AppService>>,
 
-    // instance restore from backup
+    /// The restore configuration provides a way to restore a database from a backup
+    /// stored in an S3 compatible object store.
+    ///
+    /// **Default**: disabled
     pub restore: Option<Restore>,
 
-    // Expose storage class to allow user to specify a custom storage class
+    /// A StorageClass provides a way to describe the "classes" of storage offered
+    /// in a cluster, including their provisioning, replication, and durability.
+    ///
+    /// For more information on StorageClasses please see the [Kubernetes documentation](https://kubernetes.io/docs/concepts/storage/storage-classes/)
+    ///
+    /// **Default**: `None` (uses the `default` StorageClass in your cluster)
     #[serde(rename = "storageClass")]
     pub storage_class: Option<String>,
 }
