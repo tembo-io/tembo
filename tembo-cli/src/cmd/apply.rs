@@ -6,6 +6,7 @@ use crate::{
     Result,
 };
 use clap::{ArgMatches, Command};
+use controller::stacks::get_stack;
 use std::io::Write;
 use std::{
     collections::HashMap,
@@ -51,7 +52,6 @@ fn execute_docker() -> Result<()> {
     Docker::installed_and_running()?;
 
     let instance_settings: HashMap<String, InstanceSettings> = get_instance_settings()?;
-
     let rendered_dockerfile: String = get_rendered_dockerfile(instance_settings.clone())?;
 
     FileUtils::create_file(
@@ -340,6 +340,12 @@ pub fn get_rendered_dockerfile(
     let _ = tera.add_raw_template("dockerfile", &contents);
     let mut context = tera::Context::new();
     for (_key, value) in instance_settings.iter() {
+        let stack_type = controller::stacks::types::StackType::from_str(value.stack_type.as_str())
+            .unwrap_or(controller::stacks::types::StackType::Standard);
+
+        let stack = get_stack(stack_type);
+
+        context.insert("stack_trunk_installs", &stack.trunk_installs);
         context.insert("extensions", &value.extensions);
     }
     let rendered_dockerfile = tera.render("dockerfile", &context).unwrap();
@@ -367,6 +373,12 @@ pub fn get_rendered_migrations_file(
     let _ = tera.add_raw_template("migrations", &contents);
     let mut context = tera::Context::new();
     for (_key, value) in instance_settings.iter() {
+        let stack_type = controller::stacks::types::StackType::from_str(value.stack_type.as_str())
+            .unwrap_or(controller::stacks::types::StackType::Standard);
+
+        let stack = get_stack(stack_type);
+
+        context.insert("stack_extensions", &stack.extensions);
         context.insert("extensions", &value.extensions);
     }
     let rendered_dockerfile = tera.render("migrations", &context).unwrap();
@@ -379,6 +391,21 @@ fn get_postgres_config(instance_settings: HashMap<String, InstanceSettings>) -> 
     let qoute_new_line = "\'\n";
     let equal_to_qoute = " = \'";
     for (_, instance_setting) in instance_settings.iter() {
+        let stack_type =
+            controller::stacks::types::StackType::from_str(instance_setting.stack_type.as_str())
+                .unwrap_or(controller::stacks::types::StackType::Standard);
+
+        let stack = get_stack(stack_type);
+
+        if stack.postgres_config.is_some() {
+            for (config) in stack.postgres_config.unwrap().iter() {
+                postgres_config.push_str(&config.name.as_str());
+                postgres_config.push_str(equal_to_qoute);
+                postgres_config.push_str(format!("{}", &config.value).as_str());
+                postgres_config.push_str(qoute_new_line);
+            }
+        }
+
         if instance_setting.postgres_configurations.is_some() {
             for (key, value) in instance_setting
                 .postgres_configurations
