@@ -535,6 +535,53 @@ mod test {
         }
     }
 
+    // function to check coredb.status.trunk_installs status of specific extension
+    async fn trunk_install_status(coredbs: &Api<CoreDB>, name: &str, extension: &str) -> bool {
+        let max_retries = 10;
+        let wait_duration = Duration::from_secs(2); // Adjust as needed
+
+        for attempt in 1..=max_retries {
+            match coredbs.get(name).await {
+                Ok(coredb) => {
+                    let has_extension_without_error = coredb.status.as_ref().map_or(false, |s| {
+                        s.trunk_installs.as_ref().map_or(false, |installs| {
+                            installs
+                                .iter()
+                                .any(|install| install.name == extension && !install.error)
+                        })
+                    });
+
+                    if has_extension_without_error {
+                        println!(
+                            "CoreDB {} has trunk_install status for {} without error",
+                            name, extension
+                        );
+                        return true;
+                    } else {
+                        println!(
+                                "Attempt {}/{}: CoreDB {} does not have trunk_install status for {} or has an error",
+                                attempt, max_retries, name, extension
+                            );
+                    }
+                }
+                Err(e) => {
+                    println!(
+                        "Failed to get CoreDB on attempt {}/{}: {}",
+                        attempt, max_retries, e
+                    );
+                }
+            }
+
+            tokio::time::sleep(wait_duration).await;
+        }
+
+        println!(
+            "CoreDB {} did not have trunk_install status for {} without error after {} attempts",
+            name, extension, max_retries
+        );
+        false
+    }
+
     #[tokio::test]
     #[ignore]
     async fn functional_test_basic_cnpg() {
@@ -4247,6 +4294,9 @@ CREATE EVENT TRIGGER pgrst_watch
                 panic!("Failed to retrieve pods: {:?}", e);
             }
         };
+
+        // Wait for pgmq to be installed before proceeding.
+        trunk_install_status(&restore_coredbs, restore_name, "pgmq").await;
         for pod in &retrieved_pods {
             let cmd = vec![
                 "/bin/sh".to_owned(),
@@ -4257,11 +4307,13 @@ CREATE EVENT TRIGGER pgrst_watch
             pod_ready_and_running(restore_pods.clone(), pod_name.clone()).await;
             let result = run_command_in_container(
                 restore_pods.clone(),
-                pod_name,
+                pod_name.clone(),
                 cmd.clone(),
                 Some("postgres".to_string()),
             )
             .await;
+            println!("Pod: {}", pod_name.clone());
+            println!("Result: {:?}", result);
             assert!(result.contains("pgmq.control"));
         }
 
