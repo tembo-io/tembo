@@ -1,5 +1,4 @@
 .gitignore
-.openapi-generator-ignore
 .travis.yml
 Cargo.toml
 README.md
@@ -25,6 +24,7 @@ docs/ExtensionStatus.md
 docs/HeaderConfig.md
 docs/Infrastructure.md
 docs/Ingress.md
+docs/IngressType.md
 docs/Instance.md
 docs/InstanceApi.md
 docs/InstanceEvent.md
@@ -89,6 +89,7 @@ src/models/extension_status.rs
 src/models/header_config.rs
 src/models/infrastructure.rs
 src/models/ingress.rs
+src/models/ingress_type.rs
 src/models/instance.rs
 src/models/instance_event.rs
 src/models/int_or_string.rs

@@ -12,14 +12,22 @@
 /// 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub enum Cpu {
+    #[serde(rename = "0.25")]
+    Variant0Period25,
+    #[serde(rename = "0.5")]
+    Variant0Period5,
     #[serde(rename = "1")]
     Variant1,
     #[serde(rename = "2")]
     Variant2,
     #[serde(rename = "4")]
     Variant4,
+    #[serde(rename = "6")]
+    Variant6,
     #[serde(rename = "8")]
     Variant8,
+    #[serde(rename = "12")]
+    Variant12,
     #[serde(rename = "16")]
     Variant16,
     #[serde(rename = "32")]
@@ -30,10 +38,14 @@ pub enum Cpu {
 impl ToString for Cpu {
     fn to_string(&self) -> String {
         match self {
+            Self::Variant0Period25 => String::from("0.25"),
+            Self::Variant0Period5 => String::from("0.5"),
             Self::Variant1 => String::from("1"),
             Self::Variant2 => String::from("2"),
             Self::Variant4 => String::from("4"),
+            Self::Variant6 => String::from("6"),
             Self::Variant8 => String::from("8"),
+            Self::Variant12 => String::from("12"),
             Self::Variant16 => String::from("16"),
             Self::Variant32 => String::from("32"),
         }
@@ -42,6 +54,10 @@ impl ToString for Cpu {
 
 impl Default for Cpu {
     fn default() -> Cpu {
-        Self::Variant1
+        Self::Variant0Period25
     }
 }
+
+
+
+
