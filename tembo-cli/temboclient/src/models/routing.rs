@@ -13,8 +13,12 @@
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Routing {
+    #[serde(rename = "entryPoints", default, with = "::serde_with::rust::double_option", skip_serializing_if = "Option::is_none")]
+    pub entry_points: Option<Option<Vec<String>>>,
     #[serde(rename = "ingressPath", default, with = "::serde_with::rust::double_option", skip_serializing_if = "Option::is_none")]
     pub ingress_path: Option<Option<String>>,
+    #[serde(rename = "ingressType", default, with = "::serde_with::rust::double_option", skip_serializing_if = "Option::is_none")]
+    pub ingress_type: Option<Option<crate::models::IngressType>>,
     #[serde(rename = "middlewares", default, with = "::serde_with::rust::double_option", skip_serializing_if = "Option::is_none")]
     pub middlewares: Option<Option<Vec<String>>>,
     #[serde(rename = "port")]
@@ -24,7 +28,9 @@ pub struct Routing {
 impl Routing {
     pub fn new(port: i32) -> Routing {
         Routing {
+            entry_points: None,
             ingress_path: None,
+            ingress_type: None,
             middlewares: None,
             port,
         }

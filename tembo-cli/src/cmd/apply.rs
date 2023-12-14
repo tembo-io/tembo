@@ -1,6 +1,6 @@
 use crate::{
     cli::{
-        context::{get_current_context, tembo_state_file_path, Environment, Target},
+        context::{get_current_context, Environment, Target},
         tembo_config,
     },
     Result,
@@ -8,16 +8,15 @@ use crate::{
 use clap::{ArgMatches, Command};
 use controller::stacks::get_stack;
 use controller::stacks::types::StackType as ControllerStackType;
-use std::io::Write;
 use std::{
     collections::HashMap,
-    fs::{self, OpenOptions},
+    fs::{self},
     str::FromStr,
 };
 use temboclient::{
     apis::{
         configuration::Configuration,
-        instance_api::{create_instance, put_instance},
+        instance_api::{create_instance, get_all, put_instance},
     },
     models::{
         Cpu, CreateInstance, Extension, ExtensionInstallLocation, Memory, PgConfig, StackType,
@@ -99,7 +98,7 @@ pub fn execute_tembo_cloud(env: Environment) -> Result<()> {
     };
 
     for (_key, value) in instance_settings.iter() {
-        let instance_id = get_instance_id_from_state(value.instance_name.clone())?;
+        let instance_id = get_instance_id(value.instance_name.clone(), &config, env.clone())?;
         if let Some(env_instance_id) = instance_id {
             update_existing_instance(env_instance_id, value, &config, env.clone());
         } else {
@@ -110,18 +109,26 @@ pub fn execute_tembo_cloud(env: Environment) -> Result<()> {
     Ok(())
 }
 
-pub fn get_instance_id_from_state(instance_name: String) -> Result<Option<String>> {
-    let contents = fs::read_to_string(tembo_state_file_path())?;
+pub fn get_instance_id(
+    instance_name: String,
+    config: &Configuration,
+    env: Environment,
+) -> Result<Option<String>> {
+    let v = Runtime::new()
+        .unwrap()
+        .block_on(get_all(config, env.org_id.clone().unwrap().as_str()));
 
-    let tembo_state_map: HashMap<String, String> = toml::from_str(&contents)?;
-
-    let tembo_state = tembo_state_map.get(&instance_name);
-    if tembo_state.is_none() {
-        Ok(None)
-    } else {
-        let instance_id = tembo_state.unwrap().clone();
-        Ok(Some(instance_id))
-    }
+    match v {
+        Ok(result) => {
+            for instance in result.iter() {
+                if instance.instance_name == instance_name {
+                    return Ok(Some(instance.clone().instance_id));
+                }
+            }
+        }
+        Err(error) => eprintln!("Error getting instance: {}", error),
+    };
+    Ok(None)
 }
 
 fn update_existing_instance(
@@ -165,17 +172,6 @@ fn create_new_instance(value: &InstanceSettings, config: &Configuration, env: En
                 "Instance creation started for instance_name: {} with instance_id: {}",
                 result.instance_name, result.instance_id
             );
-
-            let mut state_file = OpenOptions::new()
-                .append(true)
-                .open(tembo_state_file_path())
-                .expect("cannot open file");
-
-            let state = format!("{} = \"{}\"\n", result.instance_name, result.instance_id);
-
-            state_file
-                .write_all(state.as_bytes())
-                .expect("write failed");
         }
         Err(error) => eprintln!("Error creating instance: {}", error),
     };

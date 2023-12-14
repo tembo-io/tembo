@@ -15,6 +15,7 @@ use crate::apis::ResponseContent;
 use super::{Error, configuration};
 use crate::models::StackType;
 
+
 /// struct for typed errors of method [`get_all_entities`]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(untagged)]

@@ -11,8 +11,9 @@
 
 use reqwest;
 
-use crate::{apis::ResponseContent, models::InstanceEvent};
+use crate::apis::ResponseContent;
 use super::{Error, configuration};
+use crate::models::InstanceEvent;
 
 
 /// struct for typed errors of method [`create_instance`]

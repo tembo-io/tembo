@@ -4,7 +4,9 @@
 
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
+**entry_points** | Option<**Vec<String>**> |  | [optional]
 **ingress_path** | Option<**String**> |  | [optional]
+**ingress_type** | Option<[**crate::models::IngressType**](IngressType.md)> |  | [optional]
 **middlewares** | Option<**Vec<String>**> |  | [optional]
 **port** | **i32** |  | 
 

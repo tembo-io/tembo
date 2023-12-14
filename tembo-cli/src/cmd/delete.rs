@@ -13,7 +13,7 @@ use core::result::Result::Ok;
 use temboclient::apis::{configuration::Configuration, instance_api::delete_instance};
 use tokio::runtime::Runtime;
 
-use super::apply::{get_instance_id_from_state, get_instance_settings};
+use super::apply::{get_instance_id, get_instance_settings};
 
 // Create init subcommand arguments
 pub fn make_subcommand() -> Command {
@@ -43,11 +43,11 @@ fn execute_tembo_cloud(env: Environment) -> Result<()> {
     };
 
     for (_key, value) in instance_settings.iter() {
-        let instance_id = get_instance_id_from_state(value.instance_name.clone())?;
+        let instance_id = get_instance_id(value.instance_name.clone(), &config, env.clone())?;
         if let Some(env_instance_id) = instance_id {
             let v = Runtime::new().unwrap().block_on(delete_instance(
                 &config,
-                env.org_id.clone().unwrap().as_str(),
+                env.clone().org_id.unwrap().as_str(),
                 &env_instance_id,
             ));
 
