@@ -707,6 +707,7 @@ fn cluster_managed(name: &str) -> Option<ClusterManaged> {
 
 // This is a synchronous function that takes the latest_generated_node and diff_instances
 // and returns a Vec<String> containing the names of the pods to be fenced.
+#[instrument(fields(trace_id))]
 fn calculate_pods_to_fence(latest_generated_node: i32, diff_instances: i32, base_name: &str) -> Vec<String> {
     let mut pod_names_to_fence = Vec::new();
     for i in 1..=diff_instances {
@@ -718,6 +719,7 @@ fn calculate_pods_to_fence(latest_generated_node: i32, diff_instances: i32, base
 }
 
 // This is a synchronous function to extend pod_names_to_fence with fenced_pods.
+#[instrument(fields(trace_id))]
 fn extend_with_fenced_pods(pod_names_to_fence: &mut Vec<String>, fenced_pods: Option<Vec<String>>) {
     if let Some(fenced_pods) = fenced_pods {
         pod_names_to_fence.extend(fenced_pods);
@@ -725,13 +727,36 @@ fn extend_with_fenced_pods(pod_names_to_fence: &mut Vec<String>, fenced_pods: Op
 }
 
 // pods_to_fence determines a list of pod names that should be fenced when we detect that new replicas are being created
+#[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any()))]
 async fn pods_to_fence(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<String>, Action> {
+    // Check if there is an initial backup running, pending or completed.  We
+    // should never fence a pod with an active initial backup running, pending or
+    // completed.  There could be a time where we go into a reconcile loop
+    // during a restore, where the first_recoverability_time is not set and a backup
+    // is running.  We need to exit early in that case and not fence the running pod.
+    if cdb.spec.restore.is_some()
+        && is_restore_backup_running_pending_completed(cdb, ctx.clone())
+            .await
+            .unwrap_or(false)
+    {
+        debug!(
+            "Running or pending backup detected for instance {}, skipping fencing of pods.",
+            &cdb.name_any()
+        );
+        return Ok(Vec::new());
+    }
+
     // Check if a restore is requested
     if cdb.spec.restore.is_some()
         && cdb
             .status
             .as_ref()
             .and_then(|s| s.first_recoverability_time.as_ref())
+            .is_none()
+        && cdb
+            .status
+            .as_ref()
+            .and_then(|s| s.last_fully_reconciled_at.as_ref())
             .is_none()
     {
         // If restore is requested, fence all the pods based on the cdb.spec.replicas value
@@ -1713,16 +1738,13 @@ fn generate_s3_restore_credentials(
     }
 }
 
-fn is_backup_completed(backup: &Backup) -> bool {
-    match &backup.status {
-        Some(status) => status.phase.as_deref() == Some("completed"),
-        None => false,
-    }
-}
-
-// Lookup the Backup status of the instance we are deploying.  If the backup isn't
-// complete, we will requeue until it is.
-pub async fn check_backups_status(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {
+// is_restore_backup_running_pending_completed checks if a backup is running or
+// pending or completed and returns a bool or action in a result
+#[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any()))]
+async fn is_restore_backup_running_pending_completed(
+    cdb: &CoreDB,
+    ctx: Arc<Context>,
+) -> Result<bool, Action> {
     let instance_name = cdb.name_any();
     let namespace = cdb.namespace().ok_or_else(|| {
         error!("Namespace is not set for CoreDB for instance {}", instance_name);
@@ -1736,21 +1758,22 @@ pub async fn check_backups_status(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(),
 
     match backup_result {
         Ok(backup_list) => {
-            if backup_list.items.is_empty() {
-                error!("No backups found for {}, requeuing", instance_name);
-                return Err(Action::requeue(Duration::from_secs(30)));
-            }
-
             for backup_item in backup_list.items {
-                if let Some(backup_name) = &backup_item.metadata.name {
-                    if !is_backup_completed(&backup_item) {
-                        info!("Backup {} is not completed, requeuing", backup_name);
-                        return Err(Action::requeue(Duration::from_secs(30)));
+                if let Some(status) = &backup_item.status {
+                    if status.phase.as_deref() == Some("running")
+                        || status.phase.as_deref() == Some("pending")
+                        || status.phase.as_deref() == Some("completed")
+                    {
+                        debug!(
+                            "Backup for instance {} is in a {:?} state",
+                            instance_name,
+                            status.phase.as_deref()
+                        );
+                        return Ok(true);
                     }
-                    info!("Backup {} completed", backup_name);
                 }
             }
-            Ok(())
+            Ok(false)
         }
         Err(e) => {
             error!("Error listing backups: {}", e);
