@@ -7,6 +7,7 @@ use crate::{
 };
 use clap::{ArgMatches, Command};
 use controller::stacks::get_stack;
+use controller::stacks::types::StackType as ControllerStackType;
 use std::io::Write;
 use std::{
     collections::HashMap,
@@ -340,8 +341,8 @@ pub fn get_rendered_dockerfile(
     let _ = tera.add_raw_template("dockerfile", &contents);
     let mut context = tera::Context::new();
     for (_key, value) in instance_settings.iter() {
-        let stack_type = controller::stacks::types::StackType::from_str(value.stack_type.as_str())
-            .unwrap_or(controller::stacks::types::StackType::Standard);
+        let stack_type = ControllerStackType::from_str(value.stack_type.as_str())
+            .unwrap_or(ControllerStackType::Standard);
 
         let stack = get_stack(stack_type);
 
@@ -373,8 +374,8 @@ pub fn get_rendered_migrations_file(
     let _ = tera.add_raw_template("migrations", &contents);
     let mut context = tera::Context::new();
     for (_key, value) in instance_settings.iter() {
-        let stack_type = controller::stacks::types::StackType::from_str(value.stack_type.as_str())
-            .unwrap_or(controller::stacks::types::StackType::Standard);
+        let stack_type = ControllerStackType::from_str(value.stack_type.as_str())
+            .unwrap_or(ControllerStackType::Standard);
 
         let stack = get_stack(stack_type);
 
@@ -391,9 +392,8 @@ fn get_postgres_config(instance_settings: HashMap<String, InstanceSettings>) -> 
     let qoute_new_line = "\'\n";
     let equal_to_qoute = " = \'";
     for (_, instance_setting) in instance_settings.iter() {
-        let stack_type =
-            controller::stacks::types::StackType::from_str(instance_setting.stack_type.as_str())
-                .unwrap_or(controller::stacks::types::StackType::Standard);
+        let stack_type = ControllerStackType::from_str(instance_setting.stack_type.as_str())
+            .unwrap_or(ControllerStackType::Standard);
 
         let stack = get_stack(stack_type);
 
