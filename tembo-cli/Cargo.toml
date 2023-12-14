@@ -47,6 +47,7 @@ tokio = { version = "1.26.0", features = [
     "macros",
     "sync",
 ] }
+controller = "0.26.1"
 
 [dev-dependencies]
 assert_cmd = "2.0.8"
