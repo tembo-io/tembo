@@ -398,8 +398,8 @@ fn get_postgres_config(instance_settings: HashMap<String, InstanceSettings>) -> 
         let stack = get_stack(stack_type);
 
         if stack.postgres_config.is_some() {
-            for (config) in stack.postgres_config.unwrap().iter() {
-                postgres_config.push_str(&config.name.as_str());
+            for config in stack.postgres_config.unwrap().iter() {
+                postgres_config.push_str(config.name.as_str());
                 postgres_config.push_str(equal_to_qoute);
                 postgres_config.push_str(format!("{}", &config.value).as_str());
                 postgres_config.push_str(qoute_new_line);
