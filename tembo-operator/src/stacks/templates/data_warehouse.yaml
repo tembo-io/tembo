@@ -1,5 +1,5 @@
 name: DataWarehouse
-description: A Postgres instance equipped with configuration and extensions building a data warehouse on Postgres.
+description: A Postgres instance equipped with configuration and extensions for building a data warehouse on Postgres.
 image: "quay.io/tembo/dw-cnpg:15.3.0-1-0baf38f"
 stack_version: 0.1.0
 compute_templates:
@@ -30,7 +30,7 @@ postgres_config:
   - name: shared_preload_libraries
     value: pg_stat_statements,pg_cron
   - name: track_io_timing
-    value: 'on'
+    value: "on"
   - name: wal_level
     value: logical
 trunk_installs:
@@ -48,7 +48,7 @@ trunk_installs:
     version: 1.0.0
   - name: wrappers
     version: 0.2.0
-  - name: multicorn 
+  - name: multicorn
     version: 2.5.0
 extensions:
   - name: pg_stat_statements
@@ -60,7 +60,7 @@ extensions:
     locations:
       - database: postgres
         enabled: true
-        version: '11.1-7'
+        version: "11.1-7"
   - name: pg_partman
     locations:
       - database: postgres
@@ -69,30 +69,30 @@ extensions:
   - name: pg_cron
     description: pg_cron
     locations:
-    - database: postgres
-      enabled: true
-      version: 1.5.2
+      - database: postgres
+        enabled: true
+        version: 1.5.2
   - name: postgres_fdw
     description: postgres_fdw
     locations:
-    - database: postgres
-      enabled: true
-      version: '1.1'
+      - database: postgres
+        enabled: true
+        version: "1.1"
   - name: redis_fdw
     description: redis_fdw
     locations:
-    - database: postgres
-      enabled: true
-      version:  1.0.0
+      - database: postgres
+        enabled: true
+        version: 1.0.0
   - name: wrappers
     description: wrappers
     locations:
-    - database: postgres
-      enabled: true
-      version:  0.2.0
-  - name: multicorn 
-    description: multicorn 
+      - database: postgres
+        enabled: true
+        version: 0.2.0
+  - name: multicorn
+    description: multicorn
     locations:
-    - database: postgres
-      enabled: true
-      version:  2.5.0
+      - database: postgres
+        enabled: true
+        version: 2.5.0
