@@ -9,7 +9,6 @@ use crate::{
         cnpg::{cnpg_cluster_from_cdb, reconcile_cnpg, reconcile_cnpg_scheduled_backup, reconcile_pooler},
     },
     config::Config,
-    deployment_postgres_exporter::reconcile_prometheus_exporter_deployment,
     exec::{ExecCommand, ExecOutput},
     extensions::database_queries::is_not_restarting,
     heartbeat::reconcile_heartbeat,
@@ -17,7 +16,6 @@ use crate::{
     postgres_certificates::reconcile_certificates,
     psql::{PsqlCommand, PsqlOutput},
     secret::{reconcile_postgres_role_secret, reconcile_secret},
-    service::reconcile_prometheus_exporter_service,
     telemetry, Error, Metrics, Result,
 };
 use k8s_openapi::{
@@ -270,22 +268,11 @@ impl CoreDB {
             reconcile_cnpg_scheduled_backup(self, ctx.clone()).await?;
         }
 
-        if self.spec.postgresExporterEnabled {
-            debug!("Reconciling prometheus exporter deployment");
-            reconcile_prometheus_exporter_deployment(self, ctx.clone())
-                .await
-                .map_err(|e| {
-                    error!("Error reconciling prometheus exporter deployment: {:?}", e);
-                    Action::requeue(Duration::from_secs(300))
-                })?;
-        };
-
-        // reconcile service
-        debug!("Reconciling prometheus exporter service");
-        reconcile_prometheus_exporter_service(self, ctx.clone())
+        // Cleanup old Postgres Exporter Deployments, Service, ServiceAccount, Role and RoleBinding
+        crate::deployment_postgres_exporter::cleanup_postgres_exporter(self, ctx.clone())
             .await
             .map_err(|e| {
-                error!("Error reconciling service: {:?}", e);
+                error!("Error reconciling prometheus exporter deployment: {:?}", e);
                 Action::requeue(Duration::from_secs(300))
             })?;
 

@@ -44,6 +44,7 @@ use crate::{
     defaults::{default_image, default_llm_image},
     errors::ValueError,
     is_postgres_ready, patch_cdb_status_merge,
+    postgres_exporter::EXPORTER_CONFIGMAP_PREFIX,
     psql::PsqlOutput,
     trunk::extensions_that_require_load,
     Context, RESTARTED_AT,
@@ -598,6 +599,20 @@ pub fn cnpg_cluster_from_cdb(
         metrics.push(ClusterMonitoringCustomQueriesConfigMap {
             key: "custom-queries".to_string(),
             name: configmap_name,
+        })
+    }
+
+    if cdb
+        .spec
+        .metrics
+        .as_ref()
+        .and_then(|m| m.queries.as_ref())
+        .is_some()
+    {
+        let configmap = format!("{}{}", EXPORTER_CONFIGMAP_PREFIX, cdb.name_any());
+        metrics.push(ClusterMonitoringCustomQueriesConfigMap {
+            key: "tembo-queries".to_string(),
+            name: configmap,
         })
     }
 
