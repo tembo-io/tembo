@@ -44,7 +44,7 @@ spec:
   trunk_installs:
     - name: pgvector
       version: 0.5.0
-    - name: pgml
+    - name: postgresml
       version: 2.7.1
     - name: pg_cron
       version: 1.5.2

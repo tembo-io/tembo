@@ -7,7 +7,7 @@ spec:
   trunk_installs:
     - name: pgvector
       version: 0.5.1
-    - name: pgml
+    - name: postgresml
       version: 2.7.1
     - name: pg_embedding
       version: 0.1.0
