@@ -115,7 +115,7 @@ pub struct QueryItem {
     pub query: String,
 
     // We need to support this at some point going forward since master
-    // if now deprecated.
+    // is now deprecated.
     // whether to run the query only on the primary instance
     //pub primary: Option<bool>,
 
@@ -124,10 +124,6 @@ pub struct QueryItem {
     /// whether to run the query only on the master instance
     /// See [https://cloudnative-pg.io/documentation/1.20/monitoring/#structure-of-a-user-defined-metric](https://cloudnative-pg.io/documentation/1.20/monitoring/#structure-of-a-user-defined-metric)
     pub master: bool,
-
-    /// a list of databases to run the query against, or a shell-like pattern to
-    /// enable auto discovery. Overwrites the default database if provided.
-    pub target_database: Option<String>,
 
     /// the name of the column returned by the query
     ///
