@@ -120,10 +120,12 @@ pub fn get_instance_id(
 
     match v {
         Ok(result) => {
-            for instance in result.iter() {
-                if instance.instance_name == instance_name {
-                    return Ok(Some(instance.clone().instance_id));
-                }
+            let maybe_instance = result
+                .iter()
+                .find(|instance| instance.instance_name == instance_name);
+
+            if let Some(instance) = maybe_instance {
+                return Ok(Some(instance.clone().instance_id));
             }
         }
         Err(error) => eprintln!("Error getting instance: {}", error),
