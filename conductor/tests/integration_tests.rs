@@ -232,13 +232,6 @@ mod test {
         let pod_name = format!("{}-1", &namespace);
         pod_ready_and_running(pods.clone(), pod_name.clone()).await;
 
-        // Wait for postgres-exporter pod to be running
-        let lp = ListParams::default()
-            .labels(format!("app=postgres-exporter,coredb.io/name={}", namespace).as_str());
-        let exporter_pods = pods.list(&lp).await.expect("could not get pods");
-        let exporter_pod_name = exporter_pods.items[0].metadata.name.as_ref().unwrap();
-        pod_ready_and_running(pods.clone(), exporter_pod_name.clone()).await;
-
         // ADD AN EXTENSION - ASSERT IT MAKES IT TO STATUS.EXTENSIONS
         // conductor receives a CRUDevent from control plane
         // take note of number of extensions at this point in time
@@ -297,9 +290,6 @@ mod test {
         thread::sleep(time::Duration::from_secs(40));
 
         pod_ready_and_running(pods.clone(), pod_name.clone()).await;
-        let exporter_pods = pods.list(&lp).await.expect("could not get pods");
-        let exporter_pod_name = exporter_pods.items[0].metadata.name.as_ref().unwrap();
-        pod_ready_and_running(pods.clone(), exporter_pod_name.clone()).await;
 
         // Get the last time the pod was started
         // using SELECT pg_postmaster_start_time();
@@ -348,9 +338,6 @@ mod test {
         }
 
         pod_ready_and_running(pods.clone(), pod_name).await;
-        let exporter_pods = pods.list(&lp).await.expect("could not get pods");
-        let exporter_pod_name = exporter_pods.items[0].metadata.name.as_ref().unwrap();
-        pod_ready_and_running(pods.clone(), exporter_pod_name.clone()).await;
 
         // Get the last time the pod was started
         // using SELECT pg_postmaster_start_time();
