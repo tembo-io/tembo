@@ -41,7 +41,7 @@ use crate::{
     extensions::{database_queries::list_config_params, reconcile_extensions},
     ingress::{reconcile_extra_postgres_ing_route_tcp, reconcile_ip_allowlist_middleware},
     network_policies::reconcile_network_policies,
-    postgres_exporter::reconcile_prom_configmap,
+    postgres_exporter::reconcile_metrics_configmap,
     trunk::{extensions_that_require_load, reconcile_trunk_configmap},
 };
 use rand::Rng;
@@ -214,16 +214,15 @@ impl CoreDB {
 
         reconcile_app_services(self, ctx.clone()).await?;
 
-        if self.spec.postgresExporterEnabled
-            && self
-                .spec
-                .metrics
-                .as_ref()
-                .and_then(|m| m.queries.as_ref())
-                .is_some()
+        if self
+            .spec
+            .metrics
+            .as_ref()
+            .and_then(|m| m.queries.as_ref())
+            .is_some()
         {
             debug!("Reconciling prometheus configmap");
-            reconcile_prom_configmap(self, client.clone(), &ns)
+            reconcile_metrics_configmap(self, client.clone(), &ns)
                 .await
                 .map_err(|e| {
                     error!("Error reconciling prometheus configmap: {:?}", e);
@@ -237,21 +236,6 @@ impl CoreDB {
             error!("Error reconciling secret: {:?}", e);
             Action::requeue(Duration::from_secs(300))
         })?;
-
-        // Postgres exporter connection info
-        if self.spec.postgresExporterEnabled {
-            let _ = reconcile_postgres_role_secret(
-                self,
-                ctx.clone(),
-                "postgres_exporter",
-                &format!("{}-exporter", name.clone()),
-            )
-            .await
-            .map_err(|e| {
-                error!("Error reconciling postgres exporter secret: {:?}", e);
-                Action::requeue(Duration::from_secs(300))
-            })?;
-        }
 
         let _ =
             reconcile_postgres_role_secret(self, ctx.clone(), "readonly", &format!("{}-ro", name.clone()))

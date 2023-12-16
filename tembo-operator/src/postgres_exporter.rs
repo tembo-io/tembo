@@ -174,7 +174,7 @@ impl FromStr for Usage {
     }
 }
 
-pub async fn reconcile_prom_configmap(cdb: &CoreDB, client: Client, ns: &str) -> Result<(), Error> {
+pub async fn reconcile_metrics_configmap(cdb: &CoreDB, client: Client, ns: &str) -> Result<(), Error> {
     // set custom pg-prom metrics in configmap values if they are specified
     let coredb_name = cdb
         .metadata
