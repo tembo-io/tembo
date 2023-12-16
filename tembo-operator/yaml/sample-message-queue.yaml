@@ -36,7 +36,7 @@ spec:
         value: all
   trunk_installs:
     - name: pgmq
-      version: 0.32.1
+      version: 1.1.0
     - name: pg_partman
       version: 4.7.3
   extensions:
@@ -55,7 +55,7 @@ spec:
     image: quay.io/prometheuscommunity/postgres-exporter:v0.12.0
     queries:
       pgmq:
-        query: select queue_name, queue_length, oldest_msg_age_sec, newest_msg_age_sec,total_messages from public.pgmq_metrics_all()
+        query: select queue_name, queue_length, oldest_msg_age_sec, newest_msg_age_sec, total_messages from public.pgmq_metrics_all()
         master: true
         metrics:
           - queue_name:

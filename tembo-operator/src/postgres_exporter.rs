@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use tracing::debug;
 
-pub const QUERIES_YAML: &str = "queries.yaml";
+pub const QUERIES: &str = "tembo-queries";
 pub const EXPORTER_VOLUME: &str = "postgres-exporter";
 pub const EXPORTER_CONFIGMAP_PREFIX: &str = "metrics-";
 
@@ -81,10 +81,55 @@ pub struct Metrics {
     pub metrics: BTreeMap<String, Metric>,
 }
 
+/// **Example**: This example exposes specific metrics from a query to a
+/// [pgmq](https://github.com/tembo-io/pgmq) queue enabled database.
+///
+/// ```yaml
+///   metrics:
+///    enabled: true
+///    image: quay.io/prometheuscommunity/postgres-exporter:v0.12.0
+///    queries:
+///      pgmq:
+///        query: select queue_name, queue_length, oldest_msg_age_sec, newest_msg_age_sec, total_messages from pgmq.metrics_all()
+///        primary: true
+///        metrics:
+///          - queue_name:
+///              description: Name of the queue
+///              usage: LABEL
+///          - queue_length:
+///              description: Number of messages in the queue
+///              usage: GAUGE
+///          - oldest_msg_age_sec:
+///              description: Age of the oldest message in the queue, in seconds.
+///              usage: GAUGE
+///          - newest_msg_age_sec:
+///              description: Age of the newest message in the queue, in seconds.
+///              usage: GAUGE
+///          - total_messages:
+///              description: Total number of messages that have passed into the queue.
+///              usage: GAUGE
+/// ```
 #[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize)]
 pub struct QueryItem {
+    /// the SQL query to run on the target database to generate the metrics
     pub query: String,
+
+    // We need to support this at some point going forward since master
+    // is now deprecated.
+    // whether to run the query only on the primary instance
+    //pub primary: Option<bool>,
+
+    // same as primary (for compatibility with the Prometheus PostgreSQL
+    // exporter's syntax - **deprecated**)
+    /// whether to run the query only on the master instance
+    /// See [https://cloudnative-pg.io/documentation/1.20/monitoring/#structure-of-a-user-defined-metric](https://cloudnative-pg.io/documentation/1.20/monitoring/#structure-of-a-user-defined-metric)
     pub master: bool,
+
+    /// the name of the column returned by the query
+    ///
+    /// usage: one of the values described below
+    /// description: the metric's description
+    /// metrics_mapping: the optional column mapping when usage is set to MAPPEDMETRIC
     pub metrics: Vec<Metrics>,
 }
 
@@ -129,7 +174,7 @@ impl FromStr for Usage {
     }
 }
 
-pub async fn reconcile_prom_configmap(cdb: &CoreDB, client: Client, ns: &str) -> Result<(), Error> {
+pub async fn reconcile_metrics_configmap(cdb: &CoreDB, client: Client, ns: &str) -> Result<(), Error> {
     // set custom pg-prom metrics in configmap values if they are specified
     let coredb_name = cdb
         .metadata
@@ -141,7 +186,7 @@ pub async fn reconcile_prom_configmap(cdb: &CoreDB, client: Client, ns: &str) ->
     match cdb.spec.metrics.clone().and_then(|m| m.queries) {
         Some(queries) => {
             let qdata = serde_yaml::to_string(&queries).unwrap();
-            let d: BTreeMap<String, String> = BTreeMap::from([(QUERIES_YAML.to_string(), qdata)]);
+            let d: BTreeMap<String, String> = BTreeMap::from([(QUERIES.to_string(), qdata)]);
             apply_configmap(
                 client.clone(),
                 ns,
