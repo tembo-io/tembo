@@ -126,7 +126,7 @@
             "uid": "prometheus"
           },
           "editorMode": "code",
-          "expr": "count(sum by (namespace) (pg_up))",
+          "expr": "count(avg by (namespace) (kube_pod_container_status_ready{container=\"postgres\"}))",
           "hide": false,
           "legendFormat": "ADUM",
           "range": true,
