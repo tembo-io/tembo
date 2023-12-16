@@ -7,8 +7,8 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-aws-config = { version = "1.1", features = ["behavior-version-latest"] }
-aws-sdk-cloudformation = "1.8"
+aws-config = "0.55.1"
+aws-sdk-cloudformation = "0.26.0"
 base64 = "0.21.0"
 chrono = { version = "0.4.24", features = [ "serde" ] }
 controller = {path = "../tembo-operator", package = "controller"}

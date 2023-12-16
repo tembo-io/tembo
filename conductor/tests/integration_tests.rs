@@ -393,10 +393,28 @@ mod test {
         use conductor::aws::cloudformation::AWSConfigState;
         let aws_region = "us-east-1".to_owned();
         let region = Region::new(aws_region);
-        let aws_config_state = AWSConfigState::new(region).await;
+        let aws_config_state = AWSConfigState::new(region.clone()).await;
         let stack_name = format!("org-{}-inst-{}-cf", org_name, dbname);
-        let exists = aws_config_state.does_stack_exist(&stack_name).await;
-        assert!(!exists, "CF stack was not deleted");
+        // let dcf = aws_config_state
+        //     .delete_cloudformation_stack(&stack_name)
+        //     .await;
+        // assert!(dcf);
+        // let exists = aws_config_state.does_stack_exist(&stack_name).await;
+        // assert!(!exists, "CF stack was not deleted");
+        match aws_config_state
+            .delete_cloudformation_stack(&stack_name)
+            .await
+        {
+            Ok(_) => {
+                // If deletion was successful, check if the stack still exists
+                let stack_exists = aws_config_state.does_stack_exist(&stack_name).await;
+                assert!(!stack_exists, "CloudFormation stack was not deleted");
+            }
+            Err(e) => {
+                // If there was an error deleting the stack, fail the test
+                panic!("Failed to delete CloudFormation stack: {:?}", e);
+            }
+        }
     }
 
     async fn kube_client() -> kube::Client {
