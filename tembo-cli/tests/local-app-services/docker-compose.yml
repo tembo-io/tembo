@@ -1,9 +1,45 @@
 version: '3.8'
 
 services:
+
   instance-1:
     build:
       context: ./instance-1
+    networks:
+      - tembo
+    labels:
+      - "traefik.enable=true"
+      - "traefik.tcp.routers.instance-1.rule=HostSNI(`instance-1.local.tembo.io`)"
+      - "traefik.tcp.routers.instance-1.entrypoints=postgresql"
+      - "traefik.tcp.routers.instance-1.tls.passthrough=true"
+      - "traefik.tcp.services.instance-1.loadbalancer.server.port=5432"
+
+  traefik:
+    image: traefik:v3.0.0-beta2
+    command:
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.ferretdb.address=:27018/tcp"
+      - "--entrypoints.metrics.address=:9100/tcp"
+      - "--entrypoints.postgresql.address=:5432/tcp"
+      - "--entrypoints.traefik.address=:9000/tcp"
+      - "--entrypoints.web.address=:8000/tcp"
+      - "--entrypoints.websecure.address=:8443/tcp"
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+      - "--metrics.prometheus=true"
+      - "--metrics.prometheus.entrypoint=metrics"
+      - "--log.level=DEBUG"
+      - "--accesslog=true"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
     ports:
+      - "8000:8000"
+      - "8443:8443"
+      - "9000:9000"
+      - "9100:9100"
       - "5432:5432"
-    # restart: unless-stopped
+      - "27018:27018"
+
+networks:
+  tembo: {}
