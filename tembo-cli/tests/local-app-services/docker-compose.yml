@@ -16,6 +16,8 @@ services:
 
   traefik:
     image: traefik:v3.0.0-beta2
+    networks:
+      - tembo
     command:
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
