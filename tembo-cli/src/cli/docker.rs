@@ -1,4 +1,3 @@
-use crate::cli::instance::Instance;
 use crate::Result;
 use anyhow::bail;
 use simplelog::*;
@@ -71,24 +70,6 @@ impl Docker {
         run_command(command)?;
 
         sp.stop_with_message("- SQL migration completed".to_string());
-
-        Ok(())
-    }
-
-    // start container if exists for name otherwise build container and start
-    pub fn start(name: &str, instance: &Instance) -> Result {
-        if Self::container_list_filtered(name)
-            .unwrap()
-            .contains("tembo-pg")
-        {
-            info!("existing container found");
-
-            instance.start();
-        } else {
-            info!("building and then running container");
-
-            let _ = instance.init();
-        };
 
         Ok(())
     }
