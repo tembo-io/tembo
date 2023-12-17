@@ -9,6 +9,9 @@ services:
       - tembo
     labels:
       - "traefik.enable=true"
+      # an 'A' record *.local.tembo.io is set to 127.0.0.1
+      # connect with TLS passthrough, SNI into local instance.
+      # TLS termination inside postgres container.
       - "traefik.tcp.routers.instance-1.rule=HostSNI(`instance-1.local.tembo.io`)"
       - "traefik.tcp.routers.instance-1.entrypoints=postgresql"
       - "traefik.tcp.routers.instance-1.tls.passthrough=true"
@@ -31,28 +34,29 @@ services:
     networks:
       - tembo
     command:
+      # Traefik can make routing rules by talking to
+      # Docker. We also connect Docker socket to container.
       - "--providers.docker=true"
       - "--providers.docker.exposedbydefault=false"
+      # These are all the ports we can use for local dev
       - "--entrypoints.ferretdb.address=:27018/tcp"
-      - "--entrypoints.metrics.address=:9100/tcp"
       - "--entrypoints.postgresql.address=:5432/tcp"
       - "--entrypoints.traefik.address=:9000/tcp"
       - "--entrypoints.web.address=:8000/tcp"
-      - "--entrypoints.websecure.address=:8443/tcp"
       - "--api.dashboard=true"
       - "--api.insecure=true"
-      - "--metrics.prometheus=true"
-      - "--metrics.prometheus.entrypoint=metrics"
-      - "--log.level=DEBUG"
-      - "--accesslog=true"
+      # This could be enabled with debug mode on
+      # - "--accesslog=true"
+      # - "--log.level=DEBUG"
     volumes:
       - "/var/run/docker.sock:/var/run/docker.sock:ro"
     ports:
       - "8000:8000"
-      - "8443:8443"
+      # Traefik dashboard at http://localhost:9000/dashboard/
+      # helpful for troubleshooting Traefik configurations
       - "9000:9000"
-      - "9100:9100"
       - "5432:5432"
+      # FerretDB port
       - "27018:27018"
 
 networks:
