@@ -51,6 +51,7 @@ fn main() {
     let res = match matches.subcommand() {
         Some(("init", sub_matches)) => cmd::init::execute(sub_matches),
         Some(("context", sub_matches)) => cmd::context::execute(sub_matches),
+        Some(("validate", sub_matches)) => cmd::validate::execute(sub_matches),
         Some(("apply", sub_matches)) => cmd::apply::execute(sub_matches),
         Some(("delete", sub_matches)) => cmd::delete::execute(sub_matches),
         Some(("completions", sub_matches)) => (|| {
@@ -91,6 +92,7 @@ fn create_clap_command() -> Command {
         )
         .subcommand(cmd::init::make_subcommand())
         .subcommand(cmd::apply::make_subcommand())
+        .subcommand(cmd::validate::make_subcommand())
         .subcommand(cmd::delete::make_subcommand())
         .subcommand(
             Command::new("context")
