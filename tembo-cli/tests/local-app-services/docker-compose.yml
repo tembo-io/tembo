@@ -1,0 +1,9 @@
+version: '3.8'
+
+services:
+  instance-1:
+    build:
+      context: ./instance-1
+    ports:
+      - "5432:5432"
+    # restart: unless-stopped
