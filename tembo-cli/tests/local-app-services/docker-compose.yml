@@ -14,6 +14,18 @@ services:
       - "traefik.tcp.routers.instance-1.tls.passthrough=true"
       - "traefik.tcp.services.instance-1.loadbalancer.server.port=5432"
 
+  instance-2:
+    build:
+      context: ./instance-2
+    networks:
+      - tembo
+    labels:
+      - "traefik.enable=true"
+      - "traefik.tcp.routers.instance-2.rule=HostSNI(`instance-2.local.tembo.io`)"
+      - "traefik.tcp.routers.instance-2.entrypoints=postgresql"
+      - "traefik.tcp.routers.instance-2.tls.passthrough=true"
+      - "traefik.tcp.services.instance-2.loadbalancer.server.port=5432"
+
   traefik:
     image: traefik:v3.0.0-beta2
     networks:
