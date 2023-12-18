@@ -28,7 +28,9 @@ services:
       - tembo
     labels:
       - "traefik.enable=true"
+      # The settings here depends on the app service settings
       - "traefik.http.routers.instance-1-postgrest.rule=Host(`instance-1.local.tembo.io`) && (PathPrefix(`/rest/v1`) || PathPrefix(`/graphql/v1`))"
+      # in cloud, this is websecure instead of just web
       - "traefik.http.routers.instance-1-postgrest.entrypoints=web"
       - "traefik.http.services.instance-1-postgrest.loadbalancer.server.port=3000"
       - "traefik.http.middlewares.postgrest-stripprefix.stripprefix.prefixes=/rest/v1, /graphql/v1"
