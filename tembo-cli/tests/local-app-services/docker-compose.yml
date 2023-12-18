@@ -17,6 +17,23 @@ services:
       - "traefik.tcp.routers.instance-1.tls.passthrough=true"
       - "traefik.tcp.services.instance-1.loadbalancer.server.port=5432"
 
+  instance-1-postgrest:
+    image: postgrest/postgrest:v10.0.0
+    environment:
+      PGRST_DB_URI: "postgresql://postgres:postgres@instance-1:5432/postgres"
+      PGRST_DB_SCHEMA: "public, graphql"
+      PGRST_DB_ANON_ROLE: "postgres"
+      PGRST_LOG_LEVEL: "info"
+    networks:
+      - tembo
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.instance-1-postgrest.rule=Host(`instance-1.local.tembo.io`) && (PathPrefix(`/rest/v1`) || PathPrefix(`/graphql/v1`))"
+      - "traefik.http.routers.instance-1-postgrest.entrypoints=web"
+      - "traefik.http.services.instance-1-postgrest.loadbalancer.server.port=3000"
+      - "traefik.http.middlewares.postgrest-stripprefix.stripprefix.prefixes=/rest/v1, /graphql/v1"
+      - "traefik.http.routers.postgrest.middlewares=postgrest-stripprefix"
+
   instance-2:
     build:
       context: ./instance-2
