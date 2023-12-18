@@ -633,6 +633,9 @@ pub async fn reconcile_app_services(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(
             "localhost".to_string()
         }
     };
+
+    // Iterate over each AppService and process routes
+
     let resources: Vec<AppServiceResources> = appsvcs
         .iter()
         .map(|appsvc| generate_resource(appsvc, &coredb_name, &ns, oref.clone(), domain.to_owned()))
@@ -692,29 +695,33 @@ pub async fn reconcile_app_services(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(
         }
     }
 
-    match reconcile_ingress_tcp(
-        client.clone(),
-        &coredb_name,
-        &ns,
-        oref.clone(),
-        desired_tcp_routes,
-        desired_middlewares,
-        desired_entry_points_tcp,
-    )
-    .await
-    {
-        Ok(_) => {
-            debug!("Updated/applied IngressRouteTCP for {}.{}", ns, coredb_name,);
-        }
-        Err(e) => {
-            error!(
-                "Failed to update/apply IngressRouteTCP {}.{}: {}",
-                ns, coredb_name, e
-            );
-            has_errors = true;
+    for appsvc in appsvcs.iter() {
+        let app_name = appsvc.name.clone();
+
+        match reconcile_ingress_tcp(
+            client.clone(),
+            &coredb_name,
+            &ns,
+            oref.clone(),
+            desired_tcp_routes.clone(),
+            desired_middlewares.clone(),
+            desired_entry_points_tcp.clone(),
+            &app_name,
+        )
+        .await
+        {
+            Ok(_) => {
+                debug!("Updated/applied IngressRouteTCP for {}.{}", ns, coredb_name,);
+            }
+            Err(e) => {
+                error!(
+                    "Failed to update/apply IngressRouteTCP {}.{}: {}",
+                    ns, coredb_name, e
+                );
+                has_errors = true;
+            }
         }
     }
-
     if has_errors || apply_errored {
         return Err(Action::requeue(Duration::from_secs(300)));
     }

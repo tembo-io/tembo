@@ -254,6 +254,7 @@ pub fn generate_ingress_tcp_routes(
     appsvc: &AppService,
     resource_name: &str,
     namespace: &str,
+    host_matcher: String,
     coredb_name: &str,
 ) -> Option<Vec<IngressRouteTCPRoutes>> {
     match appsvc.routing.clone() {
@@ -268,7 +269,7 @@ pub fn generate_ingress_tcp_routes(
                             continue;
                         }
 
-                        let matcher = format!("HostSNI(`{}`)", path);
+                        let matcher = format!("HostSNI(`{}`)", host_matcher);
                         let middlewares: Option<Vec<IngressRouteTCPRoutesMiddlewares>> =
                             route.middlewares.clone().map(|names| {
                                 names
