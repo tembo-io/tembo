@@ -1,0 +1,88 @@
+# Maybe actually using docker compose is the way to go, or maybe you want to
+# do it all in just docker. Perhaps compose is better if that's more hackable
+# since after generating with CLI, then a user can see how it all works.
+# And if you don't use compose, then you end up re-implementing a lot of what's
+# already in docker compose, like building and running several containers from
+# a single config.
+version: '3.8'
+
+services:
+
+  instance-1:
+    build:
+      context: ./instance-1
+    networks:
+      - tembo
+    labels:
+      - "traefik.enable=true"
+      # an 'A' record *.local.tembo.io is set to 127.0.0.1
+      # connect with TLS passthrough, SNI into local instance.
+      # TLS termination inside postgres container.
+      - "traefik.tcp.routers.instance-1.rule=HostSNI(`instance-1.local.tembo.io`)"
+      - "traefik.tcp.routers.instance-1.entrypoints=postgresql"
+      - "traefik.tcp.routers.instance-1.tls.passthrough=true"
+      - "traefik.tcp.services.instance-1.loadbalancer.server.port=5432"
+
+  instance-1-postgrest:
+    image: postgrest/postgrest:v10.0.0
+    environment:
+      PGRST_DB_URI: "postgresql://postgres:postgres@instance-1:5432/postgres"
+      PGRST_DB_SCHEMA: "public, graphql"
+      PGRST_DB_ANON_ROLE: "postgres"
+      PGRST_LOG_LEVEL: "info"
+    networks:
+      - tembo
+    labels:
+      - "traefik.enable=true"
+      # The settings here depends on the app service settings
+      - "traefik.http.routers.instance-1-postgrest.rule=Host(`instance-1.local.tembo.io`) && (PathPrefix(`/rest/v1`) || PathPrefix(`/graphql/v1`))"
+      # in cloud, this is websecure instead of just web
+      - "traefik.http.routers.instance-1-postgrest.entrypoints=web"
+      - "traefik.http.services.instance-1-postgrest.loadbalancer.server.port=3000"
+      - "traefik.http.middlewares.postgrest-stripprefix.stripprefix.prefixes=/rest/v1, /graphql/v1"
+      - "traefik.http.routers.postgrest.middlewares=postgrest-stripprefix"
+
+  instance-2:
+    build:
+      context: ./instance-2
+    networks:
+      - tembo
+    labels:
+      - "traefik.enable=true"
+      - "traefik.tcp.routers.instance-2.rule=HostSNI(`instance-2.local.tembo.io`)"
+      - "traefik.tcp.routers.instance-2.entrypoints=postgresql"
+      - "traefik.tcp.routers.instance-2.tls.passthrough=true"
+      - "traefik.tcp.services.instance-2.loadbalancer.server.port=5432"
+
+  traefik:
+    image: traefik:v3.0.0-beta2
+    networks:
+      - tembo
+    command:
+      # Traefik can make routing rules by talking to
+      # Docker. We also connect Docker socket to container.
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      # These are all the ports we can use for local dev
+      - "--entrypoints.ferretdb.address=:27018/tcp"
+      - "--entrypoints.postgresql.address=:5432/tcp"
+      - "--entrypoints.traefik.address=:9000/tcp"
+      - "--entrypoints.web.address=:8000/tcp"
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+      # This could be enabled with debug mode on
+      # - "--accesslog=true"
+      # - "--log.level=DEBUG"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    ports:
+      - "8000:8000"
+      # Traefik dashboard at http://localhost:9000/dashboard/
+      # helpful for troubleshooting Traefik configurations
+      - "9000:9000"
+      - "5432:5432"
+      # FerretDB port
+      - "27018:27018"
+
+networks:
+  tembo: {}
