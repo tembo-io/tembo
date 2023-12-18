@@ -33,7 +33,7 @@ jobs:
           # in a pull request, and using all directories on the release
           # or main branches.
           changed_relative_to_ref: origin/${{ github.base_ref || 'not-a-branch' }}
-          ignore_dirs: ".coredb examples"
+          ignore_dirs: ".coredb examples tembo-cli/tests"
 
   build_and_push_images:
     name: Build and push images
