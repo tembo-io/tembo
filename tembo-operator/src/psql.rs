@@ -53,7 +53,7 @@ impl PsqlCommand {
         let psql_command = vec![
             String::from("psql"),
             format!(
-                "dbname=\"{}\" application_name=tembo-system",
+                "\"dbname={} application_name=tembo-system\"",
                 self.database.clone()
             ),
             String::from("-c"),
