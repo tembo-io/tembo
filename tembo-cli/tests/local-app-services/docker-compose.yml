@@ -1,3 +1,9 @@
+# Maybe actually using docker compose is the way to go, or maybe you want to
+# do it all in just docker. Perhaps compose is better if that's more hackable
+# since after generating with CLI, then a user can see how it all works.
+# And if you don't use compose, then you end up re-implementing a lot of what's
+# already in docker compose, like building and running several containers from
+# a single config.
 version: '3.8'
 
 services:
