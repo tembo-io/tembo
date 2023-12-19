@@ -77,10 +77,7 @@ impl Docker {
     pub fn stop_remove(name: &str) -> Result {
         let mut sp = Spinner::new(Spinners::Line, "Stopping & Removing instance".into());
 
-        if !Self::container_list_filtered(name)
-            .unwrap()
-            .contains(name)
-        {
+        if !Self::container_list_filtered(name).unwrap().contains(name) {
             sp.stop_with_message(format!("- Tembo instance {} doesn't exist", name));
         } else {
             let mut command: String = String::from("docker stop ");
