@@ -72,8 +72,15 @@ fn generate_resource(
         host_matcher.clone(),
         coredb_name,
     );
+
+    let host_matcher_tcp = format!(
+        "HostSNI(`{subdomain}.{domain}`)",
+        subdomain = coredb_name,
+        domain = domain
+    );
+
     let ingress_tcp_routes =
-        generate_ingress_tcp_routes(appsvc, &resource_name, namespace, host_matcher, coredb_name);
+        generate_ingress_tcp_routes(appsvc, &resource_name, namespace, host_matcher_tcp, coredb_name);
     // fetch entry points where ingress type is http
     let entry_points: Option<Vec<String>> = appsvc.routing.as_ref().map(|routes| {
         routes
