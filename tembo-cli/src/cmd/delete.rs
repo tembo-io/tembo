@@ -23,8 +23,12 @@ pub fn make_subcommand() -> Command {
 pub fn execute(_args: &ArgMatches) -> Result<()> {
     let env = get_current_context()?;
 
+    let instance_settings: HashMap<String, InstanceSettings> = get_instance_settings()?;
+
     if env.target == Target::Docker.to_string() {
-        Docker::stop_remove("tembo-pg")?;
+        for (_key, value) in instance_settings.iter() {
+            Docker::stop_remove(&value.instance_name.clone())?;
+        }
     } else if env.target == Target::TemboCloud.to_string() {
         return execute_tembo_cloud(env);
     }

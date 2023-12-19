@@ -41,19 +41,18 @@ impl Docker {
     }
 
     // Build & run docker image
-    pub fn build_run() -> Result {
+    pub fn build_run(instance_name: String) -> Result {
         let mut sp = Spinner::new(Spinners::Line, "Running Docker Build & Run".into());
-        let container_name = "tembo-pg";
 
-        if Self::container_list_filtered(container_name)
+        if Self::container_list_filtered(&instance_name)
             .unwrap()
-            .contains(container_name)
+            .contains(&instance_name)
         {
             sp.stop_with_message("- Existing container found".to_string());
         } else {
             let command = format!(
                 "docker build . -t postgres && docker run --name {} -p 5432:5432 -d postgres",
-                container_name
+                instance_name
             );
             run_command(&command)?;
             sp.stop_with_message("- Docker Build & Run completed".to_string());
@@ -80,9 +79,9 @@ impl Docker {
 
         if !Self::container_list_filtered(name)
             .unwrap()
-            .contains("tembo-pg")
+            .contains(name)
         {
-            sp.stop_with_message(format!("- Tembo instance {} doesn't exist", "tembo-pg"));
+            sp.stop_with_message(format!("- Tembo instance {} doesn't exist", name));
         } else {
             let mut command: String = String::from("docker stop ");
             command.push_str(name);

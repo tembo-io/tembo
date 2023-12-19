@@ -73,13 +73,14 @@ fn execute_docker() -> Result<()> {
     FileUtils::create_file(
         POSTGRESCONF_NAME.to_string(),
         POSTGRESCONF_NAME.to_string(),
-        get_postgres_config(instance_settings),
+        get_postgres_config(instance_settings.clone()),
         true,
     )?;
 
-    Docker::build_run()?;
-
-    Docker::run_sqlx_migrate()?;
+    for (_key, value) in instance_settings.iter() {
+        Docker::build_run(value.instance_name.clone())?;
+        Docker::run_sqlx_migrate()?;
+    }
 
     // If all of the above was successful, we can print the url to user
     println!(">>> Tembo instance is now running on: postgres://postgres:postgres@localhost:5432");
@@ -326,7 +327,7 @@ pub fn get_rendered_dockerfile(
     let filepath =
         "https://raw.githubusercontent.com/tembo-io/tembo-cli/main/tembo/Dockerfile.template";
 
-    FileUtils::download_file(filepath, filename)?;
+    FileUtils::download_file(filepath, filename, true)?;
 
     let contents = match fs::read_to_string(filename) {
         Ok(c) => c,
@@ -359,7 +360,7 @@ pub fn get_rendered_migrations_file(
     let filepath =
         "https://raw.githubusercontent.com/tembo-io/tembo-cli/main/tembo/migrations.sql.template";
 
-    FileUtils::download_file(filepath, filename)?;
+    FileUtils::download_file(filepath, filename, true)?;
 
     let contents = match fs::read_to_string(filename) {
         Ok(c) => c,
