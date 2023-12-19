@@ -3162,7 +3162,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "tembo"
+name = "tembo-cli"
 version = "0.8.0"
 dependencies = [
  "anyhow",
