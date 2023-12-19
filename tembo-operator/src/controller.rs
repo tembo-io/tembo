@@ -212,6 +212,13 @@ impl CoreDB {
             }
         };
 
+        debug!("Reconciling secret");
+        // Superuser connection info
+        reconcile_secret(self, ctx.clone()).await.map_err(|e| {
+            error!("Error reconciling secret: {:?}", e);
+            Action::requeue(Duration::from_secs(300))
+        })?;
+
         reconcile_app_services(self, ctx.clone()).await?;
 
         if self
@@ -230,14 +237,7 @@ impl CoreDB {
                 })?;
         }
 
-        debug!("Reconciling secret");
-        // Superuser connection info
-        reconcile_secret(self, ctx.clone()).await.map_err(|e| {
-            error!("Error reconciling secret: {:?}", e);
-            Action::requeue(Duration::from_secs(300))
-        })?;
-
-        let _ =
+       let _ =
             reconcile_postgres_role_secret(self, ctx.clone(), "readonly", &format!("{}-ro", name.clone()))
                 .await
                 .map_err(|e| {

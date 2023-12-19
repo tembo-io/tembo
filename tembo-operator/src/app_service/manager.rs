@@ -266,6 +266,7 @@ fn generate_deployment(
     let r_conn = format!("{}_R_CONNECTION", cdb_name_env);
     let ro_conn = format!("{}_RO_CONNECTION", cdb_name_env);
     let rw_conn = format!("{}_RW_CONNECTION", cdb_name_env);
+    let apps_connection_secret_name = format!("{}-apps", coredb_name);
 
     // map the secrets we inject to appService containers
     let secret_envs = vec![
@@ -273,7 +274,7 @@ fn generate_deployment(
             name: r_conn,
             value_from: Some(EnvVarSource {
                 secret_key_ref: Some(SecretKeySelector {
-                    name: Some(format!("{}-connection", coredb_name)),
+                    name: Some(apps_connection_secret_name.clone()),
                     key: "r_uri".to_string(),
                     ..SecretKeySelector::default()
                 }),
@@ -285,7 +286,7 @@ fn generate_deployment(
             name: ro_conn,
             value_from: Some(EnvVarSource {
                 secret_key_ref: Some(SecretKeySelector {
-                    name: Some(format!("{}-connection", coredb_name)),
+                    name: Some(apps_connection_secret_name.clone()),
                     key: "ro_uri".to_string(),
                     ..SecretKeySelector::default()
                 }),
@@ -297,7 +298,7 @@ fn generate_deployment(
             name: rw_conn,
             value_from: Some(EnvVarSource {
                 secret_key_ref: Some(SecretKeySelector {
-                    name: Some(format!("{}-connection", coredb_name)),
+                    name: Some(apps_connection_secret_name.clone()),
                     key: "rw_uri".to_string(),
                     ..SecretKeySelector::default()
                 }),
@@ -329,7 +330,7 @@ fn generate_deployment(
                         name: env.name,
                         value_from: Some(EnvVarSource {
                             secret_key_ref: Some(SecretKeySelector {
-                                name: Some(format!("{}-connection", coredb_name)),
+                                name: Some(apps_connection_secret_name.clone()),
                                 key: secret_key.to_string(),
                                 ..SecretKeySelector::default()
                             }),
