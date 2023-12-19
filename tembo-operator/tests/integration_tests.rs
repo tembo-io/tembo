@@ -3170,7 +3170,7 @@ mod test {
         );
 
         // Check for IngressRouteTCP
-        let ing_name = format!("{}-apps", cdb_name);
+        let ing_name = format!("{cdb_name}-ferretdb");
         let ingresses_tcp: Result<Vec<IngressRouteTCP>, errors::OperatorError> =
             list_resources(client.clone(), &ing_name, &namespace, 1).await;
         let ingress_tcp = ingresses_tcp.unwrap();
