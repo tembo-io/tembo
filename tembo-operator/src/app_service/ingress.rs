@@ -254,7 +254,7 @@ pub fn generate_ingress_tcp_routes(
     appsvc: &AppService,
     resource_name: &str,
     namespace: &str,
-    host_matcher: String,
+    host_matcher_tcp: String,
     coredb_name: &str,
 ) -> Option<Vec<IngressRouteTCPRoutes>> {
     match appsvc.routing.clone() {
@@ -269,7 +269,6 @@ pub fn generate_ingress_tcp_routes(
                             continue;
                         }
 
-                        let matcher = format!("{host_matcher} && PathPrefix(`{}`)", path);
                         let middlewares: Option<Vec<IngressRouteTCPRoutesMiddlewares>> =
                             route.middlewares.clone().map(|names| {
                                 names
@@ -281,7 +280,7 @@ pub fn generate_ingress_tcp_routes(
                                     .collect()
                             });
                         let route = IngressRouteTCPRoutes {
-                            r#match: matcher.clone(),
+                            r#match: host_matcher_tcp.clone(),
                             services: Some(vec![IngressRouteTCPRoutesServices {
                                 name: resource_name.to_string(),
                                 port: IntOrString::Int(route.port as i32),
@@ -398,9 +397,10 @@ pub async fn reconcile_ingress_tcp(
     desired_routes: Vec<IngressRouteTCPRoutes>,
     desired_middlewares: Vec<Middleware>,
     entry_points_tcp: Vec<String>,
+    app_name: &str,
 ) -> Result<(), kube::Error> {
     let ingress_api: Api<IngressRouteTCP> = Api::namespaced(client.clone(), ns);
-    let name = format!("{}-apps", coredb_name);
+    let name = format!("{}-{}", coredb_name, app_name);
 
     let middleware_api: Api<TraefikMiddleware> = Api::namespaced(client.clone(), ns);
     let desired_middlewares = generate_middlewares(&name, ns, oref.clone(), desired_middlewares);
