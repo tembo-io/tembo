@@ -1,24 +1,22 @@
 use crate::{apis::coredb_types::CoreDB, ingress_route_crd::IngressRouteRoutes, Context, Error, Result};
-use k8s_openapi::{
-    api::{
-        apps::v1::{Deployment, DeploymentSpec},
-        core::v1::{
-            Capabilities, Container, ContainerPort, EnvVar, EnvVarSource, HTTPGetAction, PodSpec,
-            PodTemplateSpec, Probe, SecretKeySelector, SecretVolumeSource, SecurityContext, Service,
-            ServicePort, ServiceSpec, Volume, VolumeMount,
-        },
+use k8s_openapi::{api::{
+    apps::v1::{Deployment, DeploymentSpec},
+    core::v1::{
+        Capabilities, Container, ContainerPort, EnvVar, EnvVarSource, HTTPGetAction, PodSpec,
+        PodTemplateSpec, Probe, SecretKeySelector, SecretVolumeSource, SecurityContext, Service,
+        ServicePort, ServiceSpec, Volume, VolumeMount,
     },
-    apimachinery::pkg::{
-        apis::meta::v1::{LabelSelector, OwnerReference},
-        util::intstr::IntOrString,
-    },
-};
+}, apimachinery::pkg::{
+    apis::meta::v1::{LabelSelector, OwnerReference},
+    util::intstr::IntOrString,
+}, ByteString};
 use kube::{
     api::{Api, ListParams, ObjectMeta, Patch, PatchParams, ResourceExt},
     runtime::controller::Action,
     Client, Resource,
 };
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
+use k8s_openapi::api::core::v1::Secret;
 
 use crate::{
     app_service::ingress::{generate_ingress_tcp_routes, reconcile_ingress_tcp},
@@ -32,6 +30,7 @@ use super::{
 };
 
 use crate::app_service::types::IngressType;
+use crate::secret::{b64_encode, fetch_all_decoded_data_from_secret};
 
 // private wrapper to hold the AppService Resources
 #[derive(Clone, Debug)]
@@ -547,6 +546,14 @@ pub async fn reconcile_app_services(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(
         }
     };
 
+    match prepare_apps_connection_secret(ctx.client.clone(), cdb).await {
+        Ok(_) => {}
+        Err(_) => {
+            error!("Failed to prepare Apps Connection Secret for CoreDB: {}", coredb_name);
+            return Err(Action::requeue(Duration::from_secs(300)));
+        }
+    };
+
     // only deploy the Kubernetes Service when there are routing configurations
     // we need one service per PORT, not necessarily 1 per AppService route
     let desired_services = match cdb.spec.app_services.clone() {
@@ -720,3 +727,56 @@ pub async fn reconcile_app_services(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(
     }
     Ok(())
 }
+
+pub async fn prepare_apps_connection_secret(
+    client: Client,
+    cdb: &CoreDB,
+) -> Result<(), Error> {
+    let namespace = cdb.namespace().unwrap();
+    let cdb_name = cdb.metadata.name.clone().unwrap();
+    let secret_name = format!("{}-connection", cdb_name);
+    let new_secret_name = format!("{}-apps", cdb_name);
+
+    let secrets_api: Api<Secret> = Api::namespaced(client.clone(), &namespace);
+
+    // Fetch the original secret
+    let original_secret_data = fetch_all_decoded_data_from_secret(secrets_api.clone(), secret_name.to_string()).await?;
+
+    // Modify the secret data
+    let mut new_secret_data = BTreeMap::new();
+    for (key, value) in original_secret_data {
+        match key.as_str() {
+            "r_uri" | "ro_uri" | "rw_uri" => {
+                let new_value = format!("{}?application_name=tembo-apps", value);
+                new_secret_data.insert(key, new_value);
+            },
+            _ => {},
+        };
+    }
+
+    // Encode the modified secret data
+    let encoded_secret_data: BTreeMap<String, ByteString> = new_secret_data
+        .into_iter()
+        .map(|(k, v)| {
+            (k, ByteString(v.into_bytes()))
+        })
+        .collect();
+
+    // Create a new secret with the modified data
+    let new_secret = Secret {
+        data: Some(encoded_secret_data),
+        metadata: kube::api::ObjectMeta {
+            name: Some(new_secret_name.to_string()),
+            namespace: Some(namespace.to_string()),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    // Apply the new secret
+    let patch_params = PatchParams::apply("cntrlr").force();
+    secrets_api.patch(&new_secret_name, &patch_params, &Patch::Apply(&new_secret)).await?;
+
+    Ok(())
+}
+
