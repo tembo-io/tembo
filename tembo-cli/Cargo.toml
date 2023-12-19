@@ -1,6 +1,6 @@
 workspace = { members = ["temboclient"] }
 [package]
-name = "tembo"
+name = "tembo-cli"
 version = "0.8.0"
 edition = "2021"
 authors = ["Tembo.io"]
