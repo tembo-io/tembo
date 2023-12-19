@@ -47,17 +47,11 @@ pub fn execute(_args: &ArgMatches) -> Result<()> {
         }
     }
 
-    match FileUtils::create_file(
-        "config".to_string(),
-        "tembo.toml".to_string(),
-        "".to_string(),
-        false,
-    ) {
-        Ok(t) => t,
-        Err(e) => {
-            return Err(e);
-        }
-    }
+    let filename = "tembo.toml";
+    let filepath =
+        "https://raw.githubusercontent.com/tembo-io/tembo/main/tembo-cli/examples/single-instance/tembo.toml";
+
+    FileUtils::download_file(filepath, filename, false)?;
 
     match FileUtils::create_dir("migrations directory".to_string(), "migrations".to_string()) {
         Ok(t) => t,

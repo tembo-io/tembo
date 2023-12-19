@@ -1,15 +1,15 @@
 # Tembo.toml configuration file version
-#version = "1.0.0"
+# version = "1.0.0"
 
 # Default settings for instances
 [defaults]
 environment = "dev"
-instance_name = "test-via-cli-9"
+instance_name = "test-via-cli-35"
 cpu = "1"
 memory = "2Gi"
 storage = "10Gi"
 replicas = 1
-stack_type = "OLTP"
+stack_type = "Standard"
 
 [defaults.postgres_configurations]
 shared_preload_libraries = 'pg_stat_statements'
