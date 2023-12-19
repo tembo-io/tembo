@@ -180,4 +180,55 @@ mod tests {
         assert_eq!(shared_buffers.name, "shared_buffers");
         assert_eq!(shared_buffers.value.to_string(), "512MB");
     }
+
+    #[test]
+    fn test_all_stack_deserialization() {
+        // must not panic when reading any stack definitions from yaml
+        let all_stacks = vec![
+            StackType::DataWarehouse,
+            StackType::Standard,
+            StackType::MessageQueue,
+            StackType::MachineLearning,
+            StackType::OLAP,
+            StackType::OLTP,
+            StackType::VectorDB,
+            StackType::Geospatial,
+            StackType::MongoAdapter,
+        ];
+
+        for stack in all_stacks {
+            // this is overly verbose, but we want to ensure each Stack can be deserialized from yaml
+            // pattern match on the StackType enum, which if a new stack is added, this test will fail until its updated
+            // guarantees all StackTypes are tested
+            match stack {
+                StackType::DataWarehouse => {
+                    get_stack(StackType::DataWarehouse);
+                }
+                StackType::Standard => {
+                    get_stack(StackType::Standard);
+                }
+                StackType::MessageQueue => {
+                    get_stack(StackType::MessageQueue);
+                }
+                StackType::MachineLearning => {
+                    get_stack(StackType::MachineLearning);
+                }
+                StackType::OLAP => {
+                    get_stack(StackType::OLAP);
+                }
+                StackType::OLTP => {
+                    get_stack(StackType::OLTP);
+                }
+                StackType::VectorDB => {
+                    get_stack(StackType::VectorDB);
+                }
+                StackType::Geospatial => {
+                    get_stack(StackType::Geospatial);
+                }
+                StackType::MongoAdapter => {
+                    get_stack(StackType::MongoAdapter);
+                }
+            }
+        }
+    }
 }
