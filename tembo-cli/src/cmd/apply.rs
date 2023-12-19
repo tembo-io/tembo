@@ -325,7 +325,7 @@ pub fn get_rendered_dockerfile(
 ) -> Result<String> {
     let filename = "Dockerfile.template";
     let filepath =
-        "https://raw.githubusercontent.com/tembo-io/tembo-cli/main/tembo/Dockerfile.template";
+        "https://raw.githubusercontent.com/tembo-io/tembo/main/tembo-cli/tembo/Dockerfile.template";
 
     FileUtils::download_file(filepath, filename, true)?;
 
@@ -358,7 +358,7 @@ pub fn get_rendered_migrations_file(
 ) -> Result<String> {
     let filename = "migrations.sql.template";
     let filepath =
-        "https://raw.githubusercontent.com/tembo-io/tembo-cli/main/tembo/migrations.sql.template";
+        "https://raw.githubusercontent.com/tembo-io/tembo/main/tembo-cli/tembo/migrations.sql.template";
 
     FileUtils::download_file(filepath, filename, true)?;
 
