@@ -35,9 +35,9 @@ appServices:
                 resources:
                   requests:
                     storage: 1Gi
-        volumeMounts:
-          - name: ferretdb-data
-            mountPath: /state
+      volumeMounts:
+        - name: ferretdb-data
+          mountPath: /state
     resources:
       requests:
         cpu: 100m
