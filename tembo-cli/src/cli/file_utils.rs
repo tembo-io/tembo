@@ -47,7 +47,17 @@ impl FileUtils {
         Ok(())
     }
 
-    pub fn download_file(file_path: &str, download_location: &str) -> std::io::Result<()> {
+    pub fn download_file(
+        file_path: &str,
+        download_location: &str,
+        recreate: bool,
+    ) -> std::io::Result<()> {
+        let path = Path::new(&download_location);
+        if !recreate && path.exists() {
+            info!("Tembo {} file exists", download_location);
+            return Ok(());
+        }
+
         let mut dst = Vec::new();
         let mut easy = Easy::new();
         easy.url(file_path).unwrap();

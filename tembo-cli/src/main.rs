@@ -1,5 +1,3 @@
-#![feature(file_create_new)]
-
 #[macro_use]
 extern crate clap;
 extern crate log;
