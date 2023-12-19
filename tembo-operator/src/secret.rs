@@ -150,9 +150,16 @@ pub async fn reconcile_postgres_role_secret(
     if secret_api.get(secret_name).await.is_ok() {
         debug!("skipping secret creation: secret {} exists", &name);
         let secret_api: Api<Secret> = Api::namespaced(client.clone(), &ns);
-        let password =  match fetch_all_decoded_data_from_secret(secret_api, name).await?.get("password"){
+        let password = match fetch_all_decoded_data_from_secret(secret_api, name)
+            .await?
+            .get("password")
+        {
             Some(password) => password.to_owned(),
-            None => return Err(Error::MissingSecretError("Did not find key 'password' in secret".to_owned())),
+            None => {
+                return Err(Error::MissingSecretError(
+                    "Did not find key 'password' in secret".to_owned(),
+                ))
+            }
         };
         let secret_data = RolePassword { password };
         return Ok(Some(secret_data));

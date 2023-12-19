@@ -237,7 +237,7 @@ impl CoreDB {
                 })?;
         }
 
-       let _ =
+        let _ =
             reconcile_postgres_role_secret(self, ctx.clone(), "readonly", &format!("{}-ro", name.clone()))
                 .await
                 .map_err(|e| {

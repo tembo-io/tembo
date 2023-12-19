@@ -2979,8 +2979,14 @@ mod test {
 
         let state = State::default();
         let context = state.create_context(client.clone());
-        wait_until_psql_contains(context.clone(), coredb_resource.clone(), query.to_string(), "tembo-apps".to_string(), false)
-            .await;
+        wait_until_psql_contains(
+            context.clone(),
+            coredb_resource.clone(),
+            query.to_string(),
+            "tembo-apps".to_string(),
+            false,
+        )
+        .await;
 
         let app_0 = deployment_items[0].clone();
         let app_1 = deployment_items[1].clone();

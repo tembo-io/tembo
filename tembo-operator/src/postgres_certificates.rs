@@ -45,7 +45,7 @@ pub async fn reconcile_certificates(client: Client, coredb: &CoreDB, namespace: 
                 );
                 return Err(Action::requeue(Duration::from_secs(300)));
             }
-            Some(ca) => {ca.to_owned()}
+            Some(ca) => ca.to_owned(),
         },
         Err(e) => {
             error!(
