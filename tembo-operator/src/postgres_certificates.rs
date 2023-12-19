@@ -1,7 +1,7 @@
 use crate::{
     apis::coredb_types::CoreDB,
     certmanager::certificates::Certificate,
-    secret::{b64_encode, fetch_decoded_data_key_from_secret},
+    secret::{b64_encode, fetch_all_decoded_data_from_secret},
 };
 use k8s_openapi::api::core::v1::Secret;
 use kube::{
@@ -31,14 +31,22 @@ pub async fn reconcile_certificates(client: Client, coredb: &CoreDB, namespace: 
     let secrets_api: Api<Secret> = Api::namespaced(client.clone(), namespace);
     let certificates_api: Api<Certificate> = Api::namespaced(client, namespace);
 
-    let decoded_ca_cert = match fetch_decoded_data_key_from_secret(
+    let decoded_ca_cert = match fetch_all_decoded_data_from_secret(
         secrets_api_cert_manager_namespace,
         POSTGRES_CA_SECRET_NAME.to_string(),
-        POSTGRES_CA_SECRET_CERT_KEY_NAME,
     )
     .await
     {
-        Ok(decoded_ca_cert) => decoded_ca_cert,
+        Ok(decoded_ca_cert) => match decoded_ca_cert.get(POSTGRES_CA_SECRET_CERT_KEY_NAME) {
+            None => {
+                error!(
+                    "Failed to fetch CA certificate from cert-manager namespace: {}",
+                    POSTGRES_CA_SECRET_CERT_KEY_NAME
+                );
+                return Err(Action::requeue(Duration::from_secs(300)));
+            }
+            Some(ca) => {ca.to_owned()}
+        },
         Err(e) => {
             error!(
                 "Failed to fetch CA certificate from cert-manager namespace: {}",
