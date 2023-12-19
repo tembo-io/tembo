@@ -4,7 +4,7 @@ use k8s_openapi::{
         apps::v1::{Deployment, DeploymentSpec},
         core::v1::{
             Capabilities, Container, ContainerPort, EnvVar, EnvVarSource, HTTPGetAction, PodSpec,
-            PodTemplateSpec, Probe, SecretKeySelector, SecretVolumeSource, SecurityContext, Service,
+            PodTemplateSpec, Probe, Secret, SecretKeySelector, SecretVolumeSource, SecurityContext, Service,
             ServicePort, ServiceSpec, Volume, VolumeMount,
         },
     },
@@ -12,6 +12,7 @@ use k8s_openapi::{
         apis::meta::v1::{LabelSelector, OwnerReference},
         util::intstr::IntOrString,
     },
+    ByteString,
 };
 use kube::{
     api::{Api, ListParams, ObjectMeta, Patch, PatchParams, ResourceExt},
@@ -31,7 +32,7 @@ use super::{
     types::{AppService, EnvVarRef, Middleware, COMPONENT_NAME},
 };
 
-use crate::app_service::types::IngressType;
+use crate::{app_service::types::IngressType, secret::fetch_all_decoded_data_from_secret};
 
 // private wrapper to hold the AppService Resources
 #[derive(Clone, Debug)]
@@ -274,6 +275,7 @@ fn generate_deployment(
     let r_conn = format!("{}_R_CONNECTION", cdb_name_env);
     let ro_conn = format!("{}_RO_CONNECTION", cdb_name_env);
     let rw_conn = format!("{}_RW_CONNECTION", cdb_name_env);
+    let apps_connection_secret_name = format!("{}-apps", coredb_name);
 
     // map the secrets we inject to appService containers
     let secret_envs = vec![
@@ -281,7 +283,7 @@ fn generate_deployment(
             name: r_conn,
             value_from: Some(EnvVarSource {
                 secret_key_ref: Some(SecretKeySelector {
-                    name: Some(format!("{}-connection", coredb_name)),
+                    name: Some(apps_connection_secret_name.clone()),
                     key: "r_uri".to_string(),
                     ..SecretKeySelector::default()
                 }),
@@ -293,7 +295,7 @@ fn generate_deployment(
             name: ro_conn,
             value_from: Some(EnvVarSource {
                 secret_key_ref: Some(SecretKeySelector {
-                    name: Some(format!("{}-connection", coredb_name)),
+                    name: Some(apps_connection_secret_name.clone()),
                     key: "ro_uri".to_string(),
                     ..SecretKeySelector::default()
                 }),
@@ -305,7 +307,7 @@ fn generate_deployment(
             name: rw_conn,
             value_from: Some(EnvVarSource {
                 secret_key_ref: Some(SecretKeySelector {
-                    name: Some(format!("{}-connection", coredb_name)),
+                    name: Some(apps_connection_secret_name.clone()),
                     key: "rw_uri".to_string(),
                     ..SecretKeySelector::default()
                 }),
@@ -337,7 +339,7 @@ fn generate_deployment(
                         name: env.name,
                         value_from: Some(EnvVarSource {
                             secret_key_ref: Some(SecretKeySelector {
-                                name: Some(format!("{}-connection", coredb_name)),
+                                name: Some(apps_connection_secret_name.clone()),
                                 key: secret_key.to_string(),
                                 ..SecretKeySelector::default()
                             }),
@@ -554,6 +556,17 @@ pub async fn reconcile_app_services(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(
         }
     };
 
+    match prepare_apps_connection_secret(ctx.client.clone(), cdb).await {
+        Ok(_) => {}
+        Err(_) => {
+            error!(
+                "Failed to prepare Apps Connection Secret for CoreDB: {}",
+                coredb_name
+            );
+            return Err(Action::requeue(Duration::from_secs(300)));
+        }
+    };
+
     // only deploy the Kubernetes Service when there are routing configurations
     // we need one service per PORT, not necessarily 1 per AppService route
     let desired_services = match cdb.spec.app_services.clone() {
@@ -732,5 +745,55 @@ pub async fn reconcile_app_services(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(
     if has_errors || apply_errored {
         return Err(Action::requeue(Duration::from_secs(300)));
     }
+    Ok(())
+}
+
+pub async fn prepare_apps_connection_secret(client: Client, cdb: &CoreDB) -> Result<(), Error> {
+    let namespace = cdb.namespace().unwrap();
+    let cdb_name = cdb.metadata.name.clone().unwrap();
+    let secret_name = format!("{}-connection", cdb_name);
+    let new_secret_name = format!("{}-apps", cdb_name);
+
+    let secrets_api: Api<Secret> = Api::namespaced(client.clone(), &namespace);
+
+    // Fetch the original secret
+    let original_secret_data =
+        fetch_all_decoded_data_from_secret(secrets_api.clone(), secret_name.to_string()).await?;
+
+    // Modify the secret data
+    let mut new_secret_data = BTreeMap::new();
+    for (key, value) in original_secret_data {
+        match key.as_str() {
+            "r_uri" | "ro_uri" | "rw_uri" => {
+                let new_value = format!("{}?application_name=tembo-apps", value);
+                new_secret_data.insert(key, new_value);
+            }
+            _ => {}
+        };
+    }
+
+    // Encode the modified secret data
+    let encoded_secret_data: BTreeMap<String, ByteString> = new_secret_data
+        .into_iter()
+        .map(|(k, v)| (k, ByteString(v.into_bytes())))
+        .collect();
+
+    // Create a new secret with the modified data
+    let new_secret = Secret {
+        data: Some(encoded_secret_data),
+        metadata: kube::api::ObjectMeta {
+            name: Some(new_secret_name.to_string()),
+            namespace: Some(namespace.to_string()),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    // Apply the new secret
+    let patch_params = PatchParams::apply("cntrlr").force();
+    secrets_api
+        .patch(&new_secret_name, &patch_params, &Patch::Apply(&new_secret))
+        .await?;
+
     Ok(())
 }

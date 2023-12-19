@@ -1,6 +1,6 @@
 workspace = { members = ["temboclient"] }
 [package]
-name = "tembo"
+name = "tembo-cli"
 version = "0.8.0"
 edition = "2021"
 authors = ["Tembo.io"]
@@ -47,6 +47,7 @@ tokio = { version = "1.26.0", features = [
     "macros",
     "sync",
 ] }
+controller = "0.26.1"
 
 [dev-dependencies]
 assert_cmd = "2.0.8"

@@ -1,21 +1,22 @@
 use crate::{
     cli::{
-        context::{get_current_context, tembo_state_file_path, Environment, Target},
+        context::{get_current_context, Environment, Target},
         tembo_config,
     },
     Result,
 };
 use clap::{ArgMatches, Command};
-use std::io::Write;
+use controller::stacks::get_stack;
+use controller::stacks::types::StackType as ControllerStackType;
 use std::{
     collections::HashMap,
-    fs::{self, OpenOptions},
+    fs::{self},
     str::FromStr,
 };
 use temboclient::{
     apis::{
         configuration::Configuration,
-        instance_api::{create_instance, put_instance},
+        instance_api::{create_instance, get_all, put_instance},
     },
     models::{
         Cpu, CreateInstance, Extension, ExtensionInstallLocation, Memory, PgConfig, StackType,
@@ -51,7 +52,6 @@ fn execute_docker() -> Result<()> {
     Docker::installed_and_running()?;
 
     let instance_settings: HashMap<String, InstanceSettings> = get_instance_settings()?;
-
     let rendered_dockerfile: String = get_rendered_dockerfile(instance_settings.clone())?;
 
     FileUtils::create_file(
@@ -98,7 +98,7 @@ pub fn execute_tembo_cloud(env: Environment) -> Result<()> {
     };
 
     for (_key, value) in instance_settings.iter() {
-        let instance_id = get_instance_id_from_state(value.instance_name.clone())?;
+        let instance_id = get_instance_id(value.instance_name.clone(), &config, env.clone())?;
         if let Some(env_instance_id) = instance_id {
             update_existing_instance(env_instance_id, value, &config, env.clone());
         } else {
@@ -109,18 +109,28 @@ pub fn execute_tembo_cloud(env: Environment) -> Result<()> {
     Ok(())
 }
 
-pub fn get_instance_id_from_state(instance_name: String) -> Result<Option<String>> {
-    let contents = fs::read_to_string(tembo_state_file_path())?;
+pub fn get_instance_id(
+    instance_name: String,
+    config: &Configuration,
+    env: Environment,
+) -> Result<Option<String>> {
+    let v = Runtime::new()
+        .unwrap()
+        .block_on(get_all(config, env.org_id.clone().unwrap().as_str()));
 
-    let tembo_state_map: HashMap<String, String> = toml::from_str(&contents)?;
+    match v {
+        Ok(result) => {
+            let maybe_instance = result
+                .iter()
+                .find(|instance| instance.instance_name == instance_name);
 
-    let tembo_state = tembo_state_map.get(&instance_name);
-    if tembo_state.is_none() {
-        Ok(None)
-    } else {
-        let instance_id = tembo_state.unwrap().clone();
-        Ok(Some(instance_id))
-    }
+            if let Some(instance) = maybe_instance {
+                return Ok(Some(instance.clone().instance_id));
+            }
+        }
+        Err(error) => eprintln!("Error getting instance: {}", error),
+    };
+    Ok(None)
 }
 
 fn update_existing_instance(
@@ -164,17 +174,6 @@ fn create_new_instance(value: &InstanceSettings, config: &Configuration, env: En
                 "Instance creation started for instance_name: {} with instance_id: {}",
                 result.instance_name, result.instance_id
             );
-
-            let mut state_file = OpenOptions::new()
-                .append(true)
-                .open(tembo_state_file_path())
-                .expect("cannot open file");
-
-            let state = format!("{} = \"{}\"\n", result.instance_name, result.instance_id);
-
-            state_file
-                .write_all(state.as_bytes())
-                .expect("write failed");
         }
         Err(error) => eprintln!("Error creating instance: {}", error),
     };
@@ -340,6 +339,12 @@ pub fn get_rendered_dockerfile(
     let _ = tera.add_raw_template("dockerfile", &contents);
     let mut context = tera::Context::new();
     for (_key, value) in instance_settings.iter() {
+        let stack_type = ControllerStackType::from_str(value.stack_type.as_str())
+            .unwrap_or(ControllerStackType::Standard);
+
+        let stack = get_stack(stack_type);
+
+        context.insert("stack_trunk_installs", &stack.trunk_installs);
         context.insert("extensions", &value.extensions);
     }
     let rendered_dockerfile = tera.render("dockerfile", &context).unwrap();
@@ -367,6 +372,12 @@ pub fn get_rendered_migrations_file(
     let _ = tera.add_raw_template("migrations", &contents);
     let mut context = tera::Context::new();
     for (_key, value) in instance_settings.iter() {
+        let stack_type = ControllerStackType::from_str(value.stack_type.as_str())
+            .unwrap_or(ControllerStackType::Standard);
+
+        let stack = get_stack(stack_type);
+
+        context.insert("stack_extensions", &stack.extensions);
         context.insert("extensions", &value.extensions);
     }
     let rendered_dockerfile = tera.render("migrations", &context).unwrap();
@@ -379,6 +390,20 @@ fn get_postgres_config(instance_settings: HashMap<String, InstanceSettings>) -> 
     let qoute_new_line = "\'\n";
     let equal_to_qoute = " = \'";
     for (_, instance_setting) in instance_settings.iter() {
+        let stack_type = ControllerStackType::from_str(instance_setting.stack_type.as_str())
+            .unwrap_or(ControllerStackType::Standard);
+
+        let stack = get_stack(stack_type);
+
+        if stack.postgres_config.is_some() {
+            for config in stack.postgres_config.unwrap().iter() {
+                postgres_config.push_str(config.name.as_str());
+                postgres_config.push_str(equal_to_qoute);
+                postgres_config.push_str(format!("{}", &config.value).as_str());
+                postgres_config.push_str(qoute_new_line);
+            }
+        }
+
         if instance_setting.postgres_configurations.is_some() {
             for (key, value) in instance_setting
                 .postgres_configurations

@@ -72,10 +72,13 @@ pub async fn apply_configmap(
     cm_name: &str,
     data: BTreeMap<String, String>,
 ) -> Result<(), Error> {
+    let mut labels: BTreeMap<String, String> = BTreeMap::new();
+    labels.insert("cnpg.io/reload".to_owned(), "true".to_owned());
     let cm_api: Api<ConfigMap> = Api::namespaced(client, namespace);
     let cm = ConfigMap {
         metadata: ObjectMeta {
             name: Some(cm_name.to_string()),
+            labels: Some(labels),
             ..Default::default()
         },
         data: Some(data),

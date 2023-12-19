@@ -70,6 +70,7 @@ Class | Method | HTTP request | Description
  - [HeaderConfig](docs/HeaderConfig.md)
  - [Infrastructure](docs/Infrastructure.md)
  - [Ingress](docs/Ingress.md)
+ - [IngressType](docs/IngressType.md)
  - [Instance](docs/Instance.md)
  - [InstanceEvent](docs/InstanceEvent.md)
  - [IntOrString](docs/IntOrString.md)

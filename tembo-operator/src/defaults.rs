@@ -30,7 +30,7 @@ pub fn default_resources() -> ResourceRequirements {
 }
 
 pub fn default_postgres_exporter_enabled() -> bool {
-    true
+    false
 }
 
 pub fn default_uid() -> i32 {

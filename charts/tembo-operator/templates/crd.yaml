@@ -1614,7 +1614,7 @@ spec:
                 nullable: true
                 properties:
                   enabled:
-                    default: true
+                    default: false
                     description: |-
                       To enable or disable the metric.
 
@@ -1675,18 +1675,12 @@ spec:
                 format: int32
                 type: integer
               postgresExporterEnabled:
-                default: true
-                description: |-
-                  Enable the use of the Postgres Exporter deployment for metrics collection
-
-                  **Default**: true.
+                default: false
+                description: '**DEPRECATED** Enable the use of the Postgres Exporter deployment for metrics collection This is no longer used and will be removed in a future release.'
                 type: boolean
               postgresExporterImage:
                 default: quay.io/prometheuscommunity/postgres-exporter:v0.12.0
-                description: |-
-                  The postgres-exporter image you want to use for the postgres-exporter deployment.
-
-                  **Default**: quay.io/prometheuscommunity/postgres-exporter:v0.12.0
+                description: '**DEPRECATED** The postgres-exporter image you want to use for the postgres-exporter deployment. This is no longer used and will be removed in a future release.'
                 type: string
               replicas:
                 default: 1

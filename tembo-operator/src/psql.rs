@@ -52,7 +52,10 @@ impl PsqlCommand {
     pub async fn execute(&self) -> Result<PsqlOutput, Action> {
         let psql_command = vec![
             String::from("psql"),
-            self.database.clone(),
+            format!(
+                "postgres://?dbname={}&application_name=tembo-system",
+                self.database.clone()
+            ),
             String::from("-c"),
             self.command.clone(),
         ];

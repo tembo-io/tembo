@@ -150,7 +150,17 @@ pub async fn reconcile_postgres_role_secret(
     if secret_api.get(secret_name).await.is_ok() {
         debug!("skipping secret creation: secret {} exists", &name);
         let secret_api: Api<Secret> = Api::namespaced(client.clone(), &ns);
-        let password = fetch_decoded_data_key_from_secret(secret_api, name, "password").await?;
+        let password = match fetch_all_decoded_data_from_secret(secret_api, name)
+            .await?
+            .get("password")
+        {
+            Some(password) => password.to_owned(),
+            None => {
+                return Err(Error::MissingSecretError(
+                    "Did not find key 'password' in secret".to_owned(),
+                ))
+            }
+        };
         let secret_data = RolePassword { password };
         return Ok(Some(secret_data));
     };
@@ -193,25 +203,32 @@ fn generate_role_secret_data(role_name: &str) -> (BTreeMap<String, ByteString>, 
 }
 
 // Lookup secret data for postgres-exporter
-pub async fn fetch_decoded_data_key_from_secret(
+pub async fn fetch_all_decoded_data_from_secret(
     secrets_api: Api<Secret>,
     name: String,
-    key_name: &str,
-) -> Result<String, Error> {
+) -> Result<BTreeMap<String, String>, Error> {
     let secret_name = name.to_string();
 
     match secrets_api.get(&secret_name).await {
         Ok(secret) => {
             if let Some(data_map) = secret.data {
-                if let Some(password_bytes) = data_map.get(key_name) {
-                    let secret_data = String::from_utf8(password_bytes.0.clone()).unwrap();
-                    Ok(secret_data)
-                } else {
-                    Err(Error::MissingSecretError(format!(
-                        "Key {} not found in secret",
-                        key_name
-                    )))
+                let mut decoded_data = BTreeMap::new();
+
+                for (key, secret_bytes) in data_map {
+                    match String::from_utf8(secret_bytes.0.clone()) {
+                        Ok(decoded_string) => {
+                            decoded_data.insert(key, decoded_string);
+                        }
+                        Err(_) => {
+                            return Err(Error::MissingSecretError(format!(
+                                "Failed to decode data for key {}",
+                                key
+                            )));
+                        }
+                    }
                 }
+
+                Ok(decoded_data)
             } else {
                 Err(Error::MissingSecretError("No data found in secret".to_owned()))
             }

@@ -26,7 +26,24 @@ pub enum StackType {
     VectorDb,
     #[serde(rename = "DataWarehouse")]
     DataWarehouse,
+    #[serde(rename = "Geospatial")]
+    Geospatial,
 
+}
+
+impl ToString for StackType {
+    fn to_string(&self) -> String {
+        match self {
+            Self::Standard => String::from("Standard"),
+            Self::MessageQueue => String::from("MessageQueue"),
+            Self::MachineLearning => String::from("MachineLearning"),
+            Self::Olap => String::from("OLAP"),
+            Self::Oltp => String::from("OLTP"),
+            Self::VectorDb => String::from("VectorDB"),
+            Self::DataWarehouse => String::from("DataWarehouse"),
+            Self::Geospatial => String::from("Geospatial"),
+        }
+    }
 }
 
 impl Default for StackType {

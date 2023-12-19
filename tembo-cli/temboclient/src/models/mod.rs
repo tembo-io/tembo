@@ -40,6 +40,8 @@ pub mod infrastructure;
 pub use self::infrastructure::Infrastructure;
 pub mod ingress;
 pub use self::ingress::Ingress;
+pub mod ingress_type;
+pub use self::ingress_type::IngressType;
 pub mod instance;
 pub use self::instance::Instance;
 pub mod instance_event;
