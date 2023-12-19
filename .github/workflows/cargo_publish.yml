@@ -29,7 +29,6 @@ jobs:
           # in a pull request, and using all directories on the release
           # or main branches.
           changed_relative_to_ref: origin/${{ github.base_ref || 'not-a-branch' }}
-          ignore_dirs: "tembo-cli"
 
 
   cargo_publish:
