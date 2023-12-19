@@ -269,7 +269,6 @@ pub fn generate_ingress_tcp_routes(
                             continue;
                         }
 
-                        let matcher = format!("{}", host_matcher_tcp);
                         let middlewares: Option<Vec<IngressRouteTCPRoutesMiddlewares>> =
                             route.middlewares.clone().map(|names| {
                                 names
@@ -281,7 +280,7 @@ pub fn generate_ingress_tcp_routes(
                                     .collect()
                             });
                         let route = IngressRouteTCPRoutes {
-                            r#match: matcher.clone(),
+                            r#match: host_matcher_tcp.clone(),
                             services: Some(vec![IngressRouteTCPRoutesServices {
                                 name: resource_name.to_string(),
                                 port: IntOrString::Int(route.port as i32),
