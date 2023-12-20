@@ -1,8 +1,8 @@
 # Tembo CLI
 
-Tembo CLI allows users to experience [Tembo](https://tembo.io) locally, as well as, 
-manage and deploy to Tembo Cloud. It abstracts away complexities of configuring, 
-managing, and running Postgres in a local environment. 
+Tembo CLI allows users to experience [Tembo](https://tembo.io) locally, as well as,
+manage and deploy to Tembo Cloud. It abstracts away complexities of configuring,
+managing, and running Postgres in a local environment.
 
 # Local Testing
 
@@ -11,6 +11,12 @@ Clone this repo and run:
 `cargo install --path .`
 
 If the install path is in your shell path, you can then run `tembo help` and other `tembo` commands.
+
+You can run this command to use the local code for any tembo command during development:
+
+```
+alias tembo='cargo run --'
+```
 
 # Commands
 
@@ -158,7 +164,7 @@ pub mod impls;
 
 # Contributing
 
-Before you start working on something, it's best to check if there is an existing plan 
+Before you start working on something, it's best to check if there is an existing plan
 first. Join our [Slack community](https://join.slack.com/t/trunk-crew/shared_invite/zt-1yiafma92-hFHq2xAN0ukjg_2AsOVvfg) and ask there.
 
 # Semver

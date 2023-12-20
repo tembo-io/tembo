@@ -1,8 +1,8 @@
 use crate::{cli::context::list_context, Result};
-use clap::{ArgMatches, Command};
+use clap::{ArgMatches, SubCommand};
 
-pub fn make_subcommand() -> Command {
-    Command::new("list").about("Command used to list context")
+pub fn make_subcommand() -> SubCommand {
+    SubCommand::with_name("list").about("Command used to list context")
 }
 
 pub fn execute(_args: &ArgMatches) -> Result<()> {
