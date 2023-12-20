@@ -12,6 +12,10 @@ repository = "https://github.com/tembo-io/tembo-cli"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[[bin]]
+name = "tembo"
+path = "src/main.rs"
+
 [dependencies]
 anyhow = "1.0.71"
 clap = { version = "4.3.12", features = ["cargo", "wrap_help"] }

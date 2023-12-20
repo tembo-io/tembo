@@ -3091,7 +3091,7 @@ mod test {
         );
 
         // Check for IngressRouteTCP
-        let ing_name = format!("{}-apps", cdb_name);
+        let ing_name = format!("{cdb_name}-ferretdb");
         let ingresses_tcp: Result<Vec<IngressRouteTCP>, errors::OperatorError> =
             list_resources(client.clone(), &ing_name, &namespace, 1).await;
         let ingress_tcp = ingresses_tcp.unwrap();
@@ -3100,10 +3100,7 @@ mod test {
         let routes_tcp = ingress_route_tcp.spec.clone().routes.clone();
         assert_eq!(routes.len(), 1);
         let route_tcp = routes_tcp[0].clone();
-        assert_eq!(
-            route_tcp.r#match,
-            format!("Host(`{}.localhost`) && PathPrefix(`/ferretdb/v1`)", cdb_name)
-        );
+        assert_eq!(route_tcp.r#match, format!("HostSNI(`{}.localhost`)", cdb_name));
 
         // Assert entry_points includes only ferretdb
         assert_eq!(
