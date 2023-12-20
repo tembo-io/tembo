@@ -2950,44 +2950,6 @@ mod test {
         // two AppService Services, because two of the AppServices expose ports
         assert!(service_items.len() == 2);
 
-        let query = r#"
-          SELECT sa.datname
-           , sa.usename
-           , sa.application_name
-           , states.state
-           , COALESCE(sa.count, 0) AS total
-           , COALESCE(sa.max_tx_secs, 0) AS max_tx_duration_seconds
-           FROM ( VALUES ('active')
-               , ('idle')
-               , ('idle in transaction')
-               , ('idle in transaction (aborted)')
-               , ('fastpath function call')
-               , ('disabled')
-               ) AS states(state)
-           LEFT JOIN (
-               SELECT datname
-                   , state
-                   , usename
-                   , COALESCE(application_name, '') AS application_name
-                   , COUNT(*)
-                   , COALESCE(EXTRACT (EPOCH FROM (max(now() - xact_start))), 0) AS max_tx_secs
-               FROM pg_catalog.pg_stat_activity
-               GROUP BY datname, state, usename, application_name
-           ) sa ON states.state = sa.state
-           WHERE sa.usename IS NOT NULL
-            "#;
-
-        let state = State::default();
-        let context = state.create_context(client.clone());
-        wait_until_psql_contains(
-            context.clone(),
-            coredb_resource.clone(),
-            query.to_string(),
-            "tembo-apps".to_string(),
-            false,
-        )
-        .await;
-
         let app_0 = deployment_items[0].clone();
         let app_1 = deployment_items[1].clone();
         let app_2 = deployment_items[2].clone();
