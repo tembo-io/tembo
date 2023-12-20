@@ -27,7 +27,7 @@ pub const CREDENTIALS_DEFAULT_TEXT: &str = "version = \"1.0\"
 [[profile]]
 name = 'prod'
 tembo_access_token = 'ACCESS_TOKEN'
-tembo_host = 'https://api.coredb.io'
+tembo_host = 'https://api.tembo.io'
 ";
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
