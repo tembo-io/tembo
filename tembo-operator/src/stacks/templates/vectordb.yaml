@@ -7,14 +7,14 @@ appServices:
     name: embeddings
     routing:
       - port: 3000
-        ingressPath: /transform
+        ingressPath: /embeddings
         middlewares:
           - map-embeddings
     middlewares:
       - !replacePathRegex
           name: map-embeddings
           config:
-            regex: \/transform\/?
+            regex: \/embeddings\/?
             replacement: /
     resources:
       requests:
