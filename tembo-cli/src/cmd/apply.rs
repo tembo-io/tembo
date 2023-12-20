@@ -79,7 +79,7 @@ fn execute_docker() -> Result<()> {
 
     for (_key, value) in instance_settings.iter() {
         Docker::build_run(value.instance_name.clone())?;
-        Docker::run_sqlx_migrate()?;
+        Docker::run_sqlx_migrate();
     }
 
     // If all of the above was successful, we can print the url to user
