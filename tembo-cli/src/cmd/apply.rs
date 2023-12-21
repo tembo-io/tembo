@@ -11,7 +11,9 @@ use controller::stacks::types::StackType as ControllerStackType;
 use std::{
     collections::HashMap,
     fs::{self},
-    str::FromStr, time::Duration, thread::sleep,
+    str::FromStr,
+    thread::sleep,
+    time::Duration,
 };
 use temboclient::{
     apis::{
