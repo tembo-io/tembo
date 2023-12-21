@@ -22,8 +22,9 @@ lazy_static! {
         serde_yaml::from_str(include_str!("templates/vectordb.yaml")).expect("vectordb.yaml not found");
     pub static ref GEOSPATIAL: Stack =
         serde_yaml::from_str(include_str!("templates/gis.yaml")).expect("gis.yaml not found");
-    pub static ref MONGO_ALTERNATIVE: Stack = serde_yaml::from_str(include_str!("templates/mongo_alternative.yaml"))
-        .expect("mongo_adapter.yaml not found");
+    pub static ref MONGO_ALTERNATIVE: Stack =
+        serde_yaml::from_str(include_str!("templates/mongo_alternative.yaml"))
+            .expect("mongo_adapter.yaml not found");
 }
 
 pub fn get_stack(entity: StackType) -> types::Stack {
