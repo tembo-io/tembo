@@ -3,6 +3,7 @@ use kube::Client;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use tracing::debug;
 
 pub const QUERIES: &str = "tembo-queries";
 pub const EXPORTER_VOLUME: &str = "postgres-exporter";
@@ -194,11 +195,10 @@ pub async fn reconcile_metrics_configmap(cdb: &CoreDB, client: Client, ns: &str)
         .expect("instance should always have a name");
     // Make sure we always check for queries in the spec, incase someone calls this function
     // directly and not through the reconcile function.
-    if let Some(metrics) = cdb.spec.metrics.as_ref() {
-        if let Some(queries) = metrics.queries.as_ref() {
+    match cdb.spec.metrics.clone().and_then(|m| m.queries) {
+        Some(queries) => {
             let qdata = serde_yaml::to_string(&queries)?;
-            let mut d: BTreeMap<String, String> = BTreeMap::new();
-            d.insert(QUERIES.to_string(), qdata);
+            let d: BTreeMap<String, String> = BTreeMap::from([(QUERIES.to_string(), qdata)]);
             apply_configmap(
                 client.clone(),
                 ns,
@@ -206,6 +206,9 @@ pub async fn reconcile_metrics_configmap(cdb: &CoreDB, client: Client, ns: &str)
                 d,
             )
             .await?
+        }
+        None => {
+            debug!("No queries specified in CoreDB spec {}", coredb_name);
         }
     }
     Ok(())
