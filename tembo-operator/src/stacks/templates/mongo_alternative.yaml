@@ -1,4 +1,4 @@
-name: MongoAdapter
+name: MongoAlternative
 description: Document-facing workloads on Postgres.
 image: "quay.io/tembo/standard-cnpg:15.3.0-1-1096aeb"
 stack_version: 0.1.0
@@ -56,6 +56,15 @@ compute_templates:
     memory: 32Gi
   - cpu: 16
     memory: 32Gi
+trunk_installs:
+  - name: pg_stat_statements
+    version: 1.10.0
+extensions:
+  - name: pg_stat_statements
+    locations:
+      - database: postgres
+        enabled: true
+        version: 1.10.0
 postgres_config_engine: standard
 postgres_config:
   - name: autovacuum_vacuum_cost_limit
