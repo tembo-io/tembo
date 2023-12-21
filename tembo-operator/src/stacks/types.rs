@@ -62,7 +62,6 @@ impl StackType {
 #[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema, PartialEq, ToSchema)]
 pub struct Stack {
     pub name: String,
-    pub common_name: String,
     pub compute_templates: Option<Vec<ComputeTemplate>>,
     pub description: Option<String>,
     #[serde(default = "default_stack_image")]
