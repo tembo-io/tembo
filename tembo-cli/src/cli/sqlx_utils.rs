@@ -43,6 +43,6 @@ impl SqlxUtils {
 
     fn b64_decode(b64_encoded: &str) -> String {
         let bytes = general_purpose::STANDARD.decode(b64_encoded).unwrap();
-        std::str::from_utf8(&bytes).unwrap().to_owned()
+        String::from_utf8(bytes).unwrap()
     }
 }

@@ -6,6 +6,7 @@ use crate::{
     },
     Result,
 };
+use anyhow::Error;
 use clap::{ArgMatches, Command};
 use controller::stacks::get_stack;
 use controller::stacks::types::StackType as ControllerStackType;
@@ -186,6 +187,7 @@ pub fn is_instance_up(
         }
         Err(error) => {
             eprintln!("Error getting instance: {}", error);
+            return Err(Error::new(error));
         }
     };
 
