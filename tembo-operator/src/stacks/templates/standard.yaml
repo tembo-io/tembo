@@ -1,4 +1,5 @@
 name: Standard
+common_name: Standard
 description: A balanced Postgres instance optimized for OLTP workloads.
 image: "quay.io/tembo/standard-cnpg:15.3.0-1-1096aeb"
 stack_version: 0.1.0

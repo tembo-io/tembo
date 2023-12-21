@@ -21,7 +21,7 @@ pub enum StackType {
     OLTP,
     VectorDB,
     Geospatial,
-    MongoAdapter,
+    MongoAlternative,
 }
 
 impl std::str::FromStr for StackType {
@@ -37,7 +37,7 @@ impl std::str::FromStr for StackType {
             "OLTP" => Ok(StackType::OLTP),
             "VectorDB" => Ok(StackType::VectorDB),
             "Geospatial" => Ok(StackType::Geospatial),
-            "MongoAdapter" => Ok(StackType::MongoAdapter),
+            "MongoAlternative" => Ok(StackType::MongoAlternative),
             _ => Err("invalid value"),
         }
     }
@@ -54,7 +54,7 @@ impl StackType {
             StackType::OLTP => "OLTP",
             StackType::VectorDB => "VectorDB",
             StackType::Geospatial => "Geospatial",
-            StackType::MongoAdapter => "MongoAdapter",
+            StackType::MongoAlternative => "MongoAlternative",
         }
     }
 }
@@ -62,6 +62,7 @@ impl StackType {
 #[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema, PartialEq, ToSchema)]
 pub struct Stack {
     pub name: String,
+    pub common_name: String,
     pub compute_templates: Option<Vec<ComputeTemplate>>,
     pub description: Option<String>,
     #[serde(default = "default_stack_image")]
@@ -193,7 +194,7 @@ mod tests {
             StackType::OLTP,
             StackType::VectorDB,
             StackType::Geospatial,
-            StackType::MongoAdapter,
+            StackType::MongoAlternative,
         ];
 
         for stack in all_stacks {
@@ -225,8 +226,8 @@ mod tests {
                 StackType::Geospatial => {
                     get_stack(StackType::Geospatial);
                 }
-                StackType::MongoAdapter => {
-                    get_stack(StackType::MongoAdapter);
+                StackType::MongoAlternative => {
+                    get_stack(StackType::MongoAlternative);
                 }
             }
         }

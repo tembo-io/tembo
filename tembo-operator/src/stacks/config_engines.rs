@@ -428,6 +428,7 @@ mod tests {
     fn test_olap_config_engine() {
         let stack = Stack {
             name: "test".to_owned(),
+            common_name: "my-test".to_owned(),
             compute_templates: None,
             infrastructure: Some(Infrastructure {
                 cpu: "4".to_string(),
