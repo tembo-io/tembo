@@ -235,7 +235,8 @@ mod tests {
                         "description": "Time at which postmaster started"
                       }
                     }
-                  ]
+                  ],
+                  "target_databases": ["postgres"]
                 },
                 "extensions": {
                   "query": "select count(*) as num_ext from pg_available_extensions",
@@ -247,7 +248,8 @@ mod tests {
                         "description": "Num extensions"
                       }
                     }
-                  ]
+                  ],
+                  "target_databases": ["postgres"]
                 }
               }
         );
@@ -298,6 +300,8 @@ mod tests {
   - num_ext:
       usage: GAUGE
       description: Num extensions
+  target_databases:
+  - postgres
 pg_postmaster:
   query: SELECT pg_postmaster_start_time as start_time_seconds from pg_postmaster_start_time()
   master: true
@@ -305,6 +309,8 @@ pg_postmaster:
   - start_time_seconds:
       usage: GAUGE
       description: Time at which postmaster started
+  target_databases:
+  - postgres
 "#;
         // formmatted correctly as yaml (for configmap)
         assert_eq!(yaml, data);
