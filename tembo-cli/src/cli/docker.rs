@@ -2,6 +2,10 @@ use crate::Result;
 use anyhow::bail;
 use simplelog::*;
 use spinners::{Spinner, Spinners};
+use sqlx::migrate::Migrator;
+use sqlx::Pool;
+use sqlx::Postgres;
+use std::path::Path;
 use std::process::Command as ShellCommand;
 use std::process::Output;
 
@@ -62,11 +66,13 @@ impl Docker {
     }
 
     // run sqlx migrate
-    pub fn run_sqlx_migrate() -> Result {
+    pub async fn run_sqlx_migrate() -> Result {
         let mut sp = Spinner::new(Spinners::Line, "Running SQL migration".into());
 
-        let command = "DATABASE_URL=postgres://postgres:postgres@localhost:5432 sqlx migrate run";
-        run_command(command)?;
+        let pool = Pool::<Postgres>::connect("postgres://postgres:postgres@localhost:5432").await?;
+
+        let m = Migrator::new(Path::new("./migrations")).await?;
+        m.run(&pool).await?;
 
         sp.stop_with_message("- SQL migration completed".to_string());
 
