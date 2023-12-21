@@ -95,6 +95,8 @@ postgres_metrics:
         - total_messages:
             usage: GAUGE
             description: Total number of messages that have passed into the queue.
+      target_databases:
+        - "postgres"
 postgres_config_engine: mq
 postgres_config:
   - name: shared_preload_libraries

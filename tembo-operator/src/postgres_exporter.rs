@@ -108,6 +108,8 @@ pub struct Metrics {
 ///          - total_messages:
 ///              description: Total number of messages that have passed into the queue.
 ///              usage: GAUGE
+///        target_databases:
+///          - "postgres"
 /// ```
 #[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize)]
 pub struct QueryItem {
@@ -131,6 +133,16 @@ pub struct QueryItem {
     /// description: the metric's description
     /// metrics_mapping: the optional column mapping when usage is set to MAPPEDMETRIC
     pub metrics: Vec<Metrics>,
+
+    /// The default database can always be overridden for a given user-defined
+    /// metric, by specifying a list of one or more databases in the target_databases
+    /// option.
+    ///
+    /// See: [https://cloudnative-pg.io/documentation/1.20/monitoring/#example-of-a-user-defined-metric-running-on-multiple-databases](https://cloudnative-pg.io/documentation/1.20/monitoring/#example-of-a-user-defined-metric-running-on-multiple-databases)
+    ///
+    /// **Default:** `["postgres"]`
+    #[serde(default = "defaults::default_postgres_exporter_target_databases")]
+    pub target_databases: Vec<String>,
 }
 
 #[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize)]
@@ -185,7 +197,7 @@ pub async fn reconcile_metrics_configmap(cdb: &CoreDB, client: Client, ns: &str)
     // directly and not through the reconcile function.
     match cdb.spec.metrics.clone().and_then(|m| m.queries) {
         Some(queries) => {
-            let qdata = serde_yaml::to_string(&queries).unwrap();
+            let qdata = serde_yaml::to_string(&queries)?;
             let d: BTreeMap<String, String> = BTreeMap::from([(QUERIES.to_string(), qdata)]);
             apply_configmap(
                 client.clone(),
@@ -196,7 +208,7 @@ pub async fn reconcile_metrics_configmap(cdb: &CoreDB, client: Client, ns: &str)
             .await?
         }
         None => {
-            debug!("No queries specified in CoreDB spec");
+            debug!("No queries specified in CoreDB spec {}", coredb_name);
         }
     }
     Ok(())
@@ -223,7 +235,8 @@ mod tests {
                         "description": "Time at which postmaster started"
                       }
                     }
-                  ]
+                  ],
+                  "target_databases": ["postgres"]
                 },
                 "extensions": {
                   "query": "select count(*) as num_ext from pg_available_extensions",
@@ -235,7 +248,8 @@ mod tests {
                         "description": "Num extensions"
                       }
                     }
-                  ]
+                  ],
+                  "target_databases": ["postgres"]
                 }
               }
         );
@@ -286,6 +300,8 @@ mod tests {
   - num_ext:
       usage: GAUGE
       description: Num extensions
+  target_databases:
+  - postgres
 pg_postmaster:
   query: SELECT pg_postmaster_start_time as start_time_seconds from pg_postmaster_start_time()
   master: true
@@ -293,6 +309,8 @@ pg_postmaster:
   - start_time_seconds:
       usage: GAUGE
       description: Time at which postmaster started
+  target_databases:
+  - postgres
 "#;
         // formmatted correctly as yaml (for configmap)
         assert_eq!(yaml, data);
