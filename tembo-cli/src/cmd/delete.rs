@@ -47,7 +47,7 @@ fn execute_tembo_cloud(env: Environment) -> Result<()> {
     };
 
     for (_key, value) in instance_settings.iter() {
-        let instance_id = get_instance_id(value.instance_name.clone(), &config, env.clone())?;
+        let instance_id = get_instance_id(value.instance_name.clone(), &config, &env)?;
         if let Some(env_instance_id) = instance_id {
             let v = Runtime::new().unwrap().block_on(delete_instance(
                 &config,
