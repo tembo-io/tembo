@@ -3,7 +3,6 @@ use kube::Client;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
-use tracing::debug;
 
 pub const QUERIES: &str = "tembo-queries";
 pub const EXPORTER_VOLUME: &str = "postgres-exporter";
@@ -108,6 +107,8 @@ pub struct Metrics {
 ///          - total_messages:
 ///              description: Total number of messages that have passed into the queue.
 ///              usage: GAUGE
+///        target_databases:
+///          - "postgres"
 /// ```
 #[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize)]
 pub struct QueryItem {
@@ -131,6 +132,16 @@ pub struct QueryItem {
     /// description: the metric's description
     /// metrics_mapping: the optional column mapping when usage is set to MAPPEDMETRIC
     pub metrics: Vec<Metrics>,
+
+    /// The default database can always be overridden for a given user-defined
+    /// metric, by specifying a list of one or more databases in the target_databases
+    /// option.
+    ///
+    /// See: [https://cloudnative-pg.io/documentation/1.20/monitoring/#example-of-a-user-defined-metric-running-on-multiple-databases](https://cloudnative-pg.io/documentation/1.20/monitoring/#example-of-a-user-defined-metric-running-on-multiple-databases)
+    ///
+    /// **Default:** `["postgres"]`
+    #[serde(default = "defaults::default_postgres_exporter_target_databases")]
+    pub target_databases: Vec<String>,
 }
 
 #[derive(Clone, Debug, JsonSchema, PartialEq, Serialize, Deserialize)]
@@ -183,10 +194,11 @@ pub async fn reconcile_metrics_configmap(cdb: &CoreDB, client: Client, ns: &str)
         .expect("instance should always have a name");
     // Make sure we always check for queries in the spec, incase someone calls this function
     // directly and not through the reconcile function.
-    match cdb.spec.metrics.clone().and_then(|m| m.queries) {
-        Some(queries) => {
-            let qdata = serde_yaml::to_string(&queries).unwrap();
-            let d: BTreeMap<String, String> = BTreeMap::from([(QUERIES.to_string(), qdata)]);
+    if let Some(metrics) = cdb.spec.metrics.as_ref() {
+        if let Some(queries) = metrics.queries.as_ref() {
+            let qdata = serde_yaml::to_string(&queries)?;
+            let mut d: BTreeMap<String, String> = BTreeMap::new();
+            d.insert(QUERIES.to_string(), qdata);
             apply_configmap(
                 client.clone(),
                 ns,
@@ -194,9 +206,6 @@ pub async fn reconcile_metrics_configmap(cdb: &CoreDB, client: Client, ns: &str)
                 d,
             )
             .await?
-        }
-        None => {
-            debug!("No queries specified in CoreDB spec");
         }
     }
     Ok(())

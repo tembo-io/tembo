@@ -262,7 +262,7 @@ pub fn generate_ingress_tcp_routes(
             let mut routes: Vec<IngressRouteTCPRoutes> = Vec::new();
             for route in routings.iter() {
                 match route.ingress_path.clone() {
-                    Some(path) => {
+                    Some(_path) => {
                         if !route.ingress_type.clone()?.eq(&IngressType::tcp) {
                             // Do not create IngressRouteTCPRoutes for non-TCP ingress type
                             debug!("Skipping IngressRouteTCPRoutes for non-TCP ingress type");
