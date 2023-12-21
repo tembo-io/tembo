@@ -11,7 +11,7 @@ use controller::stacks::types::StackType as ControllerStackType;
 use std::{
     collections::HashMap,
     fs::{self},
-    str::FromStr,
+    str::FromStr, time::Duration, thread::sleep,
 };
 use temboclient::{
     apis::{
@@ -79,7 +79,13 @@ fn execute_docker() -> Result<()> {
 
     for (_key, value) in instance_settings.iter() {
         Docker::build_run(value.instance_name.clone())?;
-        Docker::run_sqlx_migrate();
+
+        // Allows DB instance to be ready before running migrations
+        sleep(Duration::from_secs(3));
+
+        Runtime::new()
+            .unwrap()
+            .block_on(Docker::run_sqlx_migrate())?;
     }
 
     // If all of the above was successful, we can print the url to user
