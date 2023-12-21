@@ -6,6 +6,8 @@ use types::{Stack, StackType};
 use lazy_static::lazy_static;
 
 lazy_static! {
+    pub static ref API: Stack =
+        serde_yaml::from_str(include_str!("templates/api.yaml")).expect("api.yaml not found");
     pub static ref DATAWAREHOUSE: Stack = serde_yaml::from_str(include_str!("templates/data_warehouse.yaml"))
         .expect("data_warehouse.yaml not found");
     pub static ref MQ: Stack = serde_yaml::from_str(include_str!("templates/message_queue.yaml"))
@@ -24,11 +26,12 @@ lazy_static! {
         serde_yaml::from_str(include_str!("templates/gis.yaml")).expect("gis.yaml not found");
     pub static ref MONGO_ALTERNATIVE: Stack =
         serde_yaml::from_str(include_str!("templates/mongo_alternative.yaml"))
-            .expect("mongo_adapter.yaml not found");
+            .expect("mongo_alternative.yaml not found");
 }
 
 pub fn get_stack(entity: StackType) -> types::Stack {
     match entity {
+        StackType::API => API.clone(),
         StackType::DataWarehouse => DATAWAREHOUSE.clone(),
         StackType::MessageQueue => MQ.clone(),
         StackType::Standard => STANDARD.clone(),

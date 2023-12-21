@@ -12,6 +12,7 @@ use utoipa::ToSchema;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema, PartialEq, ToSchema)]
 pub enum StackType {
+    API,
     DataWarehouse,
     Standard,
     MessageQueue,
@@ -29,6 +30,7 @@ impl std::str::FromStr for StackType {
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
+            "API" => Ok(StackType::API),
             "DataWarehouse" => Ok(StackType::DataWarehouse),
             "Standard" => Ok(StackType::Standard),
             "MessageQueue" => Ok(StackType::MessageQueue),
@@ -46,6 +48,7 @@ impl std::str::FromStr for StackType {
 impl StackType {
     pub fn as_str(&self) -> &str {
         match self {
+            StackType::API => "API",
             StackType::DataWarehouse => "DataWarehouse",
             StackType::Standard => "Standard",
             StackType::MessageQueue => "MessageQueue",
@@ -185,6 +188,7 @@ mod tests {
     fn test_all_stack_deserialization() {
         // must not panic when reading any stack definitions from yaml
         let all_stacks = vec![
+            StackType::API,
             StackType::DataWarehouse,
             StackType::Standard,
             StackType::MessageQueue,
@@ -201,6 +205,9 @@ mod tests {
             // pattern match on the StackType enum, which if a new stack is added, this test will fail until its updated
             // guarantees all StackTypes are tested
             match stack {
+                StackType::API => {
+                    get_stack(StackType::API);
+                }
                 StackType::DataWarehouse => {
                     get_stack(StackType::DataWarehouse);
                 }
