@@ -139,7 +139,7 @@ pub fn execute_tembo_cloud(env: Environment) -> Result<()> {
                     &instance_id,
                     connection_info,
                     env.clone(),
-                );
+                )?;
 
                 Runtime::new()
                     .unwrap()
@@ -160,7 +160,7 @@ fn get_conn_info_with_creds(
     instance_id: &Option<String>,
     connection_info: Option<Box<ConnectionInfo>>,
     env: Environment,
-) -> ConnectionInfo {
+) -> Result<ConnectionInfo> {
     let dataplane_config = tembodataclient::apis::configuration::Configuration {
         base_path: profile.tembo_data_host,
         bearer_access_token: Some(profile.tembo_access_token),
@@ -174,6 +174,10 @@ fn get_conn_info_with_creds(
         "superuser-role",
     ));
 
+    if result.is_err() {
+        return Err(Error::msg("Error fetching instance credentials!"));
+    }
+
     let mut conn_info = *connection_info.unwrap();
 
     let map = result.as_ref().unwrap();
@@ -181,7 +185,7 @@ fn get_conn_info_with_creds(
     conn_info.user = map.get("username").unwrap().to_string();
     conn_info.password = map.get("password").unwrap().to_string();
 
-    conn_info
+    Ok(conn_info)
 }
 
 pub fn get_instance_id(
