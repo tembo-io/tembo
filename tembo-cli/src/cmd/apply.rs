@@ -1,6 +1,6 @@
 use crate::{
     cli::{
-        context::{get_current_context, Environment, Target},
+        context::{get_current_context, Environment, Profile, Target},
         sqlx_utils::SqlxUtils,
         tembo_config,
     },
@@ -28,6 +28,7 @@ use temboclient::{
         StackType, State, Storage, TrunkInstall, UpdateInstance,
     },
 };
+use tembodataclient::apis::secrets_api::get_secret_v1;
 use tokio::runtime::Runtime;
 
 use crate::cli::{docker::Docker, file_utils::FileUtils, tembo_config::InstanceSettings};
@@ -47,7 +48,7 @@ pub fn execute(_args: &ArgMatches) -> Result<()> {
     if env.target == Target::Docker.to_string() {
         return execute_docker();
     } else if env.target == Target::TemboCloud.to_string() {
-        return execute_tembo_cloud(env);
+        return execute_tembo_cloud(env.clone());
     }
 
     Ok(())
@@ -97,7 +98,7 @@ fn execute_docker() -> Result<()> {
         };
         Runtime::new()
             .unwrap()
-            .block_on(SqlxUtils::run_migrations(conn_info, false))?;
+            .block_on(SqlxUtils::run_migrations(conn_info))?;
     }
 
     // If all of the above was successful, we can print the url to user
@@ -111,13 +112,13 @@ pub fn execute_tembo_cloud(env: Environment) -> Result<()> {
 
     let profile = env.clone().selected_profile.unwrap();
     let config = Configuration {
-        base_path: profile.tembo_host,
-        bearer_access_token: Some(profile.tembo_access_token),
+        base_path: profile.clone().tembo_host,
+        bearer_access_token: Some(profile.clone().tembo_access_token),
         ..Default::default()
     };
 
     for (_key, value) in instance_settings.iter() {
-        let mut instance_id = get_instance_id(value.instance_name.clone(), &config, &env)?;
+        let mut instance_id = get_instance_id(value.instance_name.clone(), &config, env.clone())?;
 
         if let Some(env_instance_id) = instance_id.clone() {
             update_existing_instance(env_instance_id, value, &config, env.clone());
@@ -131,11 +132,21 @@ pub fn execute_tembo_cloud(env: Environment) -> Result<()> {
 
             let connection_info: Option<Box<ConnectionInfo>> =
                 is_instance_up(instance_id.as_ref().unwrap().clone(), &config, &env)?;
+
             if connection_info.is_some() {
+                let conn_info = get_conn_info_with_creds(
+                    profile.clone(),
+                    &instance_id,
+                    connection_info,
+                    env.clone(),
+                )?;
+
                 Runtime::new()
                     .unwrap()
-                    .block_on(SqlxUtils::run_migrations(*connection_info.unwrap(), true))?;
+                    .block_on(SqlxUtils::run_migrations(conn_info))?;
+
                 sp.stop_with_message("- Instance is now up!".to_string());
+
                 break;
             }
         }
@@ -144,10 +155,43 @@ pub fn execute_tembo_cloud(env: Environment) -> Result<()> {
     Ok(())
 }
 
+fn get_conn_info_with_creds(
+    profile: Profile,
+    instance_id: &Option<String>,
+    connection_info: Option<Box<ConnectionInfo>>,
+    env: Environment,
+) -> Result<ConnectionInfo> {
+    let dataplane_config = tembodataclient::apis::configuration::Configuration {
+        base_path: profile.tembo_data_host,
+        bearer_access_token: Some(profile.tembo_access_token),
+        ..Default::default()
+    };
+
+    let result = Runtime::new().unwrap().block_on(get_secret_v1(
+        &dataplane_config,
+        env.org_id.clone().unwrap().as_str(),
+        instance_id.as_ref().unwrap(),
+        "superuser-role",
+    ));
+
+    if result.is_err() {
+        return Err(Error::msg("Error fetching instance credentials!"));
+    }
+
+    let mut conn_info = *connection_info.unwrap();
+
+    let map = result.as_ref().unwrap();
+
+    conn_info.user = map.get("username").unwrap().to_string();
+    conn_info.password = map.get("password").unwrap().to_string();
+
+    Ok(conn_info)
+}
+
 pub fn get_instance_id(
     instance_name: String,
     config: &Configuration,
-    env: &Environment,
+    env: Environment,
 ) -> Result<Option<String>> {
     let v = Runtime::new()
         .unwrap()

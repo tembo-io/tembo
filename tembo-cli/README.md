@@ -47,6 +47,22 @@ Validates Tembo.toml (same as `tembo validate`) and applies the changes to the c
 
 Install OpenAPI Generator if not already by following steps [here](https://openapi-generator.tech/docs/installation)
 
+### Data plane API client
+
+Go to `tembodataclient` directory in your terminal.
+
+Delete the contents of the directory first and then run following command to re-generate the rust client code for the API.
+
+```bash
+openapi-generator generate -i https://api.data-1.use1.tembo.io/api-docs/openapi.json  -g rust -o . --additional-properties=packageName=tembodataclient
+```
+
+* Go to `tembodataclient/src/lib.rs` & add followng line at the top to disable clippy for the generated code
+
+```
+#![allow(clippy::all)]
+```
+
 ### Control plane API client
 
 Go to `temboclient` directory in your terminal.

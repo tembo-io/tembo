@@ -1,1 +1,1 @@
-ignore = ["temboclient"]
+ignore = ["temboclient", "tembodataclient"]

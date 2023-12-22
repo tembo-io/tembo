@@ -3741,6 +3741,7 @@ dependencies = [
  "spinners",
  "sqlx",
  "temboclient",
+ "tembodataclient",
  "tera",
  "tokio",
  "toml",
@@ -3755,6 +3756,18 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "serde_with",
+ "url",
+ "uuid",
+]
+
+[[package]]
+name = "tembodataclient"
+version = "0.0.1"
+dependencies = [
+ "reqwest",
+ "serde",
+ "serde_derive",
+ "serde_json",
  "url",
  "uuid",
 ]

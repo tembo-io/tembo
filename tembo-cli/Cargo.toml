@@ -1,4 +1,4 @@
-workspace = { members = ["temboclient"] }
+workspace = { members = ["temboclient", "tembodataclient"] }
 [package]
 name = "tembo-cli"
 version = "0.10.0"
@@ -45,6 +45,7 @@ log = "0.4.20"
 tera = "1.0"
 curl = "0.4.44"
 temboclient = { version = "1.0.0", path = "temboclient" }
+tembodataclient = { version = "0.0.1", path = "tembodataclient" }
 tokio = { version = "1.26.0", features = [
     "rt",
     "rt-multi-thread",
