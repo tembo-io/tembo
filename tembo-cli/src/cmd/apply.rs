@@ -10,6 +10,7 @@ use anyhow::Error;
 use clap::{ArgMatches, Command};
 use controller::stacks::get_stack;
 use controller::stacks::types::StackType as ControllerStackType;
+use log::info;
 use spinners::{Spinner, Spinners};
 use std::{
     collections::HashMap,
@@ -43,6 +44,10 @@ pub fn make_subcommand() -> Command {
 }
 
 pub fn execute(_args: &ArgMatches) -> Result<()> {
+    info!("Running validation!");
+    super::validate::execute(&ArgMatches::default())?;
+    info!("Validation completed!");
+
     let env = get_current_context()?;
 
     if env.target == Target::Docker.to_string() {
