@@ -1,5 +1,6 @@
 use crate::Result;
 use anyhow::bail;
+use anyhow::Error;
 use simplelog::*;
 use spinners::{Spinner, Spinners};
 use std::process::Command as ShellCommand;
@@ -41,24 +42,57 @@ impl Docker {
     }
 
     // Build & run docker image
-    pub fn build_run(instance_name: String) -> Result {
+    pub fn build_run(instance_name: String) -> Result<i32> {
         let mut sp = Spinner::new(Spinners::Line, "Running Docker Build & Run".into());
+        let container_list = Self::container_list_filtered(&instance_name).unwrap();
 
-        if Self::container_list_filtered(&instance_name)
-            .unwrap()
-            .contains(&instance_name)
-        {
+        if container_list.contains(&instance_name) {
+            let container_port = Docker::get_container_port(container_list)?;
+
             sp.stop_with_message("- Existing container found".to_string());
+            Ok(container_port)
         } else {
+            let port = Docker::get_available_port()?;
+
             let command = format!(
-                "docker build . -t postgres && docker run --name {} -p 5432:5432 -d postgres",
-                instance_name
+                "docker build . -t postgres && docker run --name {} -p {}:{} -d postgres",
+                instance_name, port, port
             );
             run_command(&command)?;
             sp.stop_with_message("- Docker Build & Run completed".to_string());
+            Ok(port)
         }
+    }
 
-        Ok(())
+    fn get_available_port() -> Result<i32> {
+        let ls_command = "docker ps -a --format '{{.Ports}}'";
+
+        let output = ShellCommand::new("sh")
+            .arg("-c")
+            .arg(ls_command)
+            .output()
+            .expect("failed to execute process");
+        let stdout = String::from_utf8(output.stdout)?;
+
+        Docker::get_container_port(stdout)
+    }
+
+    fn get_container_port(container_list: String) -> Result<i32> {
+        if container_list.contains("5432") {
+            if container_list.contains("5433") {
+                if container_list.contains("5434") {
+                    Err(Error::msg(
+                        "None of the ports 5432, 5433, 5434 are available!",
+                    ))
+                } else {
+                    Ok(5434)
+                }
+            } else {
+                Ok(5433)
+            }
+        } else {
+            Ok(5432)
+        }
     }
 
     // stop & remove container for given name

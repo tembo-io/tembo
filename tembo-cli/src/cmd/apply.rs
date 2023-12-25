@@ -89,7 +89,7 @@ fn execute_docker() -> Result<()> {
     )?;
 
     for (_key, value) in instance_settings.iter() {
-        Docker::build_run(value.instance_name.clone())?;
+        let port = Docker::build_run(value.instance_name.clone())?;
 
         // Allows DB instance to be ready before running migrations
         sleep(Duration::from_secs(3));
@@ -97,17 +97,20 @@ fn execute_docker() -> Result<()> {
         let conn_info = ConnectionInfo {
             host: "localhost".to_owned(),
             pooler_host: Some(Some("localhost-pooler".to_string())),
-            port: 5432,
+            port,
             user: "postgres".to_owned(),
             password: "postgres".to_owned(),
         };
         Runtime::new()
             .unwrap()
             .block_on(SqlxUtils::run_migrations(conn_info))?;
-    }
 
-    // If all of the above was successful, we can print the url to user
-    println!(">>> Tembo instance is now running on: postgres://postgres:postgres@localhost:5432");
+        // If all of the above was successful, we can print the url to user
+        println!(
+            ">>> Tembo instance is now running on: postgres://postgres:postgres@localhost:{}",
+            port
+        );
+    }
 
     Ok(())
 }
