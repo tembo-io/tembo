@@ -3,7 +3,8 @@ name: Cargo lint and test
 on:
   push:
     branches: [ "main" ]
-  pull_request: {}
+  pull_request:
+    branches: [ "main" ]
 
 jobs:
   find_directories:
