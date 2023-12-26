@@ -1,6 +1,11 @@
-use clap::{Args, Parser, Subcommand, crate_authors, crate_version};
+use clap::{Args, crate_authors, crate_version, Parser, Subcommand};
+use cmd::apply::ApplyCommand;
+use cmd::context::{ContextCommand, ContextSubCommand};
+use cmd::init::InitCommand;
 
-// Main application struct
+mod cmd;
+mod cli;
+
 #[derive(Parser)]
 #[clap(author = crate_authors!("\n"), version = crate_version!(), about = "Tembo CLI", long_about = None)]
 struct App {
@@ -8,7 +13,15 @@ struct App {
     global_opts: GlobalOpts,
 
     #[clap(subcommand)]
-    command: Commands,
+    command: SubCommands,
+}
+
+// Enum representing all available commands
+#[derive(Subcommand)]
+enum SubCommands {
+    Context(ContextCommand),
+    Init(InitCommand),
+    Apply(ApplyCommand),
 }
 
 // Global options available to all subcommands
@@ -20,53 +33,11 @@ struct GlobalOpts {
     verbose: u8,
 }
 
-// Enum representing all available commands
-#[derive(Subcommand)]
-enum Commands {
-    Context(ContextCommand),
-    Init(InitCommand),
-    Apply(ApplyCommand),
-    // ... other top-level commands
-}
-
-// Subcommand for 'context'
-#[derive(Args)]
-struct ContextCommand {
-    #[clap(subcommand)]
-    subcommand: ContextSubCommand,
-}
-
-// Enum for subcommands of 'context'
-#[derive(Subcommand)]
-enum ContextSubCommand {
-    List,
-    Set(SetArgs),
-}
-
-// Arguments for 'context set'
-#[derive(Args)]
-struct SetArgs {
-    #[clap(short, long)]
-    name: String,
-}
-
-// Arguments for 'init' command
-#[derive(Args)]
-struct InitCommand {
-    // Arguments for 'init'
-}
-
-// Arguments for 'apply' command
-#[derive(Args)]
-struct ApplyCommand {
-    // Arguments for 'apply'
-}
-
 fn main() {
     let app = App::parse();
 
     match app.command {
-        Commands::Context(context_cmd) => match context_cmd.subcommand {
+        SubCommands::Context(context_cmd) => match context_cmd.subcommand {
             ContextSubCommand::List => {
                 // Implement logic for 'context list' here
                 println!("Listing context...");
@@ -76,11 +47,11 @@ fn main() {
                 println!("Setting context to: {}", args.name);
             }
         },
-        Commands::Init(_) => {
+        SubCommands::Init(_) => {
             // Implement logic for 'init' command
             println!("Initializing...");
         },
-        Commands::Apply(_) => {
+        SubCommands::Apply(_) => {
             // Implement logic for 'apply' command
             println!("Applying...");
         },

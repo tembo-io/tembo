@@ -1,15 +1,11 @@
 use std::{collections::HashMap, fs, path::Path};
-
-use crate::{
-    cli::{file_utils::FileUtils, tembo_config::InstanceSettings},
-    Result,
-};
 use anyhow::Error;
 use anyhow::Ok;
 use clap::{ArgMatches, Command};
 use log::{error, info};
-
 use crate::cli::context::{tembo_context_file_path, tembo_credentials_file_path};
+use crate::cli::file_utils::FileUtils;
+use crate::cli::tembo_config::InstanceSettings;
 
 // Create init subcommand arguments
 pub fn make_subcommand() -> Command {
@@ -17,7 +13,7 @@ pub fn make_subcommand() -> Command {
         .about("Validates various aspects like tembo.toml file, context file etc.")
 }
 
-pub fn execute(_args: &ArgMatches) -> Result<()> {
+pub fn execute(_args: &ArgMatches) -> Result<(), anyhow::Error> {
     let mut has_error = false;
 
     if !Path::new(&tembo_context_file_path()).exists() {

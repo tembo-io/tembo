@@ -1,17 +1,12 @@
 use std::collections::HashMap;
 
-use crate::{
-    cli::{
-        context::{get_current_context, Environment, Target},
-        docker::Docker,
-        tembo_config::InstanceSettings,
-    },
-    Result,
-};
 use clap::{ArgMatches, Command};
 use core::result::Result::Ok;
 use temboclient::apis::{configuration::Configuration, instance_api::delete_instance};
 use tokio::runtime::Runtime;
+use crate::cli::context::{Environment, get_current_context, Target};
+use crate::cli::docker::Docker;
+use crate::cli::tembo_config::InstanceSettings;
 
 use super::apply::{get_instance_id, get_instance_settings};
 
@@ -20,7 +15,7 @@ pub fn make_subcommand() -> Command {
     Command::new("delete").about("Deletes database instance locally & on tembo cloud")
 }
 
-pub fn execute(_args: &ArgMatches) -> Result<()> {
+pub fn execute(_args: &ArgMatches) -> Result<(), anyhow::Error> {
     let env = get_current_context()?;
 
     let instance_settings: HashMap<String, InstanceSettings> = get_instance_settings()?;
@@ -36,7 +31,7 @@ pub fn execute(_args: &ArgMatches) -> Result<()> {
     Ok(())
 }
 
-fn execute_tembo_cloud(env: Environment) -> Result<()> {
+fn execute_tembo_cloud(env: Environment) -> Result<(), anyhow::Error> {
     let instance_settings: HashMap<String, InstanceSettings> = get_instance_settings()?;
 
     let profile = env.clone().selected_profile.unwrap();

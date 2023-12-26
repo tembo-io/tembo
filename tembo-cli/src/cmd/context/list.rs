@@ -1,11 +1,7 @@
-use crate::{cli::context::list_context, Result};
-use clap::{ArgMatches, SubCommand};
+use clap::ArgMatches;
+use crate::cli::context::list_context;
 
-pub fn make_subcommand() -> SubCommand {
-    SubCommand::with_name("list").about("Command used to list context")
-}
-
-pub fn execute(_args: &ArgMatches) -> Result<()> {
+pub fn execute(_args: &ArgMatches) -> Result<(), anyhow::Error> {
     let context = list_context()?;
 
     // TODO: Improve formatting

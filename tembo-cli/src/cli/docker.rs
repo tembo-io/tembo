@@ -1,4 +1,3 @@
-use crate::Result;
 use anyhow::bail;
 use simplelog::*;
 use spinners::{Spinner, Spinners};
@@ -16,7 +15,7 @@ impl Docker {
             .expect("failed to execute process")
     }
 
-    pub fn installed_and_running() -> Result {
+    pub fn installed_and_running() -> Result<(), anyhow::Error> {
         info!("Checking requirements: [Docker]");
 
         let output = Self::info();
@@ -41,7 +40,7 @@ impl Docker {
     }
 
     // Build & run docker image
-    pub fn build_run(instance_name: String) -> Result {
+    pub fn build_run(instance_name: String) -> Result<(), anyhow::Error> {
         let mut sp = Spinner::new(Spinners::Line, "Running Docker Build & Run".into());
 
         if Self::container_list_filtered(&instance_name)
@@ -62,7 +61,7 @@ impl Docker {
     }
 
     // run sqlx migrate
-    pub fn run_sqlx_migrate() -> Result {
+    pub fn run_sqlx_migrate() -> Result<(), anyhow::Error> {
         let mut sp = Spinner::new(Spinners::Line, "Running SQL migration".into());
 
         let command = "DATABASE_URL=postgres://postgres:postgres@localhost:5432 sqlx migrate run";
@@ -74,7 +73,7 @@ impl Docker {
     }
 
     // stop & remove container for given name
-    pub fn stop_remove(name: &str) -> Result {
+    pub fn stop_remove(name: &str) -> Result<(), anyhow::Error> {
         let mut sp = Spinner::new(Spinners::Line, "Stopping & Removing instance".into());
 
         if !Self::container_list_filtered(name).unwrap().contains(name) {
@@ -104,7 +103,7 @@ impl Docker {
     }
 
     #[allow(dead_code)]
-    pub fn container_list() -> Result<String> {
+    pub fn container_list() -> Result<String, anyhow::Error> {
         let mut ls_command = String::from("cd tembo "); // TODO: does this work for installed crates?
         ls_command.push_str("&& docker ls --all");
 
@@ -118,7 +117,7 @@ impl Docker {
         Ok(stdout.unwrap())
     }
 
-    pub fn container_list_filtered(name: &str) -> Result<String> {
+    pub fn container_list_filtered(name: &str) -> Result<String, anyhow::Error> {
         let ls_command = format!("docker container ls --all -f name={}", name);
 
         let output = ShellCommand::new("sh")
@@ -132,7 +131,7 @@ impl Docker {
     }
 }
 
-pub fn run_command(command: &str) -> Result<()> {
+pub fn run_command(command: &str) -> Result<(), anyhow::Error> {
     let output = ShellCommand::new("sh")
         .arg("-c")
         .arg(command)

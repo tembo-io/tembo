@@ -1,6 +1,5 @@
 use std::fs;
 
-use crate::Result;
 use anyhow::bail;
 use anyhow::Ok;
 use serde::Deserialize;
@@ -88,7 +87,7 @@ pub fn tembo_credentials_file_path() -> String {
     tembo_home_dir() + "/credentials"
 }
 
-pub fn list_context() -> Result<Context> {
+pub fn list_context() -> Result<Context, anyhow::Error> {
     let filename = tembo_context_file_path();
 
     let contents = match fs::read_to_string(filename.clone()) {
@@ -108,7 +107,7 @@ pub fn list_context() -> Result<Context> {
     Ok(context)
 }
 
-pub fn get_current_context() -> Result<Environment> {
+pub fn get_current_context() -> Result<Environment, anyhow::Error> {
     let context = list_context()?;
 
     let profiles = list_credentail_profiles()?;
@@ -131,7 +130,7 @@ pub fn get_current_context() -> Result<Environment> {
     bail!("Tembo context not set");
 }
 
-pub fn list_credentail_profiles() -> Result<Vec<Profile>> {
+pub fn list_credentail_profiles() -> Result<Vec<Profile>, anyhow::Error> {
     let filename = tembo_credentials_file_path();
 
     let contents = match fs::read_to_string(filename.clone()) {
