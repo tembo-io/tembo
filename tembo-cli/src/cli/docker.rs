@@ -60,18 +60,6 @@ impl Docker {
         Ok(())
     }
 
-    // run sqlx migrate
-    pub fn run_sqlx_migrate() -> Result<(), anyhow::Error> {
-        let mut sp = Spinner::new(Spinners::Line, "Running SQL migration".into());
-
-        let command = "DATABASE_URL=postgres://postgres:postgres@localhost:5432 sqlx migrate run";
-        run_command(command)?;
-
-        sp.stop_with_message("- SQL migration completed".to_string());
-
-        Ok(())
-    }
-
     // stop & remove container for given name
     pub fn stop_remove(name: &str) -> Result<(), anyhow::Error> {
         let mut sp = Spinner::new(Spinners::Line, "Stopping & Removing instance".into());

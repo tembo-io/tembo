@@ -1,3 +1,4 @@
+use anyhow::Error;
 use clap::Args;
 use controller::stacks::get_stack;
 use controller::stacks::types::StackType as ControllerStackType;
@@ -9,7 +10,6 @@ use std::{
     thread::sleep,
     time::Duration,
 };
-use anyhow::Error;
 use temboclient::{
     apis::{
         configuration::Configuration,
@@ -23,13 +23,13 @@ use temboclient::{
 use tembodataclient::apis::secrets_api::get_secret_v1;
 use tokio::runtime::Runtime;
 
-use crate::cli::context::{get_current_context, Environment, Target, Profile};
+use crate::cli::context::{get_current_context, Environment, Profile, Target};
 use crate::cli::docker::Docker;
 use crate::cli::file_utils::FileUtils;
+use crate::cli::sqlx_utils::SqlxUtils;
 use crate::cli::tembo_config;
 use crate::cli::tembo_config::InstanceSettings;
 use tera::Tera;
-use crate::cli::sqlx_utils::SqlxUtils;
 
 const DOCKERFILE_NAME: &str = "Dockerfile";
 const POSTGRESCONF_NAME: &str = "postgres.conf";
