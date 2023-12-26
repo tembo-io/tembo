@@ -39,8 +39,19 @@ async fn minimal() ->  Result<(), Box<dyn Error>> {
     cmd.arg("apply");
     cmd.assert().success();
 
+    assert_can_connect().await?;
 
-    // PostgreSQL connection string
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("delete");
+    cmd.assert().success();
+
+    assert!(assert_can_connect().await.is_err());
+
+    Ok(())
+}
+
+async fn assert_can_connect() -> Result<(), Box<dyn Error>> {
+
     let mut config = Config::new();
     config.host("localhost");
     config.user("postgres");
@@ -71,7 +82,6 @@ async fn minimal() ->  Result<(), Box<dyn Error>> {
     assert_eq!(rows.len(), 1);
     let value: i32 = rows[0].get(0);
     assert_eq!(value, 1, "Query did not return 1");
-
     Ok(())
 }
 
