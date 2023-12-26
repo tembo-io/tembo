@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use clap::{ArgMatches, Command};
+use clap::{ArgMatches, Command, Args};
 use core::result::Result::Ok;
 use temboclient::apis::{configuration::Configuration, instance_api::delete_instance};
 use tokio::runtime::Runtime;
@@ -10,12 +10,12 @@ use crate::cli::tembo_config::InstanceSettings;
 
 use super::apply::{get_instance_id, get_instance_settings};
 
-// Create init subcommand arguments
-pub fn make_subcommand() -> Command {
-    Command::new("delete").about("Deletes database instance locally & on tembo cloud")
+/// Deletes database instance locally or on Tembo Cloud
+#[derive(Args)]
+pub struct DeleteCommand {
 }
 
-pub fn execute(_args: &ArgMatches) -> Result<(), anyhow::Error> {
+pub fn execute() -> Result<(), anyhow::Error> {
     let env = get_current_context()?;
 
     let instance_settings: HashMap<String, InstanceSettings> = get_instance_settings()?;

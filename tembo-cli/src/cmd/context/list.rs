@@ -1,7 +1,6 @@
-use clap::ArgMatches;
 use crate::cli::context::list_context;
 
-pub fn execute(_args: &ArgMatches) -> Result<(), anyhow::Error> {
+pub fn execute() -> Result<(), anyhow::Error> {
     let context = list_context()?;
 
     // TODO: Improve formatting

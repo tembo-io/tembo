@@ -2,13 +2,12 @@ use clap::{ArgMatches, Args, Command};
 use crate::cli::context::{CONTEXT_DEFAULT_TEXT, CREDENTIALS_DEFAULT_TEXT, tembo_context_file_path, tembo_credentials_file_path, tembo_home_dir};
 use crate::cli::file_utils::FileUtils;
 
-// Create init subcommand arguments
-pub fn make_subcommand() -> Command {
-    Command::new("init")
-        .about("Initializes a local environment; creates needed context & config files/directories")
+/// Initializes a local environment. Creates a sample context and configuration files.
+#[derive(Args)]
+pub struct InitCommand {
 }
 
-pub fn execute(_args: &ArgMatches) -> Result<(), anyhow::Error> {
+pub fn execute() -> Result<(), anyhow::Error> {
     match FileUtils::create_dir("home directory".to_string(), tembo_home_dir()) {
         Ok(t) => t,
         Err(e) => {
@@ -54,10 +53,4 @@ pub fn execute(_args: &ArgMatches) -> Result<(), anyhow::Error> {
     }
 
     Ok(())
-}
-
-// Arguments for 'init' command
-#[derive(Args)]
-pub struct InitCommand {
-    // Arguments for 'init'
 }

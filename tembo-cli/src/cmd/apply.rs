@@ -28,17 +28,12 @@ use crate::cli::tembo_config::InstanceSettings;
 const DOCKERFILE_NAME: &str = "Dockerfile";
 const POSTGRESCONF_NAME: &str = "postgres.conf";
 
-// Arguments for 'apply' command
+/// Deploys a tembo.toml file
 #[derive(Args)]
 pub struct ApplyCommand {
-    // Arguments for 'apply'
-}
-// Create init subcommand arguments
-pub fn make_subcommand() -> Command {
-    Command::new("apply").about("Applies changes to the context set using the tembo config file")
 }
 
-pub fn execute(_args: &ArgMatches) -> Result<(), anyhow::Error> {
+pub fn execute() -> Result<(), anyhow::Error> {
     let env = get_current_context()?;
 
     if env.target == Target::Docker.to_string() {

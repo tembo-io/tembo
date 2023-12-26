@@ -1,23 +1,17 @@
-use clap::{Arg, ArgAction, ArgMatches, Command};
+use clap::{Arg, ArgAction, ArgMatches, Args, Command};
 use std::fs::{self, File};
 use std::io::Write;
 use toml::to_string;
 use crate::cli::context::{Context, tembo_context_file_path};
 
-pub fn make_subcommand() -> Command {
-    Command::new("set")
-        .arg(
-            Arg::new("name")
-                .short('n')
-                .long("name")
-                .action(ArgAction::Set)
-                .required(true)
-                .help("The name of the context to set"),
-        )
-        .about("Command used to set context")
+// Arguments for 'context set'
+#[derive(Args)]
+pub struct ContextSetArgs {
+    #[clap(short, long)]
+    pub name: String,
 }
 
-pub fn execute(args: &ArgMatches) -> Result<(), anyhow::Error> {
+pub fn execute(args: &ContextSetArgs) -> Result<(), anyhow::Error> {
     let filename = tembo_context_file_path();
 
     let contents = match fs::read_to_string(&filename) {
@@ -34,10 +28,10 @@ pub fn execute(args: &ArgMatches) -> Result<(), anyhow::Error> {
         }
     };
 
-    let name = args.get_one::<String>("name").unwrap();
+    let name = args.name.clone();
 
     for e in data.environment.iter_mut() {
-        if &e.name == name {
+        if &e.name == &name {
             e.set = Some(true)
         } else {
             e.set = None
@@ -61,3 +55,4 @@ fn write_config_to_file(config: &Context, file_path: &str) -> Result<(), anyhow:
 
     Ok(())
 }
+

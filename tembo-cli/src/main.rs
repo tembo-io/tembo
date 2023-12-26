@@ -1,7 +1,10 @@
-use clap::{Args, crate_authors, crate_version, Parser, Subcommand};
+use clap::{ArgMatches, Args, crate_authors, crate_version, Parser, Subcommand};
 use cmd::apply::ApplyCommand;
 use cmd::context::{ContextCommand, ContextSubCommand};
 use cmd::init::InitCommand;
+use crate::cmd::{apply, context, delete, init, validate};
+use crate::cmd::delete::DeleteCommand;
+use crate::cmd::validate::ValidateCommand;
 
 mod cmd;
 mod cli;
@@ -22,6 +25,8 @@ enum SubCommands {
     Context(ContextCommand),
     Init(InitCommand),
     Apply(ApplyCommand),
+    Validate(ValidateCommand),
+    Delete(DeleteCommand),
 }
 
 // Global options available to all subcommands
@@ -33,28 +38,31 @@ struct GlobalOpts {
     verbose: u8,
 }
 
-fn main() {
+fn main() -> Result<(), anyhow::Error> {
     let app = App::parse();
 
     match app.command {
         SubCommands::Context(context_cmd) => match context_cmd.subcommand {
             ContextSubCommand::List => {
-                // Implement logic for 'context list' here
-                println!("Listing context...");
+                context::list::execute()?;
             }
             ContextSubCommand::Set(args) => {
-                // Implement logic for 'context set' here
-                println!("Setting context to: {}", args.name);
+                context::set::execute(&args)?;
             }
         },
-        SubCommands::Init(_) => {
-            // Implement logic for 'init' command
-            println!("Initializing...");
+        SubCommands::Init(_init_cmd) => {
+            init::execute()?;
         },
-        SubCommands::Apply(_) => {
-            // Implement logic for 'apply' command
-            println!("Applying...");
+        SubCommands::Apply(_apply_cmd) => {
+            apply::execute()?;
         },
-        // ... other top-level commands
+        SubCommands::Validate(_validate_cmd) => {
+            validate::execute()?;
+        },
+        SubCommands::Delete(_delete_cmd) => {
+            delete::execute()?;
+        },
     }
+
+    return Ok(());
 }
