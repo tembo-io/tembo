@@ -29,7 +29,6 @@ use crate::cli::file_utils::FileUtils;
 use crate::cli::sqlx_utils::SqlxUtils;
 use crate::cli::tembo_config;
 use crate::cli::tembo_config::InstanceSettings;
-use crate::GlobalOpts;
 use tera::Tera;
 
 const DOCKERFILE_NAME: &str = "Dockerfile";
@@ -39,19 +38,19 @@ const POSTGRESCONF_NAME: &str = "postgres.conf";
 #[derive(Args)]
 pub struct ApplyCommand {}
 
-pub fn execute(global_options: &GlobalOpts) -> Result<(), anyhow::Error> {
+pub fn execute() -> Result<(), anyhow::Error> {
     let env = get_current_context()?;
 
     if env.target == Target::Docker.to_string() {
-        return execute_docker(global_options);
+        return execute_docker();
     } else if env.target == Target::TemboCloud.to_string() {
-        return execute_tembo_cloud(global_options, env.clone());
+        return execute_tembo_cloud(env.clone());
     }
 
     Ok(())
 }
 
-fn execute_docker(_global_options: &GlobalOpts) -> Result<(), anyhow::Error> {
+fn execute_docker() -> Result<(), anyhow::Error> {
     Docker::installed_and_running()?;
 
     let instance_settings: HashMap<String, InstanceSettings> = get_instance_settings()?;
@@ -104,10 +103,7 @@ fn execute_docker(_global_options: &GlobalOpts) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub fn execute_tembo_cloud(
-    _global_opts: &GlobalOpts,
-    env: Environment,
-) -> Result<(), anyhow::Error> {
+pub fn execute_tembo_cloud(env: Environment) -> Result<(), anyhow::Error> {
     let instance_settings: HashMap<String, InstanceSettings> = get_instance_settings()?;
 
     let profile = env.clone().selected_profile.unwrap();
