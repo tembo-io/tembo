@@ -23,27 +23,41 @@ fn help() -> Result<(), Box<dyn std::error::Error>> {
 
 #[tokio::test]
 async fn minimal() -> Result<(), Box<dyn Error>> {
-    // Get the root directory of the crate
     let root_dir = env!("CARGO_MANIFEST_DIR");
     let test_dir = PathBuf::from(root_dir)
-        .join("tests") // Adjust the path to the tests directory
+        .join("tests")
         .join("tomls")
         .join("minimal");
 
-    // Change the current working directory
     env::set_current_dir(&test_dir)?;
 
-    // Execute the command
+    // tembo init
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("init");
+    cmd.assert().success();
+
+    // tembo context set --name local
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("context");
+    cmd.arg("set");
+    cmd.arg("--name");
+    cmd.arg("local");
+    cmd.assert().success();
+
+    // tembo apply
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
     cmd.arg("apply");
     cmd.assert().success();
 
+    // check can connect
     assert_can_connect().await?;
 
+    // tembo delete
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
     cmd.arg("delete");
     cmd.assert().success();
 
+    // check can't connect
     assert!(assert_can_connect().await.is_err());
 
     Ok(())
