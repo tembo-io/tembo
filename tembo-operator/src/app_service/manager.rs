@@ -724,7 +724,9 @@ pub async fn reconcile_app_services(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(
             &ns,
             oref.clone(),
             desired_tcp_routes.clone(),
-            desired_middlewares.clone(),
+            // TODO: fill with actual MiddlewareTCPs when it is supported
+            // first supported MiddlewareTCP will be for custom domains
+            vec![],
             desired_entry_points_tcp.clone(),
             &app_name,
         )

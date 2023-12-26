@@ -47,6 +47,9 @@ pub enum Error {
     #[error("SerializationError: {0}")]
     SerializationError(#[source] serde_json::Error),
 
+    #[error("SerializationError: {0}")]
+    YamlSerializationError(#[source] serde_yaml::Error),
+
     #[error("Kube Error: {0}")]
     KubeError(#[from] kube::Error),
 
@@ -69,5 +72,11 @@ pub type Result<T, E = Error> = std::result::Result<T, E>;
 impl Error {
     pub fn metric_label(&self) -> String {
         format!("{self:?}").to_lowercase()
+    }
+}
+
+impl From<serde_yaml::Error> for Error {
+    fn from(err: serde_yaml::Error) -> Self {
+        Error::YamlSerializationError(err)
     }
 }

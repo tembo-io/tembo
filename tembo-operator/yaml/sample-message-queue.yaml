@@ -55,7 +55,7 @@ spec:
     image: quay.io/prometheuscommunity/postgres-exporter:v0.12.0
     queries:
       pgmq:
-        query: select queue_name, queue_length, oldest_msg_age_sec, newest_msg_age_sec, total_messages from public.pgmq_metrics_all()
+        query: select queue_name, queue_length, oldest_msg_age_sec, newest_msg_age_sec, total_messages from pgmq.metrics_all()
         master: true
         metrics:
           - queue_name:
@@ -73,6 +73,8 @@ spec:
           - total_messages:
               description: Total number of messages that have passed into the queue.
               usage: GAUGE
+        target_databases:
+          - "postgres"
   runtime_config:
     - name: shared_buffers
       value: "1024MB"

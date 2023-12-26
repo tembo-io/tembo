@@ -65,6 +65,10 @@ pub fn default_postgres_exporter_image() -> String {
     "quay.io/prometheuscommunity/postgres-exporter:v0.12.0".to_owned()
 }
 
+pub fn default_postgres_exporter_target_databases() -> Vec<String> {
+    vec!["postgres".to_owned()]
+}
+
 pub fn default_extensions() -> Vec<Extension> {
     vec![]
 }

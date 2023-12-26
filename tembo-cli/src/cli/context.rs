@@ -27,6 +27,7 @@ pub const CREDENTIALS_DEFAULT_TEXT: &str = "version = \"1.0\"
 name = 'prod'
 tembo_access_token = 'ACCESS_TOKEN'
 tembo_host = 'https://api.tembo.io'
+tembo_data_host = 'https://api.data-1.use1.tembo.io'
 ";
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
@@ -57,6 +58,7 @@ pub struct Profile {
     pub name: String,
     pub tembo_access_token: String,
     pub tembo_host: String,
+    pub tembo_data_host: String,
 }
 
 pub enum Target {

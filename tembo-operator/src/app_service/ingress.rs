@@ -262,7 +262,7 @@ pub fn generate_ingress_tcp_routes(
             let mut routes: Vec<IngressRouteTCPRoutes> = Vec::new();
             for route in routings.iter() {
                 match route.ingress_path.clone() {
-                    Some(path) => {
+                    Some(_path) => {
                         if !route.ingress_type.clone()?.eq(&IngressType::tcp) {
                             // Do not create IngressRouteTCPRoutes for non-TCP ingress type
                             debug!("Skipping IngressRouteTCPRoutes for non-TCP ingress type");
@@ -395,6 +395,7 @@ pub async fn reconcile_ingress_tcp(
     ns: &str,
     oref: OwnerReference,
     desired_routes: Vec<IngressRouteTCPRoutes>,
+    // TODO: this should be a MiddlewareTCP
     desired_middlewares: Vec<Middleware>,
     entry_points_tcp: Vec<String>,
     app_name: &str,
