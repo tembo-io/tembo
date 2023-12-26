@@ -20,7 +20,7 @@ jobs:
         with:
           contains_the_file: Cargo.toml
           changed_relative_to_ref: origin/${{ github.base_ref || 'not-a-branch' }}
-          ignore_dirs: ".coredb examples"
+          ignore_dirs: ".coredb examples tembo-cli/temboclient tembo-cli/tembodataclient"
 
   lint:
     name: Run linters
