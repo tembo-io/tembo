@@ -1,5 +1,5 @@
-use clap::{ArgMatches, Args, Subcommand};
-use simplelog::*;
+use clap::{Args, Subcommand};
+
 use set::ContextSetArgs;
 
 pub mod list;

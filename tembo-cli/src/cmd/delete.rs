@@ -1,19 +1,18 @@
 use std::collections::HashMap;
 
-use clap::{ArgMatches, Command, Args};
+use crate::cli::context::{get_current_context, Environment, Target};
+use crate::cli::docker::Docker;
+use crate::cli::tembo_config::InstanceSettings;
+use clap::Args;
 use core::result::Result::Ok;
 use temboclient::apis::{configuration::Configuration, instance_api::delete_instance};
 use tokio::runtime::Runtime;
-use crate::cli::context::{Environment, get_current_context, Target};
-use crate::cli::docker::Docker;
-use crate::cli::tembo_config::InstanceSettings;
 
 use super::apply::{get_instance_id, get_instance_settings};
 
 /// Deletes database instance locally or on Tembo Cloud
 #[derive(Args)]
-pub struct DeleteCommand {
-}
+pub struct DeleteCommand {}
 
 pub fn execute() -> Result<(), anyhow::Error> {
     let env = get_current_context()?;

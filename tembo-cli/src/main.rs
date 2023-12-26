@@ -1,13 +1,13 @@
-use clap::{ArgMatches, Args, crate_authors, crate_version, Parser, Subcommand};
+use crate::cmd::delete::DeleteCommand;
+use crate::cmd::validate::ValidateCommand;
+use crate::cmd::{apply, context, delete, init, validate};
+use clap::{crate_authors, crate_version, Args, Parser, Subcommand};
 use cmd::apply::ApplyCommand;
 use cmd::context::{ContextCommand, ContextSubCommand};
 use cmd::init::InitCommand;
-use crate::cmd::{apply, context, delete, init, validate};
-use crate::cmd::delete::DeleteCommand;
-use crate::cmd::validate::ValidateCommand;
 
-mod cmd;
 mod cli;
+mod cmd;
 
 #[derive(Parser)]
 #[clap(author = crate_authors!("\n"), version = crate_version!(), about = "Tembo CLI", long_about = None)]
@@ -52,17 +52,17 @@ fn main() -> Result<(), anyhow::Error> {
         },
         SubCommands::Init(_init_cmd) => {
             init::execute()?;
-        },
+        }
         SubCommands::Apply(_apply_cmd) => {
             apply::execute()?;
-        },
+        }
         SubCommands::Validate(_validate_cmd) => {
             validate::execute()?;
-        },
+        }
         SubCommands::Delete(_delete_cmd) => {
             delete::execute()?;
-        },
+        }
     }
 
-    return Ok(());
+    Ok(())
 }

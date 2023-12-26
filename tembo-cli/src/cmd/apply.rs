@@ -1,4 +1,4 @@
-use clap::{ArgMatches, Args, Command};
+use clap::Args;
 use controller::stacks::get_stack;
 use controller::stacks::types::StackType as ControllerStackType;
 use std::{
@@ -18,20 +18,19 @@ use temboclient::{
 };
 use tokio::runtime::Runtime;
 
-use tera::Tera;
-use crate::cli::context::{Environment, get_current_context, Target};
+use crate::cli::context::{get_current_context, Environment, Target};
 use crate::cli::docker::Docker;
 use crate::cli::file_utils::FileUtils;
 use crate::cli::tembo_config;
 use crate::cli::tembo_config::InstanceSettings;
+use tera::Tera;
 
 const DOCKERFILE_NAME: &str = "Dockerfile";
 const POSTGRESCONF_NAME: &str = "postgres.conf";
 
 /// Deploys a tembo.toml file
 #[derive(Args)]
-pub struct ApplyCommand {
-}
+pub struct ApplyCommand {}
 
 pub fn execute() -> Result<(), anyhow::Error> {
     let env = get_current_context()?;
@@ -433,4 +432,3 @@ fn get_postgres_config(instance_settings: HashMap<String, InstanceSettings>) -> 
 
     postgres_config
 }
-

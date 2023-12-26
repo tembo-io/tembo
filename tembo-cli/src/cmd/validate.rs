@@ -1,16 +1,15 @@
-use std::{collections::HashMap, fs, path::Path};
-use anyhow::Error;
-use anyhow::Ok;
-use clap::{ArgMatches, Command, Args};
-use log::{error, info};
 use crate::cli::context::{tembo_context_file_path, tembo_credentials_file_path};
 use crate::cli::file_utils::FileUtils;
 use crate::cli::tembo_config::InstanceSettings;
+use anyhow::Error;
+use anyhow::Ok;
+use clap::Args;
+use log::{error, info};
+use std::{collections::HashMap, fs, path::Path};
 
 /// Validates the tembo.toml file, context file, etc.
 #[derive(Args)]
-pub struct ValidateCommand {
-}
+pub struct ValidateCommand {}
 
 pub fn execute() -> Result<(), anyhow::Error> {
     let mut has_error = false;

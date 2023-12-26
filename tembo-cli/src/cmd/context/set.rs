@@ -1,8 +1,8 @@
-use clap::{Arg, ArgAction, ArgMatches, Args, Command};
+use crate::cli::context::{tembo_context_file_path, Context};
+use clap::Args;
 use std::fs::{self, File};
 use std::io::Write;
 use toml::to_string;
-use crate::cli::context::{Context, tembo_context_file_path};
 
 // Arguments for 'context set'
 #[derive(Args)]
@@ -31,7 +31,7 @@ pub fn execute(args: &ContextSetArgs) -> Result<(), anyhow::Error> {
     let name = args.name.clone();
 
     for e in data.environment.iter_mut() {
-        if &e.name == &name {
+        if e.name == name {
             e.set = Some(true)
         } else {
             e.set = None
@@ -55,4 +55,3 @@ fn write_config_to_file(config: &Context, file_path: &str) -> Result<(), anyhow:
 
     Ok(())
 }
-
