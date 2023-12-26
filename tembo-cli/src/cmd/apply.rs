@@ -30,6 +30,7 @@ use crate::cli::sqlx_utils::SqlxUtils;
 use crate::cli::tembo_config;
 use crate::cli::tembo_config::InstanceSettings;
 use tera::Tera;
+use crate::GlobalOpts;
 
 const DOCKERFILE_NAME: &str = "Dockerfile";
 const POSTGRESCONF_NAME: &str = "postgres.conf";
@@ -38,19 +39,19 @@ const POSTGRESCONF_NAME: &str = "postgres.conf";
 #[derive(Args)]
 pub struct ApplyCommand {}
 
-pub fn execute() -> Result<(), anyhow::Error> {
+pub fn execute(global_options: &GlobalOpts) -> Result<(), anyhow::Error> {
     let env = get_current_context()?;
 
     if env.target == Target::Docker.to_string() {
-        return execute_docker();
+        return execute_docker(global_options);
     } else if env.target == Target::TemboCloud.to_string() {
-        return execute_tembo_cloud(env.clone());
+        return execute_tembo_cloud(global_options, env.clone());
     }
 
     Ok(())
 }
 
-fn execute_docker() -> Result<(), anyhow::Error> {
+fn execute_docker(global_options: &GlobalOpts) -> Result<(), anyhow::Error> {
     Docker::installed_and_running()?;
 
     let instance_settings: HashMap<String, InstanceSettings> = get_instance_settings()?;
@@ -103,7 +104,7 @@ fn execute_docker() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub fn execute_tembo_cloud(env: Environment) -> Result<(), anyhow::Error> {
+pub fn execute_tembo_cloud(global_opts: &GlobalOpts, env: Environment) -> Result<(), anyhow::Error> {
     let instance_settings: HashMap<String, InstanceSettings> = get_instance_settings()?;
 
     let profile = env.clone().selected_profile.unwrap();
@@ -454,9 +455,13 @@ pub fn get_rendered_dockerfile(
             .unwrap_or(ControllerStackType::Standard);
 
         let stack = get_stack(stack_type);
+        dbg!(&stack);
 
         context.insert("stack_trunk_installs", &stack.trunk_installs);
-        context.insert("extensions", &value.extensions);
+        // Default handles the case of extensions not configured in tembo.toml
+        let extensions = value.extensions.clone().unwrap_or_default();
+        dbg!("Extensions: {:?}", &extensions);
+        context.insert("extensions", &extensions);
     }
     let rendered_dockerfile = tera.render("dockerfile", &context).unwrap();
 

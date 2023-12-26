@@ -53,7 +53,7 @@ fn main() -> Result<(), anyhow::Error> {
             init::execute()?;
         }
         SubCommands::Apply(_apply_cmd) => {
-            apply::execute()?;
+            apply::execute(&app.global_opts)?;
         }
         SubCommands::Validate(_validate_cmd) => {
             validate::execute()?;
