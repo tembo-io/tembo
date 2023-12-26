@@ -24,6 +24,7 @@ pub struct InstanceSettings {
     #[serde(default = "default_stack_type")]
     pub stack_type: String,
     pub postgres_configurations: Option<HashMap<String, Value>>,
+    #[serde(default = "default_extensions")]
     pub extensions: Option<HashMap<String, Extension>>,
     pub extra_domains_rw: Option<Vec<String>>,
 }
@@ -47,6 +48,10 @@ fn default_replicas() -> i32 {
 
 fn default_stack_type() -> String {
     "Standard".to_string()
+}
+
+fn default_extensions() -> Option<HashMap<String, Extension>> {
+    Some(HashMap::new())
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
