@@ -29,7 +29,6 @@ pub struct InstanceSettings {
     pub extra_domains_rw: Option<Vec<String>>,
 }
 
-
 fn default_cpu() -> String {
     "0.25".to_string()
 }

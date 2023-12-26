@@ -33,6 +33,11 @@ impl FileUtils {
             info!("Tembo {} file exists", file_name);
             return Ok(());
         }
+
+        // Create all missing directories in the path
+        let parent = path.parent().ok_or_else(|| anyhow::anyhow!("Failed to get parent directory"))?;
+        fs::create_dir_all(parent)?;
+
         let display = path.display();
         let mut file: File = match File::create(path) {
             Err(why) => panic!("Couldn't create {}: {}", display, why),
