@@ -454,12 +454,10 @@ pub fn get_rendered_dockerfile(
             .unwrap_or(ControllerStackType::Standard);
 
         let stack = get_stack(stack_type);
-        dbg!(&stack);
 
         context.insert("stack_trunk_installs", &stack.trunk_installs);
         // Default handles the case of extensions not configured in tembo.toml
         let extensions = value.extensions.clone().unwrap_or_default();
-        dbg!("Extensions: {:?}", &extensions);
         context.insert("extensions", &extensions);
     }
     let rendered_dockerfile = tera.render("dockerfile", &context).unwrap();
