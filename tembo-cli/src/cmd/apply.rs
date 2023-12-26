@@ -29,8 +29,8 @@ use crate::cli::file_utils::FileUtils;
 use crate::cli::sqlx_utils::SqlxUtils;
 use crate::cli::tembo_config;
 use crate::cli::tembo_config::InstanceSettings;
-use tera::Tera;
 use crate::GlobalOpts;
+use tera::Tera;
 
 const DOCKERFILE_NAME: &str = "Dockerfile";
 const POSTGRESCONF_NAME: &str = "postgres.conf";
@@ -51,7 +51,7 @@ pub fn execute(global_options: &GlobalOpts) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-fn execute_docker(global_options: &GlobalOpts) -> Result<(), anyhow::Error> {
+fn execute_docker(_global_options: &GlobalOpts) -> Result<(), anyhow::Error> {
     Docker::installed_and_running()?;
 
     let instance_settings: HashMap<String, InstanceSettings> = get_instance_settings()?;
@@ -104,7 +104,10 @@ fn execute_docker(global_options: &GlobalOpts) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-pub fn execute_tembo_cloud(global_opts: &GlobalOpts, env: Environment) -> Result<(), anyhow::Error> {
+pub fn execute_tembo_cloud(
+    _global_opts: &GlobalOpts,
+    env: Environment,
+) -> Result<(), anyhow::Error> {
     let instance_settings: HashMap<String, InstanceSettings> = get_instance_settings()?;
 
     let profile = env.clone().selected_profile.unwrap();

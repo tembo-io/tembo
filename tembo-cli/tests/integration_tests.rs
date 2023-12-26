@@ -1,13 +1,13 @@
+use assert_cmd::prelude::*; // Add methods on commands
+use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
+use postgres_openssl::MakeTlsConnector;
+use predicates::prelude::*; // Used for writing assertions
 use std::env;
 use std::error::Error;
 use std::path::PathBuf;
-use assert_cmd::prelude::*; // Add methods on commands
-use predicates::prelude::*; // Used for writing assertions
 use std::process::Command;
-use tokio_postgres::{Client, NoTls, Config};
 use tokio_postgres::config::SslMode;
-use postgres_openssl::MakeTlsConnector;
-use openssl::ssl::{SslConnector, SslMethod, SslVerifyMode};
+use tokio_postgres::Config;
 
 const CARGO_BIN: &str = "tembo";
 
@@ -22,12 +22,11 @@ fn help() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[tokio::test]
-async fn minimal() ->  Result<(), Box<dyn Error>> {
-
+async fn minimal() -> Result<(), Box<dyn Error>> {
     // Get the root directory of the crate
     let root_dir = env!("CARGO_MANIFEST_DIR");
     let test_dir = PathBuf::from(root_dir)
-        .join("tests")  // Adjust the path to the tests directory
+        .join("tests") // Adjust the path to the tests directory
         .join("tomls")
         .join("minimal");
 
@@ -51,7 +50,6 @@ async fn minimal() ->  Result<(), Box<dyn Error>> {
 }
 
 async fn assert_can_connect() -> Result<(), Box<dyn Error>> {
-
     let mut config = Config::new();
     config.host("localhost");
     config.user("postgres");
@@ -60,7 +58,8 @@ async fn assert_can_connect() -> Result<(), Box<dyn Error>> {
     config.port(5432);
     config.ssl_mode(SslMode::Require); // Set SSL mode to "require"
 
-    let mut builder = SslConnector::builder(SslMethod::tls()).expect("unable to create sslconnector builder");
+    let mut builder =
+        SslConnector::builder(SslMethod::tls()).expect("unable to create sslconnector builder");
     builder.set_verify(SslVerifyMode::NONE);
     let connector = MakeTlsConnector::new(builder.build());
 
@@ -84,4 +83,3 @@ async fn assert_can_connect() -> Result<(), Box<dyn Error>> {
     assert_eq!(value, 1, "Query did not return 1");
     Ok(())
 }
-
