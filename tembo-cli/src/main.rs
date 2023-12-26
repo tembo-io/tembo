@@ -32,10 +32,9 @@ enum SubCommands {
 // Global options available to all subcommands
 #[derive(Args)]
 struct GlobalOpts {
-    // Define global options here
-    // Example: Verbose mode
-    #[clap(short, long, action = clap::ArgAction::Count)]
-    verbose: u8,
+    /// Show more information in the output
+    #[clap(short, long)]
+    verbose: bool,
 }
 
 fn main() -> Result<(), anyhow::Error> {
