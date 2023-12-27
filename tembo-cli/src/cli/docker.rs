@@ -56,18 +56,14 @@ impl Docker {
         let container_list = Self::container_list_filtered(&instance_name)?;
 
         if container_list.contains(&instance_name) {
-            if verbose {
-                println!("- Existing container found, removing");
-            } else {
-                sp.as_mut()
-                    .unwrap()
-                    .stop_with_message("- Existing container found, removing".to_string());
+            if let Some(mut spinner) = sp {
+                spinner.stop_with_message("- Existing container found, removing".to_string());
                 sp = Some(Spinner::new(
                     Spinners::Line,
-                    "- Building and running container".into(),
-                ))
+                    "Building and running container".into()));
+            } else {
+                println!("- Existing container found, removing");
             }
-
             Docker::stop_remove(&instance_name)?;
         }
 
@@ -79,12 +75,10 @@ impl Docker {
         );
         run_command(&command, verbose)?;
 
-        if verbose {
-            println!("- Docker Build & Run completed");
+        if let Some(mut spinner) = sp {
+            spinner.stop_with_message("- Docker Build & Run completed".to_string());
         } else {
-            sp.as_mut()
-                .unwrap()
-                .stop_with_message("- Docker Build & Run completed".to_string());
+            println!("- Docker Build & Run completed");
         }
 
         Ok(port)
