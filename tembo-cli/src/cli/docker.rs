@@ -42,7 +42,6 @@ impl Docker {
         Ok(())
     }
 
-    // Build & run docker image
     pub fn build_run(instance_name: String, verbose: bool) -> Result<i32, anyhow::Error> {
         let mut sp = if !verbose {
             Some(Spinner::new(
@@ -53,21 +52,24 @@ impl Docker {
             None
         };
 
+        let mut show_message = |message: &str, new_spinner: bool| {
+            if let Some(mut spinner) = sp.take() {
+                spinner.stop_with_message(message.to_string());
+                if new_spinner {
+                    sp = Some(Spinner::new(
+                        Spinners::Line,
+                        "Building and running container".into(),
+                    ));
+                }
+            } else {
+                println!("{}", message);
+            }
+        };
+
         let container_list = Self::container_list_filtered(&instance_name)?;
 
         if container_list.contains(&instance_name) {
-            if verbose {
-                println!("- Existing container found, removing");
-            } else {
-                sp.as_mut()
-                    .unwrap()
-                    .stop_with_message("- Existing container found, removing".to_string());
-                sp = Some(Spinner::new(
-                    Spinners::Line,
-                    "- Building and running container".into(),
-                ))
-            }
-
+            show_message("- Existing container found, removing", true);
             Docker::stop_remove(&instance_name)?;
         }
 
@@ -79,13 +81,7 @@ impl Docker {
         );
         run_command(&command, verbose)?;
 
-        if verbose {
-            println!("- Docker Build & Run completed");
-        } else {
-            sp.as_mut()
-                .unwrap()
-                .stop_with_message("- Docker Build & Run completed".to_string());
-        }
+        show_message("- Docker Build & Run completed", false);
 
         Ok(port)
     }
