@@ -65,7 +65,7 @@ impl Docker {
     }
 
     fn get_available_port() -> Result<i32> {
-        let ls_command = "docker ps -a --format '{{.Ports}}'";
+        let ls_command = "docker ps --format '{{.Ports}}'";
 
         let output = ShellCommand::new("sh")
             .arg("-c")
