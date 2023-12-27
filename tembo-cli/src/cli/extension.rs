@@ -1,8 +1,8 @@
 // Extensions are defined in Tembo Stacks and can be custom installed by users
 // they are extensions to Postgres
 
-use crate::{Deserialize, Serialize};
 use chrono::{DateTime, Utc};
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Extension {

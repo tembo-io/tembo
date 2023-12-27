@@ -1,4 +1,3 @@
-use crate::Result;
 use curl::easy::Easy;
 use simplelog::*;
 use std::env;
@@ -9,7 +8,7 @@ use std::path::Path;
 pub struct FileUtils {}
 
 impl FileUtils {
-    pub fn create_dir(dir_name: String, dir_path: String) -> Result<()> {
+    pub fn create_dir(dir_name: String, dir_path: String) -> Result<(), anyhow::Error> {
         if Path::new(&dir_path).exists() {
             info!("Tembo {} path exists", dir_name);
             return Ok(());
@@ -28,7 +27,7 @@ impl FileUtils {
         file_path: String,
         file_content: String,
         recreate: bool,
-    ) -> Result<()> {
+    ) -> Result<(), anyhow::Error> {
         let path = Path::new(&file_path);
         if !recreate && path.exists() {
             info!("Tembo {} file exists", file_name);

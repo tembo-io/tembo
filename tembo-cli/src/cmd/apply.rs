@@ -1,13 +1,5 @@
-use crate::{
-    cli::{
-        context::{get_current_context, Environment, Profile, Target},
-        sqlx_utils::SqlxUtils,
-        tembo_config,
-    },
-    Result,
-};
 use anyhow::Error;
-use clap::{ArgMatches, Command};
+use clap::Args;
 use controller::stacks::get_stack;
 use controller::stacks::types::StackType as ControllerStackType;
 use log::info;
@@ -32,20 +24,24 @@ use temboclient::{
 use tembodataclient::apis::secrets_api::get_secret_v1;
 use tokio::runtime::Runtime;
 
-use crate::cli::{docker::Docker, file_utils::FileUtils, tembo_config::InstanceSettings};
+use crate::cli::context::{get_current_context, Environment, Profile, Target};
+use crate::cli::docker::Docker;
+use crate::cli::file_utils::FileUtils;
+use crate::cli::sqlx_utils::SqlxUtils;
+use crate::cli::tembo_config;
+use crate::cli::tembo_config::InstanceSettings;
 use tera::Tera;
 
 const DOCKERFILE_NAME: &str = "Dockerfile";
 const POSTGRESCONF_NAME: &str = "postgres.conf";
 
-// Create init subcommand arguments
-pub fn make_subcommand() -> Command {
-    Command::new("apply").about("Applies changes to the context set using the tembo config file")
-}
+/// Deploys a tembo.toml file
+#[derive(Args)]
+pub struct ApplyCommand {}
 
-pub fn execute(_args: &ArgMatches) -> Result<()> {
+pub fn execute() -> Result<(), anyhow::Error> {
     info!("Running validation!");
-    super::validate::execute(&ArgMatches::default())?;
+    super::validate::execute()?;
     info!("Validation completed!");
 
     let env = get_current_context()?;
@@ -59,7 +55,7 @@ pub fn execute(_args: &ArgMatches) -> Result<()> {
     Ok(())
 }
 
-fn execute_docker() -> Result<()> {
+fn execute_docker() -> Result<(), anyhow::Error> {
     Docker::installed_and_running()?;
 
     let instance_settings: HashMap<String, InstanceSettings> = get_instance_settings()?;
@@ -115,7 +111,7 @@ fn execute_docker() -> Result<()> {
     Ok(())
 }
 
-pub fn execute_tembo_cloud(env: Environment) -> Result<()> {
+pub fn execute_tembo_cloud(env: Environment) -> Result<(), anyhow::Error> {
     let instance_settings: HashMap<String, InstanceSettings> = get_instance_settings()?;
 
     let profile = env.clone().selected_profile.unwrap();
@@ -168,7 +164,7 @@ fn get_conn_info_with_creds(
     instance_id: &Option<String>,
     connection_info: Option<Box<ConnectionInfo>>,
     env: Environment,
-) -> Result<ConnectionInfo> {
+) -> Result<ConnectionInfo, anyhow::Error> {
     let dataplane_config = tembodataclient::apis::configuration::Configuration {
         base_path: profile.tembo_data_host,
         bearer_access_token: Some(profile.tembo_access_token),
@@ -200,7 +196,7 @@ pub fn get_instance_id(
     instance_name: String,
     config: &Configuration,
     env: Environment,
-) -> Result<Option<String>> {
+) -> Result<Option<String>, anyhow::Error> {
     let v = Runtime::new()
         .unwrap()
         .block_on(get_all(config, env.org_id.clone().unwrap().as_str()));
@@ -224,7 +220,7 @@ pub fn is_instance_up(
     instance_id: String,
     config: &Configuration,
     env: &Environment,
-) -> Result<Option<Box<ConnectionInfo>>> {
+) -> Result<Option<Box<ConnectionInfo>>, anyhow::Error> {
     let v = Runtime::new().unwrap().block_on(get_instance(
         config,
         env.org_id.clone().unwrap().as_str(),
@@ -421,7 +417,7 @@ fn get_trunk_installs(
     vec_trunk_installs
 }
 
-pub fn get_instance_settings() -> Result<HashMap<String, InstanceSettings>> {
+pub fn get_instance_settings() -> Result<HashMap<String, InstanceSettings>, anyhow::Error> {
     let mut file_path = FileUtils::get_current_working_dir();
     file_path.push_str("/tembo.toml");
 
@@ -444,7 +440,7 @@ pub fn get_instance_settings() -> Result<HashMap<String, InstanceSettings>> {
 
 pub fn get_rendered_dockerfile(
     instance_settings: HashMap<String, InstanceSettings>,
-) -> Result<String> {
+) -> Result<String, anyhow::Error> {
     let filename = "Dockerfile.template";
     let filepath =
         "https://raw.githubusercontent.com/tembo-io/tembo/main/tembo-cli/tembo/Dockerfile.template";
@@ -477,7 +473,7 @@ pub fn get_rendered_dockerfile(
 
 pub fn get_rendered_migrations_file(
     instance_settings: HashMap<String, InstanceSettings>,
-) -> Result<String> {
+) -> Result<String, anyhow::Error> {
     let filename = "migrations.sql.template";
     let filepath =
         "https://raw.githubusercontent.com/tembo-io/tembo/main/tembo-cli/tembo/migrations.sql.template";
