@@ -44,7 +44,10 @@ impl Docker {
 
     pub fn build_run(instance_name: String, verbose: bool) -> Result<i32, anyhow::Error> {
         let mut sp = if !verbose {
-            Some(Spinner::new(Spinners::Line, "Running Docker Build & Run".into()))
+            Some(Spinner::new(
+                Spinners::Line,
+                "Running Docker Build & Run".into(),
+            ))
         } else {
             None
         };
@@ -53,7 +56,10 @@ impl Docker {
             if let Some(mut spinner) = sp.take() {
                 spinner.stop_with_message(message.to_string());
                 if new_spinner {
-                    sp = Some(Spinner::new(Spinners::Line, "Building and running container".into()));
+                    sp = Some(Spinner::new(
+                        Spinners::Line,
+                        "Building and running container".into(),
+                    ));
                 }
             } else {
                 println!("{}", message);
