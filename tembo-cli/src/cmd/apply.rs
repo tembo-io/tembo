@@ -30,7 +30,7 @@ use crate::cli::file_utils::FileUtils;
 use crate::cli::sqlx_utils::SqlxUtils;
 use crate::cli::tembo_config;
 use crate::cli::tembo_config::InstanceSettings;
-use tera::Tera;
+use tera::{Context, Tera};
 
 const DOCKERFILE_NAME: &str = "Dockerfile";
 const POSTGRESCONF_NAME: &str = "postgres.conf";
@@ -39,7 +39,7 @@ const POSTGRESCONF_NAME: &str = "postgres.conf";
 #[derive(Args)]
 pub struct ApplyCommand {}
 
-pub fn execute() -> Result<(), anyhow::Error> {
+pub fn execute(verbose: bool) -> Result<(), anyhow::Error> {
     info!("Running validation!");
     super::validate::execute()?;
     info!("Validation completed!");
@@ -47,7 +47,7 @@ pub fn execute() -> Result<(), anyhow::Error> {
     let env = get_current_context()?;
 
     if env.target == Target::Docker.to_string() {
-        return execute_docker();
+        return execute_docker(verbose);
     } else if env.target == Target::TemboCloud.to_string() {
         return execute_tembo_cloud(env.clone());
     }
@@ -55,7 +55,7 @@ pub fn execute() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-fn execute_docker() -> Result<(), anyhow::Error> {
+fn execute_docker(verbose: bool) -> Result<(), anyhow::Error> {
     Docker::installed_and_running()?;
 
     let instance_settings: HashMap<String, InstanceSettings> = get_instance_settings()?;
@@ -85,7 +85,7 @@ fn execute_docker() -> Result<(), anyhow::Error> {
     )?;
 
     for (_key, value) in instance_settings.iter() {
-        let port = Docker::build_run(value.instance_name.clone())?;
+        let port = Docker::build_run(value.instance_name.clone(), verbose)?;
 
         // Allows DB instance to be ready before running migrations
         sleep(Duration::from_secs(3));
@@ -441,22 +441,13 @@ pub fn get_instance_settings() -> Result<HashMap<String, InstanceSettings>, anyh
 pub fn get_rendered_dockerfile(
     instance_settings: HashMap<String, InstanceSettings>,
 ) -> Result<String, anyhow::Error> {
-    let filename = "Dockerfile.template";
-    let filepath =
-        "https://raw.githubusercontent.com/tembo-io/tembo/main/tembo-cli/tembo/Dockerfile.template";
-
-    FileUtils::download_file(filepath, filename, true)?;
-
-    let contents = match fs::read_to_string(filename) {
-        Ok(c) => c,
-        Err(e) => {
-            panic!("Couldn't read file {}: {}", filename, e);
-        }
-    };
+    // Include the Dockerfile template directly into the binary
+    let contents = include_str!("../../tembo/Dockerfile.template");
 
     let mut tera = Tera::new("templates/**/*").unwrap();
-    let _ = tera.add_raw_template("dockerfile", &contents);
-    let mut context = tera::Context::new();
+    let _ = tera.add_raw_template("dockerfile", contents);
+    let mut context = Context::new();
+
     for (_key, value) in instance_settings.iter() {
         let stack_type = ControllerStackType::from_str(value.stack_type.as_str())
             .unwrap_or(ControllerStackType::Standard);
@@ -464,10 +455,10 @@ pub fn get_rendered_dockerfile(
         let stack = get_stack(stack_type);
 
         context.insert("stack_trunk_installs", &stack.trunk_installs);
-        // Default handles the case of extensions not configured in tembo.toml
         let extensions = value.extensions.clone().unwrap_or_default();
         context.insert("extensions", &extensions);
     }
+
     let rendered_dockerfile = tera.render("dockerfile", &context).unwrap();
 
     Ok(rendered_dockerfile)
@@ -476,23 +467,15 @@ pub fn get_rendered_dockerfile(
 pub fn get_rendered_migrations_file(
     instance_settings: HashMap<String, InstanceSettings>,
 ) -> Result<String, anyhow::Error> {
-    let filename = "migrations.sql.template";
-    let filepath =
-        "https://raw.githubusercontent.com/tembo-io/tembo/main/tembo-cli/tembo/migrations.sql.template";
+    // Include the migrations template directly into the binary
+    let contents = include_str!("../../tembo/migrations.sql.template");
 
-    FileUtils::download_file(filepath, filename, true)?;
+    let mut tera = Tera::new("templates/**/*")
+        .map_err(|e| anyhow::anyhow!("Error initializing Tera: {}", e))?;
+    tera.add_raw_template("migrations", contents)
+        .map_err(|e| anyhow::anyhow!("Error adding raw template: {}", e))?;
 
-    let contents = match fs::read_to_string(filename) {
-        Ok(c) => c,
-        Err(e) => {
-            panic!("Couldn't read file {}: {}", filename, e);
-        }
-    };
-
-    let mut tera = Tera::new("templates/**/*").unwrap();
-    let _ = tera.add_raw_template("migrations", &contents);
-    let mut context = tera::Context::new();
-
+    let mut context = Context::new();
     for (_key, value) in instance_settings.iter() {
         let stack_type = ControllerStackType::from_str(value.stack_type.as_str())
             .unwrap_or(ControllerStackType::Standard);
@@ -502,9 +485,12 @@ pub fn get_rendered_migrations_file(
         context.insert("stack_extensions", &stack.extensions);
         context.insert("extensions", &value.extensions);
     }
-    let rendered_dockerfile = tera.render("migrations", &context).unwrap();
 
-    Ok(rendered_dockerfile)
+    let rendered_migrations = tera
+        .render("migrations", &context)
+        .map_err(|e| anyhow::anyhow!("Error rendering template: {}", e))?;
+
+    Ok(rendered_migrations)
 }
 
 fn get_postgres_config(instance_settings: HashMap<String, InstanceSettings>) -> String {
