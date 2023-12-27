@@ -1,7 +1,7 @@
 use crate::cmd::delete::DeleteCommand;
 use crate::cmd::validate::ValidateCommand;
 use crate::cmd::{apply, context, delete, init, validate};
-use clap::{crate_authors, crate_version, Parser, Subcommand, Args};
+use clap::{crate_authors, crate_version, Args, Parser, Subcommand};
 use cmd::apply::ApplyCommand;
 use cmd::context::{ContextCommand, ContextSubCommand};
 use cmd::init::InitCommand;

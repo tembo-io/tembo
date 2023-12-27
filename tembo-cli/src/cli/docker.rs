@@ -1,10 +1,10 @@
-use std::io::{BufRead, BufReader};
-use anyhow::{bail, Context};
 use anyhow::Error;
+use anyhow::{bail, Context};
 use simplelog::*;
 use spinners::{Spinner, Spinners};
-use std::process::{Command as ShellCommand, Stdio};
+use std::io::{BufRead, BufReader};
 use std::process::Output;
+use std::process::{Command as ShellCommand, Stdio};
 use std::thread;
 
 pub struct Docker {}
@@ -45,7 +45,10 @@ impl Docker {
     // Build & run docker image
     pub fn build_run(instance_name: String, verbose: bool) -> Result<i32, anyhow::Error> {
         let mut sp = if !verbose {
-            Some(Spinner::new(Spinners::Line, "Running Docker Build & Run".into()))
+            Some(Spinner::new(
+                Spinners::Line,
+                "Running Docker Build & Run".into(),
+            ))
         } else {
             None
         };
@@ -56,8 +59,13 @@ impl Docker {
             if verbose {
                 println!("- Existing container found, removing");
             } else {
-                sp.as_mut().unwrap().stop_with_message("- Existing container found, removing".to_string());
-                sp = Some(Spinner::new(Spinners::Line, "- Building and running container".into()))
+                sp.as_mut()
+                    .unwrap()
+                    .stop_with_message("- Existing container found, removing".to_string());
+                sp = Some(Spinner::new(
+                    Spinners::Line,
+                    "- Building and running container".into(),
+                ))
             }
 
             Docker::stop_remove(&instance_name)?;
@@ -74,7 +82,9 @@ impl Docker {
         if verbose {
             println!("- Docker Build & Run completed");
         } else {
-            sp.as_mut().unwrap().stop_with_message("- Docker Build & Run completed".to_string());
+            sp.as_mut()
+                .unwrap()
+                .stop_with_message("- Docker Build & Run completed".to_string());
         }
 
         Ok(port)
@@ -121,13 +131,13 @@ impl Docker {
             let mut command: String = String::from("docker rm --force ");
             command.push_str(name);
 
-            let output = match ShellCommand::new("sh")
-                .arg("-c")
-                .arg(&command)
-                .output() {
-                Ok(output) => {output}
+            let output = match ShellCommand::new("sh").arg("-c").arg(&command).output() {
+                Ok(output) => output,
                 Err(_) => {
-                    sp.stop_with_message(format!("- Tembo instance {} failed to stop & remove", &name));
+                    sp.stop_with_message(format!(
+                        "- Tembo instance {} failed to stop & remove",
+                        &name
+                    ));
                     bail!("There was an issue stopping the instance")
                 }
             };
@@ -168,12 +178,8 @@ pub fn run_command(command: &str, verbose: bool) -> Result<(), anyhow::Error> {
         .with_context(|| format!("Failed to spawn command '{}'", command))?;
 
     if verbose {
-        let stdout = BufReader::new(
-            child.stdout.take().expect("Failed to open stdout")
-        );
-        let stderr = BufReader::new(
-            child.stderr.take().expect("Failed to open stderr")
-        );
+        let stdout = BufReader::new(child.stdout.take().expect("Failed to open stdout"));
+        let stderr = BufReader::new(child.stderr.take().expect("Failed to open stderr"));
 
         let stdout_handle = thread::spawn(move || {
             for line in stdout.lines() {
