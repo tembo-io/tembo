@@ -41,7 +41,7 @@ impl Docker {
     }
 
     // Build & run docker image
-    pub fn build_run(instance_name: String) -> Result<(), anyhow::Error> {
+    pub fn build_run(instance_name: String) -> Result<i32, anyhow::Error> {
         let mut sp = Spinner::new(Spinners::Line, "Running Docker Build & Run".into());
         let container_list = Self::container_list_filtered(&instance_name).unwrap();
 
@@ -63,7 +63,7 @@ impl Docker {
         }
     }
 
-    fn get_available_port() -> Result<i32> {
+    fn get_available_port() -> Result<i32, anyhow::Error> {
         let ls_command = "docker ps --format '{{.Ports}}'";
 
         let output = ShellCommand::new("sh")
@@ -76,7 +76,7 @@ impl Docker {
         Docker::get_container_port(stdout)
     }
 
-    fn get_container_port(container_list: String) -> Result<i32> {
+    fn get_container_port(container_list: String) -> Result<i32, anyhow::Error> {
         if container_list.contains("5432") {
             if container_list.contains("5433") {
                 if container_list.contains("5434") {
