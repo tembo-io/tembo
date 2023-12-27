@@ -1,21 +1,15 @@
-use crate::Result;
-use clap::{ArgMatches, Command};
-
-use crate::cli::{
-    context::{
-        tembo_context_file_path, tembo_credentials_file_path, tembo_home_dir, CONTEXT_DEFAULT_TEXT,
-        CREDENTIALS_DEFAULT_TEXT,
-    },
-    file_utils::FileUtils,
+use crate::cli::context::{
+    tembo_context_file_path, tembo_credentials_file_path, tembo_home_dir, CONTEXT_DEFAULT_TEXT,
+    CREDENTIALS_DEFAULT_TEXT,
 };
+use crate::cli::file_utils::FileUtils;
+use clap::Args;
 
-// Create init subcommand arguments
-pub fn make_subcommand() -> Command {
-    Command::new("init")
-        .about("Initializes a local environment; creates needed context & config files/directories")
-}
+/// Initializes a local environment. Creates a sample context and configuration files.
+#[derive(Args)]
+pub struct InitCommand {}
 
-pub fn execute(_args: &ArgMatches) -> Result<()> {
+pub fn execute() -> Result<(), anyhow::Error> {
     match FileUtils::create_dir("home directory".to_string(), tembo_home_dir()) {
         Ok(t) => t,
         Err(e) => {
@@ -47,17 +41,11 @@ pub fn execute(_args: &ArgMatches) -> Result<()> {
         }
     }
 
-    match FileUtils::create_file(
-        "config".to_string(),
-        "tembo.toml".to_string(),
-        "".to_string(),
-        false,
-    ) {
-        Ok(t) => t,
-        Err(e) => {
-            return Err(e);
-        }
-    }
+    let filename = "tembo.toml";
+    let filepath =
+        "https://raw.githubusercontent.com/tembo-io/tembo/main/tembo-cli/examples/single-instance/tembo.toml";
+
+    FileUtils::download_file(filepath, filename, false)?;
 
     match FileUtils::create_dir("migrations directory".to_string(), "migrations".to_string()) {
         Ok(t) => t,

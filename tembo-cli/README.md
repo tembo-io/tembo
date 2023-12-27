@@ -1,8 +1,8 @@
 # Tembo CLI
 
-Tembo CLI allows users to experience [Tembo](https://tembo.io) locally, as well as, 
-manage and deploy to Tembo Cloud. It abstracts away complexities of configuring, 
-managing, and running Postgres in a local environment. 
+Tembo CLI allows users to experience [Tembo](https://tembo.io) locally, as well as,
+manage and deploy to Tembo Cloud. It abstracts away complexities of configuring,
+managing, and running Postgres in a local environment.
 
 # Local Testing
 
@@ -11,6 +11,12 @@ Clone this repo and run:
 `cargo install --path .`
 
 If the install path is in your shell path, you can then run `tembo help` and other `tembo` commands.
+
+You can run this command to use the local code for any tembo command during development:
+
+```
+alias tembo='cargo run --'
+```
 
 # Commands
 
@@ -46,6 +52,22 @@ Validates Tembo.toml (same as `tembo validate`) and applies the changes to the c
 [OpenAPI Generator](https://openapi-generator.tech/) tool is used to generate Rust Client.
 
 Install OpenAPI Generator if not already by following steps [here](https://openapi-generator.tech/docs/installation)
+
+### Data plane API client
+
+Go to `tembodataclient` directory in your terminal.
+
+Delete the contents of the directory first and then run following command to re-generate the rust client code for the API.
+
+```bash
+openapi-generator generate -i https://api.data-1.use1.tembo.io/api-docs/openapi.json  -g rust -o . --additional-properties=packageName=tembodataclient
+```
+
+* Go to `tembodataclient/src/lib.rs` & add followng line at the top to disable clippy for the generated code
+
+```
+#![allow(clippy::all)]
+```
 
 ### Control plane API client
 
@@ -158,7 +180,7 @@ pub mod impls;
 
 # Contributing
 
-Before you start working on something, it's best to check if there is an existing plan 
+Before you start working on something, it's best to check if there is an existing plan
 first. Join our [Slack community](https://join.slack.com/t/trunk-crew/shared_invite/zt-1yiafma92-hFHq2xAN0ukjg_2AsOVvfg) and ask there.
 
 # Semver

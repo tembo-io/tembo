@@ -1,4 +1,3 @@
-use crate::Result;
 use curl::easy::Easy;
 use simplelog::*;
 use std::env;
@@ -9,7 +8,7 @@ use std::path::Path;
 pub struct FileUtils {}
 
 impl FileUtils {
-    pub fn create_dir(dir_name: String, dir_path: String) -> Result<()> {
+    pub fn create_dir(dir_name: String, dir_path: String) -> Result<(), anyhow::Error> {
         if Path::new(&dir_path).exists() {
             info!("Tembo {} path exists", dir_name);
             return Ok(());
@@ -28,12 +27,19 @@ impl FileUtils {
         file_path: String,
         file_content: String,
         recreate: bool,
-    ) -> Result<()> {
+    ) -> Result<(), anyhow::Error> {
         let path = Path::new(&file_path);
         if !recreate && path.exists() {
             info!("Tembo {} file exists", file_name);
             return Ok(());
         }
+
+        // Create all missing directories in the path
+        let parent = path
+            .parent()
+            .ok_or_else(|| anyhow::anyhow!("Failed to get parent directory"))?;
+        fs::create_dir_all(parent)?;
+
         let display = path.display();
         let mut file: File = match File::create(path) {
             Err(why) => panic!("Couldn't create {}: {}", display, why),
@@ -47,7 +53,17 @@ impl FileUtils {
         Ok(())
     }
 
-    pub fn download_file(file_path: &str, download_location: &str) -> std::io::Result<()> {
+    pub fn download_file(
+        file_path: &str,
+        download_location: &str,
+        recreate: bool,
+    ) -> std::io::Result<()> {
+        let path = Path::new(&download_location);
+        if !recreate && path.exists() {
+            info!("Tembo {} file exists", download_location);
+            return Ok(());
+        }
+
         let mut dst = Vec::new();
         let mut easy = Easy::new();
         easy.url(file_path).unwrap();

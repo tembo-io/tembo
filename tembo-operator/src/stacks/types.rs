@@ -12,6 +12,7 @@ use utoipa::ToSchema;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema, PartialEq, ToSchema)]
 pub enum StackType {
+    API,
     DataWarehouse,
     Standard,
     MessageQueue,
@@ -21,7 +22,7 @@ pub enum StackType {
     OLTP,
     VectorDB,
     Geospatial,
-    MongoAdapter,
+    MongoAlternative,
 }
 
 impl std::str::FromStr for StackType {
@@ -29,6 +30,7 @@ impl std::str::FromStr for StackType {
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
+            "API" => Ok(StackType::API),
             "DataWarehouse" => Ok(StackType::DataWarehouse),
             "Standard" => Ok(StackType::Standard),
             "MessageQueue" => Ok(StackType::MessageQueue),
@@ -37,7 +39,7 @@ impl std::str::FromStr for StackType {
             "OLTP" => Ok(StackType::OLTP),
             "VectorDB" => Ok(StackType::VectorDB),
             "Geospatial" => Ok(StackType::Geospatial),
-            "MongoAdapter" => Ok(StackType::MongoAdapter),
+            "MongoAlternative" => Ok(StackType::MongoAlternative),
             _ => Err("invalid value"),
         }
     }
@@ -46,6 +48,7 @@ impl std::str::FromStr for StackType {
 impl StackType {
     pub fn as_str(&self) -> &str {
         match self {
+            StackType::API => "API",
             StackType::DataWarehouse => "DataWarehouse",
             StackType::Standard => "Standard",
             StackType::MessageQueue => "MessageQueue",
@@ -54,7 +57,7 @@ impl StackType {
             StackType::OLTP => "OLTP",
             StackType::VectorDB => "VectorDB",
             StackType::Geospatial => "Geospatial",
-            StackType::MongoAdapter => "MongoAdapter",
+            StackType::MongoAlternative => "MongoAlternative",
         }
     }
 }
@@ -179,5 +182,60 @@ mod tests {
         let shared_buffers = hm.get("shared_buffers").unwrap();
         assert_eq!(shared_buffers.name, "shared_buffers");
         assert_eq!(shared_buffers.value.to_string(), "512MB");
+    }
+
+    #[test]
+    fn test_all_stack_deserialization() {
+        // must not panic when reading any stack definitions from yaml
+        let all_stacks = vec![
+            StackType::API,
+            StackType::DataWarehouse,
+            StackType::Standard,
+            StackType::MessageQueue,
+            StackType::MachineLearning,
+            StackType::OLAP,
+            StackType::OLTP,
+            StackType::VectorDB,
+            StackType::Geospatial,
+            StackType::MongoAlternative,
+        ];
+
+        for stack in all_stacks {
+            // this is overly verbose, but we want to ensure each Stack can be deserialized from yaml
+            // pattern match on the StackType enum, which if a new stack is added, this test will fail until its updated
+            // guarantees all StackTypes are tested
+            match stack {
+                StackType::API => {
+                    get_stack(StackType::API);
+                }
+                StackType::DataWarehouse => {
+                    get_stack(StackType::DataWarehouse);
+                }
+                StackType::Standard => {
+                    get_stack(StackType::Standard);
+                }
+                StackType::MessageQueue => {
+                    get_stack(StackType::MessageQueue);
+                }
+                StackType::MachineLearning => {
+                    get_stack(StackType::MachineLearning);
+                }
+                StackType::OLAP => {
+                    get_stack(StackType::OLAP);
+                }
+                StackType::OLTP => {
+                    get_stack(StackType::OLTP);
+                }
+                StackType::VectorDB => {
+                    get_stack(StackType::VectorDB);
+                }
+                StackType::Geospatial => {
+                    get_stack(StackType::Geospatial);
+                }
+                StackType::MongoAlternative => {
+                    get_stack(StackType::MongoAlternative);
+                }
+            }
+        }
     }
 }

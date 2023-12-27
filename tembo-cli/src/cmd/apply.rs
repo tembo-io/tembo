@@ -1,54 +1,61 @@
-use crate::{
-    cli::{
-        context::{get_current_context, Environment, Target},
-        tembo_config,
-    },
-    Result,
-};
-use clap::{ArgMatches, Command};
+use anyhow::Error;
+use clap::Args;
 use controller::stacks::get_stack;
 use controller::stacks::types::StackType as ControllerStackType;
+use log::info;
+use spinners::{Spinner, Spinners};
 use std::{
     collections::HashMap,
     fs::{self},
     str::FromStr,
+    thread::sleep,
+    time::Duration,
 };
 use temboclient::{
     apis::{
         configuration::Configuration,
-        instance_api::{create_instance, get_all, put_instance},
+        instance_api::{create_instance, get_all, get_instance, put_instance},
     },
     models::{
-        Cpu, CreateInstance, Extension, ExtensionInstallLocation, Memory, PgConfig, StackType,
-        Storage, TrunkInstall, UpdateInstance,
+        ConnectionInfo, Cpu, CreateInstance, Extension, ExtensionInstallLocation, Memory, PgConfig,
+        StackType, State, Storage, TrunkInstall, UpdateInstance,
     },
 };
+use tembodataclient::apis::secrets_api::get_secret_v1;
 use tokio::runtime::Runtime;
 
-use crate::cli::{docker::Docker, file_utils::FileUtils, tembo_config::InstanceSettings};
-use tera::Tera;
+use crate::cli::context::{get_current_context, Environment, Profile, Target};
+use crate::cli::docker::Docker;
+use crate::cli::file_utils::FileUtils;
+use crate::cli::sqlx_utils::SqlxUtils;
+use crate::cli::tembo_config;
+use crate::cli::tembo_config::InstanceSettings;
+use tera::{Context, Tera};
 
 const DOCKERFILE_NAME: &str = "Dockerfile";
 const POSTGRESCONF_NAME: &str = "postgres.conf";
 
-// Create init subcommand arguments
-pub fn make_subcommand() -> Command {
-    Command::new("apply").about("Applies changes to the context set using the tembo config file")
-}
+/// Deploys a tembo.toml file
+#[derive(Args)]
+pub struct ApplyCommand {}
 
-pub fn execute(_args: &ArgMatches) -> Result<()> {
+pub fn execute(verbose: bool) -> Result<(), anyhow::Error> {
+    info!("Running validation!");
+    super::validate::execute()?;
+    info!("Validation completed!");
+
     let env = get_current_context()?;
 
     if env.target == Target::Docker.to_string() {
-        return execute_docker();
+        return execute_docker(verbose);
     } else if env.target == Target::TemboCloud.to_string() {
-        return execute_tembo_cloud(env);
+        return execute_tembo_cloud(env.clone());
     }
 
     Ok(())
 }
 
-fn execute_docker() -> Result<()> {
+fn execute_docker(verbose: bool) -> Result<(), anyhow::Error> {
     Docker::installed_and_running()?;
 
     let instance_settings: HashMap<String, InstanceSettings> = get_instance_settings()?;
@@ -73,61 +80,165 @@ fn execute_docker() -> Result<()> {
     FileUtils::create_file(
         POSTGRESCONF_NAME.to_string(),
         POSTGRESCONF_NAME.to_string(),
-        get_postgres_config(instance_settings),
+        get_postgres_config(instance_settings.clone()),
         true,
     )?;
 
-    Docker::build_run()?;
+    for (_key, value) in instance_settings.iter() {
+        let port = Docker::build_run(value.instance_name.clone(), verbose)?;
 
-    Docker::run_sqlx_migrate()?;
+        // Allows DB instance to be ready before running migrations
+        sleep(Duration::from_secs(3));
 
-    // If all of the above was successful, we can print the url to user
-    println!(">>> Tembo instance is now running on: postgres://postgres:postgres@localhost:5432");
+        let conn_info = ConnectionInfo {
+            host: "localhost".to_owned(),
+            pooler_host: Some(Some("localhost-pooler".to_string())),
+            port,
+            user: "postgres".to_owned(),
+            password: "postgres".to_owned(),
+        };
+        Runtime::new()
+            .unwrap()
+            .block_on(SqlxUtils::run_migrations(conn_info))?;
+
+        // If all of the above was successful, we can print the url to user
+        println!(
+            ">>> Tembo instance is now running on: postgres://postgres:postgres@localhost:{}",
+            port
+        );
+    }
 
     Ok(())
 }
 
-pub fn execute_tembo_cloud(env: Environment) -> Result<()> {
+pub fn execute_tembo_cloud(env: Environment) -> Result<(), anyhow::Error> {
     let instance_settings: HashMap<String, InstanceSettings> = get_instance_settings()?;
 
     let profile = env.clone().selected_profile.unwrap();
     let config = Configuration {
-        base_path: profile.tembo_host,
-        bearer_access_token: Some(profile.tembo_access_token),
+        base_path: profile.clone().tembo_host,
+        bearer_access_token: Some(profile.clone().tembo_access_token),
         ..Default::default()
     };
 
     for (_key, value) in instance_settings.iter() {
-        let instance_id = get_instance_id(value.instance_name.clone(), &config, env.clone())?;
-        if let Some(env_instance_id) = instance_id {
+        let mut instance_id = get_instance_id(value.instance_name.clone(), &config, env.clone())?;
+
+        if let Some(env_instance_id) = instance_id.clone() {
             update_existing_instance(env_instance_id, value, &config, env.clone());
         } else {
-            create_new_instance(value, &config, env.clone());
+            instance_id = create_new_instance(value, &config, env.clone());
+        }
+
+        loop {
+            let mut sp = Spinner::new(Spinners::Line, "Waiting for instance to be up!".into());
+            sleep(Duration::from_secs(10));
+
+            let connection_info: Option<Box<ConnectionInfo>> =
+                is_instance_up(instance_id.as_ref().unwrap().clone(), &config, &env)?;
+
+            if connection_info.is_some() {
+                let conn_info = get_conn_info_with_creds(
+                    profile.clone(),
+                    &instance_id,
+                    connection_info,
+                    env.clone(),
+                )?;
+
+                Runtime::new()
+                    .unwrap()
+                    .block_on(SqlxUtils::run_migrations(conn_info))?;
+
+                sp.stop_with_message("- Instance is now up!".to_string());
+
+                break;
+            }
         }
     }
 
     Ok(())
 }
 
+fn get_conn_info_with_creds(
+    profile: Profile,
+    instance_id: &Option<String>,
+    connection_info: Option<Box<ConnectionInfo>>,
+    env: Environment,
+) -> Result<ConnectionInfo, anyhow::Error> {
+    let dataplane_config = tembodataclient::apis::configuration::Configuration {
+        base_path: profile.tembo_data_host,
+        bearer_access_token: Some(profile.tembo_access_token),
+        ..Default::default()
+    };
+
+    let result = Runtime::new().unwrap().block_on(get_secret_v1(
+        &dataplane_config,
+        env.org_id.clone().unwrap().as_str(),
+        instance_id.as_ref().unwrap(),
+        "superuser-role",
+    ));
+
+    if result.is_err() {
+        return Err(Error::msg("Error fetching instance credentials!"));
+    }
+
+    let mut conn_info = *connection_info.unwrap();
+
+    let map = result.as_ref().unwrap();
+
+    conn_info.user = map.get("username").unwrap().to_string();
+    conn_info.password = map.get("password").unwrap().to_string();
+
+    Ok(conn_info)
+}
+
 pub fn get_instance_id(
     instance_name: String,
     config: &Configuration,
     env: Environment,
-) -> Result<Option<String>> {
+) -> Result<Option<String>, anyhow::Error> {
     let v = Runtime::new()
         .unwrap()
         .block_on(get_all(config, env.org_id.clone().unwrap().as_str()));
 
     match v {
         Ok(result) => {
-            for instance in result.iter() {
-                if instance.instance_name == instance_name {
-                    return Ok(Some(instance.clone().instance_id));
-                }
+            let maybe_instance = result
+                .iter()
+                .find(|instance| instance.instance_name == instance_name);
+
+            if let Some(instance) = maybe_instance {
+                return Ok(Some(instance.clone().instance_id));
             }
         }
         Err(error) => eprintln!("Error getting instance: {}", error),
     };
+    Ok(None)
+}
+
+pub fn is_instance_up(
+    instance_id: String,
+    config: &Configuration,
+    env: &Environment,
+) -> Result<Option<Box<ConnectionInfo>>, anyhow::Error> {
+    let v = Runtime::new().unwrap().block_on(get_instance(
+        config,
+        env.org_id.clone().unwrap().as_str(),
+        &instance_id,
+    ));
+
+    match v {
+        Ok(result) => {
+            if result.state == State::Up {
+                return Ok(result.connection_info.unwrap());
+            }
+        }
+        Err(error) => {
+            eprintln!("Error getting instance: {}", error);
+            return Err(Error::new(error));
+        }
+    };
+
     Ok(None)
 }
 
@@ -151,13 +262,17 @@ fn update_existing_instance(
             println!(
                 "Instance update started for Instance Id: {}",
                 result.instance_id
-            )
+            );
         }
         Err(error) => eprintln!("Error updating instance: {}", error),
     };
 }
 
-fn create_new_instance(value: &InstanceSettings, config: &Configuration, env: Environment) {
+fn create_new_instance(
+    value: &InstanceSettings,
+    config: &Configuration,
+    env: Environment,
+) -> Option<String> {
     let instance = get_create_instance(value);
 
     let v = Runtime::new().unwrap().block_on(create_instance(
@@ -172,9 +287,15 @@ fn create_new_instance(value: &InstanceSettings, config: &Configuration, env: En
                 "Instance creation started for instance_name: {} with instance_id: {}",
                 result.instance_name, result.instance_id
             );
+
+            return Some(result.instance_id);
         }
-        Err(error) => eprintln!("Error creating instance: {}", error),
+        Err(error) => {
+            eprintln!("Error creating instance: {}", error);
+        }
     };
+
+    None
 }
 
 fn get_create_instance(instance_settings: &InstanceSettings) -> CreateInstance {
@@ -296,7 +417,7 @@ fn get_trunk_installs(
     vec_trunk_installs
 }
 
-pub fn get_instance_settings() -> Result<HashMap<String, InstanceSettings>> {
+pub fn get_instance_settings() -> Result<HashMap<String, InstanceSettings>, anyhow::Error> {
     let mut file_path = FileUtils::get_current_working_dir();
     file_path.push_str("/tembo.toml");
 
@@ -319,23 +440,14 @@ pub fn get_instance_settings() -> Result<HashMap<String, InstanceSettings>> {
 
 pub fn get_rendered_dockerfile(
     instance_settings: HashMap<String, InstanceSettings>,
-) -> Result<String> {
-    let filename = "Dockerfile.template";
-    let filepath =
-        "https://raw.githubusercontent.com/tembo-io/tembo-cli/main/tembo/Dockerfile.template";
-
-    FileUtils::download_file(filepath, filename)?;
-
-    let contents = match fs::read_to_string(filename) {
-        Ok(c) => c,
-        Err(e) => {
-            panic!("Couldn't read file {}: {}", filename, e);
-        }
-    };
+) -> Result<String, anyhow::Error> {
+    // Include the Dockerfile template directly into the binary
+    let contents = include_str!("../../tembo/Dockerfile.template");
 
     let mut tera = Tera::new("templates/**/*").unwrap();
-    let _ = tera.add_raw_template("dockerfile", &contents);
-    let mut context = tera::Context::new();
+    let _ = tera.add_raw_template("dockerfile", contents);
+    let mut context = Context::new();
+
     for (_key, value) in instance_settings.iter() {
         let stack_type = ControllerStackType::from_str(value.stack_type.as_str())
             .unwrap_or(ControllerStackType::Standard);
@@ -343,8 +455,10 @@ pub fn get_rendered_dockerfile(
         let stack = get_stack(stack_type);
 
         context.insert("stack_trunk_installs", &stack.trunk_installs);
-        context.insert("extensions", &value.extensions);
+        let extensions = value.extensions.clone().unwrap_or_default();
+        context.insert("extensions", &extensions);
     }
+
     let rendered_dockerfile = tera.render("dockerfile", &context).unwrap();
 
     Ok(rendered_dockerfile)
@@ -352,23 +466,16 @@ pub fn get_rendered_dockerfile(
 
 pub fn get_rendered_migrations_file(
     instance_settings: HashMap<String, InstanceSettings>,
-) -> Result<String> {
-    let filename = "migrations.sql.template";
-    let filepath =
-        "https://raw.githubusercontent.com/tembo-io/tembo-cli/main/tembo/migrations.sql.template";
+) -> Result<String, anyhow::Error> {
+    // Include the migrations template directly into the binary
+    let contents = include_str!("../../tembo/migrations.sql.template");
 
-    FileUtils::download_file(filepath, filename)?;
+    let mut tera = Tera::new("templates/**/*")
+        .map_err(|e| anyhow::anyhow!("Error initializing Tera: {}", e))?;
+    tera.add_raw_template("migrations", contents)
+        .map_err(|e| anyhow::anyhow!("Error adding raw template: {}", e))?;
 
-    let contents = match fs::read_to_string(filename) {
-        Ok(c) => c,
-        Err(e) => {
-            panic!("Couldn't read file {}: {}", filename, e);
-        }
-    };
-
-    let mut tera = Tera::new("templates/**/*").unwrap();
-    let _ = tera.add_raw_template("migrations", &contents);
-    let mut context = tera::Context::new();
+    let mut context = Context::new();
     for (_key, value) in instance_settings.iter() {
         let stack_type = ControllerStackType::from_str(value.stack_type.as_str())
             .unwrap_or(ControllerStackType::Standard);
@@ -378,9 +485,12 @@ pub fn get_rendered_migrations_file(
         context.insert("stack_extensions", &stack.extensions);
         context.insert("extensions", &value.extensions);
     }
-    let rendered_dockerfile = tera.render("migrations", &context).unwrap();
 
-    Ok(rendered_dockerfile)
+    let rendered_migrations = tera
+        .render("migrations", &context)
+        .map_err(|e| anyhow::anyhow!("Error rendering template: {}", e))?;
+
+    Ok(rendered_migrations)
 }
 
 fn get_postgres_config(instance_settings: HashMap<String, InstanceSettings>) -> String {

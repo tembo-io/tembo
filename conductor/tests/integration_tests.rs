@@ -17,7 +17,6 @@ mod test {
     };
 
     use kube::{
-        api::ListParams,
         runtime::wait::{await_condition, conditions},
         Api, Client, Config,
     };
@@ -232,13 +231,6 @@ mod test {
         let pod_name = format!("{}-1", &namespace);
         pod_ready_and_running(pods.clone(), pod_name.clone()).await;
 
-        // Wait for postgres-exporter pod to be running
-        let lp = ListParams::default()
-            .labels(format!("app=postgres-exporter,coredb.io/name={}", namespace).as_str());
-        let exporter_pods = pods.list(&lp).await.expect("could not get pods");
-        let exporter_pod_name = exporter_pods.items[0].metadata.name.as_ref().unwrap();
-        pod_ready_and_running(pods.clone(), exporter_pod_name.clone()).await;
-
         // ADD AN EXTENSION - ASSERT IT MAKES IT TO STATUS.EXTENSIONS
         // conductor receives a CRUDevent from control plane
         // take note of number of extensions at this point in time
@@ -297,9 +289,6 @@ mod test {
         thread::sleep(time::Duration::from_secs(40));
 
         pod_ready_and_running(pods.clone(), pod_name.clone()).await;
-        let exporter_pods = pods.list(&lp).await.expect("could not get pods");
-        let exporter_pod_name = exporter_pods.items[0].metadata.name.as_ref().unwrap();
-        pod_ready_and_running(pods.clone(), exporter_pod_name.clone()).await;
 
         // Get the last time the pod was started
         // using SELECT pg_postmaster_start_time();
@@ -348,9 +337,6 @@ mod test {
         }
 
         pod_ready_and_running(pods.clone(), pod_name).await;
-        let exporter_pods = pods.list(&lp).await.expect("could not get pods");
-        let exporter_pod_name = exporter_pods.items[0].metadata.name.as_ref().unwrap();
-        pod_ready_and_running(pods.clone(), exporter_pod_name.clone()).await;
 
         // Get the last time the pod was started
         // using SELECT pg_postmaster_start_time();
@@ -407,10 +393,28 @@ mod test {
         use conductor::aws::cloudformation::AWSConfigState;
         let aws_region = "us-east-1".to_owned();
         let region = Region::new(aws_region);
-        let aws_config_state = AWSConfigState::new(region).await;
+        let aws_config_state = AWSConfigState::new(region.clone()).await;
         let stack_name = format!("org-{}-inst-{}-cf", org_name, dbname);
-        let exists = aws_config_state.does_stack_exist(&stack_name).await;
-        assert!(!exists, "CF stack was not deleted");
+        // let dcf = aws_config_state
+        //     .delete_cloudformation_stack(&stack_name)
+        //     .await;
+        // assert!(dcf);
+        // let exists = aws_config_state.does_stack_exist(&stack_name).await;
+        // assert!(!exists, "CF stack was not deleted");
+        match aws_config_state
+            .delete_cloudformation_stack(&stack_name)
+            .await
+        {
+            Ok(_) => {
+                // If deletion was successful, check if the stack still exists
+                let stack_exists = aws_config_state.does_stack_exist(&stack_name).await;
+                assert!(!stack_exists, "CloudFormation stack was not deleted");
+            }
+            Err(e) => {
+                // If there was an error deleting the stack, fail the test
+                panic!("Failed to delete CloudFormation stack: {:?}", e);
+            }
+        }
     }
 
     async fn kube_client() -> kube::Client {

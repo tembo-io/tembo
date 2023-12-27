@@ -4,3 +4,4 @@ dataplane-webserver/** @sjmiller609
 tembo-operator/** @sjmiller609 @nhudson @ianstanton @ChuckHend
 conductor/** @sjmiller609 @nhudson @ianstanton @ChuckHend
 tembo-pod-init/** @nhudson
+tembo-cli/** @shahadarsh @vrmiguel @DarrenBaldwin07 @sjmiller609

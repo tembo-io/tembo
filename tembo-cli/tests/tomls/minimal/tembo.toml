@@ -1,0 +1,3 @@
+[minimal]
+environment = "prod"
+instance_name = "minimal"

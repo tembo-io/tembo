@@ -9,7 +9,6 @@ use crate::{
         cnpg::{cnpg_cluster_from_cdb, reconcile_cnpg, reconcile_cnpg_scheduled_backup, reconcile_pooler},
     },
     config::Config,
-    deployment_postgres_exporter::reconcile_prometheus_exporter_deployment,
     exec::{ExecCommand, ExecOutput},
     extensions::database_queries::is_not_restarting,
     heartbeat::reconcile_heartbeat,
@@ -17,7 +16,6 @@ use crate::{
     postgres_certificates::reconcile_certificates,
     psql::{PsqlCommand, PsqlOutput},
     secret::{reconcile_postgres_role_secret, reconcile_secret},
-    service::reconcile_prometheus_exporter_service,
     telemetry, Error, Metrics, Result,
 };
 use k8s_openapi::{
@@ -43,7 +41,7 @@ use crate::{
     extensions::{database_queries::list_config_params, reconcile_extensions},
     ingress::{reconcile_extra_postgres_ing_route_tcp, reconcile_ip_allowlist_middleware},
     network_policies::reconcile_network_policies,
-    postgres_exporter::reconcile_prom_configmap,
+    postgres_exporter::reconcile_metrics_configmap,
     trunk::{extensions_that_require_load, reconcile_trunk_configmap},
 };
 use rand::Rng;
@@ -214,25 +212,6 @@ impl CoreDB {
             }
         };
 
-        reconcile_app_services(self, ctx.clone()).await?;
-
-        if self.spec.postgresExporterEnabled
-            && self
-                .spec
-                .metrics
-                .as_ref()
-                .and_then(|m| m.queries.as_ref())
-                .is_some()
-        {
-            debug!("Reconciling prometheus configmap");
-            reconcile_prom_configmap(self, client.clone(), &ns)
-                .await
-                .map_err(|e| {
-                    error!("Error reconciling prometheus configmap: {:?}", e);
-                    Action::requeue(Duration::from_secs(300))
-                })?;
-        }
-
         debug!("Reconciling secret");
         // Superuser connection info
         reconcile_secret(self, ctx.clone()).await.map_err(|e| {
@@ -240,19 +219,22 @@ impl CoreDB {
             Action::requeue(Duration::from_secs(300))
         })?;
 
-        // Postgres exporter connection info
-        if self.spec.postgresExporterEnabled {
-            let _ = reconcile_postgres_role_secret(
-                self,
-                ctx.clone(),
-                "postgres_exporter",
-                &format!("{}-exporter", name.clone()),
-            )
-            .await
-            .map_err(|e| {
-                error!("Error reconciling postgres exporter secret: {:?}", e);
-                Action::requeue(Duration::from_secs(300))
-            })?;
+        reconcile_app_services(self, ctx.clone()).await?;
+
+        if self
+            .spec
+            .metrics
+            .as_ref()
+            .and_then(|m| m.queries.as_ref())
+            .is_some()
+        {
+            debug!("Reconciling prometheus configmap");
+            reconcile_metrics_configmap(self, client.clone(), &ns)
+                .await
+                .map_err(|e| {
+                    error!("Error reconciling prometheus configmap: {:?}", e);
+                    Action::requeue(Duration::from_secs(300))
+                })?;
         }
 
         let _ =
@@ -270,22 +252,11 @@ impl CoreDB {
             reconcile_cnpg_scheduled_backup(self, ctx.clone()).await?;
         }
 
-        if self.spec.postgresExporterEnabled {
-            debug!("Reconciling prometheus exporter deployment");
-            reconcile_prometheus_exporter_deployment(self, ctx.clone())
-                .await
-                .map_err(|e| {
-                    error!("Error reconciling prometheus exporter deployment: {:?}", e);
-                    Action::requeue(Duration::from_secs(300))
-                })?;
-        };
-
-        // reconcile service
-        debug!("Reconciling prometheus exporter service");
-        reconcile_prometheus_exporter_service(self, ctx.clone())
+        // Cleanup old Postgres Exporter Deployments, Service, ServiceAccount, Role and RoleBinding
+        crate::deployment_postgres_exporter::cleanup_postgres_exporter(self, ctx.clone())
             .await
             .map_err(|e| {
-                error!("Error reconciling service: {:?}", e);
+                error!("Error reconciling prometheus exporter deployment: {:?}", e);
                 Action::requeue(Duration::from_secs(300))
             })?;
 

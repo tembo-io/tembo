@@ -1,10 +1,11 @@
-use crate::cli::instance::Instance;
-use crate::Result;
-use anyhow::bail;
+use anyhow::Error;
+use anyhow::{bail, Context};
 use simplelog::*;
 use spinners::{Spinner, Spinners};
-use std::process::Command as ShellCommand;
+use std::io::{BufRead, BufReader};
 use std::process::Output;
+use std::process::{Command as ShellCommand, Stdio};
+use std::thread;
 
 pub struct Docker {}
 
@@ -17,7 +18,7 @@ impl Docker {
             .expect("failed to execute process")
     }
 
-    pub fn installed_and_running() -> Result {
+    pub fn installed_and_running() -> Result<(), anyhow::Error> {
         info!("Checking requirements: [Docker]");
 
         let output = Self::info();
@@ -42,77 +43,104 @@ impl Docker {
     }
 
     // Build & run docker image
-    pub fn build_run() -> Result {
-        let mut sp = Spinner::new(Spinners::Line, "Running Docker Build & Run".into());
-        let container_name = "tembo-pg";
-
-        if Self::container_list_filtered(container_name)
-            .unwrap()
-            .contains(container_name)
-        {
-            sp.stop_with_message("- Existing container found".to_string());
+    pub fn build_run(instance_name: String, verbose: bool) -> Result<i32, anyhow::Error> {
+        let mut sp = if !verbose {
+            Some(Spinner::new(
+                Spinners::Line,
+                "Running Docker Build & Run".into(),
+            ))
         } else {
-            let command = format!(
-                "docker build . -t postgres && docker run --name {} -p 5432:5432 -d postgres",
-                container_name
-            );
-            run_command(&command)?;
-            sp.stop_with_message("- Docker Build & Run completed".to_string());
-        }
-
-        Ok(())
-    }
-
-    // run sqlx migrate
-    pub fn run_sqlx_migrate() -> Result {
-        let mut sp = Spinner::new(Spinners::Line, "Running SQL migration".into());
-
-        let command = "DATABASE_URL=postgres://postgres:postgres@localhost:5432 sqlx migrate run";
-        run_command(command)?;
-
-        sp.stop_with_message("- SQL migration completed".to_string());
-
-        Ok(())
-    }
-
-    // start container if exists for name otherwise build container and start
-    pub fn start(name: &str, instance: &Instance) -> Result {
-        if Self::container_list_filtered(name)
-            .unwrap()
-            .contains("tembo-pg")
-        {
-            info!("existing container found");
-
-            instance.start();
-        } else {
-            info!("building and then running container");
-
-            let _ = instance.init();
+            None
         };
 
-        Ok(())
+        let container_list = Self::container_list_filtered(&instance_name)?;
+
+        if container_list.contains(&instance_name) {
+            if verbose {
+                println!("- Existing container found, removing");
+            } else {
+                sp.as_mut()
+                    .unwrap()
+                    .stop_with_message("- Existing container found, removing".to_string());
+                sp = Some(Spinner::new(
+                    Spinners::Line,
+                    "- Building and running container".into(),
+                ))
+            }
+
+            Docker::stop_remove(&instance_name)?;
+        }
+
+        let port = Docker::get_available_port()?;
+
+        let command = format!(
+            "docker build . -t postgres-{} && docker run --rm --name {} -p {}:{} -d postgres-{}",
+            instance_name, instance_name, port, port, instance_name
+        );
+        run_command(&command, verbose)?;
+
+        if verbose {
+            println!("- Docker Build & Run completed");
+        } else {
+            sp.as_mut()
+                .unwrap()
+                .stop_with_message("- Docker Build & Run completed".to_string());
+        }
+
+        Ok(port)
+    }
+
+    fn get_available_port() -> Result<i32, anyhow::Error> {
+        let ls_command = "docker ps --format '{{.Ports}}'";
+
+        let output = ShellCommand::new("sh")
+            .arg("-c")
+            .arg(ls_command)
+            .output()
+            .expect("failed to execute process");
+        let stdout = String::from_utf8(output.stdout)?;
+
+        Docker::get_container_port(stdout)
+    }
+
+    fn get_container_port(container_list: String) -> Result<i32, anyhow::Error> {
+        if container_list.contains("5432") {
+            if container_list.contains("5433") {
+                if container_list.contains("5434") {
+                    Err(Error::msg(
+                        "None of the ports 5432, 5433, 5434 are available!",
+                    ))
+                } else {
+                    Ok(5434)
+                }
+            } else {
+                Ok(5433)
+            }
+        } else {
+            Ok(5432)
+        }
     }
 
     // stop & remove container for given name
-    pub fn stop_remove(name: &str) -> Result {
+    pub fn stop_remove(name: &str) -> Result<(), anyhow::Error> {
         let mut sp = Spinner::new(Spinners::Line, "Stopping & Removing instance".into());
 
-        if !Self::container_list_filtered(name)
-            .unwrap()
-            .contains("tembo-pg")
-        {
-            sp.stop_with_message(format!("- Tembo instance {} doesn't exist", "tembo-pg"));
+        if !Self::container_list_filtered(name).unwrap().contains(name) {
+            sp.stop_with_message(format!("- Tembo instance {} doesn't exist", name));
         } else {
-            let mut command: String = String::from("docker stop ");
-            command.push_str(name);
-            command.push_str(" && docker rm ");
+            let mut command: String = String::from("docker rm --force ");
             command.push_str(name);
 
-            let output = ShellCommand::new("sh")
-                .arg("-c")
-                .arg(&command)
-                .output()
-                .expect("failed to execute process");
+            let output = match ShellCommand::new("sh").arg("-c").arg(&command).output() {
+                Ok(output) => output,
+                Err(_) => {
+                    sp.stop_with_message(format!(
+                        "- Tembo instance {} failed to stop & remove",
+                        &name
+                    ));
+                    bail!("There was an issue stopping the instance")
+                }
+            };
 
             sp.stop_with_message(format!("- Tembo instance {} stopped & removed", &name));
 
@@ -126,22 +154,7 @@ impl Docker {
         Ok(())
     }
 
-    #[allow(dead_code)]
-    pub fn container_list() -> Result<String> {
-        let mut ls_command = String::from("cd tembo "); // TODO: does this work for installed crates?
-        ls_command.push_str("&& docker ls --all");
-
-        let output = ShellCommand::new("sh")
-            .arg("-c")
-            .arg(&ls_command)
-            .output()
-            .expect("failed to execute process");
-        let stdout = String::from_utf8(output.stdout);
-
-        Ok(stdout.unwrap())
-    }
-
-    pub fn container_list_filtered(name: &str) -> Result<String> {
+    pub fn container_list_filtered(name: &str) -> Result<String, anyhow::Error> {
         let ls_command = format!("docker container ls --all -f name={}", name);
 
         let output = ShellCommand::new("sh")
@@ -155,18 +168,45 @@ impl Docker {
     }
 }
 
-pub fn run_command(command: &str) -> Result<()> {
-    let output = ShellCommand::new("sh")
+pub fn run_command(command: &str, verbose: bool) -> Result<(), anyhow::Error> {
+    let mut child = ShellCommand::new("sh")
         .arg("-c")
         .arg(command)
-        .output()
-        .expect("failed to execute process");
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .with_context(|| format!("Failed to spawn command '{}'", command))?;
 
-    // Using output status to determine whether there is an error or not
-    // because stderr returns a value even when there is no error
-    if !output.status.success() {
-        let stderr = String::from_utf8(output.stderr).unwrap();
-        bail!("There was an issue running command: {}", stderr)
+    if verbose {
+        let stdout = BufReader::new(child.stdout.take().expect("Failed to open stdout"));
+        let stderr = BufReader::new(child.stderr.take().expect("Failed to open stderr"));
+
+        let stdout_handle = thread::spawn(move || {
+            for line in stdout.lines() {
+                match line {
+                    Ok(line) => println!("{}", line),
+                    Err(e) => eprintln!("Error reading line from stdout: {}", e),
+                }
+            }
+        });
+
+        let stderr_handle = thread::spawn(move || {
+            for line in stderr.lines() {
+                match line {
+                    Ok(line) => eprintln!("{}", line),
+                    Err(e) => eprintln!("Error reading line from stderr: {}", e),
+                }
+            }
+        });
+
+        stdout_handle.join().expect("Stdout thread panicked");
+        stderr_handle.join().expect("Stderr thread panicked");
+    }
+
+    let status = child.wait().expect("Failed to wait on child");
+
+    if !status.success() {
+        bail!("Command executed with failures");
     }
 
     Ok(())

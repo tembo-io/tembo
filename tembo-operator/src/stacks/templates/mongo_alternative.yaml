@@ -1,0 +1,87 @@
+name: MongoAlternative
+description: Document-facing workloads on Postgres.
+image: "quay.io/tembo/standard-cnpg:15.3.0-1-1096aeb"
+stack_version: 0.1.0
+appServices:
+  - name: fdb-api
+    image: ghcr.io/ferretdb/ferretdb
+    routing:
+      - port: 27018
+        ingressPath: /ferretdb/v1
+        entryPoints:
+          - ferretdb
+        ingressType: tcp
+    env:
+      - name: FERRETDB_POSTGRESQL_URL
+        valueFromPlatform: ReadWriteConnection
+      - name: FERRETDB_LOG_LEVEL
+        value: debug
+      - name: FERRETDB_STATE_DIR
+        value: '-'
+      - name: FERRETDB_LISTEN_TLS_CERT_FILE
+        value: /tembo/certs/tls.crt
+      - name: FERRETDB_LISTEN_TLS_KEY_FILE
+        value: /tembo/certs/tls.key
+      - name: FERRETDB_LISTEN_TLS
+        value: :27018
+    storage:
+      volumes:
+        - name: ferretdb-data
+          ephemeral:
+            volumeClaimTemplate:
+              spec:
+                accessModes:
+                  - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: 1Gi
+      volumeMounts:
+        - name: ferretdb-data
+          mountPath: /state
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 400m
+        memory: 256Mi
+compute_templates:
+  - cpu: 1
+    memory: 4Gi
+  - cpu: 2
+    memory: 8Gi
+  - cpu: 4
+    memory: 16Gi
+  - cpu: 8
+    memory: 32Gi
+  - cpu: 16
+    memory: 32Gi
+trunk_installs:
+  - name: pg_stat_statements
+    version: 1.10.0
+extensions:
+  - name: pg_stat_statements
+    locations:
+      - database: postgres
+        enabled: true
+        version: 1.10.0
+postgres_config_engine: standard
+postgres_config:
+  - name: autovacuum_vacuum_cost_limit
+    value: -1
+  - name: autovacuum_vacuum_scale_factor
+    value: 0.05
+  - name: autovacuum_vacuum_insert_scale_factor
+    value: 0.05
+  - name: autovacuum_analyze_scale_factor
+    value: 0.05
+  - name: checkpoint_timeout
+    value: 10min
+  - name: track_activity_query_size
+    value: 2048
+  - name: wal_compression
+    value: 'on'
+  - name: track_io_timing
+    value: 'on'
+  - name: log_min_duration_statement # https://www.postgresql.org/docs/15/runtime-config-logging.html
+    value: 1000

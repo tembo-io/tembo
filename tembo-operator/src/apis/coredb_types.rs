@@ -364,9 +364,8 @@ pub struct CoreDBSpec {
     #[serde(default = "defaults::default_pkglibdir_storage")]
     pub pkglibdirStorage: Quantity,
 
-    /// Enable the use of the Postgres Exporter deployment for metrics collection
-    ///
-    /// **Default**: true.
+    /// **DEPRECATED** Enable the use of the Postgres Exporter deployment for metrics collection
+    /// This is no longer used and will be removed in a future release.
     #[serde(default = "defaults::default_postgres_exporter_enabled")]
     pub postgresExporterEnabled: bool,
 
@@ -379,9 +378,8 @@ pub struct CoreDBSpec {
     #[serde(default = "defaults::default_image")]
     pub image: String,
 
-    /// The postgres-exporter image you want to use for the postgres-exporter deployment.
-    ///
-    /// **Default**: quay.io/prometheuscommunity/postgres-exporter:v0.12.0
+    /// **DEPRECATED** The postgres-exporter image you want to use for the postgres-exporter deployment.
+    /// This is no longer used and will be removed in a future release.
     #[serde(default = "defaults::default_postgres_exporter_image")]
     pub postgresExporterImage: String,
 
