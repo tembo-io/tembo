@@ -43,8 +43,7 @@ impl Docker {
     }
 
     // Build & run docker image
-    pub fn build_run(instance_name: String) -> Result<i32, anyhow::Error> {
-        let verbose = false;
+    pub fn build_run(instance_name: String, verbose: bool) -> Result<i32, anyhow::Error> {
         let mut sp = if !verbose {
             Some(Spinner::new(Spinners::Line, "Running Docker Build & Run".into()))
         } else {
@@ -54,8 +53,6 @@ impl Docker {
         let container_list = Self::container_list_filtered(&instance_name)?;
 
         if container_list.contains(&instance_name) {
-            let container_port = Docker::get_container_port(container_list)?;
-
             if verbose {
                 println!("- Existing container found, removing");
             } else {

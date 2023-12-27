@@ -39,7 +39,7 @@ const POSTGRESCONF_NAME: &str = "postgres.conf";
 #[derive(Args)]
 pub struct ApplyCommand {}
 
-pub fn execute() -> Result<(), anyhow::Error> {
+pub fn execute(verbose: bool) -> Result<(), anyhow::Error> {
     info!("Running validation!");
     super::validate::execute()?;
     info!("Validation completed!");
@@ -47,7 +47,7 @@ pub fn execute() -> Result<(), anyhow::Error> {
     let env = get_current_context()?;
 
     if env.target == Target::Docker.to_string() {
-        return execute_docker();
+        return execute_docker(verbose);
     } else if env.target == Target::TemboCloud.to_string() {
         return execute_tembo_cloud(env.clone());
     }
@@ -55,7 +55,7 @@ pub fn execute() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-fn execute_docker() -> Result<(), anyhow::Error> {
+fn execute_docker(verbose: bool) -> Result<(), anyhow::Error> {
     Docker::installed_and_running()?;
 
     let instance_settings: HashMap<String, InstanceSettings> = get_instance_settings()?;
@@ -85,7 +85,7 @@ fn execute_docker() -> Result<(), anyhow::Error> {
     )?;
 
     for (_key, value) in instance_settings.iter() {
-        let port = Docker::build_run(value.instance_name.clone())?;
+        let port = Docker::build_run(value.instance_name.clone(), verbose)?;
 
         // Allows DB instance to be ready before running migrations
         sleep(Duration::from_secs(3));
