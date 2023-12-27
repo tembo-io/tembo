@@ -1,27 +1,22 @@
-use crate::Result;
+use clap::{Args, Subcommand};
 
-use clap::ArgMatches;
-use simplelog::*;
+use set::ContextSetArgs;
 
 pub mod list;
 pub mod set;
 
-// handles all context command calls
-pub fn execute(args: &ArgMatches) -> Result<()> {
-    // execute the context subcommands
-    let res = match args.subcommand() {
-        Some(("list", sub_matches)) => list::execute(sub_matches),
-        Some(("set", sub_matches)) => set::execute(sub_matches),
+/// Manage Tembo contexts
+#[derive(Args)]
+pub struct ContextCommand {
+    #[clap(subcommand)]
+    pub subcommand: ContextSubCommand,
+}
 
-        _ => unreachable!(),
-    };
-
-    if res.is_err() {
-        error!("{}", res.err().unwrap());
-
-        // TODO: adding logging, log error
-        std::process::exit(101);
-    }
-
-    Ok(())
+// Enum for subcommands of 'context'
+#[derive(Subcommand)]
+pub enum ContextSubCommand {
+    /// List all available contexts
+    List,
+    /// Set the current context
+    Set(ContextSetArgs),
 }
