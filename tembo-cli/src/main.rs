@@ -1,7 +1,7 @@
 use crate::cmd::delete::DeleteCommand;
 use crate::cmd::validate::ValidateCommand;
 use crate::cmd::{apply, context, delete, init, validate};
-use clap::{crate_authors, crate_version, Args, Parser, Subcommand};
+use clap::{crate_authors, crate_version, Parser, Subcommand};
 use cmd::apply::ApplyCommand;
 use cmd::context::{ContextCommand, ContextSubCommand};
 use cmd::init::InitCommand;
@@ -12,9 +12,6 @@ mod cmd;
 #[derive(Parser)]
 #[clap(author = crate_authors!("\n"), version = crate_version!(), about = "Tembo CLI", long_about = None)]
 struct App {
-    #[clap(flatten)]
-    global_opts: GlobalOpts,
-
     #[clap(subcommand)]
     command: SubCommands,
 }
@@ -27,15 +24,6 @@ enum SubCommands {
     Apply(ApplyCommand),
     Validate(ValidateCommand),
     Delete(DeleteCommand),
-}
-
-// Global options available to all subcommands
-#[derive(Args)]
-struct GlobalOpts {
-    // Define global options here
-    // Example: Verbose mode
-    #[clap(short, long, action = clap::ArgAction::Count)]
-    verbose: u8,
 }
 
 fn main() -> Result<(), anyhow::Error> {
