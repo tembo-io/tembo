@@ -30,7 +30,7 @@ use crate::cli::file_utils::FileUtils;
 use crate::cli::sqlx_utils::SqlxUtils;
 use crate::cli::tembo_config;
 use crate::cli::tembo_config::InstanceSettings;
-use tera::Tera;
+use tera::{Context, Tera};
 
 const DOCKERFILE_NAME: &str = "Dockerfile";
 const POSTGRESCONF_NAME: &str = "postgres.conf";
@@ -441,22 +441,13 @@ pub fn get_instance_settings() -> Result<HashMap<String, InstanceSettings>, anyh
 pub fn get_rendered_dockerfile(
     instance_settings: HashMap<String, InstanceSettings>,
 ) -> Result<String, anyhow::Error> {
-    let filename = "Dockerfile.template";
-    let filepath =
-        "https://raw.githubusercontent.com/tembo-io/tembo/main/tembo-cli/tembo/Dockerfile.template";
-
-    FileUtils::download_file(filepath, filename, true)?;
-
-    let contents = match fs::read_to_string(filename) {
-        Ok(c) => c,
-        Err(e) => {
-            panic!("Couldn't read file {}: {}", filename, e);
-        }
-    };
+    // Include the Dockerfile template directly into the binary
+    let contents = include_str!("../../tembo/Dockerfile.template");
 
     let mut tera = Tera::new("templates/**/*").unwrap();
-    let _ = tera.add_raw_template("dockerfile", &contents);
-    let mut context = tera::Context::new();
+    let _ = tera.add_raw_template("dockerfile", contents);
+    let mut context = Context::new();
+
     for (_key, value) in instance_settings.iter() {
         let stack_type = ControllerStackType::from_str(value.stack_type.as_str())
             .unwrap_or(ControllerStackType::Standard);
@@ -464,10 +455,10 @@ pub fn get_rendered_dockerfile(
         let stack = get_stack(stack_type);
 
         context.insert("stack_trunk_installs", &stack.trunk_installs);
-        // Default handles the case of extensions not configured in tembo.toml
         let extensions = value.extensions.clone().unwrap_or_default();
         context.insert("extensions", &extensions);
     }
+
     let rendered_dockerfile = tera.render("dockerfile", &context).unwrap();
 
     Ok(rendered_dockerfile)
