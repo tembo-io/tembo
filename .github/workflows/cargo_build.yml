@@ -18,7 +18,9 @@ jobs:
     # does not exist, ignoring if the version is already
     # published.
     name: Cargo build
-    runs-on: quay.io/tembo/muslrust:1.71.0-stable
+    runs-on: ubuntu-20.04
+    container:
+      image: quay.io/tembo/muslrust:1.71.0-stable
       #needs:
       # - find_directories
     strategy:
