@@ -33,17 +33,6 @@ jobs:
         id: cargo_flags
         run: |
           set -x
-          BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
-          if [ "${BRANCH_NAME}" == "main" ]; then
-            echo "dry_run=false" >> $GITHUB_OUTPUT
-            echo "fail_if_version_published=false" >> $GITHUB_OUTPUT
-          elif [[ "${BRANCH_NAME}" == release/* ]]; then
-            echo "dry_run=false" >> $GITHUB_OUTPUT
-            echo "fail_if_version_published=false" >> $GITHUB_OUTPUT
-          else
-            echo "dry_run=true" >> $GITHUB_OUTPUT
-            echo "fail_if_version_published=false" >> $GITHUB_OUTPUT
-          fi
           cargo build --release --target=x86_64-unknown-linux-musl
       - uses: Swatinem/rust-cache@v2
         with:
