@@ -18,7 +18,6 @@ jobs:
     # does not exist, ignoring if the version is already
     # published.
     name: Cargo build
-    working-directory: ./tembo-cli
     runs-on: quay.io/tembo/muslrust:1.71.0-stable
       #needs:
       # - find_directories
@@ -29,6 +28,7 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v3
       - name: Determine which flags to use on cargo publish
+        working-directory: ./tembo-cli
         id: cargo_flags
         run: |
           set -x
