@@ -1,4 +1,4 @@
-name: Cargo publish or validate
+name: Cargo Build
 
 on:
   pull_request:
