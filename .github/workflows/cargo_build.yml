@@ -23,7 +23,6 @@ jobs:
       # - find_directories
     strategy:
       fail-fast: false
-      matrix: ${{ fromJson(needs.find_directories.outputs.changed_crates) }}
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
