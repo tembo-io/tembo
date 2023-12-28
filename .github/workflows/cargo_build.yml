@@ -1,0 +1,51 @@
+name: Cargo publish or validate
+
+on:
+  pull_request:
+    branches:
+      - gh-release
+
+  push:
+    branches:
+      - 'gh-release'
+
+jobs:
+
+  cargo_build:
+    # On a pull request, this is validating that the version
+    # is not already published to crates.io, and on a push to
+    # main or release branches, it is publishing if the version
+    # does not exist, ignoring if the version is already
+    # published.
+    name: Cargo build
+    working-directory: ./tembo-cli
+    runs-on: quay.io/tembo/muslrust:1.71.0-stable
+      #needs:
+      # - find_directories
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.find_directories.outputs.changed_crates) }}
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v3
+      - name: Determine which flags to use on cargo publish
+        id: cargo_flags
+        run: |
+          set -x
+          BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
+          if [ "${BRANCH_NAME}" == "main" ]; then
+            echo "dry_run=false" >> $GITHUB_OUTPUT
+            echo "fail_if_version_published=false" >> $GITHUB_OUTPUT
+          elif [[ "${BRANCH_NAME}" == release/* ]]; then
+            echo "dry_run=false" >> $GITHUB_OUTPUT
+            echo "fail_if_version_published=false" >> $GITHUB_OUTPUT
+          else
+            echo "dry_run=true" >> $GITHUB_OUTPUT
+            echo "fail_if_version_published=false" >> $GITHUB_OUTPUT
+          fi
+          cargo build --release --target=x86_64-unknown-linux-musl
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: ${{ matrix.name }}
+          workspaces: |
+            ${{ matrix.path }}
