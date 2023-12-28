@@ -55,7 +55,7 @@ fn main() -> Result<(), anyhow::Error> {
             apply::execute(app.global_opts.verbose)?;
         }
         SubCommands::Validate(_validate_cmd) => {
-            validate::execute()?;
+            validate::execute(app.global_opts.verbose)?;
         }
         SubCommands::Delete(_delete_cmd) => {
             delete::execute()?;

@@ -41,7 +41,7 @@ pub struct ApplyCommand {}
 
 pub fn execute(verbose: bool) -> Result<(), anyhow::Error> {
     info!("Running validation!");
-    super::validate::execute()?;
+    super::validate::execute(verbose)?;
     info!("Validation completed!");
 
     let env = get_current_context()?;
