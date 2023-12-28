@@ -47,6 +47,7 @@ jobs:
         with:
           tag_name: ${{ github.ref }}
           release_name: Release ${{ github.ref }}
+          working-directory: ${{ matrix.path }}
           draft: true
           prerelease: true
 
