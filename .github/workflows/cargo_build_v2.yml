@@ -29,6 +29,8 @@ jobs:
           - target: x86_64-unknown-linux-musl
             os: ubuntu-20.04
     runs-on: ${{ matrix.os }}
+    env:
+      PKG_CONFIG_SYSROOT_DIR: /
     steps:
       - uses: actions/checkout@v4
       - name: Install cross-compilation tools
