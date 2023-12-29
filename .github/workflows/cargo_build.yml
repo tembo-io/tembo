@@ -5,18 +5,9 @@ on:
     branches:
       - gh-release
 
-  push:
-    branches:
-      - 'gh-release'
-
 jobs:
 
   cargo_build:
-    # On a pull request, this is validating that the version
-    # is not already published to crates.io, and on a push to
-    # main or release branches, it is publishing if the version
-    # does not exist, ignoring if the version is already
-    # published.
     name: Cargo build
     runs-on: ubuntu-20.04
     container:
@@ -28,9 +19,9 @@ jobs:
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
-      - name: Determine which flags to use on cargo publish
+      - name: Cargo build
         working-directory: ./tembo-cli
-        id: cargo_flags
+        id: cargo_build
         run: |
           set -x
           cargo build --release --target=x86_64-unknown-linux-musl
