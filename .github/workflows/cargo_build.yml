@@ -1,9 +1,9 @@
 name: Cargo Build
 
 on:
-  pull_request:
-    branches:
-      - gh-release
+  push:
+    tags:
+      - v[0-9]+.*-beta
 
 jobs:
 
@@ -30,15 +30,4 @@ jobs:
           prefix-key: ${{ matrix.name }}
           workspaces: |
             ${{ matrix.path }}
-      - name: Create Release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} # This token is provided by Actions, you do not need to create your own token
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          working-directory: ${{ matrix.path }}
-          draft: true
-          prerelease: true
 
