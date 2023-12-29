@@ -16,23 +16,23 @@ compute_templates:
     cpu: 8
     memory: 32Gi
     instance_class: GeneralPurpose
-  - name: CI-4
+  - name: C-4
     cpu: 2
     memory: 4Gi
     instance_class: ComputeOptimized
-  - name: CI-8
+  - name: C-8
     cpu: 4
     memory: 8Gi
     instance_class: ComputeOptimized
-  - name: CI-16
+  - name: C-16
     cpu: 8
     memory: 16Gi
     instance_class: ComputeOptimized
-  - name: MI-16
+  - name: M-16
     cpu: 2
     memory: 16Gi
     instance_class: MemoryOptimized
-  - name: MI-32
+  - name: M-32
     cpu: 4
     memory: 32Gi
     instance_class: MemoryOptimized
