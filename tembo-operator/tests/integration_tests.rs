@@ -2935,7 +2935,7 @@ mod test {
         });
         let params = PatchParams::apply("tembo-integration-test");
         let patch = Patch::Apply(&coredb_json);
-        let coredb_resource = coredbs.patch(cdb_name, &params, &patch).await.unwrap();
+        let _coredb_resource = coredbs.patch(cdb_name, &params, &patch).await.unwrap();
 
         // assert we created three Deployments, with the names we provided
         let deployment_items: Vec<Deployment> = list_resources(client.clone(), cdb_name, &namespace, 3)

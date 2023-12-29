@@ -4,15 +4,29 @@ image: "quay.io/tembo/ml-cnpg:15.3.0-1-93dae54"
 stack_version: 0.3.0
 compute_templates:
   - cpu: 2
+    memory: 8Gi
+    instance_class: GeneralPurpose
+  - cpu: 4
+    memory: 16Gi
+    instance_class: GeneralPurpose
+  - cpu: 8
+    memory: 32Gi
+    instance_class: GeneralPurpose
+  - cpu: 2
     memory: 4Gi
+    instance_class: ComputeOptimized
   - cpu: 4
     memory: 8Gi
+    instance_class: ComputeOptimized
   - cpu: 8
     memory: 16Gi
-  - cpu: 16
+    instance_class: ComputeOptimized
+  - cpu: 2
+    memory: 16Gi
+    instance_class: MemoryOptimized
+  - cpu: 4
     memory: 32Gi
-  - cpu: 32
-    memory: 32Gi
+    instance_class: MemoryOptimized
 postgres_config_engine: standard
 postgres_config:
   - name: pg_stat_statements.track
