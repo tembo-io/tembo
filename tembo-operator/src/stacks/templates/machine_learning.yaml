@@ -3,15 +3,29 @@ description: A Postgres instance equipped with machine learning extensions and o
 image: "quay.io/tembo/ml-cnpg:15.3.0-1-93dae54"
 stack_version: 0.3.0
 compute_templates:
-  - cpu: 2
-    memory: 4Gi
-  - cpu: 4
+  - name: GP-8
+    cpu: 2
     memory: 8Gi
-  - cpu: 8
+  - name: GP-16
+    cpu: 4
     memory: 16Gi
-  - cpu: 16
+  - name: GP-32
+    cpu: 8
     memory: 32Gi
-  - cpu: 32
+  - name: CI-4
+    cpu: 2
+    memory: 4Gi
+  - name: CI-8
+    cpu: 4
+    memory: 8Gi
+  - name: CI-16
+    cpu: 8
+    memory: 16Gi
+  - name: MI-16
+    cpu: 2
+    memory: 16Gi
+  - name: MI-32
+    cpu: 4
     memory: 32Gi
 postgres_config_engine: standard
 postgres_config:

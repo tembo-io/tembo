@@ -3,19 +3,50 @@ description: A balanced Postgres instance optimized for OLTP workloads.
 image: "quay.io/tembo/standard-cnpg:15.3.0-1-1096aeb"
 stack_version: 0.1.0
 compute_templates:
-  - cpu: 0.25
+  - name: GP-1
+    cpu: 0.25
     memory: 1Gi
-  - cpu: 0.5
+  - name: GP-2
+    cpu: 0.5
     memory: 2Gi
-  - cpu: 1
+  - name: GP-4
+    cpu: 1
     memory: 4Gi
-  - cpu: 2
+  - name: GP-8
+    cpu: 2
     memory: 8Gi
-  - cpu: 4
+  - name: GP-16
+    cpu: 4
     memory: 16Gi
-  - cpu: 8
+  - name: GP-32
+    cpu: 8
     memory: 32Gi
-  - cpu: 16
+  - name: CI-1
+    cpu: 0.5
+    memory: 1Gi
+  - name: CI-2
+    cpu: 1
+    memory: 2Gi
+  - name: CI-4
+    cpu: 2
+    memory: 4Gi
+  - name: CI-8
+    cpu: 4
+    memory: 8Gi
+  - name: CI-16
+    cpu: 8
+    memory: 16Gi
+  - name: MI-4
+    cpu: 0.5
+    memory: 4Gi
+  - name: MI-8
+    cpu: 1
+    memory: 8Gi
+  - name: MI-16
+    cpu: 2
+    memory: 16Gi
+  - name: MI-32
+    cpu: 4
     memory: 32Gi
 postgres_config_engine: standard
 postgres_config:
