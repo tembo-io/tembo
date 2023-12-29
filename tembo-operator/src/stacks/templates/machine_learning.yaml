@@ -3,7 +3,6 @@ description: A Postgres instance equipped with machine learning extensions and o
 image: "quay.io/tembo/ml-cnpg:15.3.0-1-93dae54"
 stack_version: 0.3.0
 compute_templates:
-    instance_class: GeneralPurpose
   - name: GP-8
     cpu: 2
     memory: 8Gi
