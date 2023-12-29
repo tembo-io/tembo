@@ -23,6 +23,7 @@ jobs:
           changelog: CHANGELOG.md
           # (required) GitHub token for creating GitHub Releases.
           token: ${{ secrets.GITHUB_TOKEN }}
+          draft: true
 
   upload-assets:
     needs: create-release
