@@ -49,36 +49,43 @@ compute_templates:
   - name: GP-4
     cpu: 1
     memory: 4Gi
+    instance_class: GeneralPurpose
   - name: GP-8
     cpu: 2
     memory: 8Gi
+    instance_class: GeneralPurpose
   - name: GP-16
     cpu: 4
     memory: 16Gi
+    instance_class: GeneralPurpose
   - name: GP-32
     cpu: 8
     memory: 32Gi
+    instance_class: GeneralPurpose
   - name: CI-4
     cpu: 2
     memory: 4Gi
+    instance_class: ComputeOptimized
   - name: CI-8
     cpu: 4
     memory: 8Gi
+    instance_class: ComputeOptimized
   - name: CI-16
     cpu: 8
     memory: 16Gi
-  - name: MI-4
-    cpu: 0.5
-    memory: 4Gi
+    instance_class: ComputeOptimized
   - name: MI-8
     cpu: 1
     memory: 8Gi
+    instance_class: MemoryOptimized
   - name: MI-16
     cpu: 2
     memory: 16Gi
+    instance_class: MemoryOptimized
   - name: MI-32
     cpu: 4
     memory: 32Gi
+    instance_class: MemoryOptimized
 trunk_installs:
   - name: pg_stat_statements
     version: 1.10.0
