@@ -40,7 +40,7 @@ jobs:
         if: startsWith(matrix.os, 'ubuntu')
       - name: Installs build deps
         run: |
-          sudo apt install libssl-dev
+          sudo apt-get install libssl-dev
       - name: Uploads CLI actifacts
         uses: taiki-e/upload-rust-binary-action@v1
         with:
