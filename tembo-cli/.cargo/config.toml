@@ -1,0 +1,10 @@
+[env]
+# Delete this configuration when CLI supports
+# multiple databases at the same time.
+# When we add SNI proxy, then we can do it like
+# behind the same proxy even for different
+# DBs or different tembo.toml files, so instead we
+# just limit there are no two DBs of same name.
+# And different tembo.tomls with tembo apply
+# on same system can use shared SNI proxy.
+RUST_TEST_THREADS = "1"

@@ -1,0 +1,7 @@
+[data-warehouse]
+environment = "test"
+instance_name = "data-warehouse"
+cpu = "2"
+memory = "8Gi"
+storage = "50Gi"
+stack_type = "DataWarehouse"
