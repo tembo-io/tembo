@@ -4,13 +4,9 @@ permissions:
   contents: write
 
 on:
-  pull_request:
-    branches:
-      - gh-release
-
   push:
-    branches:
-      - 'gh-release'
+    tags:
+      - test-*
 
 jobs:
   create-release:
