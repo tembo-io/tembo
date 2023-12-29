@@ -37,7 +37,6 @@ jobs:
           target: ${{ matrix.target }}
         if: startsWith(matrix.os, 'ubuntu')
       - name: Uploads CLI actifacts
-        working-directory: ./tembo-cli
         uses: taiki-e/upload-rust-binary-action@v1
         with:
           # (required) Comma-separated list of binary names (non-extension portion of filename) to build and upload.
@@ -47,3 +46,4 @@ jobs:
           target: ${{ matrix.target }}
           # (required) GitHub token for uploading assets to GitHub Releases.
           token: ${{ secrets.GITHUB_TOKEN }}
+          manifest-path: ./tembo-cli/Cargo.toml
