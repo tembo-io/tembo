@@ -129,7 +129,6 @@ fn default_storage() -> String {
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, JsonSchema, PartialEq)]
 pub struct ComputeTemplate {
-    pub name: String,
     pub cpu: String,
     pub memory: String,
     pub instance_class: InstanceClass,

@@ -3,64 +3,49 @@ description: A Postgres instance equipped with configuration and extensions for 
 image: "quay.io/tembo/standard-cnpg:15.3.0-1-1096aeb"
 stack_version: 0.1.0
 compute_templates:
-  - name: GP-1
-    cpu: 0.25
+  - cpu: 0.25
     memory: 1Gi
     instance_class: GeneralPurpose
-  - name: GP-2
-    cpu: 0.5
+  - cpu: 0.5
     memory: 2Gi
     instance_class: GeneralPurpose
-  - name: GP-4
-    cpu: 1
+  - cpu: 1
     memory: 4Gi
     instance_class: GeneralPurpose
-  - name: GP-8
-    cpu: 2
+  - cpu: 2
     memory: 8Gi
     instance_class: GeneralPurpose
-  - name: GP-16
-    cpu: 4
+  - cpu: 4
     memory: 16Gi
     instance_class: GeneralPurpose
-  - name: GP-32
-    cpu: 8
+  - cpu: 8
     memory: 32Gi
     instance_class: GeneralPurpose
-  - name: C-1
-    cpu: 0.5
+  - cpu: 0.5
     memory: 1Gi
     instance_class: ComputeOptimized
-  - name: C-2
-    cpu: 1
+  - cpu: 1
     memory: 2Gi
     instance_class: ComputeOptimized
-  - name: C-4
-    cpu: 2
+  - cpu: 2
     memory: 4Gi
     instance_class: ComputeOptimized
-  - name: C-8
-    cpu: 4
+  - cpu: 4
     memory: 8Gi
     instance_class: ComputeOptimized
-  - name: C-16
-    cpu: 8
+  - cpu: 8
     memory: 16Gi
     instance_class: ComputeOptimized
-  - name: M-4
-    cpu: 0.5
+  - cpu: 0.5
     memory: 4Gi
     instance_class: MemoryOptimized
-  - name: M-8
-    cpu: 1
+  - cpu: 1
     memory: 8Gi
     instance_class: MemoryOptimized
-  - name: M-16
-    cpu: 2
+  - cpu: 2
     memory: 16Gi
     instance_class: MemoryOptimized
-  - name: M-32
-    cpu: 4
+  - cpu: 4
     memory: 32Gi
     instance_class: MemoryOptimized
 postgres_config_engine: olap
