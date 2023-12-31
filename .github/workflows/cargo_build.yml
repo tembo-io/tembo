@@ -25,9 +25,10 @@ jobs:
         run: |
           set -x
           cargo build --release --target=x86_64-unknown-linux-musl
-      - uses: Swatinem/rust-cache@v2
+      - name: Upload binaries to release
+        uses: svenstaro/upload-release-action@v2
         with:
-          prefix-key: ${{ matrix.name }}
-          workspaces: |
-            ${{ matrix.path }}
-
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: bin
+          asset_name: ${{ matrix.asset_name }}
+          tag: ${{ github.ref }}

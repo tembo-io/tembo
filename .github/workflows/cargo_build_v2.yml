@@ -3,10 +3,10 @@ name: Release
 permissions:
   contents: write
 
-on:
-  push:
-    tags:
-      - v[0-9]+.*-beta
+    #on:
+    #push:
+    #tags:
+    #  - v[0-9]+.*-beta
 
 jobs:
   create-release:
