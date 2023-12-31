@@ -20,6 +20,12 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v3
 
+      - name: Setup tools
+        id: setup_tools
+        run: |
+          set -x
+          apt-get update && apt-get install -y gh
+
       - uses: taiki-e/create-gh-release-action@v1
         with:
           # (optional) Path to changelog.
