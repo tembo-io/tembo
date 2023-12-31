@@ -23,21 +23,6 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v4
 
-      - name: Setup tools
-        id: setup_tools
-        run: |
-          set -x
-          apt-get update && apt-get install -y gh
-          git config --global --add safe.directory '*'
-
-      - uses: taiki-e/create-gh-release-action@v1
-        with:
-          # (optional) Path to changelog.
-          # changelog: CHANGELOG.md
-          # (required) GitHub token for creating GitHub Releases.
-          token: ${{ secrets.GITHUB_TOKEN }}
-          draft: true
-
       - name: Cargo build
         working-directory: ./tembo-cli
         id: cargo_build
@@ -51,5 +36,6 @@ jobs:
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: tembo-cli/target/x86_64-unknown-linux-musl
-            #asset_name: ${{ matrix.asset_name }}
+          asset_name: tembo-cli-x86_64-unknown-linux-musl
+          prerelease: true
           tag: ${{ github.ref }}
