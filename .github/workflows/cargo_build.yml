@@ -28,6 +28,7 @@ jobs:
         run: |
           set -x
           apt-get update && apt-get install -y gh
+          git config --global --add safe.directory '*'
 
       - uses: taiki-e/create-gh-release-action@v1
         with:
