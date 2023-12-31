@@ -19,16 +19,26 @@ jobs:
     steps:
       - name: Check out the repo
         uses: actions/checkout@v3
+
+      - uses: taiki-e/create-gh-release-action@v1
+        with:
+          # (optional) Path to changelog.
+          # changelog: CHANGELOG.md
+          # (required) GitHub token for creating GitHub Releases.
+          token: ${{ secrets.GITHUB_TOKEN }}
+          draft: true
+
       - name: Cargo build
         working-directory: ./tembo-cli
         id: cargo_build
         run: |
           set -x
           cargo build --release --target=x86_64-unknown-linux-musl
+
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: bin
-          asset_name: ${{ matrix.asset_name }}
+          file: target/release/x86_64-unknown-linux-musl
+            #asset_name: ${{ matrix.asset_name }}
           tag: ${{ github.ref }}
