@@ -50,6 +50,6 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: target/x86_64-unknown-linux-musl
+          file: tembo-cli/target/x86_64-unknown-linux-musl
             #asset_name: ${{ matrix.asset_name }}
           tag: ${{ github.ref }}
