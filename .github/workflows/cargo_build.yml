@@ -1,4 +1,7 @@
-name: Cargo Build
+name: Release tembo
+
+permissions:
+  contents: write
 
 on:
   push:
