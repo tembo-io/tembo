@@ -31,11 +31,11 @@ jobs:
           TEMBO_CLI_NAME="$(echo $TEMBO_VERSION | sed 's/ /-/g')"
           echo "TEMBO_CLI_NAME=$TEMBO_CLI_NAME" >> $GITHUB_ENV
 
-      - name: Build Changelog
-        id: github_release
-        uses: mikepenz/release-changelog-builder-action@v3
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Generate changelog
+        id: changelog
+        uses: metcalfc/changelog-generator@v4.2.0
+        with:
+          myToken: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
@@ -45,4 +45,4 @@ jobs:
           asset_name: ${{ env.TEMBO_CLI_NAME }}-x86_64-unknown-linux-musl
           prerelease: true
           tag: ${{ github.ref }}
-          body: ${{steps.github_release.outputs.changelog}}
+          body: ${{ steps.changelog.outputs.changelog }}
