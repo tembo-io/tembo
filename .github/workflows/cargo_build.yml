@@ -27,6 +27,7 @@ jobs:
         run: |
           set -x
           cargo build --release --target=x86_64-unknown-linux-musl
+          target/x86_64-unknown-linux-musl/release/tembo --version
 
       - name: Build Changelog
         id: github_release
@@ -39,7 +40,7 @@ jobs:
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: tembo-cli/target/x86_64-unknown-linux-musl/release/tembo
-          asset_name: tembo-cli-${{ CARGO_PKG_VERSION }}-x86_64-unknown-linux-musl
+          asset_name: tembo-cli-${{ github.ref}}-x86_64-unknown-linux-musl
           prerelease: true
           tag: ${{ github.ref }}
           body: ${{steps.github_release.outputs.changelog}}
