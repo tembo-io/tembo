@@ -131,7 +131,17 @@ fn default_storage() -> String {
 pub struct ComputeTemplate {
     pub cpu: String,
     pub memory: String,
+    pub instance_class: InstanceClass,
 }
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema, PartialEq, ToSchema)]
+pub enum InstanceClass {
+    #[default]
+    GeneralPurpose,
+    MemoryOptimized,
+    ComputeOptimized,
+}
+
 
 #[cfg(test)]
 mod tests {
