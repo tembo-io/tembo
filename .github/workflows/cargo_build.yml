@@ -28,8 +28,7 @@ jobs:
           set -x
           cargo build --release --target=x86_64-unknown-linux-musl
           TEMBO_VERSION=$(target/x86_64-unknown-linux-musl/release/tembo --version)
-          echo $0
-          TEMBO_CLI_NAME=${TEMBO_VERSION// /-}
+          TEMBO_CLI_NAME="${TEMBO_VERSION// /-}"
           echo "TEMBO_CLI_NAME=$TEMBO_CLI_NAME" >> $GITHUB_ENV
 
       - name: Build Changelog
