@@ -15,8 +15,6 @@ jobs:
     runs-on: ubuntu-20.04
     container:
       image: quay.io/tembo/muslrust:1.71.0-stable
-      #needs:
-      # - find_directories
     strategy:
       fail-fast: false
     steps:
@@ -29,13 +27,19 @@ jobs:
         run: |
           set -x
           cargo build --release --target=x86_64-unknown-linux-musl
-          ls -R
+
+      - name: Build Changelog
+        id: github_release
+        uses: mikepenz/release-changelog-builder-action@v3
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: tembo-cli/target/x86_64-unknown-linux-musl/release/tembo
-          asset_name: tembo-cli
+          asset_name: tembo-cli-${{ CARGO_PKG_VERSION }}-x86_64-unknown-linux-musl
           prerelease: true
           tag: ${{ github.ref }}
+          body: ${{steps.github_release.outputs.changelog}}
