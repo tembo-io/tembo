@@ -30,6 +30,7 @@ jobs:
           TEMBO_VERSION=$(target/x86_64-unknown-linux-musl/release/tembo --version)
           TEMBO_CLI_NAME="$(echo $TEMBO_VERSION | sed 's/ /-/g')"
           echo "TEMBO_CLI_NAME=$TEMBO_CLI_NAME" >> $GITHUB_ENV
+          git config --global --add safe.directory '*'
 
       - name: Generate changelog
         id: changelog
