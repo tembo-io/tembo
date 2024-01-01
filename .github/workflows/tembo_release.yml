@@ -1,0 +1,52 @@
+name: Github release for the repo
+
+permissions:
+  contents: write
+
+on:
+  push:
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+
+jobs:
+
+  cargo_build:
+    name: Cargo build
+    runs-on: ubuntu-20.04
+    container:
+      image: quay.io/tembo/muslrust:1.71.0-stable
+    strategy:
+      fail-fast: false
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Cargo build
+        working-directory: ./tembo-cli
+        id: cargo_build
+        run: |
+          set -x
+          cargo build --release --target=x86_64-unknown-linux-musl
+          TEMBO_VERSION=$(target/x86_64-unknown-linux-musl/release/tembo --version)
+          TEMBO_CLI_NAME="$(echo $TEMBO_VERSION | sed 's/ /-/g')"
+          echo "TEMBO_CLI_NAME=$TEMBO_CLI_NAME" >> $GITHUB_ENV
+          git config --global --add safe.directory '*'
+
+      - name: Generate changelog
+        id: changelog
+        uses: metcalfc/changelog-generator@v4.2.0
+        with:
+          myToken: ${{ secrets.GITHUB_TOKEN }}
+          fetch: false
+
+      - name: Upload binaries to release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: tembo-cli/target/x86_64-unknown-linux-musl/release/tembo
+          asset_name: ${{ env.TEMBO_CLI_NAME }}-x86_64-unknown-linux-musl
+          prerelease: true
+          tag: ${{ github.ref }}
+          body: ${{ github.ref }}
+          # body: ${{ steps.changelog.outputs.changelog }}
+
