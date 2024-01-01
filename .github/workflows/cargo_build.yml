@@ -37,6 +37,7 @@ jobs:
         uses: metcalfc/changelog-generator@v4.2.0
         with:
           myToken: ${{ secrets.GITHUB_TOKEN }}
+          fetch: false
 
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
