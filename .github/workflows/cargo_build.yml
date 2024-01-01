@@ -47,4 +47,4 @@ jobs:
           asset_name: ${{ env.TEMBO_CLI_NAME }}-x86_64-unknown-linux-musl
           prerelease: true
           tag: ${{ github.ref }}
-          body: ${{ steps.changelog.outputs.changelog }}
+          # body: ${{ steps.changelog.outputs.changelog }}
