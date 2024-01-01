@@ -6,7 +6,7 @@ permissions:
 on:
   push:
     tags:
-      - v[0-9]+.*-beta
+      - [0-9]+.*
 
 jobs:
 
