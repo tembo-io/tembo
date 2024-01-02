@@ -5,3 +5,7 @@ cpu = "2"
 memory = "8Gi"
 storage = "50Gi"
 stack_type = "DataWarehouse"
+
+[data-warehouse.extensions.clerk_fdw]
+enabled = true
+version = "0.2.4"
