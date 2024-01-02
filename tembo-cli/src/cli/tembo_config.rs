@@ -1,4 +1,4 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
 use toml::Value;
 
@@ -24,9 +24,37 @@ pub struct InstanceSettings {
     #[serde(default = "default_stack_type")]
     pub stack_type: String,
     pub postgres_configurations: Option<HashMap<String, Value>>,
-    #[serde(default = "default_extensions")]
+    #[serde(
+        deserialize_with = "deserialize_extensions",
+        default = "default_extensions"
+    )]
     pub extensions: Option<HashMap<String, Extension>>,
     pub extra_domains_rw: Option<Vec<String>>,
+}
+
+// If a trunk project name is not specified, then assume
+// it's the same name as the extension.
+fn deserialize_extensions<'de, D>(
+    deserializer: D,
+) -> Result<Option<HashMap<String, Extension>>, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    let map = Option::<HashMap<String, Extension>>::deserialize(deserializer)?;
+
+    map.map(|mut m| {
+        m.iter_mut().for_each(|(key, ext)| {
+            if ext.trunk_project.is_none() {
+                ext.trunk_project = Some(key.clone());
+            }
+        });
+        m
+    })
+    .map_or(Ok(None), |m| Ok(Some(m)))
+}
+
+fn default_extensions() -> Option<HashMap<String, Extension>> {
+    Some(HashMap::new())
 }
 
 fn default_cpu() -> String {
@@ -47,10 +75,6 @@ fn default_replicas() -> i32 {
 
 fn default_stack_type() -> String {
     "Standard".to_string()
-}
-
-fn default_extensions() -> Option<HashMap<String, Extension>> {
-    Some(HashMap::new())
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
