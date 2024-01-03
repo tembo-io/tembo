@@ -41,6 +41,13 @@ jobs:
         working-directory: ./tembo-cli
         id: cargo_build
         run: |
+          if [[ ${{ matrix.os }} -eq "ubuntu-20.04" ]]
+          then
+            apt update -y
+            apt install pkg-config -y
+          elif [[ ${{ matrix.os }} -eq "macos-latest" ]]
+            brew install pkg-config
+          fi
           set -x
           rustup target add ${{ matrix.target }}
           cargo build --release --target=${{ matrix.target }}
