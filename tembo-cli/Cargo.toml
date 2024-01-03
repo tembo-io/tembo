@@ -55,6 +55,8 @@ tokio = { version = "1.26.0", features = [
 controller = "0.26.1"
 sqlx = { version = "0.7.3", features = ["runtime-tokio-native-tls", "postgres", "chrono", "json"] }
 base64 = "0.21.5"
+
+[target.'cfg(macos)'.dependencies]
 openssl = { version = "0.10", features = ["vendored"] }
 
 [dev-dependencies]
