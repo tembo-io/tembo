@@ -26,6 +26,10 @@ jobs:
             asset_name: x86_64-linux
             os: ubuntu-20.04
             container: quay.io/tembo/muslrust:1.71.0-stable
+          - target: aarch64-unknown-linux-musl
+            asset_name: arm-linux
+            os: ubuntu-20.04
+            container: messense/rust-musl-cross:aarch64-musl
     runs-on: ${{ matrix.os }}
     container:
       image: ${{ matrix.container }}
