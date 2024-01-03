@@ -53,10 +53,27 @@ jobs:
           set -x
           rustup target add ${{ matrix.target }}
           cargo build --release --target=${{ matrix.target }}
+          git config --global --add safe.directory '*'
+
+      - name: CLI version Mac
+        working-directory: ./tembo-cli
+        id: cli_version_mac
+        run: |
+          set -x
           cargo install cargo-get
           TEMBO_CLI_NAME=$(cargo-get package.name)-$(cargo-get package.version)
           echo "TEMBO_CLI_NAME=$TEMBO_CLI_NAME" >> $GITHUB_ENV
-          git config --global --add safe.directory '*'
+        if: matrix.os == 'macos-latest'
+
+      - name: CLI version Mac
+        working-directory: ./tembo-cli
+        id: cli_version_mac
+        run: |
+          set -x
+          TEMBO_VERSION=$(target/${{ matrix.target }}/release/tembo --version)
+          TEMBO_CLI_NAME="$(echo $TEMBO_VERSION | sed 's/ /-/g')"
+          echo "TEMBO_CLI_NAME=$TEMBO_CLI_NAME" >> $GITHUB_ENV
+        if: matrix.os == 'ubuntu-20.04'
 
       - name: Generate changelog
         id: changelog
