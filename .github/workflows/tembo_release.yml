@@ -60,7 +60,7 @@ jobs:
         run: |
           set -x
           PKG_VERSION=$(awk -F ' = ' '$$1 ~ /version/ { gsub(/[\\"]/, "", $$2); printf("%s",$$2); exit; }' Cargo.toml)
-          TEMBO_VERSION=${PKG_VERSION#"version ="}
+          TEMBO_VERSION=${PKG_VERSION#"version = "}
           TEMBO_CLI_NAME=tembo-cli-${TEMBO_VERSION}
           echo "TEMBO_CLI_NAME=$TEMBO_CLI_NAME" >> $GITHUB_ENV
 
