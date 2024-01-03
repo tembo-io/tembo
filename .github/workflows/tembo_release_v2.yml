@@ -10,8 +10,7 @@ on:
 
 jobs:
 
-  cargo_build:
- build:
+  build:
     name: ${{ matrix.platform.os_name }} with rust ${{ matrix.toolchain }}
     runs-on: ${{ matrix.platform.os }}
     strategy:
