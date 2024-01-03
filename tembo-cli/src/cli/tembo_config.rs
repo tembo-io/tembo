@@ -53,10 +53,6 @@ where
     .map_or(Ok(None), |m| Ok(Some(m)))
 }
 
-fn default_extensions() -> Option<HashMap<String, Extension>> {
-    Some(HashMap::new())
-}
-
 fn default_cpu() -> String {
     "0.25".to_string()
 }
@@ -75,6 +71,10 @@ fn default_replicas() -> i32 {
 
 fn default_stack_type() -> String {
     "Standard".to_string()
+}
+
+fn default_extensions() -> Option<HashMap<String, Extension>> {
+    Some(HashMap::new())
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
