@@ -42,11 +42,11 @@ jobs:
         id: cargo_build
         run: |
           set -x
-          if [ ${{ matrix.os }} == 'ubuntu-20.04' ]; then
+          if [ ${{ matrix.os }} == 'macos-latest' ]; then
+            brew install pkg-config
+          else
             apt update -y
             apt install pkg-config libssl-dev -y
-          elif [ ${{ matrix.os }} == 'macos-latest' ]; then
-            brew install pkg-config
           fi
           rustup target add ${{ matrix.target }}
           cargo build --release --target=${{ matrix.target }}
