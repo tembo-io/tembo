@@ -37,7 +37,6 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v4
 
-
       - name: Install Deps Ubuntu
         id: install_deps_ubuntu
         run: |
@@ -65,9 +64,9 @@ jobs:
           echo "TEMBO_CLI_NAME=$TEMBO_CLI_NAME" >> $GITHUB_ENV
         if: matrix.os == 'macos-latest'
 
-      - name: CLI version Mac
+      - name: CLI version Ubuntu
         working-directory: ./tembo-cli
-        id: cli_version_mac
+        id: cli_version_ubuntu
         run: |
           set -x
           TEMBO_VERSION=$(target/${{ matrix.target }}/release/tembo --version)
