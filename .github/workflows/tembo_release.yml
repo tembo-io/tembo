@@ -37,17 +37,26 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v4
 
+      - name: Install Deps
+        id: install_deps
+        run: |
+          set -x
+          brew install pkg-config
+        if: matrix.os == 'macos-latest'
+
+      - name: Install Deps
+        id: install_deps
+        run: |
+          set -x
+          apt update -y
+          apt install pkg-config libssl-dev -y
+        if: matrix.os == 'ubuntu-20.04'
+
       - name: Cargo build
         working-directory: ./tembo-cli
         id: cargo_build
         run: |
           set -x
-          if [ ${{ matrix.os }} == 'macos-latest' ]; then
-            brew install pkg-config
-          else
-            apt update -y
-            apt install pkg-config libssl-dev -y
-          fi
           rustup target add ${{ matrix.target }}
           cargo build --release --target=${{ matrix.target }}
           TEMBO_VERSION=$(target/${{ matrix.target }}/release/tembo --version)
