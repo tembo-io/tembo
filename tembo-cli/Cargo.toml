@@ -62,6 +62,9 @@ openssl = { version = "0.10", features = ["vendored"] }
 [target.aarch64-unknown-linux-musl.dependencies]
 openssl = { version = "0.10", features = ["vendored"] }
 
+[target.aarch64-apple-darwin.dependencies]
+openssl = { version = "0.10", features = ["vendored"] }
+
 [dev-dependencies]
 assert_cmd = "2.0.8"
 predicates = "2.1.5"
