@@ -46,6 +46,7 @@ jobs:
             apt update -y
             apt install pkg-config -y
           elif [[ ${{ matrix.os }} -eq "macos-latest" ]]
+          then
             brew install pkg-config
           fi
           set -x
