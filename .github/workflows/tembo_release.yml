@@ -17,6 +17,12 @@ jobs:
       image: quay.io/tembo/muslrust:1.71.0-stable
     strategy:
       fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-apple-darwin
+            asset_name: x86_64-apple
+          - target: x86_64-unknown-linux-musl
+            asset_name: x86_64-linux
     steps:
       - name: Check out the repo
         uses: actions/checkout@v4
@@ -26,8 +32,8 @@ jobs:
         id: cargo_build
         run: |
           set -x
-          cargo build --release --target=x86_64-unknown-linux-musl
-          TEMBO_VERSION=$(target/x86_64-unknown-linux-musl/release/tembo --version)
+          cargo build --release --target=${{ matrix.target }}
+          TEMBO_VERSION=$(target/${{ matrix.target }}/release/tembo --version)
           TEMBO_CLI_NAME="$(echo $TEMBO_VERSION | sed 's/ /-/g')"
           echo "TEMBO_CLI_NAME=$TEMBO_CLI_NAME" >> $GITHUB_ENV
           git config --global --add safe.directory '*'
@@ -43,10 +49,9 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: tembo-cli/target/x86_64-unknown-linux-musl/release/tembo
-          asset_name: ${{ env.TEMBO_CLI_NAME }}-x86_64-unknown-linux-musl
+          file: tembo-cli/target/${{ matrix.target }}/release/tembo
+          asset_name: ${{ env.TEMBO_CLI_NAME }}-${{ matrix.asset_name }}
           prerelease: true
           tag: ${{ github.ref }}
-          body: ${{ github.ref }}
-          # body: ${{ steps.changelog.outputs.changelog }}
+          body: ${{ steps.changelog.outputs.changelog }}
 
