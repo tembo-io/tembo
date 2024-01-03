@@ -37,12 +37,6 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v4
 
-      - name: Install Deps Mac
-        id: install_deps_mac
-        run: |
-          set -x
-          brew install pkg-config
-        if: matrix.os == 'macos-latest'
 
       - name: Install Deps Ubuntu
         id: install_deps_ubuntu
@@ -59,8 +53,8 @@ jobs:
           set -x
           rustup target add ${{ matrix.target }}
           cargo build --release --target=${{ matrix.target }}
-          TEMBO_VERSION=$(target/${{ matrix.target }}/release/tembo --version)
-          TEMBO_CLI_NAME="$(echo $TEMBO_VERSION | sed 's/ /-/g')"
+          cargo install cargo-get
+          TEMBO_CLI_NAME=$(cargo get package.name)-$(cargo get package.version)
           echo "TEMBO_CLI_NAME=$TEMBO_CLI_NAME" >> $GITHUB_ENV
           git config --global --add safe.directory '*'
 
