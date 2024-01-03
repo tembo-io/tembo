@@ -49,6 +49,7 @@ jobs:
           toolchain: ${{ matrix.toolchain }}
           args: "--locked --release"
           strip: true
+          working-directory: ./tembo-cli
       - name: Rename binary (linux and macos)
         run: mv target/${{ matrix.platform.target }}/release/figctl target/${{ matrix.platform.target }}/release/${{ matrix.platform.bin }}
         if: matrix.platform.os_name != 'Windows-x86_64'
