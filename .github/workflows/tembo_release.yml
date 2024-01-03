@@ -37,15 +37,15 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v4
 
-      - name: Install Deps
-        id: install_deps
+      - name: Install Deps Mac
+        id: install_deps_mac
         run: |
           set -x
           brew install pkg-config
         if: matrix.os == 'macos-latest'
 
-      - name: Install Deps
-        id: install_deps
+      - name: Install Deps Ubuntu
+        id: install_deps_ubuntu
         run: |
           set -x
           apt update -y
