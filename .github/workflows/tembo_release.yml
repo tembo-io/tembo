@@ -42,8 +42,6 @@ jobs:
         id: cargo_build
         run: |
           set -x
-          apt update -y
-          apt install pkg-config -y
           rustup target add ${{ matrix.target }}
           cargo build --release --target=${{ matrix.target }}
           TEMBO_VERSION=$(target/${{ matrix.target }}/release/tembo --version)

@@ -59,3 +59,4 @@ base64 = "0.21.5"
 [dev-dependencies]
 assert_cmd = "2.0.8"
 predicates = "2.1.5"
+openssl = "0.10.62"
