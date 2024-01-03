@@ -54,7 +54,7 @@ jobs:
           rustup target add ${{ matrix.target }}
           cargo build --release --target=${{ matrix.target }}
           cargo install cargo-get
-          TEMBO_CLI_NAME=$(cargo get package.name)-$(cargo get package.version)
+          TEMBO_CLI_NAME=$(cargo-get package.name)-$(cargo-get package.version)
           echo "TEMBO_CLI_NAME=$TEMBO_CLI_NAME" >> $GITHUB_ENV
           git config --global --add safe.directory '*'
 
