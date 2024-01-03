@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use crate::cli::context::{get_current_context, Environment, Target};
 use crate::cli::docker::Docker;
 use crate::cli::tembo_config::InstanceSettings;
+use crate::tui::confirmation;
 use clap::Args;
 use core::result::Result::Ok;
 use temboclient::apis::{configuration::Configuration, instance_api::delete_instance};
@@ -51,9 +52,9 @@ fn execute_tembo_cloud(env: Environment) -> Result<(), anyhow::Error> {
 
             match v {
                 Ok(result) => {
-                    println!(
+                    confirmation(&format!(
                         "Instance delete started for Instance Id: {}",
-                        result.instance_id
+                        result.instance_id)
                     )
                 }
                 Err(error) => eprintln!("Error deleting instance: {}", error),
