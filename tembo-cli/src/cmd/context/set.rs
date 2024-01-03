@@ -3,6 +3,7 @@ use clap::Args;
 use std::fs::{self, File};
 use std::io::Write;
 use toml::to_string;
+use crate::tui::confirmation;
 
 // Arguments for 'context set'
 #[derive(Args)]
@@ -42,7 +43,7 @@ pub fn execute(args: &ContextSetArgs) -> Result<(), anyhow::Error> {
         eprintln!("Error: {}", e);
     }
 
-    println!("Tembo context set to: {}", name);
+    confirmation(&format!("Tembo context set to: {}", name));
 
     Ok(())
 }

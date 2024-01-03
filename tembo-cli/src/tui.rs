@@ -20,8 +20,12 @@ pub fn print_gradient(log: &str) {
 	println!("{}", gradient);
 }
 
-pub fn confirmation(log: &str) {
+pub fn label(log: &str) {
 	println!("{} {}", "➜".bold(), colors::gradient_rainbow(log));
+}
+
+pub fn confirmation(log: &str) {
+	println!("{} {}", "✓".bold(), colors::gradient_rainbow(log));
 }
 
 /// Tembo branded gradient chevrons for printing singular output

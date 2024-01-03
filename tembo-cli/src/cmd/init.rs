@@ -5,7 +5,7 @@ use crate::cli::context::{
 use crate::cli::file_utils::FileUtils;
 use clap::Args;
 use colorful::Colorful;
-use crate::tui::colors::{indicator_good, gradient_rainbow};
+use crate::tui::confirmation;
 
 /// Initializes a local environment. Creates a sample context and configuration files.
 #[derive(Args)]
@@ -56,7 +56,7 @@ pub fn execute() -> Result<(), anyhow::Error> {
         }
     }
 
-    println!("{} {}", "✓".color(indicator_good()), gradient_rainbow("Tembo initialized successfully!"));
+    confirmation("Tembo initialized successfully!");
 
     Ok(())
 }
