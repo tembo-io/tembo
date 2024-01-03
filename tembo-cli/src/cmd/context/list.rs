@@ -1,5 +1,7 @@
 use crate::cli::context::list_context;
 use cli_table::{Cell, Style, Table, CellStruct};
+use crate::tui::{colors::sql_u, confirmation, indent};
+use colorful::Colorful;
 
 pub fn execute() -> Result<(), anyhow::Error> {
     let context = list_context()?;
@@ -30,16 +32,18 @@ pub fn execute() -> Result<(), anyhow::Error> {
     let table = rows
     .table()
     .title(vec![
-        "Name".cell().bold(true),
-        "Target".cell().bold(true),
-        "Org ID".cell().bold(true),
-        "Profile".cell().bold(true),
-        "Set".cell().bold(true),
+        "Name".color(sql_u()).cell().bold(true),
+        "Target".color(sql_u()).cell().bold(true),
+        "Org ID".color(sql_u()).cell().bold(true),
+        "Profile".color(sql_u()).cell().bold(true),
+        "Set".color(sql_u()).cell().bold(true),
     ])
     .bold(true);
 
     let table_display = table.display().expect("Error: could not parse `tembo context list` table contents!");
 
+    confirmation("Current Tembo Context:");
+    println!("{}", indent(1));
     println!("{}", table_display);
 
     Ok(())
