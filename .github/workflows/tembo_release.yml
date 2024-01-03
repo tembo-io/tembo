@@ -20,14 +20,14 @@ jobs:
             asset_name: x86_64-apple
             os: macos-latest
           - target: aarch64-apple-darwin
-            asset_name: arm-apple
+            asset_name: aarch64-apple
             os: macos-latest
           - target: x86_64-unknown-linux-musl
             asset_name: x86_64-linux
             os: ubuntu-20.04
             container: quay.io/tembo/muslrust:1.71.0-stable
           - target: aarch64-unknown-linux-musl
-            asset_name: arm-linux
+            asset_name: aarch64-linux
             os: ubuntu-20.04
             container: messense/rust-musl-cross:aarch64-musl
     runs-on: ${{ matrix.os }}
@@ -69,8 +69,9 @@ jobs:
         id: cli_version_ubuntu
         run: |
           set -x
-          TEMBO_VERSION=$(target/${{ matrix.target }}/release/tembo --version)
-          TEMBO_CLI_NAME="$(echo $TEMBO_VERSION | sed 's/ /-/g')"
+          PKG_VERSION=$(awk -F ' = ' '$$1 ~ /version/ { gsub(/[\\"]/, "", $$2); printf("%s",$$2); exit; }' Cargo.toml)
+          TEMBO_VERSION=${PKG_VERSION#"version ="}
+          TEMBO_CLI_NAME=tembo-cli-${TEMBO_VERSION}
           echo "TEMBO_CLI_NAME=$TEMBO_CLI_NAME" >> $GITHUB_ENV
         if: matrix.os == 'ubuntu-20.04'
 
