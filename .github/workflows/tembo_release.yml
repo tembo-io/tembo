@@ -22,9 +22,6 @@ jobs:
           - target: aarch64-apple-darwin
             asset_name: arm-apple
             os: macos-latest
-          - target: x86_64-pc-windows-gnu
-            asset_name: windows
-            os: windows-latest
           - target: x86_64-unknown-linux-musl
             asset_name: x86_64-linux
             os: ubuntu-20.04
@@ -41,6 +38,7 @@ jobs:
         id: cargo_build
         run: |
           set -x
+          rustup target add ${{ matrix.target }}
           cargo build --release --target=${{ matrix.target }}
           TEMBO_VERSION=$(target/${{ matrix.target }}/release/tembo --version)
           TEMBO_CLI_NAME="$(echo $TEMBO_VERSION | sed 's/ /-/g')"
