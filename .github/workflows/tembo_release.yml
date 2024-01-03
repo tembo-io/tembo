@@ -89,7 +89,6 @@ jobs:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: tembo-cli/target/${{ matrix.target }}/release/tembo
           asset_name: ${{ env.TEMBO_CLI_NAME }}-${{ matrix.asset_name }}
-          prerelease: true
           tag: ${{ github.ref }}
           body: ${{ steps.changelog.outputs.changelog }}
 
