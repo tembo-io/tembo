@@ -8,6 +8,7 @@ use cmd::init::InitCommand;
 
 mod cli;
 mod cmd;
+mod tui;
 
 #[derive(Parser)]
 #[clap(author = crate_authors!("\n"), version = crate_version!(), about = "Tembo CLI", long_about = None)]

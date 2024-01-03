@@ -55,6 +55,9 @@ tokio = { version = "1.26.0", features = [
 controller = "0.26.1"
 sqlx = { version = "0.7.3", features = ["runtime-tokio-native-tls", "postgres", "chrono", "json"] }
 base64 = "0.21.5"
+colorful = "0.2.2"
+cli-table = "0.4.7"
+tiny-gradient = "0.1.0"
 
 [dev-dependencies]
 assert_cmd = "2.0.8"
