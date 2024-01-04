@@ -1,7 +1,9 @@
+use crate::tui::{colors, white_confirmation};
 use anyhow::Error;
 use anyhow::{bail, Context};
+use colorful::{Color, Colorful};
 use simplelog::*;
-use spinners::{Spinner, Spinners};
+use spinoff::{spinners, Spinner};
 use std::io::{BufRead, BufReader};
 use std::process::Output;
 use std::process::{Command as ShellCommand, Stdio};
@@ -45,8 +47,9 @@ impl Docker {
     pub fn build_run(instance_name: String, verbose: bool) -> Result<i32, anyhow::Error> {
         let mut sp = if !verbose {
             Some(Spinner::new(
-                Spinners::Line,
-                "Running Docker Build & Run".into(),
+                spinners::Dots,
+                "Running Docker Build & Run",
+                spinoff::Color::White,
             ))
         } else {
             None
@@ -54,22 +57,27 @@ impl Docker {
 
         let mut show_message = |message: &str, new_spinner: bool| {
             if let Some(mut spinner) = sp.take() {
-                spinner.stop_with_message(message.to_string());
+                spinner.stop_with_message(&format!(
+                    "{} {}",
+                    "✓".color(colors::indicator_good()).bold(),
+                    message.color(Color::White).bold()
+                ));
                 if new_spinner {
                     sp = Some(Spinner::new(
-                        Spinners::Line,
-                        "Building and running container".into(),
+                        spinners::Dots,
+                        "Building and running container",
+                        spinoff::Color::White,
                     ));
                 }
             } else {
-                println!("{}", message);
+                white_confirmation(message);
             }
         };
 
         let container_list = Self::container_list_filtered(&instance_name)?;
 
         if container_list.contains(&instance_name) {
-            show_message("- Existing container found, removing", true);
+            show_message("Existing container found, removing", true);
             Docker::stop_remove(&instance_name)?;
         }
 
@@ -81,7 +89,7 @@ impl Docker {
         );
         run_command(&command, verbose)?;
 
-        show_message("- Docker Build & Run completed", false);
+        show_message("Docker Build & Run completed", false);
 
         Ok(port)
     }
@@ -119,10 +127,18 @@ impl Docker {
 
     // stop & remove container for given name
     pub fn stop_remove(name: &str) -> Result<(), anyhow::Error> {
-        let mut sp = Spinner::new(Spinners::Line, "Stopping & Removing instance".into());
+        let mut sp = Spinner::new(
+            spinners::Dots,
+            "Stopping & Removing instance",
+            spinoff::Color::White,
+        );
 
         if !Self::container_list_filtered(name).unwrap().contains(name) {
-            sp.stop_with_message(format!("- Tembo instance {} doesn't exist", name));
+            sp.stop_with_message(&format!(
+                "{} {}",
+                "➜".bold(),
+                colors::gradient_rainbow(&format!("- Tembo instance {} doesn't exist", name))
+            ));
         } else {
             let mut command: String = String::from("docker rm --force ");
             command.push_str(name);
@@ -130,7 +146,7 @@ impl Docker {
             let output = match ShellCommand::new("sh").arg("-c").arg(&command).output() {
                 Ok(output) => output,
                 Err(_) => {
-                    sp.stop_with_message(format!(
+                    sp.stop_with_message(&format!(
                         "- Tembo instance {} failed to stop & remove",
                         &name
                     ));
@@ -138,7 +154,13 @@ impl Docker {
                 }
             };
 
-            sp.stop_with_message(format!("- Tembo instance {} stopped & removed", &name));
+            sp.stop_with_message(&format!(
+                "{} {}",
+                "✓".color(colors::indicator_good()).bold(),
+                format!("Tembo instance {} stopped & removed", &name)
+                    .color(Color::White)
+                    .bold()
+            ));
 
             let stderr = String::from_utf8(output.stderr).unwrap();
 

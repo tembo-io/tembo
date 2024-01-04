@@ -1,9 +1,9 @@
 use anyhow::Error;
 use clap::Args;
+use colorful::{Color, Colorful};
 use controller::stacks::get_stack;
 use controller::stacks::types::StackType as ControllerStackType;
 use log::info;
-use spinners::{Spinner, Spinners};
 use std::{
     collections::HashMap,
     fs::{self},
@@ -24,12 +24,16 @@ use temboclient::{
 use tembodataclient::apis::secrets_api::get_secret_v1;
 use tokio::runtime::Runtime;
 
-use crate::cli::context::{get_current_context, Environment, Profile, Target};
 use crate::cli::docker::Docker;
 use crate::cli::file_utils::FileUtils;
 use crate::cli::sqlx_utils::SqlxUtils;
 use crate::cli::tembo_config;
 use crate::cli::tembo_config::InstanceSettings;
+use crate::tui::{indent, instance_started};
+use crate::{
+    cli::context::{get_current_context, Environment, Profile, Target},
+    tui::{clean_console, colors, white_confirmation},
+};
 use tera::{Context, Tera};
 
 const DOCKERFILE_NAME: &str = "Dockerfile";
@@ -102,9 +106,10 @@ fn execute_docker(verbose: bool) -> Result<(), anyhow::Error> {
             .block_on(SqlxUtils::run_migrations(conn_info))?;
 
         // If all of the above was successful, we can print the url to user
-        println!(
-            ">>> Tembo instance is now running on: postgres://postgres:postgres@localhost:{}",
-            port
+        instance_started(
+            &format!("postgres://postgres:postgres@localhost:{}", port),
+            &value.stack_type,
+            "local",
         );
     }
 
@@ -129,9 +134,13 @@ pub fn execute_tembo_cloud(env: Environment) -> Result<(), anyhow::Error> {
         } else {
             instance_id = create_new_instance(value, &config, env.clone());
         }
-
+        println!();
+        let mut sp = spinoff::Spinner::new(
+            spinoff::spinners::Aesthetic,
+            "Waiting for instance to be up...",
+            colors::SPINNER_COLOR,
+        );
         loop {
-            let mut sp = Spinner::new(Spinners::Line, "Waiting for instance to be up!".into());
             sleep(Duration::from_secs(10));
 
             let connection_info: Option<Box<ConnectionInfo>> =
@@ -147,9 +156,17 @@ pub fn execute_tembo_cloud(env: Environment) -> Result<(), anyhow::Error> {
 
                 Runtime::new()
                     .unwrap()
-                    .block_on(SqlxUtils::run_migrations(conn_info))?;
+                    .block_on(SqlxUtils::run_migrations(conn_info.clone()))?;
 
-                sp.stop_with_message("- Instance is now up!".to_string());
+                // If all of the above was successful we can stop the spinner and show a success message
+                sp.stop_with_message(&format!(
+                    "{} {}",
+                    "✓".color(colors::indicator_good()).bold(),
+                    "Instance is up!".bold()
+                ));
+                clean_console();
+                let connection_string = construct_connection_string(conn_info);
+                instance_started(&connection_string, &value.stack_type, "cloud");
 
                 break;
             }
@@ -259,10 +276,10 @@ fn update_existing_instance(
 
     match v {
         Ok(result) => {
-            println!(
+            white_confirmation(&format!(
                 "Instance update started for Instance Id: {}",
-                result.instance_id
-            );
+                result.instance_id.color(colors::sql_u()).bold()
+            ));
         }
         Err(error) => eprintln!("Error updating instance: {}", error),
     };
@@ -283,10 +300,10 @@ fn create_new_instance(
 
     match v {
         Ok(result) => {
-            println!(
-                "Instance creation started for instance_name: {} with instance_id: {}",
-                result.instance_name, result.instance_id
-            );
+            white_confirmation(&format!(
+                "Instance creation started for instance_name: {}",
+                result.instance_name.color(colors::sql_u()).bold()
+            ));
 
             return Some(result.instance_id);
         }
@@ -542,4 +559,15 @@ fn get_postgres_config(instance_settings: HashMap<String, InstanceSettings>) -> 
     }
 
     postgres_config
+}
+
+fn construct_connection_string(info: ConnectionInfo) -> String {
+    format!(
+        "postgresql://{}:{}@{}:{}/{}",
+        info.user,
+        urlencoding::encode(&info.password),
+        info.host,
+        info.port,
+        "postgres"
+    )
 }
