@@ -97,10 +97,9 @@ async fn data_warehouse() -> Result<(), Box<dyn Error>> {
 
     // check extensions includes postgres_fdw in the output
     // connecting to postgres and running the command
-    let result = get_output_from_sql(
-        "SELECT * FROM pg_extension WHERE extname = 'postgres_fdw'".to_string(),
-    );
-    assert!(result.await?.contains("postgres_fdw"));
+    let result =
+        get_output_from_sql("SELECT * FROM pg_extension WHERE extname = 'clerk_fdw'".to_string());
+    assert!(result.await?.contains("clerk_fdw"));
 
     // tembo delete
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
