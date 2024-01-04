@@ -6,6 +6,7 @@ use std::io::{BufRead, BufReader};
 use std::process::Output;
 use std::process::{Command as ShellCommand, Stdio};
 use std::thread;
+use crate::tui::white_confirmation;
 
 pub struct Docker {}
 
@@ -62,7 +63,7 @@ impl Docker {
                     ));
                 }
             } else {
-                println!("{}", message);
+                white_confirmation(message);
             }
         };
 

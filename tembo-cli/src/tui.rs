@@ -1,7 +1,7 @@
 use colorful::{Color, Colorful, RGB as ColorfulRgb};
 use tiny_gradient::{GradientDisplay, GradientStr, RGB};
 
-/// Clears the console when called
+/// Utility for completely clearing the console when called
 pub fn clean_console() {
     print!("{esc}c", esc = 27 as char);
 }
@@ -34,6 +34,14 @@ pub fn confirmation(log: &str) {
         "{} {}",
         "✓".color(colors::indicator_good()).bold(),
         colors::gradient_rainbow(log)
+    );
+}
+
+pub fn white_confirmation(log: &str) {
+	println!(
+        "{} {}",
+        "✓".color(colors::indicator_good()).bold(),
+        log.color(Color::White).bold()
     );
 }
 
