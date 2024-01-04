@@ -44,7 +44,7 @@ pub struct ApplyCommand {
     pub merge: Option<String>,
 }
 
-pub fn execute(verbose: bool, merge_path: Option<String>) -> Result<(), anyhow::Error> {
+pub fn execute(verbose: bool, _merge_path: Option<String>) -> Result<(), anyhow::Error> {
     info!("Running validation!");
     super::validate::execute(verbose)?;
     info!("Validation completed!");
@@ -63,7 +63,7 @@ pub fn execute(verbose: bool, merge_path: Option<String>) -> Result<(), anyhow::
 fn execute_docker(verbose: bool) -> Result<(), anyhow::Error> {
     Docker::installed_and_running()?;
 
-    let instance_settings = get_instance_settings(None,None)?;
+    let instance_settings = get_instance_settings(None)?;
     let rendered_dockerfile: String = get_rendered_dockerfile(instance_settings.clone())?;
 
     FileUtils::create_file(
@@ -117,7 +117,7 @@ fn execute_docker(verbose: bool) -> Result<(), anyhow::Error> {
 }
 
 pub fn execute_tembo_cloud(env: Environment) -> Result<(), anyhow::Error> {
-    let instance_settings = get_instance_settings(None,None)?;
+    let instance_settings = get_instance_settings(None)?;
 
     let profile = env.clone().selected_profile.unwrap();
     let config = Configuration {
@@ -452,7 +452,7 @@ fn merge_settings(base: &InstanceSettings, overlay: OverlayInstanceSettings) -> 
     }
 }
 
-pub fn get_instance_settings(base_file_path:Option<String>,overlay_file_path: Option<String>) -> Result<HashMap<String, InstanceSettings>, Error> {
+pub fn get_instance_settings(overlay_file_path: Option<String>) -> Result<HashMap<String, InstanceSettings>, Error> {
     let mut base_path = FileUtils::get_current_working_dir();
     base_path.push_str("/tembo.toml");
     let base_contents = fs::read_to_string(&base_path)

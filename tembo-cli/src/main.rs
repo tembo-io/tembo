@@ -59,7 +59,7 @@ fn main() -> Result<(), anyhow::Error> {
             if let SubCommands::Apply(ref _apply_cmd) = app.command {
                 let overlay_path = &_apply_cmd.merge;
         
-                let instance_settings = apply::get_instance_settings(None, overlay_path.clone())?;
+                let instance_settings = apply::get_instance_settings(overlay_path.clone())?;
                 println!("Instance settings: {:?}", instance_settings);
             }
         }
