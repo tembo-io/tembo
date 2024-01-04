@@ -9,6 +9,7 @@ use cmd::init::InitCommand;
 mod cli;
 mod cmd;
 
+
 #[derive(Parser)]
 #[clap(author = crate_authors!("\n"), version = crate_version!(), about = "Tembo CLI", long_about = None)]
 struct App {
@@ -51,9 +52,17 @@ fn main() -> Result<(), anyhow::Error> {
         SubCommands::Init(_init_cmd) => {
             init::execute()?;
         }
-        SubCommands::Apply(_apply_cmd) => {
-            let merge_option = _apply_cmd.merge;
-            apply::execute(app.global_opts.verbose, merge_option)?;
+        SubCommands::Apply(ref _apply_cmd) => {
+            let merge_option =&_apply_cmd.merge;
+            apply::execute(app.global_opts.verbose, merge_option.clone())?;
+
+            if let SubCommands::Apply(ref _apply_cmd) = app.command {
+                let default_path = Some("/Users/joshuajerin/Desktop/jarvis/tembo/tembo-cli/tests/tomls/minimal/tembo.toml".to_string());
+                let overlay_path = &_apply_cmd.merge;
+        
+                let instance_settings = apply::get_instance_settings(default_path, overlay_path.clone())?;
+                println!("Instance settings: {:?}", instance_settings);
+            }
         }
         SubCommands::Validate(_validate_cmd) => {
             validate::execute(app.global_opts.verbose)?;

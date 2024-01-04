@@ -1,5 +1,5 @@
 use anyhow::Error;
-use clap::{Parser, Args};
+use clap::Args;
 use controller::stacks::get_stack;
 use controller::stacks::types::StackType as ControllerStackType;
 use log::info;
@@ -31,6 +31,7 @@ use crate::cli::file_utils::FileUtils;
 use crate::cli::sqlx_utils::SqlxUtils;
 use crate::cli::tembo_config;
 use crate::cli::tembo_config::InstanceSettings;
+use crate::cli::tembo_config::OverlayInstanceSettings;
 use tera::{Context, Tera};
 
 const DOCKERFILE_NAME: &str = "Dockerfile";
@@ -421,30 +422,65 @@ fn get_trunk_installs(
     vec_trunk_installs
 }
 
-pub fn get_instance_settings(default_file_path: Option<String>, overlay_file_path: Option<String>) -> Result<HashMap<String, InstanceSettings>, Error> {
-    
-    let default_path = default_file_path.unwrap_or_else(|| FileUtils::get_current_working_dir() + "/tembo.toml");
-    let default_contents = fs::read_to_string(&default_path)
-        .with_context(|| format!("Couldn't read default file {}", default_path))?;
-    
-    let mut instance_settings: HashMap<String, InstanceSettings> = toml::from_str(&default_contents)
-        .context("Unable to load data from the default config")?;
+fn overlay_to_instance_settings(overlay: OverlayInstanceSettings) -> InstanceSettings {
+    InstanceSettings {
+        environment: overlay.environment.unwrap_or("default_environment".to_string()),
+        instance_name: overlay.instance_name.unwrap_or("default_instance_name".to_string()),
+        cpu: overlay.cpu,
+        memory: overlay.memory,
+        storage: overlay.storage,
+        replicas: overlay.replicas,
+        stack_type: overlay.stack_type.unwrap_or("default_stack_type".to_string()),
+        postgres_configurations: overlay.postgres_configurations,
+        extensions: overlay.extensions,
+        extra_domains_rw: overlay.extra_domains_rw,
+    }
+}
+
+fn merge_settings(base: &InstanceSettings, overlay: OverlayInstanceSettings) -> InstanceSettings {
+    InstanceSettings {
+        environment: overlay.environment.unwrap_or_else(|| base.environment.clone()),
+        instance_name: overlay.instance_name.unwrap_or_else(|| base.instance_name.clone()),
+        cpu: overlay.cpu.or_else(|| base.cpu.clone()),
+        memory: overlay.memory.or_else(|| base.memory.clone()),
+        storage: overlay.storage.or_else(|| base.storage.clone()),
+        replicas: overlay.replicas.or(base.replicas),
+        stack_type: overlay.stack_type.unwrap_or_else(|| base.stack_type.clone()),
+        postgres_configurations: overlay.postgres_configurations.or_else(|| base.postgres_configurations.clone()),
+        extensions: overlay.extensions.or_else(|| base.extensions.clone()),
+        extra_domains_rw: overlay.extra_domains_rw.or_else(|| base.extra_domains_rw.clone()),
+    }
+}
+
+pub fn get_instance_settings(default_file_path:Option<String>,overlay_file_path: Option<String>) -> Result<HashMap<String, InstanceSettings>, Error> {
+    let base_path = "/Users/joshuajerin/Desktop/jarvis/tembo/tembo-cli/tests/tomls/minimal/tembo.toml";
+    let base_contents = fs::read_to_string(&base_path)
+        .with_context(|| format!("Couldn't read base file {}", base_path))?;
+    let base_settings: HashMap<String, InstanceSettings> = toml::from_str(&base_contents)
+        .context("Unable to load data from the base config")?;
+
+        let mut final_settings = base_settings.clone();
 
     if let Some(overlay_path) = overlay_file_path {
         let overlay_contents = fs::read_to_string(&overlay_path)
             .with_context(|| format!("Couldn't read overlay file {}", overlay_path))?;
-        let overlay_settings: HashMap<String, InstanceSettings> = toml::from_str(&overlay_contents)
+        let overlay_settings: HashMap<String, OverlayInstanceSettings> = toml::from_str(&overlay_contents)
             .context("Unable to load data from the overlay config")?;
 
-        for (key, overlay_value) in overlay_settings {
-            if key != "instance_name" { 
-                instance_settings.insert(key, overlay_value);
+            for (key, overlay_value) in overlay_settings {
+                if let Some(base_value) = base_settings.get(&key) {
+                    let merged_value = merge_settings(base_value, overlay_value);
+                    final_settings.insert(key, merged_value);
+                } else {
+                    final_settings.insert(key, overlay_to_instance_settings(overlay_value));
+                }
             }
         }
+    
+        Ok(final_settings)
     }
+    
 
-    Ok(instance_settings)
-}
 
 
 
