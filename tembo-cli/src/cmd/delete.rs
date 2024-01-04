@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::cli::context::{get_current_context, Environment, Target};
 use crate::cli::docker::Docker;
 use crate::cli::tembo_config::InstanceSettings;
-use crate::tui::confirmation;
+use crate::tui::{confirmation, label};
 use clap::Args;
 use core::result::Result::Ok;
 use temboclient::apis::{configuration::Configuration, instance_api::delete_instance};

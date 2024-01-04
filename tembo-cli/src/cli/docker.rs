@@ -134,7 +134,7 @@ impl Docker {
         );
 
         if !Self::container_list_filtered(name).unwrap().contains(name) {
-            sp.stop_with_message(&format!("- Tembo instance {} doesn't exist", name));
+            sp.stop_with_message(&format!("{} {}", "➜".bold(), colors::gradient_rainbow(&format!("- Tembo instance {} doesn't exist", name))));
         } else {
             let mut command: String = String::from("docker rm --force ");
             command.push_str(name);
