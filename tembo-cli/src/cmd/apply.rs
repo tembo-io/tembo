@@ -103,10 +103,7 @@ fn execute_docker(verbose: bool) -> Result<(), anyhow::Error> {
             .block_on(SqlxUtils::run_migrations(conn_info))?;
 
         // If all of the above was successful, we can print the url to user
-        local_started(&format!(
-            "postgres://postgres:postgres@localhost:{}",
-            port)
-        );
+        local_started(&format!("postgres://postgres:postgres@localhost:{}", port));
     }
 
     Ok(())

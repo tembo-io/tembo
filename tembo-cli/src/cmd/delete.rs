@@ -51,12 +51,10 @@ fn execute_tembo_cloud(env: Environment) -> Result<(), anyhow::Error> {
             ));
 
             match v {
-                Ok(result) => {
-                    confirmation(&format!(
-                        "Instance delete started for Instance Id: {}",
-                        result.instance_id)
-                    )
-                }
+                Ok(result) => confirmation(&format!(
+                    "Instance delete started for Instance Id: {}",
+                    result.instance_id
+                )),
                 Err(error) => eprintln!("Error deleting instance: {}", error),
             };
         }
