@@ -2,9 +2,9 @@ name: Cargo lint and test
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 jobs:
   find_directories:
@@ -45,7 +45,7 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
-          toolchain: nightly-2023-11-18
+          toolchain: stable
           components: rustfmt, clippy
       - name: Install minimal stable with clippy and rustfmt
         uses: actions-rs/toolchain@v1
@@ -62,9 +62,9 @@ jobs:
         run: |
           set -xe
           cd ${{ matrix.path }}
-          cargo +nightly-2023-11-18 --version
-          cargo +nightly-2023-11-18 fmt --all --check
-          cargo +nightly-2023-11-18 clippy
+          cargo --version
+          cargo fmt --all --check
+          cargo clippy
 
   test:
     name: Run tests
