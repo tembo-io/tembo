@@ -1,6 +1,7 @@
-use crate::tui::white_confirmation;
+use crate::tui::{colors, white_confirmation};
 use anyhow::Error;
 use anyhow::{bail, Context};
+use colorful::{Color, Colorful};
 use simplelog::*;
 use spinners::{Spinner, Spinners};
 use std::io::{BufRead, BufReader};
@@ -55,7 +56,11 @@ impl Docker {
 
         let mut show_message = |message: &str, new_spinner: bool| {
             if let Some(mut spinner) = sp.take() {
-                spinner.stop_with_message(message.to_string());
+                spinner.stop_with_message(format!(
+                    "{} {}",
+                    "✓".color(colors::indicator_good()).bold(),
+                    message.color(Color::White).bold()
+                ));
                 if new_spinner {
                     sp = Some(Spinner::new(
                         Spinners::Dots,
@@ -70,7 +75,7 @@ impl Docker {
         let container_list = Self::container_list_filtered(&instance_name)?;
 
         if container_list.contains(&instance_name) {
-            show_message("- Existing container found, removing", true);
+            show_message("Existing container found, removing", true);
             Docker::stop_remove(&instance_name)?;
         }
 
@@ -82,7 +87,7 @@ impl Docker {
         );
         run_command(&command, verbose)?;
 
-        show_message("- Docker Build & Run completed", false);
+        show_message("Docker Build & Run completed", false);
 
         Ok(port)
     }
@@ -139,7 +144,11 @@ impl Docker {
                 }
             };
 
-            sp.stop_with_message(format!("- Tembo instance {} stopped & removed", &name));
+            sp.stop_with_message(format!(
+                "{} {}",
+                "✓".color(colors::indicator_good()).bold(),
+                format!("Tembo instance {} stopped & removed", &name).color(Color::White).bold()
+            ));
 
             let stderr = String::from_utf8(output.stderr).unwrap();
 

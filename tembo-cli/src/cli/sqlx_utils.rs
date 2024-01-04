@@ -1,3 +1,4 @@
+use crate::tui::colors;
 use spinners::Spinner;
 use spinners::Spinners;
 use sqlx::migrate::Migrator;
@@ -5,6 +6,7 @@ use sqlx::Pool;
 use sqlx::Postgres;
 use std::path::Path;
 use temboclient::models::ConnectionInfo;
+use colorful::{Color, Colorful};
 
 pub struct SqlxUtils {}
 
@@ -26,7 +28,11 @@ impl SqlxUtils {
         let m = Migrator::new(Path::new("./migrations")).await?;
         m.run(&pool).await?;
 
-        sp.stop_with_message("- SQL migration completed".to_string());
+        sp.stop_with_message(format!(
+            "{} {}",
+            "✓".color(colors::indicator_good()).bold(),
+            "SQL migration completed".color(Color::White).bold()
+        ));
 
         Ok(())
     }
