@@ -1,5 +1,5 @@
 use tiny_gradient::{GradientDisplay, GradientStr, RGB};
-use colorful::{RGB as ColorfulRgb, Colorful};
+use colorful::{RGB as ColorfulRgb, Colorful, Color};
 
 /// Clears the console when called
 pub fn clean_console() {
@@ -25,7 +25,7 @@ pub fn label(log: &str) {
 }
 
 pub fn confirmation(log: &str) {
-	println!("{} {}", "✓".bold(), colors::gradient_rainbow(log));
+	println!("{} {}", "✓".color(colors::indicator_good()).bold(), colors::gradient_rainbow(log));
 }
 
 /// Tembo branded gradient chevrons for printing singular output
@@ -34,6 +34,20 @@ pub fn chevrons<'a>() -> GradientDisplay<'a, [RGB; 4]> {
 		&">>>>",
 		[RGB::new(255, 198, 217), RGB::new(124, 207, 225), RGB::new(137, 203, 166), RGB::new(165, 213, 113)],
 	)
+}
+
+pub fn logo<'a>() -> GradientDisplay<'a, [RGB; 3]> {
+	colors::gradient_rainbow(">>> T E M B O")
+}
+
+pub fn local_started(server_url: &str) {
+	let bar = "┃".color(colors::sql_u()).bold();
+	println!(
+		"\n{bar} {} local instance {}: \n{bar}\n{bar} ➜ {}\n",
+		logo(),
+		"started".bg_rgb(255, 125, 127).color(Color::White).bold(),
+		server_url.bold()
+	);
 }
 
 /// Helper function for printing indentations to the console

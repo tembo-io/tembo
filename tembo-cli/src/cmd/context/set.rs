@@ -3,7 +3,8 @@ use clap::Args;
 use std::fs::{self, File};
 use std::io::Write;
 use toml::to_string;
-use crate::tui::confirmation;
+use crate::tui::colors;
+use colorful::Colorful;
 
 // Arguments for 'context set'
 #[derive(Args)]
@@ -43,7 +44,7 @@ pub fn execute(args: &ContextSetArgs) -> Result<(), anyhow::Error> {
         eprintln!("Error: {}", e);
     }
 
-    confirmation(&format!("Tembo context set to: {}", name));
+    println!("{} {} {}", "✓".color(colors::indicator_good()).bold(), colors::gradient_rainbow("Tembo context set to:"), name.bold());
 
     Ok(())
 }

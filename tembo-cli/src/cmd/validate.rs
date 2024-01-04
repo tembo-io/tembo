@@ -1,6 +1,7 @@
 use crate::cli::context::{tembo_context_file_path, tembo_credentials_file_path};
 use crate::cli::file_utils::FileUtils;
 use crate::cli::tembo_config::InstanceSettings;
+use crate::tui::confirmation;
 use anyhow::Error;
 use anyhow::Ok;
 use clap::Args;
@@ -53,7 +54,7 @@ pub fn execute(verbose: bool) -> Result<(), anyhow::Error> {
         return Err(Error::msg("Fix errors above!"));
     }
 
-    println!("- Configuration is valid");
+    confirmation("Configuration is valid");
 
     Ok(())
 }

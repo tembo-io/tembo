@@ -30,6 +30,7 @@ use crate::cli::file_utils::FileUtils;
 use crate::cli::sqlx_utils::SqlxUtils;
 use crate::cli::tembo_config;
 use crate::cli::tembo_config::InstanceSettings;
+use crate::tui::{indent, local_started};
 use tera::{Context, Tera};
 
 const DOCKERFILE_NAME: &str = "Dockerfile";
@@ -102,9 +103,9 @@ fn execute_docker(verbose: bool) -> Result<(), anyhow::Error> {
             .block_on(SqlxUtils::run_migrations(conn_info))?;
 
         // If all of the above was successful, we can print the url to user
-        println!(
-            ">>> Tembo instance is now running on: postgres://postgres:postgres@localhost:{}",
-            port
+        local_started(&format!(
+            "postgres://postgres:postgres@localhost:{}",
+            port)
         );
     }
 

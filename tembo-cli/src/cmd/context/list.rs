@@ -42,7 +42,7 @@ pub fn execute() -> Result<(), anyhow::Error> {
 
     let table_display = table.display().expect("Error: could not parse `tembo context list` table contents!");
 
-    label("Current Tembo context:");
+    label("Your current Tembo context:");
     println!("{}", indent(1));
     println!("{}", table_display);
 
