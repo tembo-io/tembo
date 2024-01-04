@@ -17,7 +17,11 @@ const POSTGRES_CA_SECRET_NAME: &str = "postgres-ca-secret";
 const POSTGRES_CA_SECRET_CERT_KEY_NAME: &str = "ca.crt";
 const POSTGRES_CERTIFICATE_ISSUER_NAME: &str = "postgres-server-issuer";
 
-pub async fn reconcile_certificates(client: Client, coredb: &CoreDB, namespace: &str) -> Result<(), Action> {
+pub async fn reconcile_certificates(
+    client: Client,
+    coredb: &CoreDB,
+    namespace: &str,
+) -> Result<(), Action> {
     match std::env::var("USE_SHARED_CA") {
         Ok(_) => {}
         Err(_) => {
@@ -27,7 +31,8 @@ pub async fn reconcile_certificates(client: Client, coredb: &CoreDB, namespace: 
     }
 
     let coredb_name = coredb.metadata.name.as_ref().unwrap();
-    let secrets_api_cert_manager_namespace: Api<Secret> = Api::namespaced(client.clone(), "cert-manager");
+    let secrets_api_cert_manager_namespace: Api<Secret> =
+        Api::namespaced(client.clone(), "cert-manager");
     let secrets_api: Api<Secret> = Api::namespaced(client.clone(), namespace);
     let certificates_api: Api<Certificate> = Api::namespaced(client, namespace);
 
@@ -195,7 +200,10 @@ async fn apply_certificate(
     let certificate: Certificate = match serde_json::from_value(cert_value) {
         Ok(cert) => cert,
         Err(_) => {
-            error!("Failed to deserialize Certificate in namespace {}", namespace);
+            error!(
+                "Failed to deserialize Certificate in namespace {}",
+                namespace
+            );
             return Err(Action::requeue(Duration::from_secs(300)));
         }
     };
@@ -207,7 +215,10 @@ async fn apply_certificate(
         .clone();
     let params: PatchParams = PatchParams::apply("conductor").force();
     debug!("\nApplying Certificate {} in namespace {}", name, namespace);
-    let _o: Certificate = match cert_api.patch(&name, &params, &Patch::Apply(&certificate)).await {
+    let _o: Certificate = match cert_api
+        .patch(&name, &params, &Patch::Apply(&certificate))
+        .await
+    {
         Ok(cert) => cert,
         Err(e) => {
             error!(

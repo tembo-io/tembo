@@ -5,7 +5,9 @@ use k8s_openapi::{
 use std::collections::BTreeMap;
 
 use crate::{
-    apis::coredb_types::{Backup, ConnectionPooler, PgBouncer, S3Credentials, ServiceAccountTemplate},
+    apis::coredb_types::{
+        Backup, ConnectionPooler, PgBouncer, S3Credentials, ServiceAccountTemplate,
+    },
     cloudnativepg::poolers::{PoolerPgbouncerPoolMode, PoolerTemplateSpecContainersResources},
     extensions::types::{Extension, TrunkInstall},
 };

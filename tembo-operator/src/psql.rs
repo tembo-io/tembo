@@ -59,7 +59,11 @@ impl PsqlCommand {
             String::from("-c"),
             self.command.clone(),
         ];
-        let command = ExecCommand::new(self.pod_name.clone(), self.namespace.clone(), self.client.clone());
+        let command = ExecCommand::new(
+            self.pod_name.clone(),
+            self.namespace.clone(),
+            self.client.clone(),
+        );
         let output = match command.execute(&psql_command).await {
             Ok(output) => output,
             Err(e) => {
@@ -86,6 +90,10 @@ impl PsqlCommand {
             return Err(Action::requeue(Duration::from_secs(10)));
         }
 
-        Ok(PsqlOutput::new(output.stdout, output.stderr, output.success))
+        Ok(PsqlOutput::new(
+            output.stdout,
+            output.stderr,
+            output.success,
+        ))
     }
 }

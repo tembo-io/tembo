@@ -15,9 +15,17 @@ use serde::{Deserialize, Serialize};
 #[kube(namespaced)]
 #[kube(schema = "disabled")]
 pub struct MiddlewareTCPSpec {
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "inFlightConn")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "inFlightConn"
+    )]
     pub in_flight_conn: Option<MiddlewareTCPInFlightConn>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "ipAllowList")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "ipAllowList"
+    )]
     pub ip_allow_list: Option<MiddlewareTCPIpAllowList>,
 }
 
@@ -29,6 +37,10 @@ pub struct MiddlewareTCPInFlightConn {
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct MiddlewareTCPIpAllowList {
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "sourceRange")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "sourceRange"
+    )]
     pub source_range: Option<Vec<String>>,
 }

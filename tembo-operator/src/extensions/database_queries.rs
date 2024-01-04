@@ -22,7 +22,8 @@ use std::{
 use tracing::{debug, error, info, instrument, trace, warn};
 
 lazy_static! {
-    static ref VALID_INPUT: Regex = Regex::new(r"^[a-zA-Z]([a-zA-Z0-9]*[-_]?)*[a-zA-Z0-9]+$").unwrap();
+    static ref VALID_INPUT: Regex =
+        Regex::new(r"^[a-zA-Z]([a-zA-Z0-9]*[-_]?)*[a-zA-Z0-9]+$").unwrap();
 }
 
 pub fn check_input(input: &str) -> bool {
@@ -31,7 +32,8 @@ pub fn check_input(input: &str) -> bool {
 
 pub const LIST_SHARED_PRELOAD_LIBRARIES_QUERY: &str = r#"SHOW shared_preload_libraries;"#;
 
-pub const LIST_DATABASES_QUERY: &str = r#"SELECT datname FROM pg_database WHERE datistemplate = false;"#;
+pub const LIST_DATABASES_QUERY: &str =
+    r#"SELECT datname FROM pg_database WHERE datistemplate = false;"#;
 
 pub const LIST_EXTENSIONS_QUERY: &str = r#"select
 distinct on
@@ -106,7 +108,10 @@ pub struct ExtRow {
 }
 
 #[instrument(skip(cdb, ctx), fields(cdb_name = %cdb.name_any()))]
-pub async fn list_shared_preload_libraries(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<String>, Action> {
+pub async fn list_shared_preload_libraries(
+    cdb: &CoreDB,
+    ctx: Arc<Context>,
+) -> Result<Vec<String>, Action> {
     let psql_out = cdb
         .psql(
             LIST_SHARED_PRELOAD_LIBRARIES_QUERY.to_owned(),
@@ -139,7 +144,11 @@ pub async fn list_shared_preload_libraries(cdb: &CoreDB, ctx: Arc<Context>) -> R
 
 /// lists all extensions in a single database
 #[instrument(skip(cdb, ctx), fields(cdb_name = %cdb.name_any()))]
-pub async fn list_extensions(cdb: &CoreDB, ctx: Arc<Context>, database: &str) -> Result<Vec<ExtRow>, Action> {
+pub async fn list_extensions(
+    cdb: &CoreDB,
+    ctx: Arc<Context>,
+    database: &str,
+) -> Result<Vec<ExtRow>, Action> {
     let psql_out = cdb
         .psql(LIST_EXTENSIONS_QUERY.to_owned(), database.to_owned(), ctx)
         .await?;
@@ -221,7 +230,9 @@ pub async fn is_not_restarting(
             Action::requeue(Duration::from_secs(300))
         })?,
         Err(_) => {
-            let pod = cdb.primary_pod_cnpg_ready_or_not(ctx.client.clone()).await?;
+            let pod = cdb
+                .primary_pod_cnpg_ready_or_not(ctx.client.clone())
+                .await?;
 
             let pod_not_ready_duration = match get_pod_not_ready_duration(pod.clone()) {
                 Ok(Some(duration)) => {
@@ -233,7 +244,9 @@ pub async fn is_not_restarting(
                     return Err(Action::requeue(Duration::from_secs(5)));
                 }
                 Err(_e) => {
-                    error!("{cdb_name}: Failed to determine how long the primary has not been ready");
+                    error!(
+                        "{cdb_name}: Failed to determine how long the primary has not been ready"
+                    );
                     return Err(Action::requeue(Duration::from_secs(300)));
                 }
             };
@@ -250,7 +263,8 @@ pub async fn is_not_restarting(
                 && pod_not_ready_duration > Duration::from_secs(30)
             {
                 error!("{cdb_name}: Primary pod is older than restarted_at and has been not ready for over 30 seconds. Deleting the pod");
-                let pods_api = Api::<Pod>::namespaced(ctx.client.clone(), &pod.metadata.namespace.unwrap());
+                let pods_api =
+                    Api::<Pod>::namespaced(ctx.client.clone(), &pod.metadata.namespace.unwrap());
                 let delete_result = pods_api
                     .delete(&pod.metadata.name.unwrap(), &DeleteParams::default())
                     .await;
@@ -388,7 +402,8 @@ pub fn parse_config_params(psql_str: &str) -> Vec<PgConfig> {
         }
         // If value is multiple, Set as ConfigValue::Multiple
         if fields[1].contains(',') {
-            let values: BTreeSet<String> = fields[1].split(',').map(|s| s.trim().to_owned()).collect();
+            let values: BTreeSet<String> =
+                fields[1].split(',').map(|s| s.trim().to_owned()).collect();
             let config = PgConfig {
                 name: fields[0].to_owned(),
                 value: ConfigValue::Multiple(values),
@@ -413,11 +428,15 @@ pub fn parse_config_params(psql_str: &str) -> Vec<PgConfig> {
 
 /// list databases then get all extensions from each database
 #[instrument(skip(cdb, ctx), fields(cdb_name = %cdb.name_any()))]
-pub async fn get_all_extensions(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<ExtensionStatus>, Action> {
+pub async fn get_all_extensions(
+    cdb: &CoreDB,
+    ctx: Arc<Context>,
+) -> Result<Vec<ExtensionStatus>, Action> {
     let databases = list_databases(cdb, ctx.clone()).await?;
     debug!("databases: {:?}", databases);
 
-    let mut ext_hashmap: HashMap<(String, String), Vec<ExtensionInstallLocationStatus>> = HashMap::new();
+    let mut ext_hashmap: HashMap<(String, String), Vec<ExtensionInstallLocationStatus>> =
+        HashMap::new();
     // query every database for extensions
     // transform results by extension name, rather than by database
     for db in databases {
@@ -462,7 +481,11 @@ pub async fn toggle_extension(
     ext_loc: ExtensionInstallLocation,
     ctx: Arc<Context>,
 ) -> Result<(), String> {
-    let coredb_name = cdb.metadata.name.clone().expect("CoreDB should have a name");
+    let coredb_name = cdb
+        .metadata
+        .name
+        .clone()
+        .expect("CoreDB should have a name");
     if !check_input(ext_name) {
         warn!(
             "Extension is not formatted properly. Skipping operation. {}",
@@ -608,27 +631,45 @@ mod tests {
          archive_mode          | off     |      |          |            |            | sighup  | enum    |        |         |         | on,off   | off      | off       |            |            | f";
         let config = parse_config_params(config_psql);
         assert_eq!(config.len(), 4);
-        assert_eq!(config[0], PgConfig {
-            name: "allow_system_table_mods".to_owned(),
-            value: "off".parse().unwrap(),
-        });
-        assert_eq!(config[1], PgConfig {
-            name: "application_name".to_owned(),
-            value: "".parse().unwrap(),
-        });
-        assert_eq!(config[2], PgConfig {
-            name: "archive_command".to_owned(),
-            value: "".parse().unwrap(),
-        });
-        assert_eq!(config[3], PgConfig {
-            name: "archive_mode".to_owned(),
-            value: "off".parse().unwrap(),
-        });
+        assert_eq!(
+            config[0],
+            PgConfig {
+                name: "allow_system_table_mods".to_owned(),
+                value: "off".parse().unwrap(),
+            }
+        );
+        assert_eq!(
+            config[1],
+            PgConfig {
+                name: "application_name".to_owned(),
+                value: "".parse().unwrap(),
+            }
+        );
+        assert_eq!(
+            config[2],
+            PgConfig {
+                name: "archive_command".to_owned(),
+                value: "".parse().unwrap(),
+            }
+        );
+        assert_eq!(
+            config[3],
+            PgConfig {
+                name: "archive_mode".to_owned(),
+                value: "off".parse().unwrap(),
+            }
+        );
     }
 
     #[test]
     fn test_check_input() {
-        let invalids = ["extension--", "data;", "invalid^#$$characters", ";invalid", ""];
+        let invalids = [
+            "extension--",
+            "data;",
+            "invalid^#$$characters",
+            ";invalid",
+            "",
+        ];
         for i in invalids.iter() {
             assert!(!check_input(i), "input {} should be invalid", i);
         }

@@ -1,7 +1,9 @@
 use crate::{apis::coredb_types::CoreDB, Context, Error};
 
 use base64::{engine::general_purpose, Engine as _};
-use k8s_openapi::{api::core::v1::Secret, apimachinery::pkg::apis::meta::v1::ObjectMeta, ByteString};
+use k8s_openapi::{
+    api::core::v1::Secret, apimachinery::pkg::apis::meta::v1::ObjectMeta, ByteString,
+};
 use kube::{
     api::{ListParams, Patch, PatchParams},
     Api, Resource, ResourceExt,
@@ -26,7 +28,8 @@ pub async fn reconcile_secret(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Err
     labels.insert("coredb.io/name".to_owned(), cdb.name_any());
 
     // check for existing secret
-    let lp = ListParams::default().labels(format!("app=coredb,coredb.io/name={}", cdb.name_any()).as_str());
+    let lp = ListParams::default()
+        .labels(format!("app=coredb,coredb.io/name={}", cdb.name_any()).as_str());
     let secrets = secret_api.list(&lp).await.expect("could not get Secrets");
 
     // If the secret is already created, re-use the password
@@ -37,7 +40,9 @@ pub async fn reconcile_secret(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Err
                 .data
                 .clone()
                 .expect("Expect to always have 'data' block in a kubernetes secret");
-            let password_bytes = secret_data.get("password").expect("could not find password");
+            let password_bytes = secret_data
+                .get("password")
+                .expect("could not find password");
             let password_encoded = serde_json::to_string(password_bytes)
                 .expect("Expected to be able decode from byte string to base64-encoded string");
             let password_encoded = password_encoded.as_str();
@@ -111,18 +116,27 @@ fn secret_data(cdb: &CoreDB, ns: &str, password: String) -> BTreeMap<String, Byt
     data.insert("r_uri".to_owned(), b64_uri);
 
     // encode and insert read-write uri into secret data
-    let rwuri = format!("postgresql://{}:{}@{}:{}", &user, &password, &rw_host, &port);
+    let rwuri = format!(
+        "postgresql://{}:{}@{}:{}",
+        &user, &password, &rw_host, &port
+    );
     let b64_rwuri = b64_encode(&rwuri);
     data.insert("rw_uri".to_owned(), b64_rwuri);
 
     // encode and insert read-only uri into secret data
-    let rouri = format!("postgresql://{}:{}@{}:{}", &user, &password, &ro_host, &port);
+    let rouri = format!(
+        "postgresql://{}:{}@{}:{}",
+        &user, &password, &ro_host, &port
+    );
     let b64_rouri = b64_encode(&rouri);
     data.insert("ro_uri".to_owned(), b64_rouri);
 
     // encode and insert pooler uri into secret data
     if cdb.spec.connectionPooler.enabled {
-        let pooler_uri = format!("postgresql://{}:{}@{}:{}", &user, &password, &pooler_host, &port);
+        let pooler_uri = format!(
+            "postgresql://{}:{}@{}:{}",
+            &user, &password, &pooler_host, &port
+        );
         let b64_pooler_uri = b64_encode(&pooler_uri);
         data.insert("pooler_uri".to_owned(), b64_pooler_uri);
     }
@@ -230,7 +244,9 @@ pub async fn fetch_all_decoded_data_from_secret(
 
                 Ok(decoded_data)
             } else {
-                Err(Error::MissingSecretError("No data found in secret".to_owned()))
+                Err(Error::MissingSecretError(
+                    "No data found in secret".to_owned(),
+                ))
             }
         }
         Err(e) => Err(Error::KubeError(e)),
