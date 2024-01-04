@@ -554,35 +554,3 @@ fn get_postgres_config(instance_settings: HashMap<String, InstanceSettings>) -> 
 
     postgres_config
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::collections::HashMap;
-
-    #[test]
-    fn test_merge_functionality() {
-        let overlay_path = Some("/Users/joshuajerin/Desktop/jarvis/tembo/tembo-cli/tests/tomls/minimal/second-instance.toml".to_string());
-        let default_path = Some("/Users/joshuajerin/Desktop/jarvis/tembo/tembo-cli/tests/tomls/minimal/tembo.toml".to_string());
-
-        let result = get_instance_settings(default_path.clone(),overlay_path.clone()).unwrap();
-
-        let instance_settings = get_instance_settings(default_path, overlay_path).unwrap();
-
-        println!("Merged instance settings: {:?}", instance_settings);
-
-        if let Some(instance) = result.get("instance") {
-            
-            assert_eq!(instance.instance_name, "default_instance");
-            assert_eq!(instance.cpu.as_deref(), Some("2"));
-            assert_eq!(instance.stack_type, "basic");
-
-            
-            assert_eq!(instance.memory.as_deref(), Some("4GiB"));
-            assert_eq!(instance.storage.as_deref(), Some("10GiB"));
-            assert_eq!(instance.replicas, Some(3));
-        } else {
-            panic!("Instance settings not found");
-        }
-    }
-}
