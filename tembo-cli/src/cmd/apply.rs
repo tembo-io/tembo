@@ -1,5 +1,5 @@
 use anyhow::Error;
-use clap::Args;
+use clap::{Parser, Args};
 use controller::stacks::get_stack;
 use controller::stacks::types::StackType as ControllerStackType;
 use log::info;
@@ -11,6 +11,7 @@ use std::{
     thread::sleep,
     time::Duration,
 };
+use anyhow::Context as AnyhowContext;
 use temboclient::{
     apis::{
         configuration::Configuration,
@@ -37,9 +38,12 @@ const POSTGRESCONF_NAME: &str = "postgres.conf";
 
 /// Deploys a tembo.toml file
 #[derive(Args)]
-pub struct ApplyCommand {}
+pub struct ApplyCommand {
+    #[clap(long, short = 'm')]
+    pub merge: Option<String>,
+}
 
-pub fn execute(verbose: bool) -> Result<(), anyhow::Error> {
+pub fn execute(verbose: bool, merge_path: Option<String>) -> Result<(), anyhow::Error> {
     info!("Running validation!");
     super::validate::execute(verbose)?;
     info!("Validation completed!");
@@ -58,7 +62,7 @@ pub fn execute(verbose: bool) -> Result<(), anyhow::Error> {
 fn execute_docker(verbose: bool) -> Result<(), anyhow::Error> {
     Docker::installed_and_running()?;
 
-    let instance_settings: HashMap<String, InstanceSettings> = get_instance_settings()?;
+    let instance_settings = get_instance_settings(None,None)?;
     let rendered_dockerfile: String = get_rendered_dockerfile(instance_settings.clone())?;
 
     FileUtils::create_file(
@@ -112,7 +116,7 @@ fn execute_docker(verbose: bool) -> Result<(), anyhow::Error> {
 }
 
 pub fn execute_tembo_cloud(env: Environment) -> Result<(), anyhow::Error> {
-    let instance_settings: HashMap<String, InstanceSettings> = get_instance_settings()?;
+    let instance_settings = get_instance_settings(None,None)?;
 
     let profile = env.clone().selected_profile.unwrap();
     let config = Configuration {
@@ -300,16 +304,16 @@ fn create_new_instance(
 
 fn get_create_instance(instance_settings: &InstanceSettings) -> CreateInstance {
     return CreateInstance {
-        cpu: Cpu::from_str(instance_settings.cpu.as_str()).unwrap(),
-        memory: Memory::from_str(instance_settings.memory.as_str()).unwrap(),
+        cpu: Cpu::from_str(instance_settings.cpu.as_ref().map(|s| s.as_str()).unwrap_or_default()).unwrap(),
+        memory: Memory::from_str(instance_settings.memory.as_ref().map(|s| s.as_str()).unwrap_or_default()).unwrap(),
         environment: temboclient::models::Environment::from_str(
             instance_settings.environment.as_str(),
         )
         .unwrap(),
         instance_name: instance_settings.instance_name.clone(),
         stack_type: StackType::from_str(instance_settings.stack_type.as_str()).unwrap(),
-        storage: Storage::from_str(instance_settings.storage.as_str()).unwrap(),
-        replicas: Some(instance_settings.replicas),
+        storage: Storage::from_str(instance_settings.storage.as_ref().map(|s| s.as_str()).unwrap_or_default()).unwrap(),
+        replicas: Some(instance_settings.replicas.unwrap_or_default(),),
         app_services: None,
         connection_pooler: None,
         extensions: Some(Some(get_extensions(instance_settings.extensions.clone()))),
@@ -324,14 +328,14 @@ fn get_create_instance(instance_settings: &InstanceSettings) -> CreateInstance {
 
 fn get_update_instance(instance_settings: &InstanceSettings) -> UpdateInstance {
     return UpdateInstance {
-        cpu: Cpu::from_str(instance_settings.cpu.as_str()).unwrap(),
-        memory: Memory::from_str(instance_settings.memory.as_str()).unwrap(),
+        cpu: Cpu::from_str(instance_settings.cpu.as_ref().map(|s| s.as_str()).unwrap_or_default()).unwrap(),
+        memory: Memory::from_str(instance_settings.memory.as_ref().map(|s| s.as_str()).unwrap_or_default()).unwrap(),
         environment: temboclient::models::Environment::from_str(
             instance_settings.environment.as_str(),
         )
         .unwrap(),
-        storage: Storage::from_str(instance_settings.storage.as_str()).unwrap(),
-        replicas: instance_settings.replicas,
+        storage: Storage::from_str(instance_settings.storage.as_ref().map(|s| s.as_str()).unwrap_or_default()).unwrap(),
+        replicas:  instance_settings.replicas.unwrap_or_default(),
         app_services: None,
         connection_pooler: None,
         extensions: Some(Some(get_extensions(instance_settings.extensions.clone()))),
@@ -417,26 +421,33 @@ fn get_trunk_installs(
     vec_trunk_installs
 }
 
-pub fn get_instance_settings() -> Result<HashMap<String, InstanceSettings>, anyhow::Error> {
-    let mut file_path = FileUtils::get_current_working_dir();
-    file_path.push_str("/tembo.toml");
+pub fn get_instance_settings(default_file_path: Option<String>, overlay_file_path: Option<String>) -> Result<HashMap<String, InstanceSettings>, Error> {
+    
+    let default_path = default_file_path.unwrap_or_else(|| FileUtils::get_current_working_dir() + "/tembo.toml");
+    let default_contents = fs::read_to_string(&default_path)
+        .with_context(|| format!("Couldn't read default file {}", default_path))?;
+    
+    let mut instance_settings: HashMap<String, InstanceSettings> = toml::from_str(&default_contents)
+        .context("Unable to load data from the default config")?;
 
-    let contents = match fs::read_to_string(file_path.clone()) {
-        Ok(c) => c,
-        Err(e) => {
-            panic!("Couldn't read context file {}: {}", file_path, e);
-        }
-    };
+    if let Some(overlay_path) = overlay_file_path {
+        let overlay_contents = fs::read_to_string(&overlay_path)
+            .with_context(|| format!("Couldn't read overlay file {}", overlay_path))?;
+        let overlay_settings: HashMap<String, InstanceSettings> = toml::from_str(&overlay_contents)
+            .context("Unable to load data from the overlay config")?;
 
-    let instance_settings: HashMap<String, InstanceSettings> = match toml::from_str(&contents) {
-        Ok(d) => d,
-        Err(e) => {
-            panic!("Unable to load data. Error: `{}`", e);
+        for (key, overlay_value) in overlay_settings {
+            if key != "instance_name" { 
+                instance_settings.insert(key, overlay_value);
+            }
         }
-    };
+    }
 
     Ok(instance_settings)
 }
+
+
+
 
 pub fn get_rendered_dockerfile(
     instance_settings: HashMap<String, InstanceSettings>,
@@ -542,4 +553,36 @@ fn get_postgres_config(instance_settings: HashMap<String, InstanceSettings>) -> 
     }
 
     postgres_config
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::HashMap;
+
+    #[test]
+    fn test_merge_functionality() {
+        let overlay_path = Some("/Users/joshuajerin/Desktop/jarvis/tembo/tembo-cli/tests/tomls/minimal/second-instance.toml".to_string());
+        let default_path = Some("/Users/joshuajerin/Desktop/jarvis/tembo/tembo-cli/tests/tomls/minimal/tembo.toml".to_string());
+
+        let result = get_instance_settings(default_path.clone(),overlay_path.clone()).unwrap();
+
+        let instance_settings = get_instance_settings(default_path, overlay_path).unwrap();
+
+        println!("Merged instance settings: {:?}", instance_settings);
+
+        if let Some(instance) = result.get("instance") {
+            
+            assert_eq!(instance.instance_name, "default_instance");
+            assert_eq!(instance.cpu.as_deref(), Some("2"));
+            assert_eq!(instance.stack_type, "basic");
+
+            
+            assert_eq!(instance.memory.as_deref(), Some("4GiB"));
+            assert_eq!(instance.storage.as_deref(), Some("10GiB"));
+            assert_eq!(instance.replicas, Some(3));
+        } else {
+            panic!("Instance settings not found");
+        }
+    }
 }

@@ -52,7 +52,8 @@ fn main() -> Result<(), anyhow::Error> {
             init::execute()?;
         }
         SubCommands::Apply(_apply_cmd) => {
-            apply::execute(app.global_opts.verbose)?;
+            let merge_option = _apply_cmd.merge;
+            apply::execute(app.global_opts.verbose, merge_option)?;
         }
         SubCommands::Validate(_validate_cmd) => {
             validate::execute(app.global_opts.verbose)?;

@@ -14,13 +14,13 @@ pub struct InstanceSettings {
     pub environment: String,
     pub instance_name: String,
     #[serde(default = "default_cpu")]
-    pub cpu: String,
+    pub cpu: Option<String>,
     #[serde(default = "default_memory")]
-    pub memory: String,
+    pub memory: Option<String>,
     #[serde(default = "default_storage")]
-    pub storage: String,
+    pub storage: Option<String>,
     #[serde(default = "default_replicas")]
-    pub replicas: i32,
+    pub replicas: Option<i32>,
     #[serde(default = "default_stack_type")]
     pub stack_type: String,
     pub postgres_configurations: Option<HashMap<String, Value>>,
@@ -53,20 +53,20 @@ where
     .map_or(Ok(None), |m| Ok(Some(m)))
 }
 
-fn default_cpu() -> String {
-    "0.25".to_string()
+fn default_cpu() -> Option<String> {
+    Some("0.25".to_string())
 }
 
-fn default_memory() -> String {
-    "1GiB".to_string()
+fn default_memory() -> Option<String> {
+    Some("1GiB".to_string())
 }
 
-fn default_storage() -> String {
-    "10GiB".to_string()
+fn default_storage() -> Option<String> {
+    Some("10GiB".to_string())
 }
 
-fn default_replicas() -> i32 {
-    1
+fn default_replicas() -> Option<i32> {
+    Some(1)
 }
 
 fn default_stack_type() -> String {
