@@ -89,8 +89,8 @@ pub fn indent(amount: u32) -> String {
 
 pub mod colors {
     use colorful::RGB as ColorfulRgb;
+    use spinoff::Color as SpinnerColor;
     use tiny_gradient::{GradientDisplay, GradientStr, RGB};
-	use spinoff::Color as SpinnerColor;
 
     pub fn sql_u() -> ColorfulRgb {
         ColorfulRgb::new(255, 125, 127)
@@ -131,9 +131,9 @@ pub mod colors {
         ColorfulRgb::new(158, 162, 166)
     }
 
-	pub const SPINNER_COLOR: SpinnerColor = SpinnerColor::TrueColor {
-		r: 255,
-		g: 125,
-		b: 127,
-	};
+    pub const SPINNER_COLOR: SpinnerColor = SpinnerColor::TrueColor {
+        r: 255,
+        g: 125,
+        b: 127,
+    };
 }

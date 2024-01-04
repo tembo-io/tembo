@@ -1,6 +1,6 @@
 use anyhow::Error;
 use clap::Args;
-use colorful::{Colorful, Color};
+use colorful::{Color, Colorful};
 use controller::stacks::get_stack;
 use controller::stacks::types::StackType as ControllerStackType;
 use log::info;
@@ -24,13 +24,16 @@ use temboclient::{
 use tembodataclient::apis::secrets_api::get_secret_v1;
 use tokio::runtime::Runtime;
 
-use crate::{cli::context::{get_current_context, Environment, Profile, Target}, tui::{white_confirmation, colors, clean_console}};
 use crate::cli::docker::Docker;
 use crate::cli::file_utils::FileUtils;
 use crate::cli::sqlx_utils::SqlxUtils;
 use crate::cli::tembo_config;
 use crate::cli::tembo_config::InstanceSettings;
 use crate::tui::{indent, instance_started};
+use crate::{
+    cli::context::{get_current_context, Environment, Profile, Target},
+    tui::{clean_console, colors, white_confirmation},
+};
 use tera::{Context, Tera};
 
 const DOCKERFILE_NAME: &str = "Dockerfile";
@@ -106,7 +109,7 @@ fn execute_docker(verbose: bool) -> Result<(), anyhow::Error> {
         instance_started(
             &format!("postgres://postgres:postgres@localhost:{}", port),
             &value.stack_type,
-            "local"
+            "local",
         );
     }
 
@@ -132,7 +135,11 @@ pub fn execute_tembo_cloud(env: Environment) -> Result<(), anyhow::Error> {
             instance_id = create_new_instance(value, &config, env.clone());
         }
         println!();
-        let mut sp = spinoff::Spinner::new(spinoff::spinners::Aesthetic, "Waiting for instance to be up...", colors::SPINNER_COLOR);
+        let mut sp = spinoff::Spinner::new(
+            spinoff::spinners::Aesthetic,
+            "Waiting for instance to be up...",
+            colors::SPINNER_COLOR,
+        );
         loop {
             sleep(Duration::from_secs(10));
 
@@ -159,11 +166,7 @@ pub fn execute_tembo_cloud(env: Environment) -> Result<(), anyhow::Error> {
                 ));
                 clean_console();
                 let connection_string = construct_connection_string(conn_info);
-                instance_started(
-                    &connection_string,
-                    &value.stack_type,
-                    "cloud"
-                );
+                instance_started(&connection_string, &value.stack_type, "cloud");
 
                 break;
             }
@@ -275,8 +278,8 @@ fn update_existing_instance(
         Ok(result) => {
             white_confirmation(&format!(
                 "Instance update started for Instance Id: {}",
-                result.instance_id.color(colors::sql_u()).bold())
-            );
+                result.instance_id.color(colors::sql_u()).bold()
+            ));
         }
         Err(error) => eprintln!("Error updating instance: {}", error),
     };
@@ -299,8 +302,8 @@ fn create_new_instance(
         Ok(result) => {
             white_confirmation(&format!(
                 "Instance creation started for instance_name: {}",
-                result.instance_name.color(colors::sql_u()).bold())
-            );
+                result.instance_name.color(colors::sql_u()).bold()
+            ));
 
             return Some(result.instance_id);
         }

@@ -49,7 +49,7 @@ impl Docker {
             Some(Spinner::new(
                 spinners::Dots,
                 "Running Docker Build & Run",
-                spinoff::Color::White
+                spinoff::Color::White,
             ))
         } else {
             None
@@ -66,7 +66,7 @@ impl Docker {
                     sp = Some(Spinner::new(
                         spinners::Dots,
                         "Building and running container",
-                        spinoff::Color::White
+                        spinoff::Color::White,
                     ));
                 }
             } else {
@@ -127,7 +127,11 @@ impl Docker {
 
     // stop & remove container for given name
     pub fn stop_remove(name: &str) -> Result<(), anyhow::Error> {
-        let mut sp = Spinner::new(spinners::Dots, "Stopping & Removing instance", spinoff::Color::White);
+        let mut sp = Spinner::new(
+            spinners::Dots,
+            "Stopping & Removing instance",
+            spinoff::Color::White,
+        );
 
         if !Self::container_list_filtered(name).unwrap().contains(name) {
             sp.stop_with_message(&format!("- Tembo instance {} doesn't exist", name));
