@@ -62,10 +62,10 @@ pub fn logo<'a>() -> GradientDisplay<'a, [RGB; 3]> {
     colors::gradient_rainbow(">>> T E M B O")
 }
 
-pub fn local_started(server_url: &str, stack: &str) {
+pub fn instance_started(server_url: &str, stack: &str, instance_type: &str) {
     let bar = "┃".color(colors::sql_u()).bold();
     println!(
-        "\n{bar} {} local instance {}: \n{bar}\n{bar} ➜ {}\n{bar} ➜ {}",
+        "\n{bar} {} {instance_type} instance {}: \n\n ➜ {}\n ➜ {}",
         logo(),
         "started".bg_rgb(255, 125, 127).color(Color::White).bold(),
         format!(
@@ -90,6 +90,7 @@ pub fn indent(amount: u32) -> String {
 pub mod colors {
     use colorful::RGB as ColorfulRgb;
     use tiny_gradient::{GradientDisplay, GradientStr, RGB};
+	use spinoff::Color as SpinnerColor;
 
     pub fn sql_u() -> ColorfulRgb {
         ColorfulRgb::new(255, 125, 127)
@@ -129,4 +130,10 @@ pub mod colors {
     pub fn grey() -> ColorfulRgb {
         ColorfulRgb::new(158, 162, 166)
     }
+
+	pub const SPINNER_COLOR: SpinnerColor = SpinnerColor::TrueColor {
+		r: 255,
+		g: 125,
+		b: 127,
+	};
 }
