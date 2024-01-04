@@ -57,10 +57,9 @@ fn main() -> Result<(), anyhow::Error> {
             apply::execute(app.global_opts.verbose, merge_option.clone())?;
 
             if let SubCommands::Apply(ref _apply_cmd) = app.command {
-                let default_path = Some("/Users/joshuajerin/Desktop/jarvis/tembo/tembo-cli/tests/tomls/minimal/tembo.toml".to_string());
                 let overlay_path = &_apply_cmd.merge;
         
-                let instance_settings = apply::get_instance_settings(default_path, overlay_path.clone())?;
+                let instance_settings = apply::get_instance_settings(None, overlay_path.clone())?;
                 println!("Instance settings: {:?}", instance_settings);
             }
         }

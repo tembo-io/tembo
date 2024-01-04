@@ -452,8 +452,9 @@ fn merge_settings(base: &InstanceSettings, overlay: OverlayInstanceSettings) -> 
     }
 }
 
-pub fn get_instance_settings(default_file_path:Option<String>,overlay_file_path: Option<String>) -> Result<HashMap<String, InstanceSettings>, Error> {
-    let base_path = "/Users/joshuajerin/Desktop/jarvis/tembo/tembo-cli/tests/tomls/minimal/tembo.toml";
+pub fn get_instance_settings(base_file_path:Option<String>,overlay_file_path: Option<String>) -> Result<HashMap<String, InstanceSettings>, Error> {
+    let mut base_path = FileUtils::get_current_working_dir();
+    base_path.push_str("/tembo.toml");
     let base_contents = fs::read_to_string(&base_path)
         .with_context(|| format!("Couldn't read base file {}", base_path))?;
     let base_settings: HashMap<String, InstanceSettings> = toml::from_str(&base_contents)
