@@ -1,3 +1,4 @@
+use crate::tui::white_confirmation;
 use anyhow::Error;
 use anyhow::{bail, Context};
 use simplelog::*;
@@ -6,7 +7,6 @@ use std::io::{BufRead, BufReader};
 use std::process::Output;
 use std::process::{Command as ShellCommand, Stdio};
 use std::thread;
-use crate::tui::white_confirmation;
 
 pub struct Docker {}
 
@@ -46,7 +46,7 @@ impl Docker {
     pub fn build_run(instance_name: String, verbose: bool) -> Result<i32, anyhow::Error> {
         let mut sp = if !verbose {
             Some(Spinner::new(
-                Spinners::Line,
+                Spinners::Dots,
                 "Running Docker Build & Run".into(),
             ))
         } else {
@@ -58,7 +58,7 @@ impl Docker {
                 spinner.stop_with_message(message.to_string());
                 if new_spinner {
                     sp = Some(Spinner::new(
-                        Spinners::Line,
+                        Spinners::Dots,
                         "Building and running container".into(),
                     ));
                 }
@@ -120,7 +120,7 @@ impl Docker {
 
     // stop & remove container for given name
     pub fn stop_remove(name: &str) -> Result<(), anyhow::Error> {
-        let mut sp = Spinner::new(Spinners::Line, "Stopping & Removing instance".into());
+        let mut sp = Spinner::new(Spinners::Dots, "Stopping & Removing instance".into());
 
         if !Self::container_list_filtered(name).unwrap().contains(name) {
             sp.stop_with_message(format!("- Tembo instance {} doesn't exist", name));

@@ -38,7 +38,7 @@ pub fn confirmation(log: &str) {
 }
 
 pub fn white_confirmation(log: &str) {
-	println!(
+    println!(
         "{} {}",
         "✓".color(colors::indicator_good()).bold(),
         log.color(Color::White).bold()

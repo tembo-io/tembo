@@ -11,7 +11,7 @@ pub struct SqlxUtils {}
 impl SqlxUtils {
     // run sqlx migrate
     pub async fn run_migrations(connection_info: ConnectionInfo) -> Result<(), anyhow::Error> {
-        let mut sp = Spinner::new(Spinners::Line, "Running SQL migration".into());
+        let mut sp = Spinner::new(Spinners::Dots, "Running SQL migration".into());
 
         let connection_string = format!(
             "postgresql://{}:{}@{}:{}",
