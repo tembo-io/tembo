@@ -62,13 +62,18 @@ pub fn logo<'a>() -> GradientDisplay<'a, [RGB; 3]> {
     colors::gradient_rainbow(">>> T E M B O")
 }
 
-pub fn local_started(server_url: &str) {
+pub fn local_started(server_url: &str, stack: &str) {
     let bar = "┃".color(colors::sql_u()).bold();
     println!(
-        "\n{bar} {} local instance {}: \n{bar}\n{bar} ➜ {}\n",
+        "\n{bar} {} local instance {}: \n{bar}\n{bar} ➜ {}\n{bar} ➜ {}",
         logo(),
         "started".bg_rgb(255, 125, 127).color(Color::White).bold(),
-        server_url.bold()
+        format!(
+            "{} {}",
+            "Url:".color(Color::White).bold(),
+            server_url.bold()
+        ),
+        stack.color(colors::grey()).bold()
     );
 }
 
@@ -119,5 +124,9 @@ pub mod colors {
 
     pub fn indicator_good() -> ColorfulRgb {
         ColorfulRgb::new(132, 234, 189)
+    }
+
+    pub fn grey() -> ColorfulRgb {
+        ColorfulRgb::new(158, 162, 166)
     }
 }

@@ -147,7 +147,9 @@ impl Docker {
             sp.stop_with_message(format!(
                 "{} {}",
                 "✓".color(colors::indicator_good()).bold(),
-                format!("Tembo instance {} stopped & removed", &name).color(Color::White).bold()
+                format!("Tembo instance {} stopped & removed", &name)
+                    .color(Color::White)
+                    .bold()
             ));
 
             let stderr = String::from_utf8(output.stderr).unwrap();

@@ -1,4 +1,5 @@
 use crate::tui::colors;
+use colorful::{Color, Colorful};
 use spinners::Spinner;
 use spinners::Spinners;
 use sqlx::migrate::Migrator;
@@ -6,7 +7,6 @@ use sqlx::Pool;
 use sqlx::Postgres;
 use std::path::Path;
 use temboclient::models::ConnectionInfo;
-use colorful::{Color, Colorful};
 
 pub struct SqlxUtils {}
 
