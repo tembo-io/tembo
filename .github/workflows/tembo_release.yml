@@ -12,25 +12,69 @@ jobs:
 
   cargo_build:
     name: Cargo build
-    runs-on: ubuntu-20.04
-    container:
-      image: quay.io/tembo/muslrust:1.71.0-stable
     strategy:
       fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-apple-darwin
+            asset_name: x86_64-apple
+            os: macos-latest
+          - target: aarch64-apple-darwin
+            asset_name: aarch64-apple
+            os: macos-latest
+          - target: x86_64-unknown-linux-musl
+            asset_name: x86_64-linux
+            os: ubuntu-20.04
+            container: quay.io/tembo/muslrust:1.71.0-stable
+          - target: aarch64-unknown-linux-musl
+            asset_name: aarch64-linux
+            os: ubuntu-20.04
+            container: messense/rust-musl-cross:aarch64-musl
+    runs-on: ${{ matrix.os }}
+    container:
+      image: ${{ matrix.container }}
     steps:
       - name: Check out the repo
         uses: actions/checkout@v4
+
+      - name: Install Deps Ubuntu
+        id: install_deps_ubuntu
+        run: |
+          set -x
+          apt update -y
+          apt install pkg-config libssl-dev -y
+        if: matrix.os == 'ubuntu-20.04'
 
       - name: Cargo build
         working-directory: ./tembo-cli
         id: cargo_build
         run: |
           set -x
-          cargo build --release --target=x86_64-unknown-linux-musl
-          TEMBO_VERSION=$(target/x86_64-unknown-linux-musl/release/tembo --version)
-          TEMBO_CLI_NAME="$(echo $TEMBO_VERSION | sed 's/ /-/g')"
-          echo "TEMBO_CLI_NAME=$TEMBO_CLI_NAME" >> $GITHUB_ENV
+          rustup target add ${{ matrix.target }}
+          cargo build --release --target=${{ matrix.target }}
           git config --global --add safe.directory '*'
+
+      # TODO: Figure out a better way to fetch version for mac & linux
+      - name: CLI version Mac
+        working-directory: ./tembo-cli
+        id: cli_version_mac
+        run: |
+          set -x
+          cargo install cargo-get
+          TEMBO_CLI_NAME=$(cargo-get package.name)-$(cargo-get package.version)
+          echo "TEMBO_CLI_NAME=$TEMBO_CLI_NAME" >> $GITHUB_ENV
+        if: matrix.os == 'macos-latest'
+
+      - name: CLI version Ubuntu
+        working-directory: ./tembo-cli
+        id: cli_version_ubuntu
+        run: |
+          set -x
+          PKG_VERSION=$(awk -F ' = ' '$$1 ~ /version/ { gsub(/[\\"]/, "", $$2); printf("%s",$$2); exit; }' Cargo.toml)
+          TEMBO_VERSION=${PKG_VERSION#"version = "}
+          TEMBO_CLI_NAME=tembo-cli-${TEMBO_VERSION}
+          echo "TEMBO_CLI_NAME=$TEMBO_CLI_NAME" >> $GITHUB_ENV
+        if: matrix.os == 'ubuntu-20.04'
 
       - name: Generate changelog
         id: changelog
@@ -43,10 +87,8 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: tembo-cli/target/x86_64-unknown-linux-musl/release/tembo
-          asset_name: ${{ env.TEMBO_CLI_NAME }}-x86_64-unknown-linux-musl
-          prerelease: true
+          file: tembo-cli/target/${{ matrix.target }}/release/tembo
+          asset_name: ${{ env.TEMBO_CLI_NAME }}-${{ matrix.asset_name }}
           tag: ${{ github.ref }}
-          body: ${{ github.ref }}
-          # body: ${{ steps.changelog.outputs.changelog }}
+          body: ${{ steps.changelog.outputs.changelog }}
 

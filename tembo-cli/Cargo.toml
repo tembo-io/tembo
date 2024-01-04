@@ -56,6 +56,15 @@ controller = "0.26.1"
 sqlx = { version = "0.7.3", features = ["runtime-tokio-native-tls", "postgres", "chrono", "json"] }
 base64 = "0.21.5"
 
+[target.aarch64-unknown-linux-musl.dependencies]
+openssl = { version = "0.10", features = ["vendored"] }
+
+[target.aarch64-apple-darwin.dependencies]
+openssl = { version = "0.10", features = ["vendored"] }
+
+[target.x86_64-apple-darwin.dependencies]
+openssl = { version = "0.10", features = ["vendored"] }
+
 [dev-dependencies]
 assert_cmd = "2.0.8"
 predicates = "2.1.5"
