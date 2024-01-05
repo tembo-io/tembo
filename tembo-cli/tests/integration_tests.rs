@@ -116,21 +116,28 @@ async fn data_warehouse() -> Result<(), Box<dyn Error>> {
 
 
 #[test]
-fn merge() -> Result<(), Box<dyn std::error::Error>> {
-    let overlay_config_path = "/Users/joshuajerin/Desktop/jarvis/tembo/tembo-cli/tests/tomls/merge/second-instance.toml";
+fn merge() -> Result<(), Box<dyn Error>> {
+    let root_dir = env!("CARGO_MANIFEST_DIR");
 
-    let mut cmd = Command::cargo_bin("tembo")?; 
+    let overlay_config_path = PathBuf::from(root_dir)
+        .join("tests")
+        .join("tomls")
+        .join("merge")
+        .join("second-instance.toml");
+
+    let overlay_config_str = overlay_config_path.to_str().ok_or("Invalid path")?;
+
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
     cmd.arg("apply")
-        .arg("--merge")
-        .arg(overlay_config_path);
+       .arg("--merge")
+       .arg(overlay_config_str);
 
-    // Execute the command and assert its output
     cmd.assert()
-   .success()
-   .stdout(predicate::str::contains("- Configuration is valid"))
-   .stdout(predicate::str::contains("- Docker Build & Run completed"))
-   .stdout(predicate::str::contains("- SQL migration completed"))
-   .stdout(predicate::str::contains("Tembo instance is now running on: postgres://postgres:postgres@localhost:5432"));
+       .success()
+       .stdout(predicate::str::contains("- Configuration is valid"))
+       .stdout(predicate::str::contains("- Docker Build & Run completed"))
+       .stdout(predicate::str::contains("- SQL migration completed"))
+       .stdout(predicate::str::contains("Tembo instance is now running on: postgres://postgres:postgres@localhost:5432"));
 
     Ok(())
 }
