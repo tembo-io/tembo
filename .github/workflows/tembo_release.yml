@@ -77,12 +77,11 @@ jobs:
           echo "TEMBO_CLI_NAME=$TEMBO_CLI_NAME" >> $GITHUB_ENV
         if: runner.os == 'Linux'
 
-      - name: Generate changelog
+      - name: "✏️ Generate release changelog"
         id: changelog
-        uses: metcalfc/changelog-generator@v4.2.0
+        uses: heinrichreimer/action-github-changelog-generator@v2.3
         with:
-          myToken: ${{ secrets.GITHUB_TOKEN }}
-          fetch: false
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
