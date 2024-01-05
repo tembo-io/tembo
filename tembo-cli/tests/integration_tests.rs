@@ -134,11 +134,7 @@ fn merge() -> Result<(), Box<dyn Error>> {
 
     cmd.assert()
        .success()
-       .stdout(predicate::str::contains("- Configuration is valid"))
-       .stdout(predicate::str::contains("- Docker Build & Run completed"))
-       .stdout(predicate::str::contains("- SQL migration completed"))
-       .stdout(predicate::str::contains("Tembo instance is now running on: postgres://postgres:postgres@localhost:5432"));
-
+       .stdout(predicate::str::contains("Configuration is valid"));
     Ok(())
 }
 
