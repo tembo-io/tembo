@@ -443,10 +443,10 @@ fn overlay_to_instance_settings(overlay: OverlayInstanceSettings) -> InstanceSet
     InstanceSettings {
         environment: overlay.environment.unwrap_or("default_environment".to_string()),
         instance_name: overlay.instance_name.unwrap_or("default_instance_name".to_string()),
-        cpu: overlay.cpu.expect("REASON"),
-        memory: overlay.memory.expect("REASON"),
-        storage: overlay.storage.expect("REASON"),
-        replicas: overlay.replicas.expect("REASON"),
+        cpu: overlay.cpu.unwrap_or("default_cpu".to_string()),
+        memory: overlay.memory.unwrap_or("default_memory".to_string()), 
+        storage: overlay.storage.unwrap_or("default_storage".to_string()),
+        replicas: overlay.replicas.unwrap_or(1), // Set a default value for replicas here
         stack_type: overlay.stack_type.unwrap_or("default_stack_type".to_string()),
         postgres_configurations: overlay.postgres_configurations,
         extensions: overlay.extensions,
