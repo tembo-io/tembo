@@ -3,7 +3,9 @@ use crate::cli::context::{
     CREDENTIALS_DEFAULT_TEXT,
 };
 use crate::cli::file_utils::FileUtils;
+use crate::tui::confirmation;
 use clap::Args;
+use colorful::Colorful;
 
 /// Initializes a local environment. Creates a sample context and configuration files.
 #[derive(Args)]
@@ -53,6 +55,8 @@ pub fn execute() -> Result<(), anyhow::Error> {
             return Err(e);
         }
     }
+
+    confirmation("Tembo initialized successfully!");
 
     Ok(())
 }

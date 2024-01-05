@@ -1,5 +1,7 @@
 use crate::cli::context::{tembo_context_file_path, Context};
+use crate::tui::colors;
 use clap::Args;
+use colorful::Colorful;
 use std::fs::{self, File};
 use std::io::Write;
 use toml::to_string;
@@ -42,7 +44,12 @@ pub fn execute(args: &ContextSetArgs) -> Result<(), anyhow::Error> {
         eprintln!("Error: {}", e);
     }
 
-    println!("Tembo context set to: {}", name);
+    println!(
+        "{} {} {}",
+        "✓".color(colors::indicator_good()).bold(),
+        colors::gradient_rainbow("Tembo context set to:"),
+        name.bold()
+    );
 
     Ok(())
 }

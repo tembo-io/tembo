@@ -8,6 +8,7 @@ use cmd::init::InitCommand;
 
 mod cli;
 mod cmd;
+mod tui;
 
 
 #[derive(Parser)]
