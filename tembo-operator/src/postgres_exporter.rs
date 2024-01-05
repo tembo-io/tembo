@@ -186,7 +186,11 @@ impl FromStr for Usage {
     }
 }
 
-pub async fn reconcile_metrics_configmap(cdb: &CoreDB, client: Client, ns: &str) -> Result<(), Error> {
+pub async fn reconcile_metrics_configmap(
+    cdb: &CoreDB,
+    client: Client,
+    ns: &str,
+) -> Result<(), Error> {
     // set custom pg-prom metrics in configmap values if they are specified
     let coredb_name = cdb
         .metadata
@@ -254,7 +258,8 @@ mod tests {
               }
         );
 
-        let query_config: QueryConfig = serde_json::from_value(incoming_data).expect("failed to deserialize");
+        let query_config: QueryConfig =
+            serde_json::from_value(incoming_data).expect("failed to deserialize");
 
         assert!(query_config.queries.contains_key("pg_postmaster"));
         assert!(query_config.queries.contains_key("extensions"));

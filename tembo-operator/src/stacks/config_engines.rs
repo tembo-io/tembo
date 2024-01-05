@@ -218,7 +218,10 @@ fn parse_memory(stack: &Stack) -> Result<f64, ValueError> {
     match unit.as_str() {
         "Gi" => Ok(mem * 1024.0),
         "Mi" => Ok(mem),
-        _ => Err(ValueError::Invalid(format!("Invalid mem value: {}", mem_str))),
+        _ => Err(ValueError::Invalid(format!(
+            "Invalid mem value: {}",
+            mem_str
+        ))),
     }
 }
 
@@ -259,8 +262,8 @@ fn standard_max_connections(mem_mb: f64) -> i32 {
 
 // returns work_mem value in MB
 fn dynamic_work_mem(sys_mem_mb: i32, shared_buffers_mb: i32, max_connections: i32) -> i32 {
-    (((sys_mem_mb - shared_buffers_mb) as f64 - (sys_mem_mb as f64 * 0.2)) / max_connections as f64).floor()
-        as i32
+    (((sys_mem_mb - shared_buffers_mb) as f64 - (sys_mem_mb as f64 * 0.2)) / max_connections as f64)
+        .floor() as i32
 }
 
 // generally safe for most workloads
@@ -283,7 +286,10 @@ fn split_string(input: &str) -> Result<(f64, String), ValueError> {
         let alpha = cap[2].to_string();
         Ok((num, alpha))
     } else {
-        Err(ValueError::Invalid(format!("Invalid string format: {}", input)))
+        Err(ValueError::Invalid(format!(
+            "Invalid string format: {}",
+            input
+        )))
     }
 }
 

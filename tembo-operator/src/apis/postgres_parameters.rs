@@ -25,7 +25,8 @@ pub const MULTI_VAL_CONFIGS: [&str; 5] = [
 // This array defines the priority order for any multi-value config
 // This defines any required order for shared_preload_libraries, otherwise alphabetical
 // TODO: move this to a trunk endpoint
-pub const MULTI_VAL_CONFIGS_PRIORITY_LIST: [&str; 3] = ["citus", "pg_stat_statements", "pg_stat_kcache"];
+pub const MULTI_VAL_CONFIGS_PRIORITY_LIST: [&str; 3] =
+    ["citus", "pg_stat_statements", "pg_stat_kcache"];
 
 // configurations that are not allowed to be set by the user
 pub const DISALLOWED_CONFIGS: [&str; 66] = [
@@ -247,7 +248,8 @@ impl JsonSchema for ConfigValue {
 
     fn json_schema(_: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
         let mut schema_object = SchemaObject::default();
-        schema_object.metadata().description = Some("A postgresql.conf configuration value".to_owned());
+        schema_object.metadata().description =
+            Some("A postgresql.conf configuration value".to_owned());
         schema_object.metadata().read_only = false;
         // overriding the enums to be a string
         schema_object.instance_type = Some(schemars::schema::InstanceType::String.into());
@@ -383,7 +385,8 @@ impl<'de> Deserialize<'de> for PgConfig {
                 let raw_value = value.ok_or_else(|| M::Error::custom("key 'value' not found"))?;
 
                 let value = if MULTI_VAL_CONFIGS.contains(&name.as_str()) {
-                    let set: BTreeSet<String> = raw_value.split(',').map(|s| s.trim().to_string()).collect();
+                    let set: BTreeSet<String> =
+                        raw_value.split(',').map(|s| s.trim().to_string()).collect();
                     ConfigValue::Multiple(set)
                 } else {
                     ConfigValue::Single(raw_value)
@@ -459,7 +462,10 @@ mod pg_param_tests {
         };
         let mut requires_load: BTreeMap<String, String> = BTreeMap::new();
         requires_load.insert("pg_cron".to_string(), "pg_cron".to_string());
-        requires_load.insert("pg_stat_statements".to_string(), "pg_stat_statements".to_string());
+        requires_load.insert(
+            "pg_stat_statements".to_string(),
+            "pg_stat_statements".to_string(),
+        );
         let pg_configs = spec
             .get_pg_configs(requires_load)
             .expect("failed to get pg configs")
@@ -562,7 +568,8 @@ mod pg_param_tests {
             serialized,
             "{\"name\":\"shared_preload_libraries\",\"value\":\"a,b,c\"}"
         );
-        let deserialized: PgConfig = serde_json::from_str(&serialized).expect("failed to deserialize");
+        let deserialized: PgConfig =
+            serde_json::from_str(&serialized).expect("failed to deserialize");
         match deserialized.value {
             ConfigValue::Multiple(set) => {
                 assert_eq!(set.len(), 3);

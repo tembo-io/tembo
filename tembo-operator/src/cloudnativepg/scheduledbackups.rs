@@ -58,10 +58,22 @@ pub enum ScheduledBackupTarget {
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct ScheduledBackupStatus {
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "lastCheckTime")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "lastCheckTime"
+    )]
     pub last_check_time: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "lastScheduleTime")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "lastScheduleTime"
+    )]
     pub last_schedule_time: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "nextScheduleTime")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "nextScheduleTime"
+    )]
     pub next_schedule_time: Option<String>,
 }

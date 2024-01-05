@@ -61,7 +61,10 @@ pub async fn reconcile_heartbeat(coredb: &CoreDB, ctx: Arc<Context>) -> Result<(
             coredb.name_any()
         ),
         Err(e) => {
-            warn!("Did not create setup_heartbeat function, will requeue: {:?}", e);
+            warn!(
+                "Did not create setup_heartbeat function, will requeue: {:?}",
+                e
+            );
             return Err(Action::requeue(Duration::from_secs(30)));
         }
     }

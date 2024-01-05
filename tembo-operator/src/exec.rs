@@ -119,6 +119,10 @@ impl ExecCommand {
                 )));
             }
         };
-        Ok(ExecOutput::new(Some(result_stdout), Some(result_stderr), success))
+        Ok(ExecOutput::new(
+            Some(result_stdout),
+            Some(result_stderr),
+            success,
+        ))
     }
 }

@@ -60,7 +60,10 @@ pub async fn extensions_that_require_load(
             }
             // Add any extra extensions that require load
             for extra_extension in EXTRA_EXTENSIONS_REQUIRE_LOAD.iter() {
-                libraries_map.insert(extra_extension.name.clone(), extra_extension.library_name.clone());
+                libraries_map.insert(
+                    extra_extension.name.clone(),
+                    extra_extension.library_name.clone(),
+                );
             }
             Ok(libraries_map)
         } else {
@@ -71,7 +74,10 @@ pub async fn extensions_that_require_load(
             Err(Action::requeue(Duration::from_secs(300)))
         }
     } else {
-        error!("No data in trunk metadata configmap in namespace {}", namespace);
+        error!(
+            "No data in trunk metadata configmap in namespace {}",
+            namespace
+        );
         Err(Action::requeue(Duration::from_secs(300)))
     }
 }
@@ -80,7 +86,10 @@ pub async fn reconcile_trunk_configmap(client: Client, namespace: &str) -> Resul
     let libraries = match requires_load_list_from_trunk().await {
         Ok(libraries) => libraries,
         Err(e) => {
-            error!("Failed to update extensions libraries list from trunk: {:?}", e);
+            error!(
+                "Failed to update extensions libraries list from trunk: {:?}",
+                e
+            );
             let cm_api: Api<ConfigMap> = Api::namespaced(client.clone(), namespace);
             match cm_api.get(TRUNK_CONFIGMAP_NAME).await {
                 Ok(_) => {
@@ -109,8 +118,8 @@ pub async fn reconcile_trunk_configmap(client: Client, namespace: &str) -> Resul
 }
 
 async fn requires_load_list_from_trunk() -> Result<Vec<String>, TrunkError> {
-    let domain =
-        env::var("TRUNK_REGISTRY_DOMAIN").unwrap_or_else(|_| DEFAULT_TRUNK_REGISTRY_DOMAIN.to_string());
+    let domain = env::var("TRUNK_REGISTRY_DOMAIN")
+        .unwrap_or_else(|_| DEFAULT_TRUNK_REGISTRY_DOMAIN.to_string());
     let url = format!("https://{}/extensions/libraries", domain);
 
     let response = reqwest::get(&url).await?;
