@@ -1,9 +1,7 @@
 use crate::cli::context::{get_current_context, Environment, Target};
 use crate::cli::docker::Docker;
-overlay-configs
 use crate::cli::tembo_config::InstanceSettings;
 use crate::tui::{confirmation, label};
-main
 use clap::Args;
 use core::result::Result::Ok;
 use temboclient::apis::{configuration::Configuration, instance_api::delete_instance};

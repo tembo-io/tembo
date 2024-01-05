@@ -30,14 +30,12 @@ use crate::cli::file_utils::FileUtils;
 use crate::cli::sqlx_utils::SqlxUtils;
 use crate::cli::tembo_config;
 use crate::cli::tembo_config::InstanceSettings;
-overlay-configs
 use crate::cli::tembo_config::OverlayInstanceSettings;
 use crate::tui::{indent, instance_started};
 use crate::{
     cli::context::{get_current_context, Environment, Profile, Target},
     tui::{clean_console, colors, white_confirmation},
 };
-main
 use tera::{Context, Tera};
 
 const DOCKERFILE_NAME: &str = "Dockerfile";
@@ -609,10 +607,8 @@ fn get_postgres_config(instance_settings: HashMap<String, InstanceSettings>) -> 
     }
 
     postgres_config
-overlay-configs
 }
 
-}
 
 fn construct_connection_string(info: ConnectionInfo) -> String {
     format!(
@@ -624,4 +620,3 @@ fn construct_connection_string(info: ConnectionInfo) -> String {
         "postgres"
     )
 }
-main
