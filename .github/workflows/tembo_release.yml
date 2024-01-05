@@ -84,6 +84,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           onlyLastTag: true
+        if: runner.os == 'Linux'
 
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
