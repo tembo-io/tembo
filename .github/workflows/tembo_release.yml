@@ -92,5 +92,4 @@ jobs:
           asset_name: ${{ env.TEMBO_CLI_NAME }}-${{ matrix.asset_name }}.tar.gz
           tag: ${{ github.ref }}
           body: ${{ steps.changelog.outputs.changelog }}
-          prerelease: true
 
