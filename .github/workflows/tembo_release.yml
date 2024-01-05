@@ -43,7 +43,7 @@ jobs:
           set -x
           apt update -y
           apt install pkg-config libssl-dev -y
-        if: matrix.os == 'ubuntu-20.04'
+        if: runner.os == 'Linux'
 
       - name: Cargo build
         working-directory: ./tembo-cli
@@ -52,6 +52,8 @@ jobs:
           set -x
           rustup target add ${{ matrix.target }}
           cargo build --release --target=${{ matrix.target }}
+          cd target/${{ matrix.target }}/release
+          tar -czvf tembo.tar.gz tembo
           git config --global --add safe.directory '*'
 
       # TODO: Figure out a better way to fetch version for mac & linux
@@ -63,7 +65,7 @@ jobs:
           cargo install cargo-get
           TEMBO_CLI_NAME=$(cargo-get package.name)-$(cargo-get package.version)
           echo "TEMBO_CLI_NAME=$TEMBO_CLI_NAME" >> $GITHUB_ENV
-        if: matrix.os == 'macos-latest'
+        if: runner.os == 'macOS'
 
       - name: CLI version Ubuntu
         working-directory: ./tembo-cli
@@ -74,21 +76,20 @@ jobs:
           TEMBO_VERSION=${PKG_VERSION#"version = "}
           TEMBO_CLI_NAME=tembo-cli-${TEMBO_VERSION}
           echo "TEMBO_CLI_NAME=$TEMBO_CLI_NAME" >> $GITHUB_ENV
-        if: matrix.os == 'ubuntu-20.04'
+        if: runner.os == 'Linux'
 
-      - name: Generate changelog
+      - name: "Generate release changelog"
         id: changelog
-        uses: metcalfc/changelog-generator@v4.2.0
+        uses: mikepenz/release-changelog-builder-action@v4.1.0
         with:
-          myToken: ${{ secrets.GITHUB_TOKEN }}
-          fetch: false
+          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: tembo-cli/target/${{ matrix.target }}/release/tembo
-          asset_name: ${{ env.TEMBO_CLI_NAME }}-${{ matrix.asset_name }}
+          file: tembo-cli/target/${{ matrix.target }}/release/tembo.tar.gz
+          asset_name: ${{ env.TEMBO_CLI_NAME }}-${{ matrix.asset_name }}.tar.gz
           tag: ${{ github.ref }}
           body: ${{ steps.changelog.outputs.changelog }}
 
