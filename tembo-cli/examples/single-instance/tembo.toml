@@ -4,7 +4,7 @@
 # Default settings for instances
 [defaults]
 environment = "dev"
-instance_name = "test-via-cli-35"
+instance_name = "your-instance-name"
 cpu = "1"
 memory = "2Gi"
 storage = "10Gi"

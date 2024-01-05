@@ -1,5 +1,9 @@
 use crate::cli::context::{get_current_context, Environment, Target};
 use crate::cli::docker::Docker;
+overlay-configs
+use crate::cli::tembo_config::InstanceSettings;
+use crate::tui::{confirmation, label};
+main
 use clap::Args;
 use core::result::Result::Ok;
 use temboclient::apis::{configuration::Configuration, instance_api::delete_instance};
@@ -47,12 +51,10 @@ fn execute_tembo_cloud(env: Environment) -> Result<(), anyhow::Error> {
             ));
 
             match v {
-                Ok(result) => {
-                    println!(
-                        "Instance delete started for Instance Id: {}",
-                        result.instance_id
-                    )
-                }
+                Ok(result) => confirmation(&format!(
+                    "Instance delete started for Instance Id: {}",
+                    result.instance_id
+                )),
                 Err(error) => eprintln!("Error deleting instance: {}", error),
             };
         }

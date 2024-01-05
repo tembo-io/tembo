@@ -92,7 +92,7 @@ compute_templates:
     instance_class: MemoryOptimized
 trunk_installs:
   - name: pgmq
-    version: 1.1.0
+    version: 1.1.1
   - name: pg_partman
     version: 4.7.3
 extensions:
@@ -100,7 +100,7 @@ extensions:
     locations:
       - database: postgres
         enabled: true
-        version: 1.1.0
+        version: 1.1.1
   - name: pg_partman
     locations:
       - database: postgres
