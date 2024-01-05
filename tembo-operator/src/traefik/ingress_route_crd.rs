@@ -18,7 +18,11 @@ use serde::{Deserialize, Serialize};
 #[kube(namespaced)]
 pub struct IngressRouteSpec {
     /// EntryPoints defines the list of entry point names to bind to. Entry points have to be configured in the static configuration. More info: https://doc.traefik.io/traefik/v3.0/routing/entrypoints/ Default: all.
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "entryPoints")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "entryPoints"
+    )]
     pub entry_points: Option<Vec<String>>,
     /// Routes defines the list of routes.
     pub routes: Vec<IngressRouteRoutes>,
@@ -75,7 +79,11 @@ pub struct IngressRouteRoutesServices {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub namespace: Option<String>,
     /// PassHostHeader defines whether the client Host header is forwarded to the upstream Kubernetes Service. By default, passHostHeader is true.
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "passHostHeader")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "passHostHeader"
+    )]
     pub pass_host_header: Option<bool>,
     /// Port defines the port of a Kubernetes Service. This can be a reference to a named port.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -91,7 +99,11 @@ pub struct IngressRouteRoutesServices {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub scheme: Option<String>,
     /// ServersTransport defines the name of ServersTransport resource to use. It allows to configure the transport between Traefik and your servers. Can only be used on a Kubernetes Service.
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "serversTransport")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "serversTransport"
+    )]
     pub servers_transport: Option<String>,
     /// Sticky defines the sticky sessions configuration. More info: https://doc.traefik.io/traefik/v3.0/routing/services/#sticky-sessions
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -115,7 +127,11 @@ pub enum IngressRouteRoutesServicesKind {
 #[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
 pub struct IngressRouteRoutesServicesResponseForwarding {
     /// FlushInterval defines the interval, in milliseconds, in between flushes to the client while copying the response body. A negative value means to flush immediately after each write to the client. This configuration is ignored when ReverseProxy recognizes a response as a streaming response; for such responses, writes are flushed to the client immediately. Default: 100ms
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "flushInterval")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "flushInterval"
+    )]
     pub flush_interval: Option<String>,
 }
 
@@ -148,7 +164,11 @@ pub struct IngressRouteRoutesServicesStickyCookie {
 #[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
 pub struct IngressRouteTls {
     /// CertResolver defines the name of the certificate resolver to use. Cert resolvers have to be configured in the static configuration. More info: https://doc.traefik.io/traefik/v3.0/https/acme/#certificate-resolvers
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "certResolver")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "certResolver"
+    )]
     pub cert_resolver: Option<String>,
     /// Domains defines the list of domains that will be used to issue certificates. More info: https://doc.traefik.io/traefik/v3.0/routing/routers/#domains
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -157,7 +177,11 @@ pub struct IngressRouteTls {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub options: Option<IngressRouteTlsOptions>,
     /// SecretName is the name of the referenced Kubernetes Secret to specify the certificate details.
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "secretName")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "secretName"
+    )]
     pub secret_name: Option<String>,
     /// Store defines the reference to the TLSStore, that will be used to store certificates. Please note that only `default` TLSStore can be used.
     #[serde(default, skip_serializing_if = "Option::is_none")]

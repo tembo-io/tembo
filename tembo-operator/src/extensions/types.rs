@@ -107,7 +107,8 @@ impl Default for Extension {
         Extension {
             name: "pg_stat_statements".to_owned(),
             description: Some(
-                " track planning and execution statistics of all SQL statements executed".to_owned(),
+                " track planning and execution statistics of all SQL statements executed"
+                    .to_owned(),
             ),
             locations: vec![ExtensionInstallLocation::default()],
         }
@@ -188,7 +189,10 @@ pub fn generate_extension_enable_cmd(
     }
     let mut command_suffix: String = "".to_string();
     if EXTRA_COMMANDS_TO_ENABLE_EXTENSION.contains_key(ext_name) {
-        command_suffix = EXTRA_COMMANDS_TO_ENABLE_EXTENSION.get(ext_name).unwrap().clone();
+        command_suffix = EXTRA_COMMANDS_TO_ENABLE_EXTENSION
+            .get(ext_name)
+            .unwrap()
+            .clone();
     }
     // only specify the schema if it provided
     let command = match ext_loc.enabled {
@@ -281,7 +285,9 @@ mod tests {
         apis::coredb_types::{CoreDB, CoreDBSpec, CoreDBStatus},
         extensions::{
             kubernetes_queries::merge_location_status_into_extension_status_list,
-            toggle::{determine_extension_locations_to_toggle, determine_updated_extensions_status},
+            toggle::{
+                determine_extension_locations_to_toggle, determine_updated_extensions_status,
+            },
         },
     };
 
@@ -356,7 +362,10 @@ mod tests {
             version: Some("1.0.0".to_string()),
         };
         let cmd = generate_extension_enable_cmd("my_ext", &loc1);
-        assert_eq!(cmd.unwrap(), "CREATE EXTENSION IF NOT EXISTS \"my_ext\" CASCADE;");
+        assert_eq!(
+            cmd.unwrap(),
+            "CREATE EXTENSION IF NOT EXISTS \"my_ext\" CASCADE;"
+        );
 
         // schema specified
         let loc2 = ExtensionInstallLocation {
@@ -366,7 +375,10 @@ mod tests {
             version: Some("1.0.0".to_string()),
         };
         let cmd = generate_extension_enable_cmd("my_ext", &loc2);
-        assert_eq!(cmd.unwrap(), "CREATE EXTENSION IF NOT EXISTS \"my_ext\" CASCADE;");
+        assert_eq!(
+            cmd.unwrap(),
+            "CREATE EXTENSION IF NOT EXISTS \"my_ext\" CASCADE;"
+        );
 
         // drop extension
         let loc2 = ExtensionInstallLocation {
@@ -556,7 +568,8 @@ mod tests {
                     ExtensionInstallLocationStatus {
                         enabled: Some(false),
                         error: None,
-                        database: "db_where_its_available_and_disabled_missing_from_status".to_string(),
+                        database: "db_where_its_available_and_disabled_missing_from_status"
+                            .to_string(),
                         schema: Some("public".to_string()),
                         version: None,
                         error_message: None,
@@ -564,7 +577,8 @@ mod tests {
                     ExtensionInstallLocationStatus {
                         enabled: Some(true),
                         error: None,
-                        database: "db_where_its_available_and_enabled_missing_from_status".to_string(),
+                        database: "db_where_its_available_and_enabled_missing_from_status"
+                            .to_string(),
                         schema: Some("public".to_string()),
                         version: None,
                         error_message: None,
@@ -572,8 +586,9 @@ mod tests {
                     ExtensionInstallLocationStatus {
                         enabled: Some(false),
                         error: None,
-                        database: "db_where_it_is_currently_in_error_having_tried_to_enable_and_failed"
-                            .to_string(),
+                        database:
+                            "db_where_it_is_currently_in_error_having_tried_to_enable_and_failed"
+                                .to_string(),
                         schema: Some("public".to_string()),
                         version: None,
                         error_message: None,
@@ -666,7 +681,8 @@ mod tests {
         assert_eq!(location_status.enabled, Some(false));
         assert!(location_status.error.unwrap());
         assert!(location_status.error_message.is_some());
-        let location_status = get_location_status(&cdb, "ext1", "db_where_its_not_available").unwrap();
+        let location_status =
+            get_location_status(&cdb, "ext1", "db_where_its_not_available").unwrap();
         assert_eq!(location_status.enabled, None);
         assert!(location_status.error.unwrap());
         assert!(location_status.error_message.is_some());
@@ -683,12 +699,20 @@ mod tests {
         };
 
         // When available and disabled, requesting to enable, we should try to toggle it
-        let location =
-            get_location_spec(&cdb_spec_check, "ext1", "db_where_its_available_and_disabled").unwrap();
+        let location = get_location_spec(
+            &cdb_spec_check,
+            "ext1",
+            "db_where_its_available_and_disabled",
+        )
+        .unwrap();
         assert!(location.enabled);
         // When available and enabled, requesting to disable, we should try to toggle it
-        let location =
-            get_location_spec(&cdb_spec_check, "ext1", "db_where_its_available_and_enabled").unwrap();
+        let location = get_location_spec(
+            &cdb_spec_check,
+            "ext1",
+            "db_where_its_available_and_enabled",
+        )
+        .unwrap();
         assert!(!location.enabled);
         // When available and disabled, requesting to enable, we should try to toggle it
         let location = get_location_spec(

@@ -61,7 +61,9 @@ pub fn merge_location_status_into_extension_status_list(
             extension.locations.push(new_location_status.clone());
             // Then sort the locations alphabetically by database name
             // sort locations by database and schema so the order is deterministic
-            extension.locations.sort_by(|a, b| a.database.cmp(&b.database));
+            extension
+                .locations
+                .sort_by(|a, b| a.database.cmp(&b.database));
             return new_extensions_status;
         }
     }
@@ -322,11 +324,16 @@ mod tests {
             installed_to_pods: Some(vec!["pod-1".to_string(), "pod-2".to_string()]),
         };
 
-        let updated_trunk_installs = update_trunk_installs(current_trunk_installs, &new_trunk_install);
+        let updated_trunk_installs =
+            update_trunk_installs(current_trunk_installs, &new_trunk_install);
 
         assert_eq!(updated_trunk_installs.clone().len(), 1);
         assert_eq!(
-            updated_trunk_installs[0].installed_to_pods.clone().unwrap().len(),
+            updated_trunk_installs[0]
+                .installed_to_pods
+                .clone()
+                .unwrap()
+                .len(),
             2
         );
     }

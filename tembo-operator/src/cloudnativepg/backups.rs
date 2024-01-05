@@ -37,21 +37,41 @@ pub enum BackupTarget {
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct BackupStatus {
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "azureCredentials")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "azureCredentials"
+    )]
     pub azure_credentials: Option<BackupStatusAzureCredentials>,
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "backupId")]
     pub backup_id: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "backupName")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "backupName"
+    )]
     pub backup_name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "beginLSN")]
     pub begin_lsn: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "beginWal")]
     pub begin_wal: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "commandError")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "commandError"
+    )]
     pub command_error: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "commandOutput")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "commandOutput"
+    )]
     pub command_output: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "destinationPath")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "destinationPath"
+    )]
     pub destination_path: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub encryption: Option<String>,
@@ -59,9 +79,17 @@ pub struct BackupStatus {
     pub end_lsn: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "endWal")]
     pub end_wal: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "endpointCA")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "endpointCA"
+    )]
     pub endpoint_ca: Option<BackupStatusEndpointCa>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "endpointURL")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "endpointURL"
+    )]
     pub endpoint_url: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
@@ -71,13 +99,25 @@ pub struct BackupStatus {
         rename = "googleCredentials"
     )]
     pub google_credentials: Option<BackupStatusGoogleCredentials>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "instanceID")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "instanceID"
+    )]
     pub instance_id: Option<BackupStatusInstanceId>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub phase: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "s3Credentials")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "s3Credentials"
+    )]
     pub s3_credentials: Option<BackupStatusS3Credentials>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "serverName")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "serverName"
+    )]
     pub server_name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "startedAt")]
     pub started_at: Option<String>,
@@ -87,7 +127,11 @@ pub struct BackupStatus {
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct BackupStatusAzureCredentials {
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "connectionString")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "connectionString"
+    )]
     pub connection_string: Option<BackupStatusAzureCredentialsConnectionString>,
     #[serde(
         default,
@@ -95,11 +139,23 @@ pub struct BackupStatusAzureCredentials {
         rename = "inheritFromAzureAD"
     )]
     pub inherit_from_azure_ad: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "storageAccount")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "storageAccount"
+    )]
     pub storage_account: Option<BackupStatusAzureCredentialsStorageAccount>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "storageKey")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "storageKey"
+    )]
     pub storage_key: Option<BackupStatusAzureCredentialsStorageKey>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "storageSasToken")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "storageSasToken"
+    )]
     pub storage_sas_token: Option<BackupStatusAzureCredentialsStorageSasToken>,
 }
 
@@ -141,7 +197,11 @@ pub struct BackupStatusGoogleCredentials {
         rename = "applicationCredentials"
     )]
     pub application_credentials: Option<BackupStatusGoogleCredentialsApplicationCredentials>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "gkeEnvironment")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "gkeEnvironment"
+    )]
     pub gke_environment: Option<bool>,
 }
 
@@ -153,7 +213,11 @@ pub struct BackupStatusGoogleCredentialsApplicationCredentials {
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct BackupStatusInstanceId {
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "ContainerID")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "ContainerID"
+    )]
     pub container_id: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "podName")]
     pub pod_name: Option<String>,
@@ -161,7 +225,11 @@ pub struct BackupStatusInstanceId {
 
 #[derive(Serialize, Deserialize, Clone, Debug, Default)]
 pub struct BackupStatusS3Credentials {
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "accessKeyId")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "accessKeyId"
+    )]
     pub access_key_id: Option<BackupStatusS3CredentialsAccessKeyId>,
     #[serde(
         default,
@@ -171,9 +239,17 @@ pub struct BackupStatusS3Credentials {
     pub inherit_from_iam_role: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub region: Option<BackupStatusS3CredentialsRegion>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "secretAccessKey")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "secretAccessKey"
+    )]
     pub secret_access_key: Option<BackupStatusS3CredentialsSecretAccessKey>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "sessionToken")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "sessionToken"
+    )]
     pub session_token: Option<BackupStatusS3CredentialsSessionToken>,
 }
 

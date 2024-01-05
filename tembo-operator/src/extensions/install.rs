@@ -16,7 +16,10 @@ use crate::apis::coredb_types::CoreDBStatus;
 
 // Syncroniously merge and deduplicate pods
 #[instrument(skip(non_fenced_pods, fenced_names) fields(trace_id))]
-fn merge_and_deduplicate_pods(non_fenced_pods: Vec<Pod>, fenced_names: Option<Vec<String>>) -> Vec<Pod> {
+fn merge_and_deduplicate_pods(
+    non_fenced_pods: Vec<Pod>,
+    fenced_names: Option<Vec<String>>,
+) -> Vec<Pod> {
     let mut all_pods: Vec<Pod> = Vec::new();
     let mut unique_pod_names: HashSet<String> = HashSet::new();
 
@@ -50,8 +53,15 @@ fn merge_and_deduplicate_pods(non_fenced_pods: Vec<Pod>, fenced_names: Option<Ve
 
 // Collect any fenced pods and add them to the list of pods to install extensions into
 #[instrument(skip(ctx, cdb) fields(trace_id))]
-async fn all_fenced_and_non_fenced_pods(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<Pod>, Action> {
-    let name = cdb.metadata.name.clone().expect("CoreDB should have a name");
+async fn all_fenced_and_non_fenced_pods(
+    cdb: &CoreDB,
+    ctx: Arc<Context>,
+) -> Result<Vec<Pod>, Action> {
+    let name = cdb
+        .metadata
+        .name
+        .clone()
+        .expect("CoreDB should have a name");
 
     // Get fenced pods
     let pods_fenced = get_fenced_pods(cdb, ctx.clone()).await?;
@@ -76,7 +86,10 @@ async fn all_fenced_and_non_fenced_pods(cdb: &CoreDB, ctx: Arc<Context>) -> Resu
 fn find_trunk_installs_to_remove_from_status(cdb: &CoreDB) -> Vec<String> {
     debug!(
         "Checking for trunk installs to remove from status for {}",
-        cdb.metadata.name.clone().expect("CoreDB should have a name")
+        cdb.metadata
+            .name
+            .clone()
+            .expect("CoreDB should have a name")
     );
 
     let mut trunk_installs_to_remove_from_status = Vec::new();
@@ -118,7 +131,10 @@ fn find_trunk_installs_to_pod<'a>(cdb: &'a CoreDB, pod_name: &str) -> Vec<&'a Tr
     debug!(
         "Checking for trunk installs to install on pod {} for {}",
         pod_name,
-        cdb.metadata.name.clone().expect("CoreDB should have a name")
+        cdb.metadata
+            .name
+            .clone()
+            .expect("CoreDB should have a name")
     );
 
     let mut trunk_installs_to_install = Vec::new();
@@ -176,7 +192,11 @@ pub async fn reconcile_trunk_installs(
     cdb: &CoreDB,
     ctx: Arc<Context>,
 ) -> Result<Vec<TrunkInstallStatus>, Action> {
-    let instance_name = cdb.metadata.name.clone().expect("CoreDB should have a name");
+    let instance_name = cdb
+        .metadata
+        .name
+        .clone()
+        .expect("CoreDB should have a name");
 
     debug!("Starting to reconcile trunk installs for {}", instance_name);
 
@@ -197,7 +217,10 @@ pub async fn reconcile_trunk_installs(
     // Remove extensions from status
     remove_trunk_installs_from_status(
         &coredb_api,
-        &cdb.metadata.name.clone().expect("CoreDB should have a name"),
+        &cdb.metadata
+            .name
+            .clone()
+            .expect("CoreDB should have a name"),
         trunk_installs_to_remove_from_status,
     )
     .await?;
@@ -334,8 +357,12 @@ async fn execute_extension_install_command(
         Ok(result) => {
             let output = format!(
                 "{}\n{}",
-                result.stdout.unwrap_or_else(|| "Nothing in stdout".to_string()),
-                result.stderr.unwrap_or_else(|| "Nothing in stderr".to_string())
+                result
+                    .stdout
+                    .unwrap_or_else(|| "Nothing in stdout".to_string()),
+                result
+                    .stderr
+                    .unwrap_or_else(|| "Nothing in stderr".to_string())
             );
 
             let trunk_install_status = if result.success {
@@ -385,7 +412,11 @@ pub async fn install_extensions_to_pod(
     ctx: &Arc<Context>,
     pod_name: String,
 ) -> Result<Vec<TrunkInstallStatus>, Action> {
-    let coredb_name = cdb.metadata.name.clone().expect("CoreDB should have a name");
+    let coredb_name = cdb
+        .metadata
+        .name
+        .clone()
+        .expect("CoreDB should have a name");
     let coredb_api: Api<CoreDB> = Api::namespaced(
         ctx.client.clone(),
         &cdb.metadata
@@ -401,14 +432,22 @@ pub async fn install_extensions_to_pod(
         debug!("No extensions to install into {}", coredb_name);
         return Ok(current_trunk_install_statuses);
     }
-    info!("Installing extensions into {}: {:?}", coredb_name, trunk_installs);
+    info!(
+        "Installing extensions into {}: {:?}",
+        coredb_name, trunk_installs
+    );
 
     let mut requeue = false;
     for ext in trunk_installs.iter() {
-        info!("Attempting to install extension: {} on {}", ext.name, coredb_name);
+        info!(
+            "Attempting to install extension: {} on {}",
+            ext.name, coredb_name
+        );
 
         // Execute trunk install command
-        match execute_extension_install_command(cdb, ctx.clone(), &coredb_name, ext, &pod_name).await {
+        match execute_extension_install_command(cdb, ctx.clone(), &coredb_name, ext, &pod_name)
+            .await
+        {
             Ok(trunk_install_status) => {
                 if trunk_install_status.error {
                     // Log and continue to the next iteration
@@ -416,12 +455,17 @@ pub async fn install_extensions_to_pod(
                         "Error occurred during installation: {:?}",
                         trunk_install_status.error_message
                     );
-                    current_trunk_install_statuses =
-                        add_trunk_install_to_status(&coredb_api, &coredb_name, &trunk_install_status).await?;
+                    current_trunk_install_statuses = add_trunk_install_to_status(
+                        &coredb_api,
+                        &coredb_name,
+                        &trunk_install_status,
+                    )
+                    .await?;
                     continue;
                 }
                 current_trunk_install_statuses =
-                    add_trunk_install_to_status(&coredb_api, &coredb_name, &trunk_install_status).await?;
+                    add_trunk_install_to_status(&coredb_api, &coredb_name, &trunk_install_status)
+                        .await?;
             }
             Err(should_requeue) => {
                 requeue = should_requeue;
@@ -480,11 +524,10 @@ mod tests {
             .iter()
             .filter_map(|pod| pod.metadata.name.clone())
             .collect();
-        assert_eq!(deduplicated_names, vec![
-            "pod1".to_string(),
-            "pod2".to_string(),
-            "pod3".to_string()
-        ]);
+        assert_eq!(
+            deduplicated_names,
+            vec!["pod1".to_string(), "pod2".to_string(), "pod3".to_string()]
+        );
     }
 
     #[test]
@@ -647,7 +690,10 @@ mod tests {
                 ..Default::default()
             },
             status: Some(CoreDBStatus {
-                trunk_installs: Some(vec![trunk_install_status1.clone(), trunk_install_status2.clone()]),
+                trunk_installs: Some(vec![
+                    trunk_install_status1.clone(),
+                    trunk_install_status2.clone(),
+                ]),
                 ..Default::default()
             }),
         };
@@ -681,7 +727,9 @@ mod tests {
                 name: Some("coredb1".to_string()),
                 ..Default::default()
             },
-            spec: CoreDBSpec { ..Default::default() },
+            spec: CoreDBSpec {
+                ..Default::default()
+            },
             status: None,
         };
         let coredb_name = "cdb_without_status";

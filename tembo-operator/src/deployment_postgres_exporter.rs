@@ -32,7 +32,10 @@ async fn delete_postgres_exporter_deployment(cdb: &CoreDB, ctx: Arc<Context>) ->
     // Delete the deployment
     for deployment in deployments {
         if let Some(deployment_name) = deployment.metadata.name {
-            match deployment_api.delete(&deployment_name, &Default::default()).await {
+            match deployment_api
+                .delete(&deployment_name, &Default::default())
+                .await
+            {
                 Ok(_) => {
                     debug!(
                         "Deleted Deployment: {}, for instance {}",

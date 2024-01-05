@@ -8,15 +8,17 @@ use crate::{
         clusters::{
             Cluster, ClusterAffinity, ClusterBackup, ClusterBackupBarmanObjectStore,
             ClusterBackupBarmanObjectStoreData, ClusterBackupBarmanObjectStoreDataCompression,
-            ClusterBackupBarmanObjectStoreDataEncryption, ClusterBackupBarmanObjectStoreS3Credentials,
+            ClusterBackupBarmanObjectStoreDataEncryption,
+            ClusterBackupBarmanObjectStoreS3Credentials,
             ClusterBackupBarmanObjectStoreS3CredentialsAccessKeyId,
             ClusterBackupBarmanObjectStoreS3CredentialsRegion,
             ClusterBackupBarmanObjectStoreS3CredentialsSecretAccessKey,
-            ClusterBackupBarmanObjectStoreS3CredentialsSessionToken, ClusterBackupBarmanObjectStoreWal,
-            ClusterBackupBarmanObjectStoreWalCompression, ClusterBackupBarmanObjectStoreWalEncryption,
-            ClusterBootstrap, ClusterBootstrapInitdb, ClusterBootstrapRecovery,
-            ClusterBootstrapRecoveryRecoveryTarget, ClusterCertificates, ClusterExternalClusters,
-            ClusterExternalClustersBarmanObjectStore, ClusterExternalClustersBarmanObjectStoreS3Credentials,
+            ClusterBackupBarmanObjectStoreS3CredentialsSessionToken,
+            ClusterBackupBarmanObjectStoreWal, ClusterBackupBarmanObjectStoreWalCompression,
+            ClusterBackupBarmanObjectStoreWalEncryption, ClusterBootstrap, ClusterBootstrapInitdb,
+            ClusterBootstrapRecovery, ClusterBootstrapRecoveryRecoveryTarget, ClusterCertificates,
+            ClusterExternalClusters, ClusterExternalClustersBarmanObjectStore,
+            ClusterExternalClustersBarmanObjectStoreS3Credentials,
             ClusterExternalClustersBarmanObjectStoreS3CredentialsAccessKeyId,
             ClusterExternalClustersBarmanObjectStoreS3CredentialsRegion,
             ClusterExternalClustersBarmanObjectStoreS3CredentialsSecretAccessKey,
@@ -25,18 +27,21 @@ use crate::{
             ClusterExternalClustersBarmanObjectStoreWalCompression,
             ClusterExternalClustersBarmanObjectStoreWalEncryption, ClusterExternalClustersPassword,
             ClusterLogLevel, ClusterManaged, ClusterManagedRoles, ClusterManagedRolesEnsure,
-            ClusterManagedRolesPasswordSecret, ClusterMonitoring, ClusterMonitoringCustomQueriesConfigMap,
-            ClusterNodeMaintenanceWindow, ClusterPostgresql, ClusterPostgresqlSyncReplicaElectionConstraint,
+            ClusterManagedRolesPasswordSecret, ClusterMonitoring,
+            ClusterMonitoringCustomQueriesConfigMap, ClusterNodeMaintenanceWindow,
+            ClusterPostgresql, ClusterPostgresqlSyncReplicaElectionConstraint,
             ClusterPrimaryUpdateMethod, ClusterPrimaryUpdateStrategy, ClusterReplicationSlots,
-            ClusterReplicationSlotsHighAvailability, ClusterResources, ClusterServiceAccountTemplate,
-            ClusterServiceAccountTemplateMetadata, ClusterSpec, ClusterStorage, ClusterSuperuserSecret,
+            ClusterReplicationSlotsHighAvailability, ClusterResources,
+            ClusterServiceAccountTemplate, ClusterServiceAccountTemplateMetadata, ClusterSpec,
+            ClusterStorage, ClusterSuperuserSecret,
         },
         poolers::{
             Pooler, PoolerCluster, PoolerPgbouncer, PoolerSpec, PoolerTemplate, PoolerTemplateSpec,
             PoolerTemplateSpecContainers, PoolerType,
         },
         scheduledbackups::{
-            ScheduledBackup, ScheduledBackupBackupOwnerReference, ScheduledBackupCluster, ScheduledBackupSpec,
+            ScheduledBackup, ScheduledBackupBackupOwnerReference, ScheduledBackupCluster,
+            ScheduledBackupSpec,
         },
     },
     config::Config,
@@ -213,7 +218,9 @@ pub fn cnpg_backup_configuration(
                 .metadata
                 .as_ref()
                 .and_then(|meta| meta.annotations.as_ref())
-                .map_or(false, |annots| annots.contains_key("eks.amazonaws.com/role-arn")));
+                .map_or(false, |annots| {
+                    annots.contains_key("eks.amazonaws.com/role-arn")
+                }));
 
     let should_reset_service_account_template = cdb
         .spec
@@ -222,12 +229,17 @@ pub fn cnpg_backup_configuration(
         .as_ref()
         .and_then(|cred| cred.inherit_from_iam_role)
         == Some(false)
-        && (cdb.spec.backup.s3_credentials.as_ref().map_or(false, |cred| {
-            cred.access_key_id.is_some()
-                || cred.region.is_some()
-                || cred.secret_access_key.is_some()
-                || cred.session_token.is_some()
-        }));
+        && (cdb
+            .spec
+            .backup
+            .s3_credentials
+            .as_ref()
+            .map_or(false, |cred| {
+                cred.access_key_id.is_some()
+                    || cred.region.is_some()
+                    || cred.secret_access_key.is_some()
+                    || cred.session_token.is_some()
+            }));
 
     if should_reset_service_account_template {
         service_account_template = None;
@@ -244,7 +256,8 @@ pub fn cnpg_backup_configuration(
             warn!("Backups are disabled because we don't have a service account template with annotations");
             return (None, None);
         }
-        let annotations = service_account_annotations.expect("Expected service account template annotations");
+        let annotations =
+            service_account_annotations.expect("Expected service account template annotations");
         let service_account_role_arn = annotations.get("eks.amazonaws.com/role-arn");
         if service_account_role_arn.is_none() {
             warn!(
@@ -269,7 +282,8 @@ pub fn cnpg_backup_configuration(
     // Copy the endpoint_url and s3_credentials from cdb to configure backups
     let endpoint_url = cdb.spec.backup.endpoint_url.as_deref().unwrap_or_default();
     let s3_credentials = generate_s3_backup_credentials(cdb.spec.backup.s3_credentials.as_ref());
-    let cluster_backup = create_cluster_backup(cdb, endpoint_url, &backup_path.unwrap(), &s3_credentials);
+    let cluster_backup =
+        create_cluster_backup(cdb, endpoint_url, &backup_path.unwrap(), &s3_credentials);
 
     (cluster_backup, service_account_template)
 }
@@ -344,10 +358,8 @@ pub fn cnpg_cluster_bootstrap_from_cdb(
     // todo: Somehow turn this into a requeue action, so that we can retry when the target_time is not in the correct format.
     //      for now we just log the error and return None, which will disable point-in-time-recovery, but allow for a full recovery
     let parsed_target_time = cdb.spec.restore.as_ref().and_then(|restore| {
-        restore
-            .recovery_target_time
-            .as_ref()
-            .and_then(|time_str| match parse_target_time(Some(time_str)) {
+        restore.recovery_target_time.as_ref().and_then(|time_str| {
+            match parse_target_time(Some(time_str)) {
                 Ok(Some(parsed_time)) => Some(parsed_time),
                 Ok(None) => None,
                 Err(err) => {
@@ -358,7 +370,8 @@ pub fn cnpg_cluster_bootstrap_from_cdb(
                     );
                     None
                 }
-            })
+            }
+        })
     });
 
     let cluster_bootstrap = if let Some(_restore) = &cdb.spec.restore {
@@ -410,7 +423,9 @@ pub fn cnpg_cluster_bootstrap_from_cdb(
                 wal: Some(ClusterExternalClustersBarmanObjectStoreWal {
                     max_parallel: Some(5),
                     encryption: Some(ClusterExternalClustersBarmanObjectStoreWalEncryption::Aes256),
-                    compression: Some(ClusterExternalClustersBarmanObjectStoreWalCompression::Snappy),
+                    compression: Some(
+                        ClusterExternalClustersBarmanObjectStoreWalCompression::Snappy,
+                    ),
                 }),
                 server_name: Some(restore.server_name.clone()),
                 ..ClusterExternalClustersBarmanObjectStore::default()
@@ -459,7 +474,8 @@ fn cnpg_postgres_config(
                         shared_preload_libraries.push(pg_config.value.to_string());
                     }
                     _ => {
-                        postgres_parameters.insert(pg_config.name.clone(), pg_config.value.to_string());
+                        postgres_parameters
+                            .insert(pg_config.name.clone(), pg_config.value.to_string());
                     }
                 }
             }
@@ -533,7 +549,10 @@ fn cnpg_high_availability(cdb: &CoreDB) -> Option<ClusterReplicationSlots> {
 
 fn default_cluster_annotations(cdb: &CoreDB) -> BTreeMap<String, String> {
     let mut annotations = cdb.metadata.annotations.clone().unwrap_or_default();
-    annotations.insert("tembo-pod-init.tembo.io/inject".to_string(), "true".to_string());
+    annotations.insert(
+        "tembo-pod-init.tembo.io/inject".to_string(),
+        "true".to_string(),
+    );
     // If the annotation tembo.io/org_id is present, rename it to tembo.io/organization_id
     if let Some(org_id) = annotations.remove("tembo.io/org_id") {
         annotations.insert("tembo.io/organization_id".to_string(), org_id);
@@ -655,10 +674,12 @@ pub fn cnpg_cluster_from_cdb(
             postgresql: Some(ClusterPostgresql {
                 ldap: None,
                 parameters: postgres_parameters,
-                sync_replica_election_constraint: Some(ClusterPostgresqlSyncReplicaElectionConstraint {
-                    enabled: false,
-                    ..ClusterPostgresqlSyncReplicaElectionConstraint::default()
-                }),
+                sync_replica_election_constraint: Some(
+                    ClusterPostgresqlSyncReplicaElectionConstraint {
+                        enabled: false,
+                        ..ClusterPostgresqlSyncReplicaElectionConstraint::default()
+                    },
+                ),
                 shared_preload_libraries,
                 pg_hba: None,
                 ..ClusterPostgresql::default()
@@ -713,7 +734,10 @@ fn cluster_managed(name: &str) -> Option<ClusterManaged> {
                 password_secret: Some(ClusterManagedRolesPasswordSecret {
                     name: format!("{}-exporter", name).to_string(),
                 }),
-                in_roles: Some(vec!["pg_read_all_stats".to_string(), "pg_monitor".to_string()]),
+                in_roles: Some(vec![
+                    "pg_read_all_stats".to_string(),
+                    "pg_monitor".to_string(),
+                ]),
                 ..ClusterManagedRoles::default()
             },
         ]),
@@ -723,7 +747,11 @@ fn cluster_managed(name: &str) -> Option<ClusterManaged> {
 // This is a synchronous function that takes the latest_generated_node and diff_instances
 // and returns a Vec<String> containing the names of the pods to be fenced.
 #[instrument(fields(trace_id))]
-fn calculate_pods_to_fence(latest_generated_node: i32, diff_instances: i32, base_name: &str) -> Vec<String> {
+fn calculate_pods_to_fence(
+    latest_generated_node: i32,
+    diff_instances: i32,
+    base_name: &str,
+) -> Vec<String> {
     let mut pod_names_to_fence = Vec::new();
     for i in 1..=diff_instances {
         let pod_to_fence = latest_generated_node + i;
@@ -873,20 +901,29 @@ async fn pods_to_fence(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<String>, A
 // cdb: the CoreDB object
 // maybe_cluster, Option<Cluster> of the current CNPG cluster, if it exists
 // new_spec: the new Cluster spec to be applied
-fn update_restarted_at(cdb: &CoreDB, maybe_cluster: Option<&Cluster>, new_spec: &mut Cluster) -> bool {
+fn update_restarted_at(
+    cdb: &CoreDB,
+    maybe_cluster: Option<&Cluster>,
+    new_spec: &mut Cluster,
+) -> bool {
     let Some(cdb_restarted_at) = cdb.annotations().get(RESTARTED_AT) else {
         // No need to update the annotation if it's not present in the CoreDB
         return false;
     };
 
     // Remember the previous value of the annotation, if any
-    let previous_restarted_at = maybe_cluster.and_then(|cluster| cluster.annotations().get(RESTARTED_AT));
+    let previous_restarted_at =
+        maybe_cluster.and_then(|cluster| cluster.annotations().get(RESTARTED_AT));
 
     // Forward the `restartedAt` annotation from CoreDB over to the CNPG cluster,
     // does not matter if changed or not.
-    new_spec.metadata.annotations.as_mut().map(|cluster_annotations| {
-        cluster_annotations.insert(RESTARTED_AT.into(), cdb_restarted_at.to_owned())
-    });
+    new_spec
+        .metadata
+        .annotations
+        .as_mut()
+        .map(|cluster_annotations| {
+            cluster_annotations.insert(RESTARTED_AT.into(), cdb_restarted_at.to_owned())
+        });
 
     let restart_annotation_updated = previous_restarted_at != Some(cdb_restarted_at);
 
@@ -902,7 +939,8 @@ fn update_restarted_at(cdb: &CoreDB, maybe_cluster: Option<&Cluster>, new_spec: 
 pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {
     let pods_to_fence = pods_to_fence(cdb, ctx.clone()).await?;
     let requires_load =
-        extensions_that_require_load(ctx.client.clone(), &cdb.metadata.namespace.clone().unwrap()).await?;
+        extensions_that_require_load(ctx.client.clone(), &cdb.metadata.namespace.clone().unwrap())
+            .await?;
 
     debug!("Generating CNPG spec");
     let mut cluster = cnpg_cluster_from_cdb(cdb, Some(pods_to_fence), requires_load);
@@ -923,7 +961,8 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
     let cluster_api: Api<Cluster> = Api::namespaced(ctx.client.clone(), namespace.as_str());
     let maybe_cluster = cluster_api.get(&name).await;
 
-    let restart_annotation_updated = update_restarted_at(cdb, maybe_cluster.as_ref().ok(), &mut cluster);
+    let restart_annotation_updated =
+        update_restarted_at(cdb, maybe_cluster.as_ref().ok(), &mut cluster);
 
     let mut _restart_required = false;
 
@@ -958,7 +997,9 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
                     if current_shared_preload_libraries != new_libs {
                         let mut libs_that_are_installed: Vec<String> = vec![];
                         // If we can't find the existing primary pod, returns a requeue
-                        let primary_pod_cnpg = cdb.primary_pod_cnpg_ready_or_not(ctx.client.clone()).await?;
+                        let primary_pod_cnpg = cdb
+                            .primary_pod_cnpg_ready_or_not(ctx.client.clone())
+                            .await?;
                         // Check if the file is already installed
                         let command = vec![
                             "/bin/sh".to_string(),
@@ -977,12 +1018,16 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
                                 error!("Error checking for presence of extension files");
                                 return Err(Action::requeue(Duration::from_secs(30)));
                             }
-                            Some(output) => {
-                                output.split('\n').map(|s| s.to_string()).collect::<Vec<String>>()
-                            }
+                            Some(output) => output
+                                .split('\n')
+                                .map(|s| s.to_string())
+                                .collect::<Vec<String>>(),
                         };
                         for libs in new_libs {
-                            let split_libs = libs.split(',').map(|s| s.to_string()).collect::<Vec<String>>();
+                            let split_libs = libs
+                                .split(',')
+                                .map(|s| s.to_string())
+                                .collect::<Vec<String>>();
                             for new_lib in split_libs {
                                 if available_libs.contains(&format!("{}.so", new_lib)) {
                                     info!("Changing shared_preload_libraries on {}, found {} is installed, so including it", &name, &new_lib);
@@ -1069,7 +1114,9 @@ pub async fn reconcile_pooler(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Act
                 ..ObjectMeta::default()
             },
             spec: PoolerSpec {
-                cluster: PoolerCluster { name: cdb.name_any() },
+                cluster: PoolerCluster {
+                    name: cdb.name_any(),
+                },
                 deployment_strategy: None,
                 instances: 1,
                 monitoring: None,
@@ -1121,7 +1168,10 @@ pub async fn reconcile_pooler(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Act
                 cdb.name_any()
             ),
             Err(e) => {
-                warn!("Did not create setup_pgbouncer function, will requeue: {:?}", e);
+                warn!(
+                    "Did not create setup_pgbouncer function, will requeue: {:?}",
+                    e
+                );
                 return Err(Action::requeue(Duration::from_secs(30)));
             }
         }
@@ -1214,7 +1264,10 @@ END;
 $$;"#;
 
 #[instrument(skip(coredb, ctx) fields(trace_id, instance_name = %coredb.name_any()))]
-async fn setup_pgbouncer_function(coredb: &CoreDB, ctx: Arc<Context>) -> Result<PsqlOutput, Action> {
+async fn setup_pgbouncer_function(
+    coredb: &CoreDB,
+    ctx: Arc<Context>,
+) -> Result<PsqlOutput, Action> {
     // execute the PGBOUNCER_SETUP_FUNCTION to install/update the function
     // on the instance
     let query = coredb
@@ -1287,7 +1340,10 @@ fn cnpg_scheduled_backup(cdb: &CoreDB) -> ScheduledBackup {
 
 // Reconcile a SheduledBackup
 #[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any()))]
-pub async fn reconcile_cnpg_scheduled_backup(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {
+pub async fn reconcile_cnpg_scheduled_backup(
+    cdb: &CoreDB,
+    ctx: Arc<Context>,
+) -> Result<(), Action> {
     let scheduledbackup = cnpg_scheduled_backup(cdb);
     let client = ctx.client.clone();
     let name = scheduledbackup
@@ -1357,7 +1413,11 @@ pub async fn get_latest_generated_node(
 /// fenced_pods_initialized checks if fenced pods are initialized and retuns a bool or action in a
 /// result
 #[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any()))]
-async fn fenced_pods_initialized(cdb: &CoreDB, ctx: Arc<Context>, pod_name: &str) -> Result<bool, Action> {
+async fn fenced_pods_initialized(
+    cdb: &CoreDB,
+    ctx: Arc<Context>,
+    pod_name: &str,
+) -> Result<bool, Action> {
     let instance_name = cdb.name_any();
     let namespace = cdb.namespace().ok_or_else(|| {
         error!("Namespace is not set for CoreDB {}", instance_name);
@@ -1371,9 +1431,9 @@ async fn fenced_pods_initialized(cdb: &CoreDB, ctx: Arc<Context>, pod_name: &str
         Ok(pod_resource) => {
             if let Some(status) = pod_resource.status {
                 if let Some(conditions) = status.conditions {
-                    let initialized_condition = conditions
-                        .iter()
-                        .find(|condition| condition.type_ == "Initialized" && condition.status == "True");
+                    let initialized_condition = conditions.iter().find(|condition| {
+                        condition.type_ == "Initialized" && condition.status == "True"
+                    });
                     return Ok(initialized_condition.is_some());
                 }
             }
@@ -1409,7 +1469,10 @@ pub fn get_fenced_instances_from_annotations(
 
 // get_fenced_nodes returns a list of nodes that are fenced only after all the pods are initialized
 #[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any()))]
-pub async fn get_fenced_pods(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Option<Vec<String>>, Action> {
+pub async fn get_fenced_pods(
+    cdb: &CoreDB,
+    ctx: Arc<Context>,
+) -> Result<Option<Vec<String>>, Action> {
     let instance_name = cdb.metadata.name.as_deref().unwrap_or_default();
     let namespace = cdb.namespace().ok_or_else(|| {
         error!("Namespace is not set for CoreDB instance {}", instance_name);
@@ -1458,7 +1521,8 @@ pub async fn get_fenced_pods(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Option<V
             .name_any();
 
         // Check if primary pod is initialized
-        let is_primary_initialized = fenced_pods_initialized(cdb, ctx.clone(), &primary_pod_name).await?;
+        let is_primary_initialized =
+            fenced_pods_initialized(cdb, ctx.clone(), &primary_pod_name).await?;
         if is_primary_initialized {
             debug!(
                 "Primary pod {} is initialized for instance {}",
@@ -1508,7 +1572,10 @@ async fn get_instance_replicas(cdb: &CoreDB, ctx: Arc<Context>) -> Result<i64, A
     let namespace = match cdb.namespace() {
         Some(ns) => ns,
         None => {
-            error!("Namespace is not set for CoreDB instance {}", cdb.name_any());
+            error!(
+                "Namespace is not set for CoreDB instance {}",
+                cdb.name_any()
+            );
             return Err(Action::requeue(Duration::from_secs(300)));
         }
     };
@@ -1560,7 +1627,10 @@ pub async fn unfence_pod(cdb: &CoreDB, ctx: Arc<Context>, pod_name: &str) -> Res
     let namespace = match cdb.namespace() {
         Some(ns) => ns,
         None => {
-            error!("Namespace is not set for CoreDB for instance {}", instance_name);
+            error!(
+                "Namespace is not set for CoreDB for instance {}",
+                instance_name
+            );
             return Err(Action::requeue(Duration::from_secs(300)));
         }
     };
@@ -1582,7 +1652,8 @@ pub async fn unfence_pod(cdb: &CoreDB, ctx: Arc<Context>, pod_name: &str) -> Res
 
     if let Some(annotations) = annotations_clone {
         // Use the remove_pod_from_fenced_instances function
-        let updated_annotations = remove_pod_from_fenced_instances_annotation(&annotations, pod_name);
+        let updated_annotations =
+            remove_pod_from_fenced_instances_annotation(&annotations, pod_name);
 
         if let Ok(Some(updated_annotations)) = updated_annotations {
             // Update the cluster object
@@ -1676,13 +1747,12 @@ fn generate_s3_backup_credentials(
                 }
             }),
             inherit_from_iam_role: Some(false),
-            region: creds
-                .region
-                .as_ref()
-                .map(|r| ClusterBackupBarmanObjectStoreS3CredentialsRegion {
+            region: creds.region.as_ref().map(|r| {
+                ClusterBackupBarmanObjectStoreS3CredentialsRegion {
                     key: r.key.clone(),
                     name: r.name.clone(),
-                }),
+                }
+            }),
             secret_access_key: creds.secret_access_key.as_ref().map(|key| {
                 ClusterBackupBarmanObjectStoreS3CredentialsSecretAccessKey {
                     key: key.key.clone(),
@@ -1762,12 +1832,18 @@ async fn is_restore_backup_running_pending_completed(
 ) -> Result<bool, Action> {
     let instance_name = cdb.name_any();
     let namespace = cdb.namespace().ok_or_else(|| {
-        error!("Namespace is not set for CoreDB for instance {}", instance_name);
+        error!(
+            "Namespace is not set for CoreDB for instance {}",
+            instance_name
+        );
         Action::requeue(Duration::from_secs(300))
     })?;
 
     let backups_api: Api<Backup> = Api::namespaced(ctx.client.clone(), &namespace);
-    let label_selector = format!("cnpg.io/cluster={},cnpg.io/immediateBackup=true", instance_name);
+    let label_selector = format!(
+        "cnpg.io/cluster={},cnpg.io/immediateBackup=true",
+        instance_name
+    );
     let lp = ListParams::default().labels(&label_selector);
     let backup_result = backups_api.list(&lp).await;
 
@@ -2149,7 +2225,8 @@ mod tests {
 
         "#;
 
-        let _result: Cluster = serde_json::from_str(json_str).expect("Should be able to deserialize");
+        let _result: Cluster =
+            serde_json::from_str(json_str).expect("Should be able to deserialize");
     }
 
     use serde_yaml::from_str;
@@ -2202,7 +2279,11 @@ mod tests {
 
         // Assert to make sure that backup destination path is set
         assert_eq!(
-            backup.unwrap().barman_object_store.unwrap().destination_path,
+            backup
+                .unwrap()
+                .barman_object_store
+                .unwrap()
+                .destination_path,
             "s3://aws-s3-bucket/tembo/backup".to_string()
         );
 
@@ -2233,7 +2314,10 @@ mod tests {
 
         // Annotation exists but is invalid
         let mut annotations = BTreeMap::new();
-        annotations.insert("cnpg.io/fencedInstances".to_string(), "invalid_json".to_string());
+        annotations.insert(
+            "cnpg.io/fencedInstances".to_string(),
+            "invalid_json".to_string(),
+        );
 
         let result = get_fenced_instances_from_annotations(&annotations);
         assert!(result.is_err());
@@ -2269,12 +2353,16 @@ mod tests {
 
         //"cnpg.io/fencedInstances" is not present
         let empty_annotations = BTreeMap::new();
-        let result = remove_pod_from_fenced_instances_annotation(&empty_annotations, "pod1").unwrap();
+        let result =
+            remove_pod_from_fenced_instances_annotation(&empty_annotations, "pod1").unwrap();
         assert!(result.is_none());
 
         //"cnpg.io/fencedInstances" contains invalid JSON
         let mut invalid_annotations = BTreeMap::new();
-        invalid_annotations.insert("cnpg.io/fencedInstances".to_string(), "invalid_json".to_string());
+        invalid_annotations.insert(
+            "cnpg.io/fencedInstances".to_string(),
+            "invalid_json".to_string(),
+        );
         let result = remove_pod_from_fenced_instances_annotation(&invalid_annotations, "pod1");
         assert!(result.is_err());
     }
@@ -2380,7 +2468,8 @@ mod tests {
           }
         }
         "#;
-        let _result: Cluster = serde_json::from_str(json_str).expect("Should be able to deserialize");
+        let _result: Cluster =
+            serde_json::from_str(json_str).expect("Should be able to deserialize");
     }
 
     #[test]
