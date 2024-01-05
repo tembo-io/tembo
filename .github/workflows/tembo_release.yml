@@ -43,7 +43,7 @@ jobs:
           set -x
           apt update -y
           apt install pkg-config libssl-dev -y
-        if: matrix.os == 'ubuntu-20.04'
+        if: runner.os == 'Linux'
 
       - name: Cargo build
         working-directory: ./tembo-cli
@@ -64,7 +64,7 @@ jobs:
           cargo install cargo-get
           TEMBO_CLI_NAME=$(cargo-get package.name)-$(cargo-get package.version)
           echo "TEMBO_CLI_NAME=$TEMBO_CLI_NAME" >> $GITHUB_ENV
-        if: matrix.os == 'macos-latest'
+        if: runner.os == 'macOS'
 
       - name: CLI version Ubuntu
         working-directory: ./tembo-cli
@@ -75,7 +75,7 @@ jobs:
           TEMBO_VERSION=${PKG_VERSION#"version = "}
           TEMBO_CLI_NAME=tembo-cli-${TEMBO_VERSION}
           echo "TEMBO_CLI_NAME=$TEMBO_CLI_NAME" >> $GITHUB_ENV
-        if: matrix.os == 'ubuntu-20.04'
+        if: runner.os == 'Linux'
 
       - name: Generate changelog
         id: changelog
