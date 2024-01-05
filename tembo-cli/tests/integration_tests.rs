@@ -112,6 +112,30 @@ async fn data_warehouse() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+
+
+
+#[test]
+fn merge() -> Result<(), Box<dyn std::error::Error>> {
+    let overlay_config_path = "/Users/joshuajerin/Desktop/jarvis/tembo/tembo-cli/tests/tomls/merge/second-instance.toml";
+
+    let mut cmd = Command::cargo_bin("tembo")?; 
+    cmd.arg("apply")
+        .arg("--merge")
+        .arg(overlay_config_path);
+
+    // Execute the command and assert its output
+    cmd.assert()
+   .success()
+   .stdout(predicate::str::contains("- Configuration is valid"))
+   .stdout(predicate::str::contains("- Docker Build & Run completed"))
+   .stdout(predicate::str::contains("- SQL migration completed"))
+   .stdout(predicate::str::contains("Tembo instance is now running on: postgres://postgres:postgres@localhost:5432"));
+
+    Ok(())
+}
+
+
 async fn get_output_from_sql(sql: String) -> Result<String, Box<dyn Error>> {
     // Command to execute psql
     let mut child = Command::new("psql")

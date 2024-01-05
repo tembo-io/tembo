@@ -305,16 +305,16 @@ fn create_new_instance(
 
 fn get_create_instance(instance_settings: &InstanceSettings) -> CreateInstance {
     return CreateInstance {
-        cpu: Cpu::from_str(instance_settings.cpu.as_ref().map(|s| s.as_str()).unwrap_or_default()).unwrap(),
-        memory: Memory::from_str(instance_settings.memory.as_ref().map(|s| s.as_str()).unwrap_or_default()).unwrap(),
+        cpu: Cpu::from_str(&instance_settings.cpu).unwrap(),
+        memory: Memory::from_str(&instance_settings.cpu).unwrap(),
         environment: temboclient::models::Environment::from_str(
             instance_settings.environment.as_str(),
         )
         .unwrap(),
         instance_name: instance_settings.instance_name.clone(),
         stack_type: StackType::from_str(instance_settings.stack_type.as_str()).unwrap(),
-        storage: Storage::from_str(instance_settings.storage.as_ref().map(|s| s.as_str()).unwrap_or_default()).unwrap(),
-        replicas: Some(instance_settings.replicas.unwrap_or_default(),),
+        storage: Storage::from_str(&instance_settings.cpu).unwrap(),
+        replicas: Some(instance_settings.replicas),
         app_services: None,
         connection_pooler: None,
         extensions: Some(Some(get_extensions(instance_settings.extensions.clone()))),
@@ -329,14 +329,14 @@ fn get_create_instance(instance_settings: &InstanceSettings) -> CreateInstance {
 
 fn get_update_instance(instance_settings: &InstanceSettings) -> UpdateInstance {
     return UpdateInstance {
-        cpu: Cpu::from_str(instance_settings.cpu.as_ref().map(|s| s.as_str()).unwrap_or_default()).unwrap(),
-        memory: Memory::from_str(instance_settings.memory.as_ref().map(|s| s.as_str()).unwrap_or_default()).unwrap(),
+        cpu: Cpu::from_str(&instance_settings.cpu).unwrap(),
+        memory: Memory::from_str(&instance_settings.cpu).unwrap(),
         environment: temboclient::models::Environment::from_str(
             instance_settings.environment.as_str(),
         )
         .unwrap(),
-        storage: Storage::from_str(instance_settings.storage.as_ref().map(|s| s.as_str()).unwrap_or_default()).unwrap(),
-        replicas:  instance_settings.replicas.unwrap_or_default(),
+        storage: Storage::from_str(&instance_settings.cpu).unwrap(),
+        replicas: instance_settings.replicas,
         app_services: None,
         connection_pooler: None,
         extensions: Some(Some(get_extensions(instance_settings.extensions.clone()))),
@@ -426,10 +426,10 @@ fn overlay_to_instance_settings(overlay: OverlayInstanceSettings) -> InstanceSet
     InstanceSettings {
         environment: overlay.environment.unwrap_or("default_environment".to_string()),
         instance_name: overlay.instance_name.unwrap_or("default_instance_name".to_string()),
-        cpu: overlay.cpu,
-        memory: overlay.memory,
-        storage: overlay.storage,
-        replicas: overlay.replicas,
+        cpu: overlay.cpu.expect("REASON"),
+        memory: overlay.memory.expect("REASON"),
+        storage: overlay.storage.expect("REASON"),
+        replicas: overlay.replicas.expect("REASON"),
         stack_type: overlay.stack_type.unwrap_or("default_stack_type".to_string()),
         postgres_configurations: overlay.postgres_configurations,
         extensions: overlay.extensions,
@@ -441,10 +441,10 @@ fn merge_settings(base: &InstanceSettings, overlay: OverlayInstanceSettings) -> 
     InstanceSettings {
         environment: overlay.environment.unwrap_or_else(|| base.environment.clone()),
         instance_name: overlay.instance_name.unwrap_or_else(|| base.instance_name.clone()),
-        cpu: overlay.cpu.or_else(|| base.cpu.clone()),
-        memory: overlay.memory.or_else(|| base.memory.clone()),
-        storage: overlay.storage.or_else(|| base.storage.clone()),
-        replicas: overlay.replicas.or(base.replicas),
+        cpu: overlay.cpu.unwrap_or_else(|| base.cpu.clone()),
+        memory: overlay.memory.unwrap_or_else(|| base.memory.clone()),
+        storage: overlay.storage.unwrap_or_else(|| base.storage.clone()),
+        replicas: overlay.replicas.unwrap_or_else(|| base.replicas.clone()),
         stack_type: overlay.stack_type.unwrap_or_else(|| base.stack_type.clone()),
         postgres_configurations: overlay.postgres_configurations.or_else(|| base.postgres_configurations.clone()),
         extensions: overlay.extensions.or_else(|| base.extensions.clone()),
