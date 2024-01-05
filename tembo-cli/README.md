@@ -4,6 +4,21 @@ Tembo CLI allows users to experience [Tembo](https://tembo.io) locally, as well 
 manage and deploy to Tembo Cloud. It abstracts away complexities of configuring,
 managing, and running Postgres in a local environment.
 
+# Installing CLI
+
+Using homebrew
+
+```
+brew tap tembo-io/tembo
+brew install tembo-cli
+```
+
+Using cargo
+
+```
+cargo install tembo-cli
+```
+
 # Local Testing
 
 Clone this repo and run:
