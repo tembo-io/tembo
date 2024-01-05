@@ -4,7 +4,9 @@ use crate::{
     defaults::default_image,
     extensions::types::{Extension, TrunkInstall},
     postgres_exporter::QueryConfig,
-    stacks::config_engines::{mq_config_engine, olap_config_engine, standard_config_engine, ConfigEngine},
+    stacks::config_engines::{
+        mq_config_engine, olap_config_engine, standard_config_engine, ConfigEngine,
+    },
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -142,7 +144,6 @@ pub enum InstanceClass {
     ComputeOptimized,
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -161,8 +162,10 @@ mod tests {
         // testing the default instance configurations
         let runtime_configs = mq.runtime_config().expect("expected configs");
         // convert to vec to hashmap because order is not guaranteed
-        let hm: std::collections::HashMap<String, PgConfig> =
-            runtime_configs.into_iter().map(|c| (c.name.clone(), c)).collect();
+        let hm: std::collections::HashMap<String, PgConfig> = runtime_configs
+            .into_iter()
+            .map(|c| (c.name.clone(), c))
+            .collect();
         let shared_buffers = hm.get("shared_buffers").unwrap();
         assert_eq!(shared_buffers.name, "shared_buffers");
         assert_eq!(shared_buffers.value.to_string(), "614MB");
@@ -187,8 +190,10 @@ mod tests {
         println!("STD: {:#?}", std);
 
         let runtime_configs = std.runtime_config().expect("expected configs");
-        let hm: std::collections::HashMap<String, PgConfig> =
-            runtime_configs.into_iter().map(|c| (c.name.clone(), c)).collect();
+        let hm: std::collections::HashMap<String, PgConfig> = runtime_configs
+            .into_iter()
+            .map(|c| (c.name.clone(), c))
+            .collect();
         let shared_buffers = hm.get("shared_buffers").unwrap();
         assert_eq!(shared_buffers.name, "shared_buffers");
         assert_eq!(shared_buffers.value.to_string(), "512MB");

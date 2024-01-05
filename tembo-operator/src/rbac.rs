@@ -22,7 +22,10 @@ pub async fn cleanup_postgres_exporter_rbac(cdb: &CoreDB, ctx: Arc<Context>) -> 
 }
 
 // Delete the postgres-exporter ServiceAccount from the cluster
-async fn delete_postgres_exporter_service_account(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
+async fn delete_postgres_exporter_service_account(
+    cdb: &CoreDB,
+    ctx: Arc<Context>,
+) -> Result<(), Error> {
     let client = ctx.client.clone();
     let ns = cdb.namespace().unwrap();
     let service_account_api: Api<ServiceAccount> = Api::namespaced(client, &ns);
@@ -81,10 +84,18 @@ async fn delete_postgres_exporter_role(cdb: &CoreDB, ctx: Arc<Context>) -> Resul
         if let Some(role_name) = role.metadata.name {
             match role_api.delete(&role_name, &Default::default()).await {
                 Ok(_) => {
-                    debug!("Deleted Role: {} for instance {}", role_name, &cdb.name_any());
+                    debug!(
+                        "Deleted Role: {} for instance {}",
+                        role_name,
+                        &cdb.name_any()
+                    );
                 }
                 Err(e) => {
-                    error!("Error deleting Role: {}, for instance {}", e, &cdb.name_any());
+                    error!(
+                        "Error deleting Role: {}, for instance {}",
+                        e,
+                        &cdb.name_any()
+                    );
                     return Err(Error::KubeError(e));
                 }
             }
@@ -95,7 +106,10 @@ async fn delete_postgres_exporter_role(cdb: &CoreDB, ctx: Arc<Context>) -> Resul
 }
 
 // Delete the postgres-exporter RoleBinding from the cluster
-async fn delete_postgres_exporter_role_binding(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
+async fn delete_postgres_exporter_role_binding(
+    cdb: &CoreDB,
+    ctx: Arc<Context>,
+) -> Result<(), Error> {
     let client = ctx.client.clone();
     let ns = cdb.namespace().unwrap();
     let role_binding_api: Api<RoleBinding> = Api::namespaced(client, &ns);

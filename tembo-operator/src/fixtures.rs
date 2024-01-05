@@ -133,12 +133,17 @@ impl ApiServerVerifier {
             assert_eq!(request.method(), http::Method::PATCH);
             assert_eq!(
                 request.uri().to_string(),
-                format!("/api/v1/namespaces/testns/services/testdb?&force=true&fieldManager=cntrlr")
+                format!(
+                    "/api/v1/namespaces/testns/services/testdb?&force=true&fieldManager=cntrlr"
+                )
             );
             send.send_response(Response::builder().body(request.into_body()).unwrap());
 
             // After the PATCH to Service, we expect a GET to Pods
-            let (request, send) = handle.next_request().await.expect("Kube API called to GET Pods");
+            let (request, send) = handle
+                .next_request()
+                .await
+                .expect("Kube API called to GET Pods");
             assert_eq!(request.method(), http::Method::GET);
             assert_eq!(
                 request.uri().to_string(),
@@ -178,7 +183,8 @@ impl ApiServerVerifier {
             let json: serde_json::Value =
                 serde_json::from_slice(&req_body).expect("patch_status object is json");
             let status_json = json.get("status").expect("status object").clone();
-            let status: CoreDBStatus = serde_json::from_value(status_json).expect("contains valid status");
+            let status: CoreDBStatus =
+                serde_json::from_value(status_json).expect("contains valid status");
             assert!(
                 status.running,
                 "CoreDB::test says the status isn't running, but it was expected to be running."

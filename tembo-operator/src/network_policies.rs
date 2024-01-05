@@ -309,7 +309,9 @@ async fn lookup_kubernetes_api_ips(client: &Client) -> Result<Vec<String>, Actio
         let addresses = match subset.addresses {
             Some(a) => a,
             None => {
-                error!("while discovering kubernetes API IP address, endpoint subset has no addresses");
+                error!(
+                    "while discovering kubernetes API IP address, endpoint subset has no addresses"
+                );
                 return Err(Action::requeue(Duration::from_secs(300)));
             }
         };
@@ -321,11 +323,18 @@ async fn lookup_kubernetes_api_ips(client: &Client) -> Result<Vec<String>, Actio
     Ok(results)
 }
 
-async fn apply_network_policy(namespace: &str, np_api: &Api<NetworkPolicy>, np: Value) -> Result<(), Action> {
+async fn apply_network_policy(
+    namespace: &str,
+    np_api: &Api<NetworkPolicy>,
+    np: Value,
+) -> Result<(), Action> {
     let network_policy: NetworkPolicy = match serde_json::from_value(np) {
         Ok(np) => np,
         Err(_) => {
-            error!("Failed to deserialize Network Policy namespace {}", namespace);
+            error!(
+                "Failed to deserialize Network Policy namespace {}",
+                namespace
+            );
             return Err(Action::requeue(Duration::from_secs(300)));
         }
     };
@@ -336,8 +345,14 @@ async fn apply_network_policy(namespace: &str, np_api: &Api<NetworkPolicy>, np: 
         .expect("There is always a name for a network policy")
         .clone();
     let params: PatchParams = PatchParams::apply("conductor").force();
-    debug!("\nApplying Network Policy {} in namespace {}", name, namespace);
-    let _o: NetworkPolicy = match np_api.patch(&name, &params, &Patch::Apply(&network_policy)).await {
+    debug!(
+        "\nApplying Network Policy {} in namespace {}",
+        name, namespace
+    );
+    let _o: NetworkPolicy = match np_api
+        .patch(&name, &params, &Patch::Apply(&network_policy))
+        .await
+    {
         Ok(np) => np,
         Err(_) => {
             error!(

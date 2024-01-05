@@ -5,7 +5,10 @@ use std::sync::Arc;
 use tracing::{debug, error};
 
 // Delete the postgres-exporter service from the cluster
-pub async fn delete_postgres_exporter_service(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
+pub async fn delete_postgres_exporter_service(
+    cdb: &CoreDB,
+    ctx: Arc<Context>,
+) -> Result<(), Error> {
     let client = ctx.client.clone();
     let ns = cdb.namespace().unwrap();
     let service_api: Api<Service> = Api::namespaced(client, &ns);
@@ -30,7 +33,11 @@ pub async fn delete_postgres_exporter_service(cdb: &CoreDB, ctx: Arc<Context>) -
                     );
                 }
                 Err(e) => {
-                    error!("Error deleting Service: {}, for instance {}", e, cdb.name_any());
+                    error!(
+                        "Error deleting Service: {}, for instance {}",
+                        e,
+                        cdb.name_any()
+                    );
                     return Err(Error::KubeError(e));
                 }
             }
