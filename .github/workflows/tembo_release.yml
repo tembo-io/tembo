@@ -52,6 +52,7 @@ jobs:
           set -x
           rustup target add ${{ matrix.target }}
           cargo build --release --target=${{ matrix.target }}
+          tar -czvf target/${{ matrix.target }}/release/tembo.tar.gz target/${{ matrix.target }}/release/tembo
           git config --global --add safe.directory '*'
 
       # TODO: Figure out a better way to fetch version for mac & linux
@@ -87,8 +88,8 @@ jobs:
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
-          file: tembo-cli/target/${{ matrix.target }}/release/tembo
-          asset_name: ${{ env.TEMBO_CLI_NAME }}-${{ matrix.asset_name }}
+          file: tembo-cli/target/${{ matrix.target }}/release/tembo.tar.gz
+          asset_name: ${{ env.TEMBO_CLI_NAME }}-${{ matrix.asset_name }}.tar.gz
           tag: ${{ github.ref }}
           body: ${{ steps.changelog.outputs.changelog }}
 
