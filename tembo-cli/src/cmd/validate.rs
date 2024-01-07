@@ -223,6 +223,9 @@ mod tests {
     }
 
     #[rstest]
+    #[case("0.25", true)]
+    #[case("0.5", true)]
+    #[case("0.75", false)]
     #[case("1", true)]
     #[case("2", true)]
     #[case("4", true)]
