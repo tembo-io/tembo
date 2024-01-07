@@ -1,5 +1,0 @@
-[instance]
-environment = "prod"
-instance_name = "default_instance"
-replicas = 3
-stack_type = "basic"

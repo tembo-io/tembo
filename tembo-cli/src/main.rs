@@ -10,7 +10,6 @@ mod cli;
 mod cmd;
 mod tui;
 
-
 #[derive(Parser)]
 #[clap(author = crate_authors!("\n"), version = crate_version!(), about = "Tembo CLI", long_about = None)]
 struct App {
@@ -54,13 +53,13 @@ fn main() -> Result<(), anyhow::Error> {
             init::execute()?;
         }
         SubCommands::Apply(ref _apply_cmd) => {
-            let merge_option =&_apply_cmd.merge;
+            let merge_option = &_apply_cmd.merge;
             apply::execute(app.global_opts.verbose, merge_option.clone())?;
 
             if let SubCommands::Apply(ref _apply_cmd) = app.command {
                 let overlay_path = &_apply_cmd.merge;
-        
-                let instance_settings = apply::get_instance_settings(overlay_path.clone())?;
+
+                let _instance_settings = apply::get_instance_settings(overlay_path.clone())?;
             }
         }
         SubCommands::Validate(_validate_cmd) => {

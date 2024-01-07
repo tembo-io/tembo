@@ -112,32 +112,35 @@ async fn data_warehouse() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-
-
-
-#[test]
-fn merge() -> Result<(), Box<dyn Error>> {
+#[tokio::test]
+async fn merge() -> Result<(), Box<dyn Error>> {
     let root_dir = env!("CARGO_MANIFEST_DIR");
 
     let overlay_config_path = PathBuf::from(root_dir)
         .join("tests")
         .join("tomls")
         .join("merge")
-        .join("second-instance.toml");
+        .join("overlay.toml");
 
     let overlay_config_str = overlay_config_path.to_str().ok_or("Invalid path")?;
 
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
-    cmd.arg("apply")
-       .arg("--merge")
-       .arg(overlay_config_str);
+    cmd.arg("apply").arg("--merge").arg(overlay_config_str);
 
     cmd.assert()
-       .success()
-       .stdout(predicate::str::contains("Configuration is valid"));
+        .success()
+        .stdout(predicate::str::contains("Configuration is valid"));
+
+    // tembo delete
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("delete");
+    cmd.assert().success();
+
+    // check can't connect
+    assert!(assert_can_connect().await.is_err());
+
     Ok(())
 }
-
 
 async fn get_output_from_sql(sql: String) -> Result<String, Box<dyn Error>> {
     // Command to execute psql
