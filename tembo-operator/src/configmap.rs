@@ -10,8 +10,12 @@ use std::{collections::BTreeMap, sync::Arc};
 use tracing::{debug, error, instrument};
 
 #[instrument(skip(cdb, ctx) fields(trace_id, instance_name = %cdb.name_any()))]
-pub async fn reconcile_generic_metrics_configmap(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {
-    let (custom_metrics_namespace, custom_metrics_name) = match custom_metrics_configmap_settings() {
+pub async fn reconcile_generic_metrics_configmap(
+    cdb: &CoreDB,
+    ctx: Arc<Context>,
+) -> Result<(), Action> {
+    let (custom_metrics_namespace, custom_metrics_name) = match custom_metrics_configmap_settings()
+    {
         Some(value) => value,
         _ => return Ok(()),
     };
@@ -23,15 +27,24 @@ pub async fn reconcile_generic_metrics_configmap(cdb: &CoreDB, ctx: Arc<Context>
 
     let configmap_name = format!("{}-custom", cdb.name_any());
 
-    match configmap_api_dataplane_namespace.get(&custom_metrics_name).await {
+    match configmap_api_dataplane_namespace
+        .get(&custom_metrics_name)
+        .await
+    {
         Ok(original_configmap) => {
             let data = original_configmap.data.clone().unwrap_or_default();
             match apply_configmap(client, &namespace, &configmap_name, data).await {
                 Ok(_) => {
-                    debug!("ConfigMap data applied successfully to namespace '{}'", namespace);
+                    debug!(
+                        "ConfigMap data applied successfully to namespace '{}'",
+                        namespace
+                    );
                 }
                 Err(e) => {
-                    error!("Failed to apply ConfigMap in namespace '{}': {:?}", namespace, e);
+                    error!(
+                        "Failed to apply ConfigMap in namespace '{}': {:?}",
+                        namespace, e
+                    );
                     return Err(Action::requeue(std::time::Duration::from_secs(300)));
                 }
             }

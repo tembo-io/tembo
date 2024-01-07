@@ -23,13 +23,21 @@ pub struct CertificateSpec {
         rename = "additionalOutputFormats"
     )]
     pub additional_output_formats: Option<Vec<CertificateAdditionalOutputFormats>>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "commonName")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "commonName"
+    )]
     pub common_name: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "dnsNames")]
     pub dns_names: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub duration: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "emailAddresses")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "emailAddresses"
+    )]
     pub email_addresses: Option<Vec<String>>,
     #[serde(
         default,
@@ -37,7 +45,11 @@ pub struct CertificateSpec {
         rename = "encodeUsagesInRequest"
     )]
     pub encode_usages_in_request: Option<bool>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "ipAddresses")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "ipAddresses"
+    )]
     pub ip_addresses: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "isCA")]
     pub is_ca: Option<bool>,
@@ -45,11 +57,23 @@ pub struct CertificateSpec {
     pub issuer_ref: CertificateIssuerRef,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub keystores: Option<CertificateKeystores>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "literalSubject")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "literalSubject"
+    )]
     pub literal_subject: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "privateKey")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "privateKey"
+    )]
     pub private_key: Option<CertificatePrivateKey>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "renewBefore")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "renewBefore"
+    )]
     pub renew_before: Option<String>,
     #[serde(
         default,
@@ -59,7 +83,11 @@ pub struct CertificateSpec {
     pub revision_history_limit: Option<i32>,
     #[serde(rename = "secretName")]
     pub secret_name: String,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "secretTemplate")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "secretTemplate"
+    )]
     pub secret_template: Option<CertificateSecretTemplate>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub subject: Option<CertificateSubject>,
@@ -136,7 +164,11 @@ pub struct CertificatePrivateKey {
     pub algorithm: Option<CertificatePrivateKeyAlgorithm>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub encoding: Option<CertificatePrivateKeyEncoding>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "rotationPolicy")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "rotationPolicy"
+    )]
     pub rotation_policy: Option<CertificatePrivateKeyRotationPolicy>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub size: Option<i64>,
@@ -187,13 +219,25 @@ pub struct CertificateSubject {
     pub organizational_units: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub organizations: Option<Vec<String>>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "postalCodes")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "postalCodes"
+    )]
     pub postal_codes: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub provinces: Option<Vec<String>>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "serialNumber")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "serialNumber"
+    )]
     pub serial_number: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "streetAddresses")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "streetAddresses"
+    )]
     pub street_addresses: Option<Vec<String>>,
 }
 
@@ -207,7 +251,11 @@ pub struct CertificateStatus {
         rename = "failedIssuanceAttempts"
     )]
     pub failed_issuance_attempts: Option<i64>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "lastFailureTime")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "lastFailureTime"
+    )]
     pub last_failure_time: Option<String>,
     #[serde(
         default,
@@ -219,7 +267,11 @@ pub struct CertificateStatus {
     pub not_after: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "notBefore")]
     pub not_before: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "renewalTime")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "renewalTime"
+    )]
     pub renewal_time: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub revision: Option<i64>,

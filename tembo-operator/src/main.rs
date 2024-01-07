@@ -1,4 +1,6 @@
-use actix_web::{get, middleware, web::Data, App, HttpRequest, HttpResponse, HttpServer, Responder};
+use actix_web::{
+    get, middleware, web::Data, App, HttpRequest, HttpResponse, HttpServer, Responder,
+};
 pub use controller::{self, telemetry, State};
 use prometheus::{Encoder, TextEncoder};
 

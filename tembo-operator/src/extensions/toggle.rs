@@ -12,7 +12,8 @@ use crate::{
     apis::coredb_types::CoreDBStatus,
     extensions::{
         database_queries::list_shared_preload_libraries,
-        kubernetes_queries::merge_location_status_into_extension_status_list, types::get_location_status,
+        kubernetes_queries::merge_location_status_into_extension_status_list,
+        types::get_location_status,
     },
     trunk::extensions_that_require_load,
 };
@@ -23,8 +24,10 @@ pub async fn reconcile_extension_toggle_state(
     cdb: &CoreDB,
     ctx: Arc<Context>,
 ) -> Result<Vec<ExtensionStatus>, Action> {
-    let all_actually_installed_extensions = database_queries::get_all_extensions(cdb, ctx.clone()).await?;
-    let ext_status_updates = determine_updated_extensions_status(cdb, all_actually_installed_extensions);
+    let all_actually_installed_extensions =
+        database_queries::get_all_extensions(cdb, ctx.clone()).await?;
+    let ext_status_updates =
+        determine_updated_extensions_status(cdb, all_actually_installed_extensions);
     kubernetes_queries::update_extensions_status(cdb, ext_status_updates.clone(), &ctx).await?;
     let cdb = get_current_coredb_resource(cdb, ctx.clone()).await?;
     let toggle_these_extensions = determine_extension_locations_to_toggle(&cdb);
@@ -41,7 +44,8 @@ async fn toggle_extensions(
 ) -> Result<Vec<ExtensionStatus>, Action> {
     let current_shared_preload_libraries = list_shared_preload_libraries(cdb, ctx.clone()).await?;
     let requires_load =
-        extensions_that_require_load(ctx.client.clone(), &cdb.metadata.namespace.clone().unwrap()).await?;
+        extensions_that_require_load(ctx.client.clone(), &cdb.metadata.namespace.clone().unwrap())
+            .await?;
     let mut ext_status_updates = ext_status_updates.clone();
     for extension_to_toggle in toggle_these_extensions {
         for location_to_toggle in extension_to_toggle.locations {
@@ -266,7 +270,11 @@ pub fn determine_extension_locations_to_toggle(cdb: &CoreDB) -> Vec<Extension> {
         let mut extension_to_toggle = desired_extension.clone();
         extension_to_toggle.locations = vec![];
         for desired_location in &desired_extension.locations {
-            match types::get_location_status(cdb, &desired_extension.name, &desired_location.database) {
+            match types::get_location_status(
+                cdb,
+                &desired_extension.name,
+                &desired_location.database,
+            ) {
                 None => {
                     error!("When determining extensions to toggle, there should always be a location status for the desired location, because that should be included by determine_updated_extensions_status.");
                 }
@@ -275,10 +283,9 @@ pub fn determine_extension_locations_to_toggle(cdb: &CoreDB) -> Vec<Extension> {
                     // The actual_status.error should not be None because this only exists on old resource versions
                     // and we update actual_status before calling this function. If we find that for some reason, we just skip.
                     if actual_status.error.is_some()
-                        && (!actual_status
-                            .error
-                            .expect("We just checked this is not none, so we should be able to unwrap.")
-                            && actual_status.enabled.is_some()
+                        && (!actual_status.error.expect(
+                            "We just checked this is not none, so we should be able to unwrap.",
+                        ) && actual_status.enabled.is_some()
                             && actual_status.enabled.unwrap() != desired_location.enabled)
                     {
                         needs_toggle = true;

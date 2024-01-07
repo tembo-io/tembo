@@ -13,7 +13,9 @@ use k8s_openapi::{
     apimachinery::pkg::{api::resource::Quantity, apis::meta::v1::ObjectMeta},
 };
 
-use crate::cloudnativepg::poolers::{PoolerPgbouncerPoolMode, PoolerTemplateSpecContainersResources};
+use crate::cloudnativepg::poolers::{
+    PoolerPgbouncerPoolMode, PoolerTemplateSpecContainersResources,
+};
 use chrono::{DateTime, Utc};
 use kube::CustomResource;
 use schemars::JsonSchema;
@@ -91,7 +93,11 @@ pub struct ServiceAccountTemplate {
 #[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
 pub struct S3Credentials {
     /// The reference to the access key id
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "accessKeyId")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "accessKeyId"
+    )]
     pub access_key_id: Option<S3CredentialsAccessKeyId>,
 
     /// Use the role based authentication without providing explicitly the keys.
@@ -107,11 +113,19 @@ pub struct S3Credentials {
     pub region: Option<S3CredentialsRegion>,
 
     /// The reference to the secret access key
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "secretAccessKey")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "secretAccessKey"
+    )]
     pub secret_access_key: Option<S3CredentialsSecretAccessKey>,
 
     /// The references to the session key
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "sessionToken")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "sessionToken"
+    )]
     pub session_token: Option<S3CredentialsSessionToken>,
 }
 
@@ -545,7 +559,8 @@ impl CoreDBSpec {
             }
         }
 
-        let shared_preload_from_extensions = ConfigValue::Multiple(include_with_shared_preload_libraries);
+        let shared_preload_from_extensions =
+            ConfigValue::Multiple(include_with_shared_preload_libraries);
         let extension_settings_config = vec![PgConfig {
             name: "shared_preload_libraries".to_string(),
             value: shared_preload_from_extensions,
