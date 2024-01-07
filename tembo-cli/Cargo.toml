@@ -1,7 +1,7 @@
 workspace = { members = ["temboclient", "tembodataclient"] }
 [package]
 name = "tembo-cli"
-version = "0.13.4"
+version = "0.13.5"
 edition = "2021"
 authors = ["Tembo.io"]
 description = "The CLI for Tembo"
@@ -72,3 +72,4 @@ openssl = { version = "0.10", features = ["vendored"] }
 [dev-dependencies]
 assert_cmd = "2.0.8"
 predicates = "2.1.5"
+rstest = "0.18"
