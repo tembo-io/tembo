@@ -116,10 +116,10 @@ async fn data_warehouse() -> Result<(), Box<dyn Error>> {
 async fn merge() -> Result<(), Box<dyn Error>> {
     let root_dir = env!("CARGO_MANIFEST_DIR");
 
-     // tembo init
-     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
-     cmd.arg("init");
-     cmd.assert().success(); 
+    // tembo init
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("init");
+    cmd.assert().success(); 
 
     let overlay_config_path = PathBuf::from(root_dir)
         .join("tests")
@@ -188,53 +188,5 @@ async fn get_output_from_sql(sql: String) -> Result<String, Box<dyn Error>> {
 async fn assert_can_connect() -> Result<(), Box<dyn Error>> {
     let result = get_output_from_sql("SELECT 1".to_string()).await?;
     assert!(result.contains('1'), "Query did not return 1");
-    Ok(())
-}
-
-/*pub fn get_merged_config(overlay_file_path: Option<String>) -> Result<HashMap<String, InstanceSettings>, Error> {
-    // Example of loading configuration from a TOML file
-    get_instance_settings(overlay_file_path)
-}*/
-
-#[tokio::test]
-async fn test_overlay_not_overwriting() -> Result<(), Box<dyn Error>> {
-    let root_dir = env!("CARGO_MANIFEST_DIR");
-
-    // tembo init
-    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
-    cmd.arg("init");
-    cmd.assert().success();
-
-    // Specify the path to the overlay.toml file
-    let overlay_config_path = PathBuf::from(root_dir)
-        .join("tests")
-        .join("tomls")
-        .join("merge")
-        .join("overlay.toml");
-
-    let overlay_config_str = overlay_config_path.to_str().ok_or("Invalid path")?;
-
-    // Apply the overlay configuration
-    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
-    cmd.arg("apply").arg("--merge").arg(overlay_config_str);
-    cmd.assert().success();
-
-    // Perform your custom check here. Since it's not clear what `get_instance_settings` does,
-    // you might need to adapt this part. For now, I'm just checking the success message.
-    cmd.assert()
-        .success()
-        .stdout(predicate::str::contains("Configuration is valid"));
-
-        //~Need to figure out a way to import get_merged_config here
-        //let merged_config = get_merged_config(Some(overlay_config_str.to_string()))?;
-    
-    // tembo delete
-    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
-    cmd.arg("delete");
-    cmd.assert().success();
-
-    // check can't connect
-    assert!(assert_can_connect().await.is_err());
-
     Ok(())
 }

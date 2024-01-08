@@ -1,2 +1,3 @@
 [instance]
-instance_name = "default_instance"
+instance_name = "overlay_instance"
+cpu = "5"

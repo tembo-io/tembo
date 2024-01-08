@@ -1,8 +1,7 @@
-[instance]
+[instance1]
 environment = "dev"
 instance_name = "defaults_instance"  
 cpu = "3"
-memory = "4GiB"
 storage = "50GiB"
 replicas = 3
 stack_type = "standard"

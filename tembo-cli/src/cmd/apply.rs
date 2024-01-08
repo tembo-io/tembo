@@ -441,13 +441,19 @@ fn get_trunk_installs(
 
 fn overlay_to_instance_settings(overlay: OverlayInstanceSettings) -> InstanceSettings {
     InstanceSettings {
-        environment: overlay.environment.unwrap_or("default_environment".to_string()),
-        instance_name: overlay.instance_name.unwrap_or("default_instance_name".to_string()),
+        environment: overlay
+            .environment
+            .unwrap_or("default_environment".to_string()),
+        instance_name: overlay
+            .instance_name
+            .unwrap_or("default_instance_name".to_string()),
         cpu: overlay.cpu.unwrap_or("default_cpu".to_string()),
         memory: overlay.memory.unwrap_or("default_memory".to_string()), 
         storage: overlay.storage.unwrap_or("default_storage".to_string()),
         replicas: overlay.replicas.unwrap_or(1), // Set a default value for replicas here
-        stack_type: overlay.stack_type.unwrap_or("default_stack_type".to_string()),
+        stack_type: overlay
+            .stack_type
+            .unwrap_or("default_stack_type".to_string()),
         postgres_configurations: overlay.postgres_configurations,
         extensions: overlay.extensions,
         extra_domains_rw: overlay.extra_domains_rw,
@@ -462,10 +468,14 @@ fn merge_settings(base: &InstanceSettings, overlay: OverlayInstanceSettings) -> 
         memory: overlay.memory.unwrap_or_else(|| base.memory.clone()),
         storage: overlay.storage.unwrap_or_else(|| base.storage.clone()),
         replicas: overlay.replicas.unwrap_or(base.replicas),
-        stack_type: overlay.stack_type.unwrap_or_else(|| base.stack_type.clone()),
+        stack_type: overlay
+            .stack_type
+            .unwrap_or_else(|| base.stack_type.clone()),
         postgres_configurations: overlay.postgres_configurations.or_else(|| base.postgres_configurations.clone()),
         extensions: overlay.extensions.or_else(|| base.extensions.clone()),
-        extra_domains_rw: overlay.extra_domains_rw.or_else(|| base.extra_domains_rw.clone()),
+        extra_domains_rw: overlay
+            .extra_domains_rw
+            .or_else(|| base.extra_domains_rw.clone()),
     }
 }
 
