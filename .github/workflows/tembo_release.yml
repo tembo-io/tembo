@@ -71,11 +71,10 @@ jobs:
         working-directory: ./tembo-cli
         id: cli_version_mac
         run: |
-          set -x
           cargo install cargo-get
           TEMBO_CLI_NAME=$(cargo-get package.name)-$(cargo-get package.version)
           echo "TEMBO_CLI_NAME=$TEMBO_CLI_NAME" >> $GITHUB_ENV
-        if: runner.os == 'macOS'
+        if: runner.os == 'macOS' || runner.os == 'Windows'
 
       - name: CLI version Ubuntu
         working-directory: ./tembo-cli
