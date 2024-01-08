@@ -92,7 +92,9 @@ jobs:
         run: |
 
           $TEMBO_VERSION = $(target/${{ matrix.target }}/release/tembo.exe --version)
+          echo $TEMBO_VERSION
           $TEMBO_CLI_NAME = $TEMBO_VERSION.replace(' ','-')
+          echo $TEMBO_CLI_NAME
           echo "TEMBO_CLI_NAME=$TEMBO_CLI_NAME" >> $GITHUB_ENV
         if: runner.os == 'Windows'
 
