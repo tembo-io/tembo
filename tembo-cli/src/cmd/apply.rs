@@ -1,5 +1,5 @@
-use anyhow::{Result, Error};
-use clap::{Args, ValueEnum, Parser};
+use anyhow::{Error, Result};
+use clap::{Args, Parser, ValueEnum};
 use colorful::{Color, Colorful};
 use controller::stacks::get_stack;
 use controller::stacks::types::StackType as ControllerStackType;
@@ -48,14 +48,14 @@ pub struct ApplyCommand {
 
 fn parse_key_vals(s: &str) -> Result<HashMap<String, String>, Error> {
     s.split(',')
-     .map(|kv| {
-         let mut parts = kv.splitn(2, '=').map(str::trim);  // Adding trim here
-         match (parts.next(), parts.next()) {
-             (Some(key), Some(value)) => Ok((key.to_owned(), value.to_owned())),
-             _ => Err(Error::msg("Invalid format for --set")),
-         }
-     })
-     .collect()
+        .map(|kv| {
+            let mut parts = kv.splitn(2, '=').map(str::trim);
+            match (parts.next(), parts.next()) {
+                (Some(key), Some(value)) => Ok((key.to_owned(), value.to_owned())),
+                _ => Err(Error::msg("Invalid format for --set")),
+            }
+        })
+        .collect()
 }
 
 pub fn execute(apply_cmd: ApplyCommand, verbose: bool) -> Result<(), anyhow::Error> {
@@ -491,14 +491,16 @@ pub fn update_instance_settings(updates: &HashMap<String, String>) -> Result<(),
                     "cpu" => setting.cpu = value.clone(),
                     "memory" => setting.memory = value.clone(),
                     "storage" => setting.storage = value.clone(),
-                    "replicas" => setting.replicas = value.parse().map_err(|_| anyhow::anyhow!("Invalid number for replicas"))?,
+                    "replicas" => setting.replicas = value
+                        .parse()
+                        .map_err(|_| anyhow::anyhow!("Invalid number for replicas"))?,
                     "stack_type" => setting.stack_type = value.clone(),
                     "postgres_configurations" => {
-                        setting.postgres_configurations = Some(
-                            toml::from_str(value)
-                                .map_err(|e| anyhow::anyhow!("Error parsing postgres_configurations: {}", e))?
-                        );
-                    },
+                        setting.postgres_configurations = 
+                        Some(toml::from_str(value).map_err(|e| {
+                            anyhow::anyhow!("Error parsing postgres_configurations: {}", e)
+                        })?);
+                    }   
                     "extensions" => {
                         setting.extensions = Some(
                             toml::from_str(value)

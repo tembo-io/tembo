@@ -4,11 +4,31 @@ use predicates::prelude::*; // Used for writing assertions
 use std::error::Error;
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
-use std::{env, io};
+use std::{env, fs, io};
 
 use std::io::Write;
+use toml;
+use serde::Deserialize;
 
 const CARGO_BIN: &str = "tembo";
+
+#[derive(Deserialize)]
+struct Config {
+    defaults: InstanceSettings,
+}
+
+#[derive(Deserialize)]
+struct InstanceSettings {
+    instance_name: String,
+    environment: String,
+    cpu: String,
+}
+
+fn read_tembo_toml(file_path: &str) -> Result<Config, Box<dyn std::error::Error>> {
+    let contents = fs::read_to_string(file_path)?;
+    let config: Config = toml::from_str(&contents)?;
+    Ok(config)
+}
 
 #[test]
 fn help() -> Result<(), Box<dyn std::error::Error>> {
@@ -108,6 +128,46 @@ async fn data_warehouse() -> Result<(), Box<dyn Error>> {
 
     // check can't connect
     assert!(assert_can_connect().await.is_err());
+
+    Ok(())
+}
+
+#[tokio::test]
+async fn set_instance_name() -> Result<(), Box<dyn Error>> {
+    let root_dir = env!("CARGO_MANIFEST_DIR");
+    let test_dir = PathBuf::from(root_dir)
+        .join("tests")
+        .join("tomls")
+        .join("set");
+
+    env::set_current_dir(&test_dir)?;
+
+    // tembo init
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("init");
+    cmd.assert().success();
+
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("context");
+    cmd.arg("set");
+    cmd.arg("--name");
+    cmd.arg("local");
+    cmd.assert().success();
+
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("apply");
+    cmd.arg("--set");
+    cmd.arg("defaults.instance_name=unique");
+    cmd.assert().success();
+
+    let tembo_toml_path = test_dir.join("tembo.toml");
+     let config = read_tembo_toml(tembo_toml_path.to_str().unwrap())?;
+    assert_eq!(config.defaults.instance_name, "unique", "Instance name did not update correctly");
+
+    // tembo delete
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("delete");
+    cmd.assert().success();
 
     Ok(())
 }
