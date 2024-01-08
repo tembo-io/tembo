@@ -16,20 +16,20 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - target: x86_64-apple-darwin
-            asset_name: x86_64-apple
-            os: macos-latest
-          - target: aarch64-apple-darwin
-            asset_name: aarch64-apple
-            os: macos-latest
-          - target: x86_64-unknown-linux-musl
-            asset_name: x86_64-linux
-            os: ubuntu-20.04
-            container: quay.io/tembo/muslrust:1.71.0-stable
-          - target: aarch64-unknown-linux-musl
-            asset_name: aarch64-linux
-            os: ubuntu-20.04
-            container: messense/rust-musl-cross:aarch64-musl
+          #- target: x86_64-apple-darwin
+          #  asset_name: x86_64-apple
+          #   os: macos-latest
+          #- target: aarch64-apple-darwin
+          #  asset_name: aarch64-apple
+          #  os: macos-latest
+          # - target: x86_64-unknown-linux-musl
+          #  asset_name: x86_64-linux
+          #  os: ubuntu-20.04
+          #  container: quay.io/tembo/muslrust:1.71.0-stable
+          #- target: aarch64-unknown-linux-musl
+          #  asset_name: aarch64-linux
+          #  os: ubuntu-20.04
+          #  container: messense/rust-musl-cross:aarch64-musl
           - target: x86_64-pc-windows-msvc
             asset_name: x86_64-windows
             os: windows-latest
@@ -52,7 +52,6 @@ jobs:
         working-directory: ./tembo-cli
         id: cargo_build
         run: |
-          set -x
           rustup target add ${{ matrix.target }}
           cargo build --release --target=${{ matrix.target }}
           cd target/${{ matrix.target }}/release
