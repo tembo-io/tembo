@@ -1,4 +1,4 @@
-[instance1]
+[defaults]
 environment = "dev"
 instance_name = "defaults_instance"  
 cpu = "3"

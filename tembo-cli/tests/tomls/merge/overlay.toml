@@ -1,3 +1,2 @@
-[instance]
+[defaults]
 instance_name = "overlay_instance"
-cpu = "5"

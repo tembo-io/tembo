@@ -53,13 +53,7 @@ fn main() -> Result<(), anyhow::Error> {
             init::execute()?;
         }
         SubCommands::Apply(ref _apply_cmd) => {
-            let merge_option = &_apply_cmd.merge;
-
-            // Call get_instance_settings and execute in one place
-            let instance_settings = apply::get_instance_settings(merge_option.clone())?;
-            println!("Instance settings: {:?}", instance_settings);
-
-            apply::execute(app.global_opts.verbose, merge_option.clone())?;
+            apply::execute(app.global_opts.verbose, _apply_cmd.merge.clone())?;
         }
         SubCommands::Validate(_validate_cmd) => {
             validate::execute(app.global_opts.verbose)?;

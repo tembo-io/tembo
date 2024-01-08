@@ -55,8 +55,11 @@ pub fn execute(verbose: bool, _merge_path: Option<String>) -> Result<(), anyhow:
 
     let env = get_current_context()?;
 
+    let instance_settings = get_instance_settings(_merge_path.clone())?;
+    println!("Instance settings: {:?}", instance_settings);
+
     if env.target == Target::Docker.to_string() {
-        return execute_docker(verbose);
+        return execute_docker(verbose, _merge_path);
     } else if env.target == Target::TemboCloud.to_string() {
         return execute_tembo_cloud(env.clone());
     }
@@ -64,10 +67,10 @@ pub fn execute(verbose: bool, _merge_path: Option<String>) -> Result<(), anyhow:
     Ok(())
 }
 
-fn execute_docker(verbose: bool) -> Result<(), anyhow::Error> {
+fn execute_docker(verbose: bool, _merge_path: Option<String>) -> Result<(), anyhow::Error> {
     Docker::installed_and_running()?;
 
-    let instance_settings = get_instance_settings(None)?;
+    let instance_settings = get_instance_settings(_merge_path)?;
     let rendered_dockerfile: String = get_rendered_dockerfile(instance_settings.clone())?;
 
     FileUtils::create_file(
@@ -323,14 +326,14 @@ fn create_new_instance(
 fn get_create_instance(instance_settings: &InstanceSettings) -> CreateInstance {
     return CreateInstance {
         cpu: Cpu::from_str(&instance_settings.cpu).unwrap(),
-        memory: Memory::from_str(&instance_settings.cpu).unwrap(),
+        memory: Memory::from_str(&instance_settings.memory).unwrap(),
         environment: temboclient::models::Environment::from_str(
             instance_settings.environment.as_str(),
         )
         .unwrap(),
         instance_name: instance_settings.instance_name.clone(),
         stack_type: StackType::from_str(instance_settings.stack_type.as_str()).unwrap(),
-        storage: Storage::from_str(&instance_settings.cpu).unwrap(),
+        storage: Storage::from_str(&instance_settings.storage).unwrap(),
         replicas: Some(instance_settings.replicas),
         app_services: None,
         connection_pooler: None,
