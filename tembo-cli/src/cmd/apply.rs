@@ -1,6 +1,6 @@
 use anyhow::{Error, Result};
 use clap::{Args, Parser, ValueEnum};
-use colorful::Colorful;
+use colorful::{Color,Colorful};
 use controller::stacks::get_stack;
 use controller::stacks::types::StackType as ControllerStackType;
 use log::info;
@@ -29,7 +29,7 @@ use crate::cli::file_utils::FileUtils;
 use crate::cli::sqlx_utils::SqlxUtils;
 use crate::cli::tembo_config;
 use crate::cli::tembo_config::InstanceSettings;
-use crate::tui::instance_started;
+use crate::tui::{indent, instance_started};
 use crate::{
     cli::context::{get_current_context, Environment, Profile, Target},
     tui::{clean_console, colors, white_confirmation},
