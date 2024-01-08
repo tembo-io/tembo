@@ -52,6 +52,7 @@ jobs:
         id: install_deps_windows
         run: |
           vcpkg integrate install
+          set OPENSSL_DIR="C:/vcpkg/packages/openssl_x64-windows"
         if: runner.os == 'Windows'
 
       - name: Cargo build
