@@ -72,11 +72,11 @@ fn default_cpu() -> String {
 }
 
 fn default_memory() -> String {
-    "1GiB".to_string()
+    "1Gi".to_string()
 }
 
 fn default_storage() -> String {
-    "10GiB".to_string()
+    "10Gi".to_string()
 }
 
 fn default_replicas() -> i32 {
