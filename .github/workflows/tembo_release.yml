@@ -51,13 +51,7 @@ jobs:
       - name: Install Deps Windows
         id: install_deps_windows
         run: |
-          cd C:\
-          vcpkg install openssl:x64-windows
-          mkdir "C:\Program Files\OpenSSL-Win64\certs"
-          curl --remote-name --time-cond "C:\Program Files\OpenSSL-Win64\certs\cacert.pem" -o "C:\Program Files\OpenSSL-Win64\certs\cacert.pem" https://curl.se/ca/cacert.pem
-          set OPENSSL_NO_VENDOR=1
-          set RUSTFLAGS=-Ctarget-feature=+crt-static
-          set SSL_CERT_FILE=C:\OpenSSL-Win64\certs\cacert.pem
+          vcpkg integrate install
         if: runner.os == 'Windows'
 
       - name: Cargo build
