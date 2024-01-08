@@ -69,6 +69,9 @@ openssl = { version = "0.10", features = ["vendored"] }
 [target.x86_64-apple-darwin.dependencies]
 openssl = { version = "0.10", features = ["vendored"] }
 
+[target.x86_64-pc-windows-msvc.dependencies]
+openssl = { version = "0.10", features = ["vendored"] }
+
 [dev-dependencies]
 assert_cmd = "2.0.8"
 predicates = "2.1.5"
