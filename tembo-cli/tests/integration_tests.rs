@@ -133,7 +133,7 @@ async fn data_warehouse() -> Result<(), Box<dyn Error>> {
 }
 
 #[tokio::test]
-async fn set_instance_name() -> Result<(), Box<dyn Error>> {
+async fn set() -> Result<(), Box<dyn Error>> {
     let root_dir = env!("CARGO_MANIFEST_DIR");
     let test_dir = PathBuf::from(root_dir)
         .join("tests")
