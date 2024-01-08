@@ -66,46 +66,89 @@ fn main() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-#[tokio::test]
-async fn default_instance_settings() -> Result<(), Box<dyn std::error::Error>> {
+#[cfg(test)]
+mod tests {
+    use super::*;
     use std::path::PathBuf;
     use std::process::Command;
-    const CARGO_BIN_PATH: &str = "cargo run ";
-    let root_dir = env!("CARGO_MANIFEST_DIR");
+    use tokio;
 
-    std::env::set_current_dir(
-        PathBuf::from(root_dir)
+    const CARGO_BIN_PATH: &str = "cargo run ";
+    const root_dir: &str = env!("CARGO_MANIFEST_DIR");
+
+    #[tokio::test]
+    async fn default_instance_settings() -> Result<(), Box<dyn std::error::Error>> {
+        std::env::set_current_dir(
+            PathBuf::from(root_dir)
+                .join("tests")
+                .join("tomls")
+                .join("merge"),
+        )?;
+
+        // Path to the overlay.toml file
+        let overlay_config_path = PathBuf::from(root_dir)
             .join("tests")
             .join("tomls")
-            .join("merge"),
-    )?;
+            .join("merge")
+            .join("overlay.toml");
+        let overlay_config_str = overlay_config_path.to_str().ok_or("Invalid path")?;
 
-    // Path to the overlay.toml file
-    let overlay_config_path = PathBuf::from(root_dir)
-        .join("tests")
-        .join("tomls")
-        .join("merge")
-        .join("overlay.toml");
-    let overlay_config_str = overlay_config_path.to_str().ok_or("Invalid path")?;
+        // Running `tembo init`
+        let _output = Command::new(CARGO_BIN_PATH).arg("init");
 
-    // Running `tembo init`
-    let _output = Command::new(CARGO_BIN_PATH).arg("init");
+        let _output = Command::new(CARGO_BIN_PATH)
+            .arg("apply")
+            .arg("--merge")
+            .arg(overlay_config_str);
 
-    let _output = Command::new(CARGO_BIN_PATH)
-        .arg("apply")
-        .arg("--merge")
-        .arg(overlay_config_str);
+        let merged_settings = apply::get_instance_settings(Some(overlay_config_str.to_string()))?;
+        if let Some(setting) = merged_settings.get("defaults") {
+            assert_ne!(setting.cpu, "0.25", "Default setting was overwritten");
+        } else {
+            return Err("Setting key not found".into());
+        }
 
-    let merged_settings = apply::get_instance_settings(Some(overlay_config_str.to_string()))?;
-    if let Some(setting) = merged_settings.get("defaults") {
-        assert_ne!(setting.cpu, "0.25", "Default setting was overwritten");
-    } else {
-        return Err("Setting key not found".into());
+        // Running `tembo delete`
+        let _output = Command::new(CARGO_BIN_PATH).arg("delete");
+
+        Ok(())
     }
-    print!("{:?}", merged_settings);
 
-    // Running `tembo delete`
-    let _output = Command::new(CARGO_BIN_PATH).arg("delete");
+    #[tokio::test]
+    async fn merge() -> Result<(), Box<dyn std::error::Error>> {
+        std::env::set_current_dir(
+            PathBuf::from(root_dir)
+                .join("tests")
+                .join("tomls")
+                .join("merge"),
+        )?;
 
-    Ok(())
+        // Path to the overlay.toml file
+        let overlay_config_path = PathBuf::from(root_dir)
+            .join("tests")
+            .join("tomls")
+            .join("merge")
+            .join("overlay.toml");
+        let overlay_config_str = overlay_config_path.to_str().ok_or("Invalid path")?;
+
+        // Running `tembo init`
+        let _output = Command::new(CARGO_BIN_PATH).arg("init");
+
+        let _output = Command::new(CARGO_BIN_PATH)
+            .arg("apply")
+            .arg("--merge")
+            .arg(overlay_config_str);
+
+        let merged_settings = apply::get_instance_settings(Some(overlay_config_str.to_string()))?;
+        if let Some(setting) = merged_settings.get("defaults") {
+            assert_eq!(setting.memory, "10Gi", "Base settings was not overwritten");
+        } else {
+            return Err("Setting key not found".into());
+        }
+
+        // Running `tembo delete`
+        let _output = Command::new(CARGO_BIN_PATH).arg("delete");
+
+        Ok(())
+    }
 }

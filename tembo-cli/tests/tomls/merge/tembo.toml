@@ -1,7 +1,7 @@
 [defaults]
 environment = "dev"
-instance_name = "defaults_instance"  
-cpu = "3"
-storage = "50GiB"
-replicas = 3
-stack_type = "standard"
+instance_name = "defaults_instance"
+cpu = "1"
+storage = "50Gi"
+replicas = 1
+stack_type = "Standard"
