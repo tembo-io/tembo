@@ -62,7 +62,8 @@ jobs:
           rustup target add ${{ matrix.target }}
           cargo build --release --target=${{ matrix.target }}
           cd target/${{ matrix.target }}/release
-          tar -czvf tembo.tar.gz tembo
+          dir
+          tar -czvf tembo.tar.gz tembo.exe
           git config --global --add safe.directory '*'
 
       # TODO: Figure out a better way to fetch version for mac & linux
