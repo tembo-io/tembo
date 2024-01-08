@@ -30,6 +30,9 @@ jobs:
             asset_name: aarch64-linux
             os: ubuntu-20.04
             container: messense/rust-musl-cross:aarch64-musl
+          - target: x86_64-pc-windows-msvc
+            asset_name: x86_64-windows
+            os: windows-latest
     runs-on: ${{ matrix.os }}
     container:
       image: ${{ matrix.container }}
