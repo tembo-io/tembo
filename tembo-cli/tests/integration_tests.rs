@@ -7,7 +7,7 @@ use std::process::{Command, Stdio};
 use std::{env, fs, io};
 
 use std::io::Write;
-use toml;
+
 use serde::Deserialize;
 
 const CARGO_BIN: &str = "tembo";
@@ -161,8 +161,11 @@ async fn set_instance_name() -> Result<(), Box<dyn Error>> {
     cmd.assert().success();
 
     let tembo_toml_path = test_dir.join("tembo.toml");
-     let config = read_tembo_toml(tembo_toml_path.to_str().unwrap())?;
-    assert_eq!(config.defaults.instance_name, "unique", "Instance name did not update correctly");
+    let config = read_tembo_toml(tembo_toml_path.to_str().unwrap())?;
+    assert_eq!(
+        config.defaults.instance_name, "unique",
+        "Instance name did not update correctly"
+    );
 
     // tembo delete
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;

@@ -54,10 +54,10 @@ fn main() -> Result<(), anyhow::Error> {
         }
         SubCommands::Apply(apply_cmd) => {
             if let Some(settings) = &apply_cmd.set {
-                apply::update_instance_settings(&settings)?;
+                apply::update_instance_settings(settings)?;
             }
             apply::execute(apply_cmd, app.global_opts.verbose)?;
-        },
+        }
         SubCommands::Validate(_validate_cmd) => {
             validate::execute(app.global_opts.verbose)?;
         }

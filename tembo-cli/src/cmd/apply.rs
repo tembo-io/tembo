@@ -1,6 +1,6 @@
 use anyhow::{Error, Result};
 use clap::{Args, Parser, ValueEnum};
-use colorful::{Color, Colorful};
+use colorful::Colorful;
 use controller::stacks::get_stack;
 use controller::stacks::types::StackType as ControllerStackType;
 use log::info;
@@ -29,7 +29,7 @@ use crate::cli::file_utils::FileUtils;
 use crate::cli::sqlx_utils::SqlxUtils;
 use crate::cli::tembo_config;
 use crate::cli::tembo_config::InstanceSettings;
-use crate::tui::{indent, instance_started};
+use crate::tui::instance_started;
 use crate::{
     cli::context::{get_current_context, Environment, Profile, Target},
     tui::{clean_console, colors, white_confirmation},
@@ -491,29 +491,28 @@ pub fn update_instance_settings(updates: &HashMap<String, String>) -> Result<(),
                     "cpu" => setting.cpu = value.clone(),
                     "memory" => setting.memory = value.clone(),
                     "storage" => setting.storage = value.clone(),
-                    "replicas" => setting.replicas = value
-                        .parse()
-                        .map_err(|_| anyhow::anyhow!("Invalid number for replicas"))?,
+                    "replicas" => {
+                        setting.replicas = value
+                            .parse()
+                            .map_err(|_| anyhow::anyhow!("Invalid number for replicas"))?
+                    }
                     "stack_type" => setting.stack_type = value.clone(),
                     "postgres_configurations" => {
-                        setting.postgres_configurations = 
-                        Some(toml::from_str(value).map_err(|e| {
-                            anyhow::anyhow!("Error parsing postgres_configurations: {}", e)
-                        })?);
-                    }   
+                        setting.postgres_configurations =
+                            Some(toml::from_str(value).map_err(|e| {
+                                anyhow::anyhow!("Error parsing postgres_configurations: {}", e)
+                            })?);
+                    }
                     "extensions" => {
                         setting.extensions = Some(
                             toml::from_str(value)
-                                .map_err(|e| anyhow::anyhow!("Error parsing extensions: {}", e))?
+                                .map_err(|e| anyhow::anyhow!("Error parsing extensions: {}", e))?,
                         );
-                    },
+                    }
                     "extra_domains" => {
-                        setting.extra_domains_rw = Some(
-                            value.split(',')
-                                 .map(|s| s.trim().to_string())
-                                 .collect()
-                        );
-                    },
+                        setting.extra_domains_rw =
+                            Some(value.split(',').map(|s| s.trim().to_string()).collect());
+                    }
                     _ => return Err(anyhow::anyhow!("Invalid field name: {}", field_name)),
                 }
             } else {
@@ -539,7 +538,6 @@ pub fn update_instance_settings(updates: &HashMap<String, String>) -> Result<(),
 
     Ok(())
 }
-
 
 pub fn get_rendered_dockerfile(
     instance_settings: HashMap<String, InstanceSettings>,
