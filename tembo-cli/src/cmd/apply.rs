@@ -1,7 +1,6 @@
-use anyhow::Context as AnyhowContext;
 use anyhow::Error;
 use clap::Args;
-use colorful::Colorful;
+use colorful::{Colorful};
 use controller::stacks::get_stack;
 use controller::stacks::types::StackType as ControllerStackType;
 use log::info;
@@ -12,6 +11,7 @@ use std::{
     thread::sleep,
     time::Duration,
 };
+use anyhow::Context as AnyhowContext;
 use temboclient::{
     apis::{
         configuration::Configuration,
@@ -31,7 +31,7 @@ use crate::cli::sqlx_utils::SqlxUtils;
 use crate::cli::tembo_config;
 use crate::cli::tembo_config::InstanceSettings;
 use crate::cli::tembo_config::OverlayInstanceSettings;
-use crate::tui::instance_started;
+use crate::tui::{instance_started};
 use crate::{
     cli::context::{get_current_context, Environment, Profile, Target},
     tui::{clean_console, colors, white_confirmation},
@@ -441,19 +441,13 @@ fn get_trunk_installs(
 
 fn overlay_to_instance_settings(overlay: OverlayInstanceSettings) -> InstanceSettings {
     InstanceSettings {
-        environment: overlay
-            .environment
-            .unwrap_or("default_environment".to_string()),
-        instance_name: overlay
-            .instance_name
-            .unwrap_or("default_instance_name".to_string()),
+        environment: overlay.environment.unwrap_or("default_environment".to_string()),
+        instance_name: overlay.instance_name.unwrap_or("default_instance_name".to_string()),
         cpu: overlay.cpu.unwrap_or("default_cpu".to_string()),
-        memory: overlay.memory.unwrap_or("default_memory".to_string()),
+        memory: overlay.memory.unwrap_or("default_memory".to_string()), 
         storage: overlay.storage.unwrap_or("default_storage".to_string()),
         replicas: overlay.replicas.unwrap_or(1), // Set a default value for replicas here
-        stack_type: overlay
-            .stack_type
-            .unwrap_or("default_stack_type".to_string()),
+        stack_type: overlay.stack_type.unwrap_or("default_stack_type".to_string()),
         postgres_configurations: overlay.postgres_configurations,
         extensions: overlay.extensions,
         extra_domains_rw: overlay.extra_domains_rw,
@@ -462,47 +456,34 @@ fn overlay_to_instance_settings(overlay: OverlayInstanceSettings) -> InstanceSet
 
 fn merge_settings(base: &InstanceSettings, overlay: OverlayInstanceSettings) -> InstanceSettings {
     InstanceSettings {
-        environment: overlay
-            .environment
-            .unwrap_or_else(|| base.environment.clone()),
-        instance_name: overlay
-            .instance_name
-            .unwrap_or_else(|| base.instance_name.clone()),
+        environment: base.environment.clone(), // Retain the base environment
+        instance_name: base.instance_name.clone(), // Retain the base instance_name
         cpu: overlay.cpu.unwrap_or_else(|| base.cpu.clone()),
         memory: overlay.memory.unwrap_or_else(|| base.memory.clone()),
         storage: overlay.storage.unwrap_or_else(|| base.storage.clone()),
         replicas: overlay.replicas.unwrap_or(base.replicas),
-        stack_type: overlay
-            .stack_type
-            .unwrap_or_else(|| base.stack_type.clone()),
-        postgres_configurations: overlay
-            .postgres_configurations
-            .or_else(|| base.postgres_configurations.clone()),
+        stack_type: overlay.stack_type.unwrap_or_else(|| base.stack_type.clone()),
+        postgres_configurations: overlay.postgres_configurations.or_else(|| base.postgres_configurations.clone()),
         extensions: overlay.extensions.or_else(|| base.extensions.clone()),
-        extra_domains_rw: overlay
-            .extra_domains_rw
-            .or_else(|| base.extra_domains_rw.clone()),
+        extra_domains_rw: overlay.extra_domains_rw.or_else(|| base.extra_domains_rw.clone()),
     }
 }
 
-pub fn get_instance_settings(
-    overlay_file_path: Option<String>,
-) -> Result<HashMap<String, InstanceSettings>, Error> {
+pub fn get_instance_settings(overlay_file_path: Option<String>) -> Result<HashMap<String, InstanceSettings>, Error> {
     let mut base_path = FileUtils::get_current_working_dir();
     base_path.push_str("/tembo.toml");
     let base_contents = fs::read_to_string(&base_path)
         .with_context(|| format!("Couldn't read base file {}", base_path))?;
-    let base_settings: HashMap<String, InstanceSettings> =
-        toml::from_str(&base_contents).context("Unable to load data from the base config")?;
+    let base_settings: HashMap<String, InstanceSettings> = toml::from_str(&base_contents)
+        .context("Unable to load data from the base config")?;
 
     let mut final_settings = base_settings.clone();
 
     if let Some(overlay_path) = overlay_file_path {
         let overlay_contents = fs::read_to_string(&overlay_path)
             .with_context(|| format!("Couldn't read overlay file {}", overlay_path))?;
-        let overlay_settings: HashMap<String, OverlayInstanceSettings> =
-            toml::from_str(&overlay_contents)
-                .context("Unable to load data from the overlay config")?;
+        let overlay_settings: HashMap<String, OverlayInstanceSettings> = toml::from_str(&overlay_contents)
+            .context("Unable to load data from the overlay config")?;
 
         for (key, overlay_value) in overlay_settings {
             if let Some(base_value) = base_settings.get(&key) {
@@ -623,6 +604,7 @@ fn get_postgres_config(instance_settings: HashMap<String, InstanceSettings>) -> 
     postgres_config
 }
 
+
 fn construct_connection_string(info: ConnectionInfo) -> String {
     format!(
         "postgresql://{}:{}@{}:{}/{}",
@@ -633,3 +615,4 @@ fn construct_connection_string(info: ConnectionInfo) -> String {
         "postgres"
     )
 }
+
