@@ -62,7 +62,6 @@ jobs:
           rustup target add ${{ matrix.target }}
           cargo build --release --target=${{ matrix.target }}
           cd target/${{ matrix.target }}/release
-          dir
           tar -czvf tembo.tar.gz tembo.exe
           git config --global --add safe.directory '*'
 
@@ -74,11 +73,11 @@ jobs:
           cargo install cargo-get
           TEMBO_CLI_NAME=$(cargo-get package.name)-$(cargo-get package.version)
           echo "TEMBO_CLI_NAME=$TEMBO_CLI_NAME" >> $GITHUB_ENV
-        if: runner.os == 'macOS' || runner.os == 'Windows'
+        if: runner.os == 'macOS'
 
-      - name: CLI version Ubuntu
+      - name: CLI version Linux
         working-directory: ./tembo-cli
-        id: cli_version_ubuntu
+        id: cli_version_linux
         run: |
           set -x
           PKG_VERSION=$(awk -F ' = ' '$$1 ~ /version/ { gsub(/[\\"]/, "", $$2); printf("%s",$$2); exit; }' Cargo.toml)
@@ -86,6 +85,16 @@ jobs:
           TEMBO_CLI_NAME=tembo-cli-${TEMBO_VERSION}
           echo "TEMBO_CLI_NAME=$TEMBO_CLI_NAME" >> $GITHUB_ENV
         if: runner.os == 'Linux'
+
+      - name: CLI version Windows
+        working-directory: ./tembo-cli
+        id: cli_version_windows
+        run: |
+
+          TEMBO_VERSION=$(target/${{ matrix.target }}/release/tembo.exe --version)
+          TEMBO_CLI_NAME=$($TEMBO_VERSION -replace ' ','-')
+          echo "TEMBO_CLI_NAME=$TEMBO_CLI_NAME" >> $GITHUB_ENV
+        if: runner.os == 'Windows'
 
       - name: "Generate release changelog"
         id: changelog
