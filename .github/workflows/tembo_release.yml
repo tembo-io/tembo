@@ -91,9 +91,9 @@ jobs:
         id: cli_version_windows
         run: |
 
-          TEMBO_VERSION=$(target/${{ matrix.target }}/release/tembo.exe --version)
-          TEMBO_CLI_NAME=$($TEMBO_VERSION -replace ' ','-')
-          echo "TEMBO_CLI_NAME=$TEMBO_CLI_NAME" >> $GITHUB_ENV
+          FOR /F "tokens=2" %%F IN ('"target/${{ matrix.target }}/release/tembo.exe --version"') DO SET TEMBO_VERSION=%%F
+          FOR /F "tokens=2" %%F IN ('"%TEMBO_VERSION% -replace '', '-'"') DO SET TEMBO_CLI_NAME=%%F
+          echo "TEMBO_CLI_NAME=%TEMBO_CLI_NAME%" >> $GITHUB_ENV
         if: runner.os == 'Windows'
 
       - name: "Generate release changelog"
