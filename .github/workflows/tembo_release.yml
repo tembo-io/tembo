@@ -52,9 +52,7 @@ jobs:
         id: install_deps_windows
         run: |
           cd C:\
-          git clone https://github.com/microsoft/vcpkg
-          cd vcpkg
-          vcpkg\bootstrap-vcpkg.bat
+          vcpkg install openssl:x64-windows
           vcpkg\vcpkg install openssl:x64-windows
           mkdir "C:\Program Files\OpenSSL-Win64\certs"
           curl --remote-name --time-cond "C:\Program Files\OpenSSL-Win64\certs\cacert.pem" -o "C:\Program Files\OpenSSL-Win64\certs\cacert.pem" https://curl.se/ca/cacert.pem
