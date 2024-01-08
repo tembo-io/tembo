@@ -1,5 +1,5 @@
-use anyhow::Error;
-use clap::Args;
+use anyhow::{Result, Error};
+use clap::{Args, ValueEnum, Parser};
 use colorful::{Color, Colorful};
 use controller::stacks::get_stack;
 use controller::stacks::types::StackType as ControllerStackType;
@@ -41,14 +41,33 @@ const POSTGRESCONF_NAME: &str = "postgres.conf";
 
 /// Deploys a tembo.toml file
 #[derive(Args)]
-pub struct ApplyCommand {}
+pub struct ApplyCommand {
+    #[clap(short, long, value_parser = parse_key_vals)]
+    pub set: Option<HashMap<String, String>>,
+}
 
-pub fn execute(verbose: bool) -> Result<(), anyhow::Error> {
+fn parse_key_vals(s: &str) -> Result<HashMap<String, String>, Error> {
+    s.split(',')
+     .map(|kv| {
+         let mut parts = kv.splitn(2, '=').map(str::trim);  // Adding trim here
+         match (parts.next(), parts.next()) {
+             (Some(key), Some(value)) => Ok((key.to_owned(), value.to_owned())),
+             _ => Err(Error::msg("Invalid format for --set")),
+         }
+     })
+     .collect()
+}
+
+pub fn execute(apply_cmd: ApplyCommand, verbose: bool) -> Result<(), anyhow::Error> {
     info!("Running validation!");
     super::validate::execute(verbose)?;
     info!("Validation completed!");
 
     let env = get_current_context()?;
+
+    if let Some(ref settings) = apply_cmd.set {
+        update_instance_settings(settings)?;
+    }
 
     if env.target == Target::Docker.to_string() {
         return execute_docker(verbose);
@@ -454,6 +473,71 @@ pub fn get_instance_settings() -> Result<HashMap<String, InstanceSettings>, anyh
 
     Ok(instance_settings)
 }
+
+pub fn update_instance_settings(updates: &HashMap<String, String>) -> Result<(), anyhow::Error> {
+    let mut instance_settings = get_instance_settings()?;
+
+    for (key, value) in updates {
+        println!("Updating setting: {} with value: {}", key, value);
+        let parts: Vec<&str> = key.split('.').collect();
+        if parts.len() == 2 {
+            let instance_name = parts[0];
+            let field_name = parts[1];
+
+            if let Some(setting) = instance_settings.get_mut(instance_name) {
+                match field_name {
+                    "environment" => setting.environment = value.clone(),
+                    "instance_name" => setting.instance_name = value.clone(),
+                    "cpu" => setting.cpu = value.clone(),
+                    "memory" => setting.memory = value.clone(),
+                    "storage" => setting.storage = value.clone(),
+                    "replicas" => setting.replicas = value.parse().map_err(|_| anyhow::anyhow!("Invalid number for replicas"))?,
+                    "stack_type" => setting.stack_type = value.clone(),
+                    "postgres_configurations" => {
+                        setting.postgres_configurations = Some(
+                            toml::from_str(value)
+                                .map_err(|e| anyhow::anyhow!("Error parsing postgres_configurations: {}", e))?
+                        );
+                    },
+                    "extensions" => {
+                        setting.extensions = Some(
+                            toml::from_str(value)
+                                .map_err(|e| anyhow::anyhow!("Error parsing extensions: {}", e))?
+                        );
+                    },
+                    "extra_domains" => {
+                        setting.extra_domains_rw = Some(
+                            value.split(',')
+                                 .map(|s| s.trim().to_string())
+                                 .collect()
+                        );
+                    },
+                    _ => return Err(anyhow::anyhow!("Invalid field name: {}", field_name)),
+                }
+            } else {
+                return Err(anyhow::anyhow!("Invalid instance name: {}", instance_name));
+            }
+        } else {
+            return Err(anyhow::anyhow!("Invalid format for setting key: {}", key));
+        }
+    }
+
+    println!("Serializing instance settings to TOML format");
+    let toml_string = toml::to_string(&instance_settings)
+        .map_err(|e| anyhow::anyhow!("Error serializing instance settings: {}", e))?;
+
+    let mut file_path = FileUtils::get_current_working_dir();
+    file_path.push_str("/tembo.toml");
+
+    println!("Writing serialized data to tembo.toml");
+    fs::write(file_path, toml_string)
+        .map_err(|e| anyhow::anyhow!("Error writing to tembo.toml: {}", e))?;
+
+    println!("Data written to tembo.toml successfully");
+
+    Ok(())
+}
+
 
 pub fn get_rendered_dockerfile(
     instance_settings: HashMap<String, InstanceSettings>,

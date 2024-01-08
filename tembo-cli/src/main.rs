@@ -52,9 +52,12 @@ fn main() -> Result<(), anyhow::Error> {
         SubCommands::Init(_init_cmd) => {
             init::execute()?;
         }
-        SubCommands::Apply(_apply_cmd) => {
-            apply::execute(_apply_cmd, app.global_opts.verbose)?;
-        }
+        SubCommands::Apply(apply_cmd) => {
+            if let Some(settings) = &apply_cmd.set {
+                apply::update_instance_settings(&settings)?;
+            }
+            apply::execute(apply_cmd, app.global_opts.verbose)?;
+        },
         SubCommands::Validate(_validate_cmd) => {
             validate::execute(app.global_opts.verbose)?;
         }
