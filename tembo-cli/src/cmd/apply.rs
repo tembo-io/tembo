@@ -1,6 +1,6 @@
 use anyhow::{Error, Result};
 use clap::{Args, Parser, ValueEnum};
-use colorful::{Color,Colorful};
+use colorful::{Color, Colorful};
 use controller::stacks::get_stack;
 use controller::stacks::types::StackType as ControllerStackType;
 use log::info;
