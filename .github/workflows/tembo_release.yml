@@ -51,7 +51,6 @@ jobs:
       - name: Install Deps Windows
         id: install_deps_windows
         run: |
-          @echo on
           cd C:\
           git clone https://github.com/microsoft/vcpkg
           cd vcpkg
