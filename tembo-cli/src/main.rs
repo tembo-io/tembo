@@ -73,10 +73,8 @@ fn main() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-use std::error::Error;
-
 #[tokio::test]
-async fn default_instance_settings() -> Result<(), Box<dyn Error>> {
+async fn default_instance_settings() -> Result<(), Box<dyn std::error::Error>> {
     use std::path::PathBuf;
     use std::process::Command; 
     const CARGO_BIN_PATH: &str = "cargo run ";
