@@ -97,7 +97,7 @@ async fn default_instance_settings() -> Result<(), Box<dyn std::error::Error>> {
         .arg(overlay_config_str);
 
     let merged_settings = apply::get_instance_settings(Some(overlay_config_str.to_string()))?;
-    if let Some(setting) = merged_settings.get("instance1") {
+    if let Some(setting) = merged_settings.get("defaults") {
         assert_ne!(setting.cpu, "0.25", "Default setting was overwritten");
     } else {
         return Err("Setting key not found".into());
