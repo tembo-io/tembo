@@ -119,7 +119,7 @@ async fn merge() -> Result<(), Box<dyn Error>> {
     // tembo init
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
     cmd.arg("init");
-    cmd.assert().success(); 
+    cmd.assert().success();
 
     let overlay_config_path = PathBuf::from(root_dir)
         .join("tests")

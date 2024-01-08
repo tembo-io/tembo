@@ -10,7 +10,6 @@ mod cli;
 mod cmd;
 mod tui;
 
-
 #[derive(Parser)]
 #[clap(author = crate_authors!("\n"), version = crate_version!(), about = "Tembo CLI", long_about = None)]
 struct App {
@@ -76,7 +75,7 @@ fn main() -> Result<(), anyhow::Error> {
 #[tokio::test]
 async fn default_instance_settings() -> Result<(), Box<dyn std::error::Error>> {
     use std::path::PathBuf;
-    use std::process::Command; 
+    use std::process::Command;
     const CARGO_BIN_PATH: &str = "cargo run ";
     let root_dir = env!("CARGO_MANIFEST_DIR");
 

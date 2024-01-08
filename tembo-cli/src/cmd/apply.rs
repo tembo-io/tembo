@@ -448,7 +448,7 @@ fn overlay_to_instance_settings(overlay: OverlayInstanceSettings) -> InstanceSet
             .instance_name
             .unwrap_or("default_instance_name".to_string()),
         cpu: overlay.cpu.unwrap_or("default_cpu".to_string()),
-        memory: overlay.memory.unwrap_or("default_memory".to_string()), 
+        memory: overlay.memory.unwrap_or("default_memory".to_string()),
         storage: overlay.storage.unwrap_or("default_storage".to_string()),
         replicas: overlay.replicas.unwrap_or(1), // Set a default value for replicas here
         stack_type: overlay
@@ -488,7 +488,7 @@ pub fn get_instance_settings(
     base_path.push_str("/tembo.toml");
     let base_contents = fs::read_to_string(&base_path)
         .with_context(|| format!("Couldn't read base file {}", base_path))?;
-    let base_settings: HashMap<String, InstanceSettings> = 
+    let base_settings: HashMap<String, InstanceSettings> =
         toml::from_str(&base_contents).context("Unable to load data from the base config")?;
 
     let mut final_settings = base_settings.clone();
@@ -496,7 +496,7 @@ pub fn get_instance_settings(
     if let Some(overlay_path) = overlay_file_path {
         let overlay_contents = fs::read_to_string(&overlay_path)
             .with_context(|| format!("Couldn't read overlay file {}", overlay_path))?;
-        let overlay_settings: HashMap<String, OverlayInstanceSettings> = 
+        let overlay_settings: HashMap<String, OverlayInstanceSettings> =
             toml::from_str(&overlay_contents)
                 .context("Unable to load data from the overlay config")?;
 
@@ -615,10 +615,8 @@ fn get_postgres_config(instance_settings: HashMap<String, InstanceSettings>) -> 
             }
         }
     }
-
     postgres_config
 }
-
 
 fn construct_connection_string(info: ConnectionInfo) -> String {
     format!(
@@ -630,4 +628,3 @@ fn construct_connection_string(info: ConnectionInfo) -> String {
         "postgres"
     )
 }
-
