@@ -19,17 +19,25 @@ jobs:
           - target: x86_64-apple-darwin
             asset_name: x86_64-apple
             os: macos-latest
+            executable: tembo
           - target: aarch64-apple-darwin
             asset_name: aarch64-apple
             os: macos-latest
+            executable: tembo
           - target: x86_64-unknown-linux-musl
             asset_name: x86_64-linux
             os: ubuntu-20.04
             container: quay.io/tembo/muslrust:1.71.0-stable
+            executable: tembo
           - target: aarch64-unknown-linux-musl
             asset_name: aarch64-linux
             os: ubuntu-20.04
             container: messense/rust-musl-cross:aarch64-musl
+            executable: tembo
+          - target: x86_64-pc-windows-msvc
+            asset_name: x86_64-windows
+            os: windows-latest
+            executable: tembo.exe
     runs-on: ${{ matrix.os }}
     container:
       image: ${{ matrix.container }}
@@ -49,11 +57,10 @@ jobs:
         working-directory: ./tembo-cli
         id: cargo_build
         run: |
-          set -x
           rustup target add ${{ matrix.target }}
           cargo build --release --target=${{ matrix.target }}
           cd target/${{ matrix.target }}/release
-          tar -czvf tembo.tar.gz tembo
+          tar -czvf tembo.tar.gz ${{ matrix.executable }}
           git config --global --add safe.directory '*'
 
       # TODO: Figure out a better way to fetch version for mac & linux
@@ -61,15 +68,14 @@ jobs:
         working-directory: ./tembo-cli
         id: cli_version_mac
         run: |
-          set -x
           cargo install cargo-get
           TEMBO_CLI_NAME=$(cargo-get package.name)-$(cargo-get package.version)
           echo "TEMBO_CLI_NAME=$TEMBO_CLI_NAME" >> $GITHUB_ENV
         if: runner.os == 'macOS'
 
-      - name: CLI version Ubuntu
+      - name: CLI version Linux
         working-directory: ./tembo-cli
-        id: cli_version_ubuntu
+        id: cli_version_linux
         run: |
           set -x
           PKG_VERSION=$(awk -F ' = ' '$$1 ~ /version/ { gsub(/[\\"]/, "", $$2); printf("%s",$$2); exit; }' Cargo.toml)
@@ -77,6 +83,16 @@ jobs:
           TEMBO_CLI_NAME=tembo-cli-${TEMBO_VERSION}
           echo "TEMBO_CLI_NAME=$TEMBO_CLI_NAME" >> $GITHUB_ENV
         if: runner.os == 'Linux'
+
+      - name: CLI version Windows
+        working-directory: ./tembo-cli
+        id: cli_version_windows
+        run: |
+
+          $TEMBO_VERSION = $(target/${{ matrix.target }}/release/tembo.exe --version)
+          $TEMBO_CLI_NAME = $TEMBO_VERSION.replace(' ','-')
+          echo "TEMBO_CLI_NAME=$TEMBO_CLI_NAME" >> $env:GITHUB_ENV
+        if: runner.os == 'Windows'
 
       - name: "Generate release changelog"
         id: changelog
