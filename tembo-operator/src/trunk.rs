@@ -1,6 +1,7 @@
 use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{runtime::controller::Action, Api, Client};
 use lazy_static::lazy_static;
+use serde_json::Value;
 use std::{collections::BTreeMap, env, time::Duration};
 
 use crate::configmap::apply_configmap;
@@ -117,6 +118,8 @@ pub async fn reconcile_trunk_configmap(client: Client, namespace: &str) -> Resul
     }
 }
 
+// TODO(ianstanton) This information is now available in the trunk project metadata. We should fetch it from there
+//  instead
 async fn requires_load_list_from_trunk() -> Result<Vec<String>, TrunkError> {
     let domain = env::var("TRUNK_REGISTRY_DOMAIN")
         .unwrap_or_else(|_| DEFAULT_TRUNK_REGISTRY_DOMAIN.to_string());
@@ -137,13 +140,48 @@ async fn requires_load_list_from_trunk() -> Result<Vec<String>, TrunkError> {
     }
 }
 
+async fn get_trunk_project_metadata(trunk_project: String) -> Result<Value, TrunkError> {
+    let domain = env::var("TRUNK_REGISTRY_DOMAIN")
+        .unwrap_or_else(|_| DEFAULT_TRUNK_REGISTRY_DOMAIN.to_string());
+    let url = format!("https://{}/api/v1/trunk-projects/{}", domain, trunk_project);
+
+    let response = reqwest::get(&url).await?;
+
+    if response.status().is_success() {
+        let response_body = response.text().await?;
+        let project_metadata: Value = serde_json::from_str(&response_body)?;
+        Ok(project_metadata)
+    } else {
+        error!(
+            "Failed to fetch metadata for trunk project {}: {}",
+            trunk_project,
+            response.status()
+        );
+        Err(TrunkError::NetworkFailure(
+            response.error_for_status().unwrap_err(),
+        ))
+    }
+}
+
 // Define error type
 #[derive(Debug, thiserror::Error)]
 pub enum TrunkError {
-    #[error("Failed to update extensions libraries list from trunk: {0}")]
+    #[error("Failed to fetch metadata from trunk: {0}")]
     NetworkFailure(#[from] reqwest::Error),
     #[error("Failed to parse extensions libraries list from trunk: {0}")]
     ParsingIssue(#[from] serde_json::Error),
     #[error("Failed to apply trunk configmap")]
     ConfigMapApplyError,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_get_trunk_project_metadata() {
+        let trunk_project = "auto_explain".to_string();
+        let result = get_trunk_project_metadata(trunk_project).await;
+        assert!(result.is_ok());
+    }
 }
