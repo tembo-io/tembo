@@ -140,6 +140,7 @@ async fn requires_load_list_from_trunk() -> Result<Vec<String>, TrunkError> {
     }
 }
 
+// Get all metadata entries for a given trunk project
 async fn get_trunk_project_metadata(trunk_project: String) -> Result<Value, TrunkError> {
     let domain = env::var("TRUNK_REGISTRY_DOMAIN")
         .unwrap_or_else(|_| DEFAULT_TRUNK_REGISTRY_DOMAIN.to_string());
@@ -155,6 +156,31 @@ async fn get_trunk_project_metadata(trunk_project: String) -> Result<Value, Trun
         error!(
             "Failed to fetch metadata for trunk project {}: {}",
             trunk_project,
+            response.status()
+        );
+        Err(TrunkError::NetworkFailure(
+            response.error_for_status().unwrap_err(),
+        ))
+    }
+}
+
+// Get trunk project metadata for a specific version
+async fn get_trunk_project_metadata_for_version(trunk_project: String, version: String) -> Result<Value, TrunkError> {
+    let domain = env::var("TRUNK_REGISTRY_DOMAIN")
+        .unwrap_or_else(|_| DEFAULT_TRUNK_REGISTRY_DOMAIN.to_string());
+    let url = format!("https://{}/api/v1/trunk-projects/{}/version/{}", domain, trunk_project, version);
+
+    let response = reqwest::get(&url).await?;
+
+    if response.status().is_success() {
+        let response_body = response.text().await?;
+        let project_metadata: Value = serde_json::from_str(&response_body)?;
+        Ok(project_metadata)
+    } else {
+        error!(
+            "Failed to fetch metadata for trunk project {} version {}: {}",
+            trunk_project,
+            version,
             response.status()
         );
         Err(TrunkError::NetworkFailure(
@@ -182,6 +208,14 @@ mod tests {
     async fn test_get_trunk_project_metadata() {
         let trunk_project = "auto_explain".to_string();
         let result = get_trunk_project_metadata(trunk_project).await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_get_trunk_project_metadata_for_version() {
+        let trunk_project = "auto_explain".to_string();
+        let version = "15.3.0".to_string();
+        let result = get_trunk_project_metadata_for_version(trunk_project, version).await;
         assert!(result.is_ok());
     }
 }
