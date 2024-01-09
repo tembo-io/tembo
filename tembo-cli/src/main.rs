@@ -52,7 +52,7 @@ fn main() -> Result<(), anyhow::Error> {
         SubCommands::Init(_init_cmd) => {
             init::execute()?;
         }
-        SubCommands::Apply(ref _apply_cmd) => {
+        SubCommands::Apply(_apply_cmd) => {
             apply::execute(app.global_opts.verbose, _apply_cmd.merge.clone())?;
         }
         SubCommands::Validate(_validate_cmd) => {
