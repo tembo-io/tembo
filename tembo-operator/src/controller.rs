@@ -331,9 +331,9 @@ impl CoreDB {
                 None => None,
                 Some(status) => status.last_fully_reconciled_at,
             };
-            // Update the timestamp if it's been more than 10 seconds since the last update
+            // Update the timestamp if it's been more than 30 seconds since the last update
             if current_fully_reconciled_at.map_or(true, |last_reconciled| {
-                current_time > last_reconciled + Duration::from_secs(10)
+                current_time > last_reconciled + Duration::from_secs(30)
             }) {
                 Some(current_time)
             } else {
