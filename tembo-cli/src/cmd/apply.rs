@@ -487,7 +487,7 @@ pub fn get_instance_settings(
             if let Some(base_value) = base_settings.get(&key) {
                 let merged_value = merge_settings(base_value, overlay_value);
                 final_settings.insert(key, merged_value);
-            } 
+            }
         }
     }
 
