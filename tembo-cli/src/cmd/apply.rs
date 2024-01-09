@@ -326,15 +326,15 @@ fn create_new_instance(
 
 fn get_create_instance(instance_settings: &InstanceSettings) -> CreateInstance {
     return CreateInstance {
-        cpu: Cpu::from_str(&instance_settings.cpu).unwrap(),
-        memory: Memory::from_str(&instance_settings.memory).unwrap(),
+        cpu: Cpu::from_str(instance_settings.cpu.as_str()).unwrap(),
+        memory: Memory::from_str(instance_settings.memory.as_str()).unwrap(),
         environment: temboclient::models::Environment::from_str(
             instance_settings.environment.as_str(),
         )
         .unwrap(),
         instance_name: instance_settings.instance_name.clone(),
         stack_type: StackType::from_str(instance_settings.stack_type.as_str()).unwrap(),
-        storage: Storage::from_str(&instance_settings.storage).unwrap(),
+        storage: Storage::from_str(instance_settings.storage.as_str()).unwrap(),
         replicas: Some(instance_settings.replicas),
         app_services: None,
         connection_pooler: None,
@@ -350,13 +350,13 @@ fn get_create_instance(instance_settings: &InstanceSettings) -> CreateInstance {
 
 fn get_update_instance(instance_settings: &InstanceSettings) -> UpdateInstance {
     return UpdateInstance {
-        cpu: Cpu::from_str(&instance_settings.cpu).unwrap(),
-        memory: Memory::from_str(&instance_settings.memory).unwrap(),
+        cpu: Cpu::from_str(instance_settings.cpu.as_str()).unwrap(),
+        memory: Memory::from_str(instance_settings.memory.as_str()).unwrap(),
         environment: temboclient::models::Environment::from_str(
             instance_settings.environment.as_str(),
         )
         .unwrap(),
-        storage: Storage::from_str(&instance_settings.storage).unwrap(),
+        storage: Storage::from_str(instance_settings.storage.as_str()).unwrap(),
         replicas: instance_settings.replicas,
         app_services: None,
         connection_pooler: None,
