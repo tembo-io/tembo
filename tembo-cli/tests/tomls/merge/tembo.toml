@@ -32,3 +32,4 @@ trunk_project_version = "0.33.3"
 enabled = true
 trunk_project = "pg_partman"
 trunk_project_version = "4.7.4"
+

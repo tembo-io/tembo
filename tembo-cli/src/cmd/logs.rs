@@ -1,10 +1,6 @@
 use anyhow::{Result, Context};
 use clap::Args;
-use crate::cli::file_utils::FileUtils;
-use crate::cli::tembo_config::InstanceSettings;
 use std::process::Command;
-use std::collections::HashMap;
-use toml;
 use super::*;
 
 #[derive(Args)]
@@ -15,34 +11,45 @@ pub struct LogsCommand {
 
 impl LogsCommand {
     pub fn execute(&self) -> Result<()> {
-        let instance_settings = apply::get_instance_settings()?;
+        let instance_settings = super::apply::get_instance_settings()?;
 
-        for (instance_name, _) in instance_settings {
-            if self.verbose {
-                println!("Logs for instance: {}", instance_name);
+        for (instance_name, _settings) in instance_settings {
+            let output = Command::new("docker")
+                .arg("logs")
+                .arg(&instance_name)
+                .output()?;
+
+            if output.status.success() {
+                println!("Huge success haha");
+            } else {
+                eprintln!("Failed to get logs for instance: {}", instance_name);
+                eprintln!("{}", String::from_utf8_lossy(&output.stderr));
             }
-            Self::fetch_and_print_docker_logs(&instance_name)?;
+            fetch_and_print_docker_logs(&instance_name)?;
         }
 
         Ok(())
     }
+}
 
-    fn fetch_and_print_docker_logs(instance_name: &str) -> Result<()> {
-        println!("{}",instance_name);
-        let output = Command::new("docker")
-            .args(["logs", instance_name])
-            .args(["--details"])
-            .output()
-            .with_context(|| format!("Failed to fetch logs for Docker container '{}'", instance_name))?;
 
-        if !output.status.success() {
-            eprintln!("Error fetching logs for instance '{}'", instance_name);
-            return Ok(());
-        }
+pub fn fetch_and_print_docker_logs(instance_name: &str) -> Result<()> {
+    println!("Fetching logs for instance: {}", instance_name);
+    let output = Command::new("docker")
+        .args(["logs", instance_name])
+        .output()
+        .with_context(|| format!("Failed to fetch logs for Docker container '{}'", instance_name))?;
 
-        let logs = String::from_utf8_lossy(&output.stdout);
-        println!("{}", logs);
-
-        Ok(())
+    if !output.status.success() {
+        eprintln!("Error fetching logs for instance '{}'", instance_name);
+        return Ok(());
     }
+
+    let logs_stdout = String::from_utf8_lossy(&output.stdout);
+    let logs_stderr = String::from_utf8_lossy(&output.stderr);
+
+    println!("STDOUT:\n{}", logs_stdout);
+    println!("STDERR:\n{}", logs_stderr);
+
+    Ok(())
 }
