@@ -7,6 +7,8 @@ impl FromStr for Cpu {
 
     fn from_str(input: &str) -> core::result::Result<Cpu, Self::Err> {
         match input {
+            "0.25" => Ok(Cpu::Variant0Period25),
+            "0.5" => Ok(Cpu::Variant0Period5),
             "1" => Ok(Cpu::Variant1),
             "2" => Ok(Cpu::Variant2),
             "4" => Ok(Cpu::Variant4),
@@ -76,6 +78,7 @@ impl FromStr for StackType {
             "VectorDB" => Ok(StackType::VectorDb),
             "OLTP" => Ok(StackType::Oltp),
             "DataWarehouse" => Ok(StackType::DataWarehouse),
+            "Geospatial" => Ok(StackType::Geospatial),
             _ => Err(()),
         }
     }
