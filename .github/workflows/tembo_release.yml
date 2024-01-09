@@ -91,7 +91,6 @@ jobs:
 
           $TEMBO_VERSION = $(target/${{ matrix.target }}/release/tembo.exe --version)
           $TEMBO_CLI_NAME = $TEMBO_VERSION.replace(' ','-')
-          echo "TEMBO_CLI_NAME=$TEMBO_CLI_NAME"
           echo "TEMBO_CLI_NAME=$TEMBO_CLI_NAME" >> $env:GITHUB_ENV
         if: runner.os == 'Windows'
 
