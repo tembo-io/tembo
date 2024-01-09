@@ -55,13 +55,10 @@ pub fn execute(verbose: bool, _merge_path: Option<String>) -> Result<(), anyhow:
 
     let env = get_current_context()?;
 
-    let instance_settings = get_instance_settings(_merge_path.clone())?;
-    println!("Instance settings: {:?}", instance_settings);
-
     if env.target == Target::Docker.to_string() {
         return execute_docker(verbose, _merge_path);
     } else if env.target == Target::TemboCloud.to_string() {
-        return execute_tembo_cloud(env.clone());
+        return execute_tembo_cloud(env.clone(), _merge_path);
     }
 
     Ok(())
@@ -119,13 +116,17 @@ fn execute_docker(verbose: bool, _merge_path: Option<String>) -> Result<(), anyh
             &value.stack_type,
             "local",
         );
+        println!("Instance settings: {:?}", instance_settings);
     }
 
     Ok(())
 }
 
-pub fn execute_tembo_cloud(env: Environment) -> Result<(), anyhow::Error> {
-    let instance_settings = get_instance_settings(None)?;
+pub fn execute_tembo_cloud(
+    env: Environment,
+    _merge_path: Option<String>,
+) -> Result<(), anyhow::Error> {
+    let instance_settings = get_instance_settings(_merge_path)?;
 
     let profile = env.clone().selected_profile.unwrap();
     let config = Configuration {

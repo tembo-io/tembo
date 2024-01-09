@@ -71,7 +71,6 @@ mod tests {
     use super::*;
     use std::path::PathBuf;
     use std::process::Command;
-    use tokio;
 
     const CARGO_BIN_PATH: &str = "cargo run ";
     const root_dir: &str = env!("CARGO_MANIFEST_DIR");
