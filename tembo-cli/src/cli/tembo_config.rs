@@ -34,8 +34,6 @@ pub struct InstanceSettings {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct OverlayInstanceSettings {
-    pub environment: Option<String>,
-    pub instance_name: Option<String>,
     pub cpu: Option<String>,
     pub memory: Option<String>,
     pub storage: Option<String>,

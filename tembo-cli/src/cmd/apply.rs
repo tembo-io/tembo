@@ -351,12 +351,12 @@ fn get_create_instance(instance_settings: &InstanceSettings) -> CreateInstance {
 fn get_update_instance(instance_settings: &InstanceSettings) -> UpdateInstance {
     return UpdateInstance {
         cpu: Cpu::from_str(&instance_settings.cpu).unwrap(),
-        memory: Memory::from_str(&instance_settings.cpu).unwrap(),
+        memory: Memory::from_str(&instance_settings.memory).unwrap(),
         environment: temboclient::models::Environment::from_str(
             instance_settings.environment.as_str(),
         )
         .unwrap(),
-        storage: Storage::from_str(&instance_settings.cpu).unwrap(),
+        storage: Storage::from_str(&instance_settings.storage).unwrap(),
         replicas: instance_settings.replicas,
         app_services: None,
         connection_pooler: None,
@@ -443,27 +443,6 @@ fn get_trunk_installs(
     vec_trunk_installs
 }
 
-fn overlay_to_instance_settings(overlay: OverlayInstanceSettings) -> InstanceSettings {
-    InstanceSettings {
-        environment: overlay
-            .environment
-            .unwrap_or("default_environment".to_string()),
-        instance_name: overlay
-            .instance_name
-            .unwrap_or("default_instance_name".to_string()),
-        cpu: overlay.cpu.unwrap_or("default_cpu".to_string()),
-        memory: overlay.memory.unwrap_or("default_memory".to_string()),
-        storage: overlay.storage.unwrap_or("default_storage".to_string()),
-        replicas: overlay.replicas.unwrap_or(1), // Set a default value for replicas here
-        stack_type: overlay
-            .stack_type
-            .unwrap_or("default_stack_type".to_string()),
-        postgres_configurations: overlay.postgres_configurations,
-        extensions: overlay.extensions,
-        extra_domains_rw: overlay.extra_domains_rw,
-    }
-}
-
 fn merge_settings(base: &InstanceSettings, overlay: OverlayInstanceSettings) -> InstanceSettings {
     InstanceSettings {
         environment: base.environment.clone(), // Retain the base environment
@@ -508,9 +487,7 @@ pub fn get_instance_settings(
             if let Some(base_value) = base_settings.get(&key) {
                 let merged_value = merge_settings(base_value, overlay_value);
                 final_settings.insert(key, merged_value);
-            } else {
-                final_settings.insert(key, overlay_to_instance_settings(overlay_value));
-            }
+            } 
         }
     }
 
