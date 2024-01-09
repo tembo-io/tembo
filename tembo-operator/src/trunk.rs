@@ -165,10 +165,16 @@ async fn get_trunk_project_metadata(trunk_project: String) -> Result<Value, Trun
 }
 
 // Get trunk project metadata for a specific version
-async fn get_trunk_project_metadata_for_version(trunk_project: String, version: String) -> Result<Value, TrunkError> {
+async fn get_trunk_project_metadata_for_version(
+    trunk_project: String,
+    version: String,
+) -> Result<Value, TrunkError> {
     let domain = env::var("TRUNK_REGISTRY_DOMAIN")
         .unwrap_or_else(|_| DEFAULT_TRUNK_REGISTRY_DOMAIN.to_string());
-    let url = format!("https://{}/api/v1/trunk-projects/{}/version/{}", domain, trunk_project, version);
+    let url = format!(
+        "https://{}/api/v1/trunk-projects/{}/version/{}",
+        domain, trunk_project, version
+    );
 
     let response = reqwest::get(&url).await?;
 
