@@ -16,23 +16,28 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          #- target: x86_64-apple-darwin
-          #  asset_name: x86_64-apple
-          #   os: macos-latest
-          #- target: aarch64-apple-darwin
-          #  asset_name: aarch64-apple
-          #  os: macos-latest
-          # - target: x86_64-unknown-linux-musl
-          #  asset_name: x86_64-linux
-          #  os: ubuntu-20.04
-          #  container: quay.io/tembo/muslrust:1.71.0-stable
-          #- target: aarch64-unknown-linux-musl
-          #  asset_name: aarch64-linux
-          #  os: ubuntu-20.04
-          #  container: messense/rust-musl-cross:aarch64-musl
+          - target: x86_64-apple-darwin
+            asset_name: x86_64-apple
+            os: macos-latest
+            executable: tembo
+          - target: aarch64-apple-darwin
+            asset_name: aarch64-apple
+            os: macos-latest
+            executable: tembo
+          - target: x86_64-unknown-linux-musl
+            asset_name: x86_64-linux
+            os: ubuntu-20.04
+            container: quay.io/tembo/muslrust:1.71.0-stable
+            executable: tembo
+          - target: aarch64-unknown-linux-musl
+            asset_name: aarch64-linux
+            os: ubuntu-20.04
+            container: messense/rust-musl-cross:aarch64-musl
+            executable: tembo
           - target: x86_64-pc-windows-msvc
             asset_name: x86_64-windows
             os: windows-latest
+            executable: tembo.exe
     runs-on: ${{ matrix.os }}
     container:
       image: ${{ matrix.container }}
@@ -48,13 +53,6 @@ jobs:
           apt install pkg-config libssl-dev -y
         if: runner.os == 'Linux'
 
-      - name: Install Deps Windows
-        id: install_deps_windows
-        run: |
-          vcpkg integrate install
-          set OPENSSL_DIR="C:/vcpkg/packages/openssl_x64-windows"
-        if: runner.os == 'Windows'
-
       - name: Cargo build
         working-directory: ./tembo-cli
         id: cargo_build
@@ -62,7 +60,7 @@ jobs:
           rustup target add ${{ matrix.target }}
           cargo build --release --target=${{ matrix.target }}
           cd target/${{ matrix.target }}/release
-          tar -czvf tembo.tar.gz tembo.exe
+          tar -czvf tembo.tar.gz ${{ matrix.executable }}
           git config --global --add safe.directory '*'
 
       # TODO: Figure out a better way to fetch version for mac & linux
