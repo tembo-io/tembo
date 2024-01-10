@@ -1,8 +1,9 @@
 use crate::cmd::delete::DeleteCommand;
 use crate::cmd::validate::ValidateCommand;
-use crate::cmd::{apply, context, delete, init, validate};
+use crate::cmd::{apply, context, delete, init, validate, logs};
 use clap::{crate_authors, crate_version, Args, Parser, Subcommand};
 use cmd::apply::ApplyCommand;
+use cmd::logs::LogsCommand;
 use cmd::context::{ContextCommand, ContextSubCommand};
 use cmd::init::InitCommand;
 
@@ -28,6 +29,7 @@ enum SubCommands {
     Apply(ApplyCommand),
     Validate(ValidateCommand),
     Delete(DeleteCommand),
+    Logs(LogsCommand)
 }
 
 #[derive(Args)]
@@ -57,6 +59,9 @@ fn main() -> Result<(), anyhow::Error> {
         }
         SubCommands::Validate(_validate_cmd) => {
             validate::execute(app.global_opts.verbose)?;
+        }
+        SubCommands::Logs(_logs_cmd) => {
+            tokio::runtime::Runtime::new().unwrap().block_on(_logs_cmd.execute())?;
         }
         SubCommands::Delete(_delete_cmd) => {
             delete::execute()?;
