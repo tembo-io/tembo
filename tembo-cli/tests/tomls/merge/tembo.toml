@@ -1,35 +1,7 @@
-# Tembo.toml configuration file version
-# version = "1.0.0"
-
-# Default settings for instances
 [defaults]
 environment = "dev"
-instance_name = "defaults"
+instance_name = "defaults_instance"
 cpu = "1"
-memory = "2Gi"
-storage = "10Gi"
+storage = "50Gi"
 replicas = 1
 stack_type = "Standard"
-
-[defaults.postgres_configurations]
-shared_preload_libraries = 'pg_stat_statements'
-statement_timeout = 60
-pg_partman_bgw.dbname = 'postgres'
-pg_partman_bgw.interval = "60"
-pg_partman_bgw.role = 'postgres'
-
-[defaults.extensions.pg_jsonschema]
-enabled = true
-trunk_project = "pg_jsonschema"
-trunk_project_version = "0.1.4"
-
-[defaults.extensions.pgmq]
-enabled = true
-trunk_project = "pgmq"
-trunk_project_version = "0.33.3"
-
-[defaults.extensions.pg_partman]
-enabled = true
-trunk_project = "pg_partman"
-trunk_project_version = "4.7.4"
-

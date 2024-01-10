@@ -36,6 +36,18 @@ pub struct InstanceSettings {
     pub extra_domains_rw: Option<Vec<String>>,
 }
 
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct OverlayInstanceSettings {
+    pub cpu: Option<String>,
+    pub memory: Option<String>,
+    pub storage: Option<String>,
+    pub replicas: Option<i32>,
+    pub stack_type: Option<String>,
+    pub postgres_configurations: Option<HashMap<String, Value>>,
+    pub extensions: Option<HashMap<String, Extension>>,
+    pub extra_domains_rw: Option<Vec<String>>,
+}
+
 // If a trunk project name is not specified, then assume
 // it's the same name as the extension.
 fn deserialize_extensions<'de, D>(

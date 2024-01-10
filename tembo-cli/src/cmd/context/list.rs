@@ -15,7 +15,7 @@ pub fn execute() -> Result<(), anyhow::Error> {
             org_id = env_org;
         }
 
-        if e.target == String::from("docker") {
+        if e.target == *"docker" {
             profile = String::from("local")
         } else if let Some(env_profile) = e.profile {
             profile = env_profile;

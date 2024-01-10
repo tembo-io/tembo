@@ -1,6 +1,7 @@
+use anyhow::Context as AnyhowContext;
 use anyhow::Error;
 use clap::Args;
-use colorful::{Color, Colorful};
+use colorful::Colorful;
 use controller::stacks::get_stack;
 use controller::stacks::types::StackType as ControllerStackType;
 use log::info;
@@ -29,7 +30,8 @@ use crate::cli::file_utils::FileUtils;
 use crate::cli::sqlx_utils::SqlxUtils;
 use crate::cli::tembo_config;
 use crate::cli::tembo_config::InstanceSettings;
-use crate::tui::{indent, instance_started};
+use crate::cli::tembo_config::OverlayInstanceSettings;
+use crate::tui::instance_started;
 use crate::{
     cli::context::{get_current_context, Environment, Profile, Target},
     tui::{clean_console, colors, white_confirmation},
@@ -41,9 +43,12 @@ const POSTGRESCONF_NAME: &str = "postgres.conf";
 
 /// Deploys a tembo.toml file
 #[derive(Args)]
-pub struct ApplyCommand {}
+pub struct ApplyCommand {
+    #[clap(long, short = 'm')]
+    pub merge: Option<String>,
+}
 
-pub fn execute(verbose: bool) -> Result<(), anyhow::Error> {
+pub fn execute(verbose: bool, _merge_path: Option<String>) -> Result<(), anyhow::Error> {
     info!("Running validation!");
     super::validate::execute(verbose)?;
     info!("Validation completed!");
@@ -51,18 +56,18 @@ pub fn execute(verbose: bool) -> Result<(), anyhow::Error> {
     let env = get_current_context()?;
 
     if env.target == Target::Docker.to_string() {
-        return execute_docker(verbose);
+        return execute_docker(verbose, _merge_path);
     } else if env.target == Target::TemboCloud.to_string() {
-        return execute_tembo_cloud(env.clone());
+        return execute_tembo_cloud(env.clone(), _merge_path);
     }
 
     Ok(())
 }
 
-fn execute_docker(verbose: bool) -> Result<(), anyhow::Error> {
+fn execute_docker(verbose: bool, _merge_path: Option<String>) -> Result<(), anyhow::Error> {
     Docker::installed_and_running()?;
 
-    let instance_settings: HashMap<String, InstanceSettings> = get_instance_settings()?;
+    let instance_settings = get_instance_settings(_merge_path)?;
     let rendered_dockerfile: String = get_rendered_dockerfile(instance_settings.clone())?;
 
     FileUtils::create_file(
@@ -111,13 +116,17 @@ fn execute_docker(verbose: bool) -> Result<(), anyhow::Error> {
             &value.stack_type,
             "local",
         );
+        println!("Instance settings: {:?}", instance_settings);
     }
 
     Ok(())
 }
 
-pub fn execute_tembo_cloud(env: Environment) -> Result<(), anyhow::Error> {
-    let instance_settings: HashMap<String, InstanceSettings> = get_instance_settings()?;
+pub fn execute_tembo_cloud(
+    env: Environment,
+    _merge_path: Option<String>,
+) -> Result<(), anyhow::Error> {
+    let instance_settings = get_instance_settings(_merge_path)?;
 
     let profile = env.clone().selected_profile.unwrap();
     let config = Configuration {
@@ -434,25 +443,55 @@ fn get_trunk_installs(
     vec_trunk_installs
 }
 
-pub fn get_instance_settings() -> Result<HashMap<String, InstanceSettings>, anyhow::Error> {
-    let mut file_path = FileUtils::get_current_working_dir();
-    file_path.push_str("/tembo.toml");
+fn merge_settings(base: &InstanceSettings, overlay: OverlayInstanceSettings) -> InstanceSettings {
+    InstanceSettings {
+        environment: base.environment.clone(), // Retain the base environment
+        instance_name: base.instance_name.clone(), // Retain the base instance_name
+        cpu: overlay.cpu.unwrap_or_else(|| base.cpu.clone()),
+        memory: overlay.memory.unwrap_or_else(|| base.memory.clone()),
+        storage: overlay.storage.unwrap_or_else(|| base.storage.clone()),
+        replicas: overlay.replicas.unwrap_or(base.replicas),
+        stack_type: overlay
+            .stack_type
+            .unwrap_or_else(|| base.stack_type.clone()),
+        postgres_configurations: overlay
+            .postgres_configurations
+            .or_else(|| base.postgres_configurations.clone()),
+        extensions: overlay.extensions.or_else(|| base.extensions.clone()),
+        extra_domains_rw: overlay
+            .extra_domains_rw
+            .or_else(|| base.extra_domains_rw.clone()),
+    }
+}
 
-    let contents = match fs::read_to_string(file_path.clone()) {
-        Ok(c) => c,
-        Err(e) => {
-            panic!("Couldn't read context file {}: {}", file_path, e);
+pub fn get_instance_settings(
+    overlay_file_path: Option<String>,
+) -> Result<HashMap<String, InstanceSettings>, Error> {
+    let mut base_path = FileUtils::get_current_working_dir();
+    base_path.push_str("/tembo.toml");
+    let base_contents = fs::read_to_string(&base_path)
+        .with_context(|| format!("Couldn't read base file {}", base_path))?;
+    let base_settings: HashMap<String, InstanceSettings> =
+        toml::from_str(&base_contents).context("Unable to load data from the base config")?;
+
+    let mut final_settings = base_settings.clone();
+
+    if let Some(overlay_path) = overlay_file_path {
+        let overlay_contents = fs::read_to_string(&overlay_path)
+            .with_context(|| format!("Couldn't read overlay file {}", overlay_path))?;
+        let overlay_settings: HashMap<String, OverlayInstanceSettings> =
+            toml::from_str(&overlay_contents)
+                .context("Unable to load data from the overlay config")?;
+
+        for (key, overlay_value) in overlay_settings {
+            if let Some(base_value) = base_settings.get(&key) {
+                let merged_value = merge_settings(base_value, overlay_value);
+                final_settings.insert(key, merged_value);
+            }
         }
-    };
+    }
 
-    let instance_settings: HashMap<String, InstanceSettings> = match toml::from_str(&contents) {
-        Ok(d) => d,
-        Err(e) => {
-            panic!("Unable to load data. Error: `{}`", e);
-        }
-    };
-
-    Ok(instance_settings)
+    Ok(final_settings)
 }
 
 pub fn get_rendered_dockerfile(
@@ -557,7 +596,6 @@ fn get_postgres_config(instance_settings: HashMap<String, InstanceSettings>) -> 
             }
         }
     }
-
     postgres_config
 }
 

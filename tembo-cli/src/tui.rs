@@ -100,7 +100,7 @@ pub mod colors {
         ColorfulRgb::new(255, 244, 228)
     }
 
-    pub fn gradient_p<'a>(log: &'a str) -> GradientDisplay<'a, [RGB; 4]> {
+    pub fn gradient_p(log: &str) -> GradientDisplay<'_, [RGB; 4]> {
         GradientStr::gradient(
             log,
             [
@@ -112,7 +112,7 @@ pub mod colors {
         )
     }
 
-    pub fn gradient_rainbow<'a>(log: &'a str) -> GradientDisplay<'a, [RGB; 3]> {
+    pub fn gradient_rainbow(log: &str) -> GradientDisplay<'_, [RGB; 3]> {
         GradientStr::gradient(
             log,
             [
