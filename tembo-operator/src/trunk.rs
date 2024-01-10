@@ -21,13 +21,12 @@ pub struct ExtensionRequiresLoad {
     pub library_name: String,
 }
 
-// TODO(ianstanton) Determine all optional fields
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize, ToSchema, JsonSchema)]
 pub struct TrunkProjectMetadata {
     pub name: String,
-    pub description: String,
-    pub documentation_link: String,
-    pub repository_link: String,
+    pub description: Option<String>,
+    pub documentation_link: Option<String>,
+    pub repository_link: Option<String>,
     pub version: String,
     pub postgres_versions: Vec<i32>,
     pub extensions: Vec<TrunkExtensionMetadata>,
@@ -40,7 +39,7 @@ pub struct TrunkExtensionMetadata {
     pub version: String,
     pub trunk_project_name: String,
     pub dependencies_extension_names: Option<Vec<String>>,
-    pub loadable_libraries: Vec<TrunkLoadableLibrariesMetadata>,
+    pub loadable_libraries: Option<Vec<TrunkLoadableLibrariesMetadata>>,
     pub configurations: Option<Vec<String>>,
     pub control_file: TrunkControlFileMetadata,
 }
