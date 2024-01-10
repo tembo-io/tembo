@@ -1,11 +1,14 @@
 use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{runtime::controller::Action, Api, Client};
 use lazy_static::lazy_static;
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{collections::BTreeMap, env, time::Duration};
 
 use crate::configmap::apply_configmap;
 use tracing::log::error;
+use utoipa::ToSchema;
 
 const DEFAULT_TRUNK_REGISTRY_DOMAIN: &str = "registry.pgtrunk.io";
 
@@ -16,6 +19,50 @@ const TRUNK_CONFIGMAP_NAME: &str = "trunk-metadata";
 pub struct ExtensionRequiresLoad {
     pub name: String,
     pub library_name: String,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize, ToSchema, JsonSchema)]
+pub struct TrunkProjectMetadata {
+    pub name: String,
+    pub description: String,
+    pub documentation_link: String,
+    pub repository_link: String,
+    pub version: String,
+    pub postgres_versions: Vec<i32>,
+    pub extensions: Vec<TrunkExtensionMetadata>,
+    pub downloads: Vec<TrunkDownloadMetadata>,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize, ToSchema, JsonSchema)]
+pub struct TrunkExtensionMetadata {
+    pub extension_name: String,
+    pub version: String,
+    pub trunk_project_name: String,
+    pub dependencies_extension_names: Option<Vec<String>>,
+    pub loadable_libraries: Vec<TrunkLoadableLibrariesMetadata>,
+    pub configurations: Option<Vec<String>>,
+    pub control_file: TrunkControlFileMetadata,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize, ToSchema, JsonSchema)]
+pub struct TrunkDownloadMetadata {
+    pub link: String,
+    pub pg_version: i32,
+    pub platform: String,
+    pub sha256: String,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize, ToSchema, JsonSchema)]
+pub struct TrunkLoadableLibrariesMetadata {
+    pub library_name: String,
+    pub requires_restart: bool,
+    pub priority: i32,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize, ToSchema, JsonSchema)]
+pub struct TrunkControlFileMetadata {
+    pub absent: bool,
+    pub content: Option<String>,
 }
 
 // This is a place to configure specific exceptions before
@@ -168,7 +215,7 @@ async fn get_trunk_project_metadata(trunk_project: String) -> Result<Value, Trun
 async fn get_trunk_project_metadata_for_version(
     trunk_project: String,
     version: String,
-) -> Result<Value, TrunkError> {
+) -> Result<TrunkProjectMetadata, TrunkError> {
     let domain = env::var("TRUNK_REGISTRY_DOMAIN")
         .unwrap_or_else(|_| DEFAULT_TRUNK_REGISTRY_DOMAIN.to_string());
     let url = format!(
@@ -180,7 +227,9 @@ async fn get_trunk_project_metadata_for_version(
 
     if response.status().is_success() {
         let response_body = response.text().await?;
-        let project_metadata: Value = serde_json::from_str(&response_body)?;
+        let project_metadata: Vec<TrunkProjectMetadata> = serde_json::from_str(&response_body)?;
+        // There will only be one index here, so we can safely assume index 0
+        let project_metadata = project_metadata.get(0).unwrap().clone();
         Ok(project_metadata)
     } else {
         error!(
