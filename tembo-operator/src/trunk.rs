@@ -21,6 +21,7 @@ pub struct ExtensionRequiresLoad {
     pub library_name: String,
 }
 
+// TODO(ianstanton) Determine all optional fields
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize, ToSchema, JsonSchema)]
 pub struct TrunkProjectMetadata {
     pub name: String,
@@ -244,6 +245,24 @@ async fn get_trunk_project_metadata_for_version(
     }
 }
 
+// Check if control file is absent for a given trunk project version
+pub async fn is_control_file_absent(
+    trunk_project: String,
+    version: String,
+) -> Result<bool, TrunkError> {
+    let project_metadata: TrunkProjectMetadata =
+        get_trunk_project_metadata_for_version(trunk_project, version).await?;
+    // TODO(ianstanton) This assumes that there is only one extension in the project, but we need to handle the case
+    //  where there are multiple extensions
+    let control_file_absent = project_metadata
+        .extensions
+        .get(0)
+        .unwrap()
+        .control_file
+        .absent;
+    Ok(control_file_absent)
+}
+
 // Define error type
 #[derive(Debug, thiserror::Error)]
 pub enum TrunkError {
@@ -272,5 +291,14 @@ mod tests {
         let version = "15.3.0".to_string();
         let result = get_trunk_project_metadata_for_version(trunk_project, version).await;
         assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_is_control_file_absent() {
+        let trunk_project = "auto_explain".to_string();
+        let version = "15.3.0".to_string();
+        let result = is_control_file_absent(trunk_project, version).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), true);
     }
 }
