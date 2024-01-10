@@ -11,7 +11,7 @@ pub struct LogsCommand {
 
 impl LogsCommand {
     pub fn execute(&self) -> Result<()> {
-        let instance_settings = super::apply::get_instance_settings()?;
+        let instance_settings = super::apply::get_instance_settings(None)?;
 
         for (instance_name, _settings) in instance_settings {
             let output = Command::new("docker")
