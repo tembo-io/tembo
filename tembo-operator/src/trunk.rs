@@ -4,7 +4,6 @@ use lazy_static::lazy_static;
 use schemars::JsonSchema;
 use serde::de::Error;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::{collections::BTreeMap, env, time::Duration};
 
 use crate::configmap::apply_configmap;
