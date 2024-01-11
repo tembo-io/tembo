@@ -22,6 +22,7 @@ pub struct ExtensionRequiresLoad {
     pub library_name: String,
 }
 
+// TODO(ianstanton) We can publish this as a crate library and use it in other projects, such as Trunk CLI and Registry
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize, ToSchema, JsonSchema)]
 pub struct TrunkProjectMetadata {
     pub name: String,
@@ -29,9 +30,9 @@ pub struct TrunkProjectMetadata {
     pub documentation_link: Option<String>,
     pub repository_link: Option<String>,
     pub version: String,
-    pub postgres_versions: Vec<i32>,
+    pub postgres_versions: Option<Vec<i32>>,
     pub extensions: Vec<TrunkExtensionMetadata>,
-    pub downloads: Vec<TrunkDownloadMetadata>,
+    pub downloads: Option<Vec<TrunkDownloadMetadata>>,
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize, ToSchema, JsonSchema)]
@@ -185,6 +186,26 @@ async fn requires_load_list_from_trunk() -> Result<Vec<String>, TrunkError> {
             response.status()
         );
         Err(TrunkError::ConfigMapApplyError)
+    }
+}
+
+// Get all trunk projects
+pub async fn get_trunk_projects() -> Result<Vec<TrunkProjectMetadata>, TrunkError> {
+    let domain = env::var("TRUNK_REGISTRY_DOMAIN")
+        .unwrap_or_else(|_| DEFAULT_TRUNK_REGISTRY_DOMAIN.to_string());
+    let url = format!("https://{}/api/v1/trunk-projects", domain);
+
+    let response = reqwest::get(&url).await?;
+
+    if response.status().is_success() {
+        let response_body = response.text().await?;
+        let project_metadata: Vec<TrunkProjectMetadata> = serde_json::from_str(&response_body)?;
+        Ok(project_metadata.clone())
+    } else {
+        error!("Failed to fetch all trunk projects: {}", response.status());
+        Err(TrunkError::NetworkFailure(
+            response.error_for_status().unwrap_err(),
+        ))
     }
 }
 
@@ -350,6 +371,12 @@ pub enum TrunkError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn test_get_trunk_projects() {
+        let result = get_trunk_projects().await;
+        assert!(result.is_ok());
+    }
 
     #[tokio::test]
     async fn test_get_trunk_project_metadata() {
