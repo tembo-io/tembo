@@ -316,6 +316,27 @@ pub async fn extension_name_matches_trunk_project(
     Ok(trunk_project_names.contains(&extension_name))
 }
 
+// Find the trunk project name associated with a given extension
+pub async fn get_trunk_project_for_extension(
+    extension_name: String,
+) -> Result<Option<String>, TrunkError> {
+    let trunk_projects = match get_trunk_projects().await {
+        Ok(trunk_projects) => trunk_projects,
+        Err(e) => {
+            error!("Failed to get trunk projects: {:?}", e);
+            return Err(TrunkError::ConfigMapApplyError);
+        }
+    };
+    for trunk_project in trunk_projects {
+        for extension in trunk_project.extensions {
+            if extension.extension_name == extension_name {
+                return Ok(Some(trunk_project.name));
+            }
+        }
+    }
+    Ok(None)
+}
+
 // Check if control file is absent for a given trunk project version
 pub async fn is_control_file_absent(
     trunk_project: String,
@@ -453,6 +474,24 @@ mod tests {
         let result = extension_name_matches_trunk_project(extension_name).await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), false);
+    }
+
+    #[tokio::test]
+    async fn test_get_trunk_project_for_extension() {
+        let extension_name = "auto_explain".to_string();
+        let result = get_trunk_project_for_extension(extension_name).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Some("auto_explain".to_string()));
+
+        let extension_name = "pgml".to_string();
+        let result = get_trunk_project_for_extension(extension_name).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Some("postgresml".to_string()));
+
+        let extension_name = "vector".to_string();
+        let result = get_trunk_project_for_extension(extension_name).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Some("pgvector".to_string()));
     }
 
     #[tokio::test]
