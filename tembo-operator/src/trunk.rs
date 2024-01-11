@@ -2,6 +2,7 @@ use k8s_openapi::api::core::v1::ConfigMap;
 use kube::{runtime::controller::Action, Api, Client};
 use lazy_static::lazy_static;
 use schemars::JsonSchema;
+use serde::de::Error;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::{collections::BTreeMap, env, time::Duration};
@@ -229,8 +230,20 @@ async fn get_trunk_project_metadata_for_version(
         let response_body = response.text().await?;
         let project_metadata: Vec<TrunkProjectMetadata> = serde_json::from_str(&response_body)?;
         // There will only be one index here, so we can safely assume index 0
-        let project_metadata = project_metadata.get(0).unwrap().clone();
-        Ok(project_metadata)
+        let project_metadata = match project_metadata.get(0) {
+            Some(project_metadata) => project_metadata,
+            None => {
+                error!(
+                    "Failed to fetch metadata for trunk project {} version {}",
+                    trunk_project, version
+                );
+                return Err(TrunkError::ParsingIssue(serde_json::Error::custom(
+                    "No metadata found",
+                )));
+            }
+        };
+
+        Ok(project_metadata.clone())
     } else {
         error!(
             "Failed to fetch metadata for trunk project {} version {}: {}",
@@ -248,9 +261,18 @@ async fn get_trunk_project_metadata_for_version(
 pub async fn is_control_file_absent(
     trunk_project: String,
     version: String,
-) -> Result<bool, TrunkError> {
+) -> Result<bool, Action> {
     let project_metadata: TrunkProjectMetadata =
-        get_trunk_project_metadata_for_version(trunk_project, version).await?;
+        match get_trunk_project_metadata_for_version(trunk_project, version.clone()).await {
+            Ok(project_metadata) => project_metadata,
+            Err(e) => {
+                error!(
+                    "Failed to get trunk project metadata for version {}: {:?}",
+                    version, e
+                );
+                return Err(Action::requeue(Duration::from_secs(300)));
+            }
+        };
     // TODO(ianstanton) This assumes that there is only one extension in the project, but we need to handle the case
     //  where there are multiple extensions
     let control_file_absent = project_metadata
@@ -260,6 +282,58 @@ pub async fn is_control_file_absent(
         .control_file
         .absent;
     Ok(control_file_absent)
+}
+
+// Check if extension has loadable_library metadata for a given trunk project version and return the library name
+pub async fn get_loadable_library_name(
+    trunk_project: String,
+    version: String,
+    extension_name: String,
+) -> Result<Option<String>, Action> {
+    let project_metadata: TrunkProjectMetadata = match get_trunk_project_metadata_for_version(
+        trunk_project.clone(),
+        version.clone(),
+    )
+    .await
+    {
+        Ok(project_metadata) => project_metadata,
+        Err(e) => {
+            error!(
+                "Failed to get trunk project metadata for version {}: {:?}",
+                version, e
+            );
+            return Err(Action::requeue(Duration::from_secs(300)));
+        }
+    };
+    // Find the extension in the project metadata
+    let extension_metadata = match project_metadata
+        .extensions
+        .iter()
+        .find(|e| e.extension_name == extension_name)
+    {
+        Some(extension_metadata) => extension_metadata,
+        None => {
+            error!(
+                "Failed to find extension {} in trunk project {} version {}",
+                extension_name, trunk_project, version
+            );
+            return Err(Action::requeue(Duration::from_secs(300)));
+        }
+    };
+    // Find the loadable library in the extension metadata
+    let loadable_library_name = match extension_metadata.loadable_libraries {
+        Some(ref loadable_libraries) => {
+            let loadable_library = loadable_libraries
+                .iter()
+                .find(|l| l.requires_restart == true);
+            match loadable_library {
+                Some(loadable_library) => Some(loadable_library.library_name.clone()),
+                None => None,
+            }
+        }
+        None => None,
+    };
+    Ok(loadable_library_name)
 }
 
 // Define error type
@@ -299,5 +373,16 @@ mod tests {
         let result = is_control_file_absent(trunk_project, version).await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), true);
+    }
+
+    #[tokio::test]
+    async fn test_get_loadable_library_name() {
+        let trunk_project = "auto_explain".to_string();
+        let version = "15.3.0".to_string();
+        let extension_name = "auto_explain".to_string();
+        let result = get_loadable_library_name(trunk_project, version, extension_name).await;
+        assert!(result.is_ok());
+        println!("{:?}", result.clone().unwrap().unwrap());
+        assert_eq!(result.unwrap(), Some("auto_explain".to_string()));
     }
 }
