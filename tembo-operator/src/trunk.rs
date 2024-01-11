@@ -209,6 +209,30 @@ pub async fn get_trunk_projects() -> Result<Vec<TrunkProjectMetadata>, TrunkErro
     }
 }
 
+// Get all trunk project names
+pub async fn get_trunk_project_names() -> Result<Vec<String>, TrunkError> {
+    let domain = env::var("TRUNK_REGISTRY_DOMAIN")
+        .unwrap_or_else(|_| DEFAULT_TRUNK_REGISTRY_DOMAIN.to_string());
+    let url = format!("https://{}/api/v1/trunk-projects", domain);
+
+    let response = reqwest::get(&url).await?;
+
+    if response.status().is_success() {
+        let response_body = response.text().await?;
+        let project_metadata: Vec<TrunkProjectMetadata> = serde_json::from_str(&response_body)?;
+        let project_names: Vec<String> = project_metadata
+            .iter()
+            .map(|project_metadata| project_metadata.name.clone())
+            .collect();
+        Ok(project_names)
+    } else {
+        error!("Failed to fetch all trunk projects: {}", response.status());
+        Err(TrunkError::NetworkFailure(
+            response.error_for_status().unwrap_err(),
+        ))
+    }
+}
+
 // Get all metadata entries for a given trunk project
 async fn get_trunk_project_metadata(trunk_project: String) -> Result<Value, TrunkError> {
     let domain = env::var("TRUNK_REGISTRY_DOMAIN")
@@ -276,6 +300,20 @@ async fn get_trunk_project_metadata_for_version(
             response.error_for_status().unwrap_err(),
         ))
     }
+}
+
+// Check if extension name is in list of trunk project names
+pub async fn extension_name_matches_trunk_project(
+    extension_name: String,
+) -> Result<bool, TrunkError> {
+    let trunk_project_names = match get_trunk_project_names().await {
+        Ok(trunk_project_names) => trunk_project_names,
+        Err(e) => {
+            error!("Failed to get trunk project names: {:?}", e);
+            return Err(TrunkError::ConfigMapApplyError);
+        }
+    };
+    Ok(trunk_project_names.contains(&extension_name))
 }
 
 // Check if control file is absent for a given trunk project version
@@ -386,11 +424,35 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_get_trunk_project_names() {
+        let result = get_trunk_project_names().await;
+        assert!(result.is_ok());
+    }
+
+    #[tokio::test]
     async fn test_get_trunk_project_metadata_for_version() {
         let trunk_project = "auto_explain".to_string();
         let version = "15.3.0".to_string();
         let result = get_trunk_project_metadata_for_version(trunk_project, version).await;
         assert!(result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_extension_name_matches_trunk_project() {
+        let extension_name = "auto_explain".to_string();
+        let result = extension_name_matches_trunk_project(extension_name).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), true);
+
+        let extension_name = "pgml".to_string();
+        let result = extension_name_matches_trunk_project(extension_name).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), false);
+
+        let extension_name = "vector".to_string();
+        let result = extension_name_matches_trunk_project(extension_name).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), false);
     }
 
     #[tokio::test]
