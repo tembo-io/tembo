@@ -234,7 +234,9 @@ pub async fn get_trunk_project_names() -> Result<Vec<String>, TrunkError> {
 }
 
 // Get all metadata entries for a given trunk project
-async fn get_trunk_project_metadata(trunk_project: String) -> Result<Value, TrunkError> {
+async fn get_trunk_project_metadata(
+    trunk_project: String,
+) -> Result<Vec<TrunkProjectMetadata>, TrunkError> {
     let domain = env::var("TRUNK_REGISTRY_DOMAIN")
         .unwrap_or_else(|_| DEFAULT_TRUNK_REGISTRY_DOMAIN.to_string());
     let url = format!("https://{}/api/v1/trunk-projects/{}", domain, trunk_project);
@@ -243,7 +245,7 @@ async fn get_trunk_project_metadata(trunk_project: String) -> Result<Value, Trun
 
     if response.status().is_success() {
         let response_body = response.text().await?;
-        let project_metadata: Value = serde_json::from_str(&response_body)?;
+        let project_metadata: Vec<TrunkProjectMetadata> = serde_json::from_str(&response_body)?;
         Ok(project_metadata)
     } else {
         error!(
@@ -510,7 +512,6 @@ mod tests {
         let extension_name = "auto_explain".to_string();
         let result = get_loadable_library_name(trunk_project, version, extension_name).await;
         assert!(result.is_ok());
-        println!("{:?}", result.clone().unwrap().unwrap());
         assert_eq!(result.unwrap(), Some("auto_explain".to_string()));
     }
 }
