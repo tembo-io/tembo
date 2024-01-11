@@ -53,7 +53,7 @@ fn main() -> Result<(), anyhow::Error> {
             init::execute()?;
         }
         SubCommands::Apply(_apply_cmd) => {
-            apply::execute(app.global_opts.verbose)?;
+            apply::execute(app.global_opts.verbose, _apply_cmd.merge.clone())?;
         }
         SubCommands::Validate(_validate_cmd) => {
             validate::execute(app.global_opts.verbose)?;
@@ -64,4 +64,90 @@ fn main() -> Result<(), anyhow::Error> {
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+    use std::process::Command;
+
+    const CARGO_BIN_PATH: &str = "cargo run ";
+    const root_dir: &str = env!("CARGO_MANIFEST_DIR");
+
+    #[tokio::test]
+    async fn default_instance_settings() -> Result<(), Box<dyn std::error::Error>> {
+        std::env::set_current_dir(
+            PathBuf::from(root_dir)
+                .join("tests")
+                .join("tomls")
+                .join("merge"),
+        )?;
+
+        // Path to the overlay.toml file
+        let overlay_config_path = PathBuf::from(root_dir)
+            .join("tests")
+            .join("tomls")
+            .join("merge")
+            .join("overlay.toml");
+        let overlay_config_str = overlay_config_path.to_str().ok_or("Invalid path")?;
+
+        // Running `tembo init`
+        let _output = Command::new(CARGO_BIN_PATH).arg("init");
+
+        let _output = Command::new(CARGO_BIN_PATH)
+            .arg("apply")
+            .arg("--merge")
+            .arg(overlay_config_str);
+
+        let merged_settings = apply::get_instance_settings(Some(overlay_config_str.to_string()))?;
+        if let Some(setting) = merged_settings.get("defaults") {
+            assert_ne!(setting.cpu, "0.25", "Default setting was overwritten");
+        } else {
+            return Err("Setting key not found".into());
+        }
+
+        // Running `tembo delete`
+        let _output = Command::new(CARGO_BIN_PATH).arg("delete");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn merge() -> Result<(), Box<dyn std::error::Error>> {
+        std::env::set_current_dir(
+            PathBuf::from(root_dir)
+                .join("tests")
+                .join("tomls")
+                .join("merge"),
+        )?;
+
+        // Path to the overlay.toml file
+        let overlay_config_path = PathBuf::from(root_dir)
+            .join("tests")
+            .join("tomls")
+            .join("merge")
+            .join("overlay.toml");
+        let overlay_config_str = overlay_config_path.to_str().ok_or("Invalid path")?;
+
+        // Running `tembo init`
+        let _output = Command::new(CARGO_BIN_PATH).arg("init");
+
+        let _output = Command::new(CARGO_BIN_PATH)
+            .arg("apply")
+            .arg("--merge")
+            .arg(overlay_config_str);
+
+        let merged_settings = apply::get_instance_settings(Some(overlay_config_str.to_string()))?;
+        if let Some(setting) = merged_settings.get("defaults") {
+            assert_eq!(setting.memory, "10Gi", "Base settings was not overwritten");
+        } else {
+            return Err("Setting key not found".into());
+        }
+
+        // Running `tembo delete`
+        let _output = Command::new(CARGO_BIN_PATH).arg("delete");
+
+        Ok(())
+    }
 }
