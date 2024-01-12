@@ -116,7 +116,6 @@ fn execute_docker(verbose: bool, _merge_path: Option<String>) -> Result<(), anyh
             &value.stack_type,
             "local",
         );
-        println!("Instance settings: {:?}", instance_settings);
     }
 
     Ok(())
