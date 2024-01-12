@@ -150,7 +150,7 @@ pub mod colors {
         )
     }
 
-    pub fn gradient_rainbow<'a>(log: &'a str) -> GradientDisplay<'a, [RGB; 3]> {
+    pub fn gradient_rainbow(log: &str) -> GradientDisplay<'_, [RGB; 3]> {
         GradientStr::gradient(
             log,
             [

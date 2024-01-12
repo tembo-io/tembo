@@ -4,7 +4,9 @@ Tembo CLI allows users to experience [Tembo](https://tembo.io) locally, as well 
 manage and deploy to Tembo Cloud. It abstracts away complexities of configuring,
 managing, and running Postgres in a local environment.
 
-# Installing CLI
+## Getting Started
+
+### Installing CLI
 
 Using homebrew
 
@@ -19,7 +21,50 @@ Using cargo
 cargo install tembo-cli
 ```
 
-# Local Testing
+### Commands
+
+#### `tembo init`
+
+The `tembo init` command initializes your environment with following files. Run init in the directory you want to create the `tembo.toml` file.
+
+* `tembo.toml` example configuration file
+* `migrations` directory for sql migrations
+* `~/.tembo/context` file with various contexts user can connect to
+* `~/.tembo/credentials` file with credentials & api urls
+
+For more information: `tembo init --help`
+
+### Add Tembo Cloud info
+
+To provision instances on Tembo Cloud using CLI you will need to configure `org_id` & `tembo_access_token`
+
+* fetch the `org_id` Tembo Cloud and add it as `org_id` in context file generated above 
+* generate a JWT token using steps [here](https://tembo.io/docs/tembo-cloud/security-and-authentication/api-authentication/) & add it as `tembo_access_token` to the credentials file generated above.
+
+#### `tembo context list/set`
+
+tembo context works like [kubectl context](https://www.notion.so/abee0b15119343e4947692feb740e892?pvs=21). User can set context for local docker environment or tembo cloud (dev/qa/prod) with org_id. When they run any of the other commands it will run in the context selected. Default context will be local.
+
+#### `tembo validate`
+
+Validates `tembo.toml` and other configurations files.
+
+#### `tembo apply`
+
+Validates tembo.toml (same as `tembo validate`) and applies the changes to the context selected.
+
+* applies changes and runs migration for all dbs
+    * **local docker:** stops existing container if it exists & run docker build/run + sqlx migration
+    * **tembo-cloud:** calls the api in appropriate environment to create/update instance
+
+#### `tembo delete`
+
+- **local docker:** runs `docker stop & rm` command
+- **tembo-cloud:** calls delete tembo api endpoint
+
+## Developing Tembo CLI
+
+### Local Testing
 
 Clone this repo and run:
 
@@ -33,42 +78,13 @@ You can run this command to use the local code for any tembo command during deve
 alias tembo='cargo run --'
 ```
 
-# Commands
-
-## `tembo init`
-
-The `tembo init` command initializes your environment with following files:
-
-* `tembo.toml` configuration file
-* `migrations` directory for sql migrations
-* `~/.tembo/context` file with various contexts user can connect to
-
-For more information: `tembo init --help`
-
-## `tembo context list/set`
-
-tembo context works like [kubectl context](https://www.notion.so/abee0b15119343e4947692feb740e892?pvs=21). User can set context for local docker environment or tembo cloud (dev/qa/prod) with org_id. When they run any of the other commands it will run in the context selected. Default context will be local.
-
-## `tembo apply`
-
-Validates Tembo.toml (same as `tembo validate`) and applies the changes to the context selected.
-
-* applies changes and runs migration for all dbs
-    * **local docker:** wraps docker build/run + sqlx migration
-    * **tembo-cloud:** calls the api in appropriate environment
-
-## `tembo delete`
-
-- **local docker:** runs `docker stop & rm` command
-- **tembo-cloud:** calls delete tembo api endpoint
-
-## Generating Rust Client from API
+### Generating Rust Client from API
 
 [OpenAPI Generator](https://openapi-generator.tech/) tool is used to generate Rust Client.
 
 Install OpenAPI Generator if not already by following steps [here](https://openapi-generator.tech/docs/installation)
 
-### Data plane API client
+#### Data plane API client
 
 Go to `tembodataclient` directory in your terminal.
 
@@ -84,7 +100,7 @@ openapi-generator generate -i https://api.data-1.use1.tembo.io/api-docs/openapi.
 #![allow(clippy::all)]
 ```
 
-### Control plane API client
+#### Control plane API client
 
 Go to `temboclient` directory in your terminal.
 
@@ -198,11 +214,11 @@ impl FromStr for StackType {
 pub mod impls;
 ```
 
-# Contributing
+## Contributing
 
 Before you start working on something, it's best to check if there is an existing plan
 first. Join our [Slack community](https://join.slack.com/t/trunk-crew/shared_invite/zt-1yiafma92-hFHq2xAN0ukjg_2AsOVvfg) and ask there.
 
-# Semver
+## Semver
 
 Tembo CLI is following [Semantic Versioning 2.0](https://semver.org/).

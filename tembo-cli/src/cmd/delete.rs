@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use crate::cli::context::{get_current_context, Environment, Target};
 use crate::cli::docker::Docker;
 use crate::cli::tembo_config::InstanceSettings;
@@ -19,7 +17,7 @@ pub struct DeleteCommand {}
 pub fn execute() -> Result<(), anyhow::Error> {
     let env = get_current_context()?;
 
-    let instance_settings: HashMap<String, InstanceSettings> = get_instance_settings()?;
+    let instance_settings = get_instance_settings(None)?;
 
     if env.target == Target::Docker.to_string() {
         for (_key, value) in instance_settings.iter() {
@@ -33,7 +31,7 @@ pub fn execute() -> Result<(), anyhow::Error> {
 }
 
 fn execute_tembo_cloud(env: Environment) -> Result<(), anyhow::Error> {
-    let instance_settings: HashMap<String, InstanceSettings> = get_instance_settings()?;
+    let instance_settings = get_instance_settings(None)?;
 
     let profile = env.clone().selected_profile.unwrap();
     let config = Configuration {
