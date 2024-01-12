@@ -29,6 +29,15 @@ pub fn label(log: &str) {
     println!("{} {}", "➜".bold(), colors::gradient_rainbow(log));
 }
 
+pub fn label_with_value(log: &str, value: &str) {
+    println!(
+        "{} {} {}",
+        "➜".bold(),
+        colors::gradient_rainbow(log),
+        value.color(Color::White).bold()
+    );
+}
+
 pub fn confirmation(log: &str) {
     println!(
         "{} {}",
