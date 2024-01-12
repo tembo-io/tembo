@@ -5,7 +5,6 @@ use crate::cli::context::{
 use crate::cli::file_utils::FileUtils;
 use crate::tui::confirmation;
 use clap::Args;
-use colorful::Colorful;
 
 /// Initializes a local environment. Creates a sample context and configuration files.
 #[derive(Args)]
