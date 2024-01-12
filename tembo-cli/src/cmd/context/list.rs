@@ -7,9 +7,13 @@ pub fn execute() -> Result<(), anyhow::Error> {
     let context = list_context()?;
 
     let mut rows: Vec<Vec<CellStruct>> = vec![];
-    let current_context_profile = context.environment.iter().find(|e| {
-        e.set.is_some()
-    }).unwrap().name.clone();
+    let current_context_profile = context
+        .environment
+        .iter()
+        .find(|e| e.set.is_some())
+        .unwrap()
+        .name
+        .clone();
     for e in context.environment {
         let mut org_id = String::from("           ");
         let mut profile = String::from("   ");

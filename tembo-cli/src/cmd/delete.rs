@@ -54,9 +54,7 @@ fn execute_tembo_cloud(env: Environment) -> Result<(), anyhow::Error> {
                     "Instance delete started for Instance Id: {}",
                     result.instance_id
                 )),
-                Err(error) => {
-                    tui::error(&format!("Error deleting instance: {}", error))
-                }
+                Err(error) => tui::error(&format!("Error deleting instance: {}", error)),
             };
         }
     }

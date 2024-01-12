@@ -62,7 +62,6 @@ pub fn info(log: &str) {
     );
 }
 
-
 pub fn confirmation(log: &str) {
     println!(
         "{} {}",

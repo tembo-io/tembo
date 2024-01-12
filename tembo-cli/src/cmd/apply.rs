@@ -30,11 +30,11 @@ use crate::cli::file_utils::FileUtils;
 use crate::cli::sqlx_utils::SqlxUtils;
 use crate::cli::tembo_config;
 use crate::cli::tembo_config::InstanceSettings;
-use crate::tui;
 use crate::cli::tembo_config::OverlayInstanceSettings;
+use crate::tui;
 use crate::{
     cli::context::{get_current_context, Environment, Profile, Target},
-    tui::{clean_console, colors, white_confirmation, instance_started},
+    tui::{clean_console, colors, instance_started, white_confirmation},
 };
 use tera::{Context, Tera};
 
