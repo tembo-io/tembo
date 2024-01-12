@@ -38,6 +38,31 @@ pub fn label_with_value(log: &str, value: &str) {
     );
 }
 
+pub fn error(log: &str) {
+    println!(
+        "{} {}",
+        "✗".color(colors::bad()).bold(),
+        log.color(colors::bad())
+    );
+}
+
+pub fn warning(log: &str) {
+    println!(
+        "{} {}",
+        "⚠".color(colors::schema_y()).bold(),
+        log.color(colors::schema_y())
+    );
+}
+
+pub fn info(log: &str) {
+    println!(
+        "{} {}",
+        "i".color(colors::schema_y()).bold(),
+        log.color(colors::schema_y())
+    );
+}
+
+
 pub fn confirmation(log: &str) {
     println!(
         "{} {}",
@@ -109,6 +134,10 @@ pub mod colors {
         ColorfulRgb::new(255, 244, 228)
     }
 
+    pub fn schema_y() -> ColorfulRgb {
+        ColorfulRgb::new(233, 252, 135)
+    }
+
     pub fn gradient_p<'a>(log: &'a str) -> GradientDisplay<'a, [RGB; 4]> {
         GradientStr::gradient(
             log,
@@ -138,6 +167,10 @@ pub mod colors {
 
     pub fn grey() -> ColorfulRgb {
         ColorfulRgb::new(158, 162, 166)
+    }
+
+    pub fn bad() -> ColorfulRgb {
+        ColorfulRgb::new(250, 70, 102)
     }
 
     pub const SPINNER_COLOR: SpinnerColor = SpinnerColor::TrueColor {
