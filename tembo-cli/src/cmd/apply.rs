@@ -339,8 +339,8 @@ fn get_create_instance(instance_settings: &InstanceSettings) -> CreateInstance {
         app_services: None,
         connection_pooler: None,
         extensions: Some(Some(get_extensions(instance_settings.extensions.clone()))),
-        extra_domains_rw: None,
-        ip_allow_list: None,
+        extra_domains_rw: Some(instance_settings.extra_domains_rw.clone()),
+        ip_allow_list: Some(instance_settings.ip_allow_list.clone()),
         trunk_installs: Some(Some(get_trunk_installs(
             instance_settings.extensions.clone(),
         ))),
@@ -361,8 +361,8 @@ fn get_update_instance(instance_settings: &InstanceSettings) -> UpdateInstance {
         app_services: None,
         connection_pooler: None,
         extensions: Some(Some(get_extensions(instance_settings.extensions.clone()))),
-        extra_domains_rw: None,
-        ip_allow_list: None,
+        extra_domains_rw: Some(instance_settings.extra_domains_rw.clone()),
+        ip_allow_list: Some(instance_settings.ip_allow_list.clone()),
         trunk_installs: Some(Some(get_trunk_installs(
             instance_settings.extensions.clone(),
         ))),
@@ -460,6 +460,9 @@ fn merge_settings(base: &InstanceSettings, overlay: OverlayInstanceSettings) -> 
         extensions: overlay.extensions.or_else(|| base.extensions.clone()),
         extra_domains_rw: overlay
             .extra_domains_rw
+            .or_else(|| base.extra_domains_rw.clone()),
+        ip_allow_list: overlay
+            .ip_allow_list
             .or_else(|| base.extra_domains_rw.clone()),
     }
 }
