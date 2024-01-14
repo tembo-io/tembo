@@ -1,6 +1,5 @@
 use crate::cli::context::{get_current_context, Environment, Target};
 use crate::cli::docker::Docker;
-use crate::cli::tembo_config::InstanceSettings;
 use crate::tui;
 use crate::tui::confirmation;
 use clap::Args;

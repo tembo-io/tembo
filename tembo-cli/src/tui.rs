@@ -6,12 +6,13 @@ pub fn clean_console() {
     print!("{esc}c", esc = 27 as char);
 }
 
+#[allow(dead_code)]
 /// Prints a colored log to the console (defaults to `use tui::colors::salmon`)
 pub fn print_color(log: &str, color: Option<ColorfulRgb>) {
     let color = color.unwrap_or(colors::sql_u());
     println!("{}", log.color(color));
 }
-
+#[allow(dead_code)]
 pub fn print_gradient(log: &str) {
     let gradient = GradientStr::gradient(
         log,
@@ -25,6 +26,7 @@ pub fn print_gradient(log: &str) {
     println!("{}", gradient);
 }
 
+#[allow(dead_code)]
 pub fn label(log: &str) {
     println!("{} {}", "➜".bold(), colors::gradient_rainbow(log));
 }
@@ -46,6 +48,7 @@ pub fn error(log: &str) {
     );
 }
 
+#[allow(dead_code)]
 pub fn warning(log: &str) {
     println!(
         "{} {}",
@@ -78,6 +81,7 @@ pub fn white_confirmation(log: &str) {
     );
 }
 
+#[allow(dead_code)]
 /// Tembo branded gradient chevrons for printing singular output
 pub fn chevrons<'a>() -> GradientDisplay<'a, [RGB; 4]> {
     GradientStr::gradient(
@@ -129,6 +133,7 @@ pub mod colors {
         ColorfulRgb::new(255, 125, 127)
     }
 
+    #[allow(dead_code)]
     pub fn warning_light() -> ColorfulRgb {
         ColorfulRgb::new(255, 244, 228)
     }
@@ -137,6 +142,7 @@ pub mod colors {
         ColorfulRgb::new(233, 252, 135)
     }
 
+    #[allow(dead_code)]
     pub fn gradient_p<'a>(log: &'a str) -> GradientDisplay<'a, [RGB; 4]> {
         GradientStr::gradient(
             log,
