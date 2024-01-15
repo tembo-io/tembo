@@ -6,12 +6,13 @@ pub fn clean_console() {
     print!("{esc}c", esc = 27 as char);
 }
 
+#[allow(dead_code)]
 /// Prints a colored log to the console (defaults to `use tui::colors::salmon`)
 pub fn print_color(log: &str, color: Option<ColorfulRgb>) {
     let color = color.unwrap_or(colors::sql_u());
     println!("{}", log.color(color));
 }
-
+#[allow(dead_code)]
 pub fn print_gradient(log: &str) {
     let gradient = GradientStr::gradient(
         log,
@@ -25,8 +26,43 @@ pub fn print_gradient(log: &str) {
     println!("{}", gradient);
 }
 
+#[allow(dead_code)]
 pub fn label(log: &str) {
     println!("{} {}", "➜".bold(), colors::gradient_rainbow(log));
+}
+
+pub fn label_with_value(log: &str, value: &str) {
+    println!(
+        "{} {} {}",
+        "➜".bold(),
+        colors::gradient_rainbow(log),
+        value.color(Color::White).bold()
+    );
+}
+
+pub fn error(log: &str) {
+    println!(
+        "{} {}",
+        "✗".color(colors::bad()).bold(),
+        log.color(colors::bad())
+    );
+}
+
+#[allow(dead_code)]
+pub fn warning(log: &str) {
+    println!(
+        "{} {}",
+        "⚠".color(colors::schema_y()).bold(),
+        log.color(colors::schema_y())
+    );
+}
+
+pub fn info(log: &str) {
+    println!(
+        "{} {}",
+        "i".color(colors::schema_y()).bold(),
+        log.color(colors::schema_y())
+    );
 }
 
 pub fn confirmation(log: &str) {
@@ -45,6 +81,7 @@ pub fn white_confirmation(log: &str) {
     );
 }
 
+#[allow(dead_code)]
 /// Tembo branded gradient chevrons for printing singular output
 pub fn chevrons<'a>() -> GradientDisplay<'a, [RGB; 4]> {
     GradientStr::gradient(
@@ -96,11 +133,17 @@ pub mod colors {
         ColorfulRgb::new(255, 125, 127)
     }
 
+    #[allow(dead_code)]
     pub fn warning_light() -> ColorfulRgb {
         ColorfulRgb::new(255, 244, 228)
     }
 
-    pub fn gradient_p(log: &str) -> GradientDisplay<'_, [RGB; 4]> {
+    pub fn schema_y() -> ColorfulRgb {
+        ColorfulRgb::new(233, 252, 135)
+    }
+
+    #[allow(dead_code)]
+    pub fn gradient_p<'a>(log: &'a str) -> GradientDisplay<'a, [RGB; 4]> {
         GradientStr::gradient(
             log,
             [
@@ -129,6 +172,10 @@ pub mod colors {
 
     pub fn grey() -> ColorfulRgb {
         ColorfulRgb::new(158, 162, 166)
+    }
+
+    pub fn bad() -> ColorfulRgb {
+        ColorfulRgb::new(250, 70, 102)
     }
 
     pub const SPINNER_COLOR: SpinnerColor = SpinnerColor::TrueColor {

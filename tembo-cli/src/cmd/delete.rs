@@ -1,6 +1,6 @@
 use crate::cli::context::{get_current_context, Environment, Target};
 use crate::cli::docker::Docker;
-
+use crate::tui;
 use crate::tui::confirmation;
 use clap::Args;
 use core::result::Result::Ok;
@@ -53,7 +53,7 @@ fn execute_tembo_cloud(env: Environment) -> Result<(), anyhow::Error> {
                     "Instance delete started for Instance Id: {}",
                     result.instance_id
                 )),
-                Err(error) => eprintln!("Error deleting instance: {}", error),
+                Err(error) => tui::error(&format!("Error deleting instance: {}", error)),
             };
         }
     }

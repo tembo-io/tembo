@@ -31,10 +31,10 @@ use crate::cli::sqlx_utils::SqlxUtils;
 use crate::cli::tembo_config;
 use crate::cli::tembo_config::InstanceSettings;
 use crate::cli::tembo_config::OverlayInstanceSettings;
-use crate::tui::instance_started;
+use crate::tui;
 use crate::{
     cli::context::{get_current_context, Environment, Profile, Target},
-    tui::{clean_console, colors, white_confirmation},
+    tui::{clean_console, colors, instance_started, white_confirmation},
 };
 use tera::{Context, Tera};
 
@@ -116,7 +116,6 @@ fn execute_docker(verbose: bool, _merge_path: Option<String>) -> Result<(), anyh
             &value.stack_type,
             "local",
         );
-        println!("Instance settings: {:?}", instance_settings);
     }
 
     Ok(())
@@ -141,14 +140,23 @@ pub fn execute_tembo_cloud(
         if let Some(env_instance_id) = instance_id.clone() {
             update_existing_instance(env_instance_id, value, &config, env.clone());
         } else {
-            instance_id = create_new_instance(value, &config, env.clone());
+            let new_inst_req = create_new_instance(value, &config, env.clone());
+            match new_inst_req {
+                Ok(new_instance_id) => instance_id = Some(new_instance_id),
+                Err(error) => {
+                    tui::error(&format!("Error creating instance: {}", error));
+                    break;
+                }
+            }
         }
+
         println!();
         let mut sp = spinoff::Spinner::new(
             spinoff::spinners::Aesthetic,
-            "Waiting for instance to be up...",
+            "Waiting for instance to provision...",
             colors::SPINNER_COLOR,
         );
+
         loop {
             sleep(Duration::from_secs(10));
 
@@ -298,7 +306,7 @@ fn create_new_instance(
     value: &InstanceSettings,
     config: &Configuration,
     env: Environment,
-) -> Option<String> {
+) -> Result<String, String> {
     let instance = get_create_instance(value);
 
     let v = Runtime::new().unwrap().block_on(create_instance(
@@ -314,14 +322,13 @@ fn create_new_instance(
                 result.instance_name.color(colors::sql_u()).bold()
             ));
 
-            return Some(result.instance_id);
+            return Ok(result.instance_id);
         }
         Err(error) => {
             eprintln!("Error creating instance: {}", error);
+            Err(error.to_string())
         }
-    };
-
-    None
+    }
 }
 
 fn get_create_instance(instance_settings: &InstanceSettings) -> CreateInstance {
