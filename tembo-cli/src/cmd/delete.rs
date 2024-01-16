@@ -16,12 +16,8 @@ pub struct DeleteCommand {}
 pub fn execute() -> Result<(), anyhow::Error> {
     let env = get_current_context()?;
 
-    let instance_settings = get_instance_settings(None)?;
-
     if env.target == Target::Docker.to_string() {
-        for (_key, value) in instance_settings.iter() {
-            Docker::stop_remove(&value.instance_name.clone())?;
-        }
+        Docker::docker_compose_down()?;
     } else if env.target == Target::TemboCloud.to_string() {
         return execute_tembo_cloud(env);
     }

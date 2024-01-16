@@ -31,14 +31,16 @@ impl SqlxUtils {
 
         let pool = Pool::<Postgres>::connect(connection_string.as_str()).await?;
 
-        let path = instance_name + "/migrations";
+        let path = instance_name.clone() + "/migrations";
         let m = Migrator::new(Path::new(&path)).await?;
         m.run(&pool).await?;
 
         sp.stop_with_message(&format!(
             "{} {}",
             "✓".color(colors::indicator_good()).bold(),
-            "SQL migration completed".color(Color::White).bold()
+            format!("SQL migration completed for {}", instance_name)
+                .color(Color::White)
+                .bold()
         ));
 
         Ok(())

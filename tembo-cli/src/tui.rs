@@ -112,6 +112,7 @@ pub fn instance_started(server_url: &str, stack: &str, instance_type: &str) {
         ),
         stack.color(colors::grey()).bold()
     );
+    println!("")
 }
 
 /// Helper function for printing indentations to the console

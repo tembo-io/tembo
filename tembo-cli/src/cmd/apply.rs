@@ -205,7 +205,7 @@ pub fn tembo_cloud_apply(
         colors::SPINNER_COLOR,
     );
     loop {
-        sleep(Duration::from_secs(10));
+        sleep(Duration::from_secs(5));
 
         let connection_info: Option<Box<ConnectionInfo>> =
             is_instance_up(instance_id.as_ref().unwrap().clone(), &config, &env)?;

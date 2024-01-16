@@ -64,7 +64,7 @@ impl Docker {
                 if new_spinner {
                     sp = Some(Spinner::new(
                         spinners::Dots,
-                        format!("Building container {}", instance_name),
+                        format!("Building container for {}", instance_name),
                         spinoff::Color::White,
                     ));
                 }
@@ -108,7 +108,7 @@ impl Docker {
                 if new_spinner {
                     sp = Some(Spinner::new(
                         spinners::Dots,
-                        "Building and running container",
+                        "Running docker-compose up",
                         spinoff::Color::White,
                     ));
                 }
@@ -120,69 +120,43 @@ impl Docker {
         let command = "docker-compose up -d";
         run_command(&command, verbose)?;
 
-        show_message("Docker Compose Up", false);
+        show_message("Docker Compose Up completed", false);
 
         Ok(())
     }
 
-    // stop & remove container for given name
-    pub fn stop_remove(name: &str) -> Result<(), anyhow::Error> {
+    pub fn docker_compose_down() -> Result<(), anyhow::Error> {
         let mut sp = Spinner::new(
             spinners::Dots,
-            "Stopping & Removing instance",
+            "Running Docker Compose Down",
             spinoff::Color::White,
         );
 
-        if !Self::container_list_filtered(name).unwrap().contains(name) {
-            sp.stop_with_message(&format!(
-                "{} {}",
-                "➜".bold(),
-                colors::gradient_rainbow(&format!("- Tembo instance {} doesn't exist", name))
-            ));
-        } else {
-            let mut command: String = String::from("docker rm --force ");
-            command.push_str(name);
+        let command: String = String::from("docker-compose down");
 
-            let output = match ShellCommand::new("sh").arg("-c").arg(&command).output() {
-                Ok(output) => output,
-                Err(_) => {
-                    sp.stop_with_message(&format!(
-                        "- Tembo instance {} failed to stop & remove",
-                        &name
-                    ));
-                    bail!("There was an issue stopping the instance")
-                }
-            };
-
-            sp.stop_with_message(&format!(
-                "{} {}",
-                "✓".color(colors::indicator_good()).bold(),
-                format!("Tembo instance {} stopped & removed", &name)
-                    .color(Color::White)
-                    .bold()
-            ));
-
-            let stderr = String::from_utf8(output.stderr).unwrap();
-
-            if !stderr.is_empty() {
-                bail!("There was an issue stopping the instance: {}", stderr)
+        let output = match ShellCommand::new("sh").arg("-c").arg(&command).output() {
+            Ok(output) => output,
+            Err(_) => {
+                sp.stop_with_message(&"- Tembo instances failed to stop & remove");
+                bail!("There was an issue stopping the instances")
             }
+        };
+
+        sp.stop_with_message(&format!(
+            "{} {}",
+            "✓".color(colors::indicator_good()).bold(),
+            "Tembo instances stopped & removed"
+                .color(Color::White)
+                .bold()
+        ));
+
+        let stderr = String::from_utf8(output.stderr).unwrap();
+
+        if !stderr.is_empty() {
+            bail!("There was an issue stopping the instances: {}", stderr)
         }
 
         Ok(())
-    }
-
-    pub fn container_list_filtered(name: &str) -> Result<String, anyhow::Error> {
-        let ls_command = format!("docker container ls --all -f name={}", name);
-
-        let output = ShellCommand::new("sh")
-            .arg("-c")
-            .arg(&ls_command)
-            .output()
-            .expect("failed to execute process");
-        let stdout = String::from_utf8(output.stdout);
-
-        Ok(stdout.unwrap())
     }
 }
 
