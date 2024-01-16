@@ -61,7 +61,7 @@ fn main() -> Result<(), anyhow::Error> {
             validate::execute(app.global_opts.verbose)?;
         }
         SubCommands::Logs(_logs_cmd) => {
-            tokio::runtime::Runtime::new().unwrap().block_on(_logs_cmd.execute())?;
+            logs::execute(app.global_opts.verbose);
         }
         SubCommands::Delete(_delete_cmd) => {
             delete::execute()?;
