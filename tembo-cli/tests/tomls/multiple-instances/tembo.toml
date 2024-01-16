@@ -1,0 +1,16 @@
+[defaults]
+environment = "dev"
+instance_name = "defaults_instance"
+cpu = "1"
+storage = "50Gi"
+replicas = 1
+stack_type = "Standard"
+
+[mobile]
+environment = "dev"
+instance_name = "mobile_instance"
+cpu = "1"
+storage = "50Gi"
+replicas = 1
+stack_type = "OLTP"
+

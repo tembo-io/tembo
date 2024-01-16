@@ -61,8 +61,25 @@ pub fn execute(verbose: bool, merge_path: Option<String>) -> Result<(), anyhow::
     if env.target == Target::Docker.to_string() {
         return docker_apply(verbose, instance_settings);
     } else if env.target == Target::TemboCloud.to_string() {
-        for (_key, instance_setting) in instance_settings.iter() {
-            return tembo_cloud_apply(env.clone(), instance_setting);
+        return tembo_cloud_apply(env, instance_settings);
+    }
+
+    Ok(())
+}
+
+fn tembo_cloud_apply(
+    env: Environment,
+    instance_settings: HashMap<String, InstanceSettings>,
+) -> Result<(), anyhow::Error> {
+    for (_key, instance_setting) in instance_settings.iter() {
+        let result = tembo_cloud_apply_instance(env.clone(), instance_setting);
+
+        match result {
+            Ok(i) => i,
+            Err(error) => {
+                tui::error(&format!("Error creating instance: {}", error));
+                return Ok(());
+            }
         }
     }
 
@@ -169,7 +186,7 @@ fn docker_apply_instance(
     Ok(())
 }
 
-pub fn tembo_cloud_apply(
+pub fn tembo_cloud_apply_instance(
     env: Environment,
     instance_settings: &InstanceSettings,
 ) -> Result<(), anyhow::Error> {
@@ -368,7 +385,7 @@ fn create_new_instance(
                 result.instance_name.color(colors::sql_u()).bold()
             ));
 
-            return Ok(result.instance_id);
+            Ok(result.instance_id)
         }
         Err(error) => {
             eprintln!("Error creating instance: {}", error);

@@ -73,19 +73,19 @@ mod tests {
     use std::process::Command;
 
     const CARGO_BIN_PATH: &str = "cargo run ";
-    const root_dir: &str = env!("CARGO_MANIFEST_DIR");
+    const ROOT_DIR: &str = env!("CARGO_MANIFEST_DIR");
 
     #[tokio::test]
     async fn default_instance_settings() -> Result<(), Box<dyn std::error::Error>> {
         std::env::set_current_dir(
-            PathBuf::from(root_dir)
+            PathBuf::from(ROOT_DIR)
                 .join("tests")
                 .join("tomls")
                 .join("merge"),
         )?;
 
         // Path to the overlay.toml file
-        let overlay_config_path = PathBuf::from(root_dir)
+        let overlay_config_path = PathBuf::from(ROOT_DIR)
             .join("tests")
             .join("tomls")
             .join("merge")
@@ -116,14 +116,14 @@ mod tests {
     #[tokio::test]
     async fn merge() -> Result<(), Box<dyn std::error::Error>> {
         std::env::set_current_dir(
-            PathBuf::from(root_dir)
+            PathBuf::from(ROOT_DIR)
                 .join("tests")
                 .join("tomls")
                 .join("merge"),
         )?;
 
         // Path to the overlay.toml file
-        let overlay_config_path = PathBuf::from(root_dir)
+        let overlay_config_path = PathBuf::from(ROOT_DIR)
             .join("tests")
             .join("tomls")
             .join("merge")

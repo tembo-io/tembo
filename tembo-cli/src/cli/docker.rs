@@ -118,7 +118,7 @@ impl Docker {
         };
 
         let command = "docker-compose up -d";
-        run_command(&command, verbose)?;
+        run_command(command, verbose)?;
 
         show_message("Docker Compose Up completed", false);
 
@@ -137,7 +137,7 @@ impl Docker {
         let output = match ShellCommand::new("sh").arg("-c").arg(&command).output() {
             Ok(output) => output,
             Err(_) => {
-                sp.stop_with_message(&"- Tembo instances failed to stop & remove");
+                sp.stop_with_message("- Tembo instances failed to stop & remove");
                 bail!("There was an issue stopping the instances")
             }
         };
