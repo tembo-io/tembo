@@ -1059,7 +1059,15 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
         }
     }
 
-    let ps = PatchParams::apply("cntrlr");
+    // For manual changes conflicting with the operator, we have .force()
+    //
+    // When trying to apply an object, fields that have a different value and are owned by another manager will result in a conflict.
+    // This is done in order to signal that the operation might undo another collaborator's changes.
+    // Writes to objects with managed fields can be forced, in which case the value of any conflicted field will be overridden,
+    // and the ownership will be transferred.
+    // https://kubernetes.io/docs/reference/using-api/server-side-apply/
+    let ps = PatchParams::apply("cntrlr").force();
+
     let _o = cluster_api
         .patch(&name, &ps, &Patch::Apply(&cluster))
         .await
@@ -1145,7 +1153,7 @@ pub async fn reconcile_pooler(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Act
         };
 
         debug!("Patching Pooler {name}");
-        let ps = PatchParams::apply("cntrlr");
+        let ps = PatchParams::apply("cntrlr").force();
         let _o = pooler_api
             .patch(&name, &ps, &Patch::Apply(&pooler))
             .await
@@ -1359,7 +1367,7 @@ pub async fn reconcile_cnpg_scheduled_backup(
     let backup_api: Api<ScheduledBackup> = Api::namespaced(client.clone(), namespace.as_str());
 
     debug!("Patching ScheduledBackup");
-    let ps = PatchParams::apply("cntrlr");
+    let ps = PatchParams::apply("cntrlr").force();
     let _o = backup_api
         .patch(&name, &ps, &Patch::Apply(&scheduledbackup))
         .await
@@ -1664,7 +1672,7 @@ pub async fn unfence_pod(cdb: &CoreDB, ctx: Arc<Context>, pod_name: &str) -> Res
 
             // Patch the cluster object
             debug!("Patching Cluster resource for instance {}", instance_name);
-            let ps = PatchParams::apply("cntrlr");
+            let ps = PatchParams::apply("cntrlr").force();
             let _o = cluster
                 .patch(instance_name, &ps, &Patch::Apply(&cluster_resource))
                 .await
@@ -1696,7 +1704,7 @@ pub async fn unfence_pod(cdb: &CoreDB, ctx: Arc<Context>, pod_name: &str) -> Res
 
             // Patch the cluster object
             debug!("Patch Cluster annotation for instance {}", instance_name);
-            let ps = PatchParams::apply("cntrlr");
+            let ps = PatchParams::apply("cntrlr").force();
             let _o = cluster
                 .patch(instance_name, &ps, &Patch::Apply(&cluster_resource))
                 .await
