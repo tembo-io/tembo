@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+{% for key, instance in instance_settings %}
+  {{instance.instance_name}}:
+    build:
+      context: ./{{instance.instance_name}}
+    networks:
+      - tembo
+    labels:
+      - "traefik.enable=true"
+      # an 'A' record *.local.tembo.io is set to 127.0.0.1
+      # connect with TLS passthrough, SNI into local instance.
+      # TLS termination inside postgres container.
+      - "traefik.tcp.routers.{{instance.instance_name}}.rule=HostSNI(`{{instance.instance_name}}.local.tembo.io`)"
+      - "traefik.tcp.routers.{{instance.instance_name}}.entrypoints=postgresql"
+      - "traefik.tcp.routers.{{instance.instance_name}}.tls.passthrough=true"
+      - "traefik.tcp.services.{{instance.instance_name}}.loadbalancer.server.port=5432"
+
+  {{instance.instance_name}}-postgrest:
+    image: postgrest/postgrest:v10.0.0
+    environment:
+      PGRST_DB_URI: "postgresql://postgres:postgres@{{instance.instance_name}}:5432/postgres"
+      PGRST_DB_SCHEMA: "public, graphql"
+      PGRST_DB_ANON_ROLE: "postgres"
+      PGRST_LOG_LEVEL: "info"
+    networks:
+      - tembo
+    labels:
+      - "traefik.enable=true"
+      # The settings here depends on the app service settings
+      - "traefik.http.routers.{{instance.instance_name}}-postgrest.rule=Host(`{{instance.instance_name}}.local.tembo.io`) && (PathPrefix(`/rest/v1`) || PathPrefix(`/graphql/v1`))"
+      # in cloud, this is websecure instead of just web
+      - "traefik.http.routers.{{instance.instance_name}}-postgrest.entrypoints=web"
+      - "traefik.http.services.{{instance.instance_name}}-postgrest.loadbalancer.server.port=3000"
+      - "traefik.http.middlewares.postgrest-stripprefix.stripprefix.prefixes=/rest/v1, /graphql/v1"
+      - "traefik.http.routers.postgrest.middlewares=postgrest-stripprefix"
+{% endfor %}
+
+  traefik:
+    image: traefik:v3.0.0-beta2
+    networks:
+      - tembo
+    command:
+      # Traefik can make routing rules by talking to
+      # Docker. We also connect Docker socket to container.
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      # These are all the ports we can use for local dev
+      - "--entrypoints.ferretdb.address=:27018/tcp"
+      - "--entrypoints.postgresql.address=:5432/tcp"
+      - "--entrypoints.traefik.address=:9000/tcp"
+      - "--entrypoints.web.address=:8000/tcp"
+      - "--api.dashboard=true"
+      - "--api.insecure=true"
+      # This could be enabled with debug mode on
+      # - "--accesslog=true"
+      # - "--log.level=DEBUG"
+    volumes:
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+    ports:
+      - "8000:8000"
+      # Traefik dashboard at http://localhost:9000/dashboard/
+      # helpful for troubleshooting Traefik configurations
+      - "9000:9000"
+      - "5432:5432"
+      # FerretDB port
+      - "27018:27018"
+
+networks:
+  tembo: {}
