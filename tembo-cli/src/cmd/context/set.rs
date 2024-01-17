@@ -1,5 +1,5 @@
 use crate::cli::context::{tembo_context_file_path, Context};
-use crate::tui::colors;
+use crate::tui::{colors, error};
 use clap::Args;
 use colorful::Colorful;
 use std::fs::{self, File};
@@ -19,14 +19,16 @@ pub fn execute(args: &ContextSetArgs) -> Result<(), anyhow::Error> {
     let contents = match fs::read_to_string(&filename) {
         Ok(c) => c,
         Err(e) => {
-            panic!("Couldn't read context file {}: {}", filename, e);
+            error(&format!("Couldn't read context file {}: {}", filename, e));
+            return Err(e.into());
         }
     };
 
     let mut data: Context = match toml::from_str(&contents) {
         Ok(d) => d,
         Err(e) => {
-            panic!("Unable to load data. Error: `{}`", e);
+            error(&format!("Unable to load data. Error: `{}`", e));
+            return Err(e.into());
         }
     };
 
@@ -41,7 +43,7 @@ pub fn execute(args: &ContextSetArgs) -> Result<(), anyhow::Error> {
     }
 
     if let Err(e) = write_config_to_file(&data, &tembo_context_file_path()) {
-        eprintln!("Error: {}", e);
+        error(&format!("Error: {}", e));
     }
 
     println!(

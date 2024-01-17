@@ -34,6 +34,7 @@ pub struct InstanceSettings {
     )]
     pub extensions: Option<HashMap<String, Extension>>,
     pub extra_domains_rw: Option<Vec<String>>,
+    pub ip_allow_list: Option<Vec<String>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
@@ -46,6 +47,7 @@ pub struct OverlayInstanceSettings {
     pub postgres_configurations: Option<HashMap<String, Value>>,
     pub extensions: Option<HashMap<String, Extension>>,
     pub extra_domains_rw: Option<Vec<String>>,
+    pub ip_allow_list: Option<Vec<String>>,
 }
 
 // If a trunk project name is not specified, then assume
