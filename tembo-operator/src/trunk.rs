@@ -304,14 +304,15 @@ async fn get_trunk_project_metadata_for_version(
 }
 
 // Check if extension name is in list of trunk project names
-pub async fn extension_name_matches_trunk_project(
-    extension_name: String,
-) -> Result<bool, TrunkError> {
+pub async fn extension_name_matches_trunk_project(extension_name: String) -> Result<bool, Action> {
     let trunk_project_names = match get_trunk_project_names().await {
         Ok(trunk_project_names) => trunk_project_names,
         Err(e) => {
-            error!("Failed to get trunk project names: {:?}", e);
-            return Err(TrunkError::ConfigMapApplyError);
+            error!(
+                "Failed to check if extension name and trunk project name match for {}: {:?}",
+                extension_name, e
+            );
+            return Err(Action::requeue(Duration::from_secs(300)));
         }
     };
     Ok(trunk_project_names.contains(&extension_name))
@@ -320,14 +321,21 @@ pub async fn extension_name_matches_trunk_project(
 // Find the trunk project name associated with a given extension
 pub async fn get_trunk_project_for_extension(
     extension_name: String,
-) -> Result<Option<String>, TrunkError> {
+) -> Result<Option<String>, Action> {
     let trunk_projects = match get_trunk_projects().await {
         Ok(trunk_projects) => trunk_projects,
         Err(e) => {
-            error!("Failed to get trunk projects: {:?}", e);
-            return Err(TrunkError::ConfigMapApplyError);
+            error!(
+                "Failed to get trunk project name for extension {}: {:?}",
+                extension_name, e
+            );
+            return Err(Action::requeue(Duration::from_secs(300)));
         }
     };
+    // Check if the extension name matches a trunk project name
+    if extension_name_matches_trunk_project(extension_name.clone()).await? {
+        return Ok(Some(extension_name));
+    }
     for trunk_project in trunk_projects {
         for extension in trunk_project.extensions {
             if extension.extension_name == extension_name {
@@ -493,6 +501,11 @@ mod tests {
         let result = get_trunk_project_for_extension(extension_name).await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), Some("pgvector".to_string()));
+
+        let extension_name = "columnar".to_string();
+        let result = get_trunk_project_for_extension(extension_name).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Some("hydra_columnar".to_string()));
     }
 
     #[tokio::test]

@@ -8,6 +8,11 @@ use crate::{
 };
 use kube::runtime::controller::Action;
 
+use crate::extensions::install::check_for_so_files;
+use crate::extensions::types::TrunkInstall;
+use crate::trunk::{
+    get_loadable_library_name, get_trunk_project_for_extension, is_control_file_absent,
+};
 use crate::{
     apis::coredb_types::CoreDBStatus,
     extensions::{
@@ -18,19 +23,73 @@ use crate::{
     trunk::extensions_that_require_load,
 };
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
-use tracing::{error, warn};
+use tracing::{error, info, warn};
 
 pub async fn reconcile_extension_toggle_state(
     cdb: &CoreDB,
     ctx: Arc<Context>,
 ) -> Result<Vec<ExtensionStatus>, Action> {
-    let all_actually_installed_extensions =
+    // We need to check if LOAD extensions are installed
+    let mut all_actually_installed_extensions =
         database_queries::get_all_extensions(cdb, ctx.clone()).await?;
+
+    // Get list of trunk installed extensions
+    let trunk_installed_extensions = cdb.spec.trunk_installs.clone();
+
+    // Get list of trunk installed extensions that are not in all_actually_installed_extensions
+    let mut trunk_installed_extensions_not_in_all_actually_installed_extensions: Vec<TrunkInstall> =
+        vec![];
+    for trunk_installed_extension in trunk_installed_extensions {
+        let mut found = false;
+        for actually_installed_extension in &all_actually_installed_extensions {
+            if trunk_installed_extension.name == actually_installed_extension.name {
+                found = true;
+            }
+        }
+        if !found {
+            trunk_installed_extensions_not_in_all_actually_installed_extensions
+                .push(trunk_installed_extension);
+        }
+    }
+
+    // Get all pods
+    let all_pods =
+        crate::extensions::install::all_fenced_and_non_fenced_pods(cdb, ctx.clone()).await?;
+    for pod in all_pods {
+        let pod_name = pod.metadata.name.clone().unwrap();
+        // Check for .so files
+        for extension in trunk_installed_extensions_not_in_all_actually_installed_extensions.clone()
+        {
+            let found =
+                check_for_so_files(cdb, ctx.clone(), &*pod_name, extension.name.clone()).await?;
+            // If found, add to actually installed extensions
+            if found {
+                let mut extension_status = ExtensionStatus {
+                    name: extension.name.clone(),
+                    description: None,
+                    locations: vec![],
+                };
+                let mut location_status = ExtensionInstallLocationStatus {
+                    enabled: Some(true),
+                    database: "postgres".to_string(),
+                    schema: None,
+                    version: None,
+                    error: Some(false),
+                    error_message: None,
+                };
+                extension_status.locations.push(location_status);
+                all_actually_installed_extensions.push(extension_status);
+            }
+            info!("Found {}.so file: {}", extension.name, found);
+        }
+    }
+
     let ext_status_updates =
         determine_updated_extensions_status(cdb, all_actually_installed_extensions);
     kubernetes_queries::update_extensions_status(cdb, ext_status_updates.clone(), &ctx).await?;
     let cdb = get_current_coredb_resource(cdb, ctx.clone()).await?;
     let toggle_these_extensions = determine_extension_locations_to_toggle(&cdb);
+
     let ext_status_updates =
         toggle_extensions(ctx, ext_status_updates, &cdb, toggle_these_extensions).await?;
     Ok(ext_status_updates)
@@ -70,6 +129,38 @@ async fn toggle_extensions(
                     &extension_to_toggle.name,
                     requires_load.clone(),
                 )?;
+            }
+            // Don't toggle extension if control file is absent && it has a loadable library
+
+            // Get extensions trunk project name
+            let trunk_project_name =
+                get_trunk_project_for_extension(extension_to_toggle.name.clone()).await?;
+            let control_file_absent = is_control_file_absent(
+                trunk_project_name.clone().unwrap(),
+                location_to_toggle.clone().version.unwrap(),
+            )
+            .await?;
+            let has_loadable_library = get_loadable_library_name(
+                trunk_project_name.unwrap(),
+                location_to_toggle.clone().version.unwrap(),
+                extension_to_toggle.name.clone(),
+            )
+            .await?;
+
+            info!(
+                "Extension {}'s control file absent: {}",
+                extension_to_toggle.name, control_file_absent
+            );
+            info!(
+                "Extension {} has loadable library: {:?}",
+                extension_to_toggle.name, has_loadable_library
+            );
+            if control_file_absent && has_loadable_library.is_some() {
+                info!(
+                    "Extension {} must be enabled with LOAD. Skipping CREATE EXTENSION toggle.",
+                    extension_to_toggle.name,
+                );
+                continue;
             }
             match database_queries::toggle_extension(
                 cdb,
@@ -266,6 +357,10 @@ pub fn determine_updated_extensions_status(
 pub fn determine_extension_locations_to_toggle(cdb: &CoreDB) -> Vec<Extension> {
     let mut extensions_to_toggle: Vec<Extension> = vec![];
     for desired_extension in &cdb.spec.extensions {
+        info!(
+            "Checking if we need to toggle extension {}",
+            desired_extension.name
+        );
         let mut needs_toggle = false;
         let mut extension_to_toggle = desired_extension.clone();
         extension_to_toggle.locations = vec![];
@@ -279,6 +374,10 @@ pub fn determine_extension_locations_to_toggle(cdb: &CoreDB) -> Vec<Extension> {
                     error!("When determining extensions to toggle, there should always be a location status for the desired location, because that should be included by determine_updated_extensions_status.");
                 }
                 Some(actual_status) => {
+                    info!(
+                        "Actual status for extension {}: {:?}",
+                        desired_extension.name, actual_status
+                    );
                     // If we don't have an error already, the extension exists, and the desired does not match the actual
                     // The actual_status.error should not be None because this only exists on old resource versions
                     // and we update actual_status before calling this function. If we find that for some reason, we just skip.
@@ -295,6 +394,7 @@ pub fn determine_extension_locations_to_toggle(cdb: &CoreDB) -> Vec<Extension> {
             }
         }
         if needs_toggle {
+            info!("Adding extension {} to toggle list", desired_extension.name);
             extensions_to_toggle.push(extension_to_toggle);
         }
     }
