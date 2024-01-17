@@ -697,3 +697,77 @@ fn construct_connection_string(info: ConnectionInfo) -> String {
         "postgres"
     )
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+    use std::process::Command;
+
+    const CARGO_BIN_PATH: &str = "cargo run ";
+    const ROOT_DIR: &str = env!("CARGO_MANIFEST_DIR");
+
+    #[tokio::test]
+    async fn merge_settings() -> Result<(), Box<dyn std::error::Error>> {
+        std::env::set_current_dir(PathBuf::from(ROOT_DIR).join("examples").join("merge"))?;
+
+        // Path to the overlay.toml file
+        let overlay_config_path = PathBuf::from(ROOT_DIR)
+            .join("examples")
+            .join("merge")
+            .join("overlay.toml");
+        let overlay_config_str = overlay_config_path.to_str().ok_or("Invalid path")?;
+
+        // Running `tembo init`
+        let _output = Command::new(CARGO_BIN_PATH).arg("init");
+
+        let _output = Command::new(CARGO_BIN_PATH)
+            .arg("apply")
+            .arg("--merge")
+            .arg(overlay_config_str);
+
+        let merged_settings = get_instance_settings(Some(overlay_config_str.to_string()))?;
+        if let Some(setting) = merged_settings.get("merge") {
+            assert_ne!(setting.cpu, "0.25", "Default setting was overwritten");
+        } else {
+            return Err("Setting key not found".into());
+        }
+
+        // Running `tembo delete`
+        let _output = Command::new(CARGO_BIN_PATH).arg("delete");
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn merge() -> Result<(), Box<dyn std::error::Error>> {
+        std::env::set_current_dir(PathBuf::from(ROOT_DIR).join("examples").join("merge"))?;
+
+        // Path to the overlay.toml file
+        let overlay_config_path = PathBuf::from(ROOT_DIR)
+            .join("examples")
+            .join("merge")
+            .join("overlay.toml");
+        let overlay_config_str = overlay_config_path.to_str().ok_or("Invalid path")?;
+
+        // Running `tembo init`
+        let _output = Command::new(CARGO_BIN_PATH).arg("init");
+
+        let _output = Command::new(CARGO_BIN_PATH)
+            .arg("apply")
+            .arg("--merge")
+            .arg(overlay_config_str);
+
+        let merged_settings = get_instance_settings(Some(overlay_config_str.to_string()))?;
+        if let Some(setting) = merged_settings.get("merge") {
+            assert_eq!(setting.memory, "10Gi", "Base settings was not overwritten");
+        } else {
+            return Err("Setting key not found".into());
+        }
+
+        // Running `tembo delete`
+        let _output = Command::new(CARGO_BIN_PATH).arg("delete");
+
+        Ok(())
+    }
+}

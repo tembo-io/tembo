@@ -25,10 +25,7 @@ fn help() -> Result<(), Box<dyn std::error::Error>> {
 #[tokio::test]
 async fn minimal() -> Result<(), Box<dyn Error>> {
     let root_dir = env!("CARGO_MANIFEST_DIR");
-    let test_dir = PathBuf::from(root_dir)
-        .join("tests")
-        .join("tomls")
-        .join("minimal");
+    let test_dir = PathBuf::from(root_dir).join("examples").join("minimal");
 
     env::set_current_dir(&test_dir)?;
 
@@ -70,10 +67,7 @@ async fn data_warehouse() -> Result<(), Box<dyn Error>> {
     let instance_name = "data-warehouse";
 
     let root_dir = env!("CARGO_MANIFEST_DIR");
-    let test_dir = PathBuf::from(root_dir)
-        .join("tests")
-        .join("tomls")
-        .join(instance_name);
+    let test_dir = PathBuf::from(root_dir).join("examples").join(instance_name);
 
     env::set_current_dir(&test_dir)?;
 
@@ -123,8 +117,7 @@ async fn data_warehouse() -> Result<(), Box<dyn Error>> {
 async fn multiple_instances() -> Result<(), Box<dyn Error>> {
     let root_dir = env!("CARGO_MANIFEST_DIR");
     let test_dir = PathBuf::from(root_dir)
-        .join("tests")
-        .join("tomls")
+        .join("examples")
         .join("multiple-instances");
 
     env::set_current_dir(&test_dir)?;
@@ -151,8 +144,8 @@ async fn multiple_instances() -> Result<(), Box<dyn Error>> {
     sleep(Duration::from_secs(5));
 
     // check can connect
-    assert_can_connect("defaults-instance".to_string()).await?;
-    assert_can_connect("mobile-instance".to_string()).await?;
+    assert_can_connect("instance-1".to_string()).await?;
+    assert_can_connect("instance-2".to_string()).await?;
 
     // tembo delete
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
@@ -160,12 +153,8 @@ async fn multiple_instances() -> Result<(), Box<dyn Error>> {
     let _ = cmd.ok();
 
     // check can't connect
-    assert!(assert_can_connect("defaults-instance".to_str())
-        .await
-        .is_err());
-    assert!(assert_can_connect("mobile-instance".to_str())
-        .await
-        .is_err());
+    assert!(assert_can_connect("instance-1".to_str()).await.is_err());
+    assert!(assert_can_connect("instance-2".to_str()).await.is_err());
 
     Ok(())
 }
