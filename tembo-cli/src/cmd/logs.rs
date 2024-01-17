@@ -1,4 +1,4 @@
-use crate::apply::{get_instance_id, get_instance_settings}; // Adjust the path as needed
+use crate::apply::{get_instance_id, get_instance_settings};
 use crate::cli::context::{get_current_context, Environment, Profile};
 use anyhow::Result;
 use clap::Args;

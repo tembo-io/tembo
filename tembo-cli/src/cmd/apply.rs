@@ -55,7 +55,11 @@ pub fn execute(verbose: bool, _merge_path: Option<String>) -> Result<(), anyhow:
 
     let env = get_current_context()?;
 
-    return execute_tembo_cloud(env.clone(), _merge_path);
+    if env.target == Target::Docker.to_string() {
+        return execute_docker(verbose, _merge_path);
+    } else if env.target == Target::TemboCloud.to_string() {
+        return execute_tembo_cloud(env.clone(), _merge_path);
+    }
 
     Ok(())
 }
