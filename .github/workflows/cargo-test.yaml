@@ -99,4 +99,4 @@ jobs:
         run: |
           set -xe
           export PROMETHEUS_URL=https://prometheus-data-1.use1.dev.plat.cdb-svc.com
-          cd ${{ matrix.path }} && cargo test -- --test-threads=1
+          cd ${{ matrix.path }} && cargo test
