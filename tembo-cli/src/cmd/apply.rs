@@ -50,7 +50,11 @@ pub struct ApplyCommand {
     pub set: Option<String>,
 }
 
-pub fn execute(verbose: bool, _merge_path: Option<String>, set:Option<String>) -> Result<(), anyhow::Error> {
+pub fn execute(
+    verbose: bool,
+    _merge_path: Option<String>,
+    set: Option<String>,
+) -> Result<(), anyhow::Error> {
     info!("Running validation!");
     super::validate::execute(verbose)?;
     info!("Validation completed!");
@@ -92,12 +96,14 @@ fn parse_set_arg(set_arg: &str) -> Result<(String, String, String), Error> {
     Ok((instance_name, setting_name, setting_value))
 }
 
-
-
-fn execute_docker(verbose: bool, _merge_path: Option<String>, set_arg: Option<String>) -> Result<(), anyhow::Error> {
+fn execute_docker(
+    verbose: bool,
+    _merge_path: Option<String>,
+    set_arg: Option<String>,
+) -> Result<(), anyhow::Error> {
     Docker::installed_and_running()?;
 
-    let instance_settings = get_instance_settings(_merge_path,set_arg)?;
+    let instance_settings = get_instance_settings(_merge_path, set_arg)?;
     let rendered_dockerfile: String = get_rendered_dockerfile(instance_settings.clone())?;
 
     FileUtils::create_file(
@@ -154,9 +160,9 @@ fn execute_docker(verbose: bool, _merge_path: Option<String>, set_arg: Option<St
 pub fn execute_tembo_cloud(
     env: Environment,
     _merge_path: Option<String>,
-    _set_arg:Option<String>,
+    _set_arg: Option<String>,
 ) -> Result<(), anyhow::Error> {
-    let instance_settings = get_instance_settings(_merge_path,None)?;
+    let instance_settings = get_instance_settings(_merge_path, None)?;
 
     let profile = env.clone().selected_profile.unwrap();
     let config = Configuration {
@@ -507,7 +513,7 @@ fn merge_settings(base: &InstanceSettings, overlay: OverlayInstanceSettings) -> 
 
 pub fn get_instance_settings(
     overlay_file_path: Option<String>,
-    set_arg:Option<String>,
+    set_arg: Option<String>,
 ) -> Result<HashMap<String, InstanceSettings>, Error> {
     let mut base_path = FileUtils::get_current_working_dir();
     base_path.push_str("/tembo.toml");
@@ -535,7 +541,7 @@ pub fn get_instance_settings(
 
     if let Some(set_arg) = set_arg {
         let (instance_name, setting_name, setting_value) = parse_set_arg(&set_arg)?;
-    
+
         if let Some(settings) = final_settings.get_mut(&instance_name) {
             match setting_name.as_str() {
                 "instance_name" => settings.instance_name = setting_value,
@@ -543,7 +549,9 @@ pub fn get_instance_settings(
                 "memory" => settings.memory = setting_value,
                 "storage" => settings.storage = setting_value,
                 "replicas" => {
-                    settings.replicas = setting_value.parse().map_err(|_| Error::msg("Invalid value for replicas"))?;
+                    settings.replicas = setting_value
+                        .parse()
+                        .map_err(|_| Error::msg("Invalid value for replicas"))?;
                 }
                 "stack_type" => settings.stack_type = setting_value,
                 _ => return Err(Error::msg("Unknown setting")),
@@ -552,7 +560,6 @@ pub fn get_instance_settings(
             return Err(Error::msg("Instance not found"));
         }
     }
-
 
     Ok(final_settings)
 }

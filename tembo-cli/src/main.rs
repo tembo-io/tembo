@@ -54,9 +54,9 @@ fn main() -> Result<(), anyhow::Error> {
         }
         SubCommands::Apply(_apply_cmd) => {
             apply::execute(
-                app.global_opts.verbose, 
+                app.global_opts.verbose,
                 _apply_cmd.merge.clone(),
-                _apply_cmd.set.clone(), 
+                _apply_cmd.set.clone(),
             )?;
         }
         SubCommands::Validate(_validate_cmd) => {
@@ -104,7 +104,8 @@ mod tests {
             .arg("--merge")
             .arg(overlay_config_str);
 
-        let merged_settings = apply::get_instance_settings(Some(overlay_config_str.to_string()),None)?;
+        let merged_settings =
+            apply::get_instance_settings(Some(overlay_config_str.to_string()), None)?;
         if let Some(setting) = merged_settings.get("defaults") {
             assert_ne!(setting.cpu, "0.25", "Default setting was overwritten");
         } else {
@@ -142,7 +143,8 @@ mod tests {
             .arg("--merge")
             .arg(overlay_config_str);
 
-        let merged_settings = apply::get_instance_settings(Some(overlay_config_str.to_string()),None)?;
+        let merged_settings =
+            apply::get_instance_settings(Some(overlay_config_str.to_string()), None)?;
         if let Some(setting) = merged_settings.get("defaults") {
             assert_eq!(setting.memory, "10Gi", "Base settings was not overwritten");
         } else {
