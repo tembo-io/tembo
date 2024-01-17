@@ -53,7 +53,7 @@ pub struct ApplyCommand {
 pub fn execute(
     verbose: bool,
     _merge_path: Option<String>,
-    set: Option<String>,
+    set_arg: Option<String>,
 ) -> Result<(), anyhow::Error> {
     info!("Running validation!");
     super::validate::execute(verbose)?;
@@ -62,9 +62,9 @@ pub fn execute(
     let env = get_current_context()?;
 
     if env.target == Target::Docker.to_string() {
-        return execute_docker(verbose, _merge_path, set);
+        return execute_docker(verbose, _merge_path, set_arg);
     } else if env.target == Target::TemboCloud.to_string() {
-        return execute_tembo_cloud(env.clone(), _merge_path, set);
+        return execute_tembo_cloud(env.clone(), _merge_path, set_arg);
     }
 
     Ok(())
