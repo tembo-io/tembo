@@ -1,14 +1,10 @@
 use crate::apply::{get_instance_id, get_instance_settings}; // Adjust the path as needed
 use crate::cli::context::{get_current_context, Environment, Profile};
-use reqwest::blocking::Client;
-use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
 use anyhow::Result;
 use clap::Args;
-use temboclient::{
-    apis::{
-        configuration::Configuration,
-    },
-};
+use reqwest::blocking::Client;
+use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
+use temboclient::apis::configuration::Configuration;
 
 #[derive(Args)]
 pub struct LogsCommand {
@@ -32,10 +28,14 @@ pub fn execute(verbose: bool) -> Result<()> {
     let client = Client::new();
     let mut headers = HeaderMap::new();
     headers.insert("X-Scope-OrgID", HeaderValue::from_str(&org_id)?);
-    headers.insert(AUTHORIZATION, HeaderValue::from_str(&format!("Bearer {}", profile.tembo_access_token))?);
+    headers.insert(
+        AUTHORIZATION,
+        HeaderValue::from_str(&format!("Bearer {}", profile.tembo_access_token))?,
+    );
 
     for (_key, value) in instance_settings.iter() {
-        let instance_id_option = get_instance_id(value.instance_name.clone(), &config, env.clone())?;
+        let instance_id_option =
+            get_instance_id(value.instance_name.clone(), &config, env.clone())?;
 
         let instance_id = if let Some(id) = instance_id_option {
             id
@@ -52,7 +52,7 @@ pub fn execute(verbose: bool) -> Result<()> {
             .headers(headers.clone())
             .query(&[("query", &query)])
             .send()?;
-    
+
         if response.status().is_success() {
             let response_body = response.text()?;
             println!("{}", response_body);
