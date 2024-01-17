@@ -1,5 +1,5 @@
 use crate::cli::context::list_context;
-use crate::tui::{colors::sql_u, indent, label};
+use crate::tui::{colors::sql_u, indent, label_with_value};
 use cli_table::{Cell, CellStruct, Style, Table};
 use colorful::Colorful;
 
@@ -7,6 +7,13 @@ pub fn execute() -> Result<(), anyhow::Error> {
     let context = list_context()?;
 
     let mut rows: Vec<Vec<CellStruct>> = vec![];
+    let current_context_profile = context
+        .environment
+        .iter()
+        .find(|e| e.set.is_some())
+        .unwrap()
+        .name
+        .clone();
     for e in context.environment {
         let mut org_id = String::from("           ");
         let mut profile = String::from("   ");
@@ -49,7 +56,7 @@ pub fn execute() -> Result<(), anyhow::Error> {
         .display()
         .expect("Error: could not parse `tembo context list` table contents!");
 
-    label("Your current Tembo context:");
+    label_with_value("Your current Tembo context:", &current_context_profile);
     println!("{}", indent(1));
     println!("{}", table_display);
 
