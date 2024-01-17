@@ -3,12 +3,12 @@ use assert_cmd::prelude::*; // Add methods on commands
 use colorful::core::StrMarker;
 use predicates::prelude::*;
 use sqlx::postgres::PgConnectOptions;
+use std::env;
 use std::error::Error;
 use std::path::PathBuf;
 use std::process::Command;
 use std::thread::sleep;
 use std::time::Duration;
-use std::env;
 
 const CARGO_BIN: &str = "tembo";
 
