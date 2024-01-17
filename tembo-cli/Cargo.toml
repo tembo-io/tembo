@@ -1,7 +1,7 @@
 workspace = { members = ["temboclient", "tembodataclient"] }
 [package]
 name = "tembo-cli"
-version = "0.14.1"
+version = "0.15.0"
 edition = "2021"
 authors = ["Tembo.io"]
 description = "The CLI for Tembo"
@@ -76,3 +76,8 @@ openssl = { version = "0.10", features = ["vendored"] }
 assert_cmd = "2.0.8"
 predicates = "2.1.5"
 rstest = "0.18"
+
+# We can't run integration tests in parallel currently since there are
+# conflicts in containers (like traefik) provisioned by various tests
+[env]
+RUST_TEST_THREADS = "1"

@@ -5,6 +5,7 @@ use colorful::Colorful;
 use controller::stacks::get_stack;
 use controller::stacks::types::StackType as ControllerStackType;
 use log::info;
+use std::path::Path;
 use std::{
     collections::HashMap,
     fs::{self},
@@ -39,6 +40,7 @@ use crate::{
 use tera::{Context, Tera};
 
 const DOCKERFILE_NAME: &str = "Dockerfile";
+const DOCKERCOMPOSE_NAME: &str = "docker-compose.yml";
 const POSTGRESCONF_NAME: &str = "postgres.conf";
 
 /// Deploys a tembo.toml file
@@ -48,72 +50,97 @@ pub struct ApplyCommand {
     pub merge: Option<String>,
 }
 
-pub fn execute(verbose: bool, _merge_path: Option<String>) -> Result<(), anyhow::Error> {
+pub fn execute(verbose: bool, merge_path: Option<String>) -> Result<(), anyhow::Error> {
     info!("Running validation!");
     super::validate::execute(verbose)?;
     info!("Validation completed!");
 
     let env = get_current_context()?;
 
+    let instance_settings = get_instance_settings(merge_path)?;
+
     if env.target == Target::Docker.to_string() {
-        return execute_docker(verbose, _merge_path);
+        return docker_apply(verbose, instance_settings);
     } else if env.target == Target::TemboCloud.to_string() {
-        return execute_tembo_cloud(env.clone(), _merge_path);
+        return tembo_cloud_apply(env, instance_settings);
     }
 
     Ok(())
 }
 
-fn execute_docker(verbose: bool, _merge_path: Option<String>) -> Result<(), anyhow::Error> {
+fn tembo_cloud_apply(
+    env: Environment,
+    instance_settings: HashMap<String, InstanceSettings>,
+) -> Result<(), anyhow::Error> {
+    for (_key, instance_setting) in instance_settings.iter() {
+        let result = tembo_cloud_apply_instance(env.clone(), instance_setting);
+
+        match result {
+            Ok(i) => i,
+            Err(error) => {
+                tui::error(&format!("Error creating instance: {}", error));
+                return Ok(());
+            }
+        }
+    }
+
+    Ok(())
+}
+
+fn docker_apply(
+    verbose: bool,
+    instance_settings: HashMap<String, InstanceSettings>,
+) -> Result<(), anyhow::Error> {
     Docker::installed_and_running()?;
 
-    let instance_settings = get_instance_settings(_merge_path)?;
-    let rendered_dockerfile: String = get_rendered_dockerfile(instance_settings.clone())?;
+    for (_key, instance_setting) in instance_settings.clone().iter() {
+        let result = docker_apply_instance(verbose, instance_setting);
+
+        match result {
+            Ok(i) => i,
+            Err(error) => {
+                tui::error(&format!("Error creating instance: {}", error));
+                return Ok(());
+            }
+        }
+    }
+
+    let rendered_dockercompose: String = get_rendered_dockercompose(instance_settings.clone())?;
 
     FileUtils::create_file(
-        DOCKERFILE_NAME.to_string(),
-        DOCKERFILE_NAME.to_string(),
-        rendered_dockerfile,
+        DOCKERCOMPOSE_NAME.to_string(),
+        DOCKERCOMPOSE_NAME.to_string(),
+        rendered_dockercompose,
         true,
     )?;
 
-    let rendered_migrations: String = get_rendered_migrations_file(instance_settings.clone())?;
+    Docker::docker_compose_up(verbose)?;
 
-    FileUtils::create_file(
-        "extensions".to_string(),
-        "migrations/1_extensions.sql".to_string(), // TODO: Improve file naming
-        rendered_migrations,
-        true,
-    )?;
+    // Allows DB instance to be ready before running migrations
+    sleep(Duration::from_secs(5));
 
-    FileUtils::create_file(
-        POSTGRESCONF_NAME.to_string(),
-        POSTGRESCONF_NAME.to_string(),
-        get_postgres_config(instance_settings.clone()),
-        true,
-    )?;
+    let port = 5432;
 
-    for (_key, value) in instance_settings.iter() {
-        let port = Docker::build_run(value.instance_name.clone(), verbose)?;
-
-        // Allows DB instance to be ready before running migrations
-        sleep(Duration::from_secs(3));
-
+    for (_key, instance_setting) in instance_settings.clone().iter() {
         let conn_info = ConnectionInfo {
-            host: "localhost".to_owned(),
+            host: format!("{}.local.tembo.io", instance_setting.instance_name).to_owned(),
             pooler_host: Some(Some("localhost-pooler".to_string())),
             port,
             user: "postgres".to_owned(),
             password: "postgres".to_owned(),
         };
-        Runtime::new()
-            .unwrap()
-            .block_on(SqlxUtils::run_migrations(conn_info))?;
+        Runtime::new().unwrap().block_on(SqlxUtils::run_migrations(
+            conn_info,
+            instance_setting.instance_name.clone(),
+        ))?;
 
         // If all of the above was successful, we can print the url to user
         instance_started(
-            &format!("postgres://postgres:postgres@localhost:{}", port),
-            &value.stack_type,
+            &format!(
+                "postgres://postgres:postgres@{}.local.tembo.io:{}",
+                instance_setting.instance_name, port
+            ),
+            &instance_setting.stack_type,
             "local",
         );
     }
@@ -121,12 +148,49 @@ fn execute_docker(verbose: bool, _merge_path: Option<String>) -> Result<(), anyh
     Ok(())
 }
 
-pub fn execute_tembo_cloud(
-    env: Environment,
-    _merge_path: Option<String>,
+fn docker_apply_instance(
+    verbose: bool,
+    instance_settings: &InstanceSettings,
 ) -> Result<(), anyhow::Error> {
-    let instance_settings = get_instance_settings(_merge_path)?;
+    FileUtils::create_dir(
+        instance_settings.instance_name.clone(),
+        instance_settings.instance_name.clone(),
+    )?;
 
+    let rendered_dockerfile: String = get_rendered_dockerfile(instance_settings)?;
+
+    FileUtils::create_file(
+        DOCKERFILE_NAME.to_string(),
+        instance_settings.instance_name.clone() + "/" + DOCKERFILE_NAME,
+        rendered_dockerfile,
+        true,
+    )?;
+
+    let rendered_migrations: String = get_rendered_migrations_file(instance_settings)?;
+
+    FileUtils::create_file(
+        "extensions".to_string(),
+        instance_settings.instance_name.clone() + "/" + "migrations/1_extensions.sql",
+        rendered_migrations,
+        true,
+    )?;
+
+    FileUtils::create_file(
+        POSTGRESCONF_NAME.to_string(),
+        instance_settings.instance_name.clone() + "/" + POSTGRESCONF_NAME,
+        get_postgres_config(instance_settings),
+        true,
+    )?;
+
+    Docker::build(instance_settings.instance_name.clone(), verbose)?;
+
+    Ok(())
+}
+
+pub fn tembo_cloud_apply_instance(
+    env: Environment,
+    instance_settings: &InstanceSettings,
+) -> Result<(), anyhow::Error> {
     let profile = env.clone().selected_profile.unwrap();
     let config = Configuration {
         base_path: profile.clone().tembo_host,
@@ -134,59 +198,62 @@ pub fn execute_tembo_cloud(
         ..Default::default()
     };
 
-    for (_key, value) in instance_settings.iter() {
-        let mut instance_id = get_instance_id(value.instance_name.clone(), &config, env.clone())?;
+    let mut instance_id = get_instance_id(
+        instance_settings.instance_name.clone(),
+        &config,
+        env.clone(),
+    )?;
 
-        if let Some(env_instance_id) = instance_id.clone() {
-            update_existing_instance(env_instance_id, value, &config, env.clone());
-        } else {
-            let new_inst_req = create_new_instance(value, &config, env.clone());
-            match new_inst_req {
-                Ok(new_instance_id) => instance_id = Some(new_instance_id),
-                Err(error) => {
-                    tui::error(&format!("Error creating instance: {}", error));
-                    break;
-                }
+    if let Some(env_instance_id) = instance_id.clone() {
+        update_existing_instance(env_instance_id, instance_settings, &config, env.clone());
+    } else {
+        let new_inst_req = create_new_instance(instance_settings, &config, env.clone());
+        match new_inst_req {
+            Ok(new_instance_id) => instance_id = Some(new_instance_id),
+            Err(error) => {
+                tui::error(&format!("Error creating instance: {}", error));
+                return Ok(());
             }
         }
+    }
+    println!();
+    let mut sp = spinoff::Spinner::new(
+        spinoff::spinners::Aesthetic,
+        "Waiting for instance to be up...",
+        colors::SPINNER_COLOR,
+    );
+    loop {
+        sleep(Duration::from_secs(5));
 
-        println!();
-        let mut sp = spinoff::Spinner::new(
-            spinoff::spinners::Aesthetic,
-            "Waiting for instance to provision...",
-            colors::SPINNER_COLOR,
-        );
+        let connection_info: Option<Box<ConnectionInfo>> =
+            is_instance_up(instance_id.as_ref().unwrap().clone(), &config, &env)?;
 
-        loop {
-            sleep(Duration::from_secs(10));
+        if connection_info.is_some() {
+            let conn_info = get_conn_info_with_creds(
+                profile.clone(),
+                &instance_id,
+                connection_info,
+                env.clone(),
+            )?;
 
-            let connection_info: Option<Box<ConnectionInfo>> =
-                is_instance_up(instance_id.as_ref().unwrap().clone(), &config, &env)?;
-
-            if connection_info.is_some() {
-                let conn_info = get_conn_info_with_creds(
-                    profile.clone(),
-                    &instance_id,
-                    connection_info,
-                    env.clone(),
-                )?;
-
-                Runtime::new()
-                    .unwrap()
-                    .block_on(SqlxUtils::run_migrations(conn_info.clone()))?;
-
-                // If all of the above was successful we can stop the spinner and show a success message
-                sp.stop_with_message(&format!(
-                    "{} {}",
-                    "✓".color(colors::indicator_good()).bold(),
-                    "Instance is up!".bold()
-                ));
-                clean_console();
-                let connection_string = construct_connection_string(conn_info);
-                instance_started(&connection_string, &value.stack_type, "cloud");
-
-                break;
+            if Path::new(&instance_settings.instance_name).exists() {
+                Runtime::new().unwrap().block_on(SqlxUtils::run_migrations(
+                    conn_info.clone(),
+                    instance_settings.instance_name.clone(),
+                ))?;
             }
+
+            // If all of the above was successful we can stop the spinner and show a success message
+            sp.stop_with_message(&format!(
+                "{} {}",
+                "✓".color(colors::indicator_good()).bold(),
+                "Instance is up!".bold()
+            ));
+            clean_console();
+            let connection_string = construct_connection_string(conn_info);
+            instance_started(&connection_string, &instance_settings.stack_type, "cloud");
+
+            break;
         }
     }
 
@@ -322,7 +389,7 @@ fn create_new_instance(
                 result.instance_name.color(colors::sql_u()).bold()
             ));
 
-            return Ok(result.instance_id);
+            Ok(result.instance_id)
         }
         Err(error) => {
             eprintln!("Error creating instance: {}", error);
@@ -505,7 +572,7 @@ pub fn get_instance_settings(
 }
 
 pub fn get_rendered_dockerfile(
-    instance_settings: HashMap<String, InstanceSettings>,
+    instance_settings: &InstanceSettings,
 ) -> Result<String, anyhow::Error> {
     // Include the Dockerfile template directly into the binary
     let contents = include_str!("../../tembo/Dockerfile.template");
@@ -514,16 +581,14 @@ pub fn get_rendered_dockerfile(
     let _ = tera.add_raw_template("dockerfile", contents);
     let mut context = Context::new();
 
-    for (_key, value) in instance_settings.iter() {
-        let stack_type = ControllerStackType::from_str(value.stack_type.as_str())
-            .unwrap_or(ControllerStackType::Standard);
+    let stack_type = ControllerStackType::from_str(instance_settings.stack_type.as_str())
+        .unwrap_or(ControllerStackType::Standard);
 
-        let stack = get_stack(stack_type);
+    let stack = get_stack(stack_type);
 
-        context.insert("stack_trunk_installs", &stack.trunk_installs);
-        let extensions = value.extensions.clone().unwrap_or_default();
-        context.insert("extensions", &extensions);
-    }
+    context.insert("stack_trunk_installs", &stack.trunk_installs);
+    let extensions = instance_settings.extensions.clone().unwrap_or_default();
+    context.insert("extensions", &extensions);
 
     let rendered_dockerfile = tera.render("dockerfile", &context).unwrap();
 
@@ -531,7 +596,7 @@ pub fn get_rendered_dockerfile(
 }
 
 pub fn get_rendered_migrations_file(
-    instance_settings: HashMap<String, InstanceSettings>,
+    instance_settings: &InstanceSettings,
 ) -> Result<String, anyhow::Error> {
     // Include the migrations template directly into the binary
     let contents = include_str!("../../tembo/migrations.sql.template");
@@ -542,15 +607,13 @@ pub fn get_rendered_migrations_file(
         .map_err(|e| anyhow::anyhow!("Error adding raw template: {}", e))?;
 
     let mut context = Context::new();
-    for (_key, value) in instance_settings.iter() {
-        let stack_type = ControllerStackType::from_str(value.stack_type.as_str())
-            .unwrap_or(ControllerStackType::Standard);
+    let stack_type = ControllerStackType::from_str(instance_settings.stack_type.as_str())
+        .unwrap_or(ControllerStackType::Standard);
 
-        let stack = get_stack(stack_type);
+    let stack = get_stack(stack_type);
 
-        context.insert("stack_extensions", &stack.extensions);
-        context.insert("extensions", &value.extensions);
-    }
+    context.insert("stack_extensions", &stack.extensions);
+    context.insert("extensions", &instance_settings.extensions);
 
     let rendered_migrations = tera
         .render("migrations", &context)
@@ -559,54 +622,69 @@ pub fn get_rendered_migrations_file(
     Ok(rendered_migrations)
 }
 
-fn get_postgres_config(instance_settings: HashMap<String, InstanceSettings>) -> String {
+fn get_postgres_config(instance_settings: &InstanceSettings) -> String {
     let mut postgres_config = String::from("");
     let qoute_new_line = "\'\n";
     let equal_to_qoute = " = \'";
-    for (_, instance_setting) in instance_settings.iter() {
-        let stack_type = ControllerStackType::from_str(instance_setting.stack_type.as_str())
-            .unwrap_or(ControllerStackType::Standard);
+    let stack_type = ControllerStackType::from_str(instance_settings.stack_type.as_str())
+        .unwrap_or(ControllerStackType::Standard);
 
-        let stack = get_stack(stack_type);
+    let stack = get_stack(stack_type);
 
-        if stack.postgres_config.is_some() {
-            for config in stack.postgres_config.unwrap().iter() {
-                postgres_config.push_str(config.name.as_str());
+    if stack.postgres_config.is_some() {
+        for config in stack.postgres_config.unwrap().iter() {
+            postgres_config.push_str(config.name.as_str());
+            postgres_config.push_str(equal_to_qoute);
+            postgres_config.push_str(format!("{}", &config.value).as_str());
+            postgres_config.push_str(qoute_new_line);
+        }
+    }
+
+    if instance_settings.postgres_configurations.is_some() {
+        for (key, value) in instance_settings
+            .postgres_configurations
+            .as_ref()
+            .unwrap()
+            .iter()
+        {
+            if value.is_str() {
+                postgres_config.push_str(key.as_str());
                 postgres_config.push_str(equal_to_qoute);
-                postgres_config.push_str(format!("{}", &config.value).as_str());
+                postgres_config.push_str(value.as_str().unwrap());
                 postgres_config.push_str(qoute_new_line);
             }
-        }
-
-        if instance_setting.postgres_configurations.is_some() {
-            for (key, value) in instance_setting
-                .postgres_configurations
-                .as_ref()
-                .unwrap()
-                .iter()
-            {
-                if value.is_str() {
-                    postgres_config.push_str(key.as_str());
-                    postgres_config.push_str(equal_to_qoute);
-                    postgres_config.push_str(value.as_str().unwrap());
-                    postgres_config.push_str(qoute_new_line);
-                }
-                if value.is_table() {
-                    for row in value.as_table().iter() {
-                        for (t, v) in row.iter() {
-                            postgres_config.push_str(key.as_str());
-                            postgres_config.push('.');
-                            postgres_config.push_str(t.as_str());
-                            postgres_config.push_str(equal_to_qoute);
-                            postgres_config.push_str(v.as_str().unwrap());
-                            postgres_config.push_str(qoute_new_line);
-                        }
+            if value.is_table() {
+                for row in value.as_table().iter() {
+                    for (t, v) in row.iter() {
+                        postgres_config.push_str(key.as_str());
+                        postgres_config.push('.');
+                        postgres_config.push_str(t.as_str());
+                        postgres_config.push_str(equal_to_qoute);
+                        postgres_config.push_str(v.as_str().unwrap());
+                        postgres_config.push_str(qoute_new_line);
                     }
                 }
             }
         }
     }
     postgres_config
+}
+
+pub fn get_rendered_dockercompose(
+    instance_settings: HashMap<String, InstanceSettings>,
+) -> Result<String, anyhow::Error> {
+    // Include the Dockerfile template directly into the binary
+    let contents = include_str!("../../tembo/docker-compose.yml.template");
+
+    let mut tera = Tera::new("templates/**/*").unwrap();
+    let _ = tera.add_raw_template("docker-compose", contents);
+    let mut context = Context::new();
+
+    context.insert("instance_settings", &instance_settings);
+
+    let rendered_dockerfile = tera.render("docker-compose", &context).unwrap();
+
+    Ok(rendered_dockerfile)
 }
 
 fn construct_connection_string(info: ConnectionInfo) -> String {

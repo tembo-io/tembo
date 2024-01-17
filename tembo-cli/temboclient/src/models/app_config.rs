@@ -17,10 +17,20 @@ pub struct AppConfig {
         skip_serializing_if = "Option::is_none"
     )]
     pub env: Option<Option<Vec<crate::models::EnvVar>>>,
+    #[serde(
+        rename = "resources",
+        default,
+        with = "::serde_with::rust::double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub resources: Option<Option<Box<crate::models::ResourceRequirements>>>,
 }
 
 impl AppConfig {
     pub fn new() -> AppConfig {
-        AppConfig { env: None }
+        AppConfig {
+            env: None,
+            resources: None,
+        }
     }
 }

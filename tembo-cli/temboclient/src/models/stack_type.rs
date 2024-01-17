@@ -27,6 +27,8 @@ pub enum StackType {
     DataWarehouse,
     #[serde(rename = "Geospatial")]
     Geospatial,
+    #[serde(rename = "MongoAlternative")]
+    MongoAlternative,
 }
 
 impl ToString for StackType {
@@ -40,6 +42,7 @@ impl ToString for StackType {
             Self::VectorDb => String::from("VectorDB"),
             Self::DataWarehouse => String::from("DataWarehouse"),
             Self::Geospatial => String::from("Geospatial"),
+            Self::MongoAlternative => String::from("MongoAlternative"),
         }
     }
 }
