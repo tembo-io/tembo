@@ -1,6 +1,0 @@
-Dockerfile
-Dockerfile.template
-migrations.sql.template
-migrations/**
-!migrations/README.md
-postgres.conf

@@ -1,14 +1,14 @@
-[defaults]
+[instance-1]
 environment = "dev"
-instance_name = "defaults-instance"
+instance_name = "instance-1"
 cpu = "1"
 storage = "50Gi"
 replicas = 1
 stack_type = "Standard"
 
-[mobile]
+[instance-2]
 environment = "dev"
-instance_name = "mobile-instance"
+instance_name = "instance-2"
 cpu = "1"
 storage = "50Gi"
 replicas = 1
