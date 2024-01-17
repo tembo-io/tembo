@@ -12,15 +12,15 @@
 
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct StorageConfig {
-    #[serde(rename = "volumeMounts", default, with = "::serde_with::rust::double_option", skip_serializing_if = "Option::is_none")]
-    pub volume_mounts: Option<Option<Vec<crate::models::VolumeMount>>>,
+pub struct AppTypeOneOf4 {
+    #[serde(rename = "custom")]
+    pub custom: Box<crate::models::AppService>,
 }
 
-impl StorageConfig {
-    pub fn new() -> StorageConfig {
-        StorageConfig {
-            volume_mounts: None,
+impl AppTypeOneOf4 {
+    pub fn new(custom: crate::models::AppService) -> AppTypeOneOf4 {
+        AppTypeOneOf4 {
+            custom: Box::new(custom),
         }
     }
 }

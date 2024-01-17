@@ -5,6 +5,7 @@ use colorful::Colorful;
 use controller::stacks::get_stack;
 use controller::stacks::types::StackType as ControllerStackType;
 use log::info;
+use std::path::Path;
 use std::{
     collections::HashMap,
     fs::{self},
@@ -235,9 +236,12 @@ pub fn tembo_cloud_apply_instance(
                 env.clone(),
             )?;
 
-            Runtime::new()
-                .unwrap()
-                .block_on(SqlxUtils::run_migrations(conn_info.clone(), "".to_string()))?;
+            if Path::new(&instance_settings.instance_name).exists() {
+                Runtime::new().unwrap().block_on(SqlxUtils::run_migrations(
+                    conn_info.clone(),
+                    instance_settings.instance_name.clone(),
+                ))?;
+            }
 
             // If all of the above was successful we can stop the spinner and show a success message
             sp.stop_with_message(&format!(
