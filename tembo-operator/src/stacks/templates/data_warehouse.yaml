@@ -1,6 +1,6 @@
 name: DataWarehouse
 description: A Postgres instance equipped with configuration and extensions for building a data warehouse on Postgres.
-image: "quay.io/tembo/dw-cnpg:15.3.0-1-0baf38f"
+image: "quay.io/tembo/dw-cnpg:15.3.0-1-46c8b6f"
 stack_version: 0.1.0
 compute_templates:
   - cpu: 2
