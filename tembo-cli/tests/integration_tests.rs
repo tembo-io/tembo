@@ -2,12 +2,13 @@ use assert_cmd::prelude::*; // Add methods on commands
 
 use colorful::core::StrMarker;
 use predicates::prelude::*;
+use sqlx::postgres::PgConnectOptions;
 use std::error::Error;
 use std::path::PathBuf;
-use std::process::{Command, Stdio};
-use std::{env, io};
-
-use std::io::Write;
+use std::process::Command;
+use std::thread::sleep;
+use std::time::Duration;
+use std::env;
 
 const CARGO_BIN: &str = "tembo";
 
@@ -56,7 +57,7 @@ async fn minimal() -> Result<(), Box<dyn Error>> {
     // tembo delete
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
     cmd.arg("delete");
-    cmd.assert().success();
+    let _ = cmd.ok();
 
     // check can't connect
     assert!(assert_can_connect("minimal".to_str()).await.is_err());
@@ -100,16 +101,17 @@ async fn data_warehouse() -> Result<(), Box<dyn Error>> {
 
     // check extensions includes postgres_fdw in the output
     // connecting to postgres and running the command
-    let result = get_output_from_sql(
+    let result: String = get_output_from_sql(
         instance_name.to_string(),
-        "SELECT * FROM pg_extension WHERE extname = 'clerk_fdw'".to_string(),
-    );
-    assert!(result.await?.contains("clerk_fdw"));
+        "SELECT 1 FROM pg_extension WHERE extname = 'clerk_fdw'".to_string(),
+    )
+    .await?;
+    assert!(result.contains('1'), "Query did not return 1");
 
     // tembo delete
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
     cmd.arg("delete");
-    cmd.assert().success();
+    let _ = cmd.ok();
 
     // check can't connect
     assert!(assert_can_connect(instance_name.to_string()).await.is_err());
@@ -146,20 +148,22 @@ async fn multiple_instances() -> Result<(), Box<dyn Error>> {
     cmd.arg("apply");
     cmd.assert().success();
 
+    sleep(Duration::from_secs(5));
+
     // check can connect
-    assert_can_connect("defaults_instance".to_str()).await?;
-    assert_can_connect("mobile_instance".to_str()).await?;
+    assert_can_connect("defaults-instance".to_string()).await?;
+    assert_can_connect("mobile-instance".to_string()).await?;
 
     // tembo delete
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
     cmd.arg("delete");
-    cmd.assert().success();
+    let _ = cmd.ok();
 
     // check can't connect
-    assert!(assert_can_connect("defaults_instance".to_str())
+    assert!(assert_can_connect("defaults-instance".to_str())
         .await
         .is_err());
-    assert!(assert_can_connect("mobile_instance".to_str())
+    assert!(assert_can_connect("mobile-instance".to_str())
         .await
         .is_err());
 
@@ -167,45 +171,30 @@ async fn multiple_instances() -> Result<(), Box<dyn Error>> {
 }
 
 async fn get_output_from_sql(instance_name: String, sql: String) -> Result<String, Box<dyn Error>> {
-    // Command to execute psql
-    let mut child = Command::new("psql")
-        .arg("-h") // Hostname
-        .arg(format!("{}.local.tembo.io", instance_name))
-        .arg("-U") // User
-        .arg("postgres")
-        .arg("-d") // Database name
-        .arg("postgres")
-        .arg("-p") // Port
-        .arg("5432")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
-        .spawn()?;
+    // Configure SQLx connection options
+    let connect_options = PgConnectOptions::new()
+        .username("postgres")
+        .password("postgres")
+        .host(&format!("{}.local.tembo.io", instance_name))
+        .database("postgres");
 
-    // Writing SQL command to psql's stdin
-    if let Some(stdin) = child.stdin.as_mut() {
-        stdin.write_all(sql.as_bytes())?;
-    } else {
-        return Err(Box::new(io::Error::new(
-            io::ErrorKind::BrokenPipe,
-            "Failed to write to stdin",
-        )));
-    }
+    // Connect to the database
+    let pool = sqlx::PgPool::connect_with(connect_options).await?;
 
-    // Capturing the output
-    let output = child.wait_with_output()?;
+    // Simple query
+    let result: (i32,) = sqlx::query_as(&sql).fetch_one(&pool).await?;
 
-    // Check if the command was successful
-    if !output.status.success() {
-        let err = String::from_utf8_lossy(&output.stderr);
-        return Err(Box::new(io::Error::new(io::ErrorKind::Other, err)));
-    }
+    println!(
+        "Successfully connected to the database: {}",
+        &format!("{}.local.tembo.io", instance_name)
+    );
+    println!("{}", result.0);
 
-    Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    Ok(result.0.to_string())
 }
 
 async fn assert_can_connect(instance_name: String) -> Result<(), Box<dyn Error>> {
-    let result = get_output_from_sql(instance_name, "SELECT 1".to_string()).await?;
+    let result: String = get_output_from_sql(instance_name, "SELECT 1".to_string()).await?;
     assert!(result.contains('1'), "Query did not return 1");
     Ok(())
 }

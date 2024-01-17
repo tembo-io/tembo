@@ -116,7 +116,7 @@ fn docker_apply(
     Docker::docker_compose_up(verbose)?;
 
     // Allows DB instance to be ready before running migrations
-    sleep(Duration::from_secs(10));
+    sleep(Duration::from_secs(5));
 
     let port = 5432;
 
