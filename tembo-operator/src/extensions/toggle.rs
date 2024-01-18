@@ -74,6 +74,13 @@ async fn toggle_extensions(
                 Some(expected_library_name) => expected_library_name,
             };
             // Get extensions trunk project name
+
+            // If version is None, error
+            if location_to_toggle.version.is_none() {
+                error!("Version for {} is none. Version should never be none when toggling an extension", extension_to_toggle.name);
+                continue;
+            }
+
             let trunk_project_name =
                 get_trunk_project_for_extension(extension_to_toggle.name.clone()).await?;
             let has_loadable_library = get_loadable_library_name(

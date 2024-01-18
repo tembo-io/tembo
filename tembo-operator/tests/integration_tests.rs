@@ -2103,7 +2103,7 @@ mod test {
                         "description": "cron",
                         "locations": [{
                             "enabled": true,
-                            "version": "1.5.2",
+                            "version": "1.6.2",
                             "database": "postgres",
                         }],
                     },
@@ -2118,7 +2118,7 @@ mod test {
                 }],
                 "trunk_installs": [{
                         "name": "pg_cron",
-                        "version": "1.5.2",
+                        "version": "1.6.2",
                 },
                 {
                         "name": "citus",
@@ -2902,7 +2902,8 @@ mod test {
                         "locations": [
                             {
                                 "database": "postgres",
-                                "enabled": true
+                                "enabled": true,
+                                "version": "1.4.1"
                             }
                         ]
                     }
@@ -3320,7 +3321,8 @@ mod test {
                         "locations": [
                             {
                                 "database": "postgres",
-                                "enabled": true
+                                "enabled": true,
+                                "version": "1.4.1"
                             }
                         ]
                     }
@@ -3875,7 +3877,10 @@ CREATE EVENT TRIGGER pgrst_watch
                     }
                 }
             }
-            println!("Waiting for runtime_config to be populated with expected values");
+            println!(
+                "Waiting for runtime_config for {} to be populated with expected values",
+                name
+            );
             tokio::time::sleep(Duration::from_secs(5)).await;
         }
 

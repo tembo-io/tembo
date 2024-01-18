@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, env, time::Duration};
 
 use crate::configmap::apply_configmap;
-use tracing::log::error;
+use tracing::error;
 use utoipa::ToSchema;
 
 const DEFAULT_TRUNK_REGISTRY_DOMAIN: &str = "registry.pgtrunk.io";
@@ -329,7 +329,7 @@ pub async fn get_trunk_project_for_extension(
                 "Failed to get trunk project name for extension {}: {:?}",
                 extension_name, e
             );
-            return Err(Action::requeue(Duration::from_secs(300)));
+            return Err(Action::requeue(Duration::from_secs(3)));
         }
     };
     // Check if the extension name matches a trunk project name
@@ -359,7 +359,7 @@ pub async fn is_control_file_absent(
                     "Failed to get trunk project metadata for version {}: {:?}",
                     version, e
                 );
-                return Err(Action::requeue(Duration::from_secs(300)));
+                return Err(Action::requeue(Duration::from_secs(3)));
             }
         };
     // TODO(ianstanton) This assumes that there is only one extension in the project, but we need to handle the case
@@ -391,7 +391,7 @@ pub async fn get_loadable_library_name(
                 "Failed to get trunk project metadata for version {}: {:?}",
                 version, e
             );
-            return Err(Action::requeue(Duration::from_secs(300)));
+            return Err(Action::requeue(Duration::from_secs(3)));
         }
     };
     // Find the extension in the project metadata
@@ -406,7 +406,7 @@ pub async fn get_loadable_library_name(
                 "Failed to find extension {} in trunk project {} version {}",
                 extension_name, trunk_project, version
             );
-            return Err(Action::requeue(Duration::from_secs(300)));
+            return Err(Action::requeue(Duration::from_secs(3)));
         }
     };
     // Find the loadable library in the extension metadata
@@ -442,7 +442,7 @@ pub async fn get_trunk_project_description(
                 "Failed to get trunk project metadata for version {}: {:?}",
                 version, e
             );
-            return Err(Action::requeue(Duration::from_secs(300)));
+            return Err(Action::requeue(Duration::from_secs(3)));
         }
     };
     Ok(project_metadata.description)
