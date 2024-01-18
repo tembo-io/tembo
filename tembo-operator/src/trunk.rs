@@ -425,6 +425,29 @@ pub async fn get_loadable_library_name(
     Ok(loadable_library_name)
 }
 
+// Get trunk project description for a given trunk project version
+pub async fn get_trunk_project_description(
+    trunk_project: String,
+    version: String,
+) -> Result<Option<String>, Action> {
+    let project_metadata: TrunkProjectMetadata = match get_trunk_project_metadata_for_version(
+        trunk_project.clone(),
+        version.clone(),
+    )
+    .await
+    {
+        Ok(project_metadata) => project_metadata,
+        Err(e) => {
+            error!(
+                "Failed to get trunk project metadata for version {}: {:?}",
+                version, e
+            );
+            return Err(Action::requeue(Duration::from_secs(300)));
+        }
+    };
+    Ok(project_metadata.description)
+}
+
 // Define error type
 #[derive(Debug, thiserror::Error)]
 pub enum TrunkError {
@@ -525,5 +548,14 @@ mod tests {
         let result = get_loadable_library_name(trunk_project, version, extension_name).await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), Some("auto_explain".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_get_trunk_project_description() {
+        let trunk_project = "auto_explain".to_string();
+        let version = "15.3.0".to_string();
+        let result = get_trunk_project_description(trunk_project, version).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Some("The auto_explain module provides a means for logging execution plans of slow statements automatically, without having to run EXPLAIN by hand.".to_string()));
     }
 }
