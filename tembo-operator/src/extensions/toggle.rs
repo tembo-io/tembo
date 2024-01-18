@@ -11,7 +11,8 @@ use kube::runtime::controller::Action;
 use crate::extensions::install::check_for_so_files;
 use crate::extensions::types::TrunkInstall;
 use crate::trunk::{
-    get_loadable_library_name, get_trunk_project_for_extension, is_control_file_absent,
+    get_loadable_library_name, get_trunk_project_description, get_trunk_project_for_extension,
+    is_control_file_absent,
 };
 use crate::{
     apis::coredb_types::CoreDBStatus,
@@ -401,9 +402,18 @@ async fn check_for_extensions_enabled_with_load(
                 check_for_so_files(cdb, ctx.clone(), &*pod_name, extension.name.clone()).await?;
             // If found, add to extensions_with_load
             if found {
+                // Get trunk project description for extension
+                let trunk_project_name =
+                    get_trunk_project_for_extension(extension.name.clone()).await?;
+                let description = get_trunk_project_description(
+                    trunk_project_name.clone().unwrap(),
+                    extension.version.clone().unwrap(),
+                )
+                .await?;
+
                 let mut extension_status = ExtensionStatus {
                     name: extension.name.clone(),
-                    description: None,
+                    description,
                     locations: vec![],
                 };
                 let location_status = ExtensionInstallLocationStatus {
