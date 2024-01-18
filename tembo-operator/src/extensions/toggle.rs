@@ -35,9 +35,12 @@ pub async fn reconcile_extension_toggle_state(
     // Some extensions need to be enabled with LOAD (example: auto_explain). These extensions won't show up in
     // pg_available_extensions, and therefore won't be in all_actually_installed_extensions. We need to check for
     // these extensions and add them to all_actually_installed_extensions so they are handled appropriately.
-    let mut extensions_with_load =
-        check_for_extensions_enabled_with_load(cdb, ctx.clone(), all_actually_installed_extensions.clone())
-            .await?;
+    let mut extensions_with_load = check_for_extensions_enabled_with_load(
+        cdb,
+        ctx.clone(),
+        all_actually_installed_extensions.clone(),
+    )
+    .await?;
     all_actually_installed_extensions.append(&mut extensions_with_load);
 
     let ext_status_updates =
