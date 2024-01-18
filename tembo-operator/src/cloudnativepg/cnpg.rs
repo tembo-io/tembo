@@ -1352,6 +1352,12 @@ pub async fn reconcile_cnpg_scheduled_backup(
     cdb: &CoreDB,
     ctx: Arc<Context>,
 ) -> Result<(), Action> {
+    // check if the Cluster object exists on the cluster, if not then requeue
+    if !does_cluster_exist(cdb, ctx.clone()).await? {
+        warn!("Cluster does not exist, requeuing ScheduledBackup");
+        return Err(Action::requeue(Duration::from_secs(30)));
+    }
+
     let scheduledbackup = cnpg_scheduled_backup(cdb);
     let client = ctx.client.clone();
     let name = scheduledbackup
@@ -1877,6 +1883,34 @@ async fn is_restore_backup_running_pending_completed(
         Err(e) => {
             error!("Error listing backups: {}", e);
             Err(Action::requeue(Duration::from_secs(300)))
+        }
+    }
+}
+
+// does_cluster_exist checks if a cluster exists and returns a bool or action to
+// requeue in a result
+#[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any()))]
+async fn does_cluster_exist(cdb: &CoreDB, ctx: Arc<Context>) -> Result<bool, Action> {
+    let instance_name = cdb.name_any();
+    let namespace = cdb.namespace().ok_or_else(|| {
+        error!(
+            "Namespace is not set for CoreDB for instance {}",
+            instance_name
+        );
+        Action::requeue(Duration::from_secs(300))
+    })?;
+
+    let cluster: Api<Cluster> = Api::namespaced(ctx.client.clone(), &namespace);
+    let co = cluster.get(&instance_name).await;
+
+    match co {
+        Ok(_) => {
+            debug!("Cluster {} exists", instance_name);
+            Ok(true)
+        }
+        Err(e) => {
+            error!("Error getting cluster: {}", e);
+            Err(Action::requeue(Duration::from_secs(10)))
         }
     }
 }
