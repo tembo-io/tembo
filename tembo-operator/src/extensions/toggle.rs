@@ -29,60 +29,16 @@ pub async fn reconcile_extension_toggle_state(
     cdb: &CoreDB,
     ctx: Arc<Context>,
 ) -> Result<Vec<ExtensionStatus>, Action> {
-    // We need to check if LOAD extensions are installed
     let mut all_actually_installed_extensions =
         database_queries::get_all_extensions(cdb, ctx.clone()).await?;
 
-    // Get list of trunk installed extensions
-    let trunk_installed_extensions = cdb.spec.trunk_installs.clone();
-
-    // Get list of trunk installed extensions that are not in all_actually_installed_extensions
-    let mut trunk_installed_extensions_not_in_all_actually_installed_extensions: Vec<TrunkInstall> =
-        vec![];
-    for trunk_installed_extension in trunk_installed_extensions {
-        let mut found = false;
-        for actually_installed_extension in &all_actually_installed_extensions {
-            if trunk_installed_extension.name == actually_installed_extension.name {
-                found = true;
-            }
-        }
-        if !found {
-            trunk_installed_extensions_not_in_all_actually_installed_extensions
-                .push(trunk_installed_extension);
-        }
-    }
-
-    // Get all pods
-    let all_pods =
-        crate::extensions::install::all_fenced_and_non_fenced_pods(cdb, ctx.clone()).await?;
-    for pod in all_pods {
-        let pod_name = pod.metadata.name.clone().unwrap();
-        // Check for .so files
-        for extension in trunk_installed_extensions_not_in_all_actually_installed_extensions.clone()
-        {
-            let found =
-                check_for_so_files(cdb, ctx.clone(), &*pod_name, extension.name.clone()).await?;
-            // If found, add to actually installed extensions
-            if found {
-                let mut extension_status = ExtensionStatus {
-                    name: extension.name.clone(),
-                    description: None,
-                    locations: vec![],
-                };
-                let mut location_status = ExtensionInstallLocationStatus {
-                    enabled: Some(true),
-                    database: "postgres".to_string(),
-                    schema: None,
-                    version: None,
-                    error: Some(false),
-                    error_message: None,
-                };
-                extension_status.locations.push(location_status);
-                all_actually_installed_extensions.push(extension_status);
-            }
-            info!("Found {}.so file: {}", extension.name, found);
-        }
-    }
+    // Some extensions need to be enabled with LOAD (example: auto_explain). These extensions won't show up in
+    // pg_available_extensions, and therefore won't be in all_actually_installed_extensions. We need to check for
+    // these extensions and add them to all_actually_installed_extensions so they are handled appropriately.
+    let mut extensions_with_load =
+        check_for_extensions_enabled_with_load(cdb, ctx.clone(), all_actually_installed_extensions.clone())
+            .await?;
+    all_actually_installed_extensions.append(&mut extensions_with_load);
 
     let ext_status_updates =
         determine_updated_extensions_status(cdb, all_actually_installed_extensions);
@@ -102,6 +58,7 @@ async fn toggle_extensions(
     toggle_these_extensions: Vec<Extension>,
 ) -> Result<Vec<ExtensionStatus>, Action> {
     let current_shared_preload_libraries = list_shared_preload_libraries(cdb, ctx.clone()).await?;
+    // TODO(ianstanton) Don't fetch from this list anymore. Instead, fetch from trunk's extension metadata
     let requires_load =
         extensions_that_require_load(ctx.client.clone(), &cdb.metadata.namespace.clone().unwrap())
             .await?;
@@ -112,13 +69,23 @@ async fn toggle_extensions(
                 None => &extension_to_toggle.name,
                 Some(expected_library_name) => expected_library_name,
             };
+            // Get extensions trunk project name
+            let trunk_project_name =
+                get_trunk_project_for_extension(extension_to_toggle.name.clone()).await?;
+            let has_loadable_library = get_loadable_library_name(
+                trunk_project_name.clone().unwrap(),
+                location_to_toggle.clone().version.unwrap(),
+                extension_to_toggle.name.clone(),
+            )
+            .await?;
             // If we are toggling on,
             // the extension is included in the REQUIRES_LOAD list,
             // and also is not present in shared_preload_libraries,
             // then requeue.
             if location_to_toggle.enabled
-                && requires_load.contains_key(&extension_to_toggle.name)
-                && !current_shared_preload_libraries.contains(expected_library_name)
+                && (requires_load.contains_key(&extension_to_toggle.name)
+                    || has_loadable_library.is_some())
+                && !(current_shared_preload_libraries.contains(expected_library_name))
             {
                 warn!(
                     "Extension {} requires load, but is not present in shared_preload_libraries for {}, checking if we should requeue.",
@@ -131,19 +98,9 @@ async fn toggle_extensions(
                 )?;
             }
             // Don't toggle extension if control file is absent && it has a loadable library
-
-            // Get extensions trunk project name
-            let trunk_project_name =
-                get_trunk_project_for_extension(extension_to_toggle.name.clone()).await?;
             let control_file_absent = is_control_file_absent(
                 trunk_project_name.clone().unwrap(),
                 location_to_toggle.clone().version.unwrap(),
-            )
-            .await?;
-            let has_loadable_library = get_loadable_library_name(
-                trunk_project_name.unwrap(),
-                location_to_toggle.clone().version.unwrap(),
-                extension_to_toggle.name.clone(),
             )
             .await?;
 
@@ -399,6 +356,68 @@ pub fn determine_extension_locations_to_toggle(cdb: &CoreDB) -> Vec<Extension> {
         }
     }
     extensions_to_toggle
+}
+
+// Check for extensions enabled with LOAD. When these extensions are installed, they are not
+// present in pg_available_extensions. In order to check if they are installed, we need to check
+// for the presence of <extension_name>>.so file in the pod.
+async fn check_for_extensions_enabled_with_load(
+    cdb: &CoreDB,
+    ctx: Arc<Context>,
+    all_actually_installed_extensions: Vec<ExtensionStatus>,
+) -> Result<Vec<ExtensionStatus>, Action> {
+    // Get list of trunk installed extensions
+    let mut extensions_enabled_with_load: Vec<ExtensionStatus> = vec![];
+    let trunk_installed_extensions = cdb.spec.trunk_installs.clone();
+
+    // Get trunk installed extensions that are not in all_actually_installed_extensions
+    let mut trunk_installed_extensions_not_in_all_actually_installed_extensions: Vec<TrunkInstall> =
+        vec![];
+    for trunk_installed_extension in trunk_installed_extensions {
+        let mut found = false;
+        for actually_installed_extension in &all_actually_installed_extensions {
+            if trunk_installed_extension.name == actually_installed_extension.name {
+                found = true;
+            }
+        }
+        if !found {
+            trunk_installed_extensions_not_in_all_actually_installed_extensions
+                .push(trunk_installed_extension);
+        }
+    }
+
+    // Get all pods so we can check for <extension_name>.so
+    let all_pods =
+        crate::extensions::install::all_fenced_and_non_fenced_pods(cdb, ctx.clone()).await?;
+    for pod in all_pods {
+        let pod_name = pod.metadata.name.clone().unwrap();
+        // Check for <extension_name>.so files
+        for extension in trunk_installed_extensions_not_in_all_actually_installed_extensions.clone()
+        {
+            let found =
+                check_for_so_files(cdb, ctx.clone(), &*pod_name, extension.name.clone()).await?;
+            // If found, add to extensions_with_load
+            if found {
+                let mut extension_status = ExtensionStatus {
+                    name: extension.name.clone(),
+                    description: None,
+                    locations: vec![],
+                };
+                let location_status = ExtensionInstallLocationStatus {
+                    enabled: Some(true),
+                    database: "postgres".to_string(),
+                    schema: None,
+                    version: None,
+                    error: Some(false),
+                    error_message: None,
+                };
+                extension_status.locations.push(location_status);
+                extensions_enabled_with_load.push(extension_status);
+            }
+            info!("Found {}.so file: {}", extension.name, found);
+        }
+    }
+    Ok(extensions_enabled_with_load)
 }
 
 #[cfg(test)]
