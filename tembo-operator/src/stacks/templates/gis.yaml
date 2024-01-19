@@ -1,6 +1,6 @@
 name: Geospatial
 description: Postgres for geospatial workloads.
-image: "quay.io/tembo/standard-cnpg:15.3.0-1-1096aeb"
+image: "quay.io/tembo/standard-cnpg:15.3.0-1-795fc99"
 stack_version: 0.1.0
 compute_templates:
   - cpu: 0.25
