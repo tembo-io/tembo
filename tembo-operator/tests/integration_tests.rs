@@ -2356,6 +2356,142 @@ mod test {
         assert!(found_pg_stat_statements);
         assert!(found_auth_delay);
 
+        // Disable auto_explain and auth_delay
+        let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name,
+            },
+            "spec": {
+                "replicas": replicas,
+                "extensions": [{
+                        "name": "auto_explain",
+                        "description": "",
+                        "locations": [{
+                            "enabled": false,
+                            "version": "15.3.0",
+                            "database": "postgres",
+                        }],
+                    },
+                    {
+                        "name": "pg_stat_statements",
+                        "description": "",
+                        "locations": [{
+                            "enabled": true,
+                            "version": "1.10.0",
+                            "database": "postgres",
+                        }],
+                    },
+                    {
+                        "name": "auth_delay",
+                        "description": "",
+                        "locations": [{
+                            "enabled": false,
+                            "version": "15.3.0",
+                            "database": "postgres",
+                        }],
+                }],
+                "trunk_installs": [{
+                        "name": "auto_explain",
+                        "version": "15.3.0",
+                },
+                {
+                        "name": "pg_stat_statements",
+                        "version": "1.10.0",
+                },
+                {
+                        "name": "auth_delay",
+                        "version": "15.3.0",
+                }]
+            }
+        });
+        let params = PatchParams::apply("tembo-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        let coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        // Wait for CNPG Pod to be updated and ready
+        let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
+        let pod_name = format!("{}-1", name);
+
+        pod_ready_and_running(pods.clone(), pod_name.clone()).await;
+
+        // Assert psql show shared_preload_libraries does not contain auto_explain and auth_delay
+        wait_until_psql_contains(
+            context.clone(),
+            coredb_resource.clone(),
+            "SHOW shared_preload_libraries".to_string(),
+            "auto_explain".to_string(),
+            true,
+        )
+            .await;
+
+        wait_until_psql_contains(
+            context.clone(),
+            coredb_resource.clone(),
+            "SHOW shared_preload_libraries".to_string(),
+            "auth_delay".to_string(),
+            true,
+        )
+            .await;
+
+        // Assert psql show pg_available_extensions contains pg_stat_statements
+        wait_until_psql_contains(
+            context.clone(),
+            coredb_resource.clone(),
+            "SELECT * FROM pg_available_extensions".to_string(),
+            "pg_stat_statements".to_string(),
+            false,
+        )
+            .await;
+
+        // Assert psql show pg_available_extensions does not contain auto_explain
+        wait_until_psql_contains(
+            context.clone(),
+            coredb_resource.clone(),
+            "SELECT * FROM pg_available_extensions".to_string(),
+            "auto_explain".to_string(),
+            true,
+        )
+            .await;
+
+        // Assert psql show pg_available_extensions does not contain auth_delay
+        wait_until_psql_contains(
+            context.clone(),
+            coredb_resource.clone(),
+            "SELECT * FROM pg_available_extensions".to_string(),
+            "auth_delay".to_string(),
+            true,
+        )
+            .await;
+
+        // Check extension status in CoreDB resource
+        sleep(Duration::from_secs(10)); //TODO(ianstanton) remove this sleep
+        let coredb_resource = coredbs.get(name).await.unwrap();
+        let mut found_auto_explain = false;
+        let mut found_pg_stat_statements = false;
+        let mut found_auth_delay = false;
+        for extension in coredb_resource.status.unwrap().extensions.unwrap() {
+            for location in extension.locations {
+                if extension.name == "auto_explain" && location.enabled.unwrap() {
+                    found_auto_explain = true;
+                    assert_eq!(location.database, "postgres");
+                }
+                if extension.name == "pg_stat_statements" && location.enabled.unwrap() {
+                    found_pg_stat_statements = true;
+                    assert_eq!(location.database, "postgres");
+                }
+                if extension.name == "auth_delay" && location.enabled.unwrap() {
+                    found_auth_delay = true;
+                    assert_eq!(location.database, "postgres");
+                }
+            }
+        }
+        assert!(!found_auto_explain);
+        assert!(found_pg_stat_statements);
+        assert!(!found_auth_delay);
+
         // Cleanup
         coredbs.delete(name, &Default::default()).await.unwrap();
         println!("Waiting for CoreDB to be deleted: {}", &name);
