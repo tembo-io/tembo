@@ -398,8 +398,7 @@ fn generate_deployment(
     let mut pod_security_context: Option<PodSecurityContext> = None;
     // Add any user provided volumes / volume mounts
     if let Some(storage) = appsvc.storage.clone() {
-        // when there are user specified volumes, we need to let kubernetes modify permissions of those volumes to our user
-        // to modify ownership of volumes we attach, we need to set this
+        // when there are user specified volumes, we need to let kubernetes modify permissions of those volumes
         pod_security_context = Some(PodSecurityContext {
             fs_group: Some(65534),
             ..PodSecurityContext::default()
