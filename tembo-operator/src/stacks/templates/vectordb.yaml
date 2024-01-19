@@ -3,7 +3,7 @@ description: A Tembo Postgres Stack configured to support vector data types, sto
 image: "quay.io/tembo/standard-cnpg:15.3.0-1-795fc99"
 stack_version: 0.1.0
 appServices:
-  - image: quay.io/tembo/vector-serve:291da06
+  - image: quay.io/tembo/vector-serve:cbabfae
     name: embeddings
     env:
       - name: BATCH_SIZE
@@ -18,7 +18,7 @@ appServices:
           name: map-embeddings
           config:
             regex: ^\/vectordb\/?
-            replacement: /
+            replacement: /v1/embeddings
     resources:
       requests:
         cpu: 500m
