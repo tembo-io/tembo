@@ -2290,7 +2290,6 @@ mod test {
         )
         .await;
 
-
         // Assert psql show pg_available_extensions does not contain auto_explain
         wait_until_psql_contains(
             context.clone(),
