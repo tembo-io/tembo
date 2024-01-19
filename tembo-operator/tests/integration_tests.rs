@@ -54,6 +54,7 @@ mod test {
         thread,
         time::Duration,
     };
+    use std::thread::sleep;
 
     use tokio::{io::AsyncReadExt, time::timeout};
 
@@ -2309,6 +2310,32 @@ mod test {
             true,
         )
         .await;
+
+        // Check extension status in CoreDB resource
+        sleep(Duration::from_secs(10)); //TODO(ianstanton) remove this sleep
+        let coredb_resource = coredbs.get(name).await.unwrap();
+        let mut found_auto_explain = false;
+        let mut found_pg_stat_statements = false;
+        let mut found_auth_delay = false;
+        for extension in coredb_resource.status.unwrap().extensions.unwrap() {
+            for location in extension.locations {
+                if extension.name == "auto_explain" && location.enabled.unwrap() {
+                    found_auto_explain = true;
+                    assert_eq!(location.database, "postgres");
+                }
+                if extension.name == "pg_stat_statements" && location.enabled.unwrap() {
+                    found_pg_stat_statements = true;
+                    assert_eq!(location.database, "postgres");
+                }
+                if extension.name == "auth_delay" && location.enabled.unwrap() {
+                    found_auth_delay = true;
+                    assert_eq!(location.database, "postgres");
+                }
+            }
+        }
+        assert!(found_auto_explain);
+        assert!(found_pg_stat_statements);
+        assert!(found_auth_delay);
     }
 
     #[tokio::test]
