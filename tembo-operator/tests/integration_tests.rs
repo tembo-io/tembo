@@ -2281,6 +2281,25 @@ mod test {
 
         pod_ready_and_running(pods.clone(), pod_name.clone()).await;
 
+        // Assert psql show shared_preload_libraries contains auto_explain and auth_delay
+        wait_until_psql_contains(
+            context.clone(),
+            coredb_resource.clone(),
+            "SHOW shared_preload_libraries".to_string(),
+            "auto_explain".to_string(),
+            false,
+        )
+        .await;
+
+        wait_until_psql_contains(
+            context.clone(),
+            coredb_resource.clone(),
+            "SHOW shared_preload_libraries".to_string(),
+            "auth_delay".to_string(),
+            false,
+        )
+        .await;
+
         // Assert psql show pg_available_extensions contains pg_stat_statements
         wait_until_psql_contains(
             context.clone(),
@@ -2336,6 +2355,25 @@ mod test {
         assert!(found_auto_explain);
         assert!(found_pg_stat_statements);
         assert!(found_auth_delay);
+
+        // Cleanup
+        coredbs.delete(name, &Default::default()).await.unwrap();
+        println!("Waiting for CoreDB to be deleted: {}", &name);
+        let _assert_coredb_deleted = tokio::time::timeout(
+            Duration::from_secs(TIMEOUT_SECONDS_COREDB_DELETED),
+            await_condition(coredbs.clone(), name, conditions::is_deleted("")),
+        )
+        .await
+        .unwrap_or_else(|_| {
+            panic!(
+                "CoreDB {} was not deleted after waiting {} seconds",
+                name, TIMEOUT_SECONDS_COREDB_DELETED
+            )
+        });
+        println!("CoreDB resource deleted {}", name);
+
+        // Delete namespace
+        let _ = delete_namespace(client.clone(), &namespace).await;
     }
 
     #[tokio::test]
