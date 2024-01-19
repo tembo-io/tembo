@@ -156,4 +156,47 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn set() -> Result<(), Box<dyn std::error::Error>> {
+        std::env::set_current_dir(
+            PathBuf::from(root_dir)
+                .join("tests")
+                .join("tomls")
+                .join("merge"),
+        )?;
+
+        let overlay_config_path = PathBuf::from(root_dir)
+            .join("tests")
+            .join("tomls")
+            .join("merge")
+            .join("overlay.toml");
+        let overlay_config_str = overlay_config_path.to_str().ok_or("Invalid path")?;
+
+        // tembo init
+        let _output = Command::new(CARGO_BIN_PATH).arg("init");
+
+        let _output = Command::new(CARGO_BIN_PATH)
+            .arg("apply")
+            .arg("--set")
+            .arg("defaults.replicas = 2")
+            .output()?;
+
+        let set_arg = Some("defaults.replicas=2".to_string());
+
+        // Path to the overlay.toml file
+        
+
+        let merged_settings =
+        apply::get_instance_settings(Some(overlay_config_str.to_string()), set_arg)?;
+        if let Some(setting) = merged_settings.get("defaults") {
+            assert_eq!(setting.replicas, 2, "Replicas setting was not updated correctly");
+        } else {
+            return Err("Defaults settings not found".into());
+        }
+
+        let _output = Command::new(CARGO_BIN_PATH).arg("delete");
+
+        Ok(())
+    }
 }

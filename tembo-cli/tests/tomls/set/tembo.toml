@@ -1,0 +1,9 @@
+[defaults]
+environment = "dev"
+instance_name = "defaults2"
+cpu = "1"
+memory = "2Gi"
+storage = "10Gi"
+replicas = 1
+stack_type = "Standard"
+
