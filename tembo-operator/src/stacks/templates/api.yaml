@@ -1,6 +1,6 @@
 name: API
 description: Tembo Stack with REST and graphQL interfaces.
-image: "quay.io/tembo/standard-cnpg:15.3.0-1-1096aeb"
+image: "quay.io/tembo/standard-cnpg:15.3.0-1-795fc99"
 stack_version: 0.1.0
 appServices:
   - image: postgrest/postgrest:v12.0.0

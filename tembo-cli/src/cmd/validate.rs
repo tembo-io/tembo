@@ -1,7 +1,7 @@
 use crate::cli::context::{tembo_context_file_path, tembo_credentials_file_path};
 use crate::cli::file_utils::FileUtils;
 use crate::cli::tembo_config::InstanceSettings;
-use crate::tui::white_confirmation;
+use crate::tui::{error, info, white_confirmation};
 use anyhow::Error;
 use anyhow::Ok;
 use clap::Args;
@@ -15,14 +15,14 @@ pub fn execute(verbose: bool) -> Result<(), anyhow::Error> {
     let mut has_error = false;
 
     if !Path::new(&tembo_context_file_path()).exists() {
-        println!(
+        error(&format!(
             "No {} file exists. Run tembo init first!",
             tembo_context_file_path()
-        );
+        ));
         has_error = true
     }
     if verbose {
-        println!("- Context file exists");
+        info("Context file exists");
     }
 
     if !Path::new(&tembo_credentials_file_path()).exists() {
@@ -33,11 +33,11 @@ pub fn execute(verbose: bool) -> Result<(), anyhow::Error> {
         has_error = true
     }
     if verbose {
-        println!("- Credentials file exists");
+        info("Credentials file exists");
     }
 
     if !Path::new(&"tembo.toml").exists() {
-        println!("No Tembo file (tembo.toml) exists in this directory!");
+        error("No Tembo file (tembo.toml) exists in this directory!");
         has_error = true
     } else {
         let mut file_path = FileUtils::get_current_working_dir();
@@ -50,13 +50,13 @@ pub fn execute(verbose: bool) -> Result<(), anyhow::Error> {
         match validate_config(config, verbose) {
             std::result::Result::Ok(_) => (),
             std::result::Result::Err(e) => {
-                println!("Error validating config: {}", e);
+                error(&format!("Error validating config: {}", e));
                 has_error = true;
             }
         }
     }
     if verbose {
-        println!("- Tembo file exists");
+        info("Tembo file exists");
     }
 
     if has_error {
@@ -104,7 +104,10 @@ fn validate_environment(env: &str, section: &str, verbose: bool) -> Result<(), a
     match temboclient::models::Environment::from_str(env) {
         std::result::Result::Ok(_) => {
             if verbose {
-                println!("- Environment '{}' in section '{}' is valid", env, section);
+                white_confirmation(&format!(
+                    "Environment '{}' in section '{}' is valid",
+                    env, section
+                ));
             }
             Ok(())
         }
@@ -119,7 +122,7 @@ fn validate_cpu(cpu: &str, section: &str, verbose: bool) -> Result<(), anyhow::E
     match temboclient::models::Cpu::from_str(cpu) {
         std::result::Result::Ok(_) => {
             if verbose {
-                println!("- Cpu '{}' in section '{}' is valid", cpu, section);
+                info(&format!("Cpu '{}' in section '{}' is valid", cpu, section));
             }
             Ok(())
         }
@@ -134,7 +137,10 @@ fn validate_memory(memory: &str, section: &str, verbose: bool) -> Result<(), any
     match temboclient::models::Memory::from_str(memory) {
         std::result::Result::Ok(_) => {
             if verbose {
-                println!("- Memory '{}' in section '{}' is valid", memory, section);
+                info(&format!(
+                    "Memory '{}' in section '{}' is valid",
+                    memory, section
+                ));
             }
             Ok(())
         }
@@ -149,7 +155,10 @@ fn validate_storage(storage: &str, section: &str, verbose: bool) -> Result<(), a
     match temboclient::models::Storage::from_str(storage) {
         std::result::Result::Ok(_) => {
             if verbose {
-                println!("- Storage '{}' in section '{}' is valid", storage, section);
+                info(&format!(
+                    "- Storage '{}' in section '{}' is valid",
+                    storage, section
+                ));
             }
             Ok(())
         }
@@ -165,10 +174,10 @@ fn validate_replicas(replicas: &str, section: &str, verbose: bool) -> Result<(),
         std::result::Result::Ok(value) => {
             if value == 1 || value == 2 {
                 if verbose {
-                    println!(
-                        "- Replicas '{}' in section '{}' is valid",
+                    info(&format!(
+                        "Replicas '{}' in section '{}' is valid",
                         replicas, section
-                    );
+                    ));
                 }
                 Ok(())
             } else {
@@ -193,10 +202,10 @@ fn validate_stack_type(
     match temboclient::models::StackType::from_str(stack_types) {
         std::result::Result::Ok(_) => {
             if verbose {
-                println!(
-                    "- Stack types '{}' in section '{}' is valid",
+                info(&format!(
+                    "Stack types '{}' in section '{}' is valid",
                     stack_types, section
-                );
+                ));
             }
             Ok(())
         }
