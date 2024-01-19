@@ -52,14 +52,14 @@ pub struct ApplyCommand {
     pub set: Option<String>,
 }
 
-pub fn execute(verbose: bool, merge_path: Option<String>) -> Result<(), anyhow::Error> {
+pub fn execute(verbose: bool, merge_path: Option<&str>, set_arg:Option<&str>) -> Result<(), anyhow::Error> {
     info!("Running validation!");
     super::validate::execute(verbose)?;
     info!("Validation completed!");
 
     let env = get_current_context()?;
 
-    let instance_settings = get_instance_settings(merge_path)?;
+    let instance_settings = get_instance_settings(merge_path,set_arg)?;
 
     if env.target == Target::Docker.to_string() {
         return docker_apply(verbose, instance_settings);
@@ -97,15 +97,6 @@ fn parse_set_arg(set_arg: &str) -> Result<(String, String, String), Error> {
     Ok((instance_name, setting_name, setting_value))
 }
 
-fn execute_docker(
-    verbose: bool,
-    _merge_path: Option<String>,
-    set_arg: Option<String>,
-) -> Result<(), anyhow::Error> {
-    Docker::installed_and_running()?;
-
-    let instance_settings = get_instance_settings(_merge_path, set_arg)?;
-    let rendered_dockerfile: String = get_rendered_dockerfile(instance_settings.clone())?;
 
 fn tembo_cloud_apply(
     env: Environment,
@@ -583,58 +574,81 @@ fn merge_settings(base: &InstanceSettings, overlay: OverlayInstanceSettings) -> 
     }
 }
 
-pub fn get_instance_settings(
-    overlay_file_path: Option<String>,
-    set_arg: Option<String>,
+pub fn merge_instance_settings(
+    base_settings: &HashMap<String, InstanceSettings>,
+    overlay_file_path: &str
 ) -> Result<HashMap<String, InstanceSettings>, Error> {
-    let mut base_path = FileUtils::get_current_working_dir();
-    base_path.push_str("/tembo.toml");
-    let base_contents = fs::read_to_string(&base_path)
-        .with_context(|| format!("Couldn't read base file {}", base_path))?;
-    let base_settings: HashMap<String, InstanceSettings> =
-        toml::from_str(&base_contents).context("Unable to load data from the base config")?;
+    let overlay_contents = fs::read_to_string(overlay_file_path)
+        .with_context(|| format!("Couldn't read overlay file {}", overlay_file_path))?;
+    let overlay_settings: HashMap<String, OverlayInstanceSettings> =
+        toml::from_str(&overlay_contents)
+            .context("Unable to load data from the overlay config")?;
 
     let mut final_settings = base_settings.clone();
-
-    if let Some(overlay_path) = overlay_file_path {
-        let overlay_contents = fs::read_to_string(&overlay_path)
-            .with_context(|| format!("Couldn't read overlay file {}", overlay_path))?;
-        let overlay_settings: HashMap<String, OverlayInstanceSettings> =
-            toml::from_str(&overlay_contents)
-                .context("Unable to load data from the overlay config")?;
-
-        for (key, overlay_value) in overlay_settings {
-            if let Some(base_value) = base_settings.get(&key) {
-                let merged_value = merge_settings(base_value, overlay_value);
-                final_settings.insert(key, merged_value);
-            }
-        }
-    }
-
-    if let Some(set_arg) = set_arg {
-        let (instance_name, setting_name, setting_value) = parse_set_arg(&set_arg)?;
-
-        if let Some(settings) = final_settings.get_mut(&instance_name) {
-            match setting_name.as_str() {
-                "instance_name" => settings.instance_name = setting_value,
-                "cpu" => settings.cpu = setting_value,
-                "memory" => settings.memory = setting_value,
-                "storage" => settings.storage = setting_value,
-                "replicas" => {
-                    settings.replicas = setting_value
-                        .parse()
-                        .map_err(|_| Error::msg("Invalid value for replicas"))?;
-                }
-                "stack_type" => settings.stack_type = setting_value,
-                _ => return Err(Error::msg("Unknown setting")),
-            }
-        } else {
-            return Err(Error::msg("Instance not found"));
+    for (key, overlay_value) in overlay_settings {
+        if let Some(base_value) = base_settings.get(&key) {
+            let merged_value = merge_settings(base_value, overlay_value);
+            final_settings.insert(key, merged_value);
         }
     }
 
     Ok(final_settings)
 }
+
+
+pub fn set_instance_settings(
+    base_settings: &mut HashMap<String, InstanceSettings>,
+    set_arg: &str
+) -> Result<(), Error> {
+    let (instance_name, setting_name, setting_value) = parse_set_arg(set_arg)?;
+
+    if let Some(settings) = base_settings.get_mut(&instance_name) {
+        match setting_name.as_str() {
+            "instance_name" => settings.instance_name = setting_value,
+            "cpu" => settings.cpu = setting_value,
+            "memory" => settings.memory = setting_value,
+            "storage" => settings.storage = setting_value,
+            "replicas" => {
+                settings.replicas = setting_value
+                    .parse()
+                    .map_err(|_| Error::msg("Invalid value for replicas"))?;
+            }
+            "stack_type" => settings.stack_type = setting_value,
+            _ => return Err(Error::msg("Unknown setting")),
+        }
+    } else {
+        return Err(Error::msg("Instance not found"));
+    }
+
+    Ok(())
+}
+
+
+pub fn get_instance_settings(overlay_file_path: Option<&str>, set_arg: Option<&str>) -> Result<HashMap<String, InstanceSettings>, Error> {
+    let mut base_path = FileUtils::get_current_working_dir();
+    base_path.push_str("/tembo.toml");
+    let base_contents = fs::read_to_string(&base_path)
+        .with_context(|| format!("Couldn't read base file {}", base_path))?;
+    let base_settings: HashMap<String, InstanceSettings> = toml::from_str(&base_contents)
+    .context("Unable to load data from the base config")?;
+
+
+    let base_settings = get_instance_settings(None,None)?;
+    let mut final_settings = base_settings;
+
+    // If you need to merge settings
+    if let Some(overlay_path) = overlay_file_path {
+        final_settings = merge_instance_settings(&final_settings, overlay_path)?;
+    }
+
+    // If you need to set specific settings
+    if let Some(set_arg) = set_arg {
+        set_instance_settings(&mut final_settings, set_arg)?;
+    }
+
+    Ok(final_settings)
+    }
+
 
 pub fn get_rendered_dockerfile(
     instance_settings: &InstanceSettings,
@@ -791,7 +805,7 @@ mod tests {
             .arg("--merge")
             .arg(overlay_config_str);
 
-        let merged_settings = get_instance_settings(Some(overlay_config_str.to_string()))?;
+        let merged_settings = get_instance_settings(Some(overlay_config_str),None)?;
         if let Some(setting) = merged_settings.get("merge") {
             assert_ne!(setting.cpu, "0.25", "Default setting was overwritten");
         } else {
@@ -823,7 +837,7 @@ mod tests {
             .arg("--merge")
             .arg(overlay_config_str);
 
-        let merged_settings = get_instance_settings(Some(overlay_config_str.to_string()))?;
+        let merged_settings = get_instance_settings(Some(overlay_config_str),None)?;
         if let Some(setting) = merged_settings.get("merge") {
             assert_eq!(setting.memory, "10Gi", "Base settings was not overwritten");
         } else {
