@@ -11,8 +11,7 @@
 use reqwest;
 
 use super::{configuration, Error};
-use crate::apis::ResponseContent;
-use crate::models::InstanceEvent;
+use crate::{apis::ResponseContent, models::InstanceEvent};
 
 /// struct for typed errors of method [`create_instance`]
 #[derive(Debug, Clone, Serialize, Deserialize)]

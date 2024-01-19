@@ -10,32 +10,32 @@
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct AppType {
-    #[serde(rename = "restapi", deserialize_with = "Option::deserialize")]
-    pub restapi: Option<Box<crate::models::AppConfig>>,
-    #[serde(rename = "http", deserialize_with = "Option::deserialize")]
-    pub http: Option<Box<crate::models::AppConfig>>,
-    #[serde(rename = "custom")]
-    pub custom: Box<crate::models::AppService>,
+    // #[serde(rename = "restapi", deserialize_with = "Option::deserialize")]
+    // pub restapi: Option<Box<crate::models::AppConfig>>,
+    //#[serde(rename = "http", deserialize_with = "Option::deserialize")]
+    //pub http: Option<Box<crate::models::AppConfig>>,
+    // #[serde(rename = "mq-api", deserialize_with = "Option::deserialize")]
+    // pub mq_api: Option<Box<crate::models::AppConfig>>,
+    // #[serde(rename = "embeddings", deserialize_with = "Option::deserialize")]
+    // pub embeddings: Option<Box<crate::models::AppConfig>>,
+    // #[serde(rename = "custom")]
+    // pub custom: Box<crate::models::AppService>,
 }
 
 impl AppType {
     pub fn new(
-        restapi: Option<crate::models::AppConfig>,
-        http: Option<crate::models::AppConfig>,
-        custom: crate::models::AppService,
+        _restapi: Option<crate::models::AppConfig>,
+        _http: Option<crate::models::AppConfig>,
+        _mq_api: Option<crate::models::AppConfig>,
+        _embeddings: Option<crate::models::AppConfig>,
+        _custom: crate::models::AppService,
     ) -> AppType {
         AppType {
-            restapi: if let Some(x) = restapi {
-                Some(Box::new(x))
-            } else {
-                None
-            },
-            http: if let Some(x) = http {
-                Some(Box::new(x))
-            } else {
-                None
-            },
-            custom: Box::new(custom),
+            //restapi: if let Some(x) = restapi {Some(Box::new(x))} else {None},
+            //http: if let Some(x) = http {Some(Box::new(x))} else {None},
+            // mq_api: if let Some(x) = mq_api {Some(Box::new(x))} else {None},
+            // embeddings: if let Some(x) = embeddings {Some(Box::new(x))} else {None},
+            // custom: Box::new(custom),
         }
     }
 }

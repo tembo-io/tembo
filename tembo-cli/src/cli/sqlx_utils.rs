@@ -11,7 +11,10 @@ pub struct SqlxUtils {}
 
 impl SqlxUtils {
     // run sqlx migrate
-    pub async fn run_migrations(connection_info: ConnectionInfo) -> Result<(), anyhow::Error> {
+    pub async fn run_migrations(
+        connection_info: ConnectionInfo,
+        instance_name: String,
+    ) -> Result<(), anyhow::Error> {
         let mut sp = Spinner::new(
             spinners::Dots,
             "Running SQL migration",
@@ -28,13 +31,16 @@ impl SqlxUtils {
 
         let pool = Pool::<Postgres>::connect(connection_string.as_str()).await?;
 
-        let m = Migrator::new(Path::new("./migrations")).await?;
+        let path = instance_name.clone() + "/migrations";
+        let m = Migrator::new(Path::new(&path)).await?;
         m.run(&pool).await?;
 
         sp.stop_with_message(&format!(
             "{} {}",
             "✓".color(colors::indicator_good()).bold(),
-            "SQL migration completed".color(Color::White).bold()
+            format!("SQL migration completed for {}", instance_name)
+                .color(Color::White)
+                .bold()
         ));
 
         Ok(())

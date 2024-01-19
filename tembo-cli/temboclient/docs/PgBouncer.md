@@ -4,7 +4,7 @@
 
 Name | Type | Description | Notes
 ------------ | ------------- | ------------- | -------------
-**parameters** | Option<**::std::collections::HashMap<String, String>**> |  | [optional]
+**parameters** | Option<**::std::collections::HashMap<String, String>**> | Valid pgbouncer parameter values can be found at [https://www.pgbouncer.org/config.html](https://www.pgbouncer.org/config.html) | [optional]
 **pool_mode** | Option<[**crate::models::PoolerPgbouncerPoolMode**](PoolerPgbouncerPoolMode.md)> |  | [optional]
 **resources** | Option<[**crate::models::PoolerTemplateSpecContainersResources**](PoolerTemplateSpecContainersResources.md)> |  | [optional]
 
