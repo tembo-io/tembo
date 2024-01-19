@@ -46,6 +46,7 @@ mod test {
     };
     use rand::Rng;
     use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
+    use std::thread::sleep;
     use std::{
         collections::{BTreeMap, BTreeSet},
         ops::Not,
@@ -54,7 +55,6 @@ mod test {
         thread,
         time::Duration,
     };
-    use std::thread::sleep;
 
     use tokio::{io::AsyncReadExt, time::timeout};
 
