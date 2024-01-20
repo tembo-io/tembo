@@ -8,6 +8,8 @@ appServices:
     env:
       - name: BATCH_SIZE
         value: "1000"
+      - name: XDG_CACHE_HOME
+        value: /models/.cache
     routing:
       - port: 3000
         ingressPath: /vectordb
@@ -26,6 +28,20 @@ appServices:
       limits:
         cpu: 4000m
         memory: 1500Mi
+    storage:
+      volumeMounts:
+      - mountPath: /models
+        name: hf-data-vol
+      volumes:
+      - ephemeral:
+          volumeClaimTemplate:
+            spec:
+              accessModes:
+              - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 2Gi
+        name: hf-data-vol
 trunk_installs:
   - name: pgmq
     version: 1.1.1
