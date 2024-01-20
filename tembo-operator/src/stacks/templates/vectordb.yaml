@@ -8,6 +8,8 @@ appServices:
     env:
       - name: BATCH_SIZE
         value: "1000"
+      - name: XDG_CACHE_HOME
+        value: /models/.cache
     routing:
       - port: 3000
         ingressPath: /vectordb
@@ -19,9 +21,6 @@ appServices:
           config:
             regex: ^\/vectordb\/?
             replacement: /v1/embeddings
-    env:
-      - name: XDG_CACHE_HOME
-        value: /models/.cache
     resources:
       requests:
         cpu: 500m
