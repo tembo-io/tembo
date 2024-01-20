@@ -40,7 +40,7 @@ appServices:
               - ReadWriteOnce
               resources:
                 requests:
-                  storage: 1Gi
+                  storage: 2Gi
         name: hf-data-vol
 trunk_installs:
   - name: pgmq
