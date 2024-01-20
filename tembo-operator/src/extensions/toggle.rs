@@ -423,15 +423,25 @@ async fn check_for_extensions_enabled_with_load(
                     description,
                     locations: vec![],
                 };
-                let location_status = ExtensionInstallLocationStatus {
-                    enabled: Some(true),
-                    database: "postgres".to_string(),
-                    schema: None,
-                    version: None,
-                    error: Some(false),
-                    error_message: None,
-                };
-                extension_status.locations.push(location_status);
+
+                let extensions = cdb.spec.extensions.clone();
+                for desired_extension in extensions {
+                    if desired_extension.name == extension.name {
+                        for desired_location in desired_extension.locations {
+                            let location_status = ExtensionInstallLocationStatus {
+                                enabled: Some(desired_location.enabled.clone()),
+                                database: desired_location.database.clone(),
+                                schema: desired_location.schema.clone(),
+                                version: desired_location.version.clone(),
+                                error: Some(false),
+                                error_message: None,
+                            };
+                            extension_status
+                                .locations
+                                .push(location_status);
+                        }
+                    }
+                }
                 extensions_enabled_with_load.push(extension_status);
             }
             info!("Found {}.so file: {}", extension.name, found);

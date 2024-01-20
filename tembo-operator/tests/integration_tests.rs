@@ -2197,7 +2197,7 @@ mod test {
 
     #[tokio::test]
     #[ignore]
-    async fn funtional_test_ext_with_load() {
+    async fn functional_test_ext_with_load() {
         // Initialize the Kubernetes client
         let client = kube_client().await;
         let state = State::default();
