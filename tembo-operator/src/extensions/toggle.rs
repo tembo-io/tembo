@@ -436,9 +436,7 @@ async fn check_for_extensions_enabled_with_load(
                                 error: Some(false),
                                 error_message: None,
                             };
-                            extension_status
-                                .locations
-                                .push(location_status);
+                            extension_status.locations.push(location_status);
                         }
                     }
                 }

@@ -2425,7 +2425,7 @@ mod test {
             "auto_explain".to_string(),
             true,
         )
-            .await;
+        .await;
 
         wait_until_psql_contains(
             context.clone(),
@@ -2434,7 +2434,7 @@ mod test {
             "auth_delay".to_string(),
             true,
         )
-            .await;
+        .await;
 
         // Assert psql show pg_available_extensions contains pg_stat_statements
         wait_until_psql_contains(
@@ -2444,7 +2444,7 @@ mod test {
             "pg_stat_statements".to_string(),
             false,
         )
-            .await;
+        .await;
 
         // Assert psql show pg_available_extensions does not contain auto_explain
         wait_until_psql_contains(
@@ -2454,7 +2454,7 @@ mod test {
             "auto_explain".to_string(),
             true,
         )
-            .await;
+        .await;
 
         // Assert psql show pg_available_extensions does not contain auth_delay
         wait_until_psql_contains(
@@ -2464,7 +2464,7 @@ mod test {
             "auth_delay".to_string(),
             true,
         )
-            .await;
+        .await;
 
         // Check extension status in CoreDB resource
         sleep(Duration::from_secs(10)); //TODO(ianstanton) remove this sleep
