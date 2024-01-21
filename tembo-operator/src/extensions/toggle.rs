@@ -73,22 +73,24 @@ async fn toggle_extensions(
                 None => &extension_to_toggle.name,
                 Some(expected_library_name) => expected_library_name,
             };
-            // Get extensions trunk project name
-
             // If version is None, error
             if location_to_toggle.version.is_none() {
                 error!("Version for {} is none. Version should never be none when toggling an extension", extension_to_toggle.name);
                 continue;
             }
 
+            // Get extensions trunk project name
             let trunk_project_name =
                 get_trunk_project_for_extension(extension_to_toggle.name.clone()).await?;
+
+            // Check if extension has a loadable library
             let has_loadable_library = get_loadable_library_name(
                 trunk_project_name.clone().unwrap(),
                 location_to_toggle.clone().version.unwrap(),
                 extension_to_toggle.name.clone(),
             )
             .await?;
+
             // If we are toggling on,
             // the extension is included in the REQUIRES_LOAD list,
             // and also is not present in shared_preload_libraries,
@@ -115,17 +117,9 @@ async fn toggle_extensions(
             )
             .await?;
 
-            info!(
-                "Extension {}'s control file absent: {}",
-                extension_to_toggle.name, control_file_absent
-            );
-            info!(
-                "Extension {} has loadable library: {:?}",
-                extension_to_toggle.name, has_loadable_library
-            );
             if control_file_absent && has_loadable_library.is_some() {
                 info!(
-                    "Extension {} must be enabled with LOAD. Skipping CREATE EXTENSION toggle.",
+                    "Extension {} must be enabled with LOAD. Skipping toggle.",
                     extension_to_toggle.name,
                 );
                 continue;
@@ -342,10 +336,6 @@ pub fn determine_extension_locations_to_toggle(cdb: &CoreDB) -> Vec<Extension> {
                     error!("When determining extensions to toggle, there should always be a location status for the desired location, because that should be included by determine_updated_extensions_status.");
                 }
                 Some(actual_status) => {
-                    info!(
-                        "Actual status for extension {}: {:?}",
-                        desired_extension.name, actual_status
-                    );
                     // If we don't have an error already, the extension exists, and the desired does not match the actual
                     // The actual_status.error should not be None because this only exists on old resource versions
                     // and we update actual_status before calling this function. If we find that for some reason, we just skip.
@@ -371,7 +361,7 @@ pub fn determine_extension_locations_to_toggle(cdb: &CoreDB) -> Vec<Extension> {
 
 // Check for extensions enabled with LOAD. When these extensions are installed, they are not
 // present in pg_available_extensions. In order to check if they are installed, we need to check
-// for the presence of <extension_name>>.so file in the pod.
+// for the presence of <extension_name>.so file in the pod.
 async fn check_for_extensions_enabled_with_load(
     cdb: &CoreDB,
     ctx: Arc<Context>,
@@ -442,7 +432,6 @@ async fn check_for_extensions_enabled_with_load(
                 }
                 extensions_enabled_with_load.push(extension_status);
             }
-            info!("Found {}.so file: {}", extension.name, found);
         }
     }
     Ok(extensions_enabled_with_load)

@@ -2330,7 +2330,7 @@ mod test {
         )
         .await;
 
-        // Check extension status in CoreDB resource
+        // Check auto_explain and auth_delay and pg_stat_statements are enabled in extension status.
         sleep(Duration::from_secs(10)); //TODO(ianstanton) remove this sleep
         let coredb_resource = coredbs.get(name).await.unwrap();
         let mut found_auto_explain = false;
@@ -2466,7 +2466,7 @@ mod test {
         )
         .await;
 
-        // Check extension status in CoreDB resource
+        // Check auto_explain and auth_delay are disabled in extension status. Check pg_stat_statements is still enabled.
         sleep(Duration::from_secs(10)); //TODO(ianstanton) remove this sleep
         let coredb_resource = coredbs.get(name).await.unwrap();
         let mut found_auto_explain = false;

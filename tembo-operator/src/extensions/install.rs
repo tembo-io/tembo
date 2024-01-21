@@ -416,8 +416,8 @@ pub async fn check_for_so_files(
     let coredb_name = cdb.metadata.name.as_deref().unwrap_or_default();
 
     info!(
-        "Checking for .so files in /var/lib/postgresql/data/tembo/15/lib for pod {} for {}",
-        pod_name, coredb_name
+        "Checking for {}.so in filesystem for instance {}",
+        extension_name, coredb_name
     );
 
     let client = ctx.client.clone();
@@ -454,27 +454,27 @@ pub async fn check_for_so_files(
                 // Check if .so files exist in output
                 if output.contains(format!("{}.so", extension_name).as_str()) {
                     info!(
-                        "Found {}.so file in /usr/local/lib/postgresql/extensions for pod {} for {}",
-                        extension_name, pod_name, coredb_name
+                        "Found {}.so file in filesystem for instance {}",
+                        extension_name, coredb_name
                     );
                     return Ok(true);
                 }
                 info!(
-                    "No .so files found in /usr/local/lib/postgresql/extensions for pod {} for {}",
-                    pod_name, coredb_name
+                    "No {}.so found in filesystem for instance {}",
+                    extension_name, coredb_name
                 );
                 return Ok(false);
             }
             error!(
-                "Failed to check for {}.so file in /usr/local/lib/postgresql/extensions for pod {} for {}:\n{}",
-                extension_name, pod_name, coredb_name, output
+                "Failed to check for {}.so in filesystem for instance {}:\n{}",
+                extension_name, coredb_name, output
             );
             Err(Action::requeue(Duration::from_secs(10)))
         }
         Err(_) => {
             error!(
-                "Kube exec error checking for {}.so file in /usr/local/lib/postgresql/extensions for pod {} for {}",
-                extension_name, pod_name, coredb_name
+                "Kube exec error checking for {}.so file in filesystem for instance for {}",
+                extension_name, coredb_name
             );
             Err(Action::requeue(Duration::from_secs(10)))
         }
