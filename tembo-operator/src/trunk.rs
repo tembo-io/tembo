@@ -233,6 +233,7 @@ pub async fn get_trunk_project_names() -> Result<Vec<String>, TrunkError> {
 }
 
 // Get all metadata entries for a given trunk project
+#[allow(dead_code)]
 async fn get_trunk_project_metadata(
     trunk_project: String,
 ) -> Result<Vec<TrunkProjectMetadata>, TrunkError> {

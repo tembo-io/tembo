@@ -575,6 +575,87 @@ mod test {
         false
     }
 
+    // Wait for a specific extension to be enabled in coredb.status.extensions. Check for disabled with inverse value.
+    async fn wait_for_extension_status_enabled(
+        coredbs: &Api<CoreDB>,
+        name: &str,
+        extension: &str,
+        inverse: bool,
+    ) -> Result<(), kube::Error> {
+        let max_retries = 10;
+        let wait_duration = Duration::from_secs(2); // Adjust as needed
+
+        for attempt in 1..=max_retries {
+            match coredbs.get(name).await {
+                Ok(coredb) => {
+                    // Check if the extension is enabled in the status
+                    let has_extension = coredb.status.as_ref().map_or(false, |s| {
+                        s.extensions.as_ref().map_or(false, |extensions| {
+                            extensions.iter().any(|ext| {
+                                ext.name == extension
+                                    && ext.locations.iter().any(|loc| {
+                                        loc.enabled.unwrap() && loc.database == "postgres"
+                                    })
+                            })
+                        })
+                    });
+
+                    if inverse {
+                        if !has_extension {
+                            println!(
+                                "CoreDB {} has extension {} disabled in status",
+                                name, extension
+                            );
+                            return Ok(());
+                        } else {
+                            println!(
+                                "Attempt {}/{}: CoreDB {} has extension {} enabled in status",
+                                attempt, max_retries, name, extension
+                            );
+                        }
+                    } else {
+                        if has_extension {
+                            println!(
+                                "CoreDB {} has extension {} enabled in status",
+                                name, extension
+                            );
+                            return Ok(());
+                        } else {
+                            println!(
+                                "Attempt {}/{}: CoreDB {} has extension {} disabled in status",
+                                attempt, max_retries, name, extension
+                            );
+                        }
+                    }
+                }
+                Err(e) => {
+                    println!(
+                        "Failed to get CoreDB on attempt {}/{}: {}",
+                        attempt, max_retries, e
+                    );
+                }
+            }
+
+            tokio::time::sleep(wait_duration).await;
+        }
+
+        if inverse {
+            println!(
+                "CoreDB {} did not have extension {} disabled in status after {} attempts",
+                name, extension, max_retries
+            );
+        } else {
+            println!(
+                "CoreDB {} did not have extension {} enabled in status after {} attempts",
+                name, extension, max_retries
+            );
+        }
+        Err(kube::Error::ReadEvents(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "Timed out waiting for extension to be enabled",
+        )))
+    }
+
     // Function to wait for metrics to appear
     async fn wait_for_metric(
         pods: Api<Pod>,
@@ -2330,31 +2411,18 @@ mod test {
         )
         .await;
 
-        // Check auto_explain and auth_delay and pg_stat_statements are enabled in extension status.
-        sleep(Duration::from_secs(10)); //TODO(ianstanton) remove this sleep
-        let coredb_resource = coredbs.get(name).await.unwrap();
-        let mut found_auto_explain = false;
-        let mut found_pg_stat_statements = false;
-        let mut found_auth_delay = false;
-        for extension in coredb_resource.status.unwrap().extensions.unwrap() {
-            for location in extension.locations {
-                if extension.name == "auto_explain" && location.enabled.unwrap() {
-                    found_auto_explain = true;
-                    assert_eq!(location.database, "postgres");
-                }
-                if extension.name == "pg_stat_statements" && location.enabled.unwrap() {
-                    found_pg_stat_statements = true;
-                    assert_eq!(location.database, "postgres");
-                }
-                if extension.name == "auth_delay" && location.enabled.unwrap() {
-                    found_auth_delay = true;
-                    assert_eq!(location.database, "postgres");
-                }
-            }
-        }
-        assert!(found_auto_explain);
-        assert!(found_pg_stat_statements);
-        assert!(found_auth_delay);
+        // Check auto_explain, auth_delay and pg_stat_statements are enabled in extension status.
+        wait_for_extension_status_enabled(&coredbs, name, "auto_explain", false)
+            .await
+            .expect("Error: auto_explain was not enabled in status");
+
+        wait_for_extension_status_enabled(&coredbs, name, "auth_delay", false)
+            .await
+            .expect("Error: auth_delay was not enabled in status");
+
+        wait_for_extension_status_enabled(&coredbs, name, "pg_stat_statements", false)
+            .await
+            .expect("Error: pg_stat_statements was not enabled in status");
 
         // Disable auto_explain and auth_delay
         let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
@@ -2467,30 +2535,17 @@ mod test {
         .await;
 
         // Check auto_explain and auth_delay are disabled in extension status. Check pg_stat_statements is still enabled.
-        sleep(Duration::from_secs(10)); //TODO(ianstanton) remove this sleep
-        let coredb_resource = coredbs.get(name).await.unwrap();
-        let mut found_auto_explain = false;
-        let mut found_pg_stat_statements = false;
-        let mut found_auth_delay = false;
-        for extension in coredb_resource.status.unwrap().extensions.unwrap() {
-            for location in extension.locations {
-                if extension.name == "auto_explain" && location.enabled.unwrap() {
-                    found_auto_explain = true;
-                    assert_eq!(location.database, "postgres");
-                }
-                if extension.name == "pg_stat_statements" && location.enabled.unwrap() {
-                    found_pg_stat_statements = true;
-                    assert_eq!(location.database, "postgres");
-                }
-                if extension.name == "auth_delay" && location.enabled.unwrap() {
-                    found_auth_delay = true;
-                    assert_eq!(location.database, "postgres");
-                }
-            }
-        }
-        assert!(!found_auto_explain);
-        assert!(found_pg_stat_statements);
-        assert!(!found_auth_delay);
+        wait_for_extension_status_enabled(&coredbs, name, "auto_explain", true)
+            .await
+            .expect("Error: auto_explain was not disabled in status");
+
+        wait_for_extension_status_enabled(&coredbs, name, "auth_delay", true)
+            .await
+            .expect("Error: auth_delay was not disabled in status");
+
+        wait_for_extension_status_enabled(&coredbs, name, "pg_stat_statements", false)
+            .await
+            .expect("Error: pg_stat_statements was not enabled in status");
 
         // Cleanup
         coredbs.delete(name, &Default::default()).await.unwrap();
