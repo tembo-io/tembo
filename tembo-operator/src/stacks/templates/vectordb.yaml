@@ -3,11 +3,13 @@ description: A Tembo Postgres Stack configured to support vector data types, sto
 image: "quay.io/tembo/standard-cnpg:15.3.0-1-795fc99"
 stack_version: 0.1.0
 appServices:
-  - image: quay.io/tembo/vector-serve:291da06
+  - image: quay.io/tembo/vector-serve:cbabfae
     name: embeddings
     env:
       - name: BATCH_SIZE
         value: "1000"
+      - name: XDG_CACHE_HOME
+        value: /models/.cache
     routing:
       - port: 3000
         ingressPath: /vectordb
@@ -18,7 +20,7 @@ appServices:
           name: map-embeddings
           config:
             regex: ^\/vectordb\/?
-            replacement: /
+            replacement: /v1/embeddings
     resources:
       requests:
         cpu: 500m
@@ -26,6 +28,20 @@ appServices:
       limits:
         cpu: 4000m
         memory: 1500Mi
+    storage:
+      volumeMounts:
+      - mountPath: /models
+        name: hf-data-vol
+      volumes:
+      - ephemeral:
+          volumeClaimTemplate:
+            spec:
+              accessModes:
+              - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 2Gi
+        name: hf-data-vol
 trunk_installs:
   - name: pgmq
     version: 1.1.1
