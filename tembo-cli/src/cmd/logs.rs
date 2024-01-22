@@ -2,9 +2,9 @@ use crate::apply::{get_instance_id, get_instance_settings};
 use crate::cli::context::{get_current_context, Environment, Profile};
 use anyhow::Result;
 use clap::Args;
-use serde::{Deserialize, Serialize};
 use reqwest::blocking::Client;
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
+use serde::{Deserialize, Serialize};
 use temboclient::apis::configuration::Configuration;
 
 #[derive(Args)]
@@ -66,7 +66,7 @@ pub fn execute(verbose: bool) -> Result<()> {
         ..Default::default()
     };
 
-    let instance_settings = get_instance_settings(None,None)?;
+    let instance_settings = get_instance_settings(None, None)?;
 
     let client = Client::new();
     let mut headers = HeaderMap::new();
@@ -96,12 +96,12 @@ pub fn execute(verbose: bool) -> Result<()> {
             .query(&[("query", &query)])
             .send()?;
 
-            if response.status().is_success() {
-                let response_body = response.text()?;
-                beautify_logs(&response_body)?;
-            } else {
-                eprintln!("Error: {:?}", response.status());
-            }
+        if response.status().is_success() {
+            let response_body = response.text()?;
+            beautify_logs(&response_body)?;
+        } else {
+            eprintln!("Error: {:?}", response.status());
+        }
     }
 
     Ok(())
