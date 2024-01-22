@@ -5,9 +5,10 @@ use k8s_openapi::{
     api::{
         apps::v1::{Deployment, DeploymentSpec},
         core::v1::{
-            Capabilities, Container, ContainerPort, EnvVar, EnvVarSource, HTTPGetAction, PodSpec,
-            PodTemplateSpec, Probe, Secret, SecretKeySelector, SecretVolumeSource, SecurityContext,
-            Service, ServicePort, ServiceSpec, Volume, VolumeMount,
+            Capabilities, Container, ContainerPort, EnvVar, EnvVarSource, HTTPGetAction,
+            PodSecurityContext, PodSpec, PodTemplateSpec, Probe, Secret, SecretKeySelector,
+            SecretVolumeSource, SecurityContext, Service, ServicePort, ServiceSpec, Volume,
+            VolumeMount,
         },
     },
     apimachinery::pkg::{
@@ -394,8 +395,14 @@ fn generate_deployment(
     };
     volume_mounts.push(certs_volume_mount);
 
+    let mut pod_security_context: Option<PodSecurityContext> = None;
     // Add any user provided volumes / volume mounts
     if let Some(storage) = appsvc.storage.clone() {
+        // when there are user specified volumes, we need to let kubernetes modify permissions of those volumes
+        pod_security_context = Some(PodSecurityContext {
+            fs_group: Some(65534),
+            ..PodSecurityContext::default()
+        });
         if let Some(vols) = storage.volumes {
             volumes.extend(vols);
         }
@@ -420,6 +427,7 @@ fn generate_deployment(
             ..Container::default()
         }],
         volumes: Some(volumes),
+        security_context: pod_security_context,
         ..PodSpec::default()
     };
 
