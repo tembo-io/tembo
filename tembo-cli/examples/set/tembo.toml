@@ -1,7 +1,9 @@
-[merge]
+[set]
 environment = "dev"
-instance_name = "merge"
+instance_name = "set"
 cpu = "1"
+memory = "2Gi"
 storage = "10Gi"
 replicas = 1
 stack_type = "Standard"
+
