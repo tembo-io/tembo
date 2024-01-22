@@ -626,7 +626,7 @@ mod test {
         // Configurations
         let mut rng = rand::thread_rng();
         let suffix = rng.gen_range(0..100000);
-        let name = &format!("test-coredb-{}", suffix);
+        let name = &format!("test-basic-cnpg-{}", suffix);
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
             Err(e) => {
@@ -735,7 +735,7 @@ mod test {
         // Configurations
         let mut rng = rand::thread_rng();
         let suffix = rng.gen_range(0..100000);
-        let name = &format!("test-coredb-{}", suffix);
+        let name = &format!("test-cnpg-metrics-create-{}", suffix);
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
             Err(e) => {
@@ -997,7 +997,7 @@ mod test {
         // Configurations
         let mut rng = rand::thread_rng();
         let suffix = rng.gen_range(0..100000);
-        let name = &format!("test-coredb-{}", suffix);
+        let name = &format!("test-cnpg-pgparams-{}", suffix);
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
             Err(e) => {
@@ -1194,7 +1194,7 @@ mod test {
         // Configurations
         let mut rng = rand::thread_rng();
         let suffix = rng.gen_range(0..100000);
-        let name = &format!("test-coredb-{}", suffix);
+        let name = &format!("test-skip-reconciliation-{}", suffix);
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
             Err(e) => {
@@ -1275,7 +1275,7 @@ mod test {
         // Configurations
         let mut rng = rand::thread_rng();
         let suffix = rng.gen_range(0..100000);
-        let name = &format!("test-coredb-{}", suffix);
+        let name = &format!("test-delete-namespace-{}", suffix);
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
             Err(e) => {
@@ -1377,7 +1377,7 @@ mod test {
         // Configurations
         let mut rng = rand::thread_rng();
         let suffix = rng.gen_range(0..100000);
-        let name = &format!("test-coredb-{}", suffix.clone());
+        let name = &format!("test-ingress-route-tcp-{}", suffix.clone());
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
             Err(e) => {
@@ -1576,7 +1576,7 @@ mod test {
         // Configurations
         let mut rng = rand::thread_rng();
         let suffix = rng.gen_range(0..100000);
-        let name = &format!("test-coredb-{}", suffix.clone());
+        let name = &format!("test-ingress-route-tcp-adopt-{}", suffix.clone());
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
             Err(e) => {
@@ -1690,7 +1690,7 @@ mod test {
         // Configurations
         let mut rng = rand::thread_rng();
         let suffix = rng.gen_range(0..100000);
-        let name = &format!("test-coredb-{}", suffix.clone());
+        let name = &format!("test-ingress-route-tcp-domain-{}", suffix.clone());
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
             Err(e) => {
@@ -1818,7 +1818,7 @@ mod test {
         // Configurations
         let mut rng = rand::thread_rng();
         let suffix = rng.gen_range(0..100000);
-        let name = &format!("test-coredb-{}", suffix);
+        let name = &format!("test-ha-basic-cnpg-{}", suffix);
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
             Err(e) => {
@@ -1904,7 +1904,7 @@ mod test {
         // Configurations
         let mut rng = rand::thread_rng();
         let suffix = rng.gen_range(0..100000);
-        let name = &format!("test-coredb-{}", suffix);
+        let name = &format!("test-ha-upgrade-cnpg-{}", suffix);
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
             Err(e) => {
@@ -2205,7 +2205,7 @@ mod test {
         // Configurations
         let mut rng = rand::thread_rng();
         let suffix = rng.gen_range(0..100000);
-        let name = &format!("test-coredb-{}", suffix);
+        let name = &format!("test-ha-two-replicas-{}", suffix);
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
             Err(e) => {
@@ -2362,7 +2362,7 @@ mod test {
         // Configurations
         let mut rng = rand::thread_rng();
         let suffix = rng.gen_range(0..100000);
-        let name = &format!("test-coredb-{}", suffix);
+        let name = &format!("test-ha-verify-extension-{}", suffix);
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
             Err(e) => {
@@ -2587,7 +2587,7 @@ mod test {
         // Configurations
         let mut rng = rand::thread_rng();
         let suffix = rng.gen_range(0..100000);
-        let name = &format!("test-coredb-{}", suffix);
+        let name = &format!("test-ha-requires-load-{}", suffix);
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
             Err(e) => {
@@ -2874,7 +2874,7 @@ mod test {
         // Configurations
         let mut rng = rand::thread_rng();
         let suffix = rng.gen_range(0..100000);
-        let cdb_name = &format!("test-coredb-{}", suffix);
+        let cdb_name = &format!("test-app-service-{}", suffix);
         let namespace = match create_namespace(client.clone(), cdb_name).await {
             Ok(namespace) => namespace,
             Err(e) => {
@@ -3596,7 +3596,7 @@ CREATE EVENT TRIGGER pgrst_watch
             let mut rng = rand::thread_rng();
             let suffix = rng.gen_range(0..100000);
 
-            format!("test-coredb-{}", suffix)
+            format!("test-restart-postgres-{}", suffix)
         };
 
         let namespace = create_namespace(client.clone(), &name).await.unwrap();
@@ -3766,7 +3766,7 @@ CREATE EVENT TRIGGER pgrst_watch
         // Configurations
         let mut rng = rand::thread_rng();
         let suffix = rng.gen_range(0..100000);
-        let name = &format!("test-coredb-{}", suffix);
+        let name = &format!("test-status-configs-{}", suffix);
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
             Err(e) => {
@@ -3921,7 +3921,7 @@ CREATE EVENT TRIGGER pgrst_watch
         // Configurations
         let mut rng = rand::thread_rng();
         let suffix = rng.gen_range(0..100000);
-        let name = &format!("test-coredb-{}", suffix);
+        let name = &format!("test-backup-restore-{}", suffix);
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
             Err(e) => {
@@ -4319,7 +4319,7 @@ CREATE EVENT TRIGGER pgrst_watch
         // Configurations
         let mut rng = rand::thread_rng();
         let suffix = rng.gen_range(0..100000);
-        let name = &format!("test-coredb-{}", suffix);
+        let name = &format!("test-pooler-{}", suffix);
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
             Err(e) => {

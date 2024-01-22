@@ -105,13 +105,14 @@ pub fn instance_started(server_url: &str, stack: &str, instance_type: &str) {
         "\n{bar} {} {instance_type} instance {}: \n\n ➜ {}\n ➜ {}",
         logo(),
         "started".bg_rgb(255, 125, 127).color(Color::White).bold(),
-        format!(
+        format_args!(
             "{} {}",
             "Url:".color(Color::White).bold(),
             server_url.bold()
         ),
         stack.color(colors::grey()).bold()
     );
+    println!()
 }
 
 /// Helper function for printing indentations to the console
@@ -143,6 +144,7 @@ pub mod colors {
     }
 
     #[allow(dead_code)]
+    #[allow(clippy::needless_lifetimes)]
     pub fn gradient_p<'a>(log: &'a str) -> GradientDisplay<'a, [RGB; 4]> {
         GradientStr::gradient(
             log,

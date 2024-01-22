@@ -2,7 +2,7 @@
 
 Tembo CLI allows users to experience [Tembo](https://tembo.io) locally, as well as,
 manage and deploy to Tembo Cloud. It abstracts away complexities of configuring,
-managing, and running Postgres in a local environment.
+managing, and running Postgres.
 
 ## Getting Started
 
@@ -34,11 +34,11 @@ The `tembo init` command initializes your environment with following files. Run 
 
 For more information: `tembo init --help`
 
-### Add Tembo Cloud info
+#### Add Tembo Cloud info
 
 To provision instances on Tembo Cloud using CLI you will need to configure `org_id` & `tembo_access_token`
 
-* fetch the `org_id` Tembo Cloud and add it as `org_id` in context file generated above 
+* fetch the `org_id` from Tembo Cloud and add it as `org_id` in context file generated above
 * generate a JWT token using steps [here](https://tembo.io/docs/tembo-cloud/security-and-authentication/api-authentication/) & add it as `tembo_access_token` to the credentials file generated above.
 
 #### `tembo context list/set`
@@ -54,13 +54,18 @@ Validates `tembo.toml` and other configurations files.
 Validates tembo.toml (same as `tembo validate`) and applies the changes to the context selected.
 
 * applies changes and runs migration for all dbs
-    * **local docker:** stops existing container if it exists & run docker build/run + sqlx migration
-    * **tembo-cloud:** calls the api in appropriate environment to create/update instance
+    * **local docker:**
+        * runs `docker-compose down` to bring down all existing containers
+        * generates `Dockerfile` for each instance & builds a docker image
+        * generates `docker-compose` to provision all instances
+        * runs `docker-compose up -d` to spin up all instances
+        * runs `sqlx migration` against the instances
+    * **tembo-cloud:** Creates/updates instance on tembo-cloud by calling the api against the appropriate environment
 
 #### `tembo delete`
 
-- **local docker:** runs `docker stop & rm` command
-- **tembo-cloud:** calls delete tembo api endpoint
+- **local docker:** runs `docker-compose down` command to bring down all containers
+- **tembo-cloud:** deletes the instance on tembo-cloud by calling the api
 
 ## Developing Tembo CLI
 
@@ -94,7 +99,7 @@ Delete the contents of the directory first and then run following command to re-
 openapi-generator generate -i https://api.data-1.use1.tembo.io/api-docs/openapi.json  -g rust -o . --additional-properties=packageName=tembodataclient
 ```
 
-* Go to `tembodataclient/src/lib.rs` & add followng line at the top to disable clippy for the generated code
+* Go to `tembodataclient/src/lib.rs` & add following line at the top to disable clippy for the generated code
 
 ```
 #![allow(clippy::all)]
@@ -110,7 +115,7 @@ Delete the contents of the directory first and then run following command to re-
 openapi-generator generate -i https://api.tembo.io/api-docs/openapi.json  -g rust -o . --additional-properties=packageName=temboclient
 ```
 
-* Go to `temboclient/src/lib.rs` & add followng line at the top to disable clippy for the generated code
+* Go to `temboclient/src/lib.rs` & add following line at the top to disable clippy for the generated code
 
 ```
 #![allow(clippy::all)]
