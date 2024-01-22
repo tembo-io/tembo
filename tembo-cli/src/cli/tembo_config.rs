@@ -2,6 +2,10 @@ use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
 use toml::Value;
 
+fn parse_toml(toml_str: &str) -> Result<TemboConfig, toml::de::Error> {
+    toml::from_str(toml_str)
+}
+
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct TemboConfig {
     pub version: String,
