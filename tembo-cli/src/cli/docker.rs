@@ -152,7 +152,7 @@ impl Docker {
 
         let stderr = String::from_utf8(output.stderr).unwrap();
 
-        if !stderr.is_empty() {
+        if !output.status.success() {
             bail!("There was an issue stopping the instances: {}", stderr)
         }
 

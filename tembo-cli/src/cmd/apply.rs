@@ -93,6 +93,8 @@ fn docker_apply(
 ) -> Result<(), anyhow::Error> {
     Docker::installed_and_running()?;
 
+    Docker::docker_compose_down()?;
+
     for (_key, instance_setting) in instance_settings.clone().iter() {
         let result = docker_apply_instance(verbose, instance_setting);
 
