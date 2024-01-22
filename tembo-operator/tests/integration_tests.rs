@@ -46,6 +46,7 @@ mod test {
     };
     use rand::Rng;
     use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
+    use std::thread::sleep;
     use std::{
         collections::{BTreeMap, BTreeSet},
         ops::Not,
@@ -572,6 +573,87 @@ mod test {
             name, extension, max_retries
         );
         false
+    }
+
+    // Wait for a specific extension to be enabled in coredb.status.extensions. Check for disabled with inverse value.
+    async fn wait_for_extension_status_enabled(
+        coredbs: &Api<CoreDB>,
+        name: &str,
+        extension: &str,
+        inverse: bool,
+    ) -> Result<(), kube::Error> {
+        let max_retries = 10;
+        let wait_duration = Duration::from_secs(2); // Adjust as needed
+
+        for attempt in 1..=max_retries {
+            match coredbs.get(name).await {
+                Ok(coredb) => {
+                    // Check if the extension is enabled in the status
+                    let has_extension = coredb.status.as_ref().map_or(false, |s| {
+                        s.extensions.as_ref().map_or(false, |extensions| {
+                            extensions.iter().any(|ext| {
+                                ext.name == extension
+                                    && ext.locations.iter().any(|loc| {
+                                        loc.enabled.unwrap() && loc.database == "postgres"
+                                    })
+                            })
+                        })
+                    });
+
+                    if inverse {
+                        if !has_extension {
+                            println!(
+                                "CoreDB {} has extension {} disabled in status",
+                                name, extension
+                            );
+                            return Ok(());
+                        } else {
+                            println!(
+                                "Attempt {}/{}: CoreDB {} has extension {} enabled in status",
+                                attempt, max_retries, name, extension
+                            );
+                        }
+                    } else {
+                        if has_extension {
+                            println!(
+                                "CoreDB {} has extension {} enabled in status",
+                                name, extension
+                            );
+                            return Ok(());
+                        } else {
+                            println!(
+                                "Attempt {}/{}: CoreDB {} has extension {} disabled in status",
+                                attempt, max_retries, name, extension
+                            );
+                        }
+                    }
+                }
+                Err(e) => {
+                    println!(
+                        "Failed to get CoreDB on attempt {}/{}: {}",
+                        attempt, max_retries, e
+                    );
+                }
+            }
+
+            tokio::time::sleep(wait_duration).await;
+        }
+
+        if inverse {
+            println!(
+                "CoreDB {} did not have extension {} disabled in status after {} attempts",
+                name, extension, max_retries
+            );
+        } else {
+            println!(
+                "CoreDB {} did not have extension {} enabled in status after {} attempts",
+                name, extension, max_retries
+            );
+        }
+        Err(kube::Error::ReadEvents(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            "Timed out waiting for extension to be enabled",
+        )))
     }
 
     // Function to wait for metrics to appear
@@ -2103,7 +2185,7 @@ mod test {
                         "description": "cron",
                         "locations": [{
                             "enabled": true,
-                            "version": "1.5.2",
+                            "version": "1.6.2",
                             "database": "postgres",
                         }],
                     },
@@ -2118,7 +2200,7 @@ mod test {
                 }],
                 "trunk_installs": [{
                         "name": "pg_cron",
-                        "version": "1.5.2",
+                        "version": "1.6.2",
                 },
                 {
                         "name": "citus",
@@ -2175,6 +2257,297 @@ mod test {
 
         // CLEANUP TEST
         // Cleanup CoreDB
+        coredbs.delete(name, &Default::default()).await.unwrap();
+        println!("Waiting for CoreDB to be deleted: {}", &name);
+        let _assert_coredb_deleted = tokio::time::timeout(
+            Duration::from_secs(TIMEOUT_SECONDS_COREDB_DELETED),
+            await_condition(coredbs.clone(), name, conditions::is_deleted("")),
+        )
+        .await
+        .unwrap_or_else(|_| {
+            panic!(
+                "CoreDB {} was not deleted after waiting {} seconds",
+                name, TIMEOUT_SECONDS_COREDB_DELETED
+            )
+        });
+        println!("CoreDB resource deleted {}", name);
+
+        // Delete namespace
+        let _ = delete_namespace(client.clone(), &namespace).await;
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn functional_test_ext_with_load() {
+        // Initialize the Kubernetes client
+        let client = kube_client().await;
+        let state = State::default();
+        let context = state.create_context(client.clone());
+
+        // Configurations
+        let mut rng = rand::thread_rng();
+        let suffix = rng.gen_range(0..100000);
+        let name = &format!("test-ext-with-load-{}", suffix);
+        let namespace = match create_namespace(client.clone(), name).await {
+            Ok(namespace) => namespace,
+            Err(e) => {
+                eprintln!("Error creating namespace: {}", e);
+                std::process::exit(1);
+            }
+        };
+
+        let kind = "CoreDB";
+        let replicas = 1;
+
+        // Apply a basic configuration of CoreDB
+        println!("Creating CoreDB resource {}", name);
+        let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
+        // Generate basic CoreDB resource to start with
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name,
+            },
+            "spec": {
+                "replicas": replicas,
+                "extensions": [{
+                        "name": "auto_explain",
+                        "description": "",
+                        "locations": [{
+                            "enabled": true,
+                            "version": "15.3.0",
+                            "database": "postgres",
+                        }],
+                    },
+                    {
+                        "name": "pg_stat_statements",
+                        "description": "",
+                        "locations": [{
+                            "enabled": true,
+                            "version": "1.10.0",
+                            "database": "postgres",
+                        }],
+                    },
+                    {
+                        "name": "auth_delay",
+                        "description": "",
+                        "locations": [{
+                            "enabled": true,
+                            "version": "15.3.0",
+                            "database": "postgres",
+                        }],
+                }],
+                "trunk_installs": [{
+                        "name": "auto_explain",
+                        "version": "15.3.0",
+                },
+                {
+                        "name": "pg_stat_statements",
+                        "version": "1.10.0",
+                },
+                {
+                        "name": "auth_delay",
+                        "version": "15.3.0",
+                }]
+            }
+        });
+        let params = PatchParams::apply("tembo-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        let coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        // Wait for CNPG Pod to be created
+        let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
+        let pod_name = format!("{}-1", name);
+
+        pod_ready_and_running(pods.clone(), pod_name.clone()).await;
+
+        // Assert psql show shared_preload_libraries contains auto_explain and auth_delay
+        wait_until_psql_contains(
+            context.clone(),
+            coredb_resource.clone(),
+            "SHOW shared_preload_libraries".to_string(),
+            "auto_explain".to_string(),
+            false,
+        )
+        .await;
+
+        wait_until_psql_contains(
+            context.clone(),
+            coredb_resource.clone(),
+            "SHOW shared_preload_libraries".to_string(),
+            "auth_delay".to_string(),
+            false,
+        )
+        .await;
+
+        // Assert psql show pg_available_extensions contains pg_stat_statements
+        wait_until_psql_contains(
+            context.clone(),
+            coredb_resource.clone(),
+            "SELECT * FROM pg_available_extensions".to_string(),
+            "pg_stat_statements".to_string(),
+            false,
+        )
+        .await;
+
+        // Assert psql show pg_available_extensions does not contain auto_explain
+        wait_until_psql_contains(
+            context.clone(),
+            coredb_resource.clone(),
+            "SELECT * FROM pg_available_extensions".to_string(),
+            "auto_explain".to_string(),
+            true,
+        )
+        .await;
+
+        // Assert psql show pg_available_extensions does not contain auth_delay
+        wait_until_psql_contains(
+            context.clone(),
+            coredb_resource.clone(),
+            "SELECT * FROM pg_available_extensions".to_string(),
+            "auth_delay".to_string(),
+            true,
+        )
+        .await;
+
+        // Check auto_explain, auth_delay and pg_stat_statements are enabled in extension status.
+        wait_for_extension_status_enabled(&coredbs, name, "auto_explain", false)
+            .await
+            .expect("Error: auto_explain was not enabled in status");
+
+        wait_for_extension_status_enabled(&coredbs, name, "auth_delay", false)
+            .await
+            .expect("Error: auth_delay was not enabled in status");
+
+        wait_for_extension_status_enabled(&coredbs, name, "pg_stat_statements", false)
+            .await
+            .expect("Error: pg_stat_statements was not enabled in status");
+
+        // Disable auto_explain and auth_delay
+        let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name,
+            },
+            "spec": {
+                "replicas": replicas,
+                "extensions": [{
+                        "name": "auto_explain",
+                        "description": "",
+                        "locations": [{
+                            "enabled": false,
+                            "version": "15.3.0",
+                            "database": "postgres",
+                        }],
+                    },
+                    {
+                        "name": "pg_stat_statements",
+                        "description": "",
+                        "locations": [{
+                            "enabled": true,
+                            "version": "1.10.0",
+                            "database": "postgres",
+                        }],
+                    },
+                    {
+                        "name": "auth_delay",
+                        "description": "",
+                        "locations": [{
+                            "enabled": false,
+                            "version": "15.3.0",
+                            "database": "postgres",
+                        }],
+                }],
+                "trunk_installs": [{
+                        "name": "auto_explain",
+                        "version": "15.3.0",
+                },
+                {
+                        "name": "pg_stat_statements",
+                        "version": "1.10.0",
+                },
+                {
+                        "name": "auth_delay",
+                        "version": "15.3.0",
+                }]
+            }
+        });
+        let params = PatchParams::apply("tembo-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        let coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        // Wait for CNPG Pod to be updated and ready
+        let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
+        let pod_name = format!("{}-1", name);
+
+        pod_ready_and_running(pods.clone(), pod_name.clone()).await;
+
+        // Assert psql show shared_preload_libraries does not contain auto_explain and auth_delay
+        wait_until_psql_contains(
+            context.clone(),
+            coredb_resource.clone(),
+            "SHOW shared_preload_libraries".to_string(),
+            "auto_explain".to_string(),
+            true,
+        )
+        .await;
+
+        wait_until_psql_contains(
+            context.clone(),
+            coredb_resource.clone(),
+            "SHOW shared_preload_libraries".to_string(),
+            "auth_delay".to_string(),
+            true,
+        )
+        .await;
+
+        // Assert psql show pg_available_extensions contains pg_stat_statements
+        wait_until_psql_contains(
+            context.clone(),
+            coredb_resource.clone(),
+            "SELECT * FROM pg_available_extensions".to_string(),
+            "pg_stat_statements".to_string(),
+            false,
+        )
+        .await;
+
+        // Assert psql show pg_available_extensions does not contain auto_explain
+        wait_until_psql_contains(
+            context.clone(),
+            coredb_resource.clone(),
+            "SELECT * FROM pg_available_extensions".to_string(),
+            "auto_explain".to_string(),
+            true,
+        )
+        .await;
+
+        // Assert psql show pg_available_extensions does not contain auth_delay
+        wait_until_psql_contains(
+            context.clone(),
+            coredb_resource.clone(),
+            "SELECT * FROM pg_available_extensions".to_string(),
+            "auth_delay".to_string(),
+            true,
+        )
+        .await;
+
+        // Check auto_explain and auth_delay are disabled in extension status. Check pg_stat_statements is still enabled.
+        wait_for_extension_status_enabled(&coredbs, name, "auto_explain", true)
+            .await
+            .expect("Error: auto_explain was not disabled in status");
+
+        wait_for_extension_status_enabled(&coredbs, name, "auth_delay", true)
+            .await
+            .expect("Error: auth_delay was not disabled in status");
+
+        wait_for_extension_status_enabled(&coredbs, name, "pg_stat_statements", false)
+            .await
+            .expect("Error: pg_stat_statements was not enabled in status");
+
+        // Cleanup
         coredbs.delete(name, &Default::default()).await.unwrap();
         println!("Waiting for CoreDB to be deleted: {}", &name);
         let _assert_coredb_deleted = tokio::time::timeout(
@@ -2902,7 +3275,8 @@ mod test {
                         "locations": [
                             {
                                 "database": "postgres",
-                                "enabled": true
+                                "enabled": true,
+                                "version": "1.4.1"
                             }
                         ]
                     }
@@ -3320,7 +3694,8 @@ mod test {
                         "locations": [
                             {
                                 "database": "postgres",
-                                "enabled": true
+                                "enabled": true,
+                                "version": "1.4.1"
                             }
                         ]
                     }
@@ -3875,7 +4250,10 @@ CREATE EVENT TRIGGER pgrst_watch
                     }
                 }
             }
-            println!("Waiting for runtime_config to be populated with expected values");
+            println!(
+                "Waiting for runtime_config for {} to be populated with expected values",
+                name
+            );
             tokio::time::sleep(Duration::from_secs(5)).await;
         }
 
