@@ -53,7 +53,7 @@ fn merge_and_deduplicate_pods(
 
 // Collect any fenced pods and add them to the list of pods to install extensions into
 #[instrument(skip(ctx, cdb) fields(trace_id))]
-async fn all_fenced_and_non_fenced_pods(
+pub async fn all_fenced_and_non_fenced_pods(
     cdb: &CoreDB,
     ctx: Arc<Context>,
 ) -> Result<Vec<Pod>, Action> {
@@ -404,6 +404,84 @@ async fn execute_extension_install_command(
         }
     }
 }
+
+// Check if <extension_name>.so file exists for a given extension in /var/lib/postgresql/data/tembo/15/lib
+#[instrument(skip(cdb, ctx, pod_name) fields(trace_id))]
+pub async fn check_for_so_files(
+    cdb: &CoreDB,
+    ctx: Arc<Context>,
+    pod_name: &str,
+    extension_name: String,
+) -> Result<bool, Action> {
+    let coredb_name = cdb.metadata.name.as_deref().unwrap_or_default();
+
+    info!(
+        "Checking for {}.so in filesystem for instance {}",
+        extension_name, coredb_name
+    );
+
+    let client = ctx.client.clone();
+
+    // Check if the pod is up yet
+    if let Err(e) = cdb.log_pod_status(client.clone(), pod_name).await {
+        warn!(
+            "Could not fetch or log pod status for instance {}: {:?}",
+            coredb_name, e
+        );
+        return Err(Action::requeue(Duration::from_secs(10)));
+    }
+
+    // TODO(ianstanton) The postgres version should be configurable in the future, not hardcoded
+    let cmd = vec![
+        "ls".to_owned(),
+        "/var/lib/postgresql/data/tembo/15/lib".to_owned(),
+    ];
+
+    let result = cdb.exec(pod_name.to_string(), client.clone(), &cmd).await;
+
+    match result {
+        Ok(result) => {
+            let output = format!(
+                "{}\n{}",
+                result
+                    .stdout
+                    .unwrap_or_else(|| "Nothing in stdout".to_string()),
+                result
+                    .stderr
+                    .unwrap_or_else(|| "Nothing in stderr".to_string())
+            );
+
+            if result.success {
+                // Check if .so files exist in output
+                if output.contains(format!("{}.so", extension_name).as_str()) {
+                    info!(
+                        "Found {}.so file in filesystem for instance {}",
+                        extension_name, coredb_name
+                    );
+                    return Ok(true);
+                }
+                info!(
+                    "No {}.so found in filesystem for instance {}",
+                    extension_name, coredb_name
+                );
+                return Ok(false);
+            }
+            error!(
+                "Failed to check for {}.so in filesystem for instance {}:\n{}",
+                extension_name, coredb_name, output
+            );
+            Err(Action::requeue(Duration::from_secs(10)))
+        }
+        Err(_) => {
+            error!(
+                "Kube exec error checking for {}.so file in filesystem for instance for {}",
+                extension_name, coredb_name
+            );
+            Err(Action::requeue(Duration::from_secs(10)))
+        }
+    }
+}
+
 /// handles installing extensions
 #[instrument(skip(ctx, cdb) fields(trace_id))]
 pub async fn install_extensions_to_pod(
