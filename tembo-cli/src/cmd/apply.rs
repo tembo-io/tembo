@@ -785,13 +785,13 @@ mod tests {
         let overlay_config_str = overlay_config_path.to_str().unwrap();
 
         let merged_settings = get_instance_settings(Some(overlay_config_str.to_string()), None)?;
-        if let Some(setting) = merged_settings.get("defaults") {
+        if let Some(setting) = merged_settings.get("merge") {
             assert_ne!(
                 setting.cpu, "0.25",
                 "Default CPU setting was not overwritten"
             );
             assert_eq!(setting.replicas, 2, "Overlay Settings are not overwritten");
-            assert_eq!(setting.storage, "50Gi", "Base Settings are not overwritten");
+            assert_eq!(setting.storage, "10Gi", "Base Settings are not overwritten");
         } else {
             return Err("Merged setting key 'merge' not found".into());
         }
@@ -801,13 +801,13 @@ mod tests {
 
     #[tokio::test]
     async fn set_settings() -> Result<(), Box<dyn std::error::Error>> {
-        std::env::set_current_dir(PathBuf::from(ROOT_DIR).join("examples").join("merge"))?;
+        std::env::set_current_dir(PathBuf::from(ROOT_DIR).join("examples").join("set"))?;
 
-        let set_arg = "defaults.memory=2Gi";
+        let set_arg = "set.memory=2Gi";
 
         let final_settings = get_instance_settings(None, Some(set_arg.to_string()))?;
 
-        if let Some(setting) = final_settings.get("defaults") {
+        if let Some(setting) = final_settings.get("set") {
             assert_eq!(
                 setting.memory, "2Gi",
                 "Memory setting was not correctly applied"
