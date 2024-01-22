@@ -1,4 +1,4 @@
-[merge]
+[defaults]
 environment = "dev"
 instance_name = "merge"
 cpu = "1"
