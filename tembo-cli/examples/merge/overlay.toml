@@ -1,4 +1,4 @@
-[defaults]
+[merge]
 environment = "local"
 instance_name = "overlay_instance"
 replicas = 2
