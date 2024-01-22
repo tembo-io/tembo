@@ -26,7 +26,7 @@ pub fn execute() -> Result<(), anyhow::Error> {
 }
 
 fn execute_tembo_cloud(env: Environment) -> Result<(), anyhow::Error> {
-    let instance_settings = get_instance_settings(None)?;
+    let instance_settings = get_instance_settings(None, None)?;
 
     let profile = env.clone().selected_profile.unwrap();
     let config = Configuration {

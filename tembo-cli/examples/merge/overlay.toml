@@ -1,4 +1,4 @@
 [merge]
-environment = "prod"
+environment = "local"
 instance_name = "overlay_instance"
-memory = "10Gi"
+replicas = 2
