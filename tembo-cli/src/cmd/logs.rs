@@ -45,11 +45,10 @@ fn beautify_logs(json_data: &str) -> Result<()> {
     let log_data: LogData = serde_json::from_str(json_data)?;
 
     for entry in log_data.data.result {
-        println!("\nApp: {}, Container: {}, Pod: {}", entry.stream.app, entry.stream.container, entry.stream.pod);
+        //println!("\nApp: {}, Container: {}, Pod: {}", entry.stream.app, entry.stream.container, entry.stream.pod);
         for value in entry.values {
             let log_message = &value[1];
-            println!("{}", log_message);
-            println!("--------------------------------");
+            println!("\n{}", log_message);
         }
     }
 
