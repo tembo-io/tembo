@@ -607,7 +607,7 @@ pub fn set_instance_settings(
             "stack_type" => settings.stack_type = setting_value,
             _ => {
                 return Err(Error::msg(format!("Unknown setting: {}", setting_name)));
-            },
+            }
         }
     } else {
         return Err(Error::msg("Instance not found"));
@@ -615,7 +615,6 @@ pub fn set_instance_settings(
 
     Ok(())
 }
-
 
 pub fn get_instance_settings(
     overlay_file_path: Option<String>,
