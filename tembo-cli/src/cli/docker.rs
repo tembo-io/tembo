@@ -4,6 +4,7 @@ use colorful::{Color, Colorful};
 use simplelog::*;
 use spinoff::{spinners, Spinner};
 use std::io::{BufRead, BufReader};
+use std::path::Path;
 use std::process::Output;
 use std::process::{Command as ShellCommand, Stdio};
 use std::thread;
@@ -125,7 +126,21 @@ impl Docker {
         Ok(())
     }
 
-    pub fn docker_compose_down() -> Result<(), anyhow::Error> {
+    pub fn docker_compose_down(verbose: bool) -> Result<(), anyhow::Error> {
+        let path = Path::new("docker-compose.yml");
+        if !path.exists() {
+            if verbose {
+                println!(
+                    "{} {}",
+                    "✓".color(colors::indicator_good()).bold(),
+                    "No docker-compose.yml found in the directory"
+                        .color(Color::White)
+                        .bold()
+                )
+            }
+            return Ok(());
+        }
+
         let mut sp = Spinner::new(
             spinners::Dots,
             "Running Docker Compose Down",
@@ -152,7 +167,7 @@ impl Docker {
 
         let stderr = String::from_utf8(output.stderr).unwrap();
 
-        if !stderr.is_empty() {
+        if !output.status.success() {
             bail!("There was an issue stopping the instances: {}", stderr)
         }
 

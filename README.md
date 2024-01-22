@@ -18,7 +18,7 @@ We just got started, but here's what we're working on:
 * A managed service Postgres, which you can get early access to by visiting
   [our website](https://tembo.io)
 * [Tembo-Stacks](https://github.com/tembo-io/tembo-stacks) - pre-configured Postgres Stacks deployable to Kubernetes
-* [Tembo CLI](https://github.com/tembo-io/tembo-cli) built with Rust
+* [Tembo CLI](https://github.com/tembo-io/tembo/tree/main/tembo-cli) built with Rust
 * [Trunk CLI](https://github.com/tembo-io/trunk/tree/main/cli) that users can use to publish and install Postgres extensions
 * [Trunk Website](https://github.com/tembo-io/trunk/tree/main/registry) that serves as a backend for [pgt.dev](https://pgt.dev), and also provides discovery and metrics
 
