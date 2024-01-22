@@ -57,6 +57,10 @@ Validates tembo.toml (same as `tembo validate`) and applies the changes to the c
     * **local docker:** stops existing container if it exists & run docker build/run + sqlx migration
     * **tembo-cloud:** calls the api in appropriate environment to create/update instance
 
+* Flags
+    * `--merge` overlays a Tembo.toml by another toml file for a specific context
+    * `--set` overlays a Tembo.toml with a specific instance setting 
+
 #### `tembo delete`
 
 - **local docker:** runs `docker stop & rm` command
