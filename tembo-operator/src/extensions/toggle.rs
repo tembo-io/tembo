@@ -73,20 +73,28 @@ async fn toggle_extensions(
                 None => &extension_to_toggle.name,
                 Some(expected_library_name) => expected_library_name,
             };
-            // If version is None, error
-            if location_to_toggle.version.is_none() {
-                error!("Version for {} is none. Version should never be none when toggling an extension", extension_to_toggle.name);
-                continue;
-            }
-
             // Get extensions trunk project name
             let trunk_project_name =
                 get_trunk_project_for_extension(extension_to_toggle.name.clone()).await?;
 
+            // Find version for trunk_project_name in cdb.spec.trunk_installs
+            let mut trunk_project_version = None;
+            for trunk_install in cdb.spec.trunk_installs.clone() {
+                if trunk_install.name == trunk_project_name.clone().unwrap() {
+                    trunk_project_version = trunk_install.version;
+                }
+            }
+
+            // If version is None, error
+            if trunk_project_version.is_none() {
+                error!("Version for {} is none. Version should never be none when toggling an extension", extension_to_toggle.name);
+                continue;
+            }
+
             // Check if extension has a loadable library
             let has_loadable_library = get_loadable_library_name(
                 trunk_project_name.clone().unwrap(),
-                location_to_toggle.clone().version.unwrap(),
+                trunk_project_version.clone().unwrap(),
                 extension_to_toggle.name.clone(),
             )
             .await?;
@@ -113,7 +121,7 @@ async fn toggle_extensions(
             // Don't toggle extension if control file is absent && it has a loadable library
             let control_file_absent = is_control_file_absent(
                 trunk_project_name.clone().unwrap(),
-                location_to_toggle.clone().version.unwrap(),
+                trunk_project_version.unwrap(),
             )
             .await?;
 

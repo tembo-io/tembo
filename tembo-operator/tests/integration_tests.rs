@@ -2325,7 +2325,16 @@ mod test {
                         "description": "",
                         "locations": [{
                             "enabled": true,
-                            "version": "1.10.0",
+                            "version": "1.10",
+                            "database": "postgres",
+                        }],
+                    },
+                    {
+                        "name": "adminpack",
+                        "description": "",
+                        "locations": [{
+                            "enabled": true,
+                            "version": "2.1",
                             "database": "postgres",
                         }],
                     },
@@ -2349,6 +2358,10 @@ mod test {
                 {
                         "name": "auth_delay",
                         "version": "15.3.0",
+                },
+                {
+                        "name": "adminpack",
+                        "version": "2.1.0",
                 }]
             }
         });
