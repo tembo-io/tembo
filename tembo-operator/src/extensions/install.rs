@@ -431,6 +431,7 @@ pub async fn check_for_so_files(
         return Err(Action::requeue(Duration::from_secs(10)));
     }
 
+    // TODO(ianstanton) The postgres version should be configurable in the future, not hardcoded
     let cmd = vec![
         "ls".to_owned(),
         "/var/lib/postgresql/data/tembo/15/lib".to_owned(),
