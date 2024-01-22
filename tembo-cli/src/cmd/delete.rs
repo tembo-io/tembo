@@ -17,7 +17,7 @@ pub fn execute() -> Result<(), anyhow::Error> {
     let env = get_current_context()?;
 
     if env.target == Target::Docker.to_string() {
-        Docker::docker_compose_down()?;
+        Docker::docker_compose_down(true)?;
     } else if env.target == Target::TemboCloud.to_string() {
         return execute_tembo_cloud(env);
     }
