@@ -10,14 +10,18 @@
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct AppTypeOneOf2 {
-    #[serde(rename = "custom")]
-    pub custom: Box<crate::models::AppService>,
+    #[serde(rename = "mq-api", deserialize_with = "Option::deserialize")]
+    pub mq_api: Option<Box<crate::models::AppConfig>>,
 }
 
 impl AppTypeOneOf2 {
-    pub fn new(custom: crate::models::AppService) -> AppTypeOneOf2 {
+    pub fn new(mq_api: Option<crate::models::AppConfig>) -> AppTypeOneOf2 {
         AppTypeOneOf2 {
-            custom: Box::new(custom),
+            mq_api: if let Some(x) = mq_api {
+                Some(Box::new(x))
+            } else {
+                None
+            },
         }
     }
 }

@@ -1,6 +1,6 @@
 name: MachineLearning
 description: A Postgres instance equipped with machine learning extensions and optimized for machine learning workloads.
-image: "quay.io/tembo/ml-cnpg:15.3.0-1-93dae54"
+image: "quay.io/tembo/ml-cnpg:15.3.0-1-46c8b6f"
 stack_version: 0.3.0
 compute_templates:
   - cpu: 2
@@ -52,6 +52,8 @@ trunk_installs:
     version: 0.7.0
   - name: pg_later
     version: 0.0.11
+  - name: plpython3u
+    version: 1.0.0
 extensions:
   # trunk project pg_vector
   - name: vector
@@ -85,3 +87,8 @@ extensions:
     - database: postgres
       enabled: true
       version: 0.0.11
+  - name: plpython3u
+    locations:
+    - database: postgres
+      enabled: true
+      version: 1.0.0

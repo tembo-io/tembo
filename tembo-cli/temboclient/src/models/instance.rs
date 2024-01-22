@@ -10,8 +10,13 @@
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Instance {
-    //#[serde(rename = "app_services", default, with = "::serde_with::rust::double_option", skip_serializing_if = "Option::is_none")]
-    //pub app_services: Option<Option<Vec<crate::models::AppType>>>,
+    #[serde(
+        rename = "app_services",
+        default,
+        with = "::serde_with::rust::double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub app_services: Option<Option<Vec<crate::models::AppType>>>,
     #[serde(
         rename = "connection_info",
         default,
@@ -118,7 +123,7 @@ impl Instance {
         storage: crate::models::Storage,
     ) -> Instance {
         Instance {
-            //app_services: None,
+            app_services: None,
             connection_info: None,
             connection_pooler: None,
             cpu,

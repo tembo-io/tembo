@@ -1,4 +1,0 @@
-[defaults]
-environment = "prod"
-instance_name = "overlay_instance"
-memory = "10Gi"

@@ -55,6 +55,8 @@ Class | Method | HTTP request | Description
  - [AppTypeOneOf](docs/AppTypeOneOf.md)
  - [AppTypeOneOf1](docs/AppTypeOneOf1.md)
  - [AppTypeOneOf2](docs/AppTypeOneOf2.md)
+ - [AppTypeOneOf3](docs/AppTypeOneOf3.md)
+ - [AppTypeOneOf4](docs/AppTypeOneOf4.md)
  - [ConnectionInfo](docs/ConnectionInfo.md)
  - [ConnectionPooler](docs/ConnectionPooler.md)
  - [Cpu](docs/Cpu.md)

@@ -1,4 +1,5 @@
 #![allow(clippy::all)]
+#[rustfmt::skip]
 #[macro_use]
 extern crate serde_derive;
 

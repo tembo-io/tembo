@@ -1,0 +1,3 @@
+defaults-instance/*
+mobile-instance/*
+docker-compose.yml

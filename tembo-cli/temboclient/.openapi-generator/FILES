@@ -1,4 +1,5 @@
 .gitignore
+.openapi-generator-ignore
 .travis.yml
 Cargo.toml
 README.md
@@ -9,6 +10,8 @@ docs/AppType.md
 docs/AppTypeOneOf.md
 docs/AppTypeOneOf1.md
 docs/AppTypeOneOf2.md
+docs/AppTypeOneOf3.md
+docs/AppTypeOneOf4.md
 docs/ConnectionInfo.md
 docs/ConnectionPooler.md
 docs/Cpu.md
@@ -74,6 +77,8 @@ src/models/app_type.rs
 src/models/app_type_one_of.rs
 src/models/app_type_one_of_1.rs
 src/models/app_type_one_of_2.rs
+src/models/app_type_one_of_3.rs
+src/models/app_type_one_of_4.rs
 src/models/connection_info.rs
 src/models/connection_pooler.rs
 src/models/cpu.rs
