@@ -48,16 +48,22 @@ const POSTGRESCONF_NAME: &str = "postgres.conf";
 pub struct ApplyCommand {
     #[clap(long, short = 'm')]
     pub merge: Option<String>,
+    #[clap(long, short = 's')]
+    pub set: Option<String>,
 }
 
-pub fn execute(verbose: bool, merge_path: Option<String>) -> Result<(), anyhow::Error> {
+pub fn execute(
+    verbose: bool,
+    merge_path: Option<String>,
+    set_arg: Option<String>,
+) -> Result<(), anyhow::Error> {
     info!("Running validation!");
     super::validate::execute(verbose)?;
     info!("Validation completed!");
 
     let env = get_current_context()?;
 
-    let instance_settings = get_instance_settings(merge_path)?;
+    let instance_settings = get_instance_settings(merge_path, set_arg)?;
 
     if env.target == Target::Docker.to_string() {
         return docker_apply(verbose, instance_settings);
@@ -66,6 +72,26 @@ pub fn execute(verbose: bool, merge_path: Option<String>) -> Result<(), anyhow::
     }
 
     Ok(())
+}
+
+fn parse_set_arg(set_arg: &str) -> Result<(String, String, String), Error> {
+    let parts: Vec<&str> = set_arg.split('=').collect();
+    if parts.len() != 2 {
+        println!("Error: Invalid format (missing '=')");
+        return Err(Error::msg("Invalid format for --set"));
+    }
+
+    let key_parts: Vec<&str> = parts[0].split('.').collect();
+    if key_parts.len() != 2 {
+        println!("Error: Invalid format (missing '.')");
+        return Err(Error::msg("Invalid format for --set"));
+    }
+
+    let instance_name = key_parts[0].to_string();
+    let setting_name = key_parts[1].to_string();
+    let setting_value = parts[1].to_string();
+
+    Ok((instance_name, setting_name, setting_value))
 }
 
 fn tembo_cloud_apply(
@@ -541,34 +567,77 @@ fn merge_settings(base: &InstanceSettings, overlay: OverlayInstanceSettings) -> 
     }
 }
 
+pub fn merge_instance_settings(
+    base_settings: &HashMap<String, InstanceSettings>,
+    overlay_file_path: &str,
+) -> Result<HashMap<String, InstanceSettings>, Error> {
+    let overlay_contents = fs::read_to_string(overlay_file_path)
+        .with_context(|| format!("Couldn't read overlay file {}", overlay_file_path))?;
+    let overlay_settings: HashMap<String, OverlayInstanceSettings> =
+        toml::from_str(&overlay_contents).context("Unable to load data from the overlay config")?;
+
+    let mut final_settings = base_settings.clone();
+    for (key, overlay_value) in overlay_settings {
+        if let Some(base_value) = base_settings.get(&key) {
+            let merged_value = merge_settings(base_value, overlay_value);
+            final_settings.insert(key, merged_value);
+        }
+    }
+
+    Ok(final_settings)
+}
+
+pub fn set_instance_settings(
+    base_settings: &mut HashMap<String, InstanceSettings>,
+    set_arg: &str,
+) -> Result<(), Error> {
+    let (instance_name, setting_name, setting_value) = parse_set_arg(set_arg)?;
+
+    if let Some(settings) = base_settings.get_mut(&instance_name) {
+        match setting_name.as_str() {
+            "instance_name" => settings.instance_name = setting_value,
+            "cpu" => settings.cpu = setting_value,
+            "memory" => settings.memory = setting_value,
+            "storage" => settings.storage = setting_value,
+            "replicas" => {
+                settings.replicas = setting_value
+                    .parse()
+                    .map_err(|_| Error::msg("Invalid value for replicas"))?;
+            }
+            "stack_type" => settings.stack_type = setting_value,
+            _ => {
+                return Err(Error::msg(format!("Unknown setting: {}", setting_name)));
+            }
+        }
+    } else {
+        return Err(Error::msg("Instance not found"));
+    }
+
+    Ok(())
+}
+
 pub fn get_instance_settings(
     overlay_file_path: Option<String>,
+    set_arg: Option<String>,
 ) -> Result<HashMap<String, InstanceSettings>, Error> {
     let mut base_path = FileUtils::get_current_working_dir();
     base_path.push_str("/tembo.toml");
     let base_contents = fs::read_to_string(&base_path)
         .with_context(|| format!("Couldn't read base file {}", base_path))?;
-    let base_settings: HashMap<String, InstanceSettings> =
+
+    let mut base_settings: HashMap<String, InstanceSettings> =
         toml::from_str(&base_contents).context("Unable to load data from the base config")?;
 
-    let mut final_settings = base_settings.clone();
-
     if let Some(overlay_path) = overlay_file_path {
-        let overlay_contents = fs::read_to_string(&overlay_path)
-            .with_context(|| format!("Couldn't read overlay file {}", overlay_path))?;
-        let overlay_settings: HashMap<String, OverlayInstanceSettings> =
-            toml::from_str(&overlay_contents)
-                .context("Unable to load data from the overlay config")?;
-
-        for (key, overlay_value) in overlay_settings {
-            if let Some(base_value) = base_settings.get(&key) {
-                let merged_value = merge_settings(base_value, overlay_value);
-                final_settings.insert(key, merged_value);
-            }
-        }
+        let overlay_settings = merge_instance_settings(&base_settings, &overlay_path)?;
+        base_settings.extend(overlay_settings);
     }
 
-    Ok(final_settings)
+    if let Some(set_arg_str) = set_arg {
+        set_instance_settings(&mut base_settings, &set_arg_str)?;
+    }
+
+    Ok(base_settings)
 }
 
 pub fn get_rendered_dockerfile(
@@ -702,71 +771,50 @@ fn construct_connection_string(info: ConnectionInfo) -> String {
 mod tests {
     use super::*;
     use std::path::PathBuf;
-    use std::process::Command;
 
-    const CARGO_BIN_PATH: &str = "cargo run ";
     const ROOT_DIR: &str = env!("CARGO_MANIFEST_DIR");
 
     #[tokio::test]
     async fn merge_settings() -> Result<(), Box<dyn std::error::Error>> {
         std::env::set_current_dir(PathBuf::from(ROOT_DIR).join("examples").join("merge"))?;
 
-        // Path to the overlay.toml file
         let overlay_config_path = PathBuf::from(ROOT_DIR)
             .join("examples")
             .join("merge")
             .join("overlay.toml");
-        let overlay_config_str = overlay_config_path.to_str().ok_or("Invalid path")?;
+        let overlay_config_str = overlay_config_path.to_str().unwrap();
 
-        // Running `tembo init`
-        let _output = Command::new(CARGO_BIN_PATH).arg("init");
-
-        let _output = Command::new(CARGO_BIN_PATH)
-            .arg("apply")
-            .arg("--merge")
-            .arg(overlay_config_str);
-
-        let merged_settings = get_instance_settings(Some(overlay_config_str.to_string()))?;
+        let merged_settings = get_instance_settings(Some(overlay_config_str.to_string()), None)?;
         if let Some(setting) = merged_settings.get("merge") {
-            assert_ne!(setting.cpu, "0.25", "Default setting was overwritten");
+            assert_ne!(
+                setting.cpu, "0.25",
+                "Default CPU setting was not overwritten"
+            );
+            assert_eq!(setting.replicas, 2, "Overlay Settings are not overwritten");
+            assert_eq!(setting.storage, "10Gi", "Base Settings are not overwritten");
         } else {
-            return Err("Setting key not found".into());
+            return Err("Merged setting key 'merge' not found".into());
         }
-
-        // Running `tembo delete`
-        let _output = Command::new(CARGO_BIN_PATH).arg("delete");
 
         Ok(())
     }
 
     #[tokio::test]
-    async fn merge() -> Result<(), Box<dyn std::error::Error>> {
-        std::env::set_current_dir(PathBuf::from(ROOT_DIR).join("examples").join("merge"))?;
+    async fn set_settings() -> Result<(), Box<dyn std::error::Error>> {
+        std::env::set_current_dir(PathBuf::from(ROOT_DIR).join("examples").join("set"))?;
 
-        // Path to the overlay.toml file
-        let overlay_config_path = PathBuf::from(ROOT_DIR)
-            .join("examples")
-            .join("merge")
-            .join("overlay.toml");
-        let overlay_config_str = overlay_config_path.to_str().ok_or("Invalid path")?;
+        let set_arg = "set.memory=2Gi";
 
-        // Running `tembo init`
-        let _output = Command::new(CARGO_BIN_PATH).arg("init");
+        let final_settings = get_instance_settings(None, Some(set_arg.to_string()))?;
 
-        let _output = Command::new(CARGO_BIN_PATH)
-            .arg("apply")
-            .arg("--merge")
-            .arg(overlay_config_str);
-
-        let merged_settings = get_instance_settings(Some(overlay_config_str.to_string()))?;
-        if let Some(setting) = merged_settings.get("merge") {
-            assert_eq!(setting.memory, "10Gi", "Base settings was not overwritten");
+        if let Some(setting) = final_settings.get("set") {
+            assert_eq!(
+                setting.memory, "2Gi",
+                "Memory setting was not correctly applied"
+            );
         } else {
-            return Err("Setting key not found".into());
+            return Err("Setting key 'defaults' not found".into());
         }
-
-        // Running `tembo delete`
-        let _output = Command::new(CARGO_BIN_PATH).arg("delete");
 
         Ok(())
     }
