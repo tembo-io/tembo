@@ -78,7 +78,7 @@ async fn toggle_extensions(
             let trunk_project_name =
                 get_trunk_project_for_extension(extension_to_toggle.name.clone()).await?;
 
-            // Find version for trunk_project_name in cdb.spec.trunk_installs
+            // Get appropriate version for trunk project
             let trunk_project_version = get_trunk_project_version(
                 cdb,
                 trunk_project_name.clone(),
@@ -454,6 +454,7 @@ async fn get_trunk_project_version(
 ) -> Result<Option<String>, Action> {
     let mut trunk_project_version = None;
 
+    // Check if version is provided in cdb.spec.trunk_installs
     for trunk_install in cdb.spec.trunk_installs.clone() {
         if trunk_install.name == trunk_project_name.clone().unwrap() {
             trunk_project_version = trunk_install.version;
