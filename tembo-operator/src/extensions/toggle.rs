@@ -424,8 +424,10 @@ async fn check_for_extensions_enabled_with_load(
                 };
 
                 let extensions = cdb.spec.extensions.clone();
+                let mut found = false;
                 for desired_extension in extensions {
                     if desired_extension.name == extension.name {
+                        found = true;
                         for desired_location in desired_extension.locations {
                             let location_status = ExtensionInstallLocationStatus {
                                 enabled: Some(desired_location.enabled.clone()),
@@ -438,6 +440,19 @@ async fn check_for_extensions_enabled_with_load(
                             extension_status.locations.push(location_status);
                         }
                     }
+                }
+                if !found {
+                    // If trunk installed extension is not in cdb.spec.extensions, we need to set a default location status
+                    info!("Trunk installed extension {} is not in cdb.spec.extensions. Setting default location status.", extension.name);
+                    let location_status = ExtensionInstallLocationStatus {
+                        enabled: Some(false),
+                        database: "postgres".to_string(),
+                        schema: None,
+                        version: None,
+                        error: Some(false),
+                        error_message: None,
+                    };
+                    extension_status.locations.push(location_status);
                 }
                 extensions_enabled_with_load.push(extension_status);
             }
