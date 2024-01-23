@@ -1,5 +1,5 @@
 use crate::config::Config;
-use crate::metrics::types::RangeQuery;
+use crate::metrics::types::{InstantQuery, RangeQuery};
 use actix_web::http::StatusCode;
 use actix_web::web::{Data, Query};
 use actix_web::HttpResponse;
@@ -11,13 +11,76 @@ use std::time::{Duration, SystemTime};
 pub mod expression_validator;
 pub mod types;
 
+pub async fn query_prometheus_instant(
+    cfg: Data<Config>,
+    http_client: Data<Client>,
+    instant_query: Query<InstantQuery>,
+    namespace: String,
+) -> HttpResponse {
+    // Internal async block that returns Result
+    let result = async {
+        let query = match expression_validator::check_query_only_accesses_namespace(
+            &instant_query,
+            &namespace,
+        ) {
+            Ok(value) => value,
+            Err(http_response) => return Err(http_response),
+        };
+
+        let time = instant_query.time.unwrap_or_else(|| {
+            SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .expect("Time went backwards")
+                .as_secs()
+        });
+
+        let timeout = format!("{}ms", cfg.prometheus_timeout_ms);
+
+        let query_url = format!("{}/api/v1/query", cfg.prometheus_url.trim_end_matches('/'));
+        let query_params = [
+            ("query", &query),
+            ("time", &time.to_string()),
+            ("timeout", &timeout),
+        ];
+
+        let response = http_client
+            .get(&query_url)
+            .query(&query_params)
+            .timeout(std::time::Duration::from_millis(
+                cfg.prometheus_timeout_ms as u64 + 500,
+            ))
+            .send()
+            .await
+            .map_err(|e| {
+                error!("Failed to query Prometheus: {}", e);
+                HttpResponse::GatewayTimeout().json("Failed to query Prometheus")
+            })?;
+
+        let status_code = response.status();
+
+        let json_response: Value = response.json().await.map_err(|e| {
+            error!("Failed to parse Prometheus response: {}", e);
+            HttpResponse::InternalServerError().json("Failed to parse Prometheus response")
+        })?;
+
+        Ok(HttpResponse::Ok().json(json_response))
+    }
+    .await;
+
+    // Handle the result outside of the async block
+    match result {
+        Ok(response) => response,
+        Err(error_response) => error_response,
+    }
+}
+
 pub async fn query_prometheus(
     cfg: Data<Config>,
     http_client: Data<Client>,
     range_query: Query<RangeQuery>,
     namespace: String,
 ) -> HttpResponse {
-    let query = match expression_validator::check_query_only_accesses_namespace(
+    let query = match expression_validator::check_range_query_only_accesses_namespace(
         &range_query.clone(),
         &namespace,
     ) {

@@ -1,6 +1,6 @@
 use crate::{config, metrics};
 
-use crate::metrics::types::RangeQuery;
+use crate::metrics::types::{InstantQuery, RangeQuery};
 use actix_web::{get, web, Error, HttpRequest, HttpResponse};
 
 use reqwest::Client;
@@ -35,4 +35,17 @@ pub async fn query_range(
     let (namespace,) = path.into_inner();
 
     Ok(metrics::query_prometheus(cfg, http_client, range_query, namespace).await)
+}
+
+#[get("/query")]
+pub async fn query(
+    cfg: web::Data<config::Config>,
+    http_client: web::Data<Client>,
+    instant_query: web::Query<InstantQuery>,
+    _req: HttpRequest,
+    path: web::Path<(String,)>,
+) -> Result<HttpResponse, Error> {
+    let (namespace,) = path.into_inner();
+
+    Ok(metrics::query_prometheus_instant(cfg, http_client, instant_query, namespace).await)
 }

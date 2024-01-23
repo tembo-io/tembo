@@ -1,6 +1,7 @@
 use promql_parser::parser::{Expr, VectorSelector};
 use promql_parser::util::{walk_expr, ExprVisitor};
 
+use crate::metrics::types::InstantQuery;
 use crate::metrics::types::RangeQuery;
 use actix_web::web::Query;
 use actix_web::HttpResponse;
@@ -72,12 +73,56 @@ impl ExprVisitor for NamespaceVisitor {
 
 // Returns the query if it's valid
 // otherwise returns an error in the form of HttpResponse
-pub fn check_query_only_accesses_namespace(
+pub fn check_range_query_only_accesses_namespace(
     range_query: &Query<RangeQuery>,
     namespace: &String,
 ) -> Result<String, HttpResponse> {
     // Get the query parameters
     let query = range_query.query.clone();
+
+    // Parse the query
+    let abstract_syntax_tree = match parser::parse(&query) {
+        Ok(ast) => ast,
+        Err(e) => {
+            error!("Query parse error: {}", e);
+            return Err(HttpResponse::UnprocessableEntity().json("Failed to parse PromQL query"));
+        }
+    };
+
+    // Recurse through all terms in the expression to find any terms that specify
+    // label matching, and make sure all of them specify the namespace label.
+    let mut visitor = NamespaceVisitor {
+        namespace: namespace.clone(),
+    };
+    let all_metrics_specify_namespace = walk_expr(&mut visitor, &abstract_syntax_tree);
+
+    // Check if we are performing an unauthorized query.
+    match all_metrics_specify_namespace {
+        Ok(true) => {
+            info!(
+                "Authorized request: namespace '{}', query '{}'",
+                namespace, query
+            );
+        }
+        _ => {
+            warn!(
+                "Unauthorized request: namespace '{}', query '{}'",
+                namespace, query
+            );
+            return Err(
+                HttpResponse::Forbidden().json("Must include namespace in all vector selectors")
+            );
+        }
+    }
+    Ok(query)
+}
+
+pub fn check_query_only_accesses_namespace(
+    instant_query: &Query<InstantQuery>,
+    namespace: &String,
+) -> Result<String, HttpResponse> {
+    // Get the query parameters
+    let query = instant_query.query.clone();
 
     // Parse the query
     let abstract_syntax_tree = match parser::parse(&query) {
