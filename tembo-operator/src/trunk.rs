@@ -260,7 +260,7 @@ async fn get_trunk_project_metadata(
 }
 
 // Get trunk project metadata for a specific version
-async fn get_trunk_project_metadata_for_version(
+pub async fn get_trunk_project_metadata_for_version(
     trunk_project: String,
     version: String,
 ) -> Result<TrunkProjectMetadata, TrunkError> {
@@ -449,6 +449,60 @@ pub async fn get_trunk_project_description(
     Ok(project_metadata.description)
 }
 
+// Get latest version of trunk project
+pub async fn get_latest_trunk_project_version(
+    trunk_project: String,
+) -> Result<Option<String>, Action> {
+    let project_metadata: Vec<TrunkProjectMetadata> =
+        match get_trunk_project_metadata(trunk_project.clone()).await {
+            Ok(project_metadata) => project_metadata,
+            Err(e) => {
+                error!(
+                    "Failed to get trunk project metadata for {}: {:?}",
+                    trunk_project, e
+                );
+                return Err(Action::requeue(Duration::from_secs(3)));
+            }
+        };
+
+    // Get all versions
+    let mut versions: Vec<String> = project_metadata
+        .iter()
+        .map(|project_metadata| project_metadata.version.clone())
+        .collect();
+    // Sort versions
+    versions = sort_semver(versions);
+    // Get latest version
+    let latest_version = versions.last();
+
+    Ok(latest_version.cloned())
+}
+
+// Check if string version is semver
+pub fn is_semver(version: String) -> bool {
+    semver::Version::parse(&version).is_ok()
+}
+
+// Convert to semver if not already
+pub fn convert_to_semver(version: String) -> String {
+    let mut version = version;
+    if !is_semver(version.clone()) {
+        version.push_str(".0");
+    }
+    version
+}
+
+// Sort semver
+fn sort_semver(versions: Vec<String>) -> Vec<String> {
+    let mut versions = versions;
+    versions.sort_by(|a, b| {
+        let a = semver::Version::parse(&a).unwrap();
+        let b = semver::Version::parse(&b).unwrap();
+        a.cmp(&b)
+    });
+    versions
+}
+
 // Define error type
 #[derive(Debug, thiserror::Error)]
 pub enum TrunkError {
@@ -558,5 +612,45 @@ mod tests {
         let result = get_trunk_project_description(trunk_project, version).await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), Some("The auto_explain module provides a means for logging execution plans of slow statements automatically, without having to run EXPLAIN by hand.".to_string()));
+    }
+
+    #[test]
+    fn test_is_semver() {
+        let version = "1.2.3".to_string();
+        let result = is_semver(version);
+        assert_eq!(result, true);
+
+        let version = "1.2".to_string();
+        let result = is_semver(version);
+        assert_eq!(result, false);
+    }
+
+    #[test]
+    fn test_convert_to_semver() {
+        let version = "1.2.3".to_string();
+        let result = convert_to_semver(version);
+        assert_eq!(result, "1.2.3".to_string());
+
+        let version = "1.2".to_string();
+        let result = convert_to_semver(version);
+        assert_eq!(result, "1.2.0".to_string());
+    }
+
+    #[tokio::test]
+    async fn sort_semver_test() {
+        let versions = vec![
+            "2.3.0".to_string(),
+            "13.1.1".to_string(),
+            "13.1.0".to_string(),
+        ];
+        let result = sort_semver(versions);
+        assert_eq!(
+            result,
+            vec![
+                "2.3.0".to_string(),
+                "13.1.0".to_string(),
+                "13.1.1".to_string()
+            ]
+        );
     }
 }
