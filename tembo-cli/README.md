@@ -51,16 +51,23 @@ Validates `tembo.toml` and other configurations files.
 
 #### `tembo apply`
 
-Validates tembo.toml (same as `tembo validate`) and applies the changes to the context selected.
+Validates tembo.toml (same as `tembo validate`) and applies the changes to the context selected. It applies changes and runs migration for all databases.
 
-* applies changes and runs migration for all dbs
-    * **local docker:**
-        * runs `docker-compose down` to bring down all existing containers
-        * generates `Dockerfile` for each instance & builds a docker image
-        * generates `docker-compose` to provision all instances
-        * runs `docker-compose up -d` to spin up all instances
-        * runs `sqlx migration` against the instances
-    * **tembo-cloud:** Creates/updates instance on tembo-cloud by calling the api against the appropriate environment
+##### Environment:
+
+  * ###### Local Docker:
+    * runs `docker-compose down` to bring down all existing containers
+    * generates `Dockerfile` for each instance & builds a docker image
+    * generates `docker-compose` to provision all instances
+    * runs `docker-compose up -d` to spin up all instances
+    * runs `sqlx migration` against the instances
+
+  * ###### Tembo-Cloud: 
+    * Creates/updates instance on tembo-cloud by calling the api against the appropriate environment
+
+##### Flags: 
+  * `--merge`: Overlays Tembo.toml by another toml file for a specific context
+  *  `--set` : Specifies a single instance setting by assigning a new value
 
 #### `tembo delete`
 
@@ -122,8 +129,6 @@ openapi-generator generate -i https://api.tembo.io/api-docs/openapi.json  -g rus
 ```
 
 * Create `/temboclient/src/models/impls.rs` file & add following code to it:
-
-**TODO:** Find a better way to do this.
 
 ```
 use std::str::FromStr;
