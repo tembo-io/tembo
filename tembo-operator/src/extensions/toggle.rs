@@ -11,8 +11,9 @@ use kube::runtime::controller::Action;
 use crate::extensions::install::check_for_so_files;
 use crate::extensions::types::TrunkInstall;
 use crate::trunk::{
-    get_loadable_library_name, get_trunk_project_description, get_trunk_project_for_extension,
-    is_control_file_absent,
+    convert_to_semver, get_latest_trunk_project_version, get_loadable_library_name,
+    get_trunk_project_description, get_trunk_project_for_extension,
+    get_trunk_project_metadata_for_version, is_control_file_absent, is_semver,
 };
 use crate::{
     apis::coredb_types::CoreDBStatus,
@@ -78,12 +79,12 @@ async fn toggle_extensions(
                 get_trunk_project_for_extension(extension_to_toggle.name.clone()).await?;
 
             // Find version for trunk_project_name in cdb.spec.trunk_installs
-            let mut trunk_project_version = None;
-            for trunk_install in cdb.spec.trunk_installs.clone() {
-                if trunk_install.name == trunk_project_name.clone().unwrap() {
-                    trunk_project_version = trunk_install.version;
-                }
-            }
+            let trunk_project_version = get_trunk_project_version(
+                cdb,
+                trunk_project_name.clone(),
+                location_to_toggle.clone(),
+            )
+            .await?;
 
             // If version is None, error
             if trunk_project_version.is_none() {
@@ -443,6 +444,61 @@ async fn check_for_extensions_enabled_with_load(
         }
     }
     Ok(extensions_enabled_with_load)
+}
+
+// Get trunk project version
+async fn get_trunk_project_version(
+    cdb: &CoreDB,
+    trunk_project_name: Option<String>,
+    location_to_toggle: types::ExtensionInstallLocation,
+) -> Result<Option<String>, Action> {
+    let mut trunk_project_version = None;
+
+    for trunk_install in cdb.spec.trunk_installs.clone() {
+        if trunk_install.name == trunk_project_name.clone().unwrap() {
+            trunk_project_version = trunk_install.version;
+        }
+    }
+
+    // If trunk_project_version is None && extension version is semver
+    if trunk_project_version.is_none() && is_semver(location_to_toggle.version.clone().unwrap()) {
+        // Check if trunk project with extension version exists
+        let trunk_project_version_exists = get_trunk_project_metadata_for_version(
+            trunk_project_name.clone().unwrap(),
+            location_to_toggle.version.clone().unwrap(),
+        )
+        .await
+        .is_ok();
+        // If trunk project exists for this version, use it
+        if trunk_project_version_exists {
+            trunk_project_version = location_to_toggle.version.clone();
+        }
+        // Otherwise, fall back to latest version
+        else {
+            trunk_project_version =
+                get_latest_trunk_project_version(trunk_project_name.clone().unwrap()).await?;
+        }
+        // If trunk_project_version is None && extension version is NOT semver
+    } else if trunk_project_version.is_none() {
+        // Convert to semver and check if trunk project with semver version exists
+        let semver_version = convert_to_semver(location_to_toggle.version.clone().unwrap());
+        let trunk_project_version_exists = get_trunk_project_metadata_for_version(
+            trunk_project_name.clone().unwrap(),
+            semver_version.clone(),
+        )
+        .await
+        .is_ok();
+        // If trunk project exists for this version, use it
+        if trunk_project_version_exists {
+            trunk_project_version = Some(semver_version);
+        }
+        // Otherwise, fall back to latest version
+        else {
+            trunk_project_version =
+                get_latest_trunk_project_version(trunk_project_name.clone().unwrap()).await?;
+        }
+    }
+    Ok(trunk_project_version)
 }
 
 #[cfg(test)]

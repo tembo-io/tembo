@@ -2339,6 +2339,15 @@ mod test {
                         }],
                     },
                     {
+                        "name": "plperl",
+                        "description": "",
+                        "locations": [{
+                            "enabled": true,
+                            "version": "1.0",
+                            "database": "postgres",
+                        }],
+                    },
+                    {
                         "name": "auth_delay",
                         "description": "",
                         "locations": [{
