@@ -99,10 +99,8 @@ pub async fn query_prometheus(
     range_query: Query<RangeQuery>,
     namespace: String,
 ) -> HttpResponse {
-    let query = match expression_validator::check_query_only_accesses_namespace(
-        &range_query, 
-        &namespace,
-    ) {
+    let query =
+        match expression_validator::check_query_only_accesses_namespace(&range_query, &namespace) {
             Ok(value) => value,
             Err(http_response) => return http_response,
         };
