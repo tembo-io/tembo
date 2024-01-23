@@ -14,6 +14,22 @@ pub struct NamespaceVisitor {
     pub namespace: String,
 }
 
+pub trait PromQuery {
+    fn get_query(&self) -> &str;
+}
+
+impl PromQuery for RangeQuery {
+    fn get_query(&self) -> &str {
+        &self.query
+    }
+}
+
+impl PromQuery for InstantQuery {
+    fn get_query(&self) -> &str {
+        &self.query
+    }
+}
+
 // Vector selector is the part in prometheus query that selects the metrics
 // Example: (sum by (namespace) (container_memory_usage_bytes))
 // container_memory_usage_bytes is the vector selector.
@@ -73,15 +89,15 @@ impl ExprVisitor for NamespaceVisitor {
 
 // Returns the query if it's valid
 // otherwise returns an error in the form of HttpResponse
-pub fn check_range_query_only_accesses_namespace(
-    range_query: &Query<RangeQuery>,
+pub fn check_query_only_accesses_namespace<T: PromQuery>(
+    query: &Query<T>,
     namespace: &String,
 ) -> Result<String, HttpResponse> {
     // Get the query parameters
-    let query = range_query.query.clone();
+    let query_str = query.get_query();
 
     // Parse the query
-    let abstract_syntax_tree = match parser::parse(&query) {
+    let abstract_syntax_tree = match parser::parse(query_str) {
         Ok(ast) => ast,
         Err(e) => {
             error!("Query parse error: {}", e);
@@ -101,62 +117,18 @@ pub fn check_range_query_only_accesses_namespace(
         Ok(true) => {
             info!(
                 "Authorized request: namespace '{}', query '{}'",
-                namespace, query
+                namespace, query_str
             );
         }
         _ => {
             warn!(
                 "Unauthorized request: namespace '{}', query '{}'",
-                namespace, query
+                namespace, query_str
             );
             return Err(
                 HttpResponse::Forbidden().json("Must include namespace in all vector selectors")
             );
         }
     }
-    Ok(query)
-}
-
-pub fn check_query_only_accesses_namespace(
-    instant_query: &Query<InstantQuery>,
-    namespace: &String,
-) -> Result<String, HttpResponse> {
-    // Get the query parameters
-    let query = instant_query.query.clone();
-
-    // Parse the query
-    let abstract_syntax_tree = match parser::parse(&query) {
-        Ok(ast) => ast,
-        Err(e) => {
-            error!("Query parse error: {}", e);
-            return Err(HttpResponse::UnprocessableEntity().json("Failed to parse PromQL query"));
-        }
-    };
-
-    // Recurse through all terms in the expression to find any terms that specify
-    // label matching, and make sure all of them specify the namespace label.
-    let mut visitor = NamespaceVisitor {
-        namespace: namespace.clone(),
-    };
-    let all_metrics_specify_namespace = walk_expr(&mut visitor, &abstract_syntax_tree);
-
-    // Check if we are performing an unauthorized query.
-    match all_metrics_specify_namespace {
-        Ok(true) => {
-            info!(
-                "Authorized request: namespace '{}', query '{}'",
-                namespace, query
-            );
-        }
-        _ => {
-            warn!(
-                "Unauthorized request: namespace '{}', query '{}'",
-                namespace, query
-            );
-            return Err(
-                HttpResponse::Forbidden().json("Must include namespace in all vector selectors")
-            );
-        }
-    }
-    Ok(query)
+    Ok(query_str.to_string())
 }
