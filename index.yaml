@@ -2,7 +2,33 @@ apiVersion: v1
 entries:
   tembo-operator:
   - apiVersion: v2
-    created: "2023-12-16T22:02:42.895423205Z"
+    created: "2024-01-24T18:33:58.952029819Z"
+    dependencies:
+    - condition: cloudnative-pg.enabled
+      name: cloudnative-pg
+      repository: https://cloudnative-pg.github.io/charts
+      version: 0.18.2
+    description: Helm chart to deploy the tembo-operator
+    digest: 8c203b63c342ebe28257967d49ee35e6992a3bb3d25dd2a8b0e8b99a8f11c585
+    home: https://tembo.io
+    icon: https://cloud.tembo.io/images/TemboElephant.png
+    keywords:
+    - postgresql
+    - postgres
+    - database
+    maintainers:
+    - name: Tembo
+      url: https://tembocommunity.slack.com
+    name: tembo-operator
+    sources:
+    - https://github.com/tembo-io/tembo-stacks
+    - https://github.com/cloudnative-pg/cloudnative-pg
+    type: application
+    urls:
+    - https://tembo-io.github.io/tembo/tembo-operator-0.2.4.tgz
+    version: 0.2.4
+  - apiVersion: v2
+    created: "2024-01-24T18:33:58.946223854Z"
     dependencies:
     - condition: cloudnative-pg.enabled
       name: cloudnative-pg
@@ -28,7 +54,7 @@ entries:
     - https://tembo-io.github.io/tembo/tembo-operator-0.2.3.tgz
     version: 0.2.3
   - apiVersion: v2
-    created: "2023-12-16T22:02:42.88894973Z"
+    created: "2024-01-24T18:33:58.941239009Z"
     dependencies:
     - condition: cloudnative-pg.enabled
       name: cloudnative-pg
@@ -54,7 +80,7 @@ entries:
     - https://tembo-io.github.io/tembo/tembo-operator-0.2.2.tgz
     version: 0.2.2
   - apiVersion: v2
-    created: "2023-12-16T22:02:42.883440869Z"
+    created: "2024-01-24T18:33:58.935598947Z"
     dependencies:
     - condition: cloudnative-pg.enabled
       name: cloudnative-pg
@@ -80,7 +106,7 @@ entries:
     - https://tembo-io.github.io/tembo/tembo-operator-0.2.1.tgz
     version: 0.2.1
   - apiVersion: v2
-    created: "2023-12-16T22:02:42.878993234Z"
+    created: "2024-01-24T18:33:58.930479835Z"
     dependencies:
     - condition: cloudnative-pg.enabled
       name: cloudnative-pg
@@ -105,4 +131,4 @@ entries:
     urls:
     - https://tembo-io.github.io/tembo/tembo-operator-0.2.0.tgz
     version: 0.2.0
-generated: "2023-12-16T22:02:42.873485746Z"
+generated: "2024-01-24T18:33:58.924889497Z"
