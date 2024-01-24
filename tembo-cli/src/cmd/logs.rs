@@ -9,8 +9,6 @@ use temboclient::apis::configuration::Configuration;
 
 #[derive(Args)]
 pub struct LogsCommand {
-    #[clap(short, long)]
-    pub verbose: bool,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -41,21 +39,32 @@ struct LogData {
     data: LogResult,
 }
 
+#[derive(Serialize, Deserialize, Debug)]
+struct IndividualLogEntry {
+    ts: String,
+    msg: String,
+}
+
 fn beautify_logs(json_data: &str) -> Result<()> {
     let log_data: LogData = serde_json::from_str(json_data)?;
 
     for entry in log_data.data.result {
-        //println!("\nApp: {}, Container: {}, Pod: {}", entry.stream.app, entry.stream.container, entry.stream.pod);
         for value in entry.values {
-            let log_message = &value[1];
-            println!("\n{}", log_message);
+            let log_json = &value[1]; // Assuming this is where the log JSON is stored
+            let log_entry: IndividualLogEntry = serde_json::from_str(log_json)?;
+
+            println!("{}", format_log_entry(&log_entry));
         }
     }
 
     Ok(())
 }
 
-pub fn execute(verbose: bool) -> Result<()> {
+fn format_log_entry(log_entry: &IndividualLogEntry) -> String {
+    format!("{} {}", log_entry.ts, log_entry.msg)
+}
+
+pub fn execute() -> Result<()> {
     let env = get_current_context()?;
     let org_id = env.org_id.clone().unwrap_or_default();
     let profile = env.selected_profile.clone().unwrap();
