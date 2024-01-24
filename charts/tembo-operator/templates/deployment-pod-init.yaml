@@ -31,7 +31,7 @@ spec:
         {{- end }}
     spec:
       containers:
-        - image: {{ (index .Values "pod-init").image.repository }}:{{ tpl (index .Values "pod-init").image.tag . }}
+        - image: {{ (index .Values "pod-init").image.repository }}:{{ tpl (printf "%s" (index .Values "pod-init").image.tag) . }}
           imagePullPolicy: {{ (index .Values "pod-init").image.pullPolicy }}
           name: pod-init
           env:
