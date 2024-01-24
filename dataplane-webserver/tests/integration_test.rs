@@ -52,6 +52,21 @@ mod tests {
         return query_url.trim_start_matches("http://localhost").to_string();
     }
 
+    fn format_prometheus_instant_query(url: &str, query: &str) -> String {
+        let time = SystemTime::now()
+            .duration_since(SystemTime::UNIX_EPOCH)
+            .expect("Failed to get UNIX time")
+            .as_secs()
+            .to_string();
+        let query_params = vec![("query", query), ("time", &time)];
+        let url = format!("http://localhost{}", url);
+        Url::parse_with_params(url.as_str(), &query_params)
+            .expect("Failed to format query parameters")
+            .to_string()
+            .trim_start_matches("http://localhost")
+            .to_string()
+    }
+
     #[actix_web::test]
     async fn test_metrics_query_range() {
         let cfg = config::Config::default();
@@ -110,5 +125,31 @@ mod tests {
         let resp = test::call_service(&app, req).await;
         // It should be a client error if we try to request a namespace we do not own
         assert!(resp.status().is_client_error());
+    }
+
+    #[actix_web::test]
+    async fn test_metrics_query_instant() {
+        let cfg = config::Config::default();
+        let http_client = reqwest::Client::builder()
+            .build()
+            .expect("Failed to create HTTP client");
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(cfg.clone()))
+                .app_data(web::Data::new(http_client.clone()))
+                .service(web::scope("/{namespace}/metrics").service(metrics::query)),
+        )
+        .await;
+
+        let url = "/org-coredb-inst-control-plane-dev/metrics/query";
+        let query =
+            "sum(rate(http_requests_total{namespace=\"org-coredb-inst-control-plane-dev\"}[5m]))";
+        let query_url = format_prometheus_instant_query(url, query);
+        let req = test::TestRequest::get()
+            .uri(query_url.as_str())
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
     }
 }

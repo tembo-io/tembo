@@ -1,6 +1,7 @@
 use promql_parser::parser::{Expr, VectorSelector};
 use promql_parser::util::{walk_expr, ExprVisitor};
 
+use crate::metrics::types::InstantQuery;
 use crate::metrics::types::RangeQuery;
 use actix_web::web::Query;
 use actix_web::HttpResponse;
@@ -11,6 +12,22 @@ use promql_parser::parser;
 // https://prometheus.io/docs/prometheus/latest/querying/api/
 pub struct NamespaceVisitor {
     pub namespace: String,
+}
+
+pub trait PromQuery {
+    fn get_query(&self) -> &str;
+}
+
+impl PromQuery for RangeQuery {
+    fn get_query(&self) -> &str {
+        &self.query
+    }
+}
+
+impl PromQuery for InstantQuery {
+    fn get_query(&self) -> &str {
+        &self.query
+    }
 }
 
 // Vector selector is the part in prometheus query that selects the metrics
@@ -72,15 +89,15 @@ impl ExprVisitor for NamespaceVisitor {
 
 // Returns the query if it's valid
 // otherwise returns an error in the form of HttpResponse
-pub fn check_query_only_accesses_namespace(
-    range_query: &Query<RangeQuery>,
+pub fn check_query_only_accesses_namespace<T: PromQuery>(
+    query: &Query<T>,
     namespace: &String,
 ) -> Result<String, HttpResponse> {
     // Get the query parameters
-    let query = range_query.query.clone();
+    let query_str = query.get_query();
 
     // Parse the query
-    let abstract_syntax_tree = match parser::parse(&query) {
+    let abstract_syntax_tree = match parser::parse(query_str) {
         Ok(ast) => ast,
         Err(e) => {
             error!("Query parse error: {}", e);
@@ -100,18 +117,18 @@ pub fn check_query_only_accesses_namespace(
         Ok(true) => {
             info!(
                 "Authorized request: namespace '{}', query '{}'",
-                namespace, query
+                namespace, query_str
             );
         }
         _ => {
             warn!(
                 "Unauthorized request: namespace '{}', query '{}'",
-                namespace, query
+                namespace, query_str
             );
             return Err(
                 HttpResponse::Forbidden().json("Must include namespace in all vector selectors")
             );
         }
     }
-    Ok(query)
+    Ok(query_str.to_string())
 }
