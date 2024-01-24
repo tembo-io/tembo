@@ -8,6 +8,13 @@ use crate::{
 };
 use kube::runtime::controller::Action;
 
+use crate::extensions::install::check_for_so_files;
+use crate::extensions::types::TrunkInstall;
+use crate::trunk::{
+    convert_to_semver, get_latest_trunk_project_version, get_loadable_library_name,
+    get_trunk_project_description, get_trunk_project_for_extension,
+    get_trunk_project_metadata_for_version, is_control_file_absent, is_semver,
+};
 use crate::{
     apis::coredb_types::CoreDBStatus,
     extensions::{
@@ -18,19 +25,32 @@ use crate::{
     trunk::extensions_that_require_load,
 };
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
-use tracing::{error, warn};
+use tracing::{error, info, warn};
 
 pub async fn reconcile_extension_toggle_state(
     cdb: &CoreDB,
     ctx: Arc<Context>,
 ) -> Result<Vec<ExtensionStatus>, Action> {
-    let all_actually_installed_extensions =
+    let mut all_actually_installed_extensions =
         database_queries::get_all_extensions(cdb, ctx.clone()).await?;
+
+    // Some extensions need to be enabled with LOAD (example: auto_explain). These extensions won't show up in
+    // pg_available_extensions, and therefore won't be in all_actually_installed_extensions. We need to check for
+    // these extensions and add them to all_actually_installed_extensions so they are handled appropriately.
+    let mut extensions_with_load = check_for_extensions_enabled_with_load(
+        cdb,
+        ctx.clone(),
+        all_actually_installed_extensions.clone(),
+    )
+    .await?;
+    all_actually_installed_extensions.append(&mut extensions_with_load);
+
     let ext_status_updates =
         determine_updated_extensions_status(cdb, all_actually_installed_extensions);
     kubernetes_queries::update_extensions_status(cdb, ext_status_updates.clone(), &ctx).await?;
     let cdb = get_current_coredb_resource(cdb, ctx.clone()).await?;
     let toggle_these_extensions = determine_extension_locations_to_toggle(&cdb);
+
     let ext_status_updates =
         toggle_extensions(ctx, ext_status_updates, &cdb, toggle_these_extensions).await?;
     Ok(ext_status_updates)
@@ -43,6 +63,7 @@ async fn toggle_extensions(
     toggle_these_extensions: Vec<Extension>,
 ) -> Result<Vec<ExtensionStatus>, Action> {
     let current_shared_preload_libraries = list_shared_preload_libraries(cdb, ctx.clone()).await?;
+    // TODO(ianstanton) Don't fetch from this list anymore. Instead, fetch from trunk's extension metadata
     let requires_load =
         extensions_that_require_load(ctx.client.clone(), &cdb.metadata.namespace.clone().unwrap())
             .await?;
@@ -53,13 +74,40 @@ async fn toggle_extensions(
                 None => &extension_to_toggle.name,
                 Some(expected_library_name) => expected_library_name,
             };
+            // Get extensions trunk project name
+            let trunk_project_name =
+                get_trunk_project_for_extension(extension_to_toggle.name.clone()).await?;
+
+            // Get appropriate version for trunk project
+            let trunk_project_version = get_trunk_project_version(
+                cdb,
+                trunk_project_name.clone(),
+                location_to_toggle.clone(),
+            )
+            .await?;
+
+            // If version is None, error
+            if trunk_project_version.is_none() {
+                error!("Version for {} is none. Version should never be none when toggling an extension", extension_to_toggle.name);
+                continue;
+            }
+
+            // Check if extension has a loadable library
+            let has_loadable_library = get_loadable_library_name(
+                trunk_project_name.clone().unwrap(),
+                trunk_project_version.clone().unwrap(),
+                extension_to_toggle.name.clone(),
+            )
+            .await?;
+
             // If we are toggling on,
             // the extension is included in the REQUIRES_LOAD list,
             // and also is not present in shared_preload_libraries,
             // then requeue.
             if location_to_toggle.enabled
-                && requires_load.contains_key(&extension_to_toggle.name)
-                && !current_shared_preload_libraries.contains(expected_library_name)
+                && (requires_load.contains_key(&extension_to_toggle.name)
+                    || has_loadable_library.is_some())
+                && !(current_shared_preload_libraries.contains(expected_library_name))
             {
                 warn!(
                     "Extension {} requires load, but is not present in shared_preload_libraries for {}, checking if we should requeue.",
@@ -70,6 +118,20 @@ async fn toggle_extensions(
                     &extension_to_toggle.name,
                     requires_load.clone(),
                 )?;
+            }
+            // Don't toggle extension if control file is absent && it has a loadable library
+            let control_file_absent = is_control_file_absent(
+                trunk_project_name.clone().unwrap(),
+                trunk_project_version.unwrap(),
+            )
+            .await?;
+
+            if control_file_absent && has_loadable_library.is_some() {
+                info!(
+                    "Extension {} must be enabled with LOAD. Skipping toggle.",
+                    extension_to_toggle.name,
+                );
+                continue;
             }
             match database_queries::toggle_extension(
                 cdb,
@@ -266,6 +328,10 @@ pub fn determine_updated_extensions_status(
 pub fn determine_extension_locations_to_toggle(cdb: &CoreDB) -> Vec<Extension> {
     let mut extensions_to_toggle: Vec<Extension> = vec![];
     for desired_extension in &cdb.spec.extensions {
+        info!(
+            "Checking if we need to toggle extension {}",
+            desired_extension.name
+        );
         let mut needs_toggle = false;
         let mut extension_to_toggle = desired_extension.clone();
         extension_to_toggle.locations = vec![];
@@ -295,10 +361,145 @@ pub fn determine_extension_locations_to_toggle(cdb: &CoreDB) -> Vec<Extension> {
             }
         }
         if needs_toggle {
+            info!("Adding extension {} to toggle list", desired_extension.name);
             extensions_to_toggle.push(extension_to_toggle);
         }
     }
     extensions_to_toggle
+}
+
+// Check for extensions enabled with LOAD. When these extensions are installed, they are not
+// present in pg_available_extensions. In order to check if they are installed, we need to check
+// for the presence of <extension_name>.so file in the pod.
+async fn check_for_extensions_enabled_with_load(
+    cdb: &CoreDB,
+    ctx: Arc<Context>,
+    all_actually_installed_extensions: Vec<ExtensionStatus>,
+) -> Result<Vec<ExtensionStatus>, Action> {
+    // Get list of trunk installed extensions
+    let mut extensions_enabled_with_load: Vec<ExtensionStatus> = vec![];
+    let trunk_installed_extensions = cdb.spec.trunk_installs.clone();
+
+    // Get trunk installed extensions that are not in all_actually_installed_extensions
+    let mut trunk_installed_extensions_not_in_all_actually_installed_extensions: Vec<TrunkInstall> =
+        vec![];
+    for trunk_installed_extension in trunk_installed_extensions {
+        let mut found = false;
+        for actually_installed_extension in &all_actually_installed_extensions {
+            if trunk_installed_extension.name == actually_installed_extension.name {
+                found = true;
+            }
+        }
+        if !found {
+            trunk_installed_extensions_not_in_all_actually_installed_extensions
+                .push(trunk_installed_extension);
+        }
+    }
+
+    // Get all pods so we can check for <extension_name>.so
+    let all_pods =
+        crate::extensions::install::all_fenced_and_non_fenced_pods(cdb, ctx.clone()).await?;
+    for pod in all_pods {
+        let pod_name = pod.metadata.name.clone().unwrap();
+        // Check for <extension_name>.so files
+        for extension in trunk_installed_extensions_not_in_all_actually_installed_extensions.clone()
+        {
+            let found =
+                check_for_so_files(cdb, ctx.clone(), &*pod_name, extension.name.clone()).await?;
+            // If found, add to extensions_with_load
+            if found {
+                // Get trunk project description for extension
+                let trunk_project_name =
+                    get_trunk_project_for_extension(extension.name.clone()).await?;
+                let description = get_trunk_project_description(
+                    trunk_project_name.clone().unwrap(),
+                    extension.version.clone().unwrap(),
+                )
+                .await?;
+
+                let mut extension_status = ExtensionStatus {
+                    name: extension.name.clone(),
+                    description,
+                    locations: vec![],
+                };
+
+                let extensions = cdb.spec.extensions.clone();
+                for desired_extension in extensions {
+                    if desired_extension.name == extension.name {
+                        for desired_location in desired_extension.locations {
+                            let location_status = ExtensionInstallLocationStatus {
+                                enabled: Some(desired_location.enabled.clone()),
+                                database: desired_location.database.clone(),
+                                schema: desired_location.schema.clone(),
+                                version: desired_location.version.clone(),
+                                error: Some(false),
+                                error_message: None,
+                            };
+                            extension_status.locations.push(location_status);
+                        }
+                    }
+                }
+                extensions_enabled_with_load.push(extension_status);
+            }
+        }
+    }
+    Ok(extensions_enabled_with_load)
+}
+
+// Get trunk project version
+async fn get_trunk_project_version(
+    cdb: &CoreDB,
+    trunk_project_name: Option<String>,
+    location_to_toggle: types::ExtensionInstallLocation,
+) -> Result<Option<String>, Action> {
+    let mut trunk_project_version = None;
+
+    // Check if version is provided in cdb.spec.trunk_installs
+    for trunk_install in cdb.spec.trunk_installs.clone() {
+        if trunk_install.name == trunk_project_name.clone().unwrap() {
+            trunk_project_version = trunk_install.version;
+        }
+    }
+
+    // If trunk_project_version is None && extension version is semver
+    if trunk_project_version.is_none() && is_semver(location_to_toggle.version.clone().unwrap()) {
+        // Check if trunk project with extension version exists
+        let trunk_project_version_exists = get_trunk_project_metadata_for_version(
+            trunk_project_name.clone().unwrap(),
+            location_to_toggle.version.clone().unwrap(),
+        )
+        .await
+        .is_ok();
+        // If trunk project exists for this version, use it
+        if trunk_project_version_exists {
+            trunk_project_version = location_to_toggle.version.clone();
+        }
+        // Otherwise, fall back to latest version
+        else {
+            trunk_project_version =
+                get_latest_trunk_project_version(trunk_project_name.clone().unwrap()).await?;
+        }
+        // If trunk_project_version is None && extension version is NOT semver
+    } else if trunk_project_version.is_none() {
+        // Convert to semver and check if trunk project with semver version exists
+        let semver_version = convert_to_semver(location_to_toggle.version.clone().unwrap());
+        let trunk_project_version_exists = get_trunk_project_metadata_for_version(
+            trunk_project_name.clone().unwrap(),
+            semver_version.clone(),
+        )
+        .await
+        .is_ok();
+        // If trunk project exists for this version, use it
+        if trunk_project_version_exists {
+            trunk_project_version = Some(semver_version);
+        }
+        // Otherwise, fall back to latest version
+        else {
+            trunk_project_version =
+                get_latest_trunk_project_version(trunk_project_name.clone().unwrap()).await?;
+        }
+    }
+    Ok(trunk_project_version)
 }
 
 #[cfg(test)]

@@ -7,7 +7,7 @@ use serde::{Deserialize, Serialize};
 use std::{collections::BTreeMap, env, time::Duration};
 
 use crate::configmap::apply_configmap;
-use tracing::log::error;
+use tracing::error;
 use utoipa::ToSchema;
 
 const DEFAULT_TRUNK_REGISTRY_DOMAIN: &str = "registry.pgtrunk.io";
@@ -233,6 +233,7 @@ pub async fn get_trunk_project_names() -> Result<Vec<String>, TrunkError> {
 }
 
 // Get all metadata entries for a given trunk project
+#[allow(dead_code)]
 async fn get_trunk_project_metadata(
     trunk_project: String,
 ) -> Result<Vec<TrunkProjectMetadata>, TrunkError> {
@@ -259,7 +260,7 @@ async fn get_trunk_project_metadata(
 }
 
 // Get trunk project metadata for a specific version
-async fn get_trunk_project_metadata_for_version(
+pub async fn get_trunk_project_metadata_for_version(
     trunk_project: String,
     version: String,
 ) -> Result<TrunkProjectMetadata, TrunkError> {
@@ -304,14 +305,15 @@ async fn get_trunk_project_metadata_for_version(
 }
 
 // Check if extension name is in list of trunk project names
-pub async fn extension_name_matches_trunk_project(
-    extension_name: String,
-) -> Result<bool, TrunkError> {
+pub async fn extension_name_matches_trunk_project(extension_name: String) -> Result<bool, Action> {
     let trunk_project_names = match get_trunk_project_names().await {
         Ok(trunk_project_names) => trunk_project_names,
         Err(e) => {
-            error!("Failed to get trunk project names: {:?}", e);
-            return Err(TrunkError::ConfigMapApplyError);
+            error!(
+                "Failed to check if extension name and trunk project name match for {}: {:?}",
+                extension_name, e
+            );
+            return Err(Action::requeue(Duration::from_secs(300)));
         }
     };
     Ok(trunk_project_names.contains(&extension_name))
@@ -320,14 +322,21 @@ pub async fn extension_name_matches_trunk_project(
 // Find the trunk project name associated with a given extension
 pub async fn get_trunk_project_for_extension(
     extension_name: String,
-) -> Result<Option<String>, TrunkError> {
+) -> Result<Option<String>, Action> {
     let trunk_projects = match get_trunk_projects().await {
         Ok(trunk_projects) => trunk_projects,
         Err(e) => {
-            error!("Failed to get trunk projects: {:?}", e);
-            return Err(TrunkError::ConfigMapApplyError);
+            error!(
+                "Failed to get trunk project name for extension {}: {:?}",
+                extension_name, e
+            );
+            return Err(Action::requeue(Duration::from_secs(3)));
         }
     };
+    // Check if the extension name matches a trunk project name
+    if extension_name_matches_trunk_project(extension_name.clone()).await? {
+        return Ok(Some(extension_name));
+    }
     for trunk_project in trunk_projects {
         for extension in trunk_project.extensions {
             if extension.extension_name == extension_name {
@@ -351,7 +360,7 @@ pub async fn is_control_file_absent(
                     "Failed to get trunk project metadata for version {}: {:?}",
                     version, e
                 );
-                return Err(Action::requeue(Duration::from_secs(300)));
+                return Err(Action::requeue(Duration::from_secs(3)));
             }
         };
     // TODO(ianstanton) This assumes that there is only one extension in the project, but we need to handle the case
@@ -383,7 +392,7 @@ pub async fn get_loadable_library_name(
                 "Failed to get trunk project metadata for version {}: {:?}",
                 version, e
             );
-            return Err(Action::requeue(Duration::from_secs(300)));
+            return Err(Action::requeue(Duration::from_secs(3)));
         }
     };
     // Find the extension in the project metadata
@@ -398,7 +407,7 @@ pub async fn get_loadable_library_name(
                 "Failed to find extension {} in trunk project {} version {}",
                 extension_name, trunk_project, version
             );
-            return Err(Action::requeue(Duration::from_secs(300)));
+            return Err(Action::requeue(Duration::from_secs(3)));
         }
     };
     // Find the loadable library in the extension metadata
@@ -415,6 +424,83 @@ pub async fn get_loadable_library_name(
         None => None,
     };
     Ok(loadable_library_name)
+}
+
+// Get trunk project description for a given trunk project version
+pub async fn get_trunk_project_description(
+    trunk_project: String,
+    version: String,
+) -> Result<Option<String>, Action> {
+    let project_metadata: TrunkProjectMetadata = match get_trunk_project_metadata_for_version(
+        trunk_project.clone(),
+        version.clone(),
+    )
+    .await
+    {
+        Ok(project_metadata) => project_metadata,
+        Err(e) => {
+            error!(
+                "Failed to get trunk project metadata for version {}: {:?}",
+                version, e
+            );
+            return Err(Action::requeue(Duration::from_secs(3)));
+        }
+    };
+    Ok(project_metadata.description)
+}
+
+// Get latest version of trunk project
+pub async fn get_latest_trunk_project_version(
+    trunk_project: String,
+) -> Result<Option<String>, Action> {
+    let project_metadata: Vec<TrunkProjectMetadata> =
+        match get_trunk_project_metadata(trunk_project.clone()).await {
+            Ok(project_metadata) => project_metadata,
+            Err(e) => {
+                error!(
+                    "Failed to get trunk project metadata for {}: {:?}",
+                    trunk_project, e
+                );
+                return Err(Action::requeue(Duration::from_secs(3)));
+            }
+        };
+
+    // Get all versions
+    let mut versions: Vec<String> = project_metadata
+        .iter()
+        .map(|project_metadata| project_metadata.version.clone())
+        .collect();
+    // Sort versions
+    versions = sort_semver(versions);
+    // Get latest version
+    let latest_version = versions.last();
+
+    Ok(latest_version.cloned())
+}
+
+// Check if string version is semver
+pub fn is_semver(version: String) -> bool {
+    semver::Version::parse(&version).is_ok()
+}
+
+// Convert to semver if not already
+pub fn convert_to_semver(version: String) -> String {
+    let mut version = version;
+    if !is_semver(version.clone()) {
+        version.push_str(".0");
+    }
+    version
+}
+
+// Sort semver
+fn sort_semver(versions: Vec<String>) -> Vec<String> {
+    let mut versions = versions;
+    versions.sort_by(|a, b| {
+        let a = semver::Version::parse(&a).unwrap();
+        let b = semver::Version::parse(&b).unwrap();
+        a.cmp(&b)
+    });
+    versions
 }
 
 // Define error type
@@ -493,6 +579,11 @@ mod tests {
         let result = get_trunk_project_for_extension(extension_name).await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), Some("pgvector".to_string()));
+
+        let extension_name = "columnar".to_string();
+        let result = get_trunk_project_for_extension(extension_name).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Some("hydra_columnar".to_string()));
     }
 
     #[tokio::test]
@@ -512,5 +603,54 @@ mod tests {
         let result = get_loadable_library_name(trunk_project, version, extension_name).await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), Some("auto_explain".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_get_trunk_project_description() {
+        let trunk_project = "auto_explain".to_string();
+        let version = "15.3.0".to_string();
+        let result = get_trunk_project_description(trunk_project, version).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Some("The auto_explain module provides a means for logging execution plans of slow statements automatically, without having to run EXPLAIN by hand.".to_string()));
+    }
+
+    #[test]
+    fn test_is_semver() {
+        let version = "1.2.3".to_string();
+        let result = is_semver(version);
+        assert_eq!(result, true);
+
+        let version = "1.2".to_string();
+        let result = is_semver(version);
+        assert_eq!(result, false);
+    }
+
+    #[test]
+    fn test_convert_to_semver() {
+        let version = "1.2.3".to_string();
+        let result = convert_to_semver(version);
+        assert_eq!(result, "1.2.3".to_string());
+
+        let version = "1.2".to_string();
+        let result = convert_to_semver(version);
+        assert_eq!(result, "1.2.0".to_string());
+    }
+
+    #[tokio::test]
+    async fn sort_semver_test() {
+        let versions = vec![
+            "2.3.0".to_string(),
+            "13.1.1".to_string(),
+            "13.1.0".to_string(),
+        ];
+        let result = sort_semver(versions);
+        assert_eq!(
+            result,
+            vec![
+                "2.3.0".to_string(),
+                "13.1.0".to_string(),
+                "13.1.1".to_string()
+            ]
+        );
     }
 }

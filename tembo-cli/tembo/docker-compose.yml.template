@@ -5,6 +5,7 @@ services:
   {{instance.instance_name}}:
     build:
       context: ./{{instance.instance_name}}
+    container_name: {{instance.instance_name}}
     networks:
       - tembo
     labels:
