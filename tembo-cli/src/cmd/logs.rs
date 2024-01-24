@@ -14,18 +14,7 @@ impl LogsCommand {
         let instance_settings = apply::get_instance_settings(None, None)?;
 
         for (instance_name, _settings) in instance_settings {
-            let output = Command::new("docker")
-                .arg("logs")
-                .arg(&instance_name)
-                .output()?;
-
-            if output.status.success() {
-                println!("Huge success haha");
-            } else {
-                eprintln!("Failed to get logs for instance: {}", instance_name);
-                eprintln!("{}", String::from_utf8_lossy(&output.stderr));
-            }
-            fetch_and_print_docker_logs(&instance_name)?;
+            fetch_and_print_docker_logs(&_settings.instance_name)?;
         }
 
         Ok(())
