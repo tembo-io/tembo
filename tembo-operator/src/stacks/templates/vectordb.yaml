@@ -3,9 +3,11 @@ description: A Tembo Postgres Stack configured to support vector data types, sto
 image: "quay.io/tembo/standard-cnpg:15.3.0-1-795fc99"
 stack_version: 0.1.0
 appServices:
-  - image: quay.io/tembo/vector-serve:cbabfae
+  - image: quay.io/tembo/vector-serve:7dc6329
     name: embeddings
     env:
+      - name: TMPDIR
+        value: /models
       - name: BATCH_SIZE
         value: "1000"
       - name: XDG_CACHE_HOME
@@ -46,7 +48,7 @@ trunk_installs:
   - name: pgmq
     version: 1.1.1
   - name: vectorize
-    version: 0.7.0
+    version: 0.8.1
   - name: pgvector
     version: 0.5.1
   - name: pg_stat_statements
@@ -71,7 +73,7 @@ extensions:
     locations:
     - database: postgres
       enabled: true
-      version: 0.7.0
+      version: 0.8.1
   - name: pg_stat_statements
     locations:
       - database: postgres

@@ -2303,6 +2303,53 @@ mod test {
         println!("Creating CoreDB resource {}", name);
         let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
         // Generate basic CoreDB resource to start with
+        // Install extensions, but don't enable them
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name,
+            },
+            "spec": {
+                "replicas": replicas,
+                "trunk_installs": [{
+                        "name": "auto_explain",
+                        "version": "15.3.0",
+                },
+                {
+                        "name": "pg_stat_statements",
+                        "version": "1.10.0",
+                },
+                {
+                        "name": "auth_delay",
+                        "version": "15.3.0",
+                },
+                {
+                        "name": "adminpack",
+                        "version": "2.1.0",
+                }]
+            }
+        });
+        let params = PatchParams::apply("tembo-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        let coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        // Wait for CNPG Pod to be created
+        let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
+        let pod_name = format!("{}-1", name);
+
+        pod_ready_and_running(pods.clone(), pod_name.clone()).await;
+
+        //TODO(ianstanton) wait for status.extensions to be populated
+        tokio::time::sleep(Duration::from_secs(20)).await;
+
+        // Check status.extensions.locations is not empty
+        let coredb_resource = coredbs.get(name).await.unwrap();
+        for extension in coredb_resource.status.unwrap().extensions.unwrap() {
+            assert!(extension.locations.len() > 0);
+        }
+
+        // Update CoreDB resource to enable extensions
         let coredb_json = serde_json::json!({
             "apiVersion": API_VERSION,
             "kind": kind,
@@ -2374,11 +2421,12 @@ mod test {
                 }]
             }
         });
+
         let params = PatchParams::apply("tembo-integration-test");
         let patch = Patch::Apply(&coredb_json);
         let coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
 
-        // Wait for CNPG Pod to be created
+        // Wait for CNPG Pod to be updated and ready
         let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
         let pod_name = format!("{}-1", name);
 

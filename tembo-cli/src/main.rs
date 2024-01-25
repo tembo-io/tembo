@@ -6,6 +6,7 @@ use clap::{crate_authors, crate_version, Args, Parser, Subcommand};
 use cmd::apply::ApplyCommand;
 use cmd::context::{ContextCommand, ContextSubCommand};
 use cmd::init::InitCommand;
+use cmd::logs::LogsCommand;
 
 mod cli;
 mod cmd;
@@ -63,6 +64,9 @@ fn main() -> Result<(), anyhow::Error> {
         }
         SubCommands::Validate(_validate_cmd) => {
             validate::execute(app.global_opts.verbose)?;
+        }
+        SubCommands::Logs(_logs_cmd) => {
+            logs::execute()?;
         }
         SubCommands::Delete(_delete_cmd) => {
             delete::execute()?;
