@@ -1,10 +1,11 @@
 use crate::apply::{get_instance_id, get_instance_settings};
-use crate::cli::context::{get_current_context, Environment, Profile};
-use anyhow::{anyhow, Result};
+use crate::cli::context::{get_current_context, Target};
+use anyhow::{anyhow, Context, Result};
 use clap::Args;
 use reqwest::blocking::Client;
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
 use serde::{Deserialize, Serialize};
+use std::process::Command;
 use temboclient::apis::configuration::Configuration;
 
 #[derive(Args)]
@@ -66,19 +67,33 @@ fn format_log_entry(log_entry: &IndividualLogEntry) -> String {
 }
 
 pub fn execute() -> Result<()> {
+    let instance_settings = get_instance_settings(None, None)?;
+    let env = match get_current_context() {
+        Ok(env) => env,
+        Err(e) => return Err(e), // early return in case of error
+    };
+
+    if env.target == Target::Docker.to_string() {
+        for (instance_name, _settings) in instance_settings {
+            docker_logs(&_settings.instance_name)?;
+        }
+    } else if env.target == Target::TemboCloud.to_string() {
+        cloud_logs();
+    }
+    Ok(())
+}
+
+pub fn cloud_logs() -> Result<()> {
     let env = get_current_context()?;
     let org_id = env.org_id.clone().unwrap_or_default();
     let profile = env.selected_profile.clone().unwrap();
     let tembo_data_host = profile.clone().tembo_data_host;
-
     let config = Configuration {
         base_path: profile.tembo_host,
         bearer_access_token: Some(profile.tembo_access_token.clone()),
         ..Default::default()
     };
-
     let instance_settings = get_instance_settings(None, None)?;
-
     let client = Client::new();
     let mut headers = HeaderMap::new();
     headers.insert("X-Scope-OrgID", HeaderValue::from_str(&org_id)?);
@@ -114,6 +129,31 @@ pub fn execute() -> Result<()> {
             eprintln!("Error: {:?}", response.status());
         }
     }
+
+    Ok(())
+}
+
+pub fn docker_logs(instance_name: &str) -> Result<()> {
+    println!("\nFetching logs for instance: {}\n", instance_name);
+    let output = Command::new("docker")
+        .args(["logs", instance_name])
+        .output()
+        .with_context(|| {
+            format!(
+                "Failed to fetch logs for Docker container '{}'",
+                instance_name
+            )
+        })?;
+
+    if !output.status.success() {
+        eprintln!("Error fetching logs for instance '{}'", instance_name);
+        return Ok(());
+    }
+
+    let logs_stdout = String::from_utf8_lossy(&output.stdout);
+    let logs_stderr = String::from_utf8_lossy(&output.stderr);
+
+    println!("{}{}", logs_stdout, logs_stderr);
 
     Ok(())
 }
