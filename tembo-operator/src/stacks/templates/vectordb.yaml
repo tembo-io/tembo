@@ -6,6 +6,8 @@ appServices:
   - image: quay.io/tembo/vector-serve:7dc6329
     name: embeddings
     env:
+      - name: TMPDIR
+        value: /models
       - name: BATCH_SIZE
         value: "1000"
       - name: XDG_CACHE_HOME
