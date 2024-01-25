@@ -39,6 +39,7 @@ async fn main() -> std::io::Result<()> {
               secrets::get_secret_v1,
               secrets::get_secret_names_v1,
               metrics::query_range,
+              metrics::query,
         ),
         components(schemas(
             AvailableSecret
@@ -99,6 +100,7 @@ async fn main() -> std::io::Result<()> {
                     .service(secrets::get_secret_v1)
             )
             .service(web::scope("/{namespace}/metrics").service(metrics::query_range))
+            .service(web::scope("/{namespace}/metrics").service(metrics::query))
             .service(
                 web::scope("/{namespace}/secrets")
                     .service(secrets::get_secret)

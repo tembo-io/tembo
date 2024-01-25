@@ -29,7 +29,7 @@ spec:
         {{- end }}
     spec:
       containers:
-        - image: {{ (index .Values "controller").image.repository }}:{{ tpl (index .Values "controller").image.tag . }}
+        - image: {{ (index .Values "controller").image.repository }}:{{ tpl (printf "%s" (index .Values "controller").image.tag) . }}
           imagePullPolicy: {{ (index .Values "controller").image.pullPolicy }}
           name: tembo-controller
           {{- with (index .Values "controller").extraEnv }}

@@ -37,6 +37,22 @@ pub async fn query_range(
     Ok(metrics::query_prometheus(cfg, http_client, range_query, namespace).await)
 }
 
+#[utoipa::path(
+    context_path = "/{namespace}/metrics",
+    params(
+        ("namespace" = String, Path, example="org-coredb-inst-control-plane-dev", description = "Instance namespace"),
+        ("query" = inline(String), Query, example="(sum by (namespace) (max_over_time(pg_stat_activity_count{namespace=\"org-coredb-inst-control-plane-dev\"}[1h])))", description = "PromQL range query, must include a 'namespace' label matching the query path"),
+    ),
+    responses(
+        (status = 200, description = "Success range query to Prometheus, please see Prometheus documentation for response format details. https://prometheus.io/docs/prometheus/latest/querying/api/#range-queries", body = Value,
+        example = json!({"status":"success","data":{"resultType":"matrix","result":[{"metric":{"__name__":"up","job":"prometheus","instance":"localhost:9090"},"values":[[1435781430.781,"1"],[1435781445.781,"1"],[1435781460.781,"1"]]},{"metric":{"__name__":"up","job":"node","instance":"localhost:9091"},"values":[[1435781430.781,"0"],[1435781445.781,"0"],[1435781460.781,"1"]]}]}})
+        ),
+        (status = 400, description = "Parameters are missing or incorrect"),
+        (status = 403, description = "Not authorized for query"),
+        (status = 422, description = "Incorrectly formatted query"),
+        (status = 504, description = "Request timed out on metrics backend"),
+    )
+)]
 #[get("/query")]
 pub async fn query(
     cfg: web::Data<config::Config>,
