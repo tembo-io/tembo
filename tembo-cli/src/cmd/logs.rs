@@ -161,6 +161,53 @@ pub fn docker_logs(instance_name: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use colorful::core::StrMarker;
+    use std::env;
+    use std::error::Error;
+    use std::path::PathBuf;
+    use assert_cmd::prelude::*;
+
+    const ROOT_DIR: &str = env!("CARGO_MANIFEST_DIR");
+    const CARGO_BIN: &str = "tembo";
+
+    #[tokio::test]
+    async fn docker_logs() -> Result<(), Box<dyn Error>> {
+        let root_dir = env!("CARGO_MANIFEST_DIR");
+        let test_dir = PathBuf::from(root_dir).join("examples").join("set");
+
+        env::set_current_dir(&test_dir)?;
+
+        // tembo init
+        let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+        cmd.arg("init");
+        cmd.assert().success();
+
+        // tembo context set --name local
+        let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+        cmd.arg("context");
+        cmd.arg("set");
+        cmd.arg("--name");
+        cmd.arg("local");
+        cmd.assert().success();
+
+        // tembo apply
+        let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+        cmd.arg("--verbose");
+        cmd.arg("apply");
+        cmd.assert().success();
+
+        // tembo logs
+        let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+        cmd.arg("logs");
+        cmd.assert().success();
+
+        // tembo delete
+        let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+        cmd.arg("delete");
+        let _ = cmd.ok();
+
+        Ok(())
+    }
 
     fn mock_query(query: &str) -> Result<String> {
         match query {
