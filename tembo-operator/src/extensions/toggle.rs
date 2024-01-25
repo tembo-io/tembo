@@ -78,7 +78,7 @@ async fn toggle_extensions(
             let trunk_project_name =
                 get_trunk_project_for_extension(extension_to_toggle.name.clone()).await?;
             // Get appropriate version for trunk project
-            let has_loadable_library = match trunk_project_name {
+            let loadable_library_name = match trunk_project_name {
                 Some(proj_name) => {
                     let trunk_project_version = get_trunk_project_version(
                         cdb,
@@ -92,7 +92,7 @@ async fn toggle_extensions(
                         error!("Version for {} is none. Version should never be none when toggling an extension", extension_to_toggle.name);
                         continue;
                     }
-                    let has_loadable_library = get_loadable_library_name(
+                    let loadable_library_name = get_loadable_library_name(
                         proj_name.clone(),
                         trunk_project_version.clone().unwrap(),
                         extension_to_toggle.name.clone(),
@@ -101,17 +101,20 @@ async fn toggle_extensions(
                     let control_file_absent =
                         is_control_file_absent(proj_name.clone(), trunk_project_version.unwrap())
                             .await?;
-                    if control_file_absent && has_loadable_library.is_some() {
+                    if control_file_absent && loadable_library_name.is_some() {
                         info!(
                             "Extension {} must be enabled with LOAD. Skipping toggle.",
                             extension_to_toggle.name,
                         );
                         continue;
                     }
-                    has_loadable_library
+                    loadable_library_name
                 }
                 _ => {
-                    error!("Trunk project name for {} is none. Trunk project name should never be none when toggling an extension", extension_to_toggle.name);
+                    error!(
+                        "Trunk project name for {} is none.",
+                        extension_to_toggle.name
+                    );
                     None
                 }
             };
@@ -124,7 +127,7 @@ async fn toggle_extensions(
             // then requeue.
             if location_to_toggle.enabled
                 && (requires_load.contains_key(&extension_to_toggle.name)
-                    || has_loadable_library.is_some())
+                    || loadable_library_name.is_some())
                 && !(current_shared_preload_libraries.contains(expected_library_name))
             {
                 warn!(
