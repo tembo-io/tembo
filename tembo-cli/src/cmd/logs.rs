@@ -8,8 +8,7 @@ use serde::{Deserialize, Serialize};
 use temboclient::apis::configuration::Configuration;
 
 #[derive(Args)]
-pub struct LogsCommand {
-}
+pub struct LogsCommand {}
 
 #[derive(Serialize, Deserialize, Debug)]
 struct LogStream {
@@ -68,6 +67,7 @@ pub fn execute() -> Result<()> {
     let env = get_current_context()?;
     let org_id = env.org_id.clone().unwrap_or_default();
     let profile = env.selected_profile.clone().unwrap();
+    let tembo_data_host = profile.clone().tembo_data_host;
 
     let config = Configuration {
         base_path: profile.tembo_host,
@@ -97,7 +97,7 @@ pub fn execute() -> Result<()> {
         };
 
         let query = format!("{{tembo_instance_id=\"{}\"}}", instance_id);
-        let url = "https://api.data-1.use1.tembo.io/loki/api/v1/query_range";
+        let url = format!("{}/loki/api/v1/query_range", tembo_data_host);
 
         let response = client
             .get(url)
