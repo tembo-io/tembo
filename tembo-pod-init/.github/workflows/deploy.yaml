@@ -21,7 +21,7 @@ jobs:
       short_sha: ${{ steps.versions.outputs.SHORT_SHA }}
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Determine which tags to publish
         id: tags
         run: |
@@ -73,7 +73,7 @@ jobs:
       - build_and_push
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Check out the repo
         uses: ./.github/actions/argocd-update
         with:

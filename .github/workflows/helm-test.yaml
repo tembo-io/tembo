@@ -14,9 +14,9 @@ jobs:
       directories: ${{ steps.find_directories.outputs.build_matrix }}
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Check out the coredb repo to reuse some actions
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: tembo-io/tembo
           path: ./.tembo
@@ -37,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           path: 'code'
 
@@ -77,7 +77,7 @@ jobs:
       matrix: ${{ fromJson(needs.find_directories.outputs.directories) }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -92,7 +92,7 @@ jobs:
       - check_version
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
@@ -134,7 +134,7 @@ jobs:
     # if: needs.lint-ct.outputs.changed == 'true'
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
