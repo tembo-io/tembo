@@ -161,11 +161,11 @@ pub fn docker_logs(instance_name: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_cmd::prelude::*;
     use colorful::core::StrMarker;
     use std::env;
     use std::error::Error;
     use std::path::PathBuf;
-    use assert_cmd::prelude::*;
 
     const ROOT_DIR: &str = env!("CARGO_MANIFEST_DIR");
     const CARGO_BIN: &str = "tembo";
