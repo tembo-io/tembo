@@ -11,11 +11,11 @@ inputs:
   fail-if-version-published:
     description: "If the version is already published, should we fail, or ignore? By default, ignore."
     required: false
-    default: false
+    default: "false"
   dry-run:
     description: "Use --dry-run flag on cargo publish?"
     required: false
-    default: false
+    default: "false"
   toolchain:
     description: "Which Rust toolchain to use?"
     default: "stable"
@@ -24,7 +24,7 @@ outputs: {}
 runs:
   using: "composite"
   steps:
-    - uses: actions-rs/toolchain@v1
+    - uses: dtolnay/rust-toolchain@stable
       with:
         toolchain: ${{ inputs.toolchain }}
     - name: Install TOML parser
