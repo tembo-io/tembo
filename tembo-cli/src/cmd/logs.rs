@@ -1,10 +1,11 @@
 use crate::apply::{get_instance_id, get_instance_settings};
-use crate::cli::context::{get_current_context, Environment, Profile};
-use anyhow::{anyhow, Result};
+use crate::cli::context::{get_current_context, Target};
+use anyhow::{anyhow, Context, Result};
 use clap::Args;
 use reqwest::blocking::Client;
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
 use serde::{Deserialize, Serialize};
+use std::process::Command;
 use temboclient::apis::configuration::Configuration;
 
 #[derive(Args)]
@@ -66,19 +67,33 @@ fn format_log_entry(log_entry: &IndividualLogEntry) -> String {
 }
 
 pub fn execute() -> Result<()> {
+    let instance_settings = get_instance_settings(None, None)?;
+    let env = match get_current_context() {
+        Ok(env) => env,
+        Err(e) => return Err(e), // early return in case of error
+    };
+
+    if env.target == Target::Docker.to_string() {
+        for (instance_name, _settings) in instance_settings {
+            docker_logs(&_settings.instance_name)?;
+        }
+    } else if env.target == Target::TemboCloud.to_string() {
+        cloud_logs();
+    }
+    Ok(())
+}
+
+pub fn cloud_logs() -> Result<()> {
     let env = get_current_context()?;
     let org_id = env.org_id.clone().unwrap_or_default();
     let profile = env.selected_profile.clone().unwrap();
     let tembo_data_host = profile.clone().tembo_data_host;
-
     let config = Configuration {
         base_path: profile.tembo_host,
         bearer_access_token: Some(profile.tembo_access_token.clone()),
         ..Default::default()
     };
-
     let instance_settings = get_instance_settings(None, None)?;
-
     let client = Client::new();
     let mut headers = HeaderMap::new();
     headers.insert("X-Scope-OrgID", HeaderValue::from_str(&org_id)?);
@@ -118,9 +133,81 @@ pub fn execute() -> Result<()> {
     Ok(())
 }
 
+pub fn docker_logs(instance_name: &str) -> Result<()> {
+    println!("\nFetching logs for instance: {}\n", instance_name);
+    let output = Command::new("docker")
+        .args(["logs", instance_name])
+        .output()
+        .with_context(|| {
+            format!(
+                "Failed to fetch logs for Docker container '{}'",
+                instance_name
+            )
+        })?;
+
+    if !output.status.success() {
+        eprintln!("Error fetching logs for instance '{}'", instance_name);
+        return Ok(());
+    }
+
+    let logs_stdout = String::from_utf8_lossy(&output.stdout);
+    let logs_stderr = String::from_utf8_lossy(&output.stderr);
+
+    println!("{}{}", logs_stdout, logs_stderr);
+
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_cmd::prelude::*;
+    use colorful::core::StrMarker;
+    use std::env;
+    use std::error::Error;
+    use std::path::PathBuf;
+
+    const ROOT_DIR: &str = env!("CARGO_MANIFEST_DIR");
+    const CARGO_BIN: &str = "tembo";
+
+    #[tokio::test]
+    async fn docker_logs() -> Result<(), Box<dyn Error>> {
+        let root_dir = env!("CARGO_MANIFEST_DIR");
+        let test_dir = PathBuf::from(root_dir).join("examples").join("set");
+
+        env::set_current_dir(&test_dir)?;
+
+        // tembo init
+        let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+        cmd.arg("init");
+        cmd.assert().success();
+
+        // tembo context set --name local
+        let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+        cmd.arg("context");
+        cmd.arg("set");
+        cmd.arg("--name");
+        cmd.arg("local");
+        cmd.assert().success();
+
+        // tembo apply
+        let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+        cmd.arg("--verbose");
+        cmd.arg("apply");
+        cmd.assert().success();
+
+        // tembo logs
+        let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+        cmd.arg("logs");
+        cmd.assert().success();
+
+        // tembo delete
+        let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+        cmd.arg("delete");
+        let _ = cmd.ok();
+
+        Ok(())
+    }
 
     fn mock_query(query: &str) -> Result<String> {
         match query {
