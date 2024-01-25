@@ -75,9 +75,17 @@ async fn toggle_extensions(
                 Some(expected_library_name) => expected_library_name,
             };
             // Get extensions trunk project name
-            let trunk_project_name =
-                get_trunk_project_for_extension(extension_to_toggle.name.clone()).await?;
-
+            let trunk_project_name: String =
+                match get_trunk_project_for_extension(extension_to_toggle.name.clone()).await? {
+                    Some(name) => name,
+                    None => {
+                        error!(
+                            "Could not get Trunk project name for extension {}",
+                            extension_to_toggle.name
+                        );
+                        continue;
+                    }
+                };
             // Get appropriate version for trunk project
             let trunk_project_version = get_trunk_project_version(
                 cdb,
@@ -94,7 +102,7 @@ async fn toggle_extensions(
 
             // Check if extension has a loadable library
             let has_loadable_library = get_loadable_library_name(
-                trunk_project_name.clone().unwrap(),
+                trunk_project_name.clone(),
                 trunk_project_version.clone().unwrap(),
                 extension_to_toggle.name.clone(),
             )
@@ -120,11 +128,9 @@ async fn toggle_extensions(
                 )?;
             }
             // Don't toggle extension if control file is absent && it has a loadable library
-            let control_file_absent = is_control_file_absent(
-                trunk_project_name.clone().unwrap(),
-                trunk_project_version.unwrap(),
-            )
-            .await?;
+            let control_file_absent =
+                is_control_file_absent(trunk_project_name.clone(), trunk_project_version.unwrap())
+                    .await?;
 
             if control_file_absent && has_loadable_library.is_some() {
                 info!(
@@ -464,24 +470,29 @@ async fn check_for_extensions_enabled_with_load(
 // Get trunk project version
 async fn get_trunk_project_version(
     cdb: &CoreDB,
-    trunk_project_name: Option<String>,
+    trunk_project_name: String,
     location_to_toggle: types::ExtensionInstallLocation,
 ) -> Result<Option<String>, Action> {
     let mut trunk_project_version = None;
 
     // Check if version is provided in cdb.spec.trunk_installs
     for trunk_install in cdb.spec.trunk_installs.clone() {
-        if trunk_install.name == trunk_project_name.clone().unwrap() {
+        if trunk_install.name == trunk_project_name.clone() {
             trunk_project_version = trunk_install.version;
         }
     }
 
+    let location_version = location_to_toggle
+        .version
+        .clone()
+        .ok_or(Action::requeue(Duration::from_secs(300)))?;
+
     // If trunk_project_version is None && extension version is semver
-    if trunk_project_version.is_none() && is_semver(location_to_toggle.version.clone().unwrap()) {
+    if trunk_project_version.is_none() && is_semver(location_version.clone()) {
         // Check if trunk project with extension version exists
         let trunk_project_version_exists = get_trunk_project_metadata_for_version(
-            trunk_project_name.clone().unwrap(),
-            location_to_toggle.version.clone().unwrap(),
+            trunk_project_name.clone(),
+            location_version.clone(),
         )
         .await
         .is_ok();
@@ -492,14 +503,14 @@ async fn get_trunk_project_version(
         // Otherwise, fall back to latest version
         else {
             trunk_project_version =
-                get_latest_trunk_project_version(trunk_project_name.clone().unwrap()).await?;
+                get_latest_trunk_project_version(trunk_project_name.clone()).await?;
         }
         // If trunk_project_version is None && extension version is NOT semver
     } else if trunk_project_version.is_none() {
         // Convert to semver and check if trunk project with semver version exists
-        let semver_version = convert_to_semver(location_to_toggle.version.clone().unwrap());
+        let semver_version = convert_to_semver(location_version.clone());
         let trunk_project_version_exists = get_trunk_project_metadata_for_version(
-            trunk_project_name.clone().unwrap(),
+            trunk_project_name.clone(),
             semver_version.clone(),
         )
         .await
@@ -511,7 +522,7 @@ async fn get_trunk_project_version(
         // Otherwise, fall back to latest version
         else {
             trunk_project_version =
-                get_latest_trunk_project_version(trunk_project_name.clone().unwrap()).await?;
+                get_latest_trunk_project_version(trunk_project_name.clone()).await?;
         }
     }
     Ok(trunk_project_version)
