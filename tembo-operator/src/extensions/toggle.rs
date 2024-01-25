@@ -75,38 +75,48 @@ async fn toggle_extensions(
                 Some(expected_library_name) => expected_library_name,
             };
             // Get extensions trunk project name
-            let trunk_project_name: String =
-                match get_trunk_project_for_extension(extension_to_toggle.name.clone()).await? {
-                    Some(name) => name,
-                    None => {
-                        error!(
-                            "Could not get Trunk project name for extension {}",
-                            extension_to_toggle.name
+            let trunk_project_name =
+                get_trunk_project_for_extension(extension_to_toggle.name.clone()).await?;
+            // Get appropriate version for trunk project
+            let has_loadable_library = match trunk_project_name {
+                Some(proj_name) => {
+                    let trunk_project_version = get_trunk_project_version(
+                        cdb,
+                        proj_name.clone(),
+                        location_to_toggle.clone(),
+                    )
+                    .await?;
+
+                    // If version is None, error
+                    if trunk_project_version.is_none() {
+                        error!("Version for {} is none. Version should never be none when toggling an extension", extension_to_toggle.name);
+                        continue;
+                    }
+                    let has_loadable_library = get_loadable_library_name(
+                        proj_name.clone(),
+                        trunk_project_version.clone().unwrap(),
+                        extension_to_toggle.name.clone(),
+                    )
+                    .await?;
+                    let control_file_absent =
+                        is_control_file_absent(proj_name.clone(), trunk_project_version.unwrap())
+                            .await?;
+                    if control_file_absent && has_loadable_library.is_some() {
+                        info!(
+                            "Extension {} must be enabled with LOAD. Skipping toggle.",
+                            extension_to_toggle.name,
                         );
                         continue;
                     }
-                };
-            // Get appropriate version for trunk project
-            let trunk_project_version = get_trunk_project_version(
-                cdb,
-                trunk_project_name.clone(),
-                location_to_toggle.clone(),
-            )
-            .await?;
-
-            // If version is None, error
-            if trunk_project_version.is_none() {
-                error!("Version for {} is none. Version should never be none when toggling an extension", extension_to_toggle.name);
-                continue;
-            }
+                    has_loadable_library
+                }
+                _ => {
+                    error!("Trunk project name for {} is none. Trunk project name should never be none when toggling an extension", extension_to_toggle.name);
+                    None
+                }
+            };
 
             // Check if extension has a loadable library
-            let has_loadable_library = get_loadable_library_name(
-                trunk_project_name.clone(),
-                trunk_project_version.clone().unwrap(),
-                extension_to_toggle.name.clone(),
-            )
-            .await?;
 
             // If we are toggling on,
             // the extension is included in the REQUIRES_LOAD list,
@@ -127,18 +137,7 @@ async fn toggle_extensions(
                     requires_load.clone(),
                 )?;
             }
-            // Don't toggle extension if control file is absent && it has a loadable library
-            let control_file_absent =
-                is_control_file_absent(trunk_project_name.clone(), trunk_project_version.unwrap())
-                    .await?;
 
-            if control_file_absent && has_loadable_library.is_some() {
-                info!(
-                    "Extension {} must be enabled with LOAD. Skipping toggle.",
-                    extension_to_toggle.name,
-                );
-                continue;
-            }
             match database_queries::toggle_extension(
                 cdb,
                 &extension_to_toggle.name,
