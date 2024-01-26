@@ -1,6 +1,7 @@
 name: MongoAlternative
 description: Document-facing workloads on Postgres.
-image: "{{repository}}/standard-cnpg:15.3.0-1-839d08e"
+repository: "{{repository}}"
+image: "standard-cnpg:15.3.0-1-839d08e"
 stack_version: 0.1.0
 appServices:
   - name: fdb-api

@@ -1,6 +1,7 @@
 name: OLAP
 description: A Postgres instance equipped with configuration and extensions for OLAP workloads.
-image: "{{repository}}/standard-cnpg:15.3.0-1-839d08e"
+repository: "{{repository}}"
+image: standard-cnpg:15.3.0-1-839d08e"
 stack_version: 0.1.0
 compute_templates:
   - cpu: 0.25

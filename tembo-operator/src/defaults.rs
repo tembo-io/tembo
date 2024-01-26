@@ -44,25 +44,38 @@ pub fn default_port() -> i32 {
     5432
 }
 
+pub fn default_image_repository() -> String {
+    Config::default().stack_image_repository
+}
+
 pub fn default_image() -> String {
-    format!(
-        "{}/standard-cnpg:15.3.0-1-839d08e",
-        Config::default().stack_image_repository
-    )
+    "standard-cnpg:15.3.0-1-839d08e".to_owned()
 }
 
 pub fn default_llm_image() -> String {
-    format!(
-        "{}/ml-cnpg:15.3.0-1-839d08e",
-        Config::default().stack_image_repository
-    )
+    "ml-cnpg:15.3.0-1-839d08e".to_owned()
 }
 
 pub fn default_dw_image() -> String {
-    format!(
-        "{}/dw-cnpg:15.3.0-1-839d08e",
-        Config::default().stack_image_repository
-    )
+    "dw-cnpg:15.3.0-1-839d08e".to_owned()
+}
+
+pub fn default_image_uri() -> String {
+    let repo = default_image_repository();
+    let image = default_image();
+    format!("{}/{}", repo, image)
+}
+
+pub fn default_llm_image_uri() -> String {
+    let repo = default_image_repository();
+    let image = default_llm_image();
+    format!("{}/{}", repo, image)
+}
+
+pub fn default_dw_image_uri() -> String {
+    let repo = default_image_repository();
+    let image = default_dw_image();
+    format!("{}/{}", repo, image)
 }
 
 pub fn default_storage() -> Quantity {

@@ -277,7 +277,7 @@ pub async fn get_trunk_project_metadata_for_version(
         let response_body = response.text().await?;
         let project_metadata: Vec<TrunkProjectMetadata> = serde_json::from_str(&response_body)?;
         // There will only be one index here, so we can safely assume index 0
-        let project_metadata = match project_metadata.get(0) {
+        let project_metadata = match project_metadata.first() {
             Some(project_metadata) => project_metadata,
             None => {
                 error!(
@@ -368,7 +368,7 @@ pub async fn is_control_file_absent(
     //  where there are multiple extensions
     let control_file_absent = project_metadata
         .extensions
-        .get(0)
+        .first()
         .unwrap()
         .control_file
         .absent;

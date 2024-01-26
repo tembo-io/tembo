@@ -1,7 +1,7 @@
 use crate::{
     apis::postgres_parameters::PgConfig,
     app_service::types::AppService,
-    defaults::default_image,
+    defaults::{default_image, default_image_repository},
     extensions::types::{Extension, TrunkInstall},
     postgres_exporter::QueryConfig,
     stacks::config_engines::{
@@ -69,6 +69,8 @@ pub struct Stack {
     pub name: String,
     pub compute_templates: Option<Vec<ComputeTemplate>>,
     pub description: Option<String>,
+    #[serde(default = "default_stack_repository")]
+    pub repository: Option<String>,
     #[serde(default = "default_stack_image")]
     pub image: Option<String>,
     pub stack_version: Option<String>,
@@ -99,7 +101,12 @@ impl Stack {
 }
 
 fn default_stack_image() -> Option<String> {
-    Some(default_image())
+    // Some(default_image())
+    default_image().split('/').last().map(String::from)
+}
+
+fn default_stack_repository() -> Option<String> {
+    Some(default_image_repository())
 }
 
 fn default_config_engine() -> Option<ConfigEngine> {

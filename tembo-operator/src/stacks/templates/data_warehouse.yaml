@@ -1,6 +1,7 @@
 name: DataWarehouse
 description: A Postgres instance equipped with configuration and extensions for building a data warehouse on Postgres.
-image: "{{repository}}/dw-cnpg:15.3.0-1-839d08e"
+repository: "{{repository}}"
+image: "dw-cnpg:15.3.0-1-839d08e"
 stack_version: 0.1.0
 compute_templates:
   - cpu: 2

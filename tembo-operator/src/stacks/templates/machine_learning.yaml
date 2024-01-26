@@ -1,6 +1,7 @@
 name: MachineLearning
 description: A Postgres instance equipped with machine learning extensions and optimized for machine learning workloads.
-image: "{{repository}}/ml-cnpg:15.3.0-1-839d08e"
+repository: "{{repository}}"
+image: "ml-cnpg:15.3.0-1-839d08e"
 stack_version: 0.3.0
 compute_templates:
   - cpu: 2

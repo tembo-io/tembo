@@ -63,9 +63,10 @@ mod tests {
             ..Config::default()
         };
         let stack = load_stack_template("src/stacks/templates/_test.yaml", &config);
+        assert_eq!(stack.repository.as_deref(), Some("quay.io/tembo"));
         assert_eq!(
             stack.image.as_deref(),
-            Some("quay.io/tembo/standard-cnpg:15.3.0-1-839d08e")
+            Some("standard-cnpg:15.3.0-1-839d08e")
         );
     }
 
@@ -78,8 +79,12 @@ mod tests {
         };
         let stack = load_stack_template("src/stacks/templates/_test.yaml", &config);
         assert_eq!(
+            stack.repository.as_deref(),
+            Some("01234567890.dkr.ecr.us-east-1.amazonaws.com/tembo-io")
+        );
+        assert_eq!(
             stack.image.as_deref(),
-            Some("01234567890.dkr.ecr.us-east-1.amazonaws.com/tembo-io/standard-cnpg:15.3.0-1-839d08e")
+            Some("standard-cnpg:15.3.0-1-839d08e")
         );
     }
 }
