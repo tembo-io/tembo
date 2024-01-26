@@ -1,6 +1,6 @@
 name: MessageQueue
 description: A Tembo Postgres Stack optimized for Message Queue workloads.
-image: "quay.io/tembo/standard-cnpg:15.3.0-1-795fc99"
+image: "{{repository}}/standard-cnpg:15.3.0-1-839d08e"
 stack_version: 0.3.0
 appServices:
   - name: mq-api

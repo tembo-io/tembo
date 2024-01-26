@@ -1,6 +1,6 @@
 name: OLTP
 description: A Postgres instance optimized for OLTP workloads.
-image: "quay.io/tembo/standard-cnpg:15.3.0-1-795fc99"
+image: "{{repository}}/standard-cnpg:15.3.0-1-839d08e"
 stack_version: 0.1.0
 compute_templates:
   - cpu: 0.25

@@ -9,6 +9,7 @@ use crate::{
         Backup, ConnectionPooler, PgBouncer, S3Credentials, ServiceAccountTemplate,
     },
     cloudnativepg::poolers::{PoolerPgbouncerPoolMode, PoolerTemplateSpecContainersResources},
+    config::Config,
     extensions::types::{Extension, TrunkInstall},
 };
 
@@ -44,11 +45,24 @@ pub fn default_port() -> i32 {
 }
 
 pub fn default_image() -> String {
-    "quay.io/tembo/standard-cnpg:15.3.0-1-0c19c7e".to_owned()
+    format!(
+        "{}/standard-cnpg:15.3.0-1-839d08e",
+        Config::default().stack_image_repository
+    )
 }
 
 pub fn default_llm_image() -> String {
-    "quay.io/tembo/ml-cnpg:15.3.0-1-63e32a1".to_owned()
+    format!(
+        "{}/ml-cnpg:15.3.0-1-839d08e",
+        Config::default().stack_image_repository
+    )
+}
+
+pub fn default_dw_image() -> String {
+    format!(
+        "{}/dw-cnpg:15.3.0-1-839d08e",
+        Config::default().stack_image_repository
+    )
 }
 
 pub fn default_storage() -> Quantity {
