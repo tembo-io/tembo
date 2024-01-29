@@ -1,7 +1,7 @@
 name: VectorDB
 description: A Tembo Postgres Stack configured to support vector data types, storage, and operations.
 repository: "quay.io/tembo"
-image: "standard-cnpg:15.3.0-1-795fc99"
+image: "standard-cnpg:15.3.0-1-3d9a853"
 stack_version: 0.1.0
 appServices:
   - image: quay.io/tembo/vector-serve:7dc6329
