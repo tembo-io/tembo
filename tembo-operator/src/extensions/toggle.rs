@@ -405,7 +405,7 @@ async fn check_for_extensions_enabled_with_load(
         for extension in trunk_installed_extensions_not_in_all_actually_installed_extensions.clone()
         {
             let found =
-                check_for_so_files(cdb, ctx.clone(), &*pod_name, extension.name.clone()).await?;
+                check_for_so_files(cdb, ctx.clone(), &pod_name, extension.name.clone()).await?;
             // If found, add to extensions_with_load
             if found {
                 // Get trunk project description for extension
@@ -430,7 +430,7 @@ async fn check_for_extensions_enabled_with_load(
                         found = true;
                         for desired_location in desired_extension.locations {
                             let location_status = ExtensionInstallLocationStatus {
-                                enabled: Some(desired_location.enabled.clone()),
+                                enabled: Some(desired_location.enabled),
                                 database: desired_location.database.clone(),
                                 schema: desired_location.schema.clone(),
                                 version: desired_location.version.clone(),

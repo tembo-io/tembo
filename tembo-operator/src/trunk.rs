@@ -277,7 +277,7 @@ pub async fn get_trunk_project_metadata_for_version(
         let response_body = response.text().await?;
         let project_metadata: Vec<TrunkProjectMetadata> = serde_json::from_str(&response_body)?;
         // There will only be one index here, so we can safely assume index 0
-        let project_metadata = match project_metadata.get(0) {
+        let project_metadata = match project_metadata.first() {
             Some(project_metadata) => project_metadata,
             None => {
                 error!(
@@ -367,7 +367,7 @@ pub async fn is_control_file_absent(
     //  where there are multiple extensions
     let control_file_absent = project_metadata
         .extensions
-        .get(0)
+        .first()
         .unwrap()
         .control_file
         .absent;
@@ -411,18 +411,11 @@ pub async fn get_loadable_library_name(
         }
     };
     // Find the loadable library in the extension metadata
-    let loadable_library_name = match extension_metadata.loadable_libraries {
-        Some(ref loadable_libraries) => {
-            let loadable_library = loadable_libraries
-                .iter()
-                .find(|l| l.requires_restart == true);
-            match loadable_library {
-                Some(loadable_library) => Some(loadable_library.library_name.clone()),
-                None => None,
-            }
-        }
-        None => None,
-    };
+    let loadable_library_name = extension_metadata
+        .loadable_libraries
+        .as_ref()
+        .and_then(|loadable_libraries| loadable_libraries.iter().find(|l| l.requires_restart))
+        .map(|loadable_library| loadable_library.library_name.clone());
     Ok(loadable_library_name)
 }
 
@@ -496,8 +489,8 @@ pub fn convert_to_semver(version: String) -> String {
 fn sort_semver(versions: Vec<String>) -> Vec<String> {
     let mut versions = versions;
     versions.sort_by(|a, b| {
-        let a = semver::Version::parse(&a).unwrap();
-        let b = semver::Version::parse(&b).unwrap();
+        let a = semver::Version::parse(a).unwrap();
+        let b = semver::Version::parse(b).unwrap();
         a.cmp(&b)
     });
     versions
@@ -550,17 +543,17 @@ mod tests {
         let extension_name = "auto_explain".to_string();
         let result = extension_name_matches_trunk_project(extension_name).await;
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), true);
+        assert!(result.unwrap());
 
         let extension_name = "pgml".to_string();
         let result = extension_name_matches_trunk_project(extension_name).await;
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), false);
+        assert!(!result.unwrap());
 
         let extension_name = "vector".to_string();
         let result = extension_name_matches_trunk_project(extension_name).await;
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), false);
+        assert!(!result.unwrap());
     }
 
     #[tokio::test]
@@ -592,7 +585,7 @@ mod tests {
         let version = "15.3.0".to_string();
         let result = is_control_file_absent(trunk_project, version).await;
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), true);
+        assert!(result.unwrap());
     }
 
     #[tokio::test]
@@ -618,11 +611,11 @@ mod tests {
     fn test_is_semver() {
         let version = "1.2.3".to_string();
         let result = is_semver(version);
-        assert_eq!(result, true);
+        assert!(result);
 
         let version = "1.2".to_string();
         let result = is_semver(version);
-        assert_eq!(result, false);
+        assert!(!result);
     }
 
     #[test]

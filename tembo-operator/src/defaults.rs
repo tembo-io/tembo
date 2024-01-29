@@ -43,12 +43,38 @@ pub fn default_port() -> i32 {
     5432
 }
 
+pub fn default_repository() -> String {
+    "quay.io/tembo".to_owned()
+}
+
 pub fn default_image() -> String {
-    "quay.io/tembo/standard-cnpg:15.3.0-1-0c19c7e".to_owned()
+    "standard-cnpg:15.3.0-1-0c19c7e".to_owned()
 }
 
 pub fn default_llm_image() -> String {
-    "quay.io/tembo/ml-cnpg:15.3.0-1-63e32a1".to_owned()
+    "ml-cnpg:15.3.0-1-63e32a1".to_owned()
+}
+
+pub fn default_dw_image() -> String {
+    "dw-cnpg:15.3.0-1-839d08e".to_owned()
+}
+
+pub fn default_image_uri() -> String {
+    let repo = default_repository();
+    let image = default_image();
+    format!("{}/{}", repo, image)
+}
+
+pub fn default_llm_image_uri() -> String {
+    let repo = default_repository();
+    let image = default_llm_image();
+    format!("{}/{}", repo, image)
+}
+
+pub fn default_dw_image_uri() -> String {
+    let repo = default_repository();
+    let image = default_dw_image();
+    format!("{}/{}", repo, image)
 }
 
 pub fn default_storage() -> Quantity {
