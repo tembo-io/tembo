@@ -43,7 +43,7 @@ pub fn execute(verbose: bool) -> Result<(), anyhow::Error> {
         let mut file_path = FileUtils::get_current_working_dir();
         file_path.push_str("/tembo.toml");
 
-        let contents = fs::read_to_string(file_path.clone())?;
+        let contents = fs::read_to_string(&file_path)?;
         let config: HashMap<String, InstanceSettings> = toml::from_str(&contents)?;
 
         // Validate the config
