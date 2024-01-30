@@ -67,13 +67,13 @@ fn format_log_entry(log_entry: &IndividualLogEntry) -> String {
 }
 
 pub fn execute() -> Result<()> {
-    let instance_settings = get_instance_settings(None, None)?;
     let env = match get_current_context() {
         Ok(env) => env,
         Err(e) => return Err(e), // early return in case of error
     };
 
     if env.target == Target::Docker.to_string() {
+        let instance_settings = get_instance_settings(None, None)?;
         for (instance_name, _settings) in instance_settings {
             docker_logs(&_settings.instance_name)?;
         }
