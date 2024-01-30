@@ -10,6 +10,7 @@ use crate::{
     },
     cloudnativepg::poolers::{PoolerPgbouncerPoolMode, PoolerTemplateSpecContainersResources},
     extensions::types::{Extension, TrunkInstall},
+    stacks::{DATAWAREHOUSE, ML, STANDARD},
 };
 
 pub fn default_replicas() -> i32 {
@@ -48,15 +49,18 @@ pub fn default_repository() -> String {
 }
 
 pub fn default_image() -> String {
-    "standard-cnpg:15.3.0-1-0c19c7e".to_owned()
+    STANDARD
+        .image
+        .clone()
+        .expect("Standard or default image not found")
 }
 
 pub fn default_llm_image() -> String {
-    "ml-cnpg:15.3.0-1-63e32a1".to_owned()
+    ML.image.clone().expect("ML image not found")
 }
 
 pub fn default_dw_image() -> String {
-    "dw-cnpg:15.3.0-1-839d08e".to_owned()
+    DATAWAREHOUSE.image.clone().expect("DW image not found")
 }
 
 pub fn default_image_uri() -> String {
