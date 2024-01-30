@@ -28,7 +28,7 @@ struct LogEntry {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-#[serde(rename = "camelCase")]
+#[serde(rename_all = "camelCase")]
 struct LogResult {
     result_type: String,
     result: Vec<LogEntry>,
@@ -251,7 +251,6 @@ mod tests {
     #[tokio::test]
     async fn cloud_logs() {
         let valid_json_log = mock_query("valid_json").unwrap();
-        let result = beautify_logs(&valid_json_log);
-        assert!(result.is_ok());
+        beautify_logs(&valid_json_log).unwrap();
     }
 }
