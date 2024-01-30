@@ -69,6 +69,11 @@ Validates tembo.toml (same as `tembo validate`) and applies the changes to the c
   * `--merge`: Overlays Tembo.toml by another toml file for a specific context
   *  `--set` : Specifies a single instance setting by assigning a new value
 
+#### `tembo logs`
+
+Retrieves log data from the specified Tembo instances. Depending on your current context, it will fetch logs from either local Docker containers or Tembo Cloud instances.
+
+
 #### `tembo delete`
 
 - **local docker:** runs `docker-compose down` command to bring down all containers
