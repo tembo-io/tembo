@@ -567,6 +567,7 @@ fn merge_settings(base: &InstanceSettings, overlay: OverlayInstanceSettings) -> 
         ip_allow_list: overlay
             .ip_allow_list
             .or_else(|| base.extra_domains_rw.clone()),
+        pg_version: overlay.pg_version.unwrap_or(base.pg_version),
     }
 }
 
