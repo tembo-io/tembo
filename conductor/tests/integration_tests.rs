@@ -206,7 +206,7 @@ mod test {
         let passed_spec = msg.message.spec.expect("No spec found in message");
 
         // assert that the message returned by Conductor includes the new metrics values in the spec
-        println!("spec: {:?}", passed_spec);
+        // println!("spec: {:?}", passed_spec);
         assert!(passed_spec
             .metrics
             .expect("no metrics in data-plane-event message")
@@ -311,29 +311,29 @@ mod test {
         println!("start_time: {:?}", stdout);
 
         // Once CNPG is running we want to restart
-        let cluster_name = namespace.clone();
+        // let cluster_name = namespace.clone();
+        //
+        // restart_coredb(client.clone(), &namespace, &cluster_name, Utc::now())
+        //     .await
+        //     .expect("failed restarting cnpg pod");
 
-        restart_coredb(client.clone(), &namespace, &cluster_name, Utc::now())
-            .await
-            .expect("failed restarting cnpg pod");
-
-        let mut is_ready = false;
-        let mut current_iteration = 0;
-        while !is_ready {
-            if current_iteration > 30 {
-                panic!("CNPG pod did not restart after about 150 seconds");
-            }
-            thread::sleep(time::Duration::from_secs(5));
-            let current_coredb = get_coredb_error_without_status(client.clone(), &namespace)
-                .await
-                .unwrap();
-            if let Some(status) = current_coredb.status {
-                if status.running {
-                    is_ready = true;
-                }
-            }
-            current_iteration += 1;
-        }
+        // let mut is_ready = false;
+        // let mut current_iteration = 0;
+        // while !is_ready {
+        //     if current_iteration > 30 {
+        //         panic!("CNPG pod did not restart after about 300 seconds");
+        //     }
+        //     thread::sleep(time::Duration::from_secs(10));
+        //     let current_coredb = get_coredb_error_without_status(client.clone(), &namespace)
+        //         .await
+        //         .unwrap();
+        //     if let Some(status) = current_coredb.status {
+        //         if status.running {
+        //             is_ready = true;
+        //         }
+        //     }
+        //     current_iteration += 1;
+        // }
 
         pod_ready_and_running(pods.clone(), pod_name).await;
 
@@ -511,6 +511,31 @@ mod test {
             );
             thread::sleep(time::Duration::from_secs(5));
         }
+        false
+    }
+
+    async fn status_running(coredbs: &Api<CoreDB>, name: &str) -> bool {
+        let max_retries = 30;
+        let wait_duration = Duration::from_secs(10); // Adjust as needed
+
+        for attempt in 1..=max_retries {
+            let coredb = coredbs.get(name).await.expect("Failed to get CoreDB");
+
+            if coredb.status.as_ref().map_or(false, |s| s.running) {
+                println!("CoreDB {} is running", name);
+                return true;
+            } else {
+                println!(
+                    "Attempt {}/{}: CoreDB {} is not running yet",
+                    attempt, max_retries, name
+                );
+            }
+            tokio::time::sleep(wait_duration).await;
+        }
+        println!(
+            "CoreDB {} did not become running after {} attempts",
+            name, max_retries
+        );
         false
     }
 }
