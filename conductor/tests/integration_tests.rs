@@ -398,9 +398,8 @@ mod test {
         let stack_name = format!("org-{}-inst-{}-cf", org_name, dbname);
 
         // Check to see if the cloudformation stack exists
-        let exists = aws_config_state.does_stack_exist(&stack_name).await;
-        println!("CF stack {} exists: {}", stack_name, exists);
-        assert!(!exists, "CF stack was not deleted");
+        let cf_stack_deleted = check_cf_stack_deletion(&aws_config_state, &stack_name).await;
+        assert!(cf_stack_deleted, "CF stack was deleted");
     }
 
     async fn kube_client() -> kube::Client {
@@ -497,6 +496,34 @@ mod test {
             );
             thread::sleep(time::Duration::from_secs(5));
         }
+        false
+    }
+
+    use conductor::aws::cloudformation::AWSConfigState;
+    async fn check_cf_stack_deletion(acs: &AWSConfigState, stack_name: &str) -> bool {
+        let max_duration = Duration::from_secs(5 * 60); // 5 minutes
+        let check_interval = Duration::from_secs(30); // Check every 30 seconds
+
+        let start_time = tokio::time::Instant::now();
+        while tokio::time::Instant::now() - start_time < max_duration {
+            let exists = acs.does_stack_exist(stack_name).await;
+            println!("Checking if CF stack {} exists: {}", stack_name, exists);
+
+            if !exists {
+                println!(
+                    "CF stack {} does not exist, we assume it's deleted",
+                    stack_name
+                );
+                return true;
+            }
+
+            tokio::time::sleep(check_interval).await;
+        }
+
+        println!(
+            "CF stack {} was not deleted within the expected time.",
+            stack_name
+        );
         false
     }
 }
