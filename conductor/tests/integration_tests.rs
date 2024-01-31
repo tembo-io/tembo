@@ -515,6 +515,15 @@ mod test {
                     stack_name
                 );
                 return true;
+            } else {
+                match acs.delete_cloudformation_stack(stack_name).await {
+                    Ok(_) => {
+                        println!("CF stack {} was deleted", stack_name);
+                    }
+                    Err(e) => {
+                        panic!("Failed to delete CloudFormation stack: {:?}", e);
+                    }
+                }
             }
 
             tokio::time::sleep(check_interval).await;
