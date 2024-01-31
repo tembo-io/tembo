@@ -154,7 +154,7 @@ mod test {
                 image: "default-image-value".to_string()
             })
         });
-        let spec: CoreDBSpec = serde_json::from_value(spec_js).unwrap();
+        let mut spec: CoreDBSpec = serde_json::from_value(spec_js).unwrap();
 
         let msg = types::CRUDevent {
             organization_name: org_name.clone(),
@@ -163,8 +163,10 @@ mod test {
             inst_id: "inst_02s4UKVbRy34SAYVSwZq2H".to_owned(),
             event_type: types::Event::Create,
             dbname: dbname.clone(),
-            spec: Some(spec),
+            spec: Some(spec.clone()),
         };
+
+        // println!("Message: {:?}", msg);
 
         let msg_id = queue.send(&myqueue, &msg).await;
         println!("Create msg_id: {msg_id:?}");
@@ -201,11 +203,11 @@ mod test {
             .await
             .expect("error deleting message");
 
-        let spec = msg.message.spec.expect("No spec found in message");
+        let passed_spec = msg.message.spec.expect("No spec found in message");
 
         // assert that the message returned by Conductor includes the new metrics values in the spec
-        //println!("spec: {:?}", spec);
-        assert!(spec
+        println!("spec: {:?}", passed_spec);
+        assert!(passed_spec
             .metrics
             .expect("no metrics in data-plane-event message")
             .queries
@@ -214,10 +216,10 @@ mod test {
             .contains_key("pg_postmaster"));
 
         assert!(
-            !spec.extensions.is_empty(),
+            !passed_spec.extensions.is_empty(),
             "Extension object missing from spec"
         );
-        let extensions = spec.extensions;
+        let extensions = passed_spec.extensions.clone();
         assert!(
             !extensions.is_empty(),
             "Expected at least one extension: {:?}",
@@ -234,7 +236,7 @@ mod test {
         // ADD AN EXTENSION - ASSERT IT MAKES IT TO STATUS.EXTENSIONS
         // conductor receives a CRUDevent from control plane
         // take note of number of extensions at this point in time
-        let mut extensions_add = extensions.clone();
+        // let mut extensions_add = extensions.clone();
         let _install_location = ExtensionInstallLocation::default();
         let install_location = ExtensionInstallLocation {
             enabled: true,
@@ -243,16 +245,13 @@ mod test {
             ..ExtensionInstallLocation::default()
         };
         let install_location = install_location.clone();
-        extensions_add.push(Extension {
+        spec.extensions.push(Extension {
             name: "pg_jsonschema".to_owned(),
             description: Some("fake description".to_string()),
             locations: vec![install_location],
         });
-        let num_expected_extensions = extensions_add.len();
-        let spec_js = serde_json::json!({
-            "extensions": extensions_add,
-        });
-        let spec: CoreDBSpec = serde_json::from_value(spec_js).unwrap();
+        let num_expected_extensions = spec.extensions.len();
+        // println!("Updated spec: {:?}", spec.clone());
         let msg = types::CRUDevent {
             organization_name: org_name.clone(),
             data_plane_id: "org_02s3owPQskuGXHE8vYsGSY".to_owned(),
@@ -260,7 +259,7 @@ mod test {
             inst_id: "inst_02s4UKVbRy34SAYVSwZq2H".to_owned(),
             event_type: types::Event::Update,
             dbname: dbname.clone(),
-            spec: Some(spec),
+            spec: Some(spec.clone()),
         };
         let msg_id = queue.send(&myqueue, &msg).await;
         println!("Update msg_id: {msg_id:?}");
@@ -269,7 +268,7 @@ mod test {
         let mut extensions: Vec<Extension> = vec![];
         while num_expected_extensions != extensions.len() {
             let msg = get_dataplane_message(retries, retry_delay, &queue).await;
-            //println!("msg: {:?}", msg);
+            // println!("Update msg: {:?}", msg);
             queue
                 .archive("myqueue_data_plane", msg.msg_id)
                 .await
@@ -365,6 +364,7 @@ mod test {
             dbname: dbname.clone(),
             spec: None,
         };
+        // println!("DELETE msg: {:?}", msg);
         let msg_id = queue.send(&myqueue, &msg).await;
         println!("Delete msg_id: {msg_id:?}");
 

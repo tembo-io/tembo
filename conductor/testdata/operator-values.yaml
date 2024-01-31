@@ -2,12 +2,14 @@ controller:
   image:
     tag: latest
   extraEnv:
-    - name: ENABLE_INITIAL_BACKUP
+    - name: ENABLE_BACKUP
       value: "false"
     - name: RUST_LOG
       value: info,kube=info,controller=info
     - name: OPENTELEMETRY_ENDPOINT_URL
       value: http://tempo.monitoring.svc.cluster.local:4317
+    - name: DATA_PLANE_BASEDOMAIN
+      value: coredb-development.com 
 
 pod-init:
   image:
