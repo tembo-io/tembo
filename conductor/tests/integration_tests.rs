@@ -10,7 +10,6 @@
 
 #[cfg(test)]
 mod test {
-    use chrono::Utc;
     use k8s_openapi::{
         api::{core::v1::Namespace, core::v1::PersistentVolumeClaim, core::v1::Pod},
         apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
@@ -22,10 +21,8 @@ mod test {
     };
     use pgmq::{Message, PGMQueueExt};
 
-    use conductor::{
-        get_coredb_error_without_status, restart_coredb,
-        types::{self, StateToControlPlane},
-    };
+    use conductor::get_coredb_error_without_status;
+    use conductor::types::{self, StateToControlPlane};
     use controller::extensions::types::{Extension, ExtensionInstallLocation};
     use controller::{
         apis::coredb_types::{CoreDB, CoreDBSpec},
@@ -283,10 +280,6 @@ mod test {
         // we added an extension, so it should be +1 now
         assert_eq!(num_expected_extensions, extensions.len());
 
-        // Installing the new extensions will cause the pods to restart, but it can take a few
-        // seconds for that to happen.  For now lets just wait and see if that fixes the problem.
-        thread::sleep(time::Duration::from_secs(40));
-
         pod_ready_and_running(pods.clone(), pod_name.clone()).await;
 
         // Get the last time the pod was started
@@ -310,30 +303,38 @@ mod test {
 
         println!("start_time: {:?}", stdout);
 
-        // Once CNPG is running we want to restart
-        // let cluster_name = namespace.clone();
-        //
-        // restart_coredb(client.clone(), &namespace, &cluster_name, Utc::now())
-        //     .await
-        //     .expect("failed restarting cnpg pod");
+        // Lets now test sending an Event::Restart to the queue and see if the
+        // pod restarts correctly.
 
-        // let mut is_ready = false;
-        // let mut current_iteration = 0;
-        // while !is_ready {
-        //     if current_iteration > 30 {
-        //         panic!("CNPG pod did not restart after about 300 seconds");
-        //     }
-        //     thread::sleep(time::Duration::from_secs(10));
-        //     let current_coredb = get_coredb_error_without_status(client.clone(), &namespace)
-        //         .await
-        //         .unwrap();
-        //     if let Some(status) = current_coredb.status {
-        //         if status.running {
-        //             is_ready = true;
-        //         }
-        //     }
-        //     current_iteration += 1;
-        // }
+        let msg = types::CRUDevent {
+            organization_name: org_name.clone(),
+            data_plane_id: "org_02s3owPQskuGXHE8vYsGSY".to_owned(),
+            org_id: "org_02s3owPQskuGXHE8vYsGSY".to_owned(),
+            inst_id: "inst_02s4UKVbRy34SAYVSwZq2H".to_owned(),
+            event_type: types::Event::Restart,
+            dbname: dbname.clone(),
+            spec: Some(spec.clone()),
+        };
+        let msg_id = queue.send(&myqueue, &msg).await;
+        println!("Restart msg_id: {:?}", msg_id);
+
+        let mut is_ready = false;
+        let mut current_iteration = 0;
+        while !is_ready {
+            if current_iteration > 30 {
+                panic!("CNPG pod did not restart after about 300 seconds");
+            }
+            thread::sleep(time::Duration::from_secs(10));
+            let current_coredb = get_coredb_error_without_status(client.clone(), &namespace)
+                .await
+                .unwrap();
+            if let Some(status) = current_coredb.status {
+                if status.running {
+                    is_ready = true;
+                }
+            }
+            current_iteration += 1;
+        }
 
         pod_ready_and_running(pods.clone(), pod_name).await;
 
@@ -395,26 +396,11 @@ mod test {
         let region = Region::new(aws_region);
         let aws_config_state = AWSConfigState::new(region.clone()).await;
         let stack_name = format!("org-{}-inst-{}-cf", org_name, dbname);
-        // let dcf = aws_config_state
-        //     .delete_cloudformation_stack(&stack_name)
-        //     .await;
-        // assert!(dcf);
-        // let exists = aws_config_state.does_stack_exist(&stack_name).await;
-        // assert!(!exists, "CF stack was not deleted");
-        match aws_config_state
-            .delete_cloudformation_stack(&stack_name)
-            .await
-        {
-            Ok(_) => {
-                // If deletion was successful, check if the stack still exists
-                let stack_exists = aws_config_state.does_stack_exist(&stack_name).await;
-                assert!(!stack_exists, "CloudFormation stack was not deleted");
-            }
-            Err(e) => {
-                // If there was an error deleting the stack, fail the test
-                panic!("Failed to delete CloudFormation stack: {:?}", e);
-            }
-        }
+
+        // Check to see if the cloudformation stack exists
+        let exists = aws_config_state.does_stack_exist(&stack_name).await;
+        println!("CF stack {} exists: {}", stack_name, exists);
+        assert!(!exists, "CF stack was not deleted");
     }
 
     async fn kube_client() -> kube::Client {
@@ -511,31 +497,6 @@ mod test {
             );
             thread::sleep(time::Duration::from_secs(5));
         }
-        false
-    }
-
-    async fn status_running(coredbs: &Api<CoreDB>, name: &str) -> bool {
-        let max_retries = 30;
-        let wait_duration = Duration::from_secs(10); // Adjust as needed
-
-        for attempt in 1..=max_retries {
-            let coredb = coredbs.get(name).await.expect("Failed to get CoreDB");
-
-            if coredb.status.as_ref().map_or(false, |s| s.running) {
-                println!("CoreDB {} is running", name);
-                return true;
-            } else {
-                println!(
-                    "Attempt {}/{}: CoreDB {} is not running yet",
-                    attempt, max_retries, name
-                );
-            }
-            tokio::time::sleep(wait_duration).await;
-        }
-        println!(
-            "CoreDB {} did not become running after {} attempts",
-            name, max_retries
-        );
         false
     }
 }
