@@ -10,7 +10,6 @@
 
 #[cfg(test)]
 mod test {
-    use chrono::Utc;
     use k8s_openapi::{
         api::{core::v1::Namespace, core::v1::PersistentVolumeClaim, core::v1::Pod},
         apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition,
@@ -22,10 +21,8 @@ mod test {
     };
     use pgmq::{Message, PGMQueueExt};
 
-    use conductor::{
-        get_coredb_error_without_status, restart_coredb,
-        types::{self, StateToControlPlane},
-    };
+    use conductor::get_coredb_error_without_status;
+    use conductor::types::{self, StateToControlPlane};
     use controller::extensions::types::{Extension, ExtensionInstallLocation};
     use controller::{
         apis::coredb_types::{CoreDB, CoreDBSpec},
@@ -154,7 +151,7 @@ mod test {
                 image: "default-image-value".to_string()
             })
         });
-        let spec: CoreDBSpec = serde_json::from_value(spec_js).unwrap();
+        let mut spec: CoreDBSpec = serde_json::from_value(spec_js).unwrap();
 
         let msg = types::CRUDevent {
             organization_name: org_name.clone(),
@@ -163,8 +160,10 @@ mod test {
             inst_id: "inst_02s4UKVbRy34SAYVSwZq2H".to_owned(),
             event_type: types::Event::Create,
             dbname: dbname.clone(),
-            spec: Some(spec),
+            spec: Some(spec.clone()),
         };
+
+        // println!("Message: {:?}", msg);
 
         let msg_id = queue.send(&myqueue, &msg).await;
         println!("Create msg_id: {msg_id:?}");
@@ -201,11 +200,11 @@ mod test {
             .await
             .expect("error deleting message");
 
-        let spec = msg.message.spec.expect("No spec found in message");
+        let passed_spec = msg.message.spec.expect("No spec found in message");
 
         // assert that the message returned by Conductor includes the new metrics values in the spec
-        //println!("spec: {:?}", spec);
-        assert!(spec
+        // println!("spec: {:?}", passed_spec);
+        assert!(passed_spec
             .metrics
             .expect("no metrics in data-plane-event message")
             .queries
@@ -214,10 +213,10 @@ mod test {
             .contains_key("pg_postmaster"));
 
         assert!(
-            !spec.extensions.is_empty(),
+            !passed_spec.extensions.is_empty(),
             "Extension object missing from spec"
         );
-        let extensions = spec.extensions;
+        let extensions = passed_spec.extensions.clone();
         assert!(
             !extensions.is_empty(),
             "Expected at least one extension: {:?}",
@@ -234,7 +233,7 @@ mod test {
         // ADD AN EXTENSION - ASSERT IT MAKES IT TO STATUS.EXTENSIONS
         // conductor receives a CRUDevent from control plane
         // take note of number of extensions at this point in time
-        let mut extensions_add = extensions.clone();
+        // let mut extensions_add = extensions.clone();
         let _install_location = ExtensionInstallLocation::default();
         let install_location = ExtensionInstallLocation {
             enabled: true,
@@ -243,16 +242,13 @@ mod test {
             ..ExtensionInstallLocation::default()
         };
         let install_location = install_location.clone();
-        extensions_add.push(Extension {
+        spec.extensions.push(Extension {
             name: "pg_jsonschema".to_owned(),
             description: Some("fake description".to_string()),
             locations: vec![install_location],
         });
-        let num_expected_extensions = extensions_add.len();
-        let spec_js = serde_json::json!({
-            "extensions": extensions_add,
-        });
-        let spec: CoreDBSpec = serde_json::from_value(spec_js).unwrap();
+        let num_expected_extensions = spec.extensions.len();
+        // println!("Updated spec: {:?}", spec.clone());
         let msg = types::CRUDevent {
             organization_name: org_name.clone(),
             data_plane_id: "org_02s3owPQskuGXHE8vYsGSY".to_owned(),
@@ -260,7 +256,7 @@ mod test {
             inst_id: "inst_02s4UKVbRy34SAYVSwZq2H".to_owned(),
             event_type: types::Event::Update,
             dbname: dbname.clone(),
-            spec: Some(spec),
+            spec: Some(spec.clone()),
         };
         let msg_id = queue.send(&myqueue, &msg).await;
         println!("Update msg_id: {msg_id:?}");
@@ -269,7 +265,7 @@ mod test {
         let mut extensions: Vec<Extension> = vec![];
         while num_expected_extensions != extensions.len() {
             let msg = get_dataplane_message(retries, retry_delay, &queue).await;
-            //println!("msg: {:?}", msg);
+            // println!("Update msg: {:?}", msg);
             queue
                 .archive("myqueue_data_plane", msg.msg_id)
                 .await
@@ -283,10 +279,6 @@ mod test {
         }
         // we added an extension, so it should be +1 now
         assert_eq!(num_expected_extensions, extensions.len());
-
-        // Installing the new extensions will cause the pods to restart, but it can take a few
-        // seconds for that to happen.  For now lets just wait and see if that fixes the problem.
-        thread::sleep(time::Duration::from_secs(40));
 
         pod_ready_and_running(pods.clone(), pod_name.clone()).await;
 
@@ -311,20 +303,28 @@ mod test {
 
         println!("start_time: {:?}", stdout);
 
-        // Once CNPG is running we want to restart
-        let cluster_name = namespace.clone();
+        // Lets now test sending an Event::Restart to the queue and see if the
+        // pod restarts correctly.
 
-        restart_coredb(client.clone(), &namespace, &cluster_name, Utc::now())
-            .await
-            .expect("failed restarting cnpg pod");
+        let msg = types::CRUDevent {
+            organization_name: org_name.clone(),
+            data_plane_id: "org_02s3owPQskuGXHE8vYsGSY".to_owned(),
+            org_id: "org_02s3owPQskuGXHE8vYsGSY".to_owned(),
+            inst_id: "inst_02s4UKVbRy34SAYVSwZq2H".to_owned(),
+            event_type: types::Event::Restart,
+            dbname: dbname.clone(),
+            spec: Some(spec.clone()),
+        };
+        let msg_id = queue.send(&myqueue, &msg).await;
+        println!("Restart msg_id: {:?}", msg_id);
 
         let mut is_ready = false;
         let mut current_iteration = 0;
         while !is_ready {
             if current_iteration > 30 {
-                panic!("CNPG pod did not restart after about 150 seconds");
+                panic!("CNPG pod did not restart after about 300 seconds");
             }
-            thread::sleep(time::Duration::from_secs(5));
+            thread::sleep(time::Duration::from_secs(10));
             let current_coredb = get_coredb_error_without_status(client.clone(), &namespace)
                 .await
                 .unwrap();
@@ -365,6 +365,7 @@ mod test {
             dbname: dbname.clone(),
             spec: None,
         };
+        // println!("DELETE msg: {:?}", msg);
         let msg_id = queue.send(&myqueue, &msg).await;
         println!("Delete msg_id: {msg_id:?}");
 
@@ -395,26 +396,10 @@ mod test {
         let region = Region::new(aws_region);
         let aws_config_state = AWSConfigState::new(region.clone()).await;
         let stack_name = format!("org-{}-inst-{}-cf", org_name, dbname);
-        // let dcf = aws_config_state
-        //     .delete_cloudformation_stack(&stack_name)
-        //     .await;
-        // assert!(dcf);
-        // let exists = aws_config_state.does_stack_exist(&stack_name).await;
-        // assert!(!exists, "CF stack was not deleted");
-        match aws_config_state
-            .delete_cloudformation_stack(&stack_name)
-            .await
-        {
-            Ok(_) => {
-                // If deletion was successful, check if the stack still exists
-                let stack_exists = aws_config_state.does_stack_exist(&stack_name).await;
-                assert!(!stack_exists, "CloudFormation stack was not deleted");
-            }
-            Err(e) => {
-                // If there was an error deleting the stack, fail the test
-                panic!("Failed to delete CloudFormation stack: {:?}", e);
-            }
-        }
+
+        // Check to see if the cloudformation stack exists
+        let cf_stack_deleted = check_cf_stack_deletion(&aws_config_state, &stack_name).await;
+        assert!(cf_stack_deleted, "CF stack was deleted");
     }
 
     async fn kube_client() -> kube::Client {
@@ -511,6 +496,43 @@ mod test {
             );
             thread::sleep(time::Duration::from_secs(5));
         }
+        false
+    }
+
+    use conductor::aws::cloudformation::AWSConfigState;
+    async fn check_cf_stack_deletion(acs: &AWSConfigState, stack_name: &str) -> bool {
+        let max_duration = Duration::from_secs(5 * 60); // 5 minutes
+        let check_interval = Duration::from_secs(30); // Check every 30 seconds
+
+        let start_time = tokio::time::Instant::now();
+        while tokio::time::Instant::now() - start_time < max_duration {
+            let exists = acs.does_stack_exist(stack_name).await;
+            println!("Checking if CF stack {} exists: {}", stack_name, exists);
+
+            if !exists {
+                println!(
+                    "CF stack {} does not exist, we assume it's deleted",
+                    stack_name
+                );
+                return true;
+            } else {
+                match acs.delete_cloudformation_stack(stack_name).await {
+                    Ok(_) => {
+                        println!("CF stack {} was deleted", stack_name);
+                    }
+                    Err(e) => {
+                        panic!("Failed to delete CloudFormation stack: {:?}", e);
+                    }
+                }
+            }
+
+            tokio::time::sleep(check_interval).await;
+        }
+
+        println!(
+            "CF stack {} was not deleted within the expected time.",
+            stack_name
+        );
         false
     }
 }

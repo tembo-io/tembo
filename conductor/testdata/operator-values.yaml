@@ -2,7 +2,7 @@ controller:
   image:
     tag: latest
   extraEnv:
-    - name: ENABLE_INITIAL_BACKUP
+    - name: ENABLE_BACKUP
       value: "false"
     - name: RUST_LOG
       value: info,kube=info,controller=info
