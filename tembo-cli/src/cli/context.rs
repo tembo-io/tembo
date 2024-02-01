@@ -1,7 +1,6 @@
 use std::fs;
 
-use anyhow::bail;
-use anyhow::Ok;
+use anyhow::{anyhow, bail, Ok};
 use serde::Deserialize;
 use serde::Serialize;
 
@@ -92,19 +91,11 @@ pub fn tembo_credentials_file_path() -> String {
 pub fn list_context() -> Result<Context, anyhow::Error> {
     let filename = tembo_context_file_path();
 
-    let contents = match fs::read_to_string(filename.clone()) {
-        std::result::Result::Ok(c) => c,
-        Err(e) => {
-            bail!("Error reading file {filename}: {e}")
-        }
-    };
+    let contents = fs::read_to_string(&filename)
+        .map_err(|err| anyhow!("Error reading file {filename}: {err}"))?;
 
-    let context: Context = match toml::from_str(&contents) {
-        std::result::Result::Ok(c) => c,
-        Err(e) => {
-            bail!("Issue with format of toml file {filename}: {e}")
-        }
-    };
+    let context: Context =
+        toml::from_str(&contents).map_err(|err| anyhow!("Error reading file {filename}: {err}"))?;
 
     Ok(context)
 }
@@ -112,42 +103,31 @@ pub fn list_context() -> Result<Context, anyhow::Error> {
 pub fn get_current_context() -> Result<Environment, anyhow::Error> {
     let context = list_context()?;
 
-    let profiles = list_credentail_profiles()?;
+    let profiles = list_credential_profiles()?;
 
-    for mut e in context.environment {
-        if e.set.is_some() && e.set.unwrap() {
-            if e.profile.is_some() {
-                let credential = profiles
-                    .iter()
-                    .filter(|c| &c.name == e.profile.as_ref().unwrap())
-                    .last()
-                    .unwrap();
+    for mut env in context.environment {
+        if let Some(_is_set) = env.set {
+            if let Some(profile) = &env.profile {
+                let credential = profiles.iter().rev().find(|c| &c.name == profile).unwrap();
 
-                e.selected_profile = Some(credential.to_owned());
+                env.selected_profile = Some(credential.to_owned());
             }
-            return Ok(e);
+
+            return Ok(env);
         }
     }
 
     bail!("Tembo context not set");
 }
 
-pub fn list_credentail_profiles() -> Result<Vec<Profile>, anyhow::Error> {
+pub fn list_credential_profiles() -> Result<Vec<Profile>, anyhow::Error> {
     let filename = tembo_credentials_file_path();
 
-    let contents = match fs::read_to_string(filename.clone()) {
-        std::result::Result::Ok(c) => c,
-        Err(e) => {
-            bail!("Error reading file {filename}: {e}")
-        }
-    };
+    let contents = fs::read_to_string(&filename)
+        .map_err(|err| anyhow!("Error reading file {filename}: {err}"))?;
 
-    let credential: Credential = match toml::from_str(&contents) {
-        std::result::Result::Ok(c) => c,
-        Err(e) => {
-            bail!("Issue with format of toml file {filename}: {e}")
-        }
-    };
+    let credential: Credential = toml::from_str(&contents)
+        .map_err(|err| anyhow!("Issue with the format of the TOML file {filename}: {err}"))?;
 
     Ok(credential.profile)
 }

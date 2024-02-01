@@ -10,6 +10,7 @@ use crate::{
     },
     cloudnativepg::poolers::{PoolerPgbouncerPoolMode, PoolerTemplateSpecContainersResources},
     extensions::types::{Extension, TrunkInstall},
+    stacks::{DATAWAREHOUSE, ML, STANDARD},
 };
 
 pub fn default_replicas() -> i32 {
@@ -43,12 +44,41 @@ pub fn default_port() -> i32 {
     5432
 }
 
+pub fn default_repository() -> String {
+    "quay.io/tembo".to_owned()
+}
+
 pub fn default_image() -> String {
-    "quay.io/tembo/standard-cnpg:15.3.0-1-0c19c7e".to_owned()
+    STANDARD
+        .image
+        .clone()
+        .expect("Standard or default image not found")
 }
 
 pub fn default_llm_image() -> String {
-    "quay.io/tembo/ml-cnpg:15.3.0-1-63e32a1".to_owned()
+    ML.image.clone().expect("ML image not found")
+}
+
+pub fn default_dw_image() -> String {
+    DATAWAREHOUSE.image.clone().expect("DW image not found")
+}
+
+pub fn default_image_uri() -> String {
+    let repo = default_repository();
+    let image = default_image();
+    format!("{}/{}", repo, image)
+}
+
+pub fn default_llm_image_uri() -> String {
+    let repo = default_repository();
+    let image = default_llm_image();
+    format!("{}/{}", repo, image)
+}
+
+pub fn default_dw_image_uri() -> String {
+    let repo = default_repository();
+    let image = default_dw_image();
+    format!("{}/{}", repo, image)
 }
 
 pub fn default_storage() -> Quantity {

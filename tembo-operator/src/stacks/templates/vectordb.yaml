@@ -1,6 +1,7 @@
 name: VectorDB
 description: A Tembo Postgres Stack configured to support vector data types, storage, and operations.
-image: "quay.io/tembo/standard-cnpg:15.3.0-1-795fc99"
+repository: "quay.io/tembo"
+image: "standard-cnpg:15.3.0-1-3d9a853"
 stack_version: 0.1.0
 appServices:
   - image: quay.io/tembo/vector-serve:7dc6329
@@ -48,9 +49,9 @@ trunk_installs:
   - name: pgmq
     version: 1.1.1
   - name: vectorize
-    version: 0.8.1
+    version: 0.9.0
   - name: pgvector
-    version: 0.5.1
+    version: 0.6.0
   - name: pg_stat_statements
     version: 1.10.0
 extensions:
@@ -58,7 +59,7 @@ extensions:
     locations:
       - database: postgres
         enabled: true
-        version: 0.5.1
+        version: 0.6.0
   - name: pg_cron
     locations:
     - database: postgres
@@ -73,7 +74,7 @@ extensions:
     locations:
     - database: postgres
       enabled: true
-      version: 0.8.1
+      version: 0.9.0
   - name: pg_stat_statements
     locations:
       - database: postgres
