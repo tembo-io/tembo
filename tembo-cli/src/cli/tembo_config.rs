@@ -1,3 +1,5 @@
+use controller::app_service::types::{AppService, EnvVar};
+use k8s_openapi::api::core::v1::ResourceRequirements;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
 use toml::Value;
@@ -29,8 +31,30 @@ pub struct InstanceSettings {
         default = "default_extensions"
     )]
     pub extensions: Option<HashMap<String, Extension>>,
+    pub app_services: Option<HashMap<String, AppType>>,
     pub extra_domains_rw: Option<Vec<String>>,
     pub ip_allow_list: Option<Vec<String>>,
+}
+
+#[allow(clippy::upper_case_acronyms)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub enum AppType {
+    #[serde(rename = "restapi")]
+    RestAPI(Option<AppConfig>),
+    #[serde(rename = "http")]
+    HTTP(Option<AppConfig>),
+    #[serde(rename = "mq-api")]
+    MQ(Option<AppConfig>),
+    #[serde(rename = "embeddings")]
+    Embeddings(Option<AppConfig>),
+    #[serde(rename = "custom")]
+    Custom(AppService),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct AppConfig {
+    pub env: Option<Vec<EnvVar>>,
+    pub resources: Option<ResourceRequirements>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
