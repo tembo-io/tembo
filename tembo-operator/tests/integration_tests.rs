@@ -46,7 +46,6 @@ mod test {
     };
     use rand::Rng;
     use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
-    use std::thread::sleep;
     use std::{
         collections::{BTreeMap, BTreeSet},
         ops::Not,
@@ -613,19 +612,17 @@ mod test {
                                 attempt, max_retries, name, extension
                             );
                         }
+                    } else if has_extension {
+                        println!(
+                            "CoreDB {} has extension {} enabled in status",
+                            name, extension
+                        );
+                        return Ok(());
                     } else {
-                        if has_extension {
-                            println!(
-                                "CoreDB {} has extension {} enabled in status",
-                                name, extension
-                            );
-                            return Ok(());
-                        } else {
-                            println!(
-                                "Attempt {}/{}: CoreDB {} has extension {} disabled in status",
-                                attempt, max_retries, name, extension
-                            );
-                        }
+                        println!(
+                            "Attempt {}/{}: CoreDB {} has extension {} disabled in status",
+                            attempt, max_retries, name, extension
+                        );
                     }
                 }
                 Err(e) => {
@@ -2332,7 +2329,7 @@ mod test {
         });
         let params = PatchParams::apply("tembo-integration-test");
         let patch = Patch::Apply(&coredb_json);
-        let coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+        let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
 
         // Wait for CNPG Pod to be created
         let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
@@ -2346,7 +2343,7 @@ mod test {
         // Check status.extensions.locations is not empty
         let coredb_resource = coredbs.get(name).await.unwrap();
         for extension in coredb_resource.status.unwrap().extensions.unwrap() {
-            assert!(extension.locations.len() > 0);
+            assert!(!extension.locations.is_empty());
         }
 
         // Update CoreDB resource to enable extensions

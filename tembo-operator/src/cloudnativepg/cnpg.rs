@@ -46,7 +46,7 @@ use crate::{
     },
     config::Config,
     configmap::custom_metrics_configmap_settings,
-    defaults::{default_image, default_llm_image},
+    defaults::{default_dw_image_uri, default_image_uri, default_llm_image_uri},
     errors::ValueError,
     is_postgres_ready, patch_cdb_status_merge,
     postgres_exporter::EXPORTER_CONFIGMAP_PREFIX,
@@ -600,8 +600,9 @@ pub fn cnpg_cluster_from_cdb(
     // Check if the cdb.spec.image is set, if not then figure out which image to use.
     let image = if cdb.spec.image.is_empty() {
         match cdb.spec.stack.as_ref().map(|s| s.name.to_lowercase()) {
-            Some(ref name) if name == "machinelearning" => default_llm_image(),
-            _ => default_image(),
+            Some(ref name) if name == "machinelearning" => default_llm_image_uri(),
+            Some(ref name) if name == "datawarehouse" => default_dw_image_uri(),
+            _ => default_image_uri(),
         }
     } else {
         cdb.spec.image.clone()
