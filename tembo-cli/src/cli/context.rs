@@ -126,8 +126,8 @@ pub fn list_credential_profiles() -> Result<Vec<Profile>, anyhow::Error> {
     let contents = fs::read_to_string(&filename)
         .map_err(|err| anyhow!("Error reading file {filename}: {err}"))?;
 
-    let credential: Credential =
-        toml::from_str(&contents).map_err(|err| anyhow!("Issue with the format of the TOML file {filename}: {err}"))?;
+    let credential: Credential = toml::from_str(&contents)
+        .map_err(|err| anyhow!("Issue with the format of the TOML file {filename}: {err}"))?;
 
     Ok(credential.profile)
 }

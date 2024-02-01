@@ -1,5 +1,6 @@
+use k8s_openapi::api::core::v1::{ResourceRequirements, Volume, VolumeMount};
 use serde::{Deserialize, Deserializer, Serialize};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 use toml::Value;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
@@ -29,8 +30,146 @@ pub struct InstanceSettings {
         default = "default_extensions"
     )]
     pub extensions: Option<HashMap<String, Extension>>,
+    pub app_services: Option<HashMap<String, AppType>>,
     pub extra_domains_rw: Option<Vec<String>>,
     pub ip_allow_list: Option<Vec<String>>,
+}
+
+#[allow(clippy::upper_case_acronyms)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub enum AppType {
+    #[serde(rename = "restapi")]
+    RestAPI(Option<AppConfig>),
+    #[serde(rename = "http")]
+    HTTP(Option<AppConfig>),
+    #[serde(rename = "mq-api")]
+    MQ(Option<AppConfig>),
+    #[serde(rename = "embeddings")]
+    Embeddings(Option<AppConfig>),
+    #[serde(rename = "custom")]
+    Custom(AppService),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct AppConfig {
+    pub env: Option<Vec<EnvVar>>,
+    pub resources: Option<ResourceRequirements>,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+pub struct AppService {
+    pub name: String,
+
+    pub image: String,
+
+    pub args: Option<Vec<String>>,
+
+    pub command: Option<Vec<String>>,
+
+    pub env: Option<Vec<EnvVar>>,
+
+    pub resources: ResourceRequirements,
+
+    pub probes: Option<Probes>,
+
+    pub middlewares: Option<Vec<Middleware>>,
+
+    pub routing: Option<Vec<Routing>>,
+
+    pub storage: Option<StorageConfig>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct EnvVar {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<String>,
+    #[serde(rename = "valueFromPlatform", skip_serializing_if = "Option::is_none")]
+    pub value_from_platform: Option<EnvVarRef>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub enum EnvVarRef {
+    ReadOnlyConnection,
+    ReadWriteConnection,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct Probes {
+    pub readiness: Probe,
+    pub liveness: Probe,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct Probe {
+    pub path: String,
+    pub port: String,
+    // this should never be negative
+    #[serde(rename = "initialDelaySeconds")]
+    pub initial_delay_seconds: u32,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub enum Middleware {
+    #[serde(rename = "customRequestHeaders")]
+    CustomRequestHeaders(HeaderConfig),
+    #[serde(rename = "stripPrefix")]
+    StripPrefix(StripPrefixConfig),
+    #[serde(rename = "replacePathRegex")]
+    ReplacePathRegex(ReplacePathRegexConfig),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct HeaderConfig {
+    pub name: String,
+    pub config: BTreeMap<String, String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct StripPrefixConfig {
+    pub name: String,
+    pub config: Vec<String>,
+}
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct ReplacePathRegexConfig {
+    pub name: String,
+    pub config: ReplacePathRegexConfigType,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct ReplacePathRegexConfigType {
+    pub regex: String,
+    pub replacement: String,
+}
+
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub struct Routing {
+    pub port: u16,
+    #[serde(rename = "ingressPath")]
+    pub ingress_path: Option<String>,
+
+    /// provide name of the middleware resources to apply to this route
+    pub middlewares: Option<Vec<String>>,
+    #[serde(rename = "entryPoints")]
+    //#[serde(default = "default_entry_points")]
+    pub entry_points: Option<Vec<String>>,
+    #[serde(rename = "ingressType")]
+    //#[serde(default = "default_ingress_type")]
+    pub ingress_type: Option<IngressType>,
+}
+
+#[allow(non_camel_case_types)]
+#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+pub enum IngressType {
+    http,
+    tcp,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct StorageConfig {
+    pub volumes: Option<Vec<Volume>>,
+    #[serde(rename = "volumeMounts")]
+    pub volume_mounts: Option<Vec<VolumeMount>>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]

@@ -17,6 +17,27 @@ services:
       - "traefik.tcp.routers.{{instance.instance_name}}.entrypoints=postgresql"
       - "traefik.tcp.routers.{{instance.instance_name}}.tls.passthrough=true"
       - "traefik.tcp.services.{{instance.instance_name}}.loadbalancer.server.port=5432"
+
+  {% if instance.app_services.restapi %}
+  {{instance.instance_name}}-postgrest:
+    image: postgrest/postgrest:v10.0.0
+    environment:
+      PGRST_DB_URI: "postgresql://postgres:postgres@{{instance.instance_name}}:5432/postgres"
+      PGRST_DB_SCHEMA: "public, graphql"
+      PGRST_DB_ANON_ROLE: "postgres"
+      PGRST_LOG_LEVEL: "info"
+    networks:
+      - tembo
+    labels:
+      - "traefik.enable=true"
+      # The settings here depends on the app service settings
+      - "traefik.http.routers.{{instance.instance_name}}-postgrest.rule=Host(`{{instance.instance_name}}.local.tembo.io`) && (PathPrefix(`/rest/v1`) || PathPrefix(`/graphql/v1`))"
+      # in cloud, this is websecure instead of just web
+      - "traefik.http.routers.{{instance.instance_name}}-postgrest.entrypoints=web"
+      - "traefik.http.services.{{instance.instance_name}}-postgrest.loadbalancer.server.port=3000"
+      - "traefik.http.middlewares.postgrest-stripprefix.stripprefix.prefixes=/rest/v1, /graphql/v1"
+      - "traefik.http.routers.postgrest.middlewares=postgrest-stripprefix"
+  {% endif %}
 {% endfor %}
 
   traefik:
