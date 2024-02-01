@@ -142,25 +142,6 @@ pub async fn delete(client: Client, namespace: &str, name: &str) -> Result<(), C
         .await
         .map_err(ConductorError::KubeError);
 
-    // Watch for deletion
-    let wp = WatchParams {
-        field_selector: Some(format!("metadata.name={}", name)),
-        ..WatchParams::default()
-    };
-    let stream = coredb_api
-        .watch(&wp, "0")
-        .await
-        .map_err(ConductorError::KubeError)?;
-
-    let mut pinned_stream = Box::pin(stream);
-
-    while let Some(status) = pinned_stream.try_next().await? {
-        if let WatchEvent::Deleted(_) = status {
-            info!("CoreDB {} deleted", name);
-            return Ok(());
-        }
-    }
-
     Ok(())
 }
 
@@ -211,24 +192,6 @@ pub async fn delete_namespace(client: Client, name: &str) -> Result<(), Conducto
         .await
         .map_err(ConductorError::KubeError);
 
-    // Watch for deletion
-    let wp = WatchParams {
-        field_selector: Some(format!("metadata.name={}", name)),
-        ..WatchParams::default()
-    };
-    let stream = ns_api
-        .watch(&wp, "0")
-        .await
-        .map_err(ConductorError::KubeError)?;
-
-    let mut pinned_stream = Box::pin(stream);
-
-    while let Some(status) = pinned_stream.try_next().await? {
-        if let WatchEvent::Deleted(_) = status {
-            info!("Namespace {} deleted", name);
-            return Ok(());
-        }
-    }
     Ok(())
 }
 
