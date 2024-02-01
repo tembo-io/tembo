@@ -12,10 +12,9 @@ use errors::ConductorError;
 
 use k8s_openapi::api::core::v1::{Namespace, Secret};
 
-use kube::api::{DeleteParams, ListParams, Patch, PatchParams, WatchEvent, WatchParams};
+use kube::api::{DeleteParams, ListParams, Patch, PatchParams};
 
 use chrono::{DateTime, SecondsFormat, Utc};
-use futures::TryStreamExt;
 use kube::{Api, Client, ResourceExt};
 use log::{debug, info};
 use rand::Rng;
