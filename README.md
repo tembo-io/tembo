@@ -14,9 +14,9 @@ Postgres is the best OSS database in the world, with millions of active deployme
 * [Tembo-Stacks](https://github.com/tembo-io/tembo/tree/main/tembo-operator/src/stacks) - pre-configured Postgres Stacks deployable to Kubernetes
 * [Tembo CLI](https://github.com/tembo-io/tembo/tree/main/tembo-cli) - allows users to experience Tembo locally, as well as, manage and deploy to Tembo Cloud
 * [Helm Chart](https://github.com/tembo-io/tembo/tree/main/charts/tembo-operator) — Helm chart to deploy the Tembo Operator
-* [Dataplane Web Server](https://github.com/tembo-io/tembo/tree/main/dataplane-webserver) - reports readiness and liviness of Postgres instances in a Dataplane
+* [Dataplane Web Server](https://github.com/tembo-io/tembo/tree/main/dataplane-webserver) - reports readiness and liviness of Postgres instances in a data plane
 * [tembo-pod-init](https://github.com/tembo-io/tembo/tree/main/tembo-pod-init) - allows us to bootstrap the folder structure needed to add our required mutability
-* [Conductor](https://github.com/tembo-io/tembo/tree/main/conductor) - Component that runs in Tembo Dataplanes, to receive desired states from Controlplane and report back status
+* [Conductor](https://github.com/tembo-io/tembo/tree/main/conductor) - runs in the dataplane; receive desired states from control plane and reports back status
 
 ## Our other open-source projects 
 
