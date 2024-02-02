@@ -25,7 +25,7 @@ Postgres is the best OSS database in the world, with millions of active deployme
 * [pgmq](https://github.com/tembo-io/pgmq) - an easy message queue built with Rust and available as a Postgres extension and Rust crate, that we use in our managed service
 * [pg_later](https://github.com/tembo-io/pg_later) - a Postgres extension for completely asynchronous query execution
 * [pg_vectorize](https://github.com/tembo-io/pg_vectorize) - automate vector search workflow and SQL access to 100+ open source sentence transformer models
-* [clerk_fdwk](https://github.com/tembo-io/clerk_fdw) - connect to [Clerk](https://clerk.com/) User and Organization data from Postgres
+* [clerk_fdw](https://github.com/tembo-io/clerk_fdw) - connect to [Clerk](https://clerk.com/) User and Organization data from Postgres
 * [prometheus_fdw](https://github.com/tembo-io/prometheus_fdw) - query and move metrics from [Prometheus](https://prometheus.io/) to Postgres
 * [orb_fdbw](https://github.com/tembo-io/orb_fdw) - connect your billing data from [Orb](https://www.withorb.com/) to Postgres 
 
