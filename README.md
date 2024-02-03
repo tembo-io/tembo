@@ -21,8 +21,13 @@ Postgres is the best OSS database in the world, with millions of active deployme
 
 ## Our other open-source projects 
 
+### Trunk
+
 * [Trunk CLI](https://github.com/tembo-io/trunk/tree/main/cli) that users can use to publish and install Postgres extensions
 * [Trunk Website](https://github.com/tembo-io/trunk/tree/main/registry) that serves as a backend for [pgt.dev](https://pgt.dev), and also provides discovery and metrics
+
+### Postgres Extensions
+
 * [pgmq](https://github.com/tembo-io/pgmq) - a message queue built with Rust and available as a Postgres extension and Rust crate (used in our managed service)
 * [pg_later](https://github.com/tembo-io/pg_later) - a Postgres extension for completely asynchronous query execution
 * [pg_vectorize](https://github.com/tembo-io/pg_vectorize) - automate vector search workflow, and SQL access to 100+ OSS sentence transformer models
