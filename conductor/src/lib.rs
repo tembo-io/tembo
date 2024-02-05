@@ -136,10 +136,11 @@ pub async fn delete(client: Client, namespace: &str, name: &str) -> Result<(), C
     let coredb_api: Api<CoreDB> = Api::namespaced(client, namespace);
     let params = DeleteParams::default();
     info!("\nDeleting CoreDB: {}", name);
-    let _o = coredb_api
+    let _ = coredb_api
         .delete(name, &params)
         .await
         .map_err(ConductorError::KubeError);
+
     Ok(())
 }
 
@@ -189,6 +190,7 @@ pub async fn delete_namespace(client: Client, name: &str) -> Result<(), Conducto
         .delete(name, &params)
         .await
         .map_err(ConductorError::KubeError);
+
     Ok(())
 }
 

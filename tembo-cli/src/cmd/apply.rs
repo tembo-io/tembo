@@ -561,6 +561,7 @@ fn merge_settings(base: &InstanceSettings, overlay: OverlayInstanceSettings) -> 
             .postgres_configurations
             .or_else(|| base.postgres_configurations.clone()),
         extensions: overlay.extensions.or_else(|| base.extensions.clone()),
+        app_services: None,
         extra_domains_rw: overlay
             .extra_domains_rw
             .or_else(|| base.extra_domains_rw.clone()),
