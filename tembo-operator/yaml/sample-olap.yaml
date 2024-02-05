@@ -22,7 +22,7 @@ spec:
     - name: pg_stat_statements
       version: 1.10.0
     - name: hydra_columnar
-      version: 1.0.0
+      version: 1.1.1
     - name: pg_partman
       version: 4.7.3
     - name: pg_cron
@@ -43,7 +43,7 @@ spec:
       locations:
         - database: postgres
           enabled: true
-          version: '11.1-7'
+          version: '11.1-10'
     - name: pg_partman
       locations:
         - database: postgres
