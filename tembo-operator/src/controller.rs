@@ -224,7 +224,10 @@ impl CoreDB {
             Action::requeue(Duration::from_secs(300))
         })?;
 
-        reconcile_app_services(self, ctx.clone()).await?;
+        if self.spec.app_services.is_some() {
+            debug!("Reconciling app services");
+            reconcile_app_services(self, ctx.clone()).await?
+        }
 
         if self
             .spec
