@@ -57,6 +57,7 @@ fn generate_resource(
     oref: OwnerReference,
     domain: String,
 ) -> AppServiceResources {
+    // TODO(ianstanton) We still need to reconcile Service and Deployment when Ingress reconciliation is disabled
     let resource_name = format!("{}-{}", coredb_name, appsvc.name.clone());
     let service = appsvc
         .routing
@@ -673,16 +674,16 @@ pub async fn reconcile_app_services(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(
         }
     };
 
+
+    // If DATA_PLANE_BASEDOMAIN is not set, skip ingress reconciliation
     let domain = match std::env::var("DATA_PLANE_BASEDOMAIN") {
         Ok(domain) => domain,
         Err(_) => {
-            warn!("`DATA_PLANE_BASEDOMAIN` not set -- assuming `localhost`");
-            "localhost".to_string()
+            warn!("DATA_PLANE_BASEDOMAIN not set, skipping ingress reconciliation");
+            return Ok(());
         }
     };
-
     // Iterate over each AppService and process routes
-
     let resources: Vec<AppServiceResources> = appsvcs
         .iter()
         .map(|appsvc| generate_resource(appsvc, &coredb_name, &ns, oref.clone(), domain.to_owned()))
