@@ -1,0 +1,43 @@
+name: !mq-api
+appServices:
+  - image: postgrest/postgrest:v10.0.0
+    name: mq-api
+    routing:
+      - port: 3000
+        ingressPath: /pgmq/v1
+        middlewares:
+          - map-pgmq
+          - strip-prefix
+          - headers
+    middlewares:
+      - !customRequestHeaders
+          name: headers
+          config:
+            Authorization: ""
+            Content-Profile: pgmq
+            Accept-Profile: pgmq
+      - !stripPrefix
+          name: strip-prefix
+          config:
+            - /rest/v1
+      - !replacePathRegex
+          name: map-pgmq
+          config:
+            regex: \/pgmq\/v1\/?
+            replacement: /rpc/
+    env:
+      - name: PGRST_DB_URI
+        valueFromPlatform: ReadWriteConnection
+      - name: PGRST_DB_SCHEMA
+        value: "public, pgmq"
+      - name: PGRST_DB_ANON_ROLE
+        value: postgres
+      - name: PGRST_LOG_LEVEL
+        value: info
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 400m
+        memory: 256Mi
