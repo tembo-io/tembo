@@ -1,6 +1,6 @@
-use std::collections::{BTreeMap, HashMap};
 use anyhow::Error;
 use lazy_static::lazy_static;
+use std::collections::{BTreeMap, HashMap};
 use tembo_controller::{
     apis::postgres_parameters::PgConfig,
     app_service::types::{AppService, EnvVar},
@@ -226,9 +226,7 @@ fn merge_apps(
         user_app_names.insert(&app.name);
     }
     if user_app_names.len() != user_apps.len() {
-        return Err(Error::msg(
-            "Cannot have duplicate App names".to_string(),
-        ));
+        return Err(Error::msg("Cannot have duplicate App names".to_string()));
     }
     // if we've reached this point, then user has no naming conflicts in their own Apps
 
