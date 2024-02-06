@@ -674,7 +674,6 @@ pub async fn reconcile_app_services(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(
         }
     };
 
-
     // If DATA_PLANE_BASEDOMAIN is not set, skip ingress reconciliation
     let domain = match std::env::var("DATA_PLANE_BASEDOMAIN") {
         Ok(domain) => domain,
