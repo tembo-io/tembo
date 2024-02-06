@@ -1,0 +1,33 @@
+name: !restapi
+appServices:
+  - image: postgrest/postgrest:v10.0.0
+    name: restapi
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        cpu: 400m
+        memory: 256Mi
+    routing:
+      - port: 3000
+        ingressPath: "/restapi/v1"
+        middlewares:
+        - strip-auth-header
+        - strip-path-prefix
+    middlewares:
+      - !customRequestHeaders
+          name: strip-auth-header
+          config:
+            Authorization: ""
+      - !stripPrefix
+          name: strip-path-prefix
+          config:
+            - /restapi/v1
+    env:
+      - name: PGRST_DB_URI
+        valueFromPlatform: ReadWriteConnection
+      - name: PGRST_DB_SCHEMA
+        value: public
+      - name: PGRST_DB_ANON_ROLE
+        value: postgres

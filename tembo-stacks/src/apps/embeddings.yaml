@@ -1,0 +1,78 @@
+name: !embeddings
+appServices:
+  - image: quay.io/tembo/vector-serve:7dc6329
+    name: embeddings
+    routing:
+      - port: 3000
+        ingressPath: /embeddings
+        middlewares:
+          - map-embeddings
+    middlewares:
+      - !replacePathRegex
+          name: map-embeddings
+          config:
+            regex: ^\/embeddings\/?
+            replacement: /v1/embeddings
+    env:
+      - name: TMPDIR
+        value: /models
+      - name: XDG_CACHE_HOME
+        value: /models/.cache
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1500Mi
+      limits:
+        cpu: 4000m
+        memory: 1500Mi
+    storage:
+      volumeMounts:
+      - mountPath: /models
+        name: hf-model-vol
+      volumes:
+      - ephemeral:
+          volumeClaimTemplate:
+            spec:
+              accessModes:
+              - ReadWriteOnce
+              resources:
+                requests:
+                  storage: 2Gi
+        name: hf-model-vol
+trunk_installs:
+  - name: pg_cron
+    version: 1.5.2
+  - name: pgmq
+    version: 1.1.1
+  - name: pgvector
+    version: 0.6.0
+  - name: vectorize
+    version: 0.9.0
+extensions:
+  - name: pg_cron
+    locations:
+      - database: postgres
+        enabled: true
+        version: 1.5.2
+  - name: pgmq
+    locations:
+      - database: postgres
+        enabled: true
+        version: 1.1.1
+  - name: vector
+    locations:
+      - database: postgres
+        enabled: true
+        version: 0.6.0
+  - name: vectorize
+    locations:
+      - database: postgres
+        enabled: true
+        version: 0.9.0
+postgres_config:
+  - name: cron.host
+    value: /controller/run
+  - name: vectorize.host
+    value: postgresql:///postgres?host=/controller/run
+  - name: vectorize.embedding_service_url
+    value: http://${NAMESPACE}-embeddings.${NAMESPACE}.svc.cluster.local:3000/v1/embeddings
