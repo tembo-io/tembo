@@ -50,9 +50,7 @@ pub fn default_repository() -> String {
 
 pub fn default_images() -> ImagePerPgVersion {
     // Note: this will recurse infinitely if standard.yaml doesn't have `images` set
-    STANDARD
-        .images
-        .clone()
+    STANDARD.images.clone()
 }
 
 pub fn default_llm_image() -> String {

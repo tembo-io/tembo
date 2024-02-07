@@ -75,7 +75,7 @@ pub struct Stack {
     #[serde(default = "default_stack_repository")]
     pub repository: String,
     /// The Docker images to use for each supported Postgres versions
-    /// 
+    ///
     /// Default:
     ///   14: "standard-cnpg:pg14-f1721c2"
     ///   15: "standard-cnpg:15.3.0-1-3d9a853"
