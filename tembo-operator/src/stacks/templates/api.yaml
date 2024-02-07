@@ -2,9 +2,9 @@ name: API
 description: Tembo Stack with REST and graphQL interfaces.
 organization: tembo
 images:
-  14: "standard-cnpg:pg14-f1721c2"
+  14: "standard-cnpg:14-a0a5ab5"
   15: "standard-cnpg:15.3.0-1-3d9a853"
-  16: "standard-cnpg:pg16-f1721c2"
+  16: "standard-cnpg:16-a0a5ab5"
 stack_version: 0.1.0
 appServices:
   - image: postgrest/postgrest:v12.0.0

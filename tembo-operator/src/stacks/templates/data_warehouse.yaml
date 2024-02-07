@@ -2,9 +2,9 @@ name: DataWarehouse
 description: A Postgres instance equipped with configuration and extensions for building a data warehouse on Postgres.
 organization: tembo
 images:
-  14: "dw-cnpg:pg14-f1721c2"
+  14: "dw-cnpg:14-a0a5ab5"
   15: "dw-cnpg:15.3.0-1-3d9a853"
-  16: "dw-cnpg:pg16-f1721c2"
+  16: "dw-cnpg:16-a0a5ab5"
 stack_version: 0.1.0
 compute_templates:
   - cpu: 2
