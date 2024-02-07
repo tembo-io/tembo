@@ -3,7 +3,7 @@ description: A Postgres instance equipped with machine learning extensions and o
 organization: tembo
 images:
   14: "ml-cnpg:14-a0a5ab5"
-  15: "ml-cnpg:15.3.0-1-3d9a853"
+  15: "ml-cnpg:15-a0a5ab5"
   16: "ml-cnpg:16-a0a5ab5"
 stack_version: 0.3.0
 compute_templates:
