@@ -7,6 +7,7 @@ use tokio::sync::Notify;
 use serde::Deserialize;
 use webbrowser;
 use anyhow::Error;
+use std::io::{self, Write};
 
 #[derive(Args)]
 pub struct LoginCommand {}
@@ -17,6 +18,7 @@ struct TokenResponse {
 }
 
 pub async fn execute() -> Result<(), anyhow::Error> {
+    let expiry_days = prompt_for_token_expiry();
     let login_url = "https://local.tembo.io/loginjwt?isCli=true";
     webbrowser::open(&login_url)?;
 
@@ -28,14 +30,37 @@ pub async fn execute() -> Result<(), anyhow::Error> {
             eprintln!("Server error: {}", e);
         }
     });
-
+    
     // Wait for the notify to signal shutdown
     notify.notified().await;
+    send_expiry_to_cloud();
 
     println!("Token saved. Exiting the program.");
 
     Ok(())
 }
+
+fn prompt_for_token_expiry() -> u32 {
+    println!("Expiry in days for the token (1, 7, 30, 365): ");
+    let mut expiry_days = String::new();
+    io::stdout().flush().unwrap(); // Make sure the prompt is displayed before reading input
+    io::stdin().read_line(&mut expiry_days).expect("Failed to read line");
+    let expiry_days: u32 = expiry_days.trim().parse().unwrap_or(1); // Default to 1 if parsing fails
+    expiry_days
+}
+
+fn send_expiry_to_cloud() -> Result<(), Error> {
+    let client = reqwest::Client::new();
+    let res = client.post("https://local.tembo.io/api/token")
+    .body("the exact body that is sent")
+    .send()
+    ;
+
+    print!("ok");
+
+    Ok(())
+}
+
 
 async fn handle_request(req: Request<Body>, notify: Arc<Notify>) -> Result<Response<Body>, hyper::Error> {
     if req.method() == hyper::Method::POST {
