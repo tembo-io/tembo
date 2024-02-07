@@ -387,26 +387,29 @@ fn generate_deployment(
 
     // Create volume vec and add certs volume from secret
     let mut volumes: Vec<Volume> = Vec::new();
-    let certs_volume = Volume {
-        name: "tembo-certs".to_string(),
-        secret: Some(SecretVolumeSource {
-            secret_name: Some(format!("{}-server1", coredb_name)),
-            ..SecretVolumeSource::default()
-        }),
-        ..Volume::default()
-    };
-    volumes.push(certs_volume);
-
-    // Create volume mounts vec and add certs volume mount
     let mut volume_mounts: Vec<VolumeMount> = Vec::new();
-    let certs_volume_mount = VolumeMount {
-        name: "tembo-certs".to_string(),
-        mount_path: "/tembo/certs".to_string(),
-        read_only: Some(true),
-        ..VolumeMount::default()
-    };
-    volume_mounts.push(certs_volume_mount);
 
+    // If USE_SHARED_CA is not set, we don't need to mount the certs
+    if std::env::var("USE_SHARED_CA").is_ok() {
+        let certs_volume = Volume {
+            name: "tembo-certs".to_string(),
+            secret: Some(SecretVolumeSource {
+                secret_name: Some(format!("{}-server1", coredb_name)),
+                ..SecretVolumeSource::default()
+            }),
+            ..Volume::default()
+        };
+        volumes.push(certs_volume);
+
+        // Create volume mounts vec and add certs volume mount
+        let certs_volume_mount = VolumeMount {
+            name: "tembo-certs".to_string(),
+            mount_path: "/tembo/certs".to_string(),
+            read_only: Some(true),
+            ..VolumeMount::default()
+        };
+        volume_mounts.push(certs_volume_mount);
+    }
     let mut pod_security_context: Option<PodSecurityContext> = None;
     // Add any user provided volumes / volume mounts
     if let Some(storage) = appsvc.storage.clone() {
