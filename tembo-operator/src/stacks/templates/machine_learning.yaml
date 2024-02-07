@@ -1,7 +1,10 @@
 name: MachineLearning
 description: A Postgres instance equipped with machine learning extensions and optimized for machine learning workloads.
-repository: "quay.io/tembo"
-image: "ml-cnpg:15.3.0-1-3d9a853"
+organization: tembo
+images:
+  14: "ml-cnpg:pg14-f1721c2"
+  15: "ml-cnpg:15.3.0-1-3d9a853"
+  16: "ml-cnpg:pg16-f1721c2"
 stack_version: 0.3.0
 compute_templates:
   - cpu: 2
