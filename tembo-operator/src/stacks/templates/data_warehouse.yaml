@@ -1,5 +1,6 @@
 name: DataWarehouse
 description: A Postgres instance equipped with configuration and extensions for building a data warehouse on Postgres.
+repository: "quay.io/tembo"
 organization: tembo
 images:
   14: "dw-cnpg:14-a0a5ab5"

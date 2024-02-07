@@ -1,5 +1,6 @@
 name: Standard
 description: A balanced Postgres instance optimized for OLTP workloads.
+repository: "quay.io/tembo"
 organization: tembo
 images:
   14: "standard-cnpg:14-a0a5ab5"

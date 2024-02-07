@@ -1,5 +1,6 @@
 name: OLAP
 description: A Postgres instance equipped with configuration and extensions for OLAP workloads.
+repository: "quay.io/tembo"
 organization: tembo
 images:
   14: "standard-cnpg:14-a0a5ab5"

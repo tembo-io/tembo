@@ -1,5 +1,6 @@
 name: API
 description: Tembo Stack with REST and graphQL interfaces.
+repository: "quay.io/tembo"
 organization: tembo
 images:
   14: "standard-cnpg:14-a0a5ab5"
