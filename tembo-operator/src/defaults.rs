@@ -10,7 +10,7 @@ use crate::{
     },
     cloudnativepg::poolers::{PoolerPgbouncerPoolMode, PoolerTemplateSpecContainersResources},
     extensions::types::{Extension, TrunkInstall},
-    stacks::{DATAWAREHOUSE, ML, STANDARD},
+    stacks::{types::ImagePerPgVersion, DATAWAREHOUSE, ML, STANDARD},
 };
 
 pub fn default_replicas() -> i32 {
@@ -48,25 +48,26 @@ pub fn default_repository() -> String {
     "quay.io/tembo".to_owned()
 }
 
-pub fn default_image() -> String {
+pub fn default_images() -> ImagePerPgVersion {
+    // Note: this will recurse infinitely if standard.yaml doesn't have `images` set
     STANDARD
-        .image
+        .images
         .clone()
-        .expect("Standard or default image not found")
 }
 
 pub fn default_llm_image() -> String {
-    ML.image.clone().expect("ML image not found")
+    ML.images.pg15.clone()
 }
 
 pub fn default_dw_image() -> String {
-    DATAWAREHOUSE.image.clone().expect("DW image not found")
+    DATAWAREHOUSE.images.pg15.clone()
 }
 
 pub fn default_image_uri() -> String {
     let repo = default_repository();
-    let image = default_image();
-    format!("{}/{}", repo, image)
+    let image = default_images();
+    let image_for_pg_15 = image.pg15;
+    format!("{}/{}", repo, image_for_pg_15)
 }
 
 pub fn default_llm_image_uri() -> String {
