@@ -76,6 +76,7 @@ fn generate_resource(
             entry_points_tcp: None,
         };
     }
+    // It's safe to unwrap domain here because we've already checked if it's None
     let host_matcher = format!(
         "Host(`{subdomain}.{domain}`)",
         subdomain = coredb_name,
@@ -732,7 +733,7 @@ pub async fn reconcile_app_services(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(
         .flatten()
         .collect::<Vec<String>>();
 
-    // If DATA_PLANE_BASEDOMAIN is not set, skip ingress reconciliation
+    // Only reconcile IngressRoute and IngressRouteTCP if DATA_PLANE_BASEDOMAIN is set
     if domain.is_some() {
         match reconcile_ingress(
             client.clone(),
