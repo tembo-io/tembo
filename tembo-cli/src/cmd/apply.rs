@@ -139,13 +139,13 @@ fn docker_apply(
             }
         };
 
-        if app_svc != None {
-            let mut b: HashMap<String, AppService> = Default::default();
-            for a in app_svc.unwrap().iter() {
-                b.insert("k".to_string(), a.to_owned());
+        if app_svc.is_some() {
+            let mut controller_app_svcs: HashMap<String, AppService> = Default::default();
+            for cas in app_svc.unwrap().iter() {
+                controller_app_svcs.insert(cas.name.clone(), cas.to_owned());
             }
 
-            instance_setting.controller_app_services = Some(b);
+            instance_setting.controller_app_services = Some(controller_app_svcs);
         }
     }
 

@@ -1,7 +1,7 @@
 use controller::app_service::types::AppService;
 use serde::{Deserialize, Deserializer, Serialize};
-use tembo_stacks::apps::types::AppType;
 use std::collections::HashMap;
+use tembo_stacks::apps::types::AppType;
 use toml::Value;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
