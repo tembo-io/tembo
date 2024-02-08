@@ -71,6 +71,7 @@ pub struct Stack {
     pub description: Option<String>,
     /// Organization hosting the Docker images used in this stack
     /// Default: "tembo"
+    #[serde(default = "default_organization")]
     pub organization: String,
     #[serde(default = "default_stack_repository")]
     pub repository: String,
@@ -107,6 +108,10 @@ impl Stack {
             None => Some(standard_config_engine(self)),
         }
     }
+}
+
+fn default_organization() -> String {
+    "tembo".into()
 }
 
 fn default_stack_repository() -> String {
