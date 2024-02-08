@@ -1,7 +1,11 @@
 name: Geospatial
 description: Postgres for geospatial workloads.
 repository: "quay.io/tembo"
-image: "standard-cnpg:15.3.0-1-3d9a853"
+organization: tembo
+images:
+  14: "standard-cnpg:14-a0a5ab5"
+  15: "standard-cnpg:15-a0a5ab5"
+  16: "standard-cnpg:16-a0a5ab5"
 stack_version: 0.1.0
 compute_templates:
   - cpu: 0.25
