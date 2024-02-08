@@ -391,25 +391,31 @@ fn generate_deployment(
     let mut volume_mounts: Vec<VolumeMount> = Vec::new();
 
     // If USE_SHARED_CA is not set, we don't need to mount the certs
-    if std::env::var("USE_SHARED_CA").is_ok() {
-        let certs_volume = Volume {
-            name: "tembo-certs".to_string(),
-            secret: Some(SecretVolumeSource {
-                secret_name: Some(format!("{}-server1", coredb_name)),
-                ..SecretVolumeSource::default()
-            }),
-            ..Volume::default()
-        };
-        volumes.push(certs_volume);
+    match std::env::var("USE_SHARED_CA") {
+        Ok(_) => {
+            // Create volume and add it to volumes vec
+            let certs_volume = Volume {
+                name: "tembo-certs".to_string(),
+                secret: Some(SecretVolumeSource {
+                    secret_name: Some(format!("{}-server1", coredb_name)),
+                    ..SecretVolumeSource::default()
+                }),
+                ..Volume::default()
+            };
+            volumes.push(certs_volume);
 
-        // Create volume mounts vec and add certs volume mount
-        let certs_volume_mount = VolumeMount {
-            name: "tembo-certs".to_string(),
-            mount_path: "/tembo/certs".to_string(),
-            read_only: Some(true),
-            ..VolumeMount::default()
-        };
-        volume_mounts.push(certs_volume_mount);
+            // Create volume mounts vec and add certs volume mount
+            let certs_volume_mount = VolumeMount {
+                name: "tembo-certs".to_string(),
+                mount_path: "/tembo/certs".to_string(),
+                read_only: Some(true),
+                ..VolumeMount::default()
+            };
+            volume_mounts.push(certs_volume_mount);
+        }
+        Err(_) => {
+            warn!("USE_SHARED_CA not set, skipping certs volume mount");
+        }
     }
     let mut pod_security_context: Option<PodSecurityContext> = None;
     // Add any user provided volumes / volume mounts
