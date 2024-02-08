@@ -165,6 +165,22 @@ pub fn merge_app_reqs(
     })
 }
 
+// used for merging Vec of requested with Vec in Stack spec
+#[instrument(skip(opt1, opt2))]
+pub fn merge_options<T>(opt1: Option<Vec<T>>, opt2: Option<Vec<T>>) -> Option<Vec<T>>
+where
+    T: Clone,
+{
+    match (opt1, opt2) {
+        (Some(mut vec1), Some(vec2)) => {
+            vec1.extend(vec2);
+            Some(vec1)
+        }
+        (Some(vec), None) | (None, Some(vec)) => Some(vec),
+        (None, None) => None,
+    }
+}
+
 #[instrument]
 pub fn merge_location_into_extensions(
     extension_name: &str,
