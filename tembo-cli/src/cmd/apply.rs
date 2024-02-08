@@ -2,6 +2,10 @@ use anyhow::Context as AnyhowContext;
 use anyhow::Error;
 use clap::Args;
 use colorful::Colorful;
+use controller::app_service::types::AppService;
+use controller::extensions::types::Extension as ControllerExtension;
+use controller::extensions::types::ExtensionInstallLocation as ControllerExtensionInstallLocation;
+use controller::extensions::types::TrunkInstall as ControllerTrunkInstall;
 use controller::stacks::get_stack;
 use controller::stacks::types::StackType as ControllerStackType;
 use log::info;
@@ -13,6 +17,9 @@ use std::{
     thread::sleep,
     time::Duration,
 };
+use tembo_stacks::apps::app::merge_app_reqs;
+use tembo_stacks::apps::app::merge_options;
+use tembo_stacks::apps::types::MergedConfigs;
 use temboclient::{
     apis::{
         configuration::Configuration,
@@ -115,21 +122,30 @@ fn tembo_cloud_apply(
 
 fn docker_apply(
     verbose: bool,
-    instance_settings: HashMap<String, InstanceSettings>,
+    mut instance_settings: HashMap<String, InstanceSettings>,
 ) -> Result<(), anyhow::Error> {
     Docker::installed_and_running()?;
 
     Docker::docker_compose_down(false)?;
 
-    for (_key, instance_setting) in instance_settings.clone().iter() {
+    for (_key, instance_setting) in instance_settings.iter_mut() {
         let result = docker_apply_instance(verbose, instance_setting);
 
-        match result {
+        let app_svc = match result {
             Ok(i) => i,
             Err(error) => {
                 tui::error(&format!("Error creating instance: {}", error));
                 return Ok(());
             }
+        };
+
+        if app_svc != None {
+            let mut b: HashMap<String, AppService> = Default::default();
+            for a in app_svc.unwrap().iter() {
+                b.insert("k".to_string(), a.to_owned());
+            }
+
+            instance_setting.controller_app_services = Some(b);
         }
     }
 
@@ -179,13 +195,43 @@ fn docker_apply(
 fn docker_apply_instance(
     verbose: bool,
     instance_settings: &InstanceSettings,
-) -> Result<(), anyhow::Error> {
+) -> Result<Option<Vec<AppService>>, anyhow::Error> {
     FileUtils::create_dir(
         instance_settings.instance_name.clone(),
         instance_settings.instance_name.clone(),
     )?;
 
-    let rendered_dockerfile: String = get_rendered_dockerfile(instance_settings)?;
+    let stack_type = ControllerStackType::from_str(instance_settings.stack_type.as_str())
+        .unwrap_or(ControllerStackType::Standard);
+    let stack = get_stack(stack_type);
+
+    let extensions = merge_options(
+        stack.extensions.clone(),
+        Some(get_extensions_controller(
+            instance_settings.extensions.clone(),
+        )),
+    );
+    let trunk_installs = merge_options(
+        stack.trunk_installs.clone(),
+        Some(get_trunk_installs_controller(
+            instance_settings.extensions.clone(),
+        )),
+    );
+
+    let MergedConfigs {
+        extensions,
+        trunk_installs,
+        app_services,
+        pg_configs: _,
+    } = merge_app_reqs(
+        instance_settings.app_services.clone(),
+        stack.app_services.clone(),
+        extensions,
+        trunk_installs,
+        Option::None,
+    )?;
+
+    let rendered_dockerfile: String = get_rendered_dockerfile(&trunk_installs)?;
 
     FileUtils::create_file(
         DOCKERFILE_NAME.to_string(),
@@ -194,7 +240,7 @@ fn docker_apply_instance(
         true,
     )?;
 
-    let rendered_migrations: String = get_rendered_migrations_file(instance_settings)?;
+    let rendered_migrations: String = get_rendered_migrations_file(&extensions)?;
 
     FileUtils::create_file(
         "extensions".to_string(),
@@ -212,7 +258,7 @@ fn docker_apply_instance(
 
     Docker::build(instance_settings.instance_name.clone(), verbose)?;
 
-    Ok(())
+    Ok(app_services)
 }
 
 pub fn tembo_cloud_apply_instance(
@@ -528,6 +574,32 @@ fn get_extensions(
     vec_extensions
 }
 
+fn get_extensions_controller(
+    maybe_extensions: Option<HashMap<String, tembo_config::Extension>>,
+) -> Vec<ControllerExtension> {
+    let mut vec_extensions: Vec<ControllerExtension> = vec![];
+    let mut vec_extension_location: Vec<ControllerExtensionInstallLocation> = vec![];
+
+    if let Some(extensions) = maybe_extensions {
+        for (name, extension) in extensions.into_iter() {
+            vec_extension_location.push(ControllerExtensionInstallLocation {
+                database: "".to_string(),
+                schema: None,
+                version: None,
+                enabled: extension.enabled,
+            });
+
+            vec_extensions.push(ControllerExtension {
+                name: name.to_owned(),
+                description: None,
+                locations: vec_extension_location.clone(),
+            });
+        }
+    }
+
+    vec_extensions
+}
+
 fn get_trunk_installs(
     maybe_extensions: Option<HashMap<String, tembo_config::Extension>>,
 ) -> Vec<TrunkInstall> {
@@ -539,6 +611,24 @@ fn get_trunk_installs(
                 vec_trunk_installs.push(TrunkInstall {
                     name: extension.trunk_project.unwrap(),
                     version: Some(extension.trunk_project_version),
+                });
+            }
+        }
+    }
+    vec_trunk_installs
+}
+
+fn get_trunk_installs_controller(
+    maybe_extensions: Option<HashMap<String, tembo_config::Extension>>,
+) -> Vec<ControllerTrunkInstall> {
+    let mut vec_trunk_installs: Vec<ControllerTrunkInstall> = vec![];
+
+    if let Some(extensions) = maybe_extensions {
+        for (_, extension) in extensions.into_iter() {
+            if extension.trunk_project.is_some() {
+                vec_trunk_installs.push(ControllerTrunkInstall {
+                    name: extension.trunk_project.unwrap(),
+                    version: extension.trunk_project_version,
                 });
             }
         }
@@ -562,6 +652,7 @@ fn merge_settings(base: &InstanceSettings, overlay: OverlayInstanceSettings) -> 
             .or_else(|| base.postgres_configurations.clone()),
         extensions: overlay.extensions.or_else(|| base.extensions.clone()),
         app_services: None,
+        controller_app_services: None,
         extra_domains_rw: overlay
             .extra_domains_rw
             .or_else(|| base.extra_domains_rw.clone()),
@@ -646,7 +737,7 @@ pub fn get_instance_settings(
 }
 
 pub fn get_rendered_dockerfile(
-    instance_settings: &InstanceSettings,
+    trunk_installs: &Option<Vec<ControllerTrunkInstall>>,
 ) -> Result<String, anyhow::Error> {
     // Include the Dockerfile template directly into the binary
     let contents = include_str!("../../tembo/Dockerfile.template");
@@ -655,14 +746,7 @@ pub fn get_rendered_dockerfile(
     let _ = tera.add_raw_template("dockerfile", contents);
     let mut context = Context::new();
 
-    let stack_type = ControllerStackType::from_str(instance_settings.stack_type.as_str())
-        .unwrap_or(ControllerStackType::Standard);
-
-    let stack = get_stack(stack_type);
-
-    context.insert("stack_trunk_installs", &stack.trunk_installs);
-    let extensions = instance_settings.extensions.clone().unwrap_or_default();
-    context.insert("extensions", &extensions);
+    context.insert("trunk_installs", &trunk_installs);
 
     let rendered_dockerfile = tera.render("dockerfile", &context).unwrap();
 
@@ -670,7 +754,7 @@ pub fn get_rendered_dockerfile(
 }
 
 pub fn get_rendered_migrations_file(
-    instance_settings: &InstanceSettings,
+    extensions: &Option<Vec<ControllerExtension>>,
 ) -> Result<String, anyhow::Error> {
     // Include the migrations template directly into the binary
     let contents = include_str!("../../tembo/migrations.sql.template");
@@ -681,13 +765,8 @@ pub fn get_rendered_migrations_file(
         .map_err(|e| anyhow::anyhow!("Error adding raw template: {}", e))?;
 
     let mut context = Context::new();
-    let stack_type = ControllerStackType::from_str(instance_settings.stack_type.as_str())
-        .unwrap_or(ControllerStackType::Standard);
 
-    let stack = get_stack(stack_type);
-
-    context.insert("stack_extensions", &stack.extensions);
-    context.insert("extensions", &instance_settings.extensions);
+    context.insert("extensions", extensions);
 
     let rendered_migrations = tera
         .render("migrations", &context)
@@ -747,7 +826,7 @@ fn get_postgres_config(instance_settings: &InstanceSettings) -> String {
 pub fn get_rendered_dockercompose(
     instance_settings: HashMap<String, InstanceSettings>,
 ) -> Result<String, anyhow::Error> {
-    // Include the Dockerfile template directly into the binary
+    // Include the docker-compose template directly into the binary
     let contents = include_str!("../../tembo/docker-compose.yml.template");
 
     let mut tera = Tera::new("templates/**/*").unwrap();
@@ -756,9 +835,9 @@ pub fn get_rendered_dockercompose(
 
     context.insert("instance_settings", &instance_settings);
 
-    let rendered_dockerfile = tera.render("docker-compose", &context).unwrap();
+    let rendered_dockercompose = tera.render("docker-compose", &context).unwrap();
 
-    Ok(rendered_dockerfile)
+    Ok(rendered_dockercompose)
 }
 
 fn construct_connection_string(info: ConnectionInfo) -> String {

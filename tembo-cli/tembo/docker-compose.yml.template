@@ -17,27 +17,40 @@ services:
       - "traefik.tcp.routers.{{instance.instance_name}}.entrypoints=postgresql"
       - "traefik.tcp.routers.{{instance.instance_name}}.tls.passthrough=true"
       - "traefik.tcp.services.{{instance.instance_name}}.loadbalancer.server.port=5432"
-
-  {% if instance.app_services.restapi %}
-  {{instance.instance_name}}-postgrest:
-    image: postgrest/postgrest:v10.0.0
+{% if instance.controller_app_services %}
+{% for key, app_services in instance.controller_app_services %}
+  {{instance.instance_name}}-{{ app_services.name }}:
+    image: {{app_services.image}}
     environment:
       PGRST_DB_URI: "postgresql://postgres:postgres@{{instance.instance_name}}:5432/postgres"
-      PGRST_DB_SCHEMA: "public, graphql"
-      PGRST_DB_ANON_ROLE: "postgres"
-      PGRST_LOG_LEVEL: "info"
+      {% if app_services.env %}
+      {% for env in app_services.env %}
+      {% if env.value %}
+      {{ env.name }}: "{{ env.value }}"
+      {% endif %}
+      {% endfor %}
+      {% endif %}
     networks:
       - tembo
     labels:
       - "traefik.enable=true"
+      {% if app_services.routing %}
       # The settings here depends on the app service settings
-      - "traefik.http.routers.{{instance.instance_name}}-postgrest.rule=Host(`{{instance.instance_name}}.local.tembo.io`) && (PathPrefix(`/rest/v1`) || PathPrefix(`/graphql/v1`))"
+      - "traefik.http.routers.{{instance.instance_name}}-postgrest.rule=Host(`{{instance.instance_name}}.local.tembo.io`) && (PathPrefix(`{{ app_services.routing.0.ingressPath }}`))"
       # in cloud, this is websecure instead of just web
       - "traefik.http.routers.{{instance.instance_name}}-postgrest.entrypoints=web"
-      - "traefik.http.services.{{instance.instance_name}}-postgrest.loadbalancer.server.port=3000"
-      - "traefik.http.middlewares.postgrest-stripprefix.stripprefix.prefixes=/rest/v1,/graphql/v1"
+      - "traefik.http.services.{{instance.instance_name}}-postgrest.loadbalancer.server.port={{ app_services.routing.0.port }}"
+      {% endif %}
+      {% if app_services.middlewares %}
+      {% for middleware in app_services.middlewares %}
+      {% if middleware.stripPrefix %}
+      - "traefik.http.middlewares.postgrest-stripprefix.stripprefix.prefixes={{ middleware.stripPrefix.config.0 }}"
       - "traefik.http.routers.{{instance.instance_name}}-postgrest.middlewares=postgrest-stripprefix"
-  {% endif %}
+      {% endif %}
+      {% endfor %}
+      {% endif %}
+{% endfor %}
+{% endif %}
 {% endfor %}
 
   traefik:
