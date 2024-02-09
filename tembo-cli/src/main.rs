@@ -5,8 +5,8 @@ use clap::{crate_authors, crate_version, Args, Parser, Subcommand};
 use cmd::apply::ApplyCommand;
 use cmd::context::{ContextCommand, ContextSubCommand};
 use cmd::init::InitCommand;
-use cmd::logs::LogsCommand;
 use cmd::login::LoginCommand;
+use cmd::logs::LogsCommand;
 
 mod cli;
 mod cmd;

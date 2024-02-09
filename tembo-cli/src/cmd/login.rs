@@ -1,13 +1,14 @@
-use hyper::{Body, Request, Response, Server, StatusCode};
-use hyper::service::{make_service_fn, service_fn};
-use std::fs;
-use std::sync::Arc;
+use actix_cors::Cors;
+use actix_web::{http::header, post, web, App, HttpResponse, HttpServer, Responder};
+use anyhow::{Error, Result};
 use clap::Args;
-use tokio::sync::Notify;
 use serde::Deserialize;
-use webbrowser;
-use anyhow::Error;
+use std::fs;
 use std::io::{self, Write};
+use std::sync::Arc;
+use tokio::sync::Notify;
+use tokio::time::{self, Duration};
+use webbrowser;
 
 #[derive(Args)]
 pub struct LoginCommand {}
@@ -18,8 +19,8 @@ struct TokenResponse {
 }
 
 pub async fn execute() -> Result<(), anyhow::Error> {
-    let expiry_days = prompt_for_token_expiry();
-    let login_url = "https://local.tembo.io/loginjwt?isCli=true";
+    let lifetime = token_lifetime()?;
+    let login_url = "https://local.tembo.io/loginjwt?isCli=true&expiry=".to_owned() + &lifetime;
     webbrowser::open(&login_url)?;
 
     let notify = Arc::new(Notify::new());
@@ -30,82 +31,70 @@ pub async fn execute() -> Result<(), anyhow::Error> {
             eprintln!("Server error: {}", e);
         }
     });
-    
-    // Wait for the notify to signal shutdown
-    notify.notified().await;
-    send_expiry_to_cloud();
 
-    println!("Token saved. Exiting the program.");
-
-    Ok(())
-}
-
-fn prompt_for_token_expiry() -> u32 {
-    println!("Expiry in days for the token (1, 7, 30, 365): ");
-    let mut expiry_days = String::new();
-    io::stdout().flush().unwrap(); // Make sure the prompt is displayed before reading input
-    io::stdin().read_line(&mut expiry_days).expect("Failed to read line");
-    let expiry_days: u32 = expiry_days.trim().parse().unwrap_or(1); // Default to 1 if parsing fails
-    expiry_days
-}
-
-fn send_expiry_to_cloud() -> Result<(), Error> {
-    let client = reqwest::Client::new();
-    let res = client.post("https://local.tembo.io/api/token")
-    .body("the exact body that is sent")
-    .send()
-    ;
-
-    print!("ok");
-
-    Ok(())
-}
-
-
-async fn handle_request(req: Request<Body>, notify: Arc<Notify>) -> Result<Response<Body>, hyper::Error> {
-    if req.method() == hyper::Method::POST {
-        let whole_body = match hyper::body::to_bytes(req.into_body()).await {
-            Ok(body) => body,
-            Err(_) => return Ok(Response::builder().status(StatusCode::INTERNAL_SERVER_ERROR).body(Body::from("Failed to read request body")).unwrap()),
-        };
-        
-        let body_str = match String::from_utf8(whole_body.to_vec()) {
-            Ok(s) => s,
-            Err(_) => return Ok(Response::builder().status(StatusCode::BAD_REQUEST).body(Body::from("Request body decode error")).unwrap()),
-        };
-
-        // Parse the JSON to get the token
-        let token_response: TokenResponse = match serde_json::from_str(&body_str) {
-            Ok(parsed) => parsed,
-            Err(_) => return Ok(Response::builder().status(StatusCode::BAD_REQUEST).body(Body::from("Failed to parse JSON")).unwrap()),
-        };
-
-        // Use the extracted token
-        match save_token_to_file(&token_response.token) {
-            Ok(_) => notify.notify_one(),
-            Err(_) => return Ok(Response::builder().status(StatusCode::INTERNAL_SERVER_ERROR).body(Body::from("Failed to save token")).unwrap()),
+    let result = time::timeout(Duration::from_secs(60), notify.notified()).await;
+    match result {
+        Ok(_) => println!("File saved and Server Closed!"),
+        Err(_) => {
+            println!("Operation timed out. Server is being stopped.");
         }
-
-        Ok(Response::new(Body::from("Token received and processed")))
-    } else {
-        Ok(Response::builder().status(StatusCode::METHOD_NOT_ALLOWED).body(Body::from("Method not allowed")).unwrap())
     }
+
+    Ok(())
 }
 
+#[post("/")]
+async fn handle_request(
+    body: web::Json<TokenResponse>,
+    notify: web::Data<Arc<Notify>>,
+) -> impl Responder {
+    let token = &body.token;
 
-async fn start_server(notify: Arc<Notify>) -> Result<(), anyhow::Error> {
-    let addr = ([127, 0, 0, 1], 3000).into();
-    let server = Server::bind(&addr).serve(make_service_fn(move |_conn| {
-        let notify_clone = notify.clone();
-        async move {
-            Ok::<_, hyper::Error>(service_fn(move |req| handle_request(req, notify_clone.clone())))
-        }
-    }));
+    if let Err(e) = save_token_to_file(token) {
+        println!("Failed to save token: {}", e);
+        return HttpResponse::InternalServerError().body("Failed to save token");
+    }
 
-    println!("Server running on http://localhost:3000");
+    notify.notify_one();
 
-    // Await the server completion, including graceful shutdown
-    server.await.map_err(anyhow::Error::from)
+    HttpResponse::Ok().body(format!("Token received and saved: {}", token))
+}
+
+async fn start_server(notify: Arc<Notify>) -> Result<()> {
+    let notify_data = web::Data::new(notify.clone());
+
+    let server = HttpServer::new(move || {
+        let cors = Cors::default()
+            .allowed_origin("https://local.tembo.io")
+            .allowed_methods(vec!["GET", "POST"])
+            .allowed_headers(vec![header::AUTHORIZATION, header::ACCEPT])
+            .allowed_header(header::CONTENT_TYPE)
+            .supports_credentials()
+            .max_age(3600);
+
+        App::new()
+            .app_data(notify_data.clone())
+            .wrap(cors)
+            .service(handle_request)
+    })
+    .bind("127.0.0.1:3000")?
+    .run();
+
+    server.await?;
+
+    Ok(())
+}
+
+fn token_lifetime() -> Result<String> {
+    println!("Enter the token lifetime in days (e.g., 1, 7, 30): ");
+    io::stdout().flush()?;
+
+    let mut lifetime = String::new();
+    io::stdin().read_line(&mut lifetime)?;
+
+    let lifetime = lifetime.trim().to_string();
+
+    Ok(lifetime)
 }
 
 fn save_token_to_file(token: &str) -> Result<(), Error> {
@@ -113,7 +102,7 @@ fn save_token_to_file(token: &str) -> Result<(), Error> {
     let credentials_path = home_dir.join(".tembo/credentials");
 
     let new_contents = format!(
-        "version = \"1.0\"\n\n[[profile]]\nname = 'prod'\ntembo_access_token = \"{}\"\ntembo_host = 'https://api.tembo.io'\ntembo_data_host = 'https://api.data-1.use1.tembo.io'",
+        "version = \"1.0\"\n\n[[profile]]\nname = 'prod'\ntembo_access_token = \'{}\'\ntembo_host = 'https://api.tembo.io'\ntembo_data_host = 'https://api.data-1.use1.tembo.io'",
         token
     );
 
