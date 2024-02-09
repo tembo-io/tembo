@@ -55,7 +55,7 @@ fn generate_resource(
     coredb_name: &str,
     namespace: &str,
     oref: OwnerReference,
-    domain: String,
+    domain: Option<String>,
 ) -> AppServiceResources {
     let resource_name = format!("{}-{}", coredb_name, appsvc.name.clone());
     let service = appsvc
@@ -64,10 +64,23 @@ fn generate_resource(
         .map(|_| generate_service(appsvc, coredb_name, &resource_name, namespace, oref.clone()));
     let deployment = generate_deployment(appsvc, coredb_name, &resource_name, namespace, oref);
 
+    // If DATA_PLANE_BASEDOMAIN is not set, don't generate IngressRoutes, IngressRouteTCPs, or EntryPoints
+    if domain.is_none() {
+        return AppServiceResources {
+            deployment,
+            name: resource_name,
+            service,
+            ingress_routes: None,
+            ingress_tcp_routes: None,
+            entry_points: None,
+            entry_points_tcp: None,
+        };
+    }
+    // It's safe to unwrap domain here because we've already checked if it's None
     let host_matcher = format!(
         "Host(`{subdomain}.{domain}`)",
         subdomain = coredb_name,
-        domain = domain
+        domain = domain.clone().unwrap()
     );
     let ingress_routes = generate_ingress_routes(
         appsvc,
@@ -80,7 +93,7 @@ fn generate_resource(
     let host_matcher_tcp = format!(
         "HostSNI(`{subdomain}.{domain}`)",
         subdomain = coredb_name,
-        domain = domain
+        domain = domain.unwrap()
     );
 
     let ingress_tcp_routes = generate_ingress_tcp_routes(
@@ -375,26 +388,35 @@ fn generate_deployment(
 
     // Create volume vec and add certs volume from secret
     let mut volumes: Vec<Volume> = Vec::new();
-    let certs_volume = Volume {
-        name: "tembo-certs".to_string(),
-        secret: Some(SecretVolumeSource {
-            secret_name: Some(format!("{}-server1", coredb_name)),
-            ..SecretVolumeSource::default()
-        }),
-        ..Volume::default()
-    };
-    volumes.push(certs_volume);
-
-    // Create volume mounts vec and add certs volume mount
     let mut volume_mounts: Vec<VolumeMount> = Vec::new();
-    let certs_volume_mount = VolumeMount {
-        name: "tembo-certs".to_string(),
-        mount_path: "/tembo/certs".to_string(),
-        read_only: Some(true),
-        ..VolumeMount::default()
-    };
-    volume_mounts.push(certs_volume_mount);
 
+    // If USE_SHARED_CA is not set, we don't need to mount the certs
+    match std::env::var("USE_SHARED_CA") {
+        Ok(_) => {
+            // Create volume and add it to volumes vec
+            let certs_volume = Volume {
+                name: "tembo-certs".to_string(),
+                secret: Some(SecretVolumeSource {
+                    secret_name: Some(format!("{}-server1", coredb_name)),
+                    ..SecretVolumeSource::default()
+                }),
+                ..Volume::default()
+            };
+            volumes.push(certs_volume);
+
+            // Create volume mounts vec and add certs volume mount
+            let certs_volume_mount = VolumeMount {
+                name: "tembo-certs".to_string(),
+                mount_path: "/tembo/certs".to_string(),
+                read_only: Some(true),
+                ..VolumeMount::default()
+            };
+            volume_mounts.push(certs_volume_mount);
+        }
+        Err(_) => {
+            warn!("USE_SHARED_CA not set, skipping certs volume mount");
+        }
+    }
     let mut pod_security_context: Option<PodSecurityContext> = None;
     // Add any user provided volumes / volume mounts
     if let Some(storage) = appsvc.storage.clone() {
@@ -674,15 +696,13 @@ pub async fn reconcile_app_services(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(
     };
 
     let domain = match std::env::var("DATA_PLANE_BASEDOMAIN") {
-        Ok(domain) => domain,
+        Ok(domain) => Some(domain),
         Err(_) => {
-            warn!("`DATA_PLANE_BASEDOMAIN` not set -- assuming `localhost`");
-            "localhost".to_string()
+            warn!("DATA_PLANE_BASEDOMAIN not set, skipping ingress reconciliation");
+            None
         }
     };
-
     // Iterate over each AppService and process routes
-
     let resources: Vec<AppServiceResources> = appsvcs
         .iter()
         .map(|appsvc| generate_resource(appsvc, &coredb_name, &ns, oref.clone(), domain.to_owned()))
@@ -719,55 +739,58 @@ pub async fn reconcile_app_services(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(
         .flatten()
         .collect::<Vec<String>>();
 
-    match reconcile_ingress(
-        client.clone(),
-        &coredb_name,
-        &ns,
-        oref.clone(),
-        desired_routes,
-        desired_middlewares.clone(),
-        desired_entry_points,
-    )
-    .await
-    {
-        Ok(_) => {
-            debug!("Updated/applied IngressRoute for {}.{}", ns, coredb_name,);
-        }
-        Err(e) => {
-            error!(
-                "Failed to update/apply IngressRoute {}.{}: {}",
-                ns, coredb_name, e
-            );
-            has_errors = true;
-        }
-    }
-
-    for appsvc in appsvcs.iter() {
-        let app_name = appsvc.name.clone();
-
-        match reconcile_ingress_tcp(
+    // Only reconcile IngressRoute and IngressRouteTCP if DATA_PLANE_BASEDOMAIN is set
+    if domain.is_some() {
+        match reconcile_ingress(
             client.clone(),
             &coredb_name,
             &ns,
             oref.clone(),
-            desired_tcp_routes.clone(),
-            // TODO: fill with actual MiddlewareTCPs when it is supported
-            // first supported MiddlewareTCP will be for custom domains
-            vec![],
-            desired_entry_points_tcp.clone(),
-            &app_name,
+            desired_routes,
+            desired_middlewares.clone(),
+            desired_entry_points,
         )
         .await
         {
             Ok(_) => {
-                debug!("Updated/applied IngressRouteTCP for {}.{}", ns, coredb_name,);
+                debug!("Updated/applied IngressRoute for {}.{}", ns, coredb_name,);
             }
             Err(e) => {
                 error!(
-                    "Failed to update/apply IngressRouteTCP {}.{}: {}",
+                    "Failed to update/apply IngressRoute {}.{}: {}",
                     ns, coredb_name, e
                 );
                 has_errors = true;
+            }
+        }
+
+        for appsvc in appsvcs.iter() {
+            let app_name = appsvc.name.clone();
+
+            match reconcile_ingress_tcp(
+                client.clone(),
+                &coredb_name,
+                &ns,
+                oref.clone(),
+                desired_tcp_routes.clone(),
+                // TODO: fill with actual MiddlewareTCPs when it is supported
+                // first supported MiddlewareTCP will be for custom domains
+                vec![],
+                desired_entry_points_tcp.clone(),
+                &app_name,
+            )
+            .await
+            {
+                Ok(_) => {
+                    debug!("Updated/applied IngressRouteTCP for {}.{}", ns, coredb_name,);
+                }
+                Err(e) => {
+                    error!(
+                        "Failed to update/apply IngressRouteTCP {}.{}: {}",
+                        ns, coredb_name, e
+                    );
+                    has_errors = true;
+                }
             }
         }
     }
