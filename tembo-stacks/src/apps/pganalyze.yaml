@@ -1,0 +1,9 @@
+name: !pganalyze
+appServices:
+  - image: quay.io/pganalyze/collector:v0.53.0
+    name: pganalyze-collector
+    env:
+      - name: DB_URL
+        valueFromPlatform: ReadWriteConnection
+      - name: PGA_API_KEY
+        value: ""
