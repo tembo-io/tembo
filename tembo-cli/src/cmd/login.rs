@@ -20,7 +20,7 @@ struct TokenResponse {
 
 pub async fn execute() -> Result<(), anyhow::Error> {
     let lifetime = token_lifetime()?;
-    let login_url = "https://local.tembo.io/loginjwt?isCli=true&expiry=".to_owned() + &lifetime;
+    let login_url = "https://cloud.tembo.io/loginjwt?isCli=true&expiry=".to_owned() + &lifetime;
     webbrowser::open(&login_url)?;
 
     let notify = Arc::new(Notify::new());
