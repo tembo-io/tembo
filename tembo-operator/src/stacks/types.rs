@@ -1,7 +1,7 @@
 use crate::{
     apis::postgres_parameters::PgConfig,
     app_service::types::AppService,
-    defaults::default_image,
+    defaults::{default_images, default_repository},
     extensions::types::{Extension, TrunkInstall},
     postgres_exporter::QueryConfig,
     stacks::config_engines::{
@@ -69,8 +69,20 @@ pub struct Stack {
     pub name: String,
     pub compute_templates: Option<Vec<ComputeTemplate>>,
     pub description: Option<String>,
-    #[serde(default = "default_stack_image")]
-    pub image: Option<String>,
+    /// Organization hosting the Docker images used in this stack
+    /// Default: "tembo"
+    #[serde(default = "default_organization")]
+    pub organization: String,
+    #[serde(default = "default_stack_repository")]
+    pub repository: String,
+    /// The Docker images to use for each supported Postgres versions
+    ///
+    /// Default:
+    ///     14: "standard-cnpg:14-a0a5ab5"
+    ///     15: "standard-cnpg:15-a0a5ab5"
+    ///     16: "standard-cnpg:16-a0a5ab5"
+    #[serde(default = "default_images")]
+    pub images: ImagePerPgVersion,
     pub stack_version: Option<String>,
     pub trunk_installs: Option<Vec<TrunkInstall>>,
     pub extensions: Option<Vec<Extension>>,
@@ -98,8 +110,12 @@ impl Stack {
     }
 }
 
-fn default_stack_image() -> Option<String> {
-    Some(default_image())
+fn default_organization() -> String {
+    "tembo".into()
+}
+
+fn default_stack_repository() -> String {
+    default_repository()
 }
 
 fn default_config_engine() -> Option<ConfigEngine> {
@@ -144,10 +160,25 @@ pub enum InstanceClass {
     ComputeOptimized,
 }
 
+#[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema, PartialEq, ToSchema)]
+pub struct ImagePerPgVersion {
+    #[serde(rename = "14")]
+    pub pg14: String,
+    #[serde(rename = "15")]
+    pub pg15: String,
+    #[serde(rename = "16")]
+    pub pg16: String,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::stacks::{get_stack, types::Infrastructure, StackType};
+    use crate::stacks::{get_stack, types::Infrastructure, StackType, STANDARD};
+
+    #[test]
+    fn ababa() {
+        dbg!(&*STANDARD);
+    }
 
     #[test]
     fn test_stacks_definitions() {

@@ -99,7 +99,7 @@ fn tembo_cloud_apply(
     instance_settings: HashMap<String, InstanceSettings>,
 ) -> Result<(), anyhow::Error> {
     for (_key, instance_setting) in instance_settings.iter() {
-        let result = tembo_cloud_apply_instance(env.clone(), instance_setting);
+        let result = tembo_cloud_apply_instance(&env, instance_setting);
 
         match result {
             Ok(i) => i,
@@ -216,24 +216,23 @@ fn docker_apply_instance(
 }
 
 pub fn tembo_cloud_apply_instance(
-    env: Environment,
+    env: &Environment,
     instance_settings: &InstanceSettings,
 ) -> Result<(), anyhow::Error> {
-    let profile = env.clone().selected_profile.unwrap();
+    let profile = env
+        .selected_profile
+        .as_ref()
+        .with_context(|| "Expected [environment] to have a selected profile")?;
     let config = Configuration {
-        base_path: profile.clone().tembo_host,
-        bearer_access_token: Some(profile.clone().tembo_access_token),
+        base_path: profile.tembo_host.clone(),
+        bearer_access_token: Some(profile.tembo_access_token.clone()),
         ..Default::default()
     };
 
-    let mut instance_id = get_instance_id(
-        instance_settings.instance_name.clone(),
-        &config,
-        env.clone(),
-    )?;
+    let mut instance_id = get_instance_id(&instance_settings.instance_name, &config, env)?;
 
-    if let Some(env_instance_id) = instance_id.clone() {
-        update_existing_instance(env_instance_id, instance_settings, &config, env.clone());
+    if let Some(env_instance_id) = &instance_id {
+        update_existing_instance(env_instance_id, instance_settings, &config, env);
     } else {
         let new_inst_req = create_new_instance(instance_settings, &config, env.clone());
         match new_inst_req {
@@ -254,7 +253,7 @@ pub fn tembo_cloud_apply_instance(
         sleep(Duration::from_secs(5));
 
         let connection_info: Option<Box<ConnectionInfo>> =
-            is_instance_up(instance_id.as_ref().unwrap().clone(), &config, &env)?;
+            is_instance_up(instance_id.as_ref().unwrap().clone(), &config, env)?;
 
         if connection_info.is_some() {
             let conn_info = get_conn_info_with_creds(
@@ -322,9 +321,9 @@ fn get_conn_info_with_creds(
 }
 
 pub fn get_instance_id(
-    instance_name: String,
+    instance_name: &str,
     config: &Configuration,
-    env: Environment,
+    env: &Environment,
 ) -> Result<Option<String>, anyhow::Error> {
     let v = Runtime::new()
         .unwrap()
@@ -372,17 +371,17 @@ pub fn is_instance_up(
 }
 
 fn update_existing_instance(
-    instance_id: String,
+    instance_id: &str,
     value: &InstanceSettings,
     config: &Configuration,
-    env: Environment,
+    env: &Environment,
 ) {
     let instance = get_update_instance(value);
 
     let v = Runtime::new().unwrap().block_on(put_instance(
         config,
         env.org_id.clone().unwrap().as_str(),
-        &instance_id,
+        instance_id,
         instance,
     ));
 
@@ -503,12 +502,14 @@ fn get_postgres_config_cloud(instance_settings: &InstanceSettings) -> Vec<PgConf
     pg_configs
 }
 
-fn get_extensions(extensions: Option<HashMap<String, tembo_config::Extension>>) -> Vec<Extension> {
+fn get_extensions(
+    maybe_extensions: Option<HashMap<String, tembo_config::Extension>>,
+) -> Vec<Extension> {
     let mut vec_extensions: Vec<Extension> = vec![];
     let mut vec_extension_location: Vec<ExtensionInstallLocation> = vec![];
 
-    if extensions.is_some() {
-        for (name, extension) in extensions.unwrap().iter() {
+    if let Some(extensions) = maybe_extensions {
+        for (name, extension) in extensions.into_iter() {
             vec_extension_location.push(ExtensionInstallLocation {
                 database: None,
                 schema: None,
@@ -528,16 +529,16 @@ fn get_extensions(extensions: Option<HashMap<String, tembo_config::Extension>>) 
 }
 
 fn get_trunk_installs(
-    extensions: Option<HashMap<String, tembo_config::Extension>>,
+    maybe_extensions: Option<HashMap<String, tembo_config::Extension>>,
 ) -> Vec<TrunkInstall> {
     let mut vec_trunk_installs: Vec<TrunkInstall> = vec![];
 
-    if extensions.is_some() {
-        for (_, extension) in extensions.unwrap().iter() {
+    if let Some(extensions) = maybe_extensions {
+        for (_, extension) in extensions.into_iter() {
             if extension.trunk_project.is_some() {
                 vec_trunk_installs.push(TrunkInstall {
-                    name: extension.trunk_project.clone().unwrap(),
-                    version: Some(extension.trunk_project_version.clone()),
+                    name: extension.trunk_project.unwrap(),
+                    version: Some(extension.trunk_project_version),
                 });
             }
         }
@@ -560,12 +561,14 @@ fn merge_settings(base: &InstanceSettings, overlay: OverlayInstanceSettings) -> 
             .postgres_configurations
             .or_else(|| base.postgres_configurations.clone()),
         extensions: overlay.extensions.or_else(|| base.extensions.clone()),
+        app_services: None,
         extra_domains_rw: overlay
             .extra_domains_rw
             .or_else(|| base.extra_domains_rw.clone()),
         ip_allow_list: overlay
             .ip_allow_list
             .or_else(|| base.extra_domains_rw.clone()),
+        pg_version: overlay.pg_version.unwrap_or(base.pg_version),
     }
 }
 

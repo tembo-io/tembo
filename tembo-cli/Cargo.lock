@@ -3918,7 +3918,7 @@ dependencies = [
 
 [[package]]
 name = "tembo-cli"
-version = "0.15.2"
+version = "0.16.0"
 dependencies = [
  "actix-cors",
  "actix-service",
@@ -3941,6 +3941,7 @@ dependencies = [
  "hyper",
  "jsonwebtoken",
  "jwt",
+ "k8s-openapi",
  "log",
  "mockall",
  "openssl",

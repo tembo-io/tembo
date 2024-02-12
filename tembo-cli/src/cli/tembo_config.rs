@@ -1,3 +1,5 @@
+use controller::app_service::types::{AppService, EnvVar};
+use k8s_openapi::api::core::v1::ResourceRequirements;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
 use toml::Value;
@@ -24,13 +26,37 @@ pub struct InstanceSettings {
     #[serde(default = "default_stack_type")]
     pub stack_type: String,
     pub postgres_configurations: Option<HashMap<String, Value>>,
+    #[serde(default = "default_pg_version")]
+    pub pg_version: u8,
     #[serde(
         deserialize_with = "deserialize_extensions",
         default = "default_extensions"
     )]
     pub extensions: Option<HashMap<String, Extension>>,
+    pub app_services: Option<HashMap<String, AppType>>,
     pub extra_domains_rw: Option<Vec<String>>,
     pub ip_allow_list: Option<Vec<String>>,
+}
+
+#[allow(clippy::upper_case_acronyms)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub enum AppType {
+    #[serde(rename = "restapi")]
+    RestAPI(Option<AppConfig>),
+    #[serde(rename = "http")]
+    HTTP(Option<AppConfig>),
+    #[serde(rename = "mq-api")]
+    MQ(Option<AppConfig>),
+    #[serde(rename = "embeddings")]
+    Embeddings(Option<AppConfig>),
+    #[serde(rename = "custom")]
+    Custom(AppService),
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+pub struct AppConfig {
+    pub env: Option<Vec<EnvVar>>,
+    pub resources: Option<ResourceRequirements>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
@@ -44,6 +70,7 @@ pub struct OverlayInstanceSettings {
     pub extensions: Option<HashMap<String, Extension>>,
     pub extra_domains_rw: Option<Vec<String>>,
     pub ip_allow_list: Option<Vec<String>>,
+    pub pg_version: Option<u8>,
 }
 
 // If a trunk project name is not specified, then assume
@@ -65,6 +92,11 @@ where
         m
     })
     .map_or(Ok(None), |m| Ok(Some(m)))
+}
+
+/// Default to Postgres 15
+fn default_pg_version() -> u8 {
+    15
 }
 
 fn default_cpu() -> String {

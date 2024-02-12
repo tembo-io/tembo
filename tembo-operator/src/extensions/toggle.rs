@@ -77,28 +77,49 @@ async fn toggle_extensions(
             // Get extensions trunk project name
             let trunk_project_name =
                 get_trunk_project_for_extension(extension_to_toggle.name.clone()).await?;
-
             // Get appropriate version for trunk project
-            let trunk_project_version = get_trunk_project_version(
-                cdb,
-                trunk_project_name.clone(),
-                location_to_toggle.clone(),
-            )
-            .await?;
+            let loadable_library_name = match trunk_project_name {
+                Some(proj_name) => {
+                    let trunk_project_version = get_trunk_project_version(
+                        cdb,
+                        proj_name.clone(),
+                        location_to_toggle.clone(),
+                    )
+                    .await?;
 
-            // If version is None, error
-            if trunk_project_version.is_none() {
-                error!("Version for {} is none. Version should never be none when toggling an extension", extension_to_toggle.name);
-                continue;
-            }
+                    // If version is None, error
+                    if trunk_project_version.is_none() {
+                        error!("Version for {} is none. Version should never be none when toggling an extension", extension_to_toggle.name);
+                        continue;
+                    }
+                    let loadable_library_name = get_loadable_library_name(
+                        proj_name.clone(),
+                        trunk_project_version.clone().unwrap(),
+                        extension_to_toggle.name.clone(),
+                    )
+                    .await?;
+                    let control_file_absent =
+                        is_control_file_absent(proj_name.clone(), trunk_project_version.unwrap())
+                            .await?;
+                    if control_file_absent && loadable_library_name.is_some() {
+                        info!(
+                            "Extension {} must be enabled with LOAD. Skipping toggle.",
+                            extension_to_toggle.name,
+                        );
+                        continue;
+                    }
+                    loadable_library_name
+                }
+                _ => {
+                    error!(
+                        "Trunk project name for {} is none.",
+                        extension_to_toggle.name
+                    );
+                    None
+                }
+            };
 
             // Check if extension has a loadable library
-            let has_loadable_library = get_loadable_library_name(
-                trunk_project_name.clone().unwrap(),
-                trunk_project_version.clone().unwrap(),
-                extension_to_toggle.name.clone(),
-            )
-            .await?;
 
             // If we are toggling on,
             // the extension is included in the REQUIRES_LOAD list,
@@ -106,7 +127,7 @@ async fn toggle_extensions(
             // then requeue.
             if location_to_toggle.enabled
                 && (requires_load.contains_key(&extension_to_toggle.name)
-                    || has_loadable_library.is_some())
+                    || loadable_library_name.is_some())
                 && !(current_shared_preload_libraries.contains(expected_library_name))
             {
                 warn!(
@@ -119,20 +140,7 @@ async fn toggle_extensions(
                     requires_load.clone(),
                 )?;
             }
-            // Don't toggle extension if control file is absent && it has a loadable library
-            let control_file_absent = is_control_file_absent(
-                trunk_project_name.clone().unwrap(),
-                trunk_project_version.unwrap(),
-            )
-            .await?;
 
-            if control_file_absent && has_loadable_library.is_some() {
-                info!(
-                    "Extension {} must be enabled with LOAD. Skipping toggle.",
-                    extension_to_toggle.name,
-                );
-                continue;
-            }
             match database_queries::toggle_extension(
                 cdb,
                 &extension_to_toggle.name,
@@ -405,7 +413,7 @@ async fn check_for_extensions_enabled_with_load(
         for extension in trunk_installed_extensions_not_in_all_actually_installed_extensions.clone()
         {
             let found =
-                check_for_so_files(cdb, ctx.clone(), &*pod_name, extension.name.clone()).await?;
+                check_for_so_files(cdb, ctx.clone(), &pod_name, extension.name.clone()).await?;
             // If found, add to extensions_with_load
             if found {
                 // Get trunk project description for extension
@@ -430,7 +438,7 @@ async fn check_for_extensions_enabled_with_load(
                         found = true;
                         for desired_location in desired_extension.locations {
                             let location_status = ExtensionInstallLocationStatus {
-                                enabled: Some(desired_location.enabled.clone()),
+                                enabled: Some(desired_location.enabled),
                                 database: desired_location.database.clone(),
                                 schema: desired_location.schema.clone(),
                                 version: desired_location.version.clone(),
@@ -464,24 +472,29 @@ async fn check_for_extensions_enabled_with_load(
 // Get trunk project version
 async fn get_trunk_project_version(
     cdb: &CoreDB,
-    trunk_project_name: Option<String>,
+    trunk_project_name: String,
     location_to_toggle: types::ExtensionInstallLocation,
 ) -> Result<Option<String>, Action> {
     let mut trunk_project_version = None;
 
     // Check if version is provided in cdb.spec.trunk_installs
     for trunk_install in cdb.spec.trunk_installs.clone() {
-        if trunk_install.name == trunk_project_name.clone().unwrap() {
+        if trunk_install.name == trunk_project_name.clone() {
             trunk_project_version = trunk_install.version;
         }
     }
 
+    let location_version = location_to_toggle
+        .version
+        .clone()
+        .ok_or(Action::requeue(Duration::from_secs(300)))?;
+
     // If trunk_project_version is None && extension version is semver
-    if trunk_project_version.is_none() && is_semver(location_to_toggle.version.clone().unwrap()) {
+    if trunk_project_version.is_none() && is_semver(location_version.clone()) {
         // Check if trunk project with extension version exists
         let trunk_project_version_exists = get_trunk_project_metadata_for_version(
-            trunk_project_name.clone().unwrap(),
-            location_to_toggle.version.clone().unwrap(),
+            trunk_project_name.clone(),
+            location_version.clone(),
         )
         .await
         .is_ok();
@@ -492,14 +505,14 @@ async fn get_trunk_project_version(
         // Otherwise, fall back to latest version
         else {
             trunk_project_version =
-                get_latest_trunk_project_version(trunk_project_name.clone().unwrap()).await?;
+                get_latest_trunk_project_version(trunk_project_name.clone()).await?;
         }
         // If trunk_project_version is None && extension version is NOT semver
     } else if trunk_project_version.is_none() {
         // Convert to semver and check if trunk project with semver version exists
-        let semver_version = convert_to_semver(location_to_toggle.version.clone().unwrap());
+        let semver_version = convert_to_semver(location_version.clone());
         let trunk_project_version_exists = get_trunk_project_metadata_for_version(
-            trunk_project_name.clone().unwrap(),
+            trunk_project_name.clone(),
             semver_version.clone(),
         )
         .await
@@ -511,7 +524,7 @@ async fn get_trunk_project_version(
         // Otherwise, fall back to latest version
         else {
             trunk_project_version =
-                get_latest_trunk_project_version(trunk_project_name.clone().unwrap()).await?;
+                get_latest_trunk_project_version(trunk_project_name.clone()).await?;
         }
     }
     Ok(trunk_project_version)

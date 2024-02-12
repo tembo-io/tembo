@@ -1,6 +1,6 @@
 use crate::apply::{get_instance_id, get_instance_settings};
 use crate::cli::context::{get_current_context, Target};
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result};
 use clap::Args;
 use reqwest::blocking::Client;
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
@@ -28,8 +28,9 @@ struct LogEntry {
 }
 
 #[derive(Serialize, Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
 struct LogResult {
-    resultType: String,
+    result_type: String,
     result: Vec<LogEntry>,
 }
 
@@ -74,11 +75,11 @@ pub fn execute() -> Result<()> {
 
     if env.target == Target::Docker.to_string() {
         let instance_settings = get_instance_settings(None, None)?;
-        for (instance_name, _settings) in instance_settings {
+        for (_instance_name, _settings) in instance_settings {
             docker_logs(&_settings.instance_name)?;
         }
     } else if env.target == Target::TemboCloud.to_string() {
-        cloud_logs();
+        let _ = cloud_logs();
     }
     Ok(())
 }
@@ -103,8 +104,7 @@ pub fn cloud_logs() -> Result<()> {
     );
 
     for (_key, value) in instance_settings.iter() {
-        let instance_id_option =
-            get_instance_id(value.instance_name.clone(), &config, env.clone())?;
+        let instance_id_option = get_instance_id(&value.instance_name, &config, &env)?;
 
         let instance_id = if let Some(id) = instance_id_option {
             id
@@ -161,8 +161,8 @@ pub fn docker_logs(instance_name: &str) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::anyhow;
     use assert_cmd::prelude::*;
-    use colorful::core::StrMarker;
     use std::env;
     use std::error::Error;
     use std::path::PathBuf;
@@ -172,8 +172,7 @@ mod tests {
 
     #[tokio::test]
     async fn docker_logs() -> Result<(), Box<dyn Error>> {
-        let root_dir = env!("CARGO_MANIFEST_DIR");
-        let test_dir = PathBuf::from(root_dir).join("examples").join("set");
+        let test_dir = PathBuf::from(ROOT_DIR).join("examples").join("set");
 
         env::set_current_dir(&test_dir)?;
 
@@ -252,7 +251,6 @@ mod tests {
     #[tokio::test]
     async fn cloud_logs() {
         let valid_json_log = mock_query("valid_json").unwrap();
-        let result = beautify_logs(&valid_json_log);
-        assert!(result.is_ok());
+        beautify_logs(&valid_json_log).unwrap();
     }
 }

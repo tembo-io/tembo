@@ -1,6 +1,7 @@
 use assert_cmd::prelude::*; // Add methods on commands
 
 use colorful::core::StrMarker;
+use curl::easy::Easy;
 use predicates::prelude::*;
 use sqlx::postgres::PgConnectOptions;
 use std::env;
@@ -115,6 +116,9 @@ async fn data_warehouse() -> Result<(), Box<dyn Error>> {
 
 #[tokio::test]
 async fn multiple_instances() -> Result<(), Box<dyn Error>> {
+    let instance1_name = "instance-1";
+    let instance2_name = "instance-2";
+
     let root_dir = env!("CARGO_MANIFEST_DIR");
     let test_dir = PathBuf::from(root_dir)
         .join("examples")
@@ -144,8 +148,36 @@ async fn multiple_instances() -> Result<(), Box<dyn Error>> {
     sleep(Duration::from_secs(5));
 
     // check can connect
-    assert_can_connect("instance-1".to_string()).await?;
-    assert_can_connect("instance-2".to_string()).await?;
+    assert_can_connect(instance1_name.to_string()).await?;
+    assert_can_connect(instance2_name.to_string()).await?;
+
+    execute_sql(
+        instance2_name.to_string(),
+        "create table public.todos (id serial primary key,
+            done boolean not null default false,
+            task text not null,
+            due timestamptz
+          );"
+        .to_string(),
+    )
+    .await?;
+
+    execute_sql(
+        instance2_name.to_string(),
+        "insert into public.todos (task) values
+        ('finish tutorial 0'), ('pat self on back');"
+            .to_string(),
+    )
+    .await?;
+
+    let mut easy = Easy::new();
+    easy.url(&format!(
+        "http://{}.local.tembo.io:8000/rest/v1/todos",
+        instance2_name.to_string()
+    ))
+    .unwrap();
+    easy.perform().unwrap();
+    assert_eq!(easy.response_code().unwrap(), 200);
 
     // tembo delete
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
@@ -153,8 +185,8 @@ async fn multiple_instances() -> Result<(), Box<dyn Error>> {
     let _ = cmd.ok();
 
     // check can't connect
-    assert!(assert_can_connect("instance-1".to_str()).await.is_err());
-    assert!(assert_can_connect("instance-2".to_str()).await.is_err());
+    assert!(assert_can_connect(instance1_name.to_str()).await.is_err());
+    assert!(assert_can_connect(instance2_name.to_str()).await.is_err());
 
     Ok(())
 }
@@ -180,6 +212,28 @@ async fn get_output_from_sql(instance_name: String, sql: String) -> Result<Strin
     println!("{}", result.0);
 
     Ok(result.0.to_string())
+}
+
+async fn execute_sql(instance_name: String, sql: String) -> Result<(), Box<dyn Error>> {
+    // Configure SQLx connection options
+    let connect_options = PgConnectOptions::new()
+        .username("postgres")
+        .password("postgres")
+        .host(&format!("{}.local.tembo.io", instance_name))
+        .database("postgres");
+
+    // Connect to the database
+    let pool = sqlx::PgPool::connect_with(connect_options).await?;
+
+    // Simple query
+    sqlx::query(&sql).fetch_optional(&pool).await?;
+
+    println!(
+        "Successfully connected to the database: {}",
+        &format!("{}.local.tembo.io", instance_name)
+    );
+
+    Ok(())
 }
 
 async fn assert_can_connect(instance_name: String) -> Result<(), Box<dyn Error>> {

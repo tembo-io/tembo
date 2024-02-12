@@ -389,7 +389,7 @@ pub struct CoreDBSpec {
     /// please visit our [tembo-images](https://github.com/tembo-io/tembo-images) repository.
     ///
     /// **Default**: quay.io/tembo/standard-cnpg:15.3.0-1-0c19c7e
-    #[serde(default = "defaults::default_image")]
+    #[serde(default = "defaults::default_image_uri")]
     pub image: String,
 
     /// **DEPRECATED** The postgres-exporter image you want to use for the postgres-exporter deployment.

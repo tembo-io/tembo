@@ -1,6 +1,11 @@
 name: MachineLearning
 description: A Postgres instance equipped with machine learning extensions and optimized for machine learning workloads.
-image: "quay.io/tembo/ml-cnpg:15.3.0-1-46c8b6f"
+repository: "quay.io/tembo"
+organization: tembo
+images:
+  14: "ml-cnpg:14-a0a5ab5"
+  15: "ml-cnpg:15-a0a5ab5"
+  16: "ml-cnpg:16-a0a5ab5"
 stack_version: 0.3.0
 compute_templates:
   - cpu: 2
@@ -41,7 +46,7 @@ postgres_config:
     value: http://${NAMESPACE}-embeddings.${NAMESPACE}.svc.cluster.local:3000/v1/embeddings
 trunk_installs:
   - name: pgvector
-    version: 0.5.1
+    version: 0.6.0
   - name: postgresml
     version: 2.7.1
   - name: pg_cron
@@ -49,7 +54,7 @@ trunk_installs:
   - name: pgmq
     version: 1.1.1
   - name: vectorize
-    version: 0.8.1
+    version: 0.9.0
   - name: pg_later
     version: 0.0.11
   - name: plpython3u
@@ -60,7 +65,7 @@ extensions:
     locations:
       - database: postgres
         enabled: true
-        version: 0.5.1
+        version: 0.6.0
   # trunk project postgresml
   - name: pgml
     locations:
@@ -81,7 +86,7 @@ extensions:
     locations:
     - database: postgres
       enabled: true
-      version: 0.8.1
+      version: 0.9.0
   - name: pg_later
     locations:
     - database: postgres
