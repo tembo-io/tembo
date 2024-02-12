@@ -32,7 +32,7 @@ pub async fn execute() -> Result<(), anyhow::Error> {
         }
     });
 
-    let result = time::timeout(Duration::from_secs(60), notify.notified()).await;
+    let result = time::timeout(Duration::from_secs(30), notify.notified()).await;
     match result {
         Ok(_) => println!("File saved and Server Closed!"),
         Err(_) => {
@@ -65,7 +65,9 @@ async fn start_server(notify: Arc<Notify>) -> Result<()> {
 
     let server = HttpServer::new(move || {
         let cors = Cors::default()
+            .allowed_origin("https://pr-462.dkwugv8ig5mdu.amplifyapp.com")
             .allowed_origin("https://local.tembo.io")
+            .allowed_origin("https://cloud.tembo.io")
             .allowed_methods(vec!["GET", "POST"])
             .allowed_headers(vec![header::AUTHORIZATION, header::ACCEPT])
             .allowed_header(header::CONTENT_TYPE)
