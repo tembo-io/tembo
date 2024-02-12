@@ -5,5 +5,4 @@ appServices:
     env:
       - name: DB_URL
         valueFromPlatform: ReadWriteConnection
-      - name: PGA_API_KEY
-        value: ""
+
