@@ -1110,11 +1110,15 @@ mod test {
                     },
                     {
                         "name": "pgmq",
-                        "version": "0.10.0",
+                        "version": "1.1.1",
                     },
                     {
                         "name": "pg_stat_statements",
                         "version": "1.10.0",
+                    },
+                    {
+                        "name": "postgis",
+                        "version": "3.4.0",
                     },
                 ],
                 "extensions": [
@@ -1133,7 +1137,7 @@ mod test {
                         "locations": [
                         {
                           "enabled": true,
-                          "version": "0.10.0",
+                          "version": "1.1.1",
                           "database": "postgres",
                           "schema": "public"
                         }]
@@ -1144,6 +1148,16 @@ mod test {
                         {
                           "enabled": true,
                           "version": "1.10.0",
+                          "database": "postgres",
+                          "schema": "public"
+                        }]
+                    },
+                    {
+                        "name": "postgis",
+                        "locations": [
+                        {
+                          "enabled": true,
+                          "version": "3.4.0",
                           "database": "postgres",
                           "schema": "public"
                         }]
@@ -1191,6 +1205,18 @@ mod test {
 
         println!("{}", result.stdout.clone().unwrap());
         assert!(result.stdout.clone().unwrap().contains("pgmq"));
+
+        let result = wait_until_psql_contains(
+            context.clone(),
+            coredb_resource.clone(),
+            "select extname from pg_catalog.pg_extension;".to_string(),
+            "postgis".to_string(),
+            false,
+        )
+        .await;
+
+        println!("{}", result.stdout.clone().unwrap());
+        assert!(result.stdout.clone().unwrap().contains("postgis"));
 
         println!("Restarting CNPG pod");
         // Restart the CNPG instance

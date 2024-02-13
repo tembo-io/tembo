@@ -3,7 +3,7 @@ kind: CoreDB
 metadata:
   name: tembo-dw
 spec:
-  image: quay.io/tembo/dw-cnpg:15.3.0-1-0baf38f
+  image: quay.io/tembo/dw-cnpg:15-a0a5ab5
   stack:
     name: DataWarehouse
   runtime_config:
