@@ -1,20 +1,10 @@
 FROM quay.io/tembo/tembo-local:latest
 
-# Trunk Installs from stack_type
-{% for stack in stack_trunk_installs %}
-{% if stack.version %}
-RUN trunk install --version {{stack.version}} {{stack.name}}
+{% for trunk_install in trunk_installs %}
+{% if trunk_install.version %}
+RUN trunk install --version {{trunk_install.version}} {{trunk_install.name}}
 {% else %}
-RUN trunk install {{stack.name}}
-{% endif %}
-{% endfor %}
-
-# Trunk Installs from tembo.toml
-{% for key, value in extensions %}
-{% if value.trunk_project and value.trunk_project_version %}
-RUN trunk install --version {{value.trunk_project_version}} {{value.trunk_project}}
-{% elif value.trunk_project %}
-RUN trunk install {{value.trunk_project}}
+RUN trunk install {{trunk_install.name}}
 {% endif %}
 {% endfor %}
 
