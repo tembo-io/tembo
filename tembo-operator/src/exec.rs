@@ -40,9 +40,9 @@ impl ExecCommand {
             stdin: true,
             stdout: true,
             stderr: true,
-            max_stdin_buf_size: Some(1024),
-            max_stdout_buf_size: Some(1024),
-            max_stderr_buf_size: Some(1024),
+            max_stdin_buf_size: Some(10240),
+            max_stdout_buf_size: Some(10240),
+            max_stderr_buf_size: Some(10240),
         };
 
         let mut attached_process = self
