@@ -1,7 +1,7 @@
 name: !pganalyze
 appServices:
   - image: quay.io/pganalyze/collector:v0.53.0
-    name: pganalyze-collector
+    name: pganalyze
     env:
       - name: DB_URL
         valueFromPlatform: ReadWriteConnection
