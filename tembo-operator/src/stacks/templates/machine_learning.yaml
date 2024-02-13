@@ -44,6 +44,8 @@ postgres_config:
     value: vectorize,pg_stat_statements,pgml,pg_cron,pg_later
   - name: vectorize.embedding_service_url
     value: http://${NAMESPACE}-embeddings.${NAMESPACE}.svc.cluster.local:3000/v1/embeddings
+  - name: pglater.host
+    value: postgresql:///postgres?host=/controller/run
 trunk_installs:
   - name: pgvector
     version: 0.6.0
@@ -56,7 +58,7 @@ trunk_installs:
   - name: vectorize
     version: 0.9.0
   - name: pg_later
-    version: 0.0.11
+    version: 0.1.0
   - name: plpython3u
     version: 1.0.0
 extensions:
@@ -91,7 +93,7 @@ extensions:
     locations:
     - database: postgres
       enabled: true
-      version: 0.0.11
+      version: 0.1.0
   - name: plpython3u
     locations:
     - database: postgres
