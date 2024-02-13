@@ -3,7 +3,7 @@ kind: CoreDB
 metadata:
   name: sample-standard-backup
 spec:
-  image: "quay.io/tembo/standard-cnpg:15.3.0-1-45c2054"
+  image: "quay.io/tembo/standard-cnpg:15-a0a5ab5"
   backup:
     destinationPath: s3://tembo-backup/sample-standard-backup
     encryption: ""
