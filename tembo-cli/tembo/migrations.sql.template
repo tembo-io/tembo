@@ -1,7 +1,3 @@
-{% for stack in stack_extensions %}
-CREATE EXTENSION IF NOT EXISTS {{stack.name}} CASCADE;
-{% endfor %}
-
-{% for key, value in extensions %}
-CREATE EXTENSION IF NOT EXISTS {{key}} CASCADE;
+{% for extension in extensions %}
+CREATE EXTENSION IF NOT EXISTS {{extension.name}} CASCADE;
 {% endfor %}
