@@ -1,4 +1,4 @@
-FROM rust:1.71-bookworm as builder
+FROM quay.io/tembo/rust:1.76-bookworm as builder
 
 COPY tembo-operator ./tembo-operator
 WORKDIR /tembo-pod-init
@@ -6,13 +6,13 @@ COPY Cargo.toml .
 COPY src/ ./src/
 RUN cargo build --release
 
-FROM debian:bookworm-slim
+FROM quay.io/tembo/debian:12.5-slim
 RUN set -eux; \
     apt-get update; \
     apt-get upgrade -y; \
     apt-get autoremove -y; \
     apt-get clean; \
-    rm -rf /var/lib/apt/lists/*
+    rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 
 COPY --from=builder /tembo-pod-init/target/release/tembo-pod-init /usr/bin/tembo-pod-init
 

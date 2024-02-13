@@ -1,4 +1,4 @@
-FROM quay.io/coredb/rust:1.71.0-slim-buster as builder
+FROM quay.io/tembo/rust:1.76-slim-bookworm as builder
 
 RUN apt-get update && \
     apt-get install -y pkg-config libssl-dev && apt-get clean && \
@@ -13,8 +13,13 @@ COPY ./src ./src
 
 RUN cargo install --path .
 
-FROM quay.io/coredb/debian:11.6-slim
-RUN apt-get update && \
-    apt-get install -y ca-certificates && apt-get clean && \
+FROM quay.io/tembo/debian:12.5-slim
+RUN set -eux; \
+    apt-get update; \
+    apt-get upgrade -y; \
+    apt-get install -y ca-certificates; \
+    apt-get clean; \
+    apt-get autoremove -y; \
+    apt-get clean; \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 COPY --from=builder /usr/local/cargo/bin/* /usr/local/bin/
