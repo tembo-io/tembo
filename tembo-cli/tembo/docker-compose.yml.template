@@ -36,6 +36,9 @@ services:
 
   {{instance.instance_name}}-{{app_services.name}}:
     image: {{app_services.image}}
+    {% if app_services.name == "embeddings" -%}
+    platform: linux/amd64
+    {% endif %}
     environment:
       PGRST_DB_URI: "postgresql://postgres:postgres@{{instance.instance_name}}:5432/postgres"
       {% if app_services.env -%}
@@ -61,6 +64,11 @@ services:
       {% if middleware.stripPrefix -%}
       - "traefik.http.middlewares.postgrest-stripprefix.stripprefix.prefixes={{ prefixes }}"
       - "traefik.http.routers.{{instance.instance_name}}-postgrest.middlewares=postgrest-stripprefix"
+      {% endif -%}
+      {% if middleware.replacePathRegex -%}
+      - "traefik.http.middlewares.postgrest-replacepathregex.replacepathregex.regex={{ middleware.replacePathRegex.config.regex | replace(from="\", to="") }}"
+      - "traefik.http.middlewares.postgrest-replacepathregex.replacepathregex.replacement={{ middleware.replacePathRegex.config.replacement }}"
+      - "traefik.http.routers.{{instance.instance_name}}-postgrest.middlewares=postgrest-replacepathregex"
       {% endif -%}
       {% endfor -%}
       {% endif -%}

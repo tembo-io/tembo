@@ -583,7 +583,7 @@ fn get_extensions_controller(
     if let Some(extensions) = maybe_extensions {
         for (name, extension) in extensions.into_iter() {
             vec_extension_location.push(ControllerExtensionInstallLocation {
-                database: "".to_string(),
+                database: String::new(),
                 schema: None,
                 version: None,
                 enabled: extension.enabled,
