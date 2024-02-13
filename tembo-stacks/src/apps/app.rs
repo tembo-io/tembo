@@ -19,6 +19,8 @@ lazy_static! {
         serde_yaml::from_str(include_str!("mq.yaml")).expect("mq.yaml not found");
     pub static ref EMBEDDINGS: App =
         serde_yaml::from_str(include_str!("embeddings.yaml")).expect("embeddings.yaml not found");
+    pub static ref PGANALYZE: App =
+        serde_yaml::from_str(include_str!("pganalyze.yaml")).expect("pganalyze.yaml not found");
 }
 
 // handling merging requirements coming from an App into the final
@@ -92,6 +94,18 @@ pub fn merge_app_reqs(
                     if let Some(pg_cfg) = embedding_app.postgres_config {
                         final_pg_configs.extend(pg_cfg);
                     }
+                }
+                AppType::PgAnalyze(config) => {
+                    // There is only 1 app_service in the pganalyze app
+                    let pg_analyze = PGANALYZE.clone();
+                    let mut pg_analyze_app_svc = pg_analyze.app_services.unwrap()[0].clone();
+                    // If there are user provided configs, overwrite the defaults with them
+                    if let Some(cfg) = config {
+                        pg_analyze_app_svc = merge_app_configs(pg_analyze_app_svc, cfg);
+                    }
+                    user_app_services.push(pg_analyze_app_svc);
+                    // pganalyze only has app_service containers
+                    // no extensions or trunk installs
                 }
                 AppType::Custom(custom_app) => {
                     user_app_services.push(custom_app);

@@ -35,6 +35,8 @@ pub enum AppType {
     MQ(Option<AppConfig>),
     #[serde(rename = "embeddings")]
     Embeddings(Option<AppConfig>),
+    #[serde(rename = "pganalyze")]
+    PgAnalyze(Option<AppConfig>),
     #[serde(rename = "custom")]
     Custom(AppService),
 }
@@ -67,6 +69,7 @@ impl TryFrom<AppService> for AppType {
             "http" => Ok(AppType::HTTP(app_config)),
             "mq-api" => Ok(AppType::MQ(app_config)),
             "embeddings" => Ok(AppType::Embeddings(app_config)),
+            "pganalyze" => Ok(AppType::PgAnalyze(app_config)),
             _ => {
                 // everything else is a custom app
                 Ok(AppType::Custom(app_service))
