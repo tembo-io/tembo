@@ -33,7 +33,7 @@ Postgres is the best OSS database in the world, with millions of active deployme
 * [pg_vectorize](https://github.com/tembo-io/pg_vectorize) - automate vector search workflow, and SQL access to 100+ OSS sentence transformer models
 * [clerk_fdw](https://github.com/tembo-io/clerk_fdw) - connect to [Clerk](https://clerk.com/) User and Organization data from Postgres
 * [prometheus_fdw](https://github.com/tembo-io/prometheus_fdw) - query and move metrics from [Prometheus](https://prometheus.io/) to Postgres
-* [orb_fdbw](https://github.com/tembo-io/orb_fdw) - connect your billing data from [Orb](https://www.withorb.com/) to Postgres 
+* [orb_fdw](https://github.com/tembo-io/orb_fdw) - connect your billing data from [Orb](https://www.withorb.com/) to Postgres 
 
 ## Tembo Cloud
 
