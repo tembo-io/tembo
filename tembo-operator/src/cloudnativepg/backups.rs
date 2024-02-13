@@ -4,11 +4,16 @@
 
 use kube::CustomResource;
 use schemars::JsonSchema;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Specification of the desired behavior of the backup. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
 #[derive(CustomResource, Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
-#[kube(group = "postgresql.cnpg.io", version = "v1", kind = "Backup", plural = "backups")]
+#[kube(
+    group = "postgresql.cnpg.io",
+    version = "v1",
+    kind = "Backup",
+    plural = "backups"
+)]
 #[kube(namespaced)]
 #[kube(status = "BackupStatus")]
 pub struct BackupSpec {
@@ -21,7 +26,11 @@ pub struct BackupSpec {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub online: Option<bool>,
     /// Configuration parameters to control the online/hot backup with volume snapshots Overrides the default settings specified in the cluster '.backup.volumeSnapshot.onlineConfiguration' stanza
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "onlineConfiguration")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "onlineConfiguration"
+    )]
     pub online_configuration: Option<BackupOnlineConfiguration>,
     /// The policy to decide which instance should perform this backup. If empty, it defaults to `cluster.spec.backup.target`. Available options are empty string, `primary` and `prefer-standby`. `primary` to have backups run always on primary instances, `prefer-standby` to have backups run preferably on the most updated standby, if available.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -48,10 +57,18 @@ pub enum BackupMethod {
 #[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
 pub struct BackupOnlineConfiguration {
     /// Control whether the I/O workload for the backup initial checkpoint will be limited, according to the `checkpoint_completion_target` setting on the PostgreSQL server. If set to true, an immediate checkpoint will be used, meaning PostgreSQL will complete the checkpoint as soon as possible. `false` by default.
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "immediateCheckpoint")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "immediateCheckpoint"
+    )]
     pub immediate_checkpoint: Option<bool>,
     /// If false, the function will return immediately after the backup is completed, without waiting for WAL to be archived. This behavior is only useful with backup software that independently monitors WAL archiving. Otherwise, WAL required to make the backup consistent might be missing and make the backup useless. By default, or when this parameter is true, pg_backup_stop will wait for WAL to be archived when archiving is enabled. On a standby, this means that it will wait only when archive_mode = always. If write activity on the primary is low, it may be useful to run pg_switch_wal on the primary in order to trigger an immediate segment switch.
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "waitForArchive")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "waitForArchive"
+    )]
     pub wait_for_archive: Option<bool>,
 }
 
@@ -68,16 +85,28 @@ pub enum BackupTarget {
 #[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
 pub struct BackupStatus {
     /// The credentials to use to upload data to Azure Blob Storage
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "azureCredentials")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "azureCredentials"
+    )]
     pub azure_credentials: Option<BackupStatusAzureCredentials>,
     /// The ID of the Barman backup
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "backupId")]
     pub backup_id: Option<String>,
     /// Backup label file content as returned by Postgres in case of online (hot) backups
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "backupLabelFile")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "backupLabelFile"
+    )]
     pub backup_label_file: Option<String>,
     /// The Name of the Barman backup
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "backupName")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "backupName"
+    )]
     pub backup_name: Option<String>,
     /// The starting xlog
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "beginLSN")]
@@ -86,13 +115,25 @@ pub struct BackupStatus {
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "beginWal")]
     pub begin_wal: Option<String>,
     /// The backup command output in case of error
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "commandError")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "commandError"
+    )]
     pub command_error: Option<String>,
     /// Unused. Retained for compatibility with old versions.
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "commandOutput")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "commandOutput"
+    )]
     pub command_output: Option<String>,
     /// The path where to store the backup (i.e. s3://bucket/path/to/folder) this path, with different destination folders, will be used for WALs and for data. This may not be populated in case of errors.
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "destinationPath")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "destinationPath"
+    )]
     pub destination_path: Option<String>,
     /// Encryption method required to S3 API
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -104,19 +145,35 @@ pub struct BackupStatus {
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "endWal")]
     pub end_wal: Option<String>,
     /// EndpointCA store the CA bundle of the barman endpoint. Useful when using self-signed certificates to avoid errors with certificate issuer and barman-cloud-wal-archive.
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "endpointCA")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "endpointCA"
+    )]
     pub endpoint_ca: Option<BackupStatusEndpointCa>,
     /// Endpoint to be used to upload data to the cloud, overriding the automatic endpoint discovery
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "endpointURL")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "endpointURL"
+    )]
     pub endpoint_url: Option<String>,
     /// The detected error
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
     /// The credentials to use to upload data to Google Cloud Storage
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "googleCredentials")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "googleCredentials"
+    )]
     pub google_credentials: Option<BackupStatusGoogleCredentials>,
     /// Information to identify the instance where the backup has been taken from
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "instanceID")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "instanceID"
+    )]
     pub instance_id: Option<BackupStatusInstanceId>,
     /// The backup method being used
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -128,13 +185,25 @@ pub struct BackupStatus {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub phase: Option<String>,
     /// The credentials to use to upload data to S3
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "s3Credentials")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "s3Credentials"
+    )]
     pub s3_credentials: Option<BackupStatusS3Credentials>,
     /// The server name on S3, the cluster name is used if this parameter is omitted
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "serverName")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "serverName"
+    )]
     pub server_name: Option<String>,
     /// Status of the volumeSnapshot backup
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "snapshotBackupStatus")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "snapshotBackupStatus"
+    )]
     pub snapshot_backup_status: Option<BackupStatusSnapshotBackupStatus>,
     /// When the backup was started
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "startedAt")]
@@ -143,7 +212,11 @@ pub struct BackupStatus {
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "stoppedAt")]
     pub stopped_at: Option<String>,
     /// Tablespace map file content as returned by Postgres in case of online (hot) backups
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "tablespaceMapFile")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "tablespaceMapFile"
+    )]
     pub tablespace_map_file: Option<String>,
 }
 
@@ -151,19 +224,39 @@ pub struct BackupStatus {
 #[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
 pub struct BackupStatusAzureCredentials {
     /// The connection string to be used
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "connectionString")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "connectionString"
+    )]
     pub connection_string: Option<BackupStatusAzureCredentialsConnectionString>,
     /// Use the Azure AD based authentication without providing explicitly the keys.
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "inheritFromAzureAD")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "inheritFromAzureAD"
+    )]
     pub inherit_from_azure_ad: Option<bool>,
     /// The storage account where to upload data
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "storageAccount")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "storageAccount"
+    )]
     pub storage_account: Option<BackupStatusAzureCredentialsStorageAccount>,
     /// The storage account key to be used in conjunction with the storage account name
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "storageKey")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "storageKey"
+    )]
     pub storage_key: Option<BackupStatusAzureCredentialsStorageKey>,
     /// A shared-access-signature to be used in conjunction with the storage account name
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "storageSasToken")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "storageSasToken"
+    )]
     pub storage_sas_token: Option<BackupStatusAzureCredentialsStorageSasToken>,
 }
 
@@ -216,10 +309,18 @@ pub struct BackupStatusEndpointCa {
 #[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
 pub struct BackupStatusGoogleCredentials {
     /// The secret containing the Google Cloud Storage JSON file with the credentials
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "applicationCredentials")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "applicationCredentials"
+    )]
     pub application_credentials: Option<BackupStatusGoogleCredentialsApplicationCredentials>,
     /// If set to true, will presume that it's running inside a GKE environment, default to false.
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "gkeEnvironment")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "gkeEnvironment"
+    )]
     pub gke_environment: Option<bool>,
 }
 
@@ -236,7 +337,11 @@ pub struct BackupStatusGoogleCredentialsApplicationCredentials {
 #[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
 pub struct BackupStatusInstanceId {
     /// The container ID
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "ContainerID")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "ContainerID"
+    )]
     pub container_id: Option<String>,
     /// The pod name
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "podName")]
@@ -247,19 +352,35 @@ pub struct BackupStatusInstanceId {
 #[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
 pub struct BackupStatusS3Credentials {
     /// The reference to the access key id
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "accessKeyId")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "accessKeyId"
+    )]
     pub access_key_id: Option<BackupStatusS3CredentialsAccessKeyId>,
     /// Use the role based authentication without providing explicitly the keys.
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "inheritFromIAMRole")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "inheritFromIAMRole"
+    )]
     pub inherit_from_iam_role: Option<bool>,
     /// The reference to the secret containing the region name
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub region: Option<BackupStatusS3CredentialsRegion>,
     /// The reference to the secret access key
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "secretAccessKey")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "secretAccessKey"
+    )]
     pub secret_access_key: Option<BackupStatusS3CredentialsSecretAccessKey>,
     /// The references to the session key
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "sessionToken")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "sessionToken"
+    )]
     pub session_token: Option<BackupStatusS3CredentialsSessionToken>,
 }
 
@@ -313,10 +434,13 @@ pub struct BackupStatusSnapshotBackupStatusElements {
     /// Name is the snapshot resource name
     pub name: String,
     /// TablespaceName is the name of the snapshotted tablespace. Only set when type is PG_TABLESPACE
-    #[serde(default, skip_serializing_if = "Option::is_none", rename = "tablespaceName")]
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "tablespaceName"
+    )]
     pub tablespace_name: Option<String>,
     /// Type is tho role of the snapshot in the cluster, such as PG_DATA, PG_WAL and PG_TABLESPACE
     #[serde(rename = "type")]
     pub r#type: String,
 }
-
