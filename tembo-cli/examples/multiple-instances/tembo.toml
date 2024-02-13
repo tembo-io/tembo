@@ -15,4 +15,4 @@ replicas = 1
 stack_type = "OLTP"
 
 [[instance-2.app_services]]
-restapi = { }
+restapi = { env = [{ name = "FOO", value  = "BAR" }, { name = "FOO2", value  = "BAR2" }] }

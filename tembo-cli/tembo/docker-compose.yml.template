@@ -17,40 +17,55 @@ services:
       - "traefik.tcp.routers.{{instance.instance_name}}.entrypoints=postgresql"
       - "traefik.tcp.routers.{{instance.instance_name}}.tls.passthrough=true"
       - "traefik.tcp.services.{{instance.instance_name}}.loadbalancer.server.port=5432"
-{% if instance.controller_app_services %}
-{% for key, app_services in instance.controller_app_services %}
-  {{instance.instance_name}}-{{ app_services.name }}:
+{% if instance.controller_app_services -%}
+{% for key, app_services in instance.controller_app_services -%}
+
+{% set_global pathPrefixes = "" -%}
+{% set_global prefixes = "" -%}
+{% if app_services.routing -%}
+{% for route in app_services.routing -%}
+{% if prefixes == "" -%}
+{% set_global prefixes = route.ingressPath -%}
+{% set_global pathPrefixes = "PathPrefix(`" ~ route.ingressPath ~ "`)" -%}
+{% else -%}
+{% set_global prefixes = prefixes ~ ", " ~ route.ingressPath -%}
+{% set_global pathPrefixes = pathPrefixes ~ " || PathPrefix(`" ~ route.ingressPath  ~ "`)" -%}
+{% endif -%}
+{% endfor -%}
+{% endif %}
+
+  {{instance.instance_name}}-{{app_services.name}}:
     image: {{app_services.image}}
     environment:
       PGRST_DB_URI: "postgresql://postgres:postgres@{{instance.instance_name}}:5432/postgres"
-      {% if app_services.env %}
-      {% for env in app_services.env %}
-      {% if env.value %}
+      {% if app_services.env -%}
+      {% for env in app_services.env -%}
+      {% if env.value -%}
       {{ env.name }}: "{{ env.value }}"
-      {% endif %}
-      {% endfor %}
+      {% endif -%}
+      {% endfor -%}
       {% endif %}
     networks:
       - tembo
     labels:
       - "traefik.enable=true"
-      {% if app_services.routing %}
+      {% if app_services.routing -%}
       # The settings here depends on the app service settings
-      - "traefik.http.routers.{{instance.instance_name}}-postgrest.rule=Host(`{{instance.instance_name}}.local.tembo.io`) && (PathPrefix(`{{ app_services.routing.0.ingressPath }}`))"
+      - "traefik.http.routers.{{instance.instance_name}}-postgrest.rule=Host(`{{instance.instance_name}}.local.tembo.io`) && ({{ pathPrefixes }})"
       # in cloud, this is websecure instead of just web
       - "traefik.http.routers.{{instance.instance_name}}-postgrest.entrypoints=web"
       - "traefik.http.services.{{instance.instance_name}}-postgrest.loadbalancer.server.port={{ app_services.routing.0.port }}"
-      {% endif %}
-      {% if app_services.middlewares %}
-      {% for middleware in app_services.middlewares %}
-      {% if middleware.stripPrefix %}
-      - "traefik.http.middlewares.postgrest-stripprefix.stripprefix.prefixes={{ middleware.stripPrefix.config.0 }}"
+      {% endif -%}
+      {% if app_services.middlewares -%}
+      {% for middleware in app_services.middlewares -%}
+      {% if middleware.stripPrefix -%}
+      - "traefik.http.middlewares.postgrest-stripprefix.stripprefix.prefixes={{ prefixes }}"
       - "traefik.http.routers.{{instance.instance_name}}-postgrest.middlewares=postgrest-stripprefix"
-      {% endif %}
-      {% endfor %}
-      {% endif %}
-{% endfor %}
-{% endif %}
+      {% endif -%}
+      {% endfor -%}
+      {% endif -%}
+{% endfor -%}
+{% endif -%}
 {% endfor %}
 
   traefik:
