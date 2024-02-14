@@ -378,8 +378,8 @@ pub fn cnpg_cluster_bootstrap_from_cdb(
         ClusterBootstrap {
             recovery: Some(ClusterBootstrapRecovery {
                 source: Some("tembo-recovery".to_string()),
-                database: Some("app".to_string()),
-                owner: Some("app".to_string()),
+                database: Some("postgres".to_string()),
+                owner: Some("postgres".to_string()),
                 recovery_target: parsed_target_time.map(|target_time| {
                     ClusterBootstrapRecoveryRecoveryTarget {
                         target_time: Some(target_time),
@@ -393,11 +393,14 @@ pub fn cnpg_cluster_bootstrap_from_cdb(
     } else {
         ClusterBootstrap {
             initdb: Some(ClusterBootstrapInitdb {
+                database: Some("postgres".to_string()),
+                owner: Some("postgres".to_string()),
                 ..ClusterBootstrapInitdb::default()
             }),
             ..ClusterBootstrap::default()
         }
     };
+
     let cluster_name = cdb.name_any();
 
     let mut coredb_connection_parameters = BTreeMap::new();
