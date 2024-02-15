@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: psql-pod
+spec:
+  containers:
+  - name: psql
+    image: postgres
+    command: ["sleep"]
+    args: ["infinity"]
