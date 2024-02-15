@@ -398,7 +398,6 @@ pub fn cnpg_cluster_bootstrap_from_cdb(
             ..ClusterBootstrap::default()
         }
     };
-
     let cluster_name = cdb.name_any();
 
     let mut coredb_connection_parameters = BTreeMap::new();
