@@ -2101,22 +2101,20 @@ mod test {
             }
         }
 
-        // Revert replicas back to 1 to disable HA
-        let replicas = 1;
-        // Generate HA CoreDB resource
-        let coredb_json = serde_json::json!({
+        // Remove HA CoreDB resource
+        let coredb_json_patch = serde_json::json!({
             "apiVersion": API_VERSION,
             "kind": kind,
             "metadata": {
                 "name": name
             },
             "spec": {
-                "replicas": replicas,
+                "replicas": 1,
             }
         });
-        println!("Disabling HA by setting replicas to {}", replicas);
+        println!("Disabling HA by setting replicas to 1");
         let params = PatchParams::apply("tembo-integration-test");
-        let patch = Patch::Apply(&coredb_json);
+        let patch = Patch::Apply(&coredb_json_patch);
         let coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
 
         // Wait for secondary CNPG pod to be deleted

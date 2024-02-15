@@ -1,3 +1,0 @@
-env:
-  - name: OPENTELEMETRY_ENDPOINT_URL
-    value: http://tempo.monitoring.svc.cluster.local:4318

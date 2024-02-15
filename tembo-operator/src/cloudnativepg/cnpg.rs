@@ -683,6 +683,7 @@ pub fn cnpg_cluster_from_cdb(
                 ),
                 shared_preload_libraries,
                 pg_hba: None,
+                enable_alter_system: Some(true),
                 ..ClusterPostgresql::default()
             }),
             primary_update_method: Some(ClusterPrimaryUpdateMethod::Restart),
@@ -697,6 +698,8 @@ pub fn cnpg_cluster_from_cdb(
             start_delay: Some(30),
             // The time in seconds that is allowed for a PostgreSQL instance to gracefully shutdown
             stop_delay: Some(30),
+            // The maximum time window in seconds within the stopDelay value reserved to complete the smart shutdown procedure in PostgreSQL
+            smart_shutdown_timeout: Some(15),
             storage,
             // The time in seconds that is allowed for a primary PostgreSQL instance
             // to gracefully shutdown during a switchover
@@ -706,7 +709,7 @@ pub fn cnpg_cluster_from_cdb(
                 // TODO TEM-1407: Make this configurable and aligned with cluster scale down
                 // default to in_progress: true - otherwise single-instance CNPG clusters
                 // prevent cluster scale down.
-                in_progress: true,
+                in_progress: Some(true),
                 ..ClusterNodeMaintenanceWindow::default()
             }),
             ..ClusterSpec::default()
@@ -1127,7 +1130,7 @@ pub async fn reconcile_pooler(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Act
                     name: cdb.name_any(),
                 },
                 deployment_strategy: None,
-                instances: 1,
+                instances: Some(1),
                 monitoring: None,
                 pgbouncer: PoolerPgbouncer {
                     auth_query: None,
@@ -1135,7 +1138,7 @@ pub async fn reconcile_pooler(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Act
                     parameters: cdb.spec.connectionPooler.pooler.parameters.clone(),
                     paused: None,
                     pg_hba: None,
-                    pool_mode: cdb.spec.connectionPooler.pooler.poolMode.clone(),
+                    pool_mode: Some(cdb.spec.connectionPooler.pooler.poolMode.clone()),
                 },
                 template: Some(PoolerTemplate {
                     metadata: None,
@@ -1148,7 +1151,7 @@ pub async fn reconcile_pooler(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Act
                         ..Default::default()
                     }),
                 }),
-                r#type: PoolerType::Rw,
+                r#type: Some(PoolerType::Rw),
             },
             status: None,
         };
@@ -1337,7 +1340,7 @@ fn cnpg_scheduled_backup(cdb: &CoreDB) -> ScheduledBackup {
         },
         spec: ScheduledBackupSpec {
             backup_owner_reference: Some(ScheduledBackupBackupOwnerReference::Cluster),
-            cluster: Some(ScheduledBackupCluster { name }),
+            cluster: ScheduledBackupCluster { name },
             immediate: Some(true),
             schedule: schedule_expression_from_cdb(cdb),
             suspend: Some(false),
