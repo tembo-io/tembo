@@ -14,5 +14,5 @@ storage = "50Gi"
 replicas = 1
 stack_type = "OLTP"
 
-[instance-2.app_services.restapi]
-restapi = { }
+[[instance-2.app_services]]
+restapi = { env = [{ name = "FOO", value  = "BAR" }, { name = "FOO2", value  = "BAR2" }] }

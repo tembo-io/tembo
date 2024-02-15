@@ -172,7 +172,7 @@ async fn multiple_instances() -> Result<(), Box<dyn Error>> {
 
     let mut easy = Easy::new();
     easy.url(&format!(
-        "http://{}.local.tembo.io:8000/rest/v1/todos",
+        "http://{}.local.tembo.io:8000/restapi/v1/todos",
         instance2_name.to_string()
     ))
     .unwrap();

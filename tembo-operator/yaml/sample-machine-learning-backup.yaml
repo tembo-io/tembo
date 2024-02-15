@@ -3,7 +3,7 @@ kind: CoreDB
 metadata:
   name: sample-machine-learning-backup
 spec:
-  image: "quay.io/tembo/ml-cnpg:15.3.0-1-a3e532d"
+  image: "quay.io/tembo/ml-cnpg:15-a0a5ab5"
   backup:
     destinationPath: s3://tembo-backup/sample-machine-learning-backup
     encryption: ""
@@ -38,7 +38,7 @@ spec:
     - name: pg_cron
       version: 1.5.2
     - name: pgmq
-      version: 0.28.0
+      version: 1.1.1
     - name: vectorize
       version: 0.0.2
     - name: pg_later
@@ -67,7 +67,7 @@ spec:
       locations:
         - database: postgres
           enabled: true
-          version: 0.28.0
+          version: 1.1.1
     - name: vectorize
       description: simple vector search
       locations:

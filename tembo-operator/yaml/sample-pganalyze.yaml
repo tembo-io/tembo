@@ -1,0 +1,13 @@
+apiVersion: coredb.io/v1alpha1
+kind: CoreDB
+metadata:
+  name: sample-pganalyze
+spec:
+  appServices:
+    - name: pganalyze-collector
+      image: quay.io/pganalyze/collector:v0.53.0
+      env:
+        - name: DB_URL
+          valueFromPlatform: ReadWriteConnection
+        - name: PGA_API_KEY
+          value: <pganalyze-api-key>

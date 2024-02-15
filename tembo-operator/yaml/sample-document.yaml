@@ -3,7 +3,7 @@ kind: CoreDB
 metadata:
   name: sample-document
 spec:
-  image: "quay.io/tembo/standard-cnpg:15.3.0-1-1096aeb"
+  image: "quay.io/tembo/standard-cnpg:15-a0a5ab5"
   stop: false
   stack:
     name: Document
