@@ -888,9 +888,9 @@ mod test {
                 ..Default::default()
             },
             spec: BackupSpec {
-                cluster: Some(BackupCluster {
+                cluster: BackupCluster {
                     name: backup_name.clone(),
-                }),
+                },
                 ..Default::default()
             },
             status: Some(BackupStatus {
@@ -920,9 +920,9 @@ mod test {
                     ..Default::default()
                 },
                 spec: BackupSpec {
-                    cluster: Some(BackupCluster {
+                    cluster: BackupCluster {
                         name: "backup-1".to_string(),
-                    }),
+                    },
                     ..Default::default()
                 },
                 status: Some(BackupStatus {
@@ -938,9 +938,9 @@ mod test {
                     ..Default::default()
                 },
                 spec: BackupSpec {
-                    cluster: Some(BackupCluster {
+                    cluster: BackupCluster {
                         name: "backup-2".to_string(),
-                    }),
+                    },
                     ..Default::default()
                 },
                 status: Some(BackupStatus {
@@ -956,9 +956,9 @@ mod test {
                     ..Default::default()
                 },
                 spec: BackupSpec {
-                    cluster: Some(BackupCluster {
+                    cluster: BackupCluster {
                         name: "backup-3".to_string(),
-                    }),
+                    },
                     ..Default::default()
                 },
                 status: Some(BackupStatus {
@@ -974,9 +974,9 @@ mod test {
                     ..Default::default()
                 },
                 spec: BackupSpec {
-                    cluster: Some(BackupCluster {
+                    cluster: BackupCluster {
                         name: "backup-4".to_string(),
-                    }),
+                    },
                     ..Default::default()
                 },
                 status: Some(BackupStatus {
