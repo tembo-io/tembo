@@ -10,6 +10,7 @@ use crate::{
 };
 
 const DEFAULT_MAINTENANCE_WORK_MEM_MB: i32 = 64;
+const DEFAULT_EFFECTIVE_IO_CONCURRENCY: i32 = 100;
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, JsonSchema, PartialEq)]
 #[serde(rename_all = "lowercase")]
@@ -32,6 +33,7 @@ pub fn standard_config_engine(stack: &Stack) -> Vec<PgConfig> {
     let effective_cache_size_mb = dynamic_effective_cache_size_mb(sys_mem_mb as i32);
     let maintenance_work_mem_mb = dynamic_maintenance_work_mem_mb(sys_mem_mb as i32);
     let max_wal_size_gb = dynamic_max_wal_size(sys_storage_gb as i32);
+    let effective_io_concurrency: i32 = DEFAULT_EFFECTIVE_IO_CONCURRENCY;
 
     vec![
         PgConfig {
@@ -62,6 +64,10 @@ pub fn standard_config_engine(stack: &Stack) -> Vec<PgConfig> {
             name: "max_wal_size".to_owned(),
             value: ConfigValue::Single(format!("{max_wal_size_gb}GB")),
         },
+        PgConfig {
+            name: "effective_io_concurrency".to_owned(),
+            value: ConfigValue::Single(effective_io_concurrency.to_string()),
+        },
     ]
 }
 
@@ -79,6 +85,8 @@ pub fn olap_config_engine(stack: &Stack) -> Vec<PgConfig> {
     let max_parallel_workers = olap_max_parallel_workers(vcpu);
     let max_parallel_workers_per_gather = olap_max_parallel_workers_per_gather(vcpu);
     let max_worker_processes = olap_max_worker_processes(vcpu);
+    let effective_io_concurrency: i32 = DEFAULT_EFFECTIVE_IO_CONCURRENCY;
+    let columnar_min_parallel_processes = olap_max_worker_processes(vcpu);
     vec![
         PgConfig {
             name: "effective_cache_size".to_owned(),
@@ -115,6 +123,14 @@ pub fn olap_config_engine(stack: &Stack) -> Vec<PgConfig> {
         PgConfig {
             name: "work_mem".to_owned(),
             value: ConfigValue::Single(format!("{work_mem}MB")),
+        },
+        PgConfig {
+            name: "effective_io_concurrency".to_owned(),
+            value: ConfigValue::Single(effective_io_concurrency.to_string()),
+        },
+        PgConfig {
+            name: "columnar.min_parallel_processes".to_owned(),
+            value: ConfigValue::Single(columnar_min_parallel_processes.to_string()),
         },
     ]
 }
