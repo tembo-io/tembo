@@ -11,7 +11,6 @@ use controller::stacks::types::StackType as ControllerStackType;
 use log::info;
 use spinoff::spinners;
 use spinoff::Spinner;
-use std::path::Path;
 use std::{
     collections::HashMap,
     fs::{self},
