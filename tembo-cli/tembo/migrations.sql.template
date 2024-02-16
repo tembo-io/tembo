@@ -1,3 +1,0 @@
-{% for extension in extensions %}
-CREATE EXTENSION IF NOT EXISTS {{extension.name}} CASCADE;
-{% endfor %}

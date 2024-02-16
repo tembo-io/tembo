@@ -162,13 +162,14 @@ fn docker_apply(
 
         let mut sp = Spinner::new(spinners::Dots, "Creating extensions", spinoff::Color::White);
 
-        let rendered_extensions: String =
-            get_rendered_extensions_file(&instance_setting.final_extensions)?;
+        for ext in instance_setting.final_extensions.clone().unwrap().iter() {
+            let query = &format!("CREATE EXTENSION IF NOT EXISTS {} CASCADE", ext.name);
 
-        let _ = Runtime::new().unwrap().block_on(SqlxUtils::execute_sql(
-            instance_name.to_owned(),
-            rendered_extensions,
-        ));
+            Runtime::new().unwrap().block_on(SqlxUtils::execute_sql(
+                instance_name.to_string(),
+                query.to_string(),
+            ))?;
+        }
 
         sp.stop_with_message(&format!(
             "{} {}",
@@ -753,28 +754,6 @@ pub fn get_rendered_dockerfile(
     let rendered_dockerfile = tera.render("dockerfile", &context).unwrap();
 
     Ok(rendered_dockerfile)
-}
-
-pub fn get_rendered_extensions_file(
-    extensions: &Option<Vec<ControllerExtension>>,
-) -> Result<String, anyhow::Error> {
-    // Include the migrations template directly into the binary
-    let contents = include_str!("../../tembo/migrations.sql.template");
-
-    let mut tera = Tera::new("templates/**/*")
-        .map_err(|e| anyhow::anyhow!("Error initializing Tera: {}", e))?;
-    tera.add_raw_template("extensions", contents)
-        .map_err(|e| anyhow::anyhow!("Error adding raw template: {}", e))?;
-
-    let mut context = Context::new();
-
-    context.insert("extensions", extensions);
-
-    let rendered_migrations = tera
-        .render("extensions", &context)
-        .map_err(|e| anyhow::anyhow!("Error rendering template: {}", e))?;
-
-    Ok(rendered_migrations)
 }
 
 fn get_postgres_config(instance_settings: &InstanceSettings) -> String {
