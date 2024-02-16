@@ -9,6 +9,8 @@ use controller::extensions::types::TrunkInstall as ControllerTrunkInstall;
 use controller::stacks::get_stack;
 use controller::stacks::types::StackType as ControllerStackType;
 use log::info;
+use spinoff::spinners;
+use spinoff::Spinner;
 use std::path::Path;
 use std::{
     collections::HashMap,
@@ -128,28 +130,18 @@ fn docker_apply(
 
     Docker::docker_compose_down(false)?;
 
+    let mut final_instance_settings: HashMap<String, InstanceSettings> = Default::default();
+
     for (_key, instance_setting) in instance_settings.iter_mut() {
-        let result = docker_apply_instance(verbose, instance_setting);
-
-        let app_svc = match result {
-            Ok(i) => i,
-            Err(error) => {
-                tui::error(&format!("Error creating instance: {}", error));
-                return Ok(());
-            }
-        };
-
-        if app_svc.is_some() {
-            let mut controller_app_svcs: HashMap<String, AppService> = Default::default();
-            for cas in app_svc.unwrap().iter() {
-                controller_app_svcs.insert(cas.name.clone(), cas.to_owned());
-            }
-
-            instance_setting.controller_app_services = Some(controller_app_svcs);
-        }
+        let final_instance_setting = docker_apply_instance(verbose, instance_setting.to_owned())?;
+        final_instance_settings.insert(
+            final_instance_setting.instance_name.clone(),
+            final_instance_setting,
+        );
     }
 
-    let rendered_dockercompose: String = get_rendered_dockercompose(instance_settings.clone())?;
+    let rendered_dockercompose: String =
+        get_rendered_dockercompose(final_instance_settings.clone())?;
 
     FileUtils::create_file(
         DOCKERCOMPOSE_NAME.to_string(),
@@ -165,18 +157,26 @@ fn docker_apply(
 
     let port = 5432;
 
-    for (_key, instance_setting) in instance_settings.clone().iter() {
-        let conn_info = ConnectionInfo {
-            host: format!("{}.local.tembo.io", instance_setting.instance_name).to_owned(),
-            pooler_host: Some(Some("localhost-pooler".to_string())),
-            port,
-            user: "postgres".to_owned(),
-            password: "postgres".to_owned(),
-        };
-        Runtime::new().unwrap().block_on(SqlxUtils::run_migrations(
-            conn_info,
-            instance_setting.instance_name.clone(),
-        ))?;
+    for (_key, instance_setting) in final_instance_settings.clone().iter() {
+        let instance_name = &instance_setting.instance_name;
+
+        let mut sp = Spinner::new(spinners::Dots, "Creating extensions", spinoff::Color::White);
+
+        let rendered_extensions: String =
+            get_rendered_extensions_file(&instance_setting.final_extensions)?;
+
+        let _ = Runtime::new().unwrap().block_on(SqlxUtils::execute_sql(
+            instance_name.to_owned(),
+            rendered_extensions,
+        ));
+
+        sp.stop_with_message(&format!(
+            "{} {}",
+            "✓".color(colors::indicator_good()).bold(),
+            format!("Extensions created for instance {}", instance_name)
+                .color(colorful::Color::White)
+                .bold()
+        ));
 
         // If all of the above was successful, we can print the url to user
         instance_started(
@@ -188,33 +188,32 @@ fn docker_apply(
             "local",
         );
     }
-
     Ok(())
 }
 
 fn docker_apply_instance(
     verbose: bool,
-    instance_settings: &InstanceSettings,
-) -> Result<Option<Vec<AppService>>, anyhow::Error> {
+    mut instance_setting: InstanceSettings,
+) -> Result<InstanceSettings, anyhow::Error> {
     FileUtils::create_dir(
-        instance_settings.instance_name.clone(),
-        instance_settings.instance_name.clone(),
+        instance_setting.instance_name.clone(),
+        instance_setting.instance_name.clone(),
     )?;
 
-    let stack_type = ControllerStackType::from_str(instance_settings.stack_type.as_str())
+    let stack_type = ControllerStackType::from_str(instance_setting.stack_type.as_str())
         .unwrap_or(ControllerStackType::Standard);
     let stack = get_stack(stack_type);
 
     let extensions = merge_options(
         stack.extensions.clone(),
         Some(get_extensions_controller(
-            instance_settings.extensions.clone(),
+            instance_setting.extensions.clone(),
         )),
     );
     let trunk_installs = merge_options(
         stack.trunk_installs.clone(),
         Some(get_trunk_installs_controller(
-            instance_settings.extensions.clone(),
+            instance_setting.extensions.clone(),
         )),
     );
 
@@ -224,7 +223,7 @@ fn docker_apply_instance(
         app_services,
         pg_configs: _,
     } = merge_app_reqs(
-        instance_settings.app_services.clone(),
+        instance_setting.app_services.clone(),
         stack.app_services.clone(),
         extensions,
         trunk_installs,
@@ -235,30 +234,32 @@ fn docker_apply_instance(
 
     FileUtils::create_file(
         DOCKERFILE_NAME.to_string(),
-        instance_settings.instance_name.clone() + "/" + DOCKERFILE_NAME,
+        instance_setting.instance_name.clone() + "/" + DOCKERFILE_NAME,
         rendered_dockerfile,
         true,
     )?;
 
-    let rendered_migrations: String = get_rendered_migrations_file(&extensions)?;
-
-    FileUtils::create_file(
-        "extensions".to_string(),
-        instance_settings.instance_name.clone() + "/" + "migrations/1_extensions.sql",
-        rendered_migrations,
-        true,
-    )?;
+    instance_setting.final_extensions = extensions;
 
     FileUtils::create_file(
         POSTGRESCONF_NAME.to_string(),
-        instance_settings.instance_name.clone() + "/" + POSTGRESCONF_NAME,
-        get_postgres_config(instance_settings),
+        instance_setting.instance_name.clone() + "/" + POSTGRESCONF_NAME,
+        get_postgres_config(&instance_setting),
         true,
     )?;
 
-    Docker::build(instance_settings.instance_name.clone(), verbose)?;
+    Docker::build(instance_setting.instance_name.clone(), verbose)?;
 
-    Ok(app_services)
+    if app_services.is_some() {
+        let mut controller_app_svcs: HashMap<String, AppService> = Default::default();
+        for cas in app_services.unwrap().iter() {
+            controller_app_svcs.insert(cas.name.clone(), cas.to_owned());
+        }
+
+        instance_setting.controller_app_services = Some(controller_app_svcs);
+    }
+
+    Ok(instance_setting)
 }
 
 pub fn tembo_cloud_apply_instance(
@@ -651,6 +652,7 @@ fn merge_settings(base: &InstanceSettings, overlay: OverlayInstanceSettings) -> 
             .postgres_configurations
             .or_else(|| base.postgres_configurations.clone()),
         extensions: overlay.extensions.or_else(|| base.extensions.clone()),
+        final_extensions: None,
         app_services: None,
         controller_app_services: None,
         extra_domains_rw: overlay
@@ -753,7 +755,7 @@ pub fn get_rendered_dockerfile(
     Ok(rendered_dockerfile)
 }
 
-pub fn get_rendered_migrations_file(
+pub fn get_rendered_extensions_file(
     extensions: &Option<Vec<ControllerExtension>>,
 ) -> Result<String, anyhow::Error> {
     // Include the migrations template directly into the binary
@@ -761,7 +763,7 @@ pub fn get_rendered_migrations_file(
 
     let mut tera = Tera::new("templates/**/*")
         .map_err(|e| anyhow::anyhow!("Error initializing Tera: {}", e))?;
-    tera.add_raw_template("migrations", contents)
+    tera.add_raw_template("extensions", contents)
         .map_err(|e| anyhow::anyhow!("Error adding raw template: {}", e))?;
 
     let mut context = Context::new();
@@ -769,7 +771,7 @@ pub fn get_rendered_migrations_file(
     context.insert("extensions", extensions);
 
     let rendered_migrations = tera
-        .render("migrations", &context)
+        .render("extensions", &context)
         .map_err(|e| anyhow::anyhow!("Error rendering template: {}", e))?;
 
     Ok(rendered_migrations)
