@@ -152,7 +152,7 @@ fn docker_apply(
 
     Docker::docker_compose_up(verbose)?;
 
-    // Allows DB instance to be ready before running migrations
+    // Allows DB instance to be ready before running CREATE EXTENSION script
     sleep(Duration::from_secs(5));
 
     let port = 5432;
@@ -310,13 +310,6 @@ pub fn tembo_cloud_apply_instance(
                 connection_info,
                 env.clone(),
             )?;
-
-            if Path::new(&instance_settings.instance_name).exists() {
-                Runtime::new().unwrap().block_on(SqlxUtils::run_migrations(
-                    conn_info.clone(),
-                    instance_settings.instance_name.clone(),
-                ))?;
-            }
 
             // If all of the above was successful we can stop the spinner and show a success message
             sp.stop_with_message(&format!(

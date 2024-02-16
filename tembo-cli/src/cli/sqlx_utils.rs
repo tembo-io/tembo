@@ -24,40 +24,4 @@ impl SqlxUtils {
 
         Ok(())
     }
-
-    // run sqlx migrate
-    pub async fn run_migrations(
-        connection_info: ConnectionInfo,
-        instance_name: String,
-    ) -> Result<(), anyhow::Error> {
-        let mut sp = Spinner::new(
-            spinners::Dots,
-            "Running SQL migration",
-            spinoff::Color::White,
-        );
-
-        let connection_string = format!(
-            "postgresql://{}:{}@{}:{}",
-            connection_info.user,
-            connection_info.password,
-            connection_info.host,
-            connection_info.port
-        );
-
-        let pool = Pool::<Postgres>::connect(connection_string.as_str()).await?;
-
-        let path = instance_name.clone() + "/migrations";
-        let m = Migrator::new(Path::new(&path)).await?;
-        m.run(&pool).await?;
-
-        sp.stop_with_message(&format!(
-            "{} {}",
-            "✓".color(colors::indicator_good()).bold(),
-            format!("SQL migration completed for {}", instance_name)
-                .color(Color::White)
-                .bold()
-        ));
-
-        Ok(())
-    }
 }
