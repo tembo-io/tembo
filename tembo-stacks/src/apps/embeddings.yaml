@@ -47,7 +47,7 @@ trunk_installs:
   - name: pgvector
     version: 0.6.0
   - name: vectorize
-    version: 0.9.0
+    version: 0.10.0
 extensions:
   - name: pg_cron
     locations:
@@ -68,7 +68,7 @@ extensions:
     locations:
       - database: postgres
         enabled: true
-        version: 0.9.0
+        version: 0.10.0
 postgres_config:
   - name: cron.host
     value: /controller/run
