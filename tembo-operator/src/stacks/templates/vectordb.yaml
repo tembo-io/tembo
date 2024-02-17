@@ -8,7 +8,7 @@ images:
   16: "standard-cnpg:16-a0a5ab5"
 stack_version: 0.1.0
 appServices:
-  - image: quay.io/tembo/vector-serve:7dc6329
+  - image: quay.io/tembo/vector-serve:32ce013
     name: embeddings
     env:
       - name: TMPDIR

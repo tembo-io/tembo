@@ -1,6 +1,6 @@
 name: !embeddings
 appServices:
-  - image: quay.io/tembo/vector-serve:7dc6329
+  - image: quay.io/tembo/vector-serve:32ce013
     name: embeddings
     routing:
       - port: 3000
