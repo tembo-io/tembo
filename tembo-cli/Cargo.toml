@@ -16,6 +16,10 @@ repository = "https://github.com/tembo-io/tembo-cli"
 name = "tembo"
 path = "src/main.rs"
 
+[lib]
+name = "tembo"
+path = "src/lib.rs"
+
 [dependencies]
 anyhow = "1.0.71"
 clap = { version = "4.3.12", features = ["cargo", "wrap_help", "derive"] }

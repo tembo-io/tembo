@@ -7,9 +7,10 @@ use kube::CustomResource;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use utoipa::ToSchema;
 
 /// Specification of the desired behavior of the Pooler. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-#[derive(CustomResource, Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(CustomResource, Serialize, Deserialize, Clone, Debug, Default, JsonSchema, ToSchema)]
 #[kube(
     group = "postgresql.cnpg.io",
     version = "v1",
@@ -280,7 +281,7 @@ pub struct PoolerPgbouncerAuthQuerySecret {
 }
 
 /// The PgBouncer configuration
-#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema, Default)]
+#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema, Default, ToSchema)]
 pub enum PoolerPgbouncerPoolMode {
     #[serde(rename = "session")]
     Session,
@@ -1663,7 +1664,7 @@ pub struct PoolerTemplateSpecContainersResizePolicy {
 }
 
 /// Compute Resources required by this container. Cannot be updated. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, ToSchema)]
 pub struct PoolerTemplateSpecContainersResources {
     /// Claims lists the names of resources, defined in spec.resourceClaims, that are used by this container.
     ///  This is an alpha field and requires enabling the DynamicResourceAllocation feature gate.
@@ -1679,7 +1680,7 @@ pub struct PoolerTemplateSpecContainersResources {
 }
 
 /// ResourceClaim references one entry in PodSpec.ResourceClaims.
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, ToSchema)]
 pub struct PoolerTemplateSpecContainersResourcesClaims {
     /// Name must match the name of one entry in pod.spec.resourceClaims of the Pod where this field is used. It makes that resource available inside a container.
     pub name: String,

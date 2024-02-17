@@ -1,4 +1,5 @@
 use controller::app_service::types::AppService;
+use controller::extensions::types::Extension as ControllerExtension;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
 use tembo_stacks::apps::types::AppType;
@@ -35,6 +36,7 @@ pub struct InstanceSettings {
     pub extensions: Option<HashMap<String, Extension>>,
     pub app_services: Option<Vec<AppType>>,
     pub controller_app_services: Option<HashMap<String, AppService>>,
+    pub final_extensions: Option<Vec<ControllerExtension>>,
     pub extra_domains_rw: Option<Vec<String>>,
     pub ip_allow_list: Option<Vec<String>>,
 }
