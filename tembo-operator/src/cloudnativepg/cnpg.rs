@@ -2701,6 +2701,9 @@ mod tests {
             retentionPolicy: "30"
             schedule: 17 9 * * *
             endpointURL: http://minio:9000
+            volumeSnapshot:
+              enabled: true
+              snapshotClass: "csi-vsc"
           image: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e 
           port: 5432
           replicas: 1
@@ -2720,7 +2723,6 @@ mod tests {
         "#;
 
         let cdb: CoreDB = serde_yaml::from_str(cdb_yaml).expect("Failed to parse YAML");
-        println!("{:?}", cdb);
         let snapshot = create_cluster_backup_volume_snapshot(&cdb);
         let scheduled_backup = cnpg_scheduled_backup(&cdb);
 
