@@ -157,11 +157,30 @@ pub struct S3CredentialsSessionToken {
     pub name: String,
 }
 
+/// VolumeSnapshots is the type for the configuration of the volume snapshots
+/// to be used for backups instead of object storage
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+pub struct VolumeSnapshot {
+    /// Enable the volume snapshots for backups
+    #[serde(default = "defaults::default_volume_snapshot_enabled")]
+    pub enabled: bool,
+
+    /// The reference to the snapshot class
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "snapshotClass"
+    )]
+    pub snapshot_class: Option<String>,
+}
+
 /// CoreDB Backup configuration
 /// The backup configuration for the CoreDB instance to facilitate database
-/// backups and WAL archive uploads to an S3 compatible object store.
+/// backups uploads to an S3 compatible object store or using Volume Snapshots
+/// For WAL archive uploads utilite an S3 compatible object store.
 ///
 /// **Example**: A typical S3 backup configuration using IAM Role for authentication
+/// with Volume Snapshots enabled
 ///
 /// See `ServiceAccountTemplate` for to map the IAM role ARN to a Kubernetes service account.
 ///
@@ -178,6 +197,9 @@ pub struct S3CredentialsSessionToken {
 ///     s3Credentials:
 ///       inheritFromIAMRole: true
 ///     schedule: "0 0 * * *" #every day at midnight
+///     volumeSnapshots:
+///       enabled: true
+///       snapshotClass: my-snapshot-class-name
 /// ```
 #[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
 #[allow(non_snake_case)]
@@ -205,6 +227,13 @@ pub struct Backup {
     /// The S3 credentials to use for backups (if not using IAM Role)
     #[serde(default = "defaults::default_s3_credentials", rename = "s3Credentials")]
     pub s3_credentials: Option<S3Credentials>,
+
+    /// Enable using Volume Snapshots for backups instead of Object Storage
+    #[serde(
+        default = "defaults::default_volume_snapshot",
+        rename = "volumeSnapshot"
+    )]
+    pub volume_snapshot: Option<VolumeSnapshot>,
 }
 
 /// Restore configuration provides a way to restore a database from a backup

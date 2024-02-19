@@ -1157,7 +1157,7 @@ pub enum ClusterBackupTarget {
 }
 
 /// VolumeSnapshot provides the configuration for the execution of volume snapshot backups.
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct ClusterBackupVolumeSnapshot {
     /// Annotations key-value pairs that will be added to .metadata.annotations snapshot resources.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1202,7 +1202,7 @@ pub struct ClusterBackupVolumeSnapshot {
 }
 
 /// Configuration parameters to control the online/hot backup with volume snapshots
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct ClusterBackupVolumeSnapshotOnlineConfiguration {
     /// Control whether the I/O workload for the backup initial checkpoint will be limited, according to the `checkpoint_completion_target` setting on the PostgreSQL server. If set to true, an immediate checkpoint will be used, meaning PostgreSQL will complete the checkpoint as soon as possible. `false` by default.
     #[serde(
@@ -1221,7 +1221,7 @@ pub struct ClusterBackupVolumeSnapshotOnlineConfiguration {
 }
 
 /// VolumeSnapshot provides the configuration for the execution of volume snapshot backups.
-#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema, PartialEq)]
 pub enum ClusterBackupVolumeSnapshotSnapshotOwnerReference {
     #[serde(rename = "none")]
     None,

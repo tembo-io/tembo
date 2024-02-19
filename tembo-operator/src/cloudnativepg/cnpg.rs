@@ -15,9 +15,12 @@ use crate::{
             ClusterBackupBarmanObjectStoreS3CredentialsSecretAccessKey,
             ClusterBackupBarmanObjectStoreS3CredentialsSessionToken,
             ClusterBackupBarmanObjectStoreWal, ClusterBackupBarmanObjectStoreWalCompression,
-            ClusterBackupBarmanObjectStoreWalEncryption, ClusterBootstrap, ClusterBootstrapInitdb,
-            ClusterBootstrapRecovery, ClusterBootstrapRecoveryRecoveryTarget, ClusterCertificates,
-            ClusterExternalClusters, ClusterExternalClustersBarmanObjectStore,
+            ClusterBackupBarmanObjectStoreWalEncryption, ClusterBackupVolumeSnapshot,
+            ClusterBackupVolumeSnapshotOnlineConfiguration,
+            ClusterBackupVolumeSnapshotSnapshotOwnerReference, ClusterBootstrap,
+            ClusterBootstrapInitdb, ClusterBootstrapRecovery,
+            ClusterBootstrapRecoveryRecoveryTarget, ClusterCertificates, ClusterExternalClusters,
+            ClusterExternalClustersBarmanObjectStore,
             ClusterExternalClustersBarmanObjectStoreS3Credentials,
             ClusterExternalClustersBarmanObjectStoreS3CredentialsAccessKeyId,
             ClusterExternalClustersBarmanObjectStoreS3CredentialsRegion,
@@ -41,7 +44,7 @@ use crate::{
         },
         scheduledbackups::{
             ScheduledBackup, ScheduledBackupBackupOwnerReference, ScheduledBackupCluster,
-            ScheduledBackupSpec,
+            ScheduledBackupMethod, ScheduledBackupSpec,
         },
     },
     config::Config,
@@ -65,6 +68,8 @@ use serde_json::json;
 use std::{collections::BTreeMap, sync::Arc};
 use tokio::time::Duration;
 use tracing::{debug, error, info, instrument, warn};
+
+const VOLUME_SNAPSHOT_CLASS_NAME: &str = "cnpg-snapshot-class";
 
 pub struct PostgresConfig {
     pub postgres_parameters: Option<BTreeMap<String, String>>,
@@ -103,7 +108,7 @@ fn create_cluster_backup_barman_wal(cdb: &CoreDB) -> Option<ClusterBackupBarmanO
         Some(ClusterBackupBarmanObjectStoreWal {
             compression: Some(ClusterBackupBarmanObjectStoreWalCompression::Snappy),
             encryption,
-            max_parallel: Some(5),
+            max_parallel: Some(8),
         })
     } else {
         None
@@ -152,6 +157,28 @@ fn create_cluster_certificates(cdb: &CoreDB) -> Option<ClusterCertificates> {
     }
 }
 
+fn create_cluster_backup_volume_snapshot(cdb: &CoreDB) -> ClusterBackupVolumeSnapshot {
+    let class_name = cdb
+        .spec
+        .backup
+        .volume_snapshot
+        .as_ref()
+        .and_then(|vs| vs.snapshot_class.as_ref())
+        .cloned() // Directly clone the Option<String> if present
+        .unwrap_or_else(|| VOLUME_SNAPSHOT_CLASS_NAME.to_string());
+
+    ClusterBackupVolumeSnapshot {
+        class_name: Some(class_name),
+        online: Some(true),
+        online_configuration: Some(ClusterBackupVolumeSnapshotOnlineConfiguration {
+            wait_for_archive: Some(true),
+            immediate_checkpoint: Some(true),
+        }),
+        snapshot_owner_reference: Some(ClusterBackupVolumeSnapshotSnapshotOwnerReference::Cluster),
+        ..ClusterBackupVolumeSnapshot::default()
+    }
+}
+
 fn create_cluster_backup(
     cdb: &CoreDB,
     endpoint_url: &str,
@@ -171,6 +198,14 @@ fn create_cluster_backup(
         },
     };
 
+    let volume_snapshot = cdb.spec.backup.volume_snapshot.as_ref().and_then(|vs| {
+        if vs.enabled {
+            Some(create_cluster_backup_volume_snapshot(cdb))
+        } else {
+            None
+        }
+    });
+
     Some(ClusterBackup {
         barman_object_store: Some(create_cluster_backup_barman_object_store(
             cdb,
@@ -178,7 +213,8 @@ fn create_cluster_backup(
             backup_path,
             s3_credentials,
         )),
-        retention_policy: Some(retention_days), // Adjust as needed
+        retention_policy: Some(retention_days),
+        volume_snapshot,
         ..ClusterBackup::default()
     })
 }
@@ -1331,6 +1367,13 @@ fn schedule_expression_from_cdb(cdb: &CoreDB) -> String {
 fn cnpg_scheduled_backup(cdb: &CoreDB) -> ScheduledBackup {
     let name = cdb.name_any();
     let namespace = cdb.namespace().unwrap();
+    let method = cdb.spec.backup.volume_snapshot.as_ref().map(|vs| {
+        if vs.enabled {
+            ScheduledBackupMethod::VolumeSnapshot
+        } else {
+            ScheduledBackupMethod::BarmanObjectStore
+        }
+    });
 
     ScheduledBackup {
         metadata: ObjectMeta {
@@ -1344,6 +1387,7 @@ fn cnpg_scheduled_backup(cdb: &CoreDB) -> ScheduledBackup {
             immediate: Some(true),
             schedule: schedule_expression_from_cdb(cdb),
             suspend: Some(false),
+            method,
             ..ScheduledBackupSpec::default()
         },
         status: None,
@@ -2292,6 +2336,8 @@ mod tests {
             encryption: AES256
             retentionPolicy: "45"
             schedule: 55 7 * * *
+            volumeSnapshot:
+              enabled: false
           image: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e 
           port: 5432
           postgresExporterEnabled: true
@@ -2321,6 +2367,11 @@ mod tests {
         assert_eq!(
             backup.clone().unwrap().retention_policy.unwrap(),
             "45d".to_string()
+        );
+
+        assert_eq!(
+            scheduled_backup.spec.method,
+            Some(ScheduledBackupMethod::BarmanObjectStore)
         );
 
         // Assert to make sure that backup destination path is set
@@ -2633,5 +2684,69 @@ mod tests {
         "#;
         let cdb_no_storage_class: CoreDB = from_str(cdb_no_storage_class_yaml).unwrap();
         assert_eq!(cnpg_cluster_storage_class(&cdb_no_storage_class), None);
+    }
+
+    #[test]
+    fn test_cnpg_cluster_volume_snapshot() {
+        let cdb_yaml = r#"
+        apiVersion: coredb.io/v1alpha1
+        kind: CoreDB
+        metadata:
+          name: test
+          namespace: default
+        spec:
+          backup:
+            destinationPath: s3://tembo-backup/sample-standard-backup
+            encryption: ""
+            retentionPolicy: "30"
+            schedule: 17 9 * * *
+            endpointURL: http://minio:9000
+            volumeSnapshot:
+              enabled: true
+              snapshotClass: csi-vsc
+          image: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e 
+          port: 5432
+          replicas: 1
+          resources:
+            limits:
+              cpu: "1"
+              memory: 0.5Gi
+          serviceAccountTemplate:
+            metadata:
+              annotations:
+                eks.amazonaws.com/role-arn: arn:aws:iam::012345678901:role/aws-iam-role-iam
+          sharedirStorage: 1Gi
+          stop: false
+          storage: 1Gi
+          storageClass: "gp3-enc"
+          uid: 999
+        "#;
+
+        let cdb: CoreDB = serde_yaml::from_str(cdb_yaml).expect("Failed to parse YAML");
+        let snapshot = create_cluster_backup_volume_snapshot(&cdb);
+        let scheduled_backup = cnpg_scheduled_backup(&cdb);
+
+        // Set an expected ClusterBackupVolumeSnapshot object
+        let expected_snapshot = ClusterBackupVolumeSnapshot {
+            class_name: Some("csi-vsc".to_string()), // Expected to match the YAML input
+            online: Some(true),
+            online_configuration: Some(ClusterBackupVolumeSnapshotOnlineConfiguration {
+                wait_for_archive: Some(true),
+                immediate_checkpoint: Some(true),
+            }),
+            snapshot_owner_reference: Some(
+                ClusterBackupVolumeSnapshotSnapshotOwnerReference::Cluster,
+            ),
+            ..ClusterBackupVolumeSnapshot::default()
+        };
+
+        // Assert to make sure that the snapshot.snapshot_class and expected_snapshot.snapshot_class are the same
+        assert_eq!(snapshot, expected_snapshot);
+
+        // Assert to make sure that the ScheduledBackup method is set to VolumeSnapshot
+        assert_eq!(
+            scheduled_backup.spec.method,
+            Some(ScheduledBackupMethod::VolumeSnapshot)
+        );
     }
 }

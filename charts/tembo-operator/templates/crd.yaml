@@ -1344,6 +1344,8 @@ spec:
                   endpointURL: null
                   s3Credentials:
                     inheritFromIAMRole: true
+                  volumeSnapshot:
+                    enabled: true
                 description: |-
                   The backup configuration for the CoreDB instance to facilitate database backups and WAL archive uploads to an S3 compatible object store.
 
@@ -1432,6 +1434,21 @@ spec:
                     description: The backup schedule set with cron syntax
                     nullable: true
                     type: string
+                  volumeSnapshot:
+                    default:
+                      enabled: true
+                    description: Enable using Volume Snapshots for backups instead of Object Storage
+                    nullable: true
+                    properties:
+                      enabled:
+                        default: true
+                        description: Enable the volume snapshots for backups
+                        type: boolean
+                      snapshotClass:
+                        description: The reference to the snapshot class
+                        nullable: true
+                        type: string
+                    type: object
                 type: object
               connectionPooler:
                 default:

@@ -18,6 +18,8 @@ spec:
       secretAccessKey:
         name: s3creds
         key: MINIO_SECRET_KEY
+    volumeSnaphot:
+      enabled: false
   restore:
     serverName: sample-standard-backup
     endpointURL: http://minio.minio.svc.cluster.local:9000
