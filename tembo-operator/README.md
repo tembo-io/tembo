@@ -1,34 +1,42 @@
 # Tembo Operator
 
-## Requirements
+The tembo operator is responsible for reconciling the differences between desired and actual cluster state. _Pad this out with around three sentences of explanation of the purpose of this component_.
 
-- A Kubernetes cluster: [kind](https://github.com/kubernetes-sigs/kind)
-- [rust](https://www.rust-lang.org/)
-- [just](https://github.com/casey/just)
-- [helm](https://helm.sh/)
-- Opentelemetry collector (**optional**)
+## Getting Started
 
-### Rust Linting
+It's fairly straightforward to get started running Tembo Operator locally for development and testing. We'll first cover simply running the existing code before moving on to how to make local changes and see them reflected in your local cluster.
 
-Run linting with `cargo fmt` and `clippy`
+### Tooling
 
-Clippy:
+Whatever your OS and IDE combination, the following tools are required for performing the steps in this section:
+
+  - [Rust](https://www.rust-lang.org/) — implementation language of Tembo Operator
+  - [psql](https://www.postgresql.org/docs/current/app-psql.html) — version 14 or higher is necessary because of Operator's use of [Server Name Indication](https://en.wikipedia.org/wiki/Server_Name_Indication)
+  - [Docker Engine](https://docs.docker.com/engine/install/) — for running local containers
+  - [kind](https://github.com/kubernetes-sigs/kind) — simplifies creation of local Kubernetes clusters using Docker (_**K**ubernetes **IN** **D**ocker_)
+  - [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl) — Kubernetes primary CLI; Docker may include this, but if not be sure to install it
+  - [helm](https://helm.sh) — the Kubernetes package manager
+  - [just](https://github.com/casey/just) — simplifies running complex project-specific commands. If you find new useful command, consider adding it to the `justfile`
+  
+### Cluster Operation
+
+To destroy any existing cluster and start the containers needed for a new one, simply run:
 
 ```bash
-rustup component add clippy
-cargo clippy
+just start-kind
 ```
 
-cargo fmt:
+In addition to starting the cluster, a fair number of necessary dependencies are installed by subtasks. Check out the definition in the `justfile` if you're curious, it's all pretty composable.
+
+Once the `kind` cluster has been started, you can start a local copy of Operator to use it. Again, it's pretty easy:
 
 ```bash
-rustup toolchain install nightly
-rustup component add rustfmt --toolchain nightly
-cargo +nightly fmt
+just run
 ```
 
-### Running Locally
 
+
+  
 To build and run the operator locally
 
 ```bash
