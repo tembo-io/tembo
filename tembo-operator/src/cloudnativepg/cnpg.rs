@@ -164,7 +164,7 @@ fn create_cluster_backup_volume_snapshot(cdb: &CoreDB) -> ClusterBackupVolumeSna
         .volume_snapshot
         .as_ref()
         .and_then(|vs| vs.snapshot_class.as_ref())
-        .cloned() // Directly clone the Option<String> if present
+        .cloned()
         .unwrap_or_else(|| VOLUME_SNAPSHOT_CLASS_NAME.to_string());
 
     ClusterBackupVolumeSnapshot {
@@ -2701,9 +2701,6 @@ mod tests {
             retentionPolicy: "30"
             schedule: 17 9 * * *
             endpointURL: http://minio:9000
-            volumeSnapshot:
-              enabled: true
-              snapshotClass: csi-vsc
           image: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e 
           port: 5432
           replicas: 1
@@ -2723,6 +2720,7 @@ mod tests {
         "#;
 
         let cdb: CoreDB = serde_yaml::from_str(cdb_yaml).expect("Failed to parse YAML");
+        println!("{:?}", cdb);
         let snapshot = create_cluster_backup_volume_snapshot(&cdb);
         let scheduled_backup = cnpg_scheduled_backup(&cdb);
 

@@ -162,7 +162,6 @@ pub struct S3CredentialsSessionToken {
 #[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
 pub struct VolumeSnapshot {
     /// Enable the volume snapshots for backups
-    #[serde(default = "defaults::default_volume_snapshot_enabled")]
     pub enabled: bool,
 
     /// The reference to the snapshot class

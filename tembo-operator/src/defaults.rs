@@ -214,11 +214,7 @@ pub fn default_s3_credentials() -> Option<S3Credentials> {
 
 pub fn default_volume_snapshot() -> Option<VolumeSnapshot> {
     Some(VolumeSnapshot {
-        enabled: default_volume_snapshot_enabled(),
-        ..Default::default()
+        enabled: false,
+        snapshot_class: None,
     })
-}
-
-pub fn default_volume_snapshot_enabled() -> bool {
-    true
 }

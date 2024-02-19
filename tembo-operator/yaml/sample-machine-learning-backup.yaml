@@ -17,8 +17,6 @@ spec:
       secretAccessKey:
         name: s3creds
         key: MINIO_SECRET_KEY
-    volumeSnaphot:
-      enabled: false
   replicas: 2
   stop: false
   stack:
