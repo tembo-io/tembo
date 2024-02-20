@@ -1,11 +1,12 @@
 use crate::cmd::delete::DeleteCommand;
 use crate::cmd::validate::ValidateCommand;
-use crate::cmd::{apply, context, delete, init, logs, validate};
+use crate::cmd::{apply, context, delete, init, logs, top, validate};
 use clap::{crate_authors, crate_version, Args, Parser, Subcommand};
 use cmd::apply::ApplyCommand;
 use cmd::context::{ContextCommand, ContextSubCommand};
 use cmd::init::InitCommand;
 use cmd::logs::LogsCommand;
+use cmd::top::TopCommand;
 
 mod cli;
 mod cmd;
@@ -30,6 +31,7 @@ enum SubCommands {
     Validate(ValidateCommand),
     Delete(DeleteCommand),
     Logs(LogsCommand),
+    Top(TopCommand),
 }
 
 #[derive(Args)]
@@ -39,7 +41,8 @@ struct GlobalOpts {
     verbose: bool,
 }
 
-fn main() -> Result<(), anyhow::Error> {
+#[tokio::main]
+ async fn main() -> Result<(), anyhow::Error> {
     let app = App::parse();
 
     match app.command {
@@ -59,7 +62,7 @@ fn main() -> Result<(), anyhow::Error> {
                 app.global_opts.verbose,
                 _apply_cmd.merge.clone(),
                 _apply_cmd.set.clone(),
-            )?;
+            ).await?;
         }
         SubCommands::Validate(_validate_cmd) => {
             validate::execute(app.global_opts.verbose)?;
@@ -68,8 +71,11 @@ fn main() -> Result<(), anyhow::Error> {
             logs::execute()?;
         }
         SubCommands::Delete(_delete_cmd) => {
-            delete::execute()?;
+            delete::execute().await?;
         }
+        SubCommands::Top(_top_cmd) => {
+            top::execute().await?;
+        },
     }
 
     Ok(())
