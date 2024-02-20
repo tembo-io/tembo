@@ -14,6 +14,13 @@ lazy_static! {
         let mut secrets_allow_list: Vec<AvailableSecret> = Vec::new();
         secrets_allow_list.push(
             AvailableSecret {
+                name: "app-role".to_string(),
+                possible_keys: vec!["username".to_string(), "password".to_string()],
+                formatter: Box::new(|instance_name| format!("{}-app", instance_name)),
+            }
+        );
+        secrets_allow_list.push(
+            AvailableSecret {
                 name: "readonly-role".to_string(),
                 possible_keys: vec!["username".to_string(), "password".to_string()],
                 formatter: Box::new(|instance_name| format!("{}-ro", instance_name)),
@@ -47,6 +54,7 @@ lazy_static! {
     responses(
         (status = 200, description = "Map of secret names and the keys this user is authorized for", body = Vec<AvailableSecret>,
         example = json!([
+            {"name":"app-role","possible_keys":["username","password"]},
             {"name":"readonly-role","possible_keys":["username","password"]},
             {"name":"superuser-role","possible_keys":["username","password"]},
             {"name":"certificate","possible_keys":["ca.crt"]}])),
@@ -117,6 +125,7 @@ pub async fn get_secret(
     responses(
         (status = 200, description = "Map of secret names and the keys this user is authorized for", body = Vec<AvailableSecret>,
         example = json!([
+            {"name":"app-role","possible_keys":["username","password"]},
             {"name":"readonly-role","possible_keys":["username","password"]},
             {"name":"superuser-role","possible_keys":["username","password"]},
             {"name":"certificate","possible_keys":["ca.crt"]}])),
