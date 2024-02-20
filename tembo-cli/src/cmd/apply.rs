@@ -2,6 +2,8 @@ use anyhow::Context as AnyhowContext;
 use anyhow::Error;
 use clap::Args;
 use colorful::Colorful;
+use controller::apis::postgres_parameters::ConfigValue as ControllerConfigValue;
+use controller::apis::postgres_parameters::PgConfig as ControllerPgConfig;
 use controller::app_service::types::AppService;
 use controller::extensions::types::Extension as ControllerExtension;
 use controller::extensions::types::ExtensionInstallLocation as ControllerExtensionInstallLocation;
@@ -33,6 +35,7 @@ use temboclient::{
 };
 use tembodataclient::apis::secrets_api::get_secret_v1;
 use tokio::runtime::Runtime;
+use toml::Value;
 
 use crate::cli::docker::Docker;
 use crate::cli::file_utils::FileUtils;
@@ -221,13 +224,13 @@ fn docker_apply_instance(
         extensions,
         trunk_installs,
         app_services,
-        pg_configs: _,
+        pg_configs,
     } = merge_app_reqs(
         instance_setting.app_services.clone(),
         stack.app_services.clone(),
         extensions,
         trunk_installs,
-        Option::None,
+        stack.postgres_config,
     )?;
 
     let rendered_dockerfile: String = get_rendered_dockerfile(&trunk_installs)?;
@@ -244,7 +247,10 @@ fn docker_apply_instance(
     FileUtils::create_file(
         POSTGRESCONF_NAME.to_string(),
         instance_setting.instance_name.clone() + "/" + POSTGRESCONF_NAME,
-        get_postgres_config(&instance_setting),
+        get_postgres_config(
+            instance_setting.postgres_configurations.clone(),
+            &pg_configs,
+        ),
         true,
     )?;
 
@@ -748,31 +754,36 @@ pub fn get_rendered_dockerfile(
     Ok(rendered_dockerfile)
 }
 
-fn get_postgres_config(instance_settings: &InstanceSettings) -> String {
+fn get_postgres_config(
+    instance_ps_config: Option<HashMap<String, Value>>,
+    postgres_configs: &std::option::Option<Vec<ControllerPgConfig>>,
+) -> String {
     let mut postgres_config = String::from("");
     let qoute_new_line = "\'\n";
     let equal_to_qoute = " = \'";
-    let stack_type = ControllerStackType::from_str(instance_settings.stack_type.as_str())
-        .unwrap_or(ControllerStackType::Standard);
-
-    let stack = get_stack(stack_type);
-
-    if stack.postgres_config.is_some() {
-        for config in stack.postgres_config.unwrap().iter() {
-            postgres_config.push_str(config.name.as_str());
-            postgres_config.push_str(equal_to_qoute);
-            postgres_config.push_str(format!("{}", &config.value).as_str());
-            postgres_config.push_str(qoute_new_line);
+    if postgres_configs.is_some() {
+        for p_config in postgres_configs.clone().unwrap().into_iter() {
+            match p_config.value {
+                ControllerConfigValue::Single(val) => {
+                    postgres_config.push_str(p_config.name.as_str());
+                    postgres_config.push_str(equal_to_qoute);
+                    postgres_config.push_str(&val);
+                    postgres_config.push_str(qoute_new_line);
+                }
+                ControllerConfigValue::Multiple(vals) => {
+                    for val in vals {
+                        postgres_config.push_str(p_config.name.as_str());
+                        postgres_config.push_str(equal_to_qoute);
+                        postgres_config.push_str(val.as_str());
+                        postgres_config.push_str(qoute_new_line);
+                    }
+                }
+            };
         }
     }
 
-    if instance_settings.postgres_configurations.is_some() {
-        for (key, value) in instance_settings
-            .postgres_configurations
-            .as_ref()
-            .unwrap()
-            .iter()
-        {
+    if instance_ps_config.is_some() {
+        for (key, value) in instance_ps_config.as_ref().unwrap().iter() {
             if value.is_str() {
                 postgres_config.push_str(key.as_str());
                 postgres_config.push_str(equal_to_qoute);

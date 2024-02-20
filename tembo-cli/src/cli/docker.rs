@@ -118,7 +118,7 @@ impl Docker {
             }
         };
 
-        let command = "docker-compose up -d";
+        let command = "docker-compose up -d --build";
         run_command(command, verbose)?;
 
         show_message("Docker Compose Up completed", false);
