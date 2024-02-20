@@ -1364,34 +1364,73 @@ fn schedule_expression_from_cdb(cdb: &CoreDB) -> String {
 }
 
 // Generate a ScheduledBackup
-fn cnpg_scheduled_backup(cdb: &CoreDB) -> ScheduledBackup {
-    let name = cdb.name_any();
-    let namespace = cdb.namespace().unwrap();
-    let method = cdb.spec.backup.volume_snapshot.as_ref().map(|vs| {
-        if vs.enabled {
-            ScheduledBackupMethod::VolumeSnapshot
-        } else {
-            ScheduledBackupMethod::BarmanObjectStore
-        }
-    });
+fn cnpg_scheduled_backup(
+    cdb: &CoreDB,
+) -> Result<Vec<(ScheduledBackup, Option<ScheduledBackup>)>, &'static str> {
+    let namespace = match cdb.namespace() {
+        Some(ns) => ns,
+        None => return Err("Namespace is required but not found"),
+    };
 
-    ScheduledBackup {
+    let name_ref = cdb.metadata.name.as_ref();
+    let name = match name_ref {
+        Some(n) => n,
+        None => return Err("Name is required but not found"),
+    };
+
+    // Set a ScheduledBackup to backup to object store
+    let s3_scheduled_backup = ScheduledBackup {
         metadata: ObjectMeta {
-            name: Some(name.clone()),
-            namespace: Some(namespace),
+            name: Some(name.to_string()),
+            namespace: Some(namespace.to_string()),
             ..ObjectMeta::default()
         },
         spec: ScheduledBackupSpec {
             backup_owner_reference: Some(ScheduledBackupBackupOwnerReference::Cluster),
-            cluster: ScheduledBackupCluster { name },
+            cluster: ScheduledBackupCluster {
+                name: name.to_string(),
+            },
             immediate: Some(true),
             schedule: schedule_expression_from_cdb(cdb),
             suspend: Some(false),
-            method,
+            method: Some(ScheduledBackupMethod::BarmanObjectStore),
             ..ScheduledBackupSpec::default()
         },
         status: None,
-    }
+    };
+
+    // Set a ScheduledBackup to backup to volume snapshot if enabled
+    let volume_snapshot_scheduled_backup = cdb
+        .spec
+        .backup
+        .volume_snapshot
+        .as_ref()
+        .filter(|vs| vs.enabled)
+        .map(|_| ScheduledBackup {
+            metadata: ObjectMeta {
+                name: Some(name.to_string() + "-snapshot"),
+                namespace: Some(namespace),
+                ..ObjectMeta::default()
+            },
+            spec: ScheduledBackupSpec {
+                backup_owner_reference: Some(ScheduledBackupBackupOwnerReference::Cluster),
+                cluster: ScheduledBackupCluster {
+                    name: name.to_string(),
+                },
+                immediate: Some(true),
+                schedule: schedule_expression_from_cdb(cdb),
+                suspend: Some(false),
+                method: Some(ScheduledBackupMethod::VolumeSnapshot),
+                ..ScheduledBackupSpec::default()
+            },
+            status: None,
+        });
+
+    // Return the ScheduledBackup objects
+    Ok(vec![(
+        s3_scheduled_backup,
+        volume_snapshot_scheduled_backup,
+    )])
 }
 
 // Reconcile a SheduledBackup
@@ -1406,30 +1445,57 @@ pub async fn reconcile_cnpg_scheduled_backup(
         return Err(Action::requeue(Duration::from_secs(30)));
     }
 
-    let scheduledbackup = cnpg_scheduled_backup(cdb);
     let client = ctx.client.clone();
-    let name = scheduledbackup
+    let scheduled_backups_result = cnpg_scheduled_backup(cdb);
+    let scheduled_backups = match scheduled_backups_result {
+        Ok(backups) => backups,
+        Err(e) => {
+            error!("Failed to generate scheduled backups: {}", e);
+            return Err(Action::requeue(Duration::from_secs(300)));
+        }
+    };
+
+    for (s3_backup, volume_snapshot_backup) in scheduled_backups {
+        // Always apply the s3_backup if backups are enabled
+        apply_scheduled_backup(&s3_backup, &client).await?;
+
+        // Conditionally apply the volume_snapshot_backup if it exists
+        if let Some(vs_backup) = volume_snapshot_backup {
+            apply_scheduled_backup(&vs_backup, &client).await?;
+        }
+    }
+
+    Ok(())
+}
+
+#[instrument(skip(client), fields(trace_id, scheduled_backup))]
+async fn apply_scheduled_backup(
+    scheduled_backup: &ScheduledBackup,
+    client: &kube::Client,
+) -> Result<(), Action> {
+    let name = scheduled_backup
         .metadata
         .name
         .clone()
         .expect("ScheduledBackup should always have a name");
-    let namespace = scheduledbackup
+    let namespace = scheduled_backup
         .metadata
         .namespace
         .clone()
         .expect("ScheduledBackup should always have a namespace");
-    let backup_api: Api<ScheduledBackup> = Api::namespaced(client.clone(), namespace.as_str());
+    let backup_api: Api<ScheduledBackup> = Api::namespaced(client.clone(), &namespace);
 
-    debug!("Patching ScheduledBackup");
+    debug!("Patching ScheduledBackup: {}", name);
     let ps = PatchParams::apply("cntrlr").force();
-    let _o = backup_api
-        .patch(&name, &ps, &Patch::Apply(&scheduledbackup))
+    backup_api
+        .patch(&name, &ps, &Patch::Apply(scheduled_backup))
         .await
         .map_err(|e| {
             error!("Error patching ScheduledBackup: {}", e);
             Action::requeue(Duration::from_secs(300))
         })?;
-    debug!("Applied ScheduledBackup");
+
+    debug!("Applied ScheduledBackup: {}", name);
     Ok(())
 }
 
@@ -2359,18 +2425,19 @@ mod tests {
         let cdb: CoreDB = from_str(cdb_yaml).unwrap();
         let cfg = Config::default();
 
-        let scheduled_backup: ScheduledBackup = cnpg_scheduled_backup(&cdb);
         let (backup, service_account_template) = cnpg_backup_configuration(&cdb, &cfg);
+        let backups_result = cnpg_scheduled_backup(&cdb).unwrap();
+        let (s3_backup, _volume_snapshot_backup) = &backups_result[0];
 
         // Assert to make sure that backup schedule is set
-        assert_eq!(scheduled_backup.spec.schedule, "0 55 7 * * *".to_string());
+        assert_eq!(s3_backup.spec.schedule, "0 55 7 * * *".to_string());
         assert_eq!(
             backup.clone().unwrap().retention_policy.unwrap(),
             "45d".to_string()
         );
 
         assert_eq!(
-            scheduled_backup.spec.method,
+            s3_backup.spec.method,
             Some(ScheduledBackupMethod::BarmanObjectStore)
         );
 
@@ -2724,7 +2791,8 @@ mod tests {
 
         let cdb: CoreDB = serde_yaml::from_str(cdb_yaml).expect("Failed to parse YAML");
         let snapshot = create_cluster_backup_volume_snapshot(&cdb);
-        let scheduled_backup = cnpg_scheduled_backup(&cdb);
+        let backups_result = cnpg_scheduled_backup(&cdb).unwrap();
+        let (s3_backup, volume_snapshot_backup) = &backups_result[0];
 
         // Set an expected ClusterBackupVolumeSnapshot object
         let expected_snapshot = ClusterBackupVolumeSnapshot {
@@ -2744,9 +2812,19 @@ mod tests {
         assert_eq!(snapshot, expected_snapshot);
 
         // Assert to make sure that the ScheduledBackup method is set to VolumeSnapshot
+        if let Some(volume_snapshot_backup) = volume_snapshot_backup {
+            assert_eq!(
+                volume_snapshot_backup.spec.method,
+                Some(ScheduledBackupMethod::VolumeSnapshot)
+            );
+        } else {
+            panic!("Expected volume snapshot backup to be Some, but was None");
+        }
+
+        // Assert to make sure that the ScheduledBackup method is set to BarmanObjectStore
         assert_eq!(
-            scheduled_backup.spec.method,
-            Some(ScheduledBackupMethod::VolumeSnapshot)
+            s3_backup.spec.method,
+            Some(ScheduledBackupMethod::BarmanObjectStore)
         );
     }
 }
