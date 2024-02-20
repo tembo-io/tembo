@@ -13,19 +13,19 @@ use super::apply::{get_instance_id, get_instance_settings};
 #[derive(Args)]
 pub struct DeleteCommand {}
 
-pub async fn execute() -> Result<(), anyhow::Error> {
+pub fn execute() -> Result<(), anyhow::Error> {
     let env = get_current_context()?;
 
     if env.target == Target::Docker.to_string() {
         Docker::docker_compose_down(true)?;
     } else if env.target == Target::TemboCloud.to_string() {
-        return execute_tembo_cloud(env).await;
+        return execute_tembo_cloud(env);
     }
 
     Ok(())
 }
 
-async fn execute_tembo_cloud(env: Environment) -> Result<(), anyhow::Error> {
+fn execute_tembo_cloud(env: Environment) -> Result<(), anyhow::Error> {
     let instance_settings = get_instance_settings(None, None)?;
 
     let profile = env.clone().selected_profile.unwrap();
@@ -36,7 +36,7 @@ async fn execute_tembo_cloud(env: Environment) -> Result<(), anyhow::Error> {
     };
 
     for (_key, value) in instance_settings.iter() {
-        let instance_id = get_instance_id(&value.instance_name, &config, &env).await?;
+        let instance_id = get_instance_id(&value.instance_name, &config, &env)?;
         if let Some(env_instance_id) = instance_id {
             let v = Runtime::new().unwrap().block_on(delete_instance(
                 &config,

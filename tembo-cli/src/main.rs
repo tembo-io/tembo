@@ -62,7 +62,7 @@ struct GlobalOpts {
                 app.global_opts.verbose,
                 _apply_cmd.merge.clone(),
                 _apply_cmd.set.clone(),
-            ).await?;
+            )?;
         }
         SubCommands::Validate(_validate_cmd) => {
             validate::execute(app.global_opts.verbose)?;
@@ -71,10 +71,10 @@ struct GlobalOpts {
             logs::execute()?;
         }
         SubCommands::Delete(_delete_cmd) => {
-            delete::execute().await?;
+            delete::execute()?;
         }
         SubCommands::Top(_top_cmd) => {
-            top::execute().await?;
+            top::execute()?;
         },
     }
 

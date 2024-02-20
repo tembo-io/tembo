@@ -60,7 +60,7 @@ pub struct ApplyCommand {
     pub set: Option<String>,
 }
 
-pub async fn execute(
+pub fn execute(
     verbose: bool,
     merge_path: Option<String>,
     set_arg: Option<String>,
@@ -76,7 +76,7 @@ pub async fn execute(
     if env.target == Target::Docker.to_string() {
         return docker_apply(verbose, instance_settings);
     } else if env.target == Target::TemboCloud.to_string() {
-        return tembo_cloud_apply(env, instance_settings).await;
+        return tembo_cloud_apply(env, instance_settings);
     }
 
     Ok(())
@@ -102,27 +102,23 @@ fn parse_set_arg(set_arg: &str) -> Result<(String, String, String), Error> {
     Ok((instance_name, setting_name, setting_value))
 }
 
-async fn tembo_cloud_apply(
+fn tembo_cloud_apply(
     env: Environment,
     instance_settings: HashMap<String, InstanceSettings>,
 ) -> Result<(), anyhow::Error> {
-    // Iterate over instance_settings and asynchronously apply each instance.
-    let futures: Vec<_> = instance_settings.iter().map(|(_key, instance_setting)| {
-        // Clone env because it will be moved into the async block.
-        let env_clone = env.clone();
-        async move {
-            match tembo_cloud_apply_instance(&env_clone, instance_setting).await {
-                Ok(_) => Ok(()),
-                Err(error) => {
-                    tui::error(&format!("Error creating instance: {}", error));
-                    Err(error)
-                },
+    for (_key, instance_setting) in instance_settings.iter() {
+        let result = tembo_cloud_apply_instance(&env, instance_setting);
+
+        match result {
+            Ok(i) => i,
+            Err(error) => {
+                tui::error(&format!("Error creating instance: {}", error));
+                return Ok(());
             }
         }
-    }).collect();
+    }
 
-    // Use futures::future::try_join_all to await all futures and return early if any errors.
-    futures::future::try_join_all(futures).await.map(|_| ())
+    Ok(())
 }
 
 fn docker_apply(
@@ -266,7 +262,7 @@ fn docker_apply_instance(
     Ok(instance_setting)
 }
 
-pub async fn tembo_cloud_apply_instance(
+pub fn tembo_cloud_apply_instance(
     env: &Environment,
     instance_settings: &InstanceSettings,
 ) -> Result<(), anyhow::Error> {
@@ -280,7 +276,7 @@ pub async fn tembo_cloud_apply_instance(
         ..Default::default()
     };
 
-    let mut instance_id = get_instance_id(&instance_settings.instance_name, &config, env).await?;
+    let mut instance_id = get_instance_id(&instance_settings.instance_name, &config, env)?;
 
     if let Some(env_instance_id) = &instance_id {
         update_existing_instance(env_instance_id, instance_settings, &config, env);
@@ -364,7 +360,7 @@ fn get_conn_info_with_creds(
     Ok(conn_info)
 }
 
-pub async fn get_instance_id(
+pub fn get_instance_id(
     instance_name: &str,
     config: &Configuration,
     env: &Environment,

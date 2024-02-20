@@ -84,7 +84,7 @@ pub fn execute() -> Result<()> {
     Ok(())
 }
 
-pub async fn cloud_logs() -> Result<()> {
+pub fn cloud_logs() -> Result<()> {
     let env = get_current_context()?;
     let org_id = env.org_id.clone().unwrap_or_default();
     let profile = env.selected_profile.clone().unwrap();
@@ -104,7 +104,7 @@ pub async fn cloud_logs() -> Result<()> {
     );
 
     for (_key, value) in instance_settings.iter() {
-        let instance_id_option = get_instance_id(&value.instance_name, &config, &env).await?;
+        let instance_id_option = get_instance_id(&value.instance_name, &config, &env)?;
 
         let instance_id = if let Some(id) = instance_id_option {
             id
