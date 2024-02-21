@@ -48,6 +48,11 @@ async fn apply_volume_snapshot(
     volume_snapshot: &VolumeSnapshot,
 ) -> Result<(), Action> {
     let name = cdb.name_any();
+    let vs_name = volume_snapshot
+        .metadata
+        .name
+        .as_ref()
+        .ok_or_else(|| Action::requeue(tokio::time::Duration::from_secs(300)))?;
 
     // Namespace for the VolumeSnapshot
     let namespace = volume_snapshot
@@ -62,7 +67,7 @@ async fn apply_volume_snapshot(
     let ps = PatchParams::apply("cntrlr").force();
 
     match vs_api
-        .patch(&name, &ps, &Patch::Apply(volume_snapshot))
+        .patch(vs_name, &ps, &Patch::Apply(volume_snapshot))
         .await
     {
         Ok(_) => debug!("VolumeSnapshot created successfully for {}.", name),
@@ -81,6 +86,11 @@ async fn apply_volume_snapshot_content(
     volume_snapshot_content: &VolumeSnapshotContent,
 ) -> Result<(), Action> {
     let name = cdb.name_any();
+    let vsc_name = volume_snapshot_content
+        .metadata
+        .name
+        .as_ref()
+        .ok_or_else(|| Action::requeue(tokio::time::Duration::from_secs(300)))?;
 
     // Apply VolumeSnapshotContent (All Namespaces)
     let vs_api: Api<VolumeSnapshotContent> = Api::all(client.clone());
@@ -88,7 +98,7 @@ async fn apply_volume_snapshot_content(
     let ps = PatchParams::apply("cntrlr").force();
 
     match vs_api
-        .patch(&name, &ps, &Patch::Apply(volume_snapshot_content))
+        .patch(vsc_name, &ps, &Patch::Apply(volume_snapshot_content))
         .await
     {
         Ok(_) => debug!("VolumeSnapshotContent created successfully for {}.", name),
