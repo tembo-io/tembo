@@ -99,8 +99,11 @@ async fn main() -> std::io::Result<()> {
                     .service(secrets::get_secret_names_v1)
                     .service(secrets::get_secret_v1)
             )
-            .service(web::scope("/{namespace}/metrics").service(metrics::query_range))
-            .service(web::scope("/{namespace}/metrics").service(metrics::query))
+            .service(
+                web::scope("/{namespace}/metrics")
+                    .service(metrics::query_range)
+                    .service(metrics::query),
+            )
             .service(
                 web::scope("/{namespace}/secrets")
                     .service(secrets::get_secret)
