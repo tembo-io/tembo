@@ -195,11 +195,14 @@ async fn lookup_volume_snapshot(cdb: &CoreDB, client: &Client) -> Result<VolumeS
         .as_ref()
         .map(|r| r.server_name.clone())
         .ok_or_else(|| Action::requeue(tokio::time::Duration::from_secs(300)))?;
-    let namespace = cdb
-        .namespace()
-        .ok_or_else(|| Action::requeue(tokio::time::Duration::from_secs(300)))?;
+    // let namespace = cdb
+    //     .namespace()
+    //     .ok_or_else(|| Action::requeue(tokio::time::Duration::from_secs(300)))?;
 
-    let volume_snapshot_api: Api<VolumeSnapshot> = Api::namespaced(client.clone(), &namespace);
+    // todo: This is a temporary fix to get the VolumeSnapshot from the same namespace as the
+    // instance you are attempting to restore from.  We need to figure out a better way of
+    // doing this in case someone wants to name a namespace differently than the instance name.
+    let volume_snapshot_api: Api<VolumeSnapshot> = Api::namespaced(client.clone(), &name);
 
     let label_selector = format!("cnpg.io/cluster={}", name);
     let lp = ListParams::default().labels(&label_selector);
@@ -219,6 +222,8 @@ async fn lookup_volume_snapshot(cdb: &CoreDB, client: &Client) -> Result<VolumeS
                 .unwrap_or(false)
         })
         .collect();
+
+    debug!("Found {} VolumeSnapshots for {}", snapshots.len(), name);
 
     if snapshots.is_empty() {
         return Err(Action::requeue(tokio::time::Duration::from_secs(300)));
