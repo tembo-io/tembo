@@ -5,6 +5,9 @@ on:
   push:
     branches:
       - 'main'
+    paths-ignore:
+      - 'tembo-py/**'
+      - 'tembo-cli/**'
 
 jobs:
   find_directories:
