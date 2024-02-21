@@ -83,7 +83,7 @@ async fn apply_volume_snapshot_content(
     let name = cdb.name_any();
 
     // Apply VolumeSnapshotContent (All Namespaces)
-    let vs_api: Api<VolumeSnapshot> = Api::all(client.clone());
+    let vs_api: Api<VolumeSnapshotContent> = Api::all(client.clone());
     debug!("Patching VolumeSnapshotContent for instance: {}", name);
     let ps = PatchParams::apply("cntrlr").force();
 
