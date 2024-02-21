@@ -1821,6 +1821,10 @@ spec:
 
                       This assumes you are keeping the backups in the new instance in the same root bucket path of `s3://my-bucket/`.
                     type: string
+                  volumeSnapshot:
+                    description: volumeSnapshot is a boolean to enable restoring from a Volume Snapshot
+                    nullable: true
+                    type: boolean
                 required:
                 - serverName
                 type: object
