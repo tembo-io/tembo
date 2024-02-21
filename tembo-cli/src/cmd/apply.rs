@@ -23,6 +23,7 @@ use std::{
 use tembo_stacks::apps::app::merge_app_reqs;
 use tembo_stacks::apps::app::merge_options;
 use tembo_stacks::apps::types::MergedConfigs;
+use temboclient::models::pg_config;
 use temboclient::{
     apis::{
         configuration::Configuration,
@@ -761,50 +762,78 @@ fn get_postgres_config(
     let mut postgres_config = String::from("");
     let qoute_new_line = "\'\n";
     let equal_to_qoute = " = \'";
-    if postgres_configs.is_some() {
-        for p_config in postgres_configs.clone().unwrap().into_iter() {
-            match p_config.value {
-                ControllerConfigValue::Single(val) => {
-                    postgres_config.push_str(p_config.name.as_str());
-                    postgres_config.push_str(equal_to_qoute);
-                    postgres_config.push_str(&val);
-                    postgres_config.push_str(qoute_new_line);
+
+    let mut shared_preload_libraries: Vec<String> = Vec::new();
+
+    if let Some(ps_config) = postgres_configs {
+        for p_config in ps_config.clone().into_iter() {
+            match p_config.name.as_str() {
+                "shared_preload_libraries" => {
+                    shared_preload_libraries.push(p_config.value.to_string());
                 }
-                ControllerConfigValue::Multiple(vals) => {
-                    for val in vals {
-                        postgres_config.push_str(p_config.name.as_str());
-                        postgres_config.push_str(equal_to_qoute);
-                        postgres_config.push_str(val.as_str());
-                        postgres_config.push_str(qoute_new_line);
-                    }
+                _ => {
+                    match p_config.value {
+                        ControllerConfigValue::Single(val) => {
+                            postgres_config.push_str(p_config.name.as_str());
+                            postgres_config.push_str(equal_to_qoute);
+                            postgres_config.push_str(&val);
+                            postgres_config.push_str(qoute_new_line);
+                        }
+                        ControllerConfigValue::Multiple(vals) => {
+                            for val in vals {
+                                postgres_config.push_str(p_config.name.as_str());
+                                postgres_config.push_str(equal_to_qoute);
+                                postgres_config.push_str(val.as_str());
+                                postgres_config.push_str(qoute_new_line);
+                            }
+                        }
+                    };
                 }
-            };
+            }
         }
     }
 
-    if instance_ps_config.is_some() {
-        for (key, value) in instance_ps_config.as_ref().unwrap().iter() {
-            if value.is_str() {
-                postgres_config.push_str(key.as_str());
-                postgres_config.push_str(equal_to_qoute);
-                postgres_config.push_str(value.as_str().unwrap());
-                postgres_config.push_str(qoute_new_line);
-            }
-            if value.is_table() {
-                for row in value.as_table().iter() {
-                    for (t, v) in row.iter() {
+    if let Some(ps_config) = instance_ps_config {
+        for (key, value) in ps_config.iter() {
+            match key.as_str() {
+                "shared_preload_libraries" => {
+                    shared_preload_libraries.push(value.to_string());
+                }
+                _ => {
+                    if value.is_str() {
                         postgres_config.push_str(key.as_str());
-                        postgres_config.push('.');
-                        postgres_config.push_str(t.as_str());
                         postgres_config.push_str(equal_to_qoute);
-                        postgres_config.push_str(v.as_str().unwrap());
+                        postgres_config.push_str(value.as_str().unwrap());
                         postgres_config.push_str(qoute_new_line);
+                    }
+                    if value.is_table() {
+                        for row in value.as_table().iter() {
+                            for (t, v) in row.iter() {
+                                postgres_config.push_str(key.as_str());
+                                postgres_config.push('.');
+                                postgres_config.push_str(t.as_str());
+                                postgres_config.push_str(equal_to_qoute);
+                                postgres_config.push_str(v.as_str().unwrap());
+                                postgres_config.push_str(qoute_new_line);
+                            }
+                        }
                     }
                 }
             }
         }
     }
+
+    let config = shared_preload_libraries.iter().map(|x| x.to_string() + ",").collect::<String>();
+
+    let a = format!("shared_preload_libraries = '{}'", config);
+    let msg = a.split_at(a.len() - 2);
+
+    postgres_config.push_str(msg.0);
+    postgres_config.push('\'');
+
+
     postgres_config
+
 }
 
 pub fn get_rendered_dockercompose(
