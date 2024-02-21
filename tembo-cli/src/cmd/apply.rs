@@ -2,15 +2,19 @@ use anyhow::Context as AnyhowContext;
 use anyhow::Error;
 use clap::Args;
 use colorful::Colorful;
+use controller::apis::postgres_parameters::ConfigValue as ControllerConfigValue;
+use controller::apis::postgres_parameters::PgConfig as ControllerPgConfig;
 use controller::app_service::types::AppService;
 use controller::extensions::types::Extension as ControllerExtension;
 use controller::extensions::types::ExtensionInstallLocation as ControllerExtensionInstallLocation;
 use controller::extensions::types::TrunkInstall as ControllerTrunkInstall;
 use controller::stacks::get_stack;
 use controller::stacks::types::StackType as ControllerStackType;
+use itertools::Itertools;
 use log::info;
 use spinoff::spinners;
 use spinoff::Spinner;
+use std::fmt::Write;
 use std::{
     collections::HashMap,
     fs::{self},
@@ -33,6 +37,7 @@ use temboclient::{
 };
 use tembodataclient::apis::secrets_api::get_secret_v1;
 use tokio::runtime::Runtime;
+use toml::Value;
 
 use crate::cli::docker::Docker;
 use crate::cli::file_utils::FileUtils;
@@ -221,13 +226,13 @@ fn docker_apply_instance(
         extensions,
         trunk_installs,
         app_services,
-        pg_configs: _,
+        pg_configs,
     } = merge_app_reqs(
         instance_setting.app_services.clone(),
         stack.app_services.clone(),
         extensions,
         trunk_installs,
-        Option::None,
+        stack.postgres_config,
     )?;
 
     let rendered_dockerfile: String = get_rendered_dockerfile(&trunk_installs)?;
@@ -244,7 +249,10 @@ fn docker_apply_instance(
     FileUtils::create_file(
         POSTGRESCONF_NAME.to_string(),
         instance_setting.instance_name.clone() + "/" + POSTGRESCONF_NAME,
-        get_postgres_config(&instance_setting),
+        get_postgres_config(
+            instance_setting.postgres_configurations.clone(),
+            &pg_configs,
+        ),
         true,
     )?;
 
@@ -748,51 +756,80 @@ pub fn get_rendered_dockerfile(
     Ok(rendered_dockerfile)
 }
 
-fn get_postgres_config(instance_settings: &InstanceSettings) -> String {
+fn get_postgres_config(
+    instance_ps_config: Option<HashMap<String, Value>>,
+    postgres_configs: &std::option::Option<Vec<ControllerPgConfig>>,
+) -> String {
     let mut postgres_config = String::from("");
-    let qoute_new_line = "\'\n";
-    let equal_to_qoute = " = \'";
-    let stack_type = ControllerStackType::from_str(instance_settings.stack_type.as_str())
-        .unwrap_or(ControllerStackType::Standard);
+    let mut shared_preload_libraries: Vec<String> = Vec::new();
 
-    let stack = get_stack(stack_type);
-
-    if stack.postgres_config.is_some() {
-        for config in stack.postgres_config.unwrap().iter() {
-            postgres_config.push_str(config.name.as_str());
-            postgres_config.push_str(equal_to_qoute);
-            postgres_config.push_str(format!("{}", &config.value).as_str());
-            postgres_config.push_str(qoute_new_line);
+    if let Some(ps_config) = postgres_configs {
+        for p_config in ps_config.clone().into_iter() {
+            match p_config.name.as_str() {
+                "shared_preload_libraries" => {
+                    shared_preload_libraries.push(p_config.value.to_string());
+                }
+                _ => {
+                    match p_config.value {
+                        ControllerConfigValue::Single(val) => {
+                            let _ =
+                                writeln!(postgres_config, "{} = '{val}'", p_config.name.as_str());
+                        }
+                        ControllerConfigValue::Multiple(vals) => {
+                            for val in vals {
+                                let _ = writeln!(
+                                    postgres_config,
+                                    "{} = '{val}'",
+                                    p_config.name.as_str()
+                                );
+                            }
+                        }
+                    };
+                }
+            }
         }
     }
 
-    if instance_settings.postgres_configurations.is_some() {
-        for (key, value) in instance_settings
-            .postgres_configurations
-            .as_ref()
-            .unwrap()
-            .iter()
-        {
-            if value.is_str() {
-                postgres_config.push_str(key.as_str());
-                postgres_config.push_str(equal_to_qoute);
-                postgres_config.push_str(value.as_str().unwrap());
-                postgres_config.push_str(qoute_new_line);
-            }
-            if value.is_table() {
-                for row in value.as_table().iter() {
-                    for (t, v) in row.iter() {
-                        postgres_config.push_str(key.as_str());
-                        postgres_config.push('.');
-                        postgres_config.push_str(t.as_str());
-                        postgres_config.push_str(equal_to_qoute);
-                        postgres_config.push_str(v.as_str().unwrap());
-                        postgres_config.push_str(qoute_new_line);
+    if let Some(ps_config) = instance_ps_config {
+        for (key, value) in ps_config.iter() {
+            match key.as_str() {
+                "shared_preload_libraries" => {
+                    shared_preload_libraries.push(value.as_str().unwrap().to_string());
+                }
+                _ => {
+                    if value.is_str() {
+                        let _ = writeln!(postgres_config, "{} = '{value}'", key.as_str());
+                    }
+                    if value.is_table() {
+                        for row in value.as_table().iter() {
+                            for (t, v) in row.iter() {
+                                let _ = writeln!(
+                                    postgres_config,
+                                    "{}.{} = '{}'",
+                                    key.as_str(),
+                                    t.as_str(),
+                                    v.as_str().unwrap()
+                                );
+                            }
+                        }
                     }
                 }
             }
         }
     }
+
+    let config = shared_preload_libraries
+        .into_iter()
+        .unique()
+        .map(|x| x.to_string() + ",")
+        .collect::<String>();
+
+    let final_libs = config.split_at(config.len() - 1);
+
+    let libs_config = format!("shared_preload_libraries = '{}'", final_libs.0);
+
+    postgres_config.push_str(&libs_config);
+
     postgres_config
 }
 
