@@ -19,8 +19,9 @@ use crate::{
             ClusterBackupVolumeSnapshotOnlineConfiguration,
             ClusterBackupVolumeSnapshotSnapshotOwnerReference, ClusterBootstrap,
             ClusterBootstrapInitdb, ClusterBootstrapRecovery,
-            ClusterBootstrapRecoveryRecoveryTarget, ClusterCertificates, ClusterExternalClusters,
-            ClusterExternalClustersBarmanObjectStore,
+            ClusterBootstrapRecoveryRecoveryTarget, ClusterBootstrapRecoveryVolumeSnapshots,
+            ClusterBootstrapRecoveryVolumeSnapshotsStorage, ClusterCertificates,
+            ClusterExternalClusters, ClusterExternalClustersBarmanObjectStore,
             ClusterExternalClustersBarmanObjectStoreS3Credentials,
             ClusterExternalClustersBarmanObjectStoreS3CredentialsAccessKeyId,
             ClusterExternalClustersBarmanObjectStoreS3CredentialsRegion,
@@ -54,6 +55,7 @@ use crate::{
     is_postgres_ready, patch_cdb_status_merge,
     postgres_exporter::EXPORTER_CONFIGMAP_PREFIX,
     psql::PsqlOutput,
+    snapshots::volumesnapshots::reconcile_volume_snapshot_restore,
     trunk::extensions_that_require_load,
     Context, RESTARTED_AT,
 };
@@ -390,49 +392,10 @@ pub fn cnpg_cluster_bootstrap_from_cdb(
     Option<Vec<ClusterExternalClusters>>,
     Option<ClusterSuperuserSecret>,
 ) {
-    // parse_target_time returns the parsed target_time which is used for point-in-time-recovery
-    // todo: Somehow turn this into a requeue action, so that we can retry when the target_time is not in the correct format.
-    //      for now we just log the error and return None, which will disable point-in-time-recovery, but allow for a full recovery
-    let parsed_target_time = cdb.spec.restore.as_ref().and_then(|restore| {
-        restore.recovery_target_time.as_ref().and_then(|time_str| {
-            match parse_target_time(Some(time_str)) {
-                Ok(Some(parsed_time)) => Some(parsed_time),
-                Ok(None) => None,
-                Err(err) => {
-                    error!(
-                        "Failed to parse target_time for instance: {}, {}",
-                        cdb.name_any(),
-                        err
-                    );
-                    None
-                }
-            }
-        })
-    });
-
-    let cluster_bootstrap = if let Some(_restore) = &cdb.spec.restore {
-        ClusterBootstrap {
-            recovery: Some(ClusterBootstrapRecovery {
-                source: Some("tembo-recovery".to_string()),
-                database: Some("app".to_string()),
-                owner: Some("app".to_string()),
-                recovery_target: parsed_target_time.map(|target_time| {
-                    ClusterBootstrapRecoveryRecoveryTarget {
-                        target_time: Some(target_time),
-                        ..ClusterBootstrapRecoveryRecoveryTarget::default()
-                    }
-                }),
-                ..ClusterBootstrapRecovery::default()
-            }),
-            ..ClusterBootstrap::default()
-        }
+    let cluster_bootstrap = if cdb.spec.restore.is_some() {
+        cnpg_cluster_bootstrap(cdb, true)
     } else {
-        ClusterBootstrap {
-            initdb: Some(ClusterBootstrapInitdb {
-                ..ClusterBootstrapInitdb::default()
-            }),
-            ..ClusterBootstrap::default()
-        }
+        cnpg_cluster_bootstrap(cdb, false)
     };
     let cluster_name = cdb.name_any();
 
@@ -448,7 +411,7 @@ pub fn cnpg_cluster_bootstrap_from_cdb(
         // Find destination_path from Backup to generate the restore destination path
         let restore_destination_path = match &cdb.spec.backup.destinationPath {
             Some(path) => generate_restore_destination_path(path),
-            None => "".to_string(), // or any other default value you'd like
+            None => "".to_string(),
         };
         ClusterExternalClusters {
             name: "tembo-recovery".to_string(),
@@ -457,7 +420,7 @@ pub fn cnpg_cluster_bootstrap_from_cdb(
                 endpoint_url: restore.endpoint_url.clone(),
                 s3_credentials: Some(s3_credentials),
                 wal: Some(ClusterExternalClustersBarmanObjectStoreWal {
-                    max_parallel: Some(5),
+                    max_parallel: Some(8),
                     encryption: Some(ClusterExternalClustersBarmanObjectStoreWalEncryption::Aes256),
                     compression: Some(
                         ClusterExternalClustersBarmanObjectStoreWalCompression::Snappy,
@@ -492,6 +455,74 @@ pub fn cnpg_cluster_bootstrap_from_cdb(
         Some(vec![coredb_cluster]),
         Some(superuser_secret),
     )
+}
+
+fn cnpg_cluster_bootstrap(cdb: &CoreDB, restore: bool) -> ClusterBootstrap {
+    // parse_target_time returns the parsed target_time which is used for point-in-time-recovery
+    // todo: Somehow turn this into a requeue action, so that we can retry when the target_time is not in the correct format.
+    //      for now we just log the error and return None, which will disable point-in-time-recovery, but allow for a full recovery
+    let parsed_target_time = cdb.spec.restore.as_ref().and_then(|restore| {
+        restore.recovery_target_time.as_ref().and_then(|time_str| {
+            match parse_target_time(Some(time_str)) {
+                Ok(Some(parsed_time)) => Some(parsed_time),
+                Ok(None) => None,
+                Err(err) => {
+                    error!(
+                        "Failed to parse target_time for instance: {}, {}",
+                        cdb.name_any(),
+                        err
+                    );
+                    None
+                }
+            }
+        })
+    });
+
+    if restore {
+        ClusterBootstrap {
+            recovery: Some(ClusterBootstrapRecovery {
+                source: Some("tembo-recovery".to_string()),
+                database: Some("app".to_string()),
+                owner: Some("app".to_string()),
+                recovery_target: parsed_target_time.map(|target_time| {
+                    ClusterBootstrapRecoveryRecoveryTarget {
+                        target_time: Some(target_time),
+                        ..ClusterBootstrapRecoveryRecoveryTarget::default()
+                    }
+                }),
+                volume_snapshots: cnpg_cluster_bootstrap_recovery_volume_snapshots(cdb),
+                ..ClusterBootstrapRecovery::default()
+            }),
+            ..ClusterBootstrap::default()
+        }
+    } else {
+        ClusterBootstrap {
+            initdb: Some(ClusterBootstrapInitdb {
+                ..ClusterBootstrapInitdb::default()
+            }),
+            ..ClusterBootstrap::default()
+        }
+    }
+}
+
+fn cnpg_cluster_bootstrap_recovery_volume_snapshots(
+    cdb: &CoreDB,
+) -> Option<ClusterBootstrapRecoveryVolumeSnapshots> {
+    if let Some(restore) = &cdb.spec.restore {
+        if restore.volume_snapshot.is_some() {
+            return Some(ClusterBootstrapRecoveryVolumeSnapshots {
+                storage: ClusterBootstrapRecoveryVolumeSnapshotsStorage {
+                    // todo: Work on getting this from the VolumeSnapshot we created
+                    // during the restore process
+                    name: format!("{}-restore", cdb.name_any()),
+                    kind: "VolumeSnapshot".to_string(),
+                    api_group: Some("snapshot.storage.k8s.io".to_string()),
+                },
+                ..ClusterBootstrapRecoveryVolumeSnapshots::default()
+            });
+        }
+    }
+    None
 }
 
 // Get PGConfig from CoreDB and convert it to a postgres_parameters and shared_preload_libraries
@@ -981,6 +1012,17 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
     let requires_load =
         extensions_that_require_load(ctx.client.clone(), &cdb.metadata.namespace.clone().unwrap())
             .await?;
+
+    // If we are restoring and have volume snapshots enabled, make sure we setup
+    // the VolumeSnapshotContent and VolumeSnapshot so that the Cluster will have
+    // something to restore from.
+    if let Some(restore) = &cdb.spec.restore {
+        if restore.volume_snapshot.is_some() {
+            debug!("Reconciling VolumeSnapshotContent and VolumeSnapshot for restore");
+            reconcile_volume_snapshot_restore(cdb, ctx.clone()).await?;
+        }
+    }
+    debug!("Setting up VolumeSnapshotContent and VolumeSnapshot for restore");
 
     debug!("Generating CNPG spec");
     let mut cluster = cnpg_cluster_from_cdb(cdb, Some(pods_to_fence), requires_load);

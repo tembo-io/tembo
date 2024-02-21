@@ -277,6 +277,10 @@ pub struct Restore {
     /// s3Credentials is the S3 credentials to use for backups.
     #[serde(rename = "s3Credentials")]
     pub s3_credentials: Option<S3Credentials>,
+
+    /// volumeSnapshot is a boolean to enable restoring from a Volume Snapshot
+    #[serde(rename = "volumeSnapshot")]
+    pub volume_snapshot: Option<bool>,
 }
 
 /// A connection pooler is a tool used to manage database connections, sitting
