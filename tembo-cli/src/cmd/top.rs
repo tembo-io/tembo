@@ -78,7 +78,7 @@ async fn fetch_metrics_loop(
         .as_ref()
         .expect("JWT Token is not configured");
     headers.insert("Authorization", format!("Bearer {}", jwt_token).parse()?);
-    let mut interval = interval(Duration::from_secs(10));
+    let mut interval = interval(Duration::from_secs(2));
 
     loop {
         interval.tick().await;
@@ -146,7 +146,7 @@ async fn get_instance_org_name(
     instance.organization_name
 }
 
-//Function to tackle two tokio runtimes
+//Function to tackle async
 fn blocking(config: &Configuration, env: &Environment) -> Result<(), anyhow::Error> {
     let rt = Runtime::new().unwrap();
     let instance_settings = get_instance_settings(None, None)?;
