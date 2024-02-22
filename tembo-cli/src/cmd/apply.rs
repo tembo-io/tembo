@@ -878,9 +878,17 @@ async fn get_loadable_libraries(
 
             let trunk_projects: Vec<TrunkProject> = serde_json::from_str(&response)?;
 
+            // If more than 1 trunk_project is returned then skip adding "shared_preload_libraries"
+            if trunk_projects.len() > 1 {
+                return Ok(shared_preload_libraries);
+            }
+
             for trunk_project in trunk_projects.iter() {
                 if let Some(extensions) = trunk_project.extensions.as_ref() {
                     for trunk_extension in extensions.iter() {
+                        if trunk_extension.extension_name != ext.name {
+                            continue;
+                        }
                         if let Some(loadable_lib) = trunk_extension.loadable_libraries.as_ref() {
                             for loadable_lib in loadable_lib.iter() {
                                 shared_preload_libraries.push(Library {

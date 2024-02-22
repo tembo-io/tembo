@@ -126,6 +126,7 @@ pub struct TrunkProject {
 
 #[derive(Serialize, Deserialize)]
 pub struct TrunkExtension {
+    pub extension_name: String,
     pub loadable_libraries: Option<Vec<LoadableLibrary>>,
 }
 
