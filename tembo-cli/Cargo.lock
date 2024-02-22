@@ -3822,7 +3822,6 @@ dependencies = [
  "controller",
  "curl",
  "dateparser",
- "futures",
  "home",
  "hyper",
  "itertools 0.12.1",
