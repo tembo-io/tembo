@@ -92,6 +92,7 @@ extensions:
         enabled: true
         version: 3.4.0
   - name: mobilitydb
+    locations:
       - database: postgres
         enabled: true
         version: 1.1.0
