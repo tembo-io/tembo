@@ -22,6 +22,7 @@ use std::{
     thread::sleep,
     time::Duration,
 };
+use tembo::cli::tembo_config::Library;
 use tembo_stacks::apps::app::merge_app_reqs;
 use tembo_stacks::apps::app::merge_options;
 use tembo_stacks::apps::types::MergedConfigs;
@@ -45,13 +46,12 @@ use crate::cli::sqlx_utils::SqlxUtils;
 use crate::cli::tembo_config;
 use crate::cli::tembo_config::InstanceSettings;
 use crate::cli::tembo_config::OverlayInstanceSettings;
+use crate::cli::tembo_config::TrunkProject;
 use crate::tui;
 use crate::{
     cli::context::{get_current_context, Environment, Profile, Target},
     tui::{clean_console, colors, instance_started, white_confirmation},
 };
-use serde::Deserialize;
-use serde::Serialize;
 use tera::{Context, Tera};
 
 const DOCKERFILE_NAME: &str = "Dockerfile";
@@ -66,29 +66,6 @@ pub struct ApplyCommand {
     pub merge: Option<String>,
     #[clap(long, short = 's')]
     pub set: Option<String>,
-}
-
-#[derive(Clone)]
-struct Library {
-    name: String,
-    priority: i32,
-}
-
-#[derive(Serialize, Deserialize)]
-struct TrunkProject {
-    name: String,
-    extensions: Option<Vec<TrunkExtension>>,
-}
-
-#[derive(Serialize, Deserialize)]
-struct TrunkExtension {
-    loadable_libraries: Option<Vec<LoadableLibrary>>,
-}
-
-#[derive(Serialize, Deserialize)]
-struct LoadableLibrary {
-    library_name: String,
-    priority: i32,
 }
 
 pub fn execute(

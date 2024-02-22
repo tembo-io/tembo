@@ -111,3 +111,26 @@ pub struct Extension {
     pub trunk_project: Option<String>,
     pub trunk_project_version: Option<String>,
 }
+
+#[derive(Clone)]
+pub struct Library {
+    pub name: String,
+    pub priority: i32,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct TrunkProject {
+    pub name: String,
+    pub extensions: Option<Vec<TrunkExtension>>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct TrunkExtension {
+    pub loadable_libraries: Option<Vec<LoadableLibrary>>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct LoadableLibrary {
+    pub library_name: String,
+    pub priority: i32,
+}
