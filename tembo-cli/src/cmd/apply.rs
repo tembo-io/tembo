@@ -525,24 +525,29 @@ fn get_postgres_config_cloud(instance_settings: &InstanceSettings) -> Vec<PgConf
     if instance_settings.postgres_configurations.is_some() {
         for (key, value) in instance_settings
             .postgres_configurations
-            .clone()
+            .as_ref()
             .unwrap()
             .iter()
         {
-            if value.is_str() {
-                pg_configs.push(PgConfig {
+            match value {
+                Value::String(string) => pg_configs.push(PgConfig {
                     name: key.to_owned(),
-                    value: value.to_string(),
-                })
-            } else if value.is_table() {
-                for row in value.as_table().iter() {
-                    for (k, v) in row.iter() {
+                    value: string.to_owned(),
+                }),
+                Value::Table(table) => {
+                    for (inner_key, value) in table {
+                        let value = match value {
+                            Value::String(str) => str.to_owned(),
+                            other => other.to_string(),
+                        };
+
                         pg_configs.push(PgConfig {
-                            name: key.to_owned() + "." + k,
-                            value: v.to_string(),
+                            name: format!("{key}.{inner_key}"),
+                            value,
                         })
                     }
                 }
+                _ => {}
             }
         }
     }
