@@ -39,7 +39,50 @@ pub async fn reconcile_volume_snapshot_restore(
     // Apply the VolumeSnapshot
     apply_volume_snapshot(cdb, &client, &vs).await?;
 
+    // We need to wait for the snapshot to become ready before we can proceed
+    is_snapshot_ready(&client, &vs).await?;
+
     Ok(vs)
+}
+
+async fn is_snapshot_ready(client: &Client, vs: &VolumeSnapshot) -> Result<(), Action> {
+    let name = vs
+        .metadata
+        .name
+        .as_ref()
+        .ok_or_else(|| Action::requeue(tokio::time::Duration::from_secs(300)))?;
+    let namespace = vs
+        .metadata
+        .namespace
+        .as_ref()
+        .ok_or_else(|| Action::requeue(tokio::time::Duration::from_secs(300)))?;
+
+    let vs_api: Api<VolumeSnapshot> = Api::namespaced(client.clone(), namespace);
+    let lp = ListParams::default().fields(&format!("metadata.name={}", name));
+    let mut ready = false;
+    let mut attempts = 0;
+
+    while !ready && attempts < 10 {
+        let vs = vs_api.list(&lp).await.map_err(|e| {
+            error!("Error listing VolumeSnapshots: {}", e);
+            Action::requeue(tokio::time::Duration::from_secs(300))
+        })?;
+
+        if let Some(status) = vs.items.first().and_then(|vs| vs.status.as_ref()) {
+            ready = status.ready_to_use.unwrap_or(false);
+        }
+
+        if !ready {
+            tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
+            attempts += 1;
+        }
+    }
+
+    if !ready {
+        return Err(Action::requeue(tokio::time::Duration::from_secs(300)));
+    }
+
+    Ok(())
 }
 
 async fn apply_volume_snapshot(
