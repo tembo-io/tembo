@@ -13,4 +13,3 @@ RUN pg_ctl init
 # Set permissive authentication
 RUN echo "host all all 0.0.0.0/0 trust" >> ${PGDATA}/pg_hba.conf
 COPY postgresql.conf ${PGDATA}/postgresql.conf
-
