@@ -287,6 +287,7 @@ mod tests {
         apis::coredb_types::CoreDB,
         snapshots::volumesnapshotcontents_crd::{
             VolumeSnapshotContent, VolumeSnapshotContentSource, VolumeSnapshotContentSpec,
+            VolumeSnapshotContentStatus,
         },
     };
     use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
@@ -343,7 +344,13 @@ mod tests {
                 volume_snapshot_class_name: Some("test-class".to_string()),
                 ..VolumeSnapshotContentSpec::default()
             },
-            status: None,
+            status: Some(VolumeSnapshotContentStatus {
+                creation_time: Some(1708542600948000000),
+                ready_to_use: Some(true),
+                restore_size: Some(10737418240),
+                snapshot_handle: Some("snap-01234567abcdef890".to_string()),
+                ..VolumeSnapshotContentStatus::default()
+            }),
         };
 
         let result = generate_volume_snapshot_content(&cdb, &snapshot_content).unwrap();
@@ -351,7 +358,7 @@ mod tests {
         assert_eq!(result.spec.driver, "test-driver");
         assert_eq!(
             result.spec.source.snapshot_handle,
-            Some("test-volume-handle".to_string())
+            Some("snap-01234567abcdef890".to_string())
         );
         assert_eq!(
             result.spec.volume_snapshot_class_name,
