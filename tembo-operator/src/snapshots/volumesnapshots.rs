@@ -431,7 +431,7 @@ mod tests {
         // Assertions
         assert_eq!(
             result.metadata.name.unwrap(),
-            format!("{}-restore", cdb.name_any())
+            format!("{}-restore-vs", cdb.name_any())
         );
         assert_eq!(
             result.spec.source.volume_snapshot_content_name,
