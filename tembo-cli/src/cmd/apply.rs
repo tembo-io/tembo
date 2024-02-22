@@ -256,7 +256,7 @@ fn docker_apply_instance(
             instance_setting.final_extensions.as_ref(),
             instance_setting.postgres_configurations.clone(),
             &pg_configs,
-        ),
+        )?,
         true,
     )?;
 
@@ -769,7 +769,7 @@ fn get_postgres_config(
     extensions: Option<&Vec<ControllerExtension>>,
     instance_ps_config: Option<HashMap<String, Value>>,
     postgres_configs: &std::option::Option<Vec<ControllerPgConfig>>,
-) -> String {
+) -> Result<String, Error> {
     let mut postgres_config = String::from("");
     let mut shared_preload_libraries: Vec<Library> = Vec::new();
 
@@ -834,26 +834,32 @@ fn get_postgres_config(
         }
     }
 
-    let final_lodable_libs = Runtime::new().unwrap().block_on(get_loadable_libraries(
+    let maybe_final_loadable_libs = Runtime::new().unwrap().block_on(get_loadable_libraries(
         shared_preload_libraries.clone(),
         extensions,
     ));
 
-    let config = final_lodable_libs
-        .unwrap()
-        .into_iter()
-        .unique_by(|f| f.name.clone())
-        .sorted_by_key(|s| s.priority)
-        .map(|x| x.name.to_string() + ",")
-        .collect::<String>();
+    match maybe_final_loadable_libs {
+        Ok(l) => {
+            let config = l
+                .into_iter()
+                .unique_by(|f| f.name.clone())
+                .sorted_by_key(|s| s.priority)
+                .map(|x| x.name.to_string() + ",")
+                .collect::<String>();
 
-    let final_libs = config.split_at(config.len() - 1);
+            let final_libs = config.split_at(config.len() - 1);
 
-    let libs_config = format!("shared_preload_libraries = '{}'", final_libs.0);
+            let libs_config = format!("shared_preload_libraries = '{}'", final_libs.0);
 
-    postgres_config.push_str(&libs_config);
+            postgres_config.push_str(&libs_config);
+        }
+        Err(error) => {
+            return Err(error);
+        }
+    }
 
-    postgres_config
+    Ok(postgres_config)
 }
 
 async fn get_loadable_libraries(
@@ -870,7 +876,7 @@ async fn get_loadable_libraries(
                 .text()
                 .await?;
 
-            let trunk_projects: Vec<TrunkProject> = serde_json::from_str(&response).unwrap();
+            let trunk_projects: Vec<TrunkProject> = serde_json::from_str(&response)?;
 
             for trunk_project in trunk_projects.iter() {
                 if let Some(extensions) = trunk_project.extensions.as_ref() {
