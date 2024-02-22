@@ -50,11 +50,14 @@ use crate::{
     cli::context::{get_current_context, Environment, Profile, Target},
     tui::{clean_console, colors, instance_started, white_confirmation},
 };
+use serde::Deserialize;
+use serde::Serialize;
 use tera::{Context, Tera};
 
 const DOCKERFILE_NAME: &str = "Dockerfile";
 const DOCKERCOMPOSE_NAME: &str = "docker-compose.yml";
 const POSTGRESCONF_NAME: &str = "postgres.conf";
+const MAX_INT32: i32 = 2147483647;
 
 /// Deploys a tembo.toml file
 #[derive(Args)]
@@ -63,6 +66,29 @@ pub struct ApplyCommand {
     pub merge: Option<String>,
     #[clap(long, short = 's')]
     pub set: Option<String>,
+}
+
+#[derive(Clone)]
+struct Library {
+    name: String,
+    priority: i32,
+}
+
+#[derive(Serialize, Deserialize)]
+struct TrunkProject {
+    name: String,
+    extensions: Option<Vec<TrunkExtension>>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct TrunkExtension {
+    loadable_libraries: Option<Vec<LoadableLibrary>>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct LoadableLibrary {
+    library_name: String,
+    priority: i32,
 }
 
 pub fn execute(
@@ -250,6 +276,7 @@ fn docker_apply_instance(
         POSTGRESCONF_NAME.to_string(),
         instance_setting.instance_name.clone() + "/" + POSTGRESCONF_NAME,
         get_postgres_config(
+            instance_setting.final_extensions.as_ref(),
             instance_setting.postgres_configurations.clone(),
             &pg_configs,
         ),
@@ -762,17 +789,21 @@ pub fn get_rendered_dockerfile(
 }
 
 fn get_postgres_config(
+    extensions: Option<&Vec<ControllerExtension>>,
     instance_ps_config: Option<HashMap<String, Value>>,
     postgres_configs: &std::option::Option<Vec<ControllerPgConfig>>,
 ) -> String {
     let mut postgres_config = String::from("");
-    let mut shared_preload_libraries: Vec<String> = Vec::new();
+    let mut shared_preload_libraries: Vec<Library> = Vec::new();
 
     if let Some(ps_config) = postgres_configs {
         for p_config in ps_config.clone().into_iter() {
             match p_config.name.as_str() {
                 "shared_preload_libraries" => {
-                    shared_preload_libraries.push(p_config.value.to_string());
+                    shared_preload_libraries.push(Library {
+                        name: p_config.value.to_string(),
+                        priority: MAX_INT32,
+                    });
                 }
                 _ => {
                     match p_config.value {
@@ -799,7 +830,10 @@ fn get_postgres_config(
         for (key, value) in ps_config.iter() {
             match key.as_str() {
                 "shared_preload_libraries" => {
-                    shared_preload_libraries.push(value.as_str().unwrap().to_string());
+                    shared_preload_libraries.push(Library {
+                        name: value.as_str().unwrap().to_string(),
+                        priority: MAX_INT32,
+                    });
                 }
                 _ => {
                     if value.is_str() {
@@ -823,10 +857,17 @@ fn get_postgres_config(
         }
     }
 
-    let config = shared_preload_libraries
+    let final_lodable_libs = Runtime::new().unwrap().block_on(get_loadable_libraries(
+        shared_preload_libraries.clone(),
+        extensions,
+    ));
+
+    let config = final_lodable_libs
+        .unwrap()
         .into_iter()
-        .unique()
-        .map(|x| x.to_string() + ",")
+        .unique_by(|f| f.name.clone())
+        .sorted_by_key(|s| s.priority)
+        .map(|x| x.name.to_string() + ",")
         .collect::<String>();
 
     let final_libs = config.split_at(config.len() - 1);
@@ -836,6 +877,41 @@ fn get_postgres_config(
     postgres_config.push_str(&libs_config);
 
     postgres_config
+}
+
+async fn get_loadable_libraries(
+    mut shared_preload_libraries: Vec<Library>,
+    maybe_extensions: Option<&Vec<ControllerExtension>>,
+) -> Result<Vec<Library>, anyhow::Error> {
+    if let Some(extensions) = maybe_extensions {
+        let trunk_projects_url =
+            "https://registry.pgtrunk.io/api/v1/trunk-projects?extension-name=";
+
+        for ext in extensions.iter() {
+            let response = reqwest::get(format!("{}{}", trunk_projects_url, ext.name))
+                .await?
+                .text()
+                .await?;
+
+            let mut trunk_projects: Vec<TrunkProject> = serde_json::from_str(&response).unwrap();
+
+            for trunk_project in trunk_projects.iter_mut() {
+                if let Some(extensions) = trunk_project.extensions.as_ref() {
+                    for trunk_extension in extensions.iter() {
+                        if let Some(loadable_lib) = trunk_extension.loadable_libraries.as_ref() {
+                            for loadable_lib in loadable_lib.iter() {
+                                shared_preload_libraries.push(Library {
+                                    name: loadable_lib.library_name.clone(),
+                                    priority: loadable_lib.priority,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(shared_preload_libraries)
 }
 
 pub fn get_rendered_dockercompose(
