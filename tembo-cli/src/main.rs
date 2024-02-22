@@ -74,7 +74,7 @@ fn main() -> Result<(), anyhow::Error> {
         }
         SubCommands::Top(_top_cmd) => {
             top::execute()?;
-        },
+        }
     }
 
     Ok(())
