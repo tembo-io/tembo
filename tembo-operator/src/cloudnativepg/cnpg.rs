@@ -1450,7 +1450,7 @@ fn cnpg_scheduled_backup(
         .filter(|vs| vs.enabled)
         .map(|_| ScheduledBackup {
             metadata: ObjectMeta {
-                name: Some(name.to_string() + "-snapshot"),
+                name: Some(name.to_string() + "-snap"),
                 namespace: Some(namespace),
                 ..ObjectMeta::default()
             },
