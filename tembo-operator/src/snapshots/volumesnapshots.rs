@@ -134,11 +134,11 @@ fn generate_volume_snapshot_content(
         .volume_snapshot_class_name
         .as_ref()
         .ok_or_else(|| Action::requeue(tokio::time::Duration::from_secs(300)))?;
-    let snapshot = format!("{}-restore", name);
+    let snapshot = format!("{}-restore-vs", name);
 
     let vsc = VolumeSnapshotContent {
         metadata: ObjectMeta {
-            name: Some(format!("{}-restore", name)),
+            name: Some(format!("{}-restore-vsc", name)),
             namespace: Some(namespace.clone()),
             ..ObjectMeta::default()
         },
@@ -171,6 +171,10 @@ fn generate_volume_snapshot(
     cdb: &CoreDB,
     snapshot_content: &VolumeSnapshotContent,
 ) -> Result<VolumeSnapshot, Action> {
+    let name = cdb.name_any();
+    let namespace = cdb
+        .namespace()
+        .ok_or_else(|| Action::requeue(tokio::time::Duration::from_secs(300)))?;
     let volume_snapshot_content_name = snapshot_content
         .metadata
         .name
@@ -184,8 +188,8 @@ fn generate_volume_snapshot(
 
     let vs = VolumeSnapshot {
         metadata: ObjectMeta {
-            name: Some(format!("{}-restore", cdb.name_any())),
-            namespace: cdb.namespace(),
+            name: Some(format!("{}-restore-vs", name)),
+            namespace: Some(namespace),
             ..ObjectMeta::default()
         },
         spec: VolumeSnapshotSpec {
