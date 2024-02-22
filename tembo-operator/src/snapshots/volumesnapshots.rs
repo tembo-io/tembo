@@ -122,7 +122,12 @@ fn generate_volume_snapshot_content(
         .namespace()
         .ok_or_else(|| Action::requeue(tokio::time::Duration::from_secs(300)))?;
 
-    let volume_handle = &snapshot_content.spec.source.volume_handle;
+    let snapshot_handle = snapshot_content
+        .status
+        .as_ref()
+        .and_then(|status| status.snapshot_handle.as_ref())
+        .ok_or_else(|| Action::requeue(tokio::time::Duration::from_secs(300)))?
+        .to_string();
     let driver = &snapshot_content.spec.driver;
     let volume_snapshot_class_name = snapshot_content
         .spec
@@ -141,7 +146,7 @@ fn generate_volume_snapshot_content(
             deletion_policy: VolumeSnapshotContentDeletionPolicy::Retain,
             driver: driver.to_string(),
             source: VolumeSnapshotContentSource {
-                snapshot_handle: volume_handle.clone(),
+                snapshot_handle: Some(snapshot_handle),
                 ..VolumeSnapshotContentSource::default()
             },
             volume_snapshot_class_name: Some(volume_snapshot_class_name.to_string()),
