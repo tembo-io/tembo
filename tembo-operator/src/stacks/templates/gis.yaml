@@ -3,9 +3,9 @@ description: Postgres for geospatial workloads.
 repository: "quay.io/tembo"
 organization: tembo
 images:
-  14: "standard-cnpg:14-a0a5ab5"
-  15: "standard-cnpg:15-a0a5ab5"
-  16: "standard-cnpg:16-a0a5ab5"
+  14: "geo-cnpg:14-8f5366e"
+  15: "geo-cnpg:15-8f5366e"
+  16: "geo-cnpg:16-8f5366e"
 stack_version: 0.1.0
 compute_templates:
   - cpu: 0.25
@@ -80,8 +80,6 @@ postgres_config:
 trunk_installs:
   - name: pg_stat_statements
     version: 1.10.0
-  - name: postgis
-    version: 3.4.0
 extensions:
   - name: pg_stat_statements
     locations:
@@ -93,3 +91,8 @@ extensions:
       - database: postgres
         enabled: true
         version: 3.4.0
+  - name: mobilitydb
+    locations:
+      - database: postgres
+        enabled: true
+        version: 1.1.0
