@@ -18,7 +18,7 @@ use kube::{
     Api, ResourceExt,
 };
 use std::sync::Arc;
-use tracing::{debug, error};
+use tracing::{debug, error, info};
 
 // Main function to reconcile the VolumeSnapshotContent and VolumeSnapshot
 pub async fn reconcile_volume_snapshot_restore(
