@@ -41,8 +41,7 @@ struct GlobalOpts {
     verbose: bool,
 }
 
-#[tokio::main]
- async fn main() -> Result<(), anyhow::Error> {
+fn main() -> Result<(), anyhow::Error> {
     let app = App::parse();
 
     match app.command {
