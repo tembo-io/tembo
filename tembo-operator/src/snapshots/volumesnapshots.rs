@@ -82,6 +82,8 @@ async fn is_snapshot_ready(client: &Client, vs: &VolumeSnapshot) -> Result<(), A
         return Err(Action::requeue(tokio::time::Duration::from_secs(300)));
     }
 
+    info!("VolumeSnapshot {} is ready.", name);
+
     Ok(())
 }
 

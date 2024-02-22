@@ -514,7 +514,7 @@ fn cnpg_cluster_bootstrap_recovery_volume_snapshots(
                 storage: ClusterBootstrapRecoveryVolumeSnapshotsStorage {
                     // todo: Work on getting this from the VolumeSnapshot we created
                     // during the restore process
-                    name: format!("{}-restore", cdb.name_any()),
+                    name: format!("{}-restore-vs", cdb.name_any()),
                     kind: "VolumeSnapshot".to_string(),
                     api_group: Some("snapshot.storage.k8s.io".to_string()),
                 },
