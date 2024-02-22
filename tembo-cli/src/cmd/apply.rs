@@ -870,9 +870,9 @@ async fn get_loadable_libraries(
                 .text()
                 .await?;
 
-            let mut trunk_projects: Vec<TrunkProject> = serde_json::from_str(&response).unwrap();
+            let trunk_projects: Vec<TrunkProject> = serde_json::from_str(&response).unwrap();
 
-            for trunk_project in trunk_projects.iter_mut() {
+            for trunk_project in trunk_projects.iter() {
                 if let Some(extensions) = trunk_project.extensions.as_ref() {
                     for trunk_extension in extensions.iter() {
                         if let Some(loadable_lib) = trunk_extension.loadable_libraries.as_ref() {
