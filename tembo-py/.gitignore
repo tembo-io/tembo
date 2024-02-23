@@ -19,8 +19,5 @@ cov.xml
 .vscode
 *.json
 
-# py files on root of project
-*.py
-
 # files and dirs beginning with a underscore
 _*
