@@ -6,7 +6,7 @@ use std::collections::BTreeMap;
 
 use crate::{
     apis::coredb_types::{
-        Backup, ConnectionPooler, PgBouncer, S3Credentials, ServiceAccountTemplate,
+        Backup, ConnectionPooler, PgBouncer, S3Credentials, ServiceAccountTemplate, VolumeSnapshot,
     },
     cloudnativepg::poolers::{PoolerPgbouncerPoolMode, PoolerTemplateSpecContainersResources},
     extensions::types::{Extension, TrunkInstall},
@@ -139,6 +139,7 @@ pub fn default_backup() -> Backup {
         retentionPolicy: default_retention_policy(),
         schedule: default_backup_schedule(),
         s3_credentials: default_s3_credentials(),
+        volume_snapshot: default_volume_snapshot(),
         ..Default::default()
     }
 }
@@ -208,5 +209,12 @@ pub fn default_s3_credentials() -> Option<S3Credentials> {
     Some(S3Credentials {
         inherit_from_iam_role: Some(true),
         ..Default::default()
+    })
+}
+
+pub fn default_volume_snapshot() -> Option<VolumeSnapshot> {
+    Some(VolumeSnapshot {
+        enabled: false,
+        snapshot_class: None,
     })
 }

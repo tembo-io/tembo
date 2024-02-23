@@ -34,6 +34,7 @@ pub mod psql;
 mod rbac;
 mod secret;
 mod service;
+pub mod snapshots;
 mod trunk;
 
 pub const RESTARTED_AT: &str = "kubectl.kubernetes.io/restartedAt";
