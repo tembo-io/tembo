@@ -46,7 +46,7 @@ reqwest = { version = "^0.11", default-features = false, features = [
   "default-tls",
   "blocking",
 ] }
-hyper = { version = "0.14", features = ["full"] }
+hyper = "0.14.27"
 rpassword = "7.2.0"
 jwt = "0.16.0"
 dateparser = "0.2.0"
