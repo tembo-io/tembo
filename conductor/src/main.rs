@@ -679,7 +679,7 @@ async fn init_cloud_perms(
                 ConductorError::NameOrNamespaceNotFound("Namespace not found".to_string())
             })?;
         // Lookup the CoreDB of the instance we are restoring from
-        let restore_spec = lookup_coredb_for_restore(client.clone(), namespace).await?;
+        let restore_spec = lookup_coredb(client.clone(), namespace).await?;
 
         // Check if volume snapshots are enabled on the CoreDB we are restoring from
         let volume_snapshot_enabled = restore_spec
@@ -713,13 +713,10 @@ async fn init_cloud_perms(
 // For restore events we need to lookup the CoreDB of the instance we are restoring from
 // to check if volume snapshots are enabled. If they are we need to enable them on the
 // CoreDB we are restoring to.
-async fn lookup_coredb_for_restore(
-    client: Client,
-    namespace: &str,
-) -> Result<CoreDBSpec, ConductorError> {
-    let restore_from_spec = get_one(client, namespace).await;
-    match restore_from_spec {
-        Ok(spec) => Ok(spec.spec),
+async fn lookup_coredb(client: Client, namespace: &str) -> Result<CoreDBSpec, ConductorError> {
+    let spec = get_one(client, namespace).await;
+    match spec {
+        Ok(s) => Ok(s.spec),
         Err(e) => Err(e),
     }
 }
@@ -731,10 +728,7 @@ fn gen_volume_snapshot_spec(msg: &Message<CRUDevent>) -> Option<VolumeSnapshot> 
     // We need to set orgs in dev, staging and prod to use volume snapshots
     // tembo-test prod: org_2UJ2WPYFsE42Cos6mlmIuwIIJ4V
     // tembo-test dev/staging: org_2YW4TYIMI1LeOqJTXIyvkHOHCUo
-    let orgs = [
-        "org_2UJ2WPYFsE42Cos6mlmIuwIIJ4V",
-        "org_2YW4TYIMI1LeOqJTXIyvkHOHCUo",
-    ];
+    let orgs = ["org_2YW4TYIMI1LeOqJTXIyvkHOHCUo"];
 
     if orgs.contains(&msg.message.org_id.as_str()) {
         info!("Volume snapshot enabled for org_id: {}", msg.message.org_id);
