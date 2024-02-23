@@ -20,31 +20,7 @@ on:
         - 'tembo-py/**'
 
 jobs:
-  setup:
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python 3.11.0
-      uses: actions/setup-python@v5
-      with:
-        python-version: 3.11.1
-    - name: Install dependencies
-      run: |
-        curl -sSL https://install.python-poetry.org | POETRY_VERSION=1.7.1 python3 -
-        poetry install
   lints:
-    needs: setup
-    runs-on: ubuntu-latest
-    steps:
-    - uses: actions/checkout@v4
-    - name: Set up Python 3.11.0
-      uses: actions/setup-python@v5
-      with:
-        python-version: 3.11.1
-    - name: Lints / Type Checking
-      run: make check
-  tests:
-    needs: setup
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v4
@@ -52,6 +28,20 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: 3.11.1
+    - name: Setup
+      run: make setup
+    - name: Lints / Type Checking
+      run: make check
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python 3.11.1
+      uses: actions/setup-python@v5
+      with:
+        python-version: 3.11.1
+    - name: Setup
+      run: make setup
     - name: Unit and Integration Tests
       run: make test
   publish:
@@ -60,7 +50,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
     steps:
     - uses: actions/checkout@v4
-    - name: Set up Python 3.11.0
+    - name: Set up Python 3.11.1
       uses: actions/setup-python@v5
       with:
         python-version: 3.11.1
