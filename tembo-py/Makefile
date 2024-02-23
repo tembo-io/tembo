@@ -4,7 +4,6 @@ format:
 	poetry run ruff check --silent --fix --exit-zero ${SOURCE_OBJECTS}
 	poetry run black ${SOURCE_OBJECTS}
 
-
 check:
 	poetry run ruff check ${SOURCE_OBJECTS}
 	poetry run black --check ${SOURCE_OBJECTS}
