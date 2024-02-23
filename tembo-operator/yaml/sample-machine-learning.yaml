@@ -3,28 +3,28 @@ kind: CoreDB
 metadata:
   name: sample-machine-learning
 spec:
-  image: "quay.io/tembo/ml-cnpg:15.3.0-1-a3e532d"
+  image: "quay.io/tembo/ml-cnpg:15-a0a5ab5"
   trunk_installs:
     - name: pgvector
-      version: 0.5.1
+      version: 0.6.0
     - name: postgresml
       version: 2.7.1
     - name: pg_embedding
-      version: 0.1.0
-    - name: pg_cron
-      version: 1.5.2
-    - name: pgmq
-      version: 0.31.0
-    - name: vectorize
       version: 0.2.0
+    - name: pg_cron
+      version: 1.6.2
+    - name: pgmq
+      version: 1.1.1
+    - name: vectorize
+      version: 0.9.0
     - name: pg_later
-      version: 0.0.11
+      version: 0.1.0
   extensions:
     - name: vector
       locations:
         - database: postgres
           enabled: true
-          version: 0.5.0
+          version: 0.6.0
     - name: pgml
       locations:
         - database: postgres
@@ -34,19 +34,19 @@ spec:
       locations:
         - database: postgres
           enabled: true
-          version: 1.5.2
+          version: 1.6.2
     - name: pgmq
       locations:
         - database: postgres
           enabled: true
-          version: 0.31.0
+          version: 1.1.1
     - name: vectorize
       locations:
         - database: postgres
           enabled: true
-          version: 0.2.0
+          version: 0.9.0
     - name: pg_later
       locations:
         - database: postgres
           enabled: true
-          version: 0.0.11
+          version: 0.1.0

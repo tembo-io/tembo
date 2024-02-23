@@ -3,7 +3,7 @@ kind: CoreDB
 metadata:
   name: sample-oltp
 spec:
-  image: "quay.io/tembo/standard-cnpg:15.3.0-1-45c2054"
+  image: "quay.io/tembo/standard-cnpg:15-a0a5ab5"
   stop: false
   stack:
     name: OLTP
@@ -26,7 +26,7 @@ spec:
         value: "on"
       - name: log_min_duration_statement # https://www.postgresql.org/docs/15/runtime-config-logging.html
         value: "1000"
-      - name: auto_explain.log_min_duration_statement
+      - name: auto_explain.log_min_duration
         value: "1000ms"
       - name: statement_timeout
         value: "86400000"

@@ -16,7 +16,7 @@ spec:
         - enabled: true
           database: postgres
           schema: public
-          version: "1.5.2"
+          version: "1.6.2"
   runtime_config:
     - name: shared_preload_libraries
       value: 'pg_cron,pg_stat_statements'

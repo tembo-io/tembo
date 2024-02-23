@@ -10,6 +10,7 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::thread::sleep;
 use std::time::Duration;
+use tembo::cli::sqlx_utils::SqlxUtils;
 
 const CARGO_BIN: &str = "tembo";
 
@@ -151,7 +152,7 @@ async fn multiple_instances() -> Result<(), Box<dyn Error>> {
     assert_can_connect(instance1_name.to_string()).await?;
     assert_can_connect(instance2_name.to_string()).await?;
 
-    execute_sql(
+    SqlxUtils::execute_sql(
         instance2_name.to_string(),
         "create table public.todos (id serial primary key,
             done boolean not null default false,
@@ -162,7 +163,7 @@ async fn multiple_instances() -> Result<(), Box<dyn Error>> {
     )
     .await?;
 
-    execute_sql(
+    SqlxUtils::execute_sql(
         instance2_name.to_string(),
         "insert into public.todos (task) values
         ('finish tutorial 0'), ('pat self on back');"
@@ -172,7 +173,7 @@ async fn multiple_instances() -> Result<(), Box<dyn Error>> {
 
     let mut easy = Easy::new();
     easy.url(&format!(
-        "http://{}.local.tembo.io:8000/rest/v1/todos",
+        "http://{}.local.tembo.io:8000/restapi/v1/todos",
         instance2_name.to_string()
     ))
     .unwrap();
@@ -212,28 +213,6 @@ async fn get_output_from_sql(instance_name: String, sql: String) -> Result<Strin
     println!("{}", result.0);
 
     Ok(result.0.to_string())
-}
-
-async fn execute_sql(instance_name: String, sql: String) -> Result<(), Box<dyn Error>> {
-    // Configure SQLx connection options
-    let connect_options = PgConnectOptions::new()
-        .username("postgres")
-        .password("postgres")
-        .host(&format!("{}.local.tembo.io", instance_name))
-        .database("postgres");
-
-    // Connect to the database
-    let pool = sqlx::PgPool::connect_with(connect_options).await?;
-
-    // Simple query
-    sqlx::query(&sql).fetch_optional(&pool).await?;
-
-    println!(
-        "Successfully connected to the database: {}",
-        &format!("{}.local.tembo.io", instance_name)
-    );
-
-    Ok(())
 }
 
 async fn assert_can_connect(instance_name: String) -> Result<(), Box<dyn Error>> {

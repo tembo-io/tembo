@@ -28,7 +28,6 @@ cargo install tembo-cli
 The `tembo init` command initializes your environment with following files. Run init in the directory you want to create the `tembo.toml` file.
 
 * `tembo.toml` example configuration file
-* `migrations` directory for sql migrations
 * `~/.tembo/context` file with various contexts user can connect to
 * `~/.tembo/credentials` file with credentials & api urls
 
@@ -51,7 +50,7 @@ Validates `tembo.toml` and other configurations files.
 
 #### `tembo apply`
 
-Validates tembo.toml (same as `tembo validate`) and applies the changes to the context selected. It applies changes and runs migration for all databases.
+Validates tembo.toml (same as `tembo validate`) and applies the changes to the context selected.
 
 ##### Environment:
 
@@ -60,7 +59,6 @@ Validates tembo.toml (same as `tembo validate`) and applies the changes to the c
     * generates `Dockerfile` for each instance & builds a docker image
     * generates `docker-compose` to provision all instances
     * runs `docker-compose up -d` to spin up all instances
-    * runs `sqlx migration` against the instances
 
   * ###### Tembo-Cloud: 
     * Creates/updates instance on tembo-cloud by calling the api against the appropriate environment

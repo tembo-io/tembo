@@ -41,7 +41,7 @@ jobs:
         kube_version:
           - '1.25.8'
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Install system dependencies
         run: |
           set -xe
@@ -53,7 +53,7 @@ jobs:
         uses: helm/kind-action@v1.7.0
         with:
           install_only: true
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
       - uses: Swatinem/rust-cache@v2

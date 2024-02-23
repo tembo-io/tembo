@@ -1,17 +1,18 @@
-use controller::app_service::types::{AppService, EnvVar};
-use k8s_openapi::api::core::v1::ResourceRequirements;
+use controller::app_service::types::AppService;
+use controller::extensions::types::Extension as ControllerExtension;
 use serde::{Deserialize, Deserializer, Serialize};
 use std::collections::HashMap;
+use tembo_stacks::apps::types::AppType;
 use toml::Value;
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TemboConfig {
     pub version: String,
     pub defaults: InstanceSettings,
 }
 
 // Config struct holds to data from the `[config]` section.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct InstanceSettings {
     pub environment: String,
     pub instance_name: String,
@@ -33,30 +34,11 @@ pub struct InstanceSettings {
         default = "default_extensions"
     )]
     pub extensions: Option<HashMap<String, Extension>>,
-    pub app_services: Option<HashMap<String, AppType>>,
+    pub app_services: Option<Vec<AppType>>,
+    pub controller_app_services: Option<HashMap<String, AppService>>,
+    pub final_extensions: Option<Vec<ControllerExtension>>,
     pub extra_domains_rw: Option<Vec<String>>,
     pub ip_allow_list: Option<Vec<String>>,
-}
-
-#[allow(clippy::upper_case_acronyms)]
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub enum AppType {
-    #[serde(rename = "restapi")]
-    RestAPI(Option<AppConfig>),
-    #[serde(rename = "http")]
-    HTTP(Option<AppConfig>),
-    #[serde(rename = "mq-api")]
-    MQ(Option<AppConfig>),
-    #[serde(rename = "embeddings")]
-    Embeddings(Option<AppConfig>),
-    #[serde(rename = "custom")]
-    Custom(AppService),
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
-pub struct AppConfig {
-    pub env: Option<Vec<EnvVar>>,
-    pub resources: Option<ResourceRequirements>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
@@ -128,4 +110,28 @@ pub struct Extension {
     pub enabled: bool,
     pub trunk_project: Option<String>,
     pub trunk_project_version: Option<String>,
+}
+
+#[derive(Clone)]
+pub struct Library {
+    pub name: String,
+    pub priority: i32,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct TrunkProject {
+    pub name: String,
+    pub extensions: Option<Vec<TrunkExtension>>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct TrunkExtension {
+    pub extension_name: String,
+    pub loadable_libraries: Option<Vec<LoadableLibrary>>,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct LoadableLibrary {
+    pub library_name: String,
+    pub priority: i32,
 }

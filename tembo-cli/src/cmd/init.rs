@@ -48,13 +48,6 @@ pub fn execute() -> Result<(), anyhow::Error> {
 
     FileUtils::download_file(filepath, filename, false)?;
 
-    match FileUtils::create_dir("migrations directory".to_string(), "migrations".to_string()) {
-        Ok(t) => t,
-        Err(e) => {
-            return Err(e);
-        }
-    }
-
     confirmation("Tembo initialized successfully!");
 
     Ok(())

@@ -417,9 +417,9 @@ dependencies = [
 
 [[package]]
 name = "controller"
-version = "0.34.0"
+version = "0.36.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54fa35dcf551ae5fe2e88b34e874591230a3b9340b9aeb68cd68e6ce915efac3"
+checksum = "1c6bdbeb72f960ddd2674a290fb911f476f14ca98ff6472257dacf763f3d4e48"
 dependencies = [
  "actix-web",
  "anyhow",
@@ -2269,7 +2269,7 @@ dependencies = [
 
 [[package]]
 name = "tembo-stacks"
-version = "0.1.1"
+version = "0.3.7"
 dependencies = [
  "anyhow",
  "controller",

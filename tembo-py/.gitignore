@@ -1,0 +1,23 @@
+data/
+
+**/*/__pycache__/
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+coverage-junit-unit-tests.xml
+coverage-report-unit-tests.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cov.xml
+.vscode
+*.json
+
+# files and dirs beginning with a underscore
+_*

@@ -4,4 +4,5 @@ pub mod delete;
 pub mod init;
 pub mod login;
 pub mod logs;
+pub mod top;
 pub mod validate;

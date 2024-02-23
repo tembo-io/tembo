@@ -699,9 +699,9 @@ checksum = "c2459377285ad874054d797f3ccebf984978aa39129f6eafde5cdc8315b612f8"
 
 [[package]]
 name = "controller"
-version = "0.26.1"
+version = "0.34.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bee23776d418e82587dcdb398093192249151f2cc62e1e6d5c7fb16e6ac42879"
+checksum = "54fa35dcf551ae5fe2e88b34e874591230a3b9340b9aeb68cd68e6ce915efac3"
 dependencies = [
  "actix-web",
  "anyhow",
@@ -865,6 +865,31 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c06d96137f14f244c37f989d9fff8f95e6c18b918e71f36638f8c49112e4c78f"
 dependencies = [
  "cfg-if",
+]
+
+[[package]]
+name = "crossterm"
+version = "0.27.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f476fe445d41c9e991fd07515a6f463074b782242ccf4a5b7b1d1012e70824df"
+dependencies = [
+ "bitflags 2.4.0",
+ "crossterm_winapi",
+ "libc",
+ "mio",
+ "parking_lot",
+ "signal-hook",
+ "signal-hook-mio",
+ "winapi",
+]
+
+[[package]]
+name = "crossterm_winapi"
+version = "0.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "acdd7c62a3665c7f6830a51635d9ac9b23ed385797f70a83bb8bafe9c572ab2b"
+dependencies = [
+ "winapi",
 ]
 
 [[package]]
@@ -1842,9 +1867,9 @@ dependencies = [
 
 [[package]]
 name = "itertools"
-version = "0.12.0"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25db6b064527c5d482d0423354fcd07a89a2dfe07b67892e62411946db7f07b0"
+checksum = "ba291022dbbd398a455acf126c1e341954079855bc60dfdda641363bd6922569"
 dependencies = [
  "either",
 ]
@@ -3529,6 +3554,27 @@ dependencies = [
 ]
 
 [[package]]
+name = "signal-hook"
+version = "0.3.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8621587d4798caf8eb44879d42e56b9a93ea5dcd315a6487c357130095b62801"
+dependencies = [
+ "libc",
+ "signal-hook-registry",
+]
+
+[[package]]
+name = "signal-hook-mio"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "29ad2e15f37ec9a6cc544097b78a1ec90001e9f71b81338ca39f430adaca99af"
+dependencies = [
+ "libc",
+ "mio",
+ "signal-hook",
+]
+
+[[package]]
 name = "signal-hook-registry"
 version = "1.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3664,7 +3710,7 @@ version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ce81b7bd7c4493975347ef60d8c7e8b742d4694f4c49f93e0a12ea263938176c"
 dependencies = [
- "itertools 0.12.0",
+ "itertools 0.12.1",
  "nom",
  "unicode_categories",
 ]
@@ -3918,7 +3964,7 @@ dependencies = [
 
 [[package]]
 name = "tembo-cli"
-version = "0.16.0"
+version = "0.18.0"
 dependencies = [
  "actix-cors",
  "actix-service",
@@ -3933,12 +3979,14 @@ dependencies = [
  "cli-table",
  "colorful",
  "controller",
+ "crossterm",
  "curl",
  "dateparser",
  "dirs",
  "futures",
  "home",
  "hyper",
+ "itertools 0.12.1",
  "jsonwebtoken",
  "jwt",
  "k8s-openapi",
@@ -3956,6 +4004,7 @@ dependencies = [
  "simplelog",
  "spinoff",
  "sqlx",
+ "tembo-stacks",
  "temboclient",
  "tembodataclient",
  "tera",
@@ -3964,6 +4013,24 @@ dependencies = [
  "toml",
  "urlencoding",
  "webbrowser",
+]
+
+[[package]]
+name = "tembo-stacks"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c666eb66e4b941900a00e8e9bd3ccca3f2f3b66093745692a9a721a9837d1185"
+dependencies = [
+ "anyhow",
+ "controller",
+ "futures",
+ "k8s-openapi",
+ "lazy_static",
+ "schemars",
+ "serde",
+ "serde_yaml",
+ "tracing",
+ "utoipa",
 ]
 
 [[package]]
@@ -4671,6 +4738,7 @@ dependencies = [
  "proc-macro-error",
  "proc-macro2",
  "quote",
+ "regex",
  "syn 2.0.37",
 ]
 

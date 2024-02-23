@@ -8,6 +8,9 @@ images:
   16: "dw-cnpg:16-a0a5ab5"
 stack_version: 0.1.0
 compute_templates:
+  - cpu: 0.25
+    memory: 1Gi
+    instance_class: GeneralPurpose
   - cpu: 2
     memory: 8Gi
     instance_class: GeneralPurpose
@@ -50,16 +53,20 @@ postgres_config:
   - name: pg_stat_statements.track
     value: top
   - name: shared_preload_libraries
-    value: pg_stat_statements,pg_cron
+    value: pg_stat_statements,pg_cron,pg_later
   - name: track_io_timing
     value: "on"
   - name: wal_level
     value: logical
+  - name: pglater.host
+    value: postgresql:///postgres?host=/controller/run
 trunk_installs:
   - name: pg_stat_statements
     version: 1.10.0
   - name: hydra_columnar
     version: 1.0.0
+  - name: pg_later
+    version: 0.1.0
   - name: pg_partman
     version: 4.7.3
   - name: pg_cron
@@ -83,6 +90,11 @@ extensions:
       - database: postgres
         enabled: true
         version: "11.1-7"
+  - name: pg_later
+    locations:
+      - database: postgres
+        enabled: true
+        version: 0.1.0
   - name: pg_partman
     locations:
       - database: postgres

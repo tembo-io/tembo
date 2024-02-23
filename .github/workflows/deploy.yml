@@ -5,6 +5,9 @@ on:
   push:
     branches:
       - 'main'
+    paths-ignore:
+      - 'tembo-py/**'
+      - 'tembo-cli/**'
 
 jobs:
   find_directories:
@@ -16,7 +19,7 @@ jobs:
       branch_name: ${{ steps.versions.outputs.BRANCH_NAME }}
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Set version strings
         id: versions
         run: |
@@ -48,9 +51,9 @@ jobs:
       matrix: ${{ fromJson(needs.find_directories.outputs.build_images) }}
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Check out the coredb repo to reuse some actions
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: tembo-io/tembo
           path: ./.tembo
@@ -107,7 +110,7 @@ jobs:
       - build_and_push_images
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Check out the repo
         uses: ./.github/actions/argocd-update
         with:

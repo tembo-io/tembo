@@ -3,8 +3,12 @@ name: Cargo lint and test
 on:
   push:
     branches: ["main"]
+    paths-ignore:
+      - 'tembo-py/**'
   pull_request:
     branches: ["main"]
+    paths-ignore:
+      - 'tembo-py/**'
 
 jobs:
   find_directories:
@@ -14,7 +18,7 @@ jobs:
       directories: ${{ steps.find_directories.outputs.build_matrix }}
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Find directories with Dockerfiles that changed
         id: find_directories
         uses: ./.github/actions/find-changed-directories
@@ -35,22 +39,20 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.find_directories.outputs.directories) }}
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v4
       - name: Install system dependencies
         run: |
           set -xe
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev
       - name: Install minimal nightly with clippy and rustfmt
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@stable
         with:
-          profile: minimal
           toolchain: stable
           components: rustfmt, clippy
       - name: Install minimal stable with clippy and rustfmt
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@stable
         with:
-          profile: minimal
           toolchain: stable
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
@@ -78,8 +80,8 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.find_directories.outputs.directories) }}
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
       - name: Install system dependencies

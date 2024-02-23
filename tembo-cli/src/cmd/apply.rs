@@ -2,10 +2,19 @@ use anyhow::Context as AnyhowContext;
 use anyhow::Error;
 use clap::Args;
 use colorful::Colorful;
+use controller::apis::postgres_parameters::ConfigValue as ControllerConfigValue;
+use controller::apis::postgres_parameters::PgConfig as ControllerPgConfig;
+use controller::app_service::types::AppService;
+use controller::extensions::types::Extension as ControllerExtension;
+use controller::extensions::types::ExtensionInstallLocation as ControllerExtensionInstallLocation;
+use controller::extensions::types::TrunkInstall as ControllerTrunkInstall;
 use controller::stacks::get_stack;
 use controller::stacks::types::StackType as ControllerStackType;
+use itertools::Itertools;
 use log::info;
-use std::path::Path;
+use spinoff::spinners;
+use spinoff::Spinner;
+use std::fmt::Write;
 use std::{
     collections::HashMap,
     fs::{self},
@@ -13,6 +22,10 @@ use std::{
     thread::sleep,
     time::Duration,
 };
+use tembo::cli::tembo_config::Library;
+use tembo_stacks::apps::app::merge_app_reqs;
+use tembo_stacks::apps::app::merge_options;
+use tembo_stacks::apps::types::MergedConfigs;
 use temboclient::{
     apis::{
         configuration::Configuration,
@@ -25,6 +38,7 @@ use temboclient::{
 };
 use tembodataclient::apis::secrets_api::get_secret_v1;
 use tokio::runtime::Runtime;
+use toml::Value;
 
 use crate::cli::docker::Docker;
 use crate::cli::file_utils::FileUtils;
@@ -32,6 +46,7 @@ use crate::cli::sqlx_utils::SqlxUtils;
 use crate::cli::tembo_config;
 use crate::cli::tembo_config::InstanceSettings;
 use crate::cli::tembo_config::OverlayInstanceSettings;
+use crate::cli::tembo_config::TrunkProject;
 use crate::tui;
 use crate::{
     cli::context::{get_current_context, Environment, Profile, Target},
@@ -42,6 +57,7 @@ use tera::{Context, Tera};
 const DOCKERFILE_NAME: &str = "Dockerfile";
 const DOCKERCOMPOSE_NAME: &str = "docker-compose.yml";
 const POSTGRESCONF_NAME: &str = "postgres.conf";
+const MAX_INT32: i32 = 2147483647;
 
 /// Deploys a tembo.toml file
 #[derive(Args)]
@@ -115,25 +131,24 @@ fn tembo_cloud_apply(
 
 fn docker_apply(
     verbose: bool,
-    instance_settings: HashMap<String, InstanceSettings>,
+    mut instance_settings: HashMap<String, InstanceSettings>,
 ) -> Result<(), anyhow::Error> {
     Docker::installed_and_running()?;
 
     Docker::docker_compose_down(false)?;
 
-    for (_key, instance_setting) in instance_settings.clone().iter() {
-        let result = docker_apply_instance(verbose, instance_setting);
+    let mut final_instance_settings: HashMap<String, InstanceSettings> = Default::default();
 
-        match result {
-            Ok(i) => i,
-            Err(error) => {
-                tui::error(&format!("Error creating instance: {}", error));
-                return Ok(());
-            }
-        }
+    for (_key, instance_setting) in instance_settings.iter_mut() {
+        let final_instance_setting = docker_apply_instance(verbose, instance_setting.to_owned())?;
+        final_instance_settings.insert(
+            final_instance_setting.instance_name.clone(),
+            final_instance_setting,
+        );
     }
 
-    let rendered_dockercompose: String = get_rendered_dockercompose(instance_settings.clone())?;
+    let rendered_dockercompose: String =
+        get_rendered_dockercompose(final_instance_settings.clone())?;
 
     FileUtils::create_file(
         DOCKERCOMPOSE_NAME.to_string(),
@@ -144,23 +159,32 @@ fn docker_apply(
 
     Docker::docker_compose_up(verbose)?;
 
-    // Allows DB instance to be ready before running migrations
+    // Allows DB instance to be ready before running CREATE EXTENSION script
     sleep(Duration::from_secs(5));
 
     let port = 5432;
 
-    for (_key, instance_setting) in instance_settings.clone().iter() {
-        let conn_info = ConnectionInfo {
-            host: format!("{}.local.tembo.io", instance_setting.instance_name).to_owned(),
-            pooler_host: Some(Some("localhost-pooler".to_string())),
-            port,
-            user: "postgres".to_owned(),
-            password: "postgres".to_owned(),
-        };
-        Runtime::new().unwrap().block_on(SqlxUtils::run_migrations(
-            conn_info,
-            instance_setting.instance_name.clone(),
-        ))?;
+    for (_key, instance_setting) in final_instance_settings.clone().iter() {
+        let instance_name = &instance_setting.instance_name;
+
+        let mut sp = Spinner::new(spinners::Dots, "Creating extensions", spinoff::Color::White);
+
+        for ext in instance_setting.final_extensions.clone().unwrap().iter() {
+            let query = &format!("CREATE EXTENSION IF NOT EXISTS {} CASCADE", ext.name);
+
+            Runtime::new().unwrap().block_on(SqlxUtils::execute_sql(
+                instance_name.to_string(),
+                query.to_string(),
+            ))?;
+        }
+
+        sp.stop_with_message(&format!(
+            "{} {}",
+            "✓".color(colors::indicator_good()).bold(),
+            format!("Extensions created for instance {}", instance_name)
+                .color(colorful::Color::White)
+                .bold()
+        ));
 
         // If all of the above was successful, we can print the url to user
         instance_started(
@@ -172,47 +196,82 @@ fn docker_apply(
             "local",
         );
     }
-
     Ok(())
 }
 
 fn docker_apply_instance(
     verbose: bool,
-    instance_settings: &InstanceSettings,
-) -> Result<(), anyhow::Error> {
+    mut instance_setting: InstanceSettings,
+) -> Result<InstanceSettings, anyhow::Error> {
     FileUtils::create_dir(
-        instance_settings.instance_name.clone(),
-        instance_settings.instance_name.clone(),
+        instance_setting.instance_name.clone(),
+        instance_setting.instance_name.clone(),
     )?;
 
-    let rendered_dockerfile: String = get_rendered_dockerfile(instance_settings)?;
+    let stack_type = ControllerStackType::from_str(instance_setting.stack_type.as_str())
+        .unwrap_or(ControllerStackType::Standard);
+    let stack = get_stack(stack_type);
+
+    let extensions = merge_options(
+        stack.extensions.clone(),
+        Some(get_extensions_controller(
+            instance_setting.extensions.clone(),
+        )),
+    );
+    let trunk_installs = merge_options(
+        stack.trunk_installs.clone(),
+        Some(get_trunk_installs_controller(
+            instance_setting.extensions.clone(),
+        )),
+    );
+
+    let MergedConfigs {
+        extensions,
+        trunk_installs,
+        app_services,
+        pg_configs,
+    } = merge_app_reqs(
+        instance_setting.app_services.clone(),
+        stack.app_services.clone(),
+        extensions,
+        trunk_installs,
+        stack.postgres_config,
+    )?;
+
+    let rendered_dockerfile: String = get_rendered_dockerfile(&trunk_installs)?;
 
     FileUtils::create_file(
         DOCKERFILE_NAME.to_string(),
-        instance_settings.instance_name.clone() + "/" + DOCKERFILE_NAME,
+        instance_setting.instance_name.clone() + "/" + DOCKERFILE_NAME,
         rendered_dockerfile,
         true,
     )?;
 
-    let rendered_migrations: String = get_rendered_migrations_file(instance_settings)?;
-
-    FileUtils::create_file(
-        "extensions".to_string(),
-        instance_settings.instance_name.clone() + "/" + "migrations/1_extensions.sql",
-        rendered_migrations,
-        true,
-    )?;
+    instance_setting.final_extensions = extensions;
 
     FileUtils::create_file(
         POSTGRESCONF_NAME.to_string(),
-        instance_settings.instance_name.clone() + "/" + POSTGRESCONF_NAME,
-        get_postgres_config(instance_settings),
+        instance_setting.instance_name.clone() + "/" + POSTGRESCONF_NAME,
+        get_postgres_config(
+            instance_setting.final_extensions.as_ref(),
+            instance_setting.postgres_configurations.clone(),
+            &pg_configs,
+        )?,
         true,
     )?;
 
-    Docker::build(instance_settings.instance_name.clone(), verbose)?;
+    Docker::build(instance_setting.instance_name.clone(), verbose)?;
 
-    Ok(())
+    if app_services.is_some() {
+        let mut controller_app_svcs: HashMap<String, AppService> = Default::default();
+        for cas in app_services.unwrap().iter() {
+            controller_app_svcs.insert(cas.name.clone(), cas.to_owned());
+        }
+
+        instance_setting.controller_app_services = Some(controller_app_svcs);
+    }
+
+    Ok(instance_setting)
 }
 
 pub fn tembo_cloud_apply_instance(
@@ -262,13 +321,6 @@ pub fn tembo_cloud_apply_instance(
                 connection_info,
                 env.clone(),
             )?;
-
-            if Path::new(&instance_settings.instance_name).exists() {
-                Runtime::new().unwrap().block_on(SqlxUtils::run_migrations(
-                    conn_info.clone(),
-                    instance_settings.instance_name.clone(),
-                ))?;
-            }
 
             // If all of the above was successful we can stop the spinner and show a success message
             sp.stop_with_message(&format!(
@@ -477,24 +529,29 @@ fn get_postgres_config_cloud(instance_settings: &InstanceSettings) -> Vec<PgConf
     if instance_settings.postgres_configurations.is_some() {
         for (key, value) in instance_settings
             .postgres_configurations
-            .clone()
+            .as_ref()
             .unwrap()
             .iter()
         {
-            if value.is_str() {
-                pg_configs.push(PgConfig {
+            match value {
+                Value::String(string) => pg_configs.push(PgConfig {
                     name: key.to_owned(),
-                    value: value.to_string(),
-                })
-            } else if value.is_table() {
-                for row in value.as_table().iter() {
-                    for (k, v) in row.iter() {
+                    value: string.to_owned(),
+                }),
+                Value::Table(table) => {
+                    for (inner_key, value) in table {
+                        let value = match value {
+                            Value::String(str) => str.to_owned(),
+                            other => other.to_string(),
+                        };
+
                         pg_configs.push(PgConfig {
-                            name: key.to_owned() + "." + k,
-                            value: v.to_string(),
+                            name: format!("{key}.{inner_key}"),
+                            value,
                         })
                     }
                 }
+                _ => {}
             }
         }
     }
@@ -528,6 +585,32 @@ fn get_extensions(
     vec_extensions
 }
 
+fn get_extensions_controller(
+    maybe_extensions: Option<HashMap<String, tembo_config::Extension>>,
+) -> Vec<ControllerExtension> {
+    let mut vec_extensions: Vec<ControllerExtension> = vec![];
+    let mut vec_extension_location: Vec<ControllerExtensionInstallLocation> = vec![];
+
+    if let Some(extensions) = maybe_extensions {
+        for (name, extension) in extensions.into_iter() {
+            vec_extension_location.push(ControllerExtensionInstallLocation {
+                database: String::new(),
+                schema: None,
+                version: None,
+                enabled: extension.enabled,
+            });
+
+            vec_extensions.push(ControllerExtension {
+                name: name.to_owned(),
+                description: None,
+                locations: vec_extension_location.clone(),
+            });
+        }
+    }
+
+    vec_extensions
+}
+
 fn get_trunk_installs(
     maybe_extensions: Option<HashMap<String, tembo_config::Extension>>,
 ) -> Vec<TrunkInstall> {
@@ -539,6 +622,24 @@ fn get_trunk_installs(
                 vec_trunk_installs.push(TrunkInstall {
                     name: extension.trunk_project.unwrap(),
                     version: Some(extension.trunk_project_version),
+                });
+            }
+        }
+    }
+    vec_trunk_installs
+}
+
+fn get_trunk_installs_controller(
+    maybe_extensions: Option<HashMap<String, tembo_config::Extension>>,
+) -> Vec<ControllerTrunkInstall> {
+    let mut vec_trunk_installs: Vec<ControllerTrunkInstall> = vec![];
+
+    if let Some(extensions) = maybe_extensions {
+        for (_, extension) in extensions.into_iter() {
+            if extension.trunk_project.is_some() {
+                vec_trunk_installs.push(ControllerTrunkInstall {
+                    name: extension.trunk_project.unwrap(),
+                    version: extension.trunk_project_version,
                 });
             }
         }
@@ -561,7 +662,9 @@ fn merge_settings(base: &InstanceSettings, overlay: OverlayInstanceSettings) -> 
             .postgres_configurations
             .or_else(|| base.postgres_configurations.clone()),
         extensions: overlay.extensions.or_else(|| base.extensions.clone()),
+        final_extensions: None,
         app_services: None,
+        controller_app_services: None,
         extra_domains_rw: overlay
             .extra_domains_rw
             .or_else(|| base.extra_domains_rw.clone()),
@@ -646,7 +749,7 @@ pub fn get_instance_settings(
 }
 
 pub fn get_rendered_dockerfile(
-    instance_settings: &InstanceSettings,
+    trunk_installs: &Option<Vec<ControllerTrunkInstall>>,
 ) -> Result<String, anyhow::Error> {
     // Include the Dockerfile template directly into the binary
     let contents = include_str!("../../tembo/Dockerfile.template");
@@ -655,99 +758,157 @@ pub fn get_rendered_dockerfile(
     let _ = tera.add_raw_template("dockerfile", contents);
     let mut context = Context::new();
 
-    let stack_type = ControllerStackType::from_str(instance_settings.stack_type.as_str())
-        .unwrap_or(ControllerStackType::Standard);
-
-    let stack = get_stack(stack_type);
-
-    context.insert("stack_trunk_installs", &stack.trunk_installs);
-    let extensions = instance_settings.extensions.clone().unwrap_or_default();
-    context.insert("extensions", &extensions);
+    context.insert("trunk_installs", &trunk_installs);
 
     let rendered_dockerfile = tera.render("dockerfile", &context).unwrap();
 
     Ok(rendered_dockerfile)
 }
 
-pub fn get_rendered_migrations_file(
-    instance_settings: &InstanceSettings,
-) -> Result<String, anyhow::Error> {
-    // Include the migrations template directly into the binary
-    let contents = include_str!("../../tembo/migrations.sql.template");
-
-    let mut tera = Tera::new("templates/**/*")
-        .map_err(|e| anyhow::anyhow!("Error initializing Tera: {}", e))?;
-    tera.add_raw_template("migrations", contents)
-        .map_err(|e| anyhow::anyhow!("Error adding raw template: {}", e))?;
-
-    let mut context = Context::new();
-    let stack_type = ControllerStackType::from_str(instance_settings.stack_type.as_str())
-        .unwrap_or(ControllerStackType::Standard);
-
-    let stack = get_stack(stack_type);
-
-    context.insert("stack_extensions", &stack.extensions);
-    context.insert("extensions", &instance_settings.extensions);
-
-    let rendered_migrations = tera
-        .render("migrations", &context)
-        .map_err(|e| anyhow::anyhow!("Error rendering template: {}", e))?;
-
-    Ok(rendered_migrations)
-}
-
-fn get_postgres_config(instance_settings: &InstanceSettings) -> String {
+fn get_postgres_config(
+    extensions: Option<&Vec<ControllerExtension>>,
+    instance_ps_config: Option<HashMap<String, Value>>,
+    postgres_configs: &std::option::Option<Vec<ControllerPgConfig>>,
+) -> Result<String, Error> {
     let mut postgres_config = String::from("");
-    let qoute_new_line = "\'\n";
-    let equal_to_qoute = " = \'";
-    let stack_type = ControllerStackType::from_str(instance_settings.stack_type.as_str())
-        .unwrap_or(ControllerStackType::Standard);
+    let mut shared_preload_libraries: Vec<Library> = Vec::new();
 
-    let stack = get_stack(stack_type);
-
-    if stack.postgres_config.is_some() {
-        for config in stack.postgres_config.unwrap().iter() {
-            postgres_config.push_str(config.name.as_str());
-            postgres_config.push_str(equal_to_qoute);
-            postgres_config.push_str(format!("{}", &config.value).as_str());
-            postgres_config.push_str(qoute_new_line);
+    if let Some(ps_config) = postgres_configs {
+        for p_config in ps_config.clone().into_iter() {
+            match p_config.name.as_str() {
+                "shared_preload_libraries" => {
+                    shared_preload_libraries.push(Library {
+                        name: p_config.value.to_string(),
+                        priority: MAX_INT32,
+                    });
+                }
+                _ => {
+                    match p_config.value {
+                        ControllerConfigValue::Single(val) => {
+                            let _ =
+                                writeln!(postgres_config, "{} = '{val}'", p_config.name.as_str());
+                        }
+                        ControllerConfigValue::Multiple(vals) => {
+                            for val in vals {
+                                let _ = writeln!(
+                                    postgres_config,
+                                    "{} = '{val}'",
+                                    p_config.name.as_str()
+                                );
+                            }
+                        }
+                    };
+                }
+            }
         }
     }
 
-    if instance_settings.postgres_configurations.is_some() {
-        for (key, value) in instance_settings
-            .postgres_configurations
-            .as_ref()
-            .unwrap()
-            .iter()
-        {
-            if value.is_str() {
-                postgres_config.push_str(key.as_str());
-                postgres_config.push_str(equal_to_qoute);
-                postgres_config.push_str(value.as_str().unwrap());
-                postgres_config.push_str(qoute_new_line);
-            }
-            if value.is_table() {
-                for row in value.as_table().iter() {
-                    for (t, v) in row.iter() {
-                        postgres_config.push_str(key.as_str());
-                        postgres_config.push('.');
-                        postgres_config.push_str(t.as_str());
-                        postgres_config.push_str(equal_to_qoute);
-                        postgres_config.push_str(v.as_str().unwrap());
-                        postgres_config.push_str(qoute_new_line);
+    if let Some(ps_config) = instance_ps_config {
+        for (key, value) in ps_config.iter() {
+            match key.as_str() {
+                "shared_preload_libraries" => {
+                    shared_preload_libraries.push(Library {
+                        name: value.as_str().unwrap().to_string(),
+                        priority: MAX_INT32,
+                    });
+                }
+                _ => {
+                    if value.is_str() {
+                        let _ = writeln!(postgres_config, "{} = '{value}'", key.as_str());
+                    }
+                    if value.is_table() {
+                        for row in value.as_table().iter() {
+                            for (t, v) in row.iter() {
+                                let _ = writeln!(
+                                    postgres_config,
+                                    "{}.{} = '{}'",
+                                    key.as_str(),
+                                    t.as_str(),
+                                    v.as_str().unwrap()
+                                );
+                            }
+                        }
                     }
                 }
             }
         }
     }
-    postgres_config
+
+    let maybe_final_loadable_libs = Runtime::new().unwrap().block_on(get_loadable_libraries(
+        shared_preload_libraries.clone(),
+        extensions,
+    ));
+
+    match maybe_final_loadable_libs {
+        Ok(l) => {
+            let config = l
+                .into_iter()
+                .unique_by(|f| f.name.clone())
+                .sorted_by_key(|s| s.priority)
+                .map(|x| x.name.to_string() + ",")
+                .collect::<String>();
+
+            let final_libs = config.split_at(config.len() - 1);
+
+            let libs_config = format!("shared_preload_libraries = '{}'", final_libs.0);
+
+            postgres_config.push_str(&libs_config);
+        }
+        Err(error) => {
+            return Err(error);
+        }
+    }
+
+    Ok(postgres_config)
+}
+
+async fn get_loadable_libraries(
+    mut shared_preload_libraries: Vec<Library>,
+    maybe_extensions: Option<&Vec<ControllerExtension>>,
+) -> Result<Vec<Library>, anyhow::Error> {
+    if let Some(extensions) = maybe_extensions {
+        let trunk_projects_url =
+            "https://registry.pgtrunk.io/api/v1/trunk-projects?extension-name=";
+
+        for ext in extensions.iter() {
+            let response = reqwest::get(format!("{}{}", trunk_projects_url, ext.name))
+                .await?
+                .text()
+                .await?;
+
+            let trunk_projects: Vec<TrunkProject> = serde_json::from_str(&response)?;
+
+            // If more than 1 trunk_project is returned then skip adding "shared_preload_libraries"
+            if trunk_projects.len() > 1 {
+                return Ok(shared_preload_libraries);
+            }
+
+            for trunk_project in trunk_projects.iter() {
+                if let Some(extensions) = trunk_project.extensions.as_ref() {
+                    for trunk_extension in extensions.iter() {
+                        if trunk_extension.extension_name != ext.name {
+                            continue;
+                        }
+                        if let Some(loadable_lib) = trunk_extension.loadable_libraries.as_ref() {
+                            for loadable_lib in loadable_lib.iter() {
+                                shared_preload_libraries.push(Library {
+                                    name: loadable_lib.library_name.clone(),
+                                    priority: loadable_lib.priority,
+                                });
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(shared_preload_libraries)
 }
 
 pub fn get_rendered_dockercompose(
     instance_settings: HashMap<String, InstanceSettings>,
 ) -> Result<String, anyhow::Error> {
-    // Include the Dockerfile template directly into the binary
+    // Include the docker-compose template directly into the binary
     let contents = include_str!("../../tembo/docker-compose.yml.template");
 
     let mut tera = Tera::new("templates/**/*").unwrap();
@@ -756,9 +917,9 @@ pub fn get_rendered_dockercompose(
 
     context.insert("instance_settings", &instance_settings);
 
-    let rendered_dockerfile = tera.render("docker-compose", &context).unwrap();
+    let rendered_dockercompose = tera.render("docker-compose", &context).unwrap();
 
-    Ok(rendered_dockerfile)
+    Ok(rendered_dockercompose)
 }
 
 fn construct_connection_string(info: ConnectionInfo) -> String {

@@ -57,5 +57,8 @@ rules:
   - apiGroups: [""]
     resources: ["namespaces"]
     verbs: ["get", "list", "watch"]
+  - apiGroups: ["snapshot.storage.k8s.io"]
+    resources: ["volumesnapshots", "volumesnapshotcontents"]
+    verbs: ["create", "delete", "get", "list", "patch", "update", "watch"]
 {{- end }}
 {{- end }}

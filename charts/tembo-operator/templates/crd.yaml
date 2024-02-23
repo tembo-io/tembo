@@ -1344,6 +1344,8 @@ spec:
                   endpointURL: null
                   s3Credentials:
                     inheritFromIAMRole: true
+                  volumeSnapshot:
+                    enabled: false
                 description: |-
                   The backup configuration for the CoreDB instance to facilitate database backups and WAL archive uploads to an S3 compatible object store.
 
@@ -1432,6 +1434,22 @@ spec:
                     description: The backup schedule set with cron syntax
                     nullable: true
                     type: string
+                  volumeSnapshot:
+                    default:
+                      enabled: false
+                    description: Enable using Volume Snapshots for backups instead of Object Storage
+                    nullable: true
+                    properties:
+                      enabled:
+                        description: Enable the volume snapshots for backups
+                        type: boolean
+                      snapshotClass:
+                        description: The reference to the snapshot class
+                        nullable: true
+                        type: string
+                    required:
+                    - enabled
+                    type: object
                 type: object
               connectionPooler:
                 default:
@@ -1498,9 +1516,12 @@ spec:
                         nullable: true
                         properties:
                           claims:
+                            description: Claims lists the names of resources, defined in spec.resourceClaims, that are used by this container. This is an alpha field and requires enabling the DynamicResourceAllocation feature gate. This field is immutable. It can only be set for containers.
                             items:
+                              description: ResourceClaim references one entry in PodSpec.ResourceClaims.
                               properties:
                                 name:
+                                  description: Name must match the name of one entry in pod.spec.resourceClaims of the Pod where this field is used. It makes that resource available inside a container.
                                   type: string
                               required:
                               - name
@@ -1512,6 +1533,7 @@ spec:
                               description: IntOrString is a type that can hold an int32 or a string.  When used in JSON or YAML marshalling and unmarshalling, it produces or consumes the inner type.  This allows you to have, for example, a JSON field that can accept a name or number.
                               format: int-or-string
                               type: string
+                            description: 'Limits describes the maximum amount of compute resources allowed. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                             nullable: true
                             type: object
                           requests:
@@ -1519,6 +1541,7 @@ spec:
                               description: IntOrString is a type that can hold an int32 or a string.  When used in JSON or YAML marshalling and unmarshalling, it produces or consumes the inner type.  This allows you to have, for example, a JSON field that can accept a name or number.
                               format: int-or-string
                               type: string
+                            description: 'Requests describes the minimum amount of compute resources required. If Requests is omitted for a container, it defaults to Limits if that is explicitly specified, otherwise to an implementation-defined value. Requests cannot exceed Limits. More info: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/'
                             nullable: true
                             type: object
                         type: object
@@ -1798,6 +1821,10 @@ spec:
 
                       This assumes you are keeping the backups in the new instance in the same root bucket path of `s3://my-bucket/`.
                     type: string
+                  volumeSnapshot:
+                    description: volumeSnapshot is a boolean to enable restoring from a Volume Snapshot
+                    nullable: true
+                    type: boolean
                 required:
                 - serverName
                 type: object

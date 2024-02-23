@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "tembo-py"
+version = "0.1.0"
+description = "The official Python client for Tembo.io"
+authors = ["Adam Hendel <adam@tembo.io>"]
+license = "Apache-2"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = ">=3.8.1,<3.12"
+llama-index = "^0.10.9"
+llama-index-vector-stores-postgres = "^0.1.1"
+tiktoken = "^0.6.0"
+psycopg = "^3.1.18"
+
+[tool.poetry.group.dev.dependencies]
+ruff = "^0.2.2"
+black = "^24.2.0"
+mypy = "^1.8.0"
+pytest = "^8.0.1"
+pytest-cov = "^4.1.0"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

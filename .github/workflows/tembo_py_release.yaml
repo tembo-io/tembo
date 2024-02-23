@@ -1,0 +1,66 @@
+name: pgmq-py CI workflow
+
+defaults:
+  run:
+    shell: bash
+    working-directory: tembo-py
+
+on:
+  pull_request:
+    branches:
+        - main
+    paths:
+        - '.github/workflows/tembo_py_release.yaml'
+        - 'tembo-py/**'
+  push:
+    branches:
+        - main
+    paths:
+        - '.github/workflows/tembo_py_release.yaml'
+        - 'tembo-py/**'
+
+jobs:
+  lints:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python 3.11.1
+      uses: actions/setup-python@v5
+      with:
+        python-version: 3.11.1
+    - name: Setup
+      run: make setup
+    - name: Lints / Type Checking
+      run: make check
+  tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python 3.11.1
+      uses: actions/setup-python@v5
+      with:
+        python-version: 3.11.1
+    - name: Setup
+      run: make setup
+    - name: Unit and Integration Tests
+      run: make test
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python 3.11.1
+      uses: actions/setup-python@v5
+      with:
+        python-version: 3.11.1
+    - name: Setup
+      run: make setup
+    - name: Publish to pypi.org
+      env:
+        POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_TOKEN }}
+      # only publish off main branch
+      run: |
+        if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+          poetry publish --build --skip-existing
+        else
+          poetry publish --build --dry-run
+        fi
