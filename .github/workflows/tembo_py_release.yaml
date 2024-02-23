@@ -46,16 +46,19 @@ jobs:
       run: make test
   publish:
     runs-on: ubuntu-latest
-    # only publish off main branch
-    if: github.ref == 'refs/heads/main'
     steps:
     - uses: actions/checkout@v4
     - name: Set up Python 3.11.1
       uses: actions/setup-python@v5
       with:
         python-version: 3.11.1
-    - name: Publish
+    - name: Publish to pypi.org
       env:
         POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_TOKEN }}
+      # only publish off main branch
       run: |
-        poetry publish --build --skip-existing
+        if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+          poetry publish --build --skip-existing
+        else
+          poetry publish --build --dry-run
+        fi
