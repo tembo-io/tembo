@@ -43,7 +43,7 @@ compute_templates:
     instance_class: ComputeOptimized
   - cpu: 16
     memory: 32Gi
-    instance_class: MemoryOptimized
+    instance_class: ComputeOptimized
   - cpu: 0.5
     memory: 4Gi
     instance_class: MemoryOptimized
