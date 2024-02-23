@@ -30,7 +30,6 @@ pub fn execute() -> Result<(), anyhow::Error> {
 }
 
 async fn handle_tokio(login_url: String) -> Result<(), anyhow::Error> {
-
     webbrowser::open(&login_url)?;
     let notify = Arc::new(Notify::new());
     let notify_clone = notify.clone();
@@ -50,7 +49,6 @@ async fn handle_tokio(login_url: String) -> Result<(), anyhow::Error> {
 
     Ok(())
 }
-
 
 #[post("/")]
 async fn handle_request(
@@ -108,7 +106,8 @@ fn token_lifetime() -> Result<String> {
 }
 
 fn save_token_to_file(token: &str) -> Result<(), Error> {
-    let home_dir = dirs::home_dir().ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Could not find home directory"))?;
+    let home_dir = dirs::home_dir()
+        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Could not find home directory"))?;
     let credentials_path = home_dir.join(".tembo/credentials");
 
     if credentials_path.exists() {
@@ -129,7 +128,9 @@ fn save_token_to_file(token: &str) -> Result<(), Error> {
         fs::write(&credentials_path, new_contents)?;
         println!("Token updated in credentials file");
     } else {
-        return Err(Error::msg("Credentials file does not exist. Run \"tembo init\""));
+        return Err(Error::msg(
+            "Credentials file does not exist. Run \"tembo init\"",
+        ));
     }
 
     Ok(())
