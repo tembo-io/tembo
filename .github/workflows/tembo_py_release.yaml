@@ -1,0 +1,71 @@
+name: pgmq-py CI workflow
+
+defaults:
+  run:
+    shell: bash
+    working-directory: tembo-py
+
+on:
+  pull_request:
+    branches:
+        - main
+    paths:
+        - '.github/workflows/tembo_py_release.yaml'
+        - 'tembo-py/**'
+  push:
+    branches:
+        - main
+    paths:
+        - '.github/workflows/tembo_py_release.yaml'
+        - 'tembo-py/**'
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python 3.11.0
+      uses: actions/setup-python@v5
+      with:
+        python-version: 3.11.1
+    - name: Install dependencies
+      run: |
+        curl -sSL https://install.python-poetry.org | POETRY_VERSION=1.7.1 python3 -
+        poetry install
+  lints:
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python 3.11.0
+      uses: actions/setup-python@v5
+      with:
+        python-version: 3.11.1
+    - name: Lints / Type Checking
+      run: make lints
+  tests:
+    needs: setup
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python 3.11.1
+      uses: actions/setup-python@v5
+      with:
+        python-version: 3.11.1
+    - name: Unit and Integration Tests
+      run: make test
+  publish:
+    runs-on: ubuntu-latest
+    # only publish off main branch
+    if: github.ref == 'refs/heads/main'
+    steps:
+    - uses: actions/checkout@v4
+    - name: Set up Python 3.11.0
+      uses: actions/setup-python@v5
+      with:
+        python-version: 3.11.1
+    - name: Publish
+      env:
+        POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_TOKEN }}
+      run: |
+        poetry publish --build --skip-existing
