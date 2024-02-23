@@ -28,7 +28,7 @@ pub async fn reconcile_volume_snapshot_restore(
     let client = ctx.client.clone();
     // Lookup the VolumeSnapshot of the original instance
     let ogvs = lookup_volume_snapshot(cdb, &client).await?;
-    let ogvsc = lookup_volume_snapshot_content(&client, ogvs).await?;
+    let ogvsc = lookup_volume_snapshot_content(cdb, &client, ogvs).await?;
 
     let vsc = generate_volume_snapshot_content(cdb, &ogvsc)?;
     let vs = generate_volume_snapshot(cdb, &vsc)?;
@@ -40,51 +40,70 @@ pub async fn reconcile_volume_snapshot_restore(
     apply_volume_snapshot(cdb, &client, &vs).await?;
 
     // We need to wait for the snapshot to become ready before we can proceed
-    is_snapshot_ready(&client, &vs).await?;
+    is_snapshot_ready(cdb, &client, &vs).await?;
 
     Ok(vs)
 }
 
-async fn is_snapshot_ready(client: &Client, vs: &VolumeSnapshot) -> Result<(), Action> {
-    let name = vs
-        .metadata
-        .name
-        .as_ref()
-        .ok_or_else(|| Action::requeue(tokio::time::Duration::from_secs(300)))?;
-    let namespace = vs
-        .metadata
-        .namespace
-        .as_ref()
-        .ok_or_else(|| Action::requeue(tokio::time::Duration::from_secs(300)))?;
+async fn is_snapshot_ready(
+    cdb: &CoreDB,
+    client: &Client,
+    vs: &VolumeSnapshot,
+) -> Result<(), Action> {
+    let name = vs.metadata.name.as_ref().ok_or_else(|| {
+        error!(
+            "VolumeSnapshot name is empty for instance: {}.",
+            cdb.name_any()
+        );
+        Action::requeue(tokio::time::Duration::from_secs(300))
+    })?;
+    let namespace = vs.metadata.namespace.as_ref().ok_or_else(|| {
+        error!(
+            "VolumeSnapshot namespace is empty for instance: {}.",
+            cdb.name_any()
+        );
+        Action::requeue(tokio::time::Duration::from_secs(300))
+    })?;
 
     let vs_api: Api<VolumeSnapshot> = Api::namespaced(client.clone(), namespace);
     let lp = ListParams::default().fields(&format!("metadata.name={}", name));
-    let mut ready = false;
-    let mut attempts = 0;
 
-    while !ready && attempts < 10 {
-        let vs = vs_api.list(&lp).await.map_err(|e| {
-            error!("Error listing VolumeSnapshots: {}", e);
-            Action::requeue(tokio::time::Duration::from_secs(300))
-        })?;
+    // Fetch the VolumeSnapshot to check its status
+    let res = vs_api.list(&lp).await.map_err(|e| {
+        error!(
+            "Error listing VolumeSnapshots {} for instance {}: {}",
+            name,
+            cdb.name_any(),
+            e,
+        );
+        Action::requeue(tokio::time::Duration::from_secs(30))
+    })?;
 
-        if let Some(status) = vs.items.first().and_then(|vs| vs.status.as_ref()) {
-            ready = status.ready_to_use.unwrap_or(false);
+    // Check if the first VolumeSnapshot is ready
+    if let Some(status) = res.items.first().and_then(|vs| vs.status.as_ref()) {
+        if status.ready_to_use.unwrap_or(false) {
+            info!(
+                "VolumeSnapshot {} is ready for instance {}.",
+                name,
+                cdb.name_any()
+            );
+            Ok(())
+        } else {
+            error!(
+                "VolumeSnapshot {} is not ready yet for instance {}.",
+                name,
+                cdb.name_any()
+            );
+            Err(Action::requeue(tokio::time::Duration::from_secs(10)))
         }
-
-        if !ready {
-            tokio::time::sleep(tokio::time::Duration::from_secs(30)).await;
-            attempts += 1;
-        }
+    } else {
+        error!(
+            "VolumeSnapshot {} not found for instance {}",
+            name,
+            cdb.name_any()
+        );
+        Err(Action::requeue(tokio::time::Duration::from_secs(30)))
     }
-
-    if !ready {
-        return Err(Action::requeue(tokio::time::Duration::from_secs(300)));
-    }
-
-    info!("VolumeSnapshot {} is ready.", name);
-
-    Ok(())
 }
 
 async fn apply_volume_snapshot(
@@ -93,18 +112,26 @@ async fn apply_volume_snapshot(
     volume_snapshot: &VolumeSnapshot,
 ) -> Result<(), Action> {
     let name = cdb.name_any();
-    let vs_name = volume_snapshot
-        .metadata
-        .name
-        .as_ref()
-        .ok_or_else(|| Action::requeue(tokio::time::Duration::from_secs(300)))?;
+    let vs_name = volume_snapshot.metadata.name.as_ref().ok_or_else(|| {
+        error!(
+            "VolumeSnapshot name is empty for instance: {}.",
+            cdb.name_any()
+        );
+        Action::requeue(tokio::time::Duration::from_secs(300))
+    })?;
 
     // Namespace for the VolumeSnapshot
     let namespace = volume_snapshot
         .metadata
         .namespace
         .as_deref()
-        .ok_or_else(|| Action::requeue(tokio::time::Duration::from_secs(300)))?;
+        .ok_or_else(|| {
+            error!(
+                "VolumeSnapshot namespace is empty for instance: {}.",
+                cdb.name_any()
+            );
+            Action::requeue(tokio::time::Duration::from_secs(300))
+        })?;
 
     // Apply VolumeSnapshot (Namespaced)
     let vs_api: Api<VolumeSnapshot> = Api::namespaced(client.clone(), namespace);
@@ -117,7 +144,10 @@ async fn apply_volume_snapshot(
     {
         Ok(_) => debug!("VolumeSnapshot created successfully for {}.", name),
         Err(e) => {
-            error!("Failed to create VolumeSnapshot: {}", e);
+            error!(
+                "Failed to create VolumeSnapshot for instance {}: {}",
+                name, e
+            );
             return Err(Action::requeue(tokio::time::Duration::from_secs(300)));
         }
     }
@@ -135,7 +165,13 @@ async fn apply_volume_snapshot_content(
         .metadata
         .name
         .as_ref()
-        .ok_or_else(|| Action::requeue(tokio::time::Duration::from_secs(300)))?;
+        .ok_or_else(|| {
+            error!(
+                "VolumeSnapshot name is empty for instance: {}.",
+                cdb.name_any()
+            );
+            Action::requeue(tokio::time::Duration::from_secs(300))
+        })?;
 
     // Apply VolumeSnapshotContent (All Namespaces)
     let vs_api: Api<VolumeSnapshotContent> = Api::all(client.clone());
@@ -148,7 +184,10 @@ async fn apply_volume_snapshot_content(
     {
         Ok(_) => debug!("VolumeSnapshotContent created successfully for {}.", name),
         Err(e) => {
-            error!("Failed to create VolumeSnapshotContent: {}", e);
+            error!(
+                "Failed to create VolumeSnapshotContent for instance {}: {}",
+                name, e
+            );
             return Err(Action::requeue(tokio::time::Duration::from_secs(300)));
         }
     }
@@ -163,22 +202,28 @@ fn generate_volume_snapshot_content(
     snapshot_content: &VolumeSnapshotContent,
 ) -> Result<VolumeSnapshotContent, Action> {
     let name = cdb.name_any();
-    let namespace = cdb
-        .namespace()
-        .ok_or_else(|| Action::requeue(tokio::time::Duration::from_secs(300)))?;
-
+    let namespace = cdb.namespace().ok_or_else(|| {
+        error!("CoreDB namespace is empty for instance: {}.", name);
+        Action::requeue(tokio::time::Duration::from_secs(300))
+    })?;
     let snapshot_handle = snapshot_content
         .status
         .as_ref()
         .and_then(|status| status.snapshot_handle.as_ref())
-        .ok_or_else(|| Action::requeue(tokio::time::Duration::from_secs(300)))?
+        .ok_or_else(|| {
+            error!("Snapshot Handle is empty for instance {}", name);
+            Action::requeue(tokio::time::Duration::from_secs(300))
+        })?
         .to_string();
     let driver = &snapshot_content.spec.driver;
     let volume_snapshot_class_name = snapshot_content
         .spec
         .volume_snapshot_class_name
         .as_ref()
-        .ok_or_else(|| Action::requeue(tokio::time::Duration::from_secs(300)))?;
+        .ok_or_else(|| {
+            error!("VolumeSnapshotClass name is empty for instance {}", name);
+            Action::requeue(tokio::time::Duration::from_secs(300))
+        })?;
     let snapshot = format!("{}-restore-vs", name);
 
     let vsc = VolumeSnapshotContent {
@@ -217,19 +262,23 @@ fn generate_volume_snapshot(
     snapshot_content: &VolumeSnapshotContent,
 ) -> Result<VolumeSnapshot, Action> {
     let name = cdb.name_any();
-    let namespace = cdb
-        .namespace()
-        .ok_or_else(|| Action::requeue(tokio::time::Duration::from_secs(300)))?;
-    let volume_snapshot_content_name = snapshot_content
-        .metadata
-        .name
-        .as_ref()
-        .ok_or_else(|| Action::requeue(tokio::time::Duration::from_secs(300)))?;
+    let namespace = cdb.namespace().ok_or_else(|| {
+        error!("CoreDB namespace is empty for instance {}", name);
+        Action::requeue(tokio::time::Duration::from_secs(300))
+    })?;
+    let volume_snapshot_content_name =
+        snapshot_content.metadata.name.as_ref().ok_or_else(|| {
+            error!("VolumeSnapshotContent name is empty for instance {}", name);
+            Action::requeue(tokio::time::Duration::from_secs(300))
+        })?;
     let volume_snapshot_class_name = snapshot_content
         .spec
         .volume_snapshot_class_name
         .as_ref()
-        .ok_or_else(|| Action::requeue(tokio::time::Duration::from_secs(300)))?;
+        .ok_or_else(|| {
+            error!("VolumeSnapshotClass name is empty for instance {}", name);
+            Action::requeue(tokio::time::Duration::from_secs(300))
+        })?;
 
     let vs = VolumeSnapshot {
         metadata: ObjectMeta {
@@ -258,10 +307,13 @@ async fn lookup_volume_snapshot(cdb: &CoreDB, client: &Client) -> Result<VolumeS
         .restore
         .as_ref()
         .map(|r| r.server_name.clone())
-        .ok_or_else(|| Action::requeue(tokio::time::Duration::from_secs(300)))?;
-    // let namespace = cdb
-    //     .namespace()
-    //     .ok_or_else(|| Action::requeue(tokio::time::Duration::from_secs(300)))?;
+        .ok_or_else(|| {
+            error!(
+                "CoreDB restore server_name is empty for instance {}",
+                cdb.name_any()
+            );
+            Action::requeue(tokio::time::Duration::from_secs(300))
+        })?;
 
     // todo: This is a temporary fix to get the VolumeSnapshot from the same namespace as the
     // instance you are attempting to restore from.  We need to figure out a better way of
@@ -271,7 +323,7 @@ async fn lookup_volume_snapshot(cdb: &CoreDB, client: &Client) -> Result<VolumeS
     let label_selector = format!("cnpg.io/cluster={}", name);
     let lp = ListParams::default().labels(&label_selector);
     let backup_result = volume_snapshot_api.list(&lp).await.map_err(|e| {
-        error!("Error listing VolumeSnapshots: {}", e);
+        error!("Error listing VolumeSnapshots for instance {}: {}", name, e);
         Action::requeue(tokio::time::Duration::from_secs(300))
     })?;
 
@@ -290,6 +342,7 @@ async fn lookup_volume_snapshot(cdb: &CoreDB, client: &Client) -> Result<VolumeS
     debug!("Found {} VolumeSnapshots for {}", snapshots.len(), name);
 
     if snapshots.is_empty() {
+        error!("No ready VolumeSnapshots found for {}", name);
         return Err(Action::requeue(tokio::time::Duration::from_secs(300)));
     }
 
@@ -299,13 +352,14 @@ async fn lookup_volume_snapshot(cdb: &CoreDB, client: &Client) -> Result<VolumeS
             .cmp(&a.metadata.creation_timestamp)
     });
 
-    snapshots
-        .first()
-        .cloned()
-        .ok_or_else(|| Action::requeue(tokio::time::Duration::from_secs(300)))
+    snapshots.first().cloned().ok_or_else(|| {
+        error!("Error getting first snapshot for instance {}", name);
+        Action::requeue(tokio::time::Duration::from_secs(300))
+    })
 }
 
 async fn lookup_volume_snapshot_content(
+    cdb: &CoreDB,
     client: &Client,
     snapshot: VolumeSnapshot,
 ) -> Result<VolumeSnapshotContent, Action> {
@@ -315,7 +369,10 @@ async fn lookup_volume_snapshot_content(
         .status
         .as_ref()
         .and_then(|s| s.bound_volume_snapshot_content_name.clone())
-        .ok_or_else(|| Action::requeue(tokio::time::Duration::from_secs(300)))?;
+        .ok_or_else(|| {
+            error!("Snapshot status is empty for instance {}", cdb.name_any());
+            Action::requeue(tokio::time::Duration::from_secs(300))
+        })?;
 
     // Lookup the VolumeSnapshotContent object, since it's not namespaced we will
     // need to filter on all objects in the cluster
@@ -323,7 +380,11 @@ async fn lookup_volume_snapshot_content(
     match volume_snapshot_content_api.get(&name).await {
         Ok(vsc) => Ok(vsc),
         Err(e) => {
-            error!("Failed to get VolumeSnapshotContent: {}", e);
+            error!(
+                "Failed to get VolumeSnapshotContent for instance {}: {}",
+                cdb.name_any(),
+                e
+            );
             Err(Action::requeue(tokio::time::Duration::from_secs(300)))
         }
     }

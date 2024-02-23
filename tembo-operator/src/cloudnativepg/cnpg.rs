@@ -1492,7 +1492,11 @@ pub async fn reconcile_cnpg_scheduled_backup(
     let scheduled_backups = match scheduled_backups_result {
         Ok(backups) => backups,
         Err(e) => {
-            error!("Failed to generate scheduled backups: {}", e);
+            error!(
+                "Failed to generate scheduled backups for {}: {}",
+                cdb.name_any(),
+                e
+            );
             return Err(Action::requeue(Duration::from_secs(300)));
         }
     };
