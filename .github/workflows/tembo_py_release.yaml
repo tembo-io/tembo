@@ -42,7 +42,7 @@ jobs:
       with:
         python-version: 3.11.1
     - name: Lints / Type Checking
-      run: make lints
+      run: make check
   tests:
     needs: setup
     runs-on: ubuntu-latest
