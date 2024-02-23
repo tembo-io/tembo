@@ -18,7 +18,7 @@ use kube::{
     Api, ResourceExt,
 };
 use std::sync::Arc;
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, warn};
 
 // Main function to reconcile the VolumeSnapshotContent and VolumeSnapshot
 pub async fn reconcile_volume_snapshot_restore(
@@ -70,7 +70,7 @@ async fn is_snapshot_ready(
 
     // Fetch the VolumeSnapshot to check its status
     let res = vs_api.list(&lp).await.map_err(|e| {
-        error!(
+        warn!(
             "Error listing VolumeSnapshots {} for instance {}: {}",
             name,
             cdb.name_any(),
@@ -89,7 +89,7 @@ async fn is_snapshot_ready(
             );
             Ok(())
         } else {
-            error!(
+            warn!(
                 "VolumeSnapshot {} is not ready yet for instance {}.",
                 name,
                 cdb.name_any()
