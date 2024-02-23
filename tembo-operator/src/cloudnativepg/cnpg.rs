@@ -71,8 +71,6 @@ use std::{collections::BTreeMap, sync::Arc};
 use tokio::time::Duration;
 use tracing::{debug, error, info, instrument, warn};
 
-const VOLUME_SNAPSHOT_CLASS_NAME: &str = "cnpg-snapshot-class";
-
 pub struct PostgresConfig {
     pub postgres_parameters: Option<BTreeMap<String, String>>,
     pub shared_preload_libraries: Option<Vec<String>>,
@@ -167,7 +165,7 @@ fn create_cluster_backup_volume_snapshot(cdb: &CoreDB) -> ClusterBackupVolumeSna
         .as_ref()
         .and_then(|vs| vs.snapshot_class.as_ref())
         .cloned()
-        .unwrap_or_else(|| VOLUME_SNAPSHOT_CLASS_NAME.to_string());
+        .unwrap_or_else(|| crate::cloudnativepg::VOLUME_SNAPSHOT_CLASS_NAME.to_string());
 
     ClusterBackupVolumeSnapshot {
         class_name: Some(class_name),
