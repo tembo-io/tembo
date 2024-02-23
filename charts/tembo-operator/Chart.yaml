@@ -3,10 +3,10 @@ name: tembo-operator
 description: 'Helm chart to deploy the tembo-operator'
 type: application
 icon: https://cloud.tembo.io/images/TemboElephant.png
-version: 0.3.0
+version: 0.3.1
 home: https://tembo.io
 sources:
-  - https://github.com/tembo-io/tembo-stacks
+  - https://github.com/tembo-io/tembo
   - https://github.com/cloudnative-pg/cloudnative-pg
 keywords:
   - postgresql

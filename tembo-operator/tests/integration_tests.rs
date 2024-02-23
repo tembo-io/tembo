@@ -4433,6 +4433,9 @@ CREATE EVENT TRIGGER pgrst_watch
                         "name": "s3creds",
                         "key": "MINIO_SECRET_KEY"
                         }
+                    },
+                    "volumeSnapshot": {
+                        "enabled": false,
                     }
                 },
                 "trunk_installs": [
@@ -4601,6 +4604,9 @@ CREATE EVENT TRIGGER pgrst_watch
                             "name": "s3creds",
                             "key": "MINIO_SECRET_KEY"
                         }
+                    },
+                    "volumeSnapshot": {
+                        "enabled": false,
                     }
                 },
                 "restore": {
