@@ -59,7 +59,7 @@ jobs:
         POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_TOKEN }}
       # only publish off main branch
       run: |
-        if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+        if [ "${{ github.ref }}" == "refs/heads/main" ]; then
           poetry publish --build --skip-existing
         else
           poetry publish --build --dry-run
