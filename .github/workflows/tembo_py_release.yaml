@@ -52,6 +52,8 @@ jobs:
       uses: actions/setup-python@v5
       with:
         python-version: 3.11.1
+    - name: Setup
+      run: make setup
     - name: Publish to pypi.org
       env:
         POETRY_PYPI_TOKEN_PYPI: ${{ secrets.PYPI_TOKEN }}
