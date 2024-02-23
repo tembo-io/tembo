@@ -4,10 +4,14 @@ on:
   pull_request:
     branches:
       - main
+    paths-ignore:
+      - 'tembo-py/**'
 
   push:
     branches:
       - 'main'
+    paths-ignore:
+      - 'tembo-py/**'
 
 jobs:
   find_directories:

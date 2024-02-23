@@ -32,7 +32,7 @@ class TemboRAGcontroller:
     ) -> list[tuple[str, str, str, str]]:
         documents = SimpleDirectoryReader(document_dir).load_data()
         chunks = self.sentence_splitter.get_nodes_from_documents(documents, **kwargs)
-        chunks_for_copy: list[tuple[str, str, dict, str]] = []
+        chunks_for_copy: list[tuple[str, str, str, str]] = []
         for chunk in chunks:
             chunks_for_copy.append(
                 (

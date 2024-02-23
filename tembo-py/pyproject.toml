@@ -17,6 +17,8 @@ psycopg = "^3.1.18"
 ruff = "^0.2.2"
 black = "^24.2.0"
 mypy = "^1.8.0"
+pytest = "^8.0.1"
+pytest-cov = "^4.1.0"
 
 [build-system]
 requires = ["poetry-core"]

@@ -3,8 +3,12 @@ name: Cargo lint and test
 on:
   push:
     branches: ["main"]
+    paths-ignore:
+      - 'tembo-py/**'
   pull_request:
     branches: ["main"]
+    paths-ignore:
+      - 'tembo-py/**'
 
 jobs:
   find_directories:
