@@ -97,9 +97,6 @@ async fn fetch_metrics_loop(
         .as_ref()
         .expect("JWT Token is not configured");
     headers.insert("Authorization", format!("Bearer {}", jwt_token).parse()?);
-    let mut interval = interval(Duration::from_secs(2));
-
-    let mut printed_lines: HashMap<String, usize> = HashMap::new();
 
     loop {
         execute!(stdout, Clear(ClearType::All))?;
@@ -109,7 +106,7 @@ async fn fetch_metrics_loop(
             let namespace = format!("org-{}-inst-{}", org_name, &value.instance_name);
             let namespace_encoded = urlencoding::encode(&namespace);
 
-            println!("Instance name: {}", &value.instance_name);
+            println!("Instance: {}", &value.instance_name);
 
             let metric_queries = vec![
                 (
@@ -126,7 +123,7 @@ async fn fetch_metrics_loop(
                         "(sum by(persistentvolumeclaim) (kubelet_volume_stats_capacity_bytes{{job=\"kubelet\", metrics_path=\"/metrics\", namespace=\"{}\"}}) - sum by(persistentvolumeclaim) (kubelet_volume_stats_available_bytes{{job=\"kubelet\", metrics_path=\"/metrics\", namespace=\"{}\"}})) / 100000000", namespace_encoded, namespace_encoded
                     ),
                     format!(
-                        "sum by(persistentvolumeclaim) (kubelet_volume_stats_available_bytes{{job=\"kubelet\", metrics_path=\"/metrics\", namespace=\"{}\"}})",
+                        "sum by(persistentvolumeclaim) (kubelet_volume_stats_available_bytes{{job=\"kubelet\", metrics_path=\"/metrics\", namespace=\"{}\"}}) / 1000000000",
                         namespace_encoded
                     )
                 ),
@@ -134,12 +131,12 @@ async fn fetch_metrics_loop(
                     "Memory",
                     format!("sum(container_memory_working_set_bytes{{job=\"kubelet\", metrics_path=\"/metrics/cadvisor\", namespace=\"{}\",container!=\"\", image!=\"\"}}) / sum(max by(pod) (kube_pod_container_resource_requests{{job=\"kube-state-metrics\", namespace=\"{}\", resource=\"memory\"}})) * 100", namespace_encoded, namespace_encoded),
                     format!(
-                        "sum(max by(pod) (kube_pod_container_resource_requests{{job=\"kube-state-metrics\", namespace=\"{}\", resource=\"memory\"}}))",
+                        "sum(max by(pod) (kube_pod_container_resource_requests{{job=\"kube-state-metrics\", namespace=\"{}\", resource=\"memory\"}})) / 100000000",
                         namespace_encoded
                     )
                 ),
-                //Doubtful if we would need Connections(Need to consult Steven)
-                /*(
+                /*Doubtful if we would need Connections(Need to consult Steven)
+                (
                     "Connections",
                     format!("max by (pod) (cnpg_backends_max_tx_duration_seconds{{namespace=\"{}\"}})", namespace_encoded),
                     format!(""
@@ -155,20 +152,48 @@ async fn fetch_metrics_loop(
 
                 match (result1, result2) {
                     (Ok(metrics_response1), Ok(metrics_response2)) => {
-                        let raw_value1: f64 = metrics_response1
-                            .data
-                            .result
-                            .get(0)
-                            .and_then(|metric_result| metric_result.value.1.parse().ok())
-                            .unwrap_or(0.0);
-                        let value1 = format!("{:.2}", raw_value1.abs());
-                        let value2 = metrics_response2
-                            .data
-                            .result
-                            .get(0)
-                            .map_or("N/A", |metric_result| &metric_result.value.1);
+                        let raw_value1: f64 = match metrics_response1.data.result.get(0) {
+                            Some(metric_result) => match metric_result.value.1.parse::<f64>() {
+                                Ok(parsed_value) => parsed_value,
+                                Err(_) => {
+                                    eprintln!(
+                                        "Error parsing value for {}: defaulting to 0.0",
+                                        query_name
+                                    );
+                                    0.0
+                                }
+                            },
+                            None => {
+                                eprintln!("No result found for {}: defaulting to 0.0", query_name);
+                                0.0
+                            }
+                        };
+                        let raw_value2: f64 = match metrics_response2.data.result.get(0) {
+                            Some(metric_result) => match metric_result.value.1.parse::<f64>() {
+                                Ok(parsed_value) => parsed_value,
+                                Err(_) => {
+                                    eprintln!(
+                                        "Error parsing value for {}: defaulting to 0.0",
+                                        query_name
+                                    );
+                                    0.0
+                                }
+                            },
+                            None => {
+                                eprintln!("No result found for {}: defaulting to 0.0", query_name);
+                                0.0
+                            }
+                        };
 
-                        println!("{}: {} | {}%", query_name, value2, value1);
+                        let value1 = format!("{:.2}", raw_value1.abs());
+
+                        if *query_name == "Storage" || *query_name == "Memory" {
+                            let value2 = format!("{:.2}", raw_value2.abs());
+                            println!("{}: {} | {}%", query_name, value2, value1);
+                        } else {
+                            let value2 = format!("{}", raw_value2.abs());
+                            println!("{}: {} | {}%", query_name, value2, value1);
+                        }
                     }
                     (Err(e), _) | (_, Err(e)) => {
                         eprintln!("Error fetching metrics for {}: {}", query_name, e);
@@ -256,6 +281,7 @@ fn blocking(config: &Configuration, env: &Environment) -> Result<(), anyhow::Err
 }
 
 pub fn execute(verbose: bool) -> Result<(), anyhow::Error> {
+    println!("WARNING! EXPERIMENTAL FEATURE!!");
     super::validate::execute(verbose)?;
     let env = get_current_context().context("Failed to get current context")?;
     let profile = env
