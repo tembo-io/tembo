@@ -8,6 +8,9 @@ images:
   16: "dw-cnpg:16-a0a5ab5"
 stack_version: 0.1.0
 compute_templates:
+  - cpu: 0.25
+    memory: 1Gi
+    instance_class: GeneralPurpose
   - cpu: 2
     memory: 8Gi
     instance_class: GeneralPurpose
