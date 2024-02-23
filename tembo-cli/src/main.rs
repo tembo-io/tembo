@@ -73,7 +73,7 @@ fn main() -> Result<(), anyhow::Error> {
             delete::execute()?;
         }
         SubCommands::Top(_top_cmd) => {
-            top::execute()?;
+            top::execute(app.global_opts.verbose)?;
         }
     }
 

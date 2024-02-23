@@ -4,11 +4,18 @@ use crate::cmd::apply::get_instance_settings;
 use crate::Args;
 use anyhow::anyhow;
 use anyhow::{Context, Result};
+use crossterm::{
+    cursor::{MoveTo, MoveUp},
+    execute,
+    terminal::{Clear, ClearType},
+};
 use hyper::header::ACCEPT;
 use reqwest::header::HeaderMap;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::convert::TryInto;
 use std::fmt;
+use std::io::{stdout, Write};
 use temboclient::models::{instance, instance_event};
 use temboclient::{
     apis::{
@@ -47,21 +54,27 @@ async fn get_instance_id(
     config: &Configuration,
     env: &Environment,
 ) -> Result<Option<String>, anyhow::Error> {
-    let v = get_all(config, env.org_id.clone().unwrap().as_str()).await;
+    let org_id = match env.org_id.as_ref() {
+        Some(id) => id,
+        None => return Err(anyhow!("Org ID not found")),
+    };
 
-    match v {
+    match get_all(config, org_id).await {
         Ok(result) => {
             let maybe_instance = result
                 .iter()
                 .find(|instance| instance.instance_name == instance_name);
-
             if let Some(instance) = maybe_instance {
-                return Ok(Some(instance.clone().instance_id));
+                Ok(Some(instance.clone().instance_id))
+            } else {
+                Ok(None)
             }
         }
-        Err(error) => eprintln!("Error getting instance: {}", error),
-    };
-    Ok(None)
+        Err(error) => {
+            eprintln!("Error getting instance: {}", error);
+            Err(error.into())
+        }
+    }
 }
 
 async fn fetch_metrics_loop(
@@ -69,7 +82,13 @@ async fn fetch_metrics_loop(
     env: Environment,
     instance_settings: HashMap<String, InstanceSettings>,
 ) -> Result<()> {
+    let mut stdout = stdout();
     let client = reqwest::Client::new();
+    let profile = env
+        .selected_profile
+        .as_ref()
+        .context("Expected environment to have a selected profile")?;
+    let url = profile.tembo_data_host.clone();
 
     let mut headers = HeaderMap::new();
     headers.insert("Accept", "application/json".parse()?);
@@ -80,28 +99,88 @@ async fn fetch_metrics_loop(
     headers.insert("Authorization", format!("Bearer {}", jwt_token).parse()?);
     let mut interval = interval(Duration::from_secs(2));
 
+    let mut printed_lines: HashMap<String, usize> = HashMap::new();
+
     loop {
-        interval.tick().await;
-        for (_key, value) in instance_settings.iter() {
-            let org_name = get_instance_org_name(&config, &env, &value.instance_name).await;
+        execute!(stdout, Clear(ClearType::All))?;
+
+        for (key, value) in &instance_settings {
+            let org_name = get_instance_org_name(&config, &env, &value.instance_name).await?;
             let namespace = format!("org-{}-inst-{}", org_name, &value.instance_name);
             let namespace_encoded = urlencoding::encode(&namespace);
-            //4 queries for memory, storage, cpu and Conncections
-            let metric_queries = vec![
-        format!("sum by (pod) (node_namespace_pod_container:container_cpu_usage_seconds_total:sum_irate{{ namespace=\"{}\", container=\"postgres\" }}) / avg by (pod) (kube_pod_container_resource_limits{{ job=\"kube-state-metrics\", namespace=\"{}\", container=\"postgres\", resource=\"cpu\" }})",namespace_encoded, namespace_encoded).to_string(),
-        format!("sum by(persistentvolumeclaim) (kubelet_volume_stats_capacity_bytes{{job=\"kubelet\", metrics_path=\"/metrics\", namespace=\"{}\"}}) - sum by(persistentvolumeclaim) (kubelet_volume_stats_available_bytes{{job=\"kubelet\", metrics_path=\"/metrics\", namespace=\"{}\"}})",namespace_encoded, namespace_encoded).to_string(),
-        format!("sum(container_memory_working_set_bytes{{job=\"kubelet\", metrics_path=\"/metrics/cadvisor\", namespace=\"{}\",container!=\"\", image!=\"\"}}) / sum(max by(pod) (kube_pod_container_resource_requests{{job=\"kube-state-metrics\", namespace=\"{}\", resource=\"memory\"}}))",namespace_encoded, namespace_encoded).to_string(),
-        format!("max by (pod) (cnpg_backends_max_tx_duration_seconds{{namespace=\"{}\"}})",namespace_encoded).to_string(),
-    ];
 
-            for query in &metric_queries {
-                //Looping it every 2 seconds to retrieve the response
-                match fetch_metric(query, &namespace_encoded, &client, &headers).await {
-                    Ok(metrics_response) => println!("{:?}", metrics_response),
-                    Err(e) => eprintln!("Error fetching metrics: {}", e),
+            println!("Instance name: {}", &value.instance_name);
+
+            let metric_queries = vec![
+                (
+                    "Cpu",
+                    format!("sum by (pod) (node_namespace_pod_container:container_cpu_usage_seconds_total:sum_irate{{ namespace=\"{}\", container=\"postgres\" }}) / avg by (pod) (kube_pod_container_resource_limits{{ job=\"kube-state-metrics\", namespace=\"{}\", container=\"postgres\", resource=\"cpu\" }})*100", namespace_encoded, namespace_encoded),
+                    format!(
+                        "avg by (pod) (kube_pod_container_resource_limits{{ job=\"kube-state-metrics\", namespace=\"{}\", container=\"postgres\", resource=\"cpu\" }})",
+                        namespace_encoded
+                    )
+                ),
+                (
+                    "Storage",
+                    format!(
+                        "(sum by(persistentvolumeclaim) (kubelet_volume_stats_capacity_bytes{{job=\"kubelet\", metrics_path=\"/metrics\", namespace=\"{}\"}}) - sum by(persistentvolumeclaim) (kubelet_volume_stats_available_bytes{{job=\"kubelet\", metrics_path=\"/metrics\", namespace=\"{}\"}})) / 100000000", namespace_encoded, namespace_encoded
+                    ),
+                    format!(
+                        "sum by(persistentvolumeclaim) (kubelet_volume_stats_available_bytes{{job=\"kubelet\", metrics_path=\"/metrics\", namespace=\"{}\"}})",
+                        namespace_encoded
+                    )
+                ),
+                (
+                    "Memory",
+                    format!("sum(container_memory_working_set_bytes{{job=\"kubelet\", metrics_path=\"/metrics/cadvisor\", namespace=\"{}\",container!=\"\", image!=\"\"}}) / sum(max by(pod) (kube_pod_container_resource_requests{{job=\"kube-state-metrics\", namespace=\"{}\", resource=\"memory\"}})) * 100", namespace_encoded, namespace_encoded),
+                    format!(
+                        "sum(max by(pod) (kube_pod_container_resource_requests{{job=\"kube-state-metrics\", namespace=\"{}\", resource=\"memory\"}}))",
+                        namespace_encoded
+                    )
+                ),
+                //Doubtful if we would need Connections(Need to consult Steven)
+                /*(
+                    "Connections",
+                    format!("max by (pod) (cnpg_backends_max_tx_duration_seconds{{namespace=\"{}\"}})", namespace_encoded),
+                    format!(""
+                    )
+                ),*/
+                ];
+
+            for (query_name, query1, query2) in &metric_queries {
+                let result1 =
+                    fetch_metric(query1, &namespace_encoded, &client, &headers, &url).await;
+                let result2 =
+                    fetch_metric(query2, &namespace_encoded, &client, &headers, &url).await;
+
+                match (result1, result2) {
+                    (Ok(metrics_response1), Ok(metrics_response2)) => {
+                        let raw_value1: f64 = metrics_response1
+                            .data
+                            .result
+                            .get(0)
+                            .and_then(|metric_result| metric_result.value.1.parse().ok())
+                            .unwrap_or(0.0);
+                        let value1 = format!("{:.2}", raw_value1.abs());
+                        let value2 = metrics_response2
+                            .data
+                            .result
+                            .get(0)
+                            .map_or("N/A", |metric_result| &metric_result.value.1);
+
+                        println!("{}: {} | {}%", query_name, value2, value1);
+                    }
+                    (Err(e), _) | (_, Err(e)) => {
+                        eprintln!("Error fetching metrics for {}: {}", query_name, e);
+                    }
                 }
             }
+
+            println!();
         }
+
+        stdout.flush()?;
+        tokio::time::sleep(Duration::from_secs(2)).await;
     }
 }
 
@@ -110,12 +189,13 @@ async fn fetch_metric(
     namespace_encoded: &str,
     client: &reqwest::Client,
     headers: &HeaderMap,
+    url: &String,
 ) -> Result<MetricsResponse> {
-    const BASE_URL: &str = "https://api.data-1.use1.tembo.io";
+    let base_url: &str = url;
     let query_encoded = urlencoding::encode(metric_query);
     let url = format!(
         "{}/{}/metrics/query?&query={}",
-        BASE_URL, namespace_encoded, query_encoded
+        base_url, namespace_encoded, query_encoded
     );
 
     //Sending the HTTP request with headers
@@ -130,33 +210,53 @@ async fn fetch_metric(
     Ok(response)
 }
 
-//Getting the org and instance name to run the queries
 async fn get_instance_org_name(
     config: &Configuration,
     env: &Environment,
     instance_name: &String,
-) -> String {
-    let instance_id = get_instance_id(instance_name, &config, &env)
-        .await
-        .unwrap()
-        .unwrap();
-    let instance = get_instance(&config, &env.org_id.clone().unwrap(), &instance_id)
-        .await
-        .unwrap();
-    instance.organization_name
+) -> Result<String, anyhow::Error> {
+    let instance_id_result = get_instance_id(instance_name, config, env).await;
+    let instance_id = match instance_id_result {
+        Ok(Some(id)) => id,
+        Ok(None) => {
+            return Err(anyhow!(
+                "Instance ID not found for instance name: {}",
+                instance_name
+            ))
+        }
+        Err(e) => return Err(e.into()),
+    };
+    let org_id = env
+        .org_id
+        .as_ref()
+        .ok_or_else(|| anyhow!("Org ID not found"))?;
+
+    let instance_result = get_instance(config, org_id, &instance_id).await;
+    match instance_result {
+        Ok(instance) => Ok(instance.organization_name),
+        Err(e) => Err(e.into()),
+    }
 }
 
 //Function to tackle async
 fn blocking(config: &Configuration, env: &Environment) -> Result<(), anyhow::Error> {
-    let rt = Runtime::new().unwrap();
+    let rt = match Runtime::new() {
+        Ok(rt) => rt,
+        Err(e) => return Err(anyhow!("Failed to create Tokio runtime: {}", e)),
+    };
+
     let instance_settings = get_instance_settings(None, None)?;
     rt.block_on(async {
-        let _metrics_response = fetch_metrics_loop(&config, env.clone(), instance_settings).await;
+        match fetch_metrics_loop(config, env.clone(), instance_settings).await {
+            Ok(_) => (),
+            Err(e) => eprintln!("Error fetching metrics: {}", e),
+        }
     });
     Ok(())
 }
 
-pub fn execute() -> Result<(), anyhow::Error> {
+pub fn execute(verbose: bool) -> Result<(), anyhow::Error> {
+    super::validate::execute(verbose)?;
     let env = get_current_context().context("Failed to get current context")?;
     let profile = env
         .selected_profile
