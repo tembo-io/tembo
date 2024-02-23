@@ -15,8 +15,12 @@ use crate::{
             ClusterBackupBarmanObjectStoreS3CredentialsSecretAccessKey,
             ClusterBackupBarmanObjectStoreS3CredentialsSessionToken,
             ClusterBackupBarmanObjectStoreWal, ClusterBackupBarmanObjectStoreWalCompression,
-            ClusterBackupBarmanObjectStoreWalEncryption, ClusterBootstrap, ClusterBootstrapInitdb,
-            ClusterBootstrapRecovery, ClusterBootstrapRecoveryRecoveryTarget, ClusterCertificates,
+            ClusterBackupBarmanObjectStoreWalEncryption, ClusterBackupVolumeSnapshot,
+            ClusterBackupVolumeSnapshotOnlineConfiguration,
+            ClusterBackupVolumeSnapshotSnapshotOwnerReference, ClusterBootstrap,
+            ClusterBootstrapInitdb, ClusterBootstrapRecovery,
+            ClusterBootstrapRecoveryRecoveryTarget, ClusterBootstrapRecoveryVolumeSnapshots,
+            ClusterBootstrapRecoveryVolumeSnapshotsStorage, ClusterCertificates,
             ClusterExternalClusters, ClusterExternalClustersBarmanObjectStore,
             ClusterExternalClustersBarmanObjectStoreS3Credentials,
             ClusterExternalClustersBarmanObjectStoreS3CredentialsAccessKeyId,
@@ -41,7 +45,7 @@ use crate::{
         },
         scheduledbackups::{
             ScheduledBackup, ScheduledBackupBackupOwnerReference, ScheduledBackupCluster,
-            ScheduledBackupSpec,
+            ScheduledBackupMethod, ScheduledBackupSpec,
         },
     },
     config::Config,
@@ -51,6 +55,7 @@ use crate::{
     is_postgres_ready, patch_cdb_status_merge,
     postgres_exporter::EXPORTER_CONFIGMAP_PREFIX,
     psql::PsqlOutput,
+    snapshots::volumesnapshots::reconcile_volume_snapshot_restore,
     trunk::extensions_that_require_load,
     Context, RESTARTED_AT,
 };
@@ -65,6 +70,8 @@ use serde_json::json;
 use std::{collections::BTreeMap, sync::Arc};
 use tokio::time::Duration;
 use tracing::{debug, error, info, instrument, warn};
+
+const VOLUME_SNAPSHOT_CLASS_NAME: &str = "cnpg-snapshot-class";
 
 pub struct PostgresConfig {
     pub postgres_parameters: Option<BTreeMap<String, String>>,
@@ -103,7 +110,7 @@ fn create_cluster_backup_barman_wal(cdb: &CoreDB) -> Option<ClusterBackupBarmanO
         Some(ClusterBackupBarmanObjectStoreWal {
             compression: Some(ClusterBackupBarmanObjectStoreWalCompression::Snappy),
             encryption,
-            max_parallel: Some(5),
+            max_parallel: Some(8),
         })
     } else {
         None
@@ -152,6 +159,28 @@ fn create_cluster_certificates(cdb: &CoreDB) -> Option<ClusterCertificates> {
     }
 }
 
+fn create_cluster_backup_volume_snapshot(cdb: &CoreDB) -> ClusterBackupVolumeSnapshot {
+    let class_name = cdb
+        .spec
+        .backup
+        .volume_snapshot
+        .as_ref()
+        .and_then(|vs| vs.snapshot_class.as_ref())
+        .cloned()
+        .unwrap_or_else(|| VOLUME_SNAPSHOT_CLASS_NAME.to_string());
+
+    ClusterBackupVolumeSnapshot {
+        class_name: Some(class_name),
+        online: Some(true),
+        online_configuration: Some(ClusterBackupVolumeSnapshotOnlineConfiguration {
+            wait_for_archive: Some(true),
+            immediate_checkpoint: Some(true),
+        }),
+        snapshot_owner_reference: Some(ClusterBackupVolumeSnapshotSnapshotOwnerReference::Cluster),
+        ..ClusterBackupVolumeSnapshot::default()
+    }
+}
+
 fn create_cluster_backup(
     cdb: &CoreDB,
     endpoint_url: &str,
@@ -171,6 +200,14 @@ fn create_cluster_backup(
         },
     };
 
+    let volume_snapshot = cdb.spec.backup.volume_snapshot.as_ref().and_then(|vs| {
+        if vs.enabled {
+            Some(create_cluster_backup_volume_snapshot(cdb))
+        } else {
+            None
+        }
+    });
+
     Some(ClusterBackup {
         barman_object_store: Some(create_cluster_backup_barman_object_store(
             cdb,
@@ -178,7 +215,8 @@ fn create_cluster_backup(
             backup_path,
             s3_credentials,
         )),
-        retention_policy: Some(retention_days), // Adjust as needed
+        retention_policy: Some(retention_days),
+        volume_snapshot,
         ..ClusterBackup::default()
     })
 }
@@ -354,49 +392,10 @@ pub fn cnpg_cluster_bootstrap_from_cdb(
     Option<Vec<ClusterExternalClusters>>,
     Option<ClusterSuperuserSecret>,
 ) {
-    // parse_target_time returns the parsed target_time which is used for point-in-time-recovery
-    // todo: Somehow turn this into a requeue action, so that we can retry when the target_time is not in the correct format.
-    //      for now we just log the error and return None, which will disable point-in-time-recovery, but allow for a full recovery
-    let parsed_target_time = cdb.spec.restore.as_ref().and_then(|restore| {
-        restore.recovery_target_time.as_ref().and_then(|time_str| {
-            match parse_target_time(Some(time_str)) {
-                Ok(Some(parsed_time)) => Some(parsed_time),
-                Ok(None) => None,
-                Err(err) => {
-                    error!(
-                        "Failed to parse target_time for instance: {}, {}",
-                        cdb.name_any(),
-                        err
-                    );
-                    None
-                }
-            }
-        })
-    });
-
-    let cluster_bootstrap = if let Some(_restore) = &cdb.spec.restore {
-        ClusterBootstrap {
-            recovery: Some(ClusterBootstrapRecovery {
-                source: Some("tembo-recovery".to_string()),
-                database: Some("app".to_string()),
-                owner: Some("app".to_string()),
-                recovery_target: parsed_target_time.map(|target_time| {
-                    ClusterBootstrapRecoveryRecoveryTarget {
-                        target_time: Some(target_time),
-                        ..ClusterBootstrapRecoveryRecoveryTarget::default()
-                    }
-                }),
-                ..ClusterBootstrapRecovery::default()
-            }),
-            ..ClusterBootstrap::default()
-        }
+    let cluster_bootstrap = if cdb.spec.restore.is_some() {
+        cnpg_cluster_bootstrap(cdb, true)
     } else {
-        ClusterBootstrap {
-            initdb: Some(ClusterBootstrapInitdb {
-                ..ClusterBootstrapInitdb::default()
-            }),
-            ..ClusterBootstrap::default()
-        }
+        cnpg_cluster_bootstrap(cdb, false)
     };
     let cluster_name = cdb.name_any();
 
@@ -412,7 +411,7 @@ pub fn cnpg_cluster_bootstrap_from_cdb(
         // Find destination_path from Backup to generate the restore destination path
         let restore_destination_path = match &cdb.spec.backup.destinationPath {
             Some(path) => generate_restore_destination_path(path),
-            None => "".to_string(), // or any other default value you'd like
+            None => "".to_string(),
         };
         ClusterExternalClusters {
             name: "tembo-recovery".to_string(),
@@ -421,7 +420,7 @@ pub fn cnpg_cluster_bootstrap_from_cdb(
                 endpoint_url: restore.endpoint_url.clone(),
                 s3_credentials: Some(s3_credentials),
                 wal: Some(ClusterExternalClustersBarmanObjectStoreWal {
-                    max_parallel: Some(5),
+                    max_parallel: Some(8),
                     encryption: Some(ClusterExternalClustersBarmanObjectStoreWalEncryption::Aes256),
                     compression: Some(
                         ClusterExternalClustersBarmanObjectStoreWalCompression::Snappy,
@@ -456,6 +455,74 @@ pub fn cnpg_cluster_bootstrap_from_cdb(
         Some(vec![coredb_cluster]),
         Some(superuser_secret),
     )
+}
+
+fn cnpg_cluster_bootstrap(cdb: &CoreDB, restore: bool) -> ClusterBootstrap {
+    // parse_target_time returns the parsed target_time which is used for point-in-time-recovery
+    // todo: Somehow turn this into a requeue action, so that we can retry when the target_time is not in the correct format.
+    //      for now we just log the error and return None, which will disable point-in-time-recovery, but allow for a full recovery
+    let parsed_target_time = cdb.spec.restore.as_ref().and_then(|restore| {
+        restore.recovery_target_time.as_ref().and_then(|time_str| {
+            match parse_target_time(Some(time_str)) {
+                Ok(Some(parsed_time)) => Some(parsed_time),
+                Ok(None) => None,
+                Err(err) => {
+                    error!(
+                        "Failed to parse target_time for instance: {}, {}",
+                        cdb.name_any(),
+                        err
+                    );
+                    None
+                }
+            }
+        })
+    });
+
+    if restore {
+        ClusterBootstrap {
+            recovery: Some(ClusterBootstrapRecovery {
+                source: Some("tembo-recovery".to_string()),
+                database: Some("app".to_string()),
+                owner: Some("app".to_string()),
+                recovery_target: parsed_target_time.map(|target_time| {
+                    ClusterBootstrapRecoveryRecoveryTarget {
+                        target_time: Some(target_time),
+                        ..ClusterBootstrapRecoveryRecoveryTarget::default()
+                    }
+                }),
+                volume_snapshots: cnpg_cluster_bootstrap_recovery_volume_snapshots(cdb),
+                ..ClusterBootstrapRecovery::default()
+            }),
+            ..ClusterBootstrap::default()
+        }
+    } else {
+        ClusterBootstrap {
+            initdb: Some(ClusterBootstrapInitdb {
+                ..ClusterBootstrapInitdb::default()
+            }),
+            ..ClusterBootstrap::default()
+        }
+    }
+}
+
+fn cnpg_cluster_bootstrap_recovery_volume_snapshots(
+    cdb: &CoreDB,
+) -> Option<ClusterBootstrapRecoveryVolumeSnapshots> {
+    if let Some(restore) = &cdb.spec.restore {
+        if restore.volume_snapshot.is_some() {
+            return Some(ClusterBootstrapRecoveryVolumeSnapshots {
+                storage: ClusterBootstrapRecoveryVolumeSnapshotsStorage {
+                    // todo: Work on getting this from the VolumeSnapshot we created
+                    // during the restore process
+                    name: format!("{}-restore-vs", cdb.name_any()),
+                    kind: "VolumeSnapshot".to_string(),
+                    api_group: Some("snapshot.storage.k8s.io".to_string()),
+                },
+                ..ClusterBootstrapRecoveryVolumeSnapshots::default()
+            });
+        }
+    }
+    None
 }
 
 // Get PGConfig from CoreDB and convert it to a postgres_parameters and shared_preload_libraries
@@ -946,6 +1013,17 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
         extensions_that_require_load(ctx.client.clone(), &cdb.metadata.namespace.clone().unwrap())
             .await?;
 
+    // If we are restoring and have volume snapshots enabled, make sure we setup
+    // the VolumeSnapshotContent and VolumeSnapshot so that the Cluster will have
+    // something to restore from.
+    if let Some(restore) = &cdb.spec.restore {
+        if restore.volume_snapshot.is_some() {
+            debug!("Reconciling VolumeSnapshotContent and VolumeSnapshot for restore");
+            reconcile_volume_snapshot_restore(cdb, ctx.clone()).await?;
+        }
+    }
+    debug!("Setting up VolumeSnapshotContent and VolumeSnapshot for restore");
+
     debug!("Generating CNPG spec");
     let mut cluster = cnpg_cluster_from_cdb(cdb, Some(pods_to_fence), requires_load);
 
@@ -1328,26 +1406,73 @@ fn schedule_expression_from_cdb(cdb: &CoreDB) -> String {
 }
 
 // Generate a ScheduledBackup
-fn cnpg_scheduled_backup(cdb: &CoreDB) -> ScheduledBackup {
-    let name = cdb.name_any();
-    let namespace = cdb.namespace().unwrap();
+fn cnpg_scheduled_backup(
+    cdb: &CoreDB,
+) -> Result<Vec<(ScheduledBackup, Option<ScheduledBackup>)>, &'static str> {
+    let namespace = match cdb.namespace() {
+        Some(ns) => ns,
+        None => return Err("Namespace is required but not found"),
+    };
 
-    ScheduledBackup {
+    let name_ref = cdb.metadata.name.as_ref();
+    let name = match name_ref {
+        Some(n) => n,
+        None => return Err("Name is required but not found"),
+    };
+
+    // Set a ScheduledBackup to backup to object store
+    let s3_scheduled_backup = ScheduledBackup {
         metadata: ObjectMeta {
-            name: Some(name.clone()),
-            namespace: Some(namespace),
+            name: Some(name.to_string()),
+            namespace: Some(namespace.to_string()),
             ..ObjectMeta::default()
         },
         spec: ScheduledBackupSpec {
             backup_owner_reference: Some(ScheduledBackupBackupOwnerReference::Cluster),
-            cluster: ScheduledBackupCluster { name },
+            cluster: ScheduledBackupCluster {
+                name: name.to_string(),
+            },
             immediate: Some(true),
             schedule: schedule_expression_from_cdb(cdb),
             suspend: Some(false),
+            method: Some(ScheduledBackupMethod::BarmanObjectStore),
             ..ScheduledBackupSpec::default()
         },
         status: None,
-    }
+    };
+
+    // Set a ScheduledBackup to backup to volume snapshot if enabled
+    let volume_snapshot_scheduled_backup = cdb
+        .spec
+        .backup
+        .volume_snapshot
+        .as_ref()
+        .filter(|vs| vs.enabled)
+        .map(|_| ScheduledBackup {
+            metadata: ObjectMeta {
+                name: Some(name.to_string() + "-snap"),
+                namespace: Some(namespace),
+                ..ObjectMeta::default()
+            },
+            spec: ScheduledBackupSpec {
+                backup_owner_reference: Some(ScheduledBackupBackupOwnerReference::Cluster),
+                cluster: ScheduledBackupCluster {
+                    name: name.to_string(),
+                },
+                immediate: Some(true),
+                schedule: schedule_expression_from_cdb(cdb),
+                suspend: Some(false),
+                method: Some(ScheduledBackupMethod::VolumeSnapshot),
+                ..ScheduledBackupSpec::default()
+            },
+            status: None,
+        });
+
+    // Return the ScheduledBackup objects
+    Ok(vec![(
+        s3_scheduled_backup,
+        volume_snapshot_scheduled_backup,
+    )])
 }
 
 // Reconcile a SheduledBackup
@@ -1362,30 +1487,61 @@ pub async fn reconcile_cnpg_scheduled_backup(
         return Err(Action::requeue(Duration::from_secs(30)));
     }
 
-    let scheduledbackup = cnpg_scheduled_backup(cdb);
     let client = ctx.client.clone();
-    let name = scheduledbackup
+    let scheduled_backups_result = cnpg_scheduled_backup(cdb);
+    let scheduled_backups = match scheduled_backups_result {
+        Ok(backups) => backups,
+        Err(e) => {
+            error!(
+                "Failed to generate scheduled backups for {}: {}",
+                cdb.name_any(),
+                e
+            );
+            return Err(Action::requeue(Duration::from_secs(300)));
+        }
+    };
+
+    for (s3_backup, volume_snapshot_backup) in scheduled_backups {
+        // Always apply the s3_backup if backups are enabled
+        apply_scheduled_backup(&s3_backup, &client).await?;
+
+        // Conditionally apply the volume_snapshot_backup if it exists
+        if let Some(vs_backup) = volume_snapshot_backup {
+            apply_scheduled_backup(&vs_backup, &client).await?;
+        }
+    }
+
+    Ok(())
+}
+
+#[instrument(skip(client), fields(trace_id, scheduled_backup))]
+async fn apply_scheduled_backup(
+    scheduled_backup: &ScheduledBackup,
+    client: &kube::Client,
+) -> Result<(), Action> {
+    let name = scheduled_backup
         .metadata
         .name
         .clone()
         .expect("ScheduledBackup should always have a name");
-    let namespace = scheduledbackup
+    let namespace = scheduled_backup
         .metadata
         .namespace
         .clone()
         .expect("ScheduledBackup should always have a namespace");
-    let backup_api: Api<ScheduledBackup> = Api::namespaced(client.clone(), namespace.as_str());
+    let backup_api: Api<ScheduledBackup> = Api::namespaced(client.clone(), &namespace);
 
-    debug!("Patching ScheduledBackup");
+    debug!("Patching ScheduledBackup: {}", name);
     let ps = PatchParams::apply("cntrlr").force();
-    let _o = backup_api
-        .patch(&name, &ps, &Patch::Apply(&scheduledbackup))
+    backup_api
+        .patch(&name, &ps, &Patch::Apply(scheduled_backup))
         .await
         .map_err(|e| {
             error!("Error patching ScheduledBackup: {}", e);
             Action::requeue(Duration::from_secs(300))
         })?;
-    debug!("Applied ScheduledBackup");
+
+    debug!("Applied ScheduledBackup: {}", name);
     Ok(())
 }
 
@@ -2292,6 +2448,8 @@ mod tests {
             encryption: AES256
             retentionPolicy: "45"
             schedule: 55 7 * * *
+            volumeSnapshot:
+              enabled: false
           image: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e 
           port: 5432
           postgresExporterEnabled: true
@@ -2313,14 +2471,20 @@ mod tests {
         let cdb: CoreDB = from_str(cdb_yaml).unwrap();
         let cfg = Config::default();
 
-        let scheduled_backup: ScheduledBackup = cnpg_scheduled_backup(&cdb);
         let (backup, service_account_template) = cnpg_backup_configuration(&cdb, &cfg);
+        let backups_result = cnpg_scheduled_backup(&cdb).unwrap();
+        let (s3_backup, _volume_snapshot_backup) = &backups_result[0];
 
         // Assert to make sure that backup schedule is set
-        assert_eq!(scheduled_backup.spec.schedule, "0 55 7 * * *".to_string());
+        assert_eq!(s3_backup.spec.schedule, "0 55 7 * * *".to_string());
         assert_eq!(
             backup.clone().unwrap().retention_policy.unwrap(),
             "45d".to_string()
+        );
+
+        assert_eq!(
+            s3_backup.spec.method,
+            Some(ScheduledBackupMethod::BarmanObjectStore)
         );
 
         // Assert to make sure that backup destination path is set
@@ -2633,5 +2797,80 @@ mod tests {
         "#;
         let cdb_no_storage_class: CoreDB = from_str(cdb_no_storage_class_yaml).unwrap();
         assert_eq!(cnpg_cluster_storage_class(&cdb_no_storage_class), None);
+    }
+
+    #[test]
+    fn test_cnpg_cluster_volume_snapshot() {
+        let cdb_yaml = r#"
+        apiVersion: coredb.io/v1alpha1
+        kind: CoreDB
+        metadata:
+          name: test
+          namespace: default
+        spec:
+          backup:
+            destinationPath: s3://tembo-backup/sample-standard-backup
+            encryption: ""
+            retentionPolicy: "30"
+            schedule: 17 9 * * *
+            endpointURL: http://minio:9000
+            volumeSnapshot:
+              enabled: true
+              snapshotClass: "csi-vsc"
+          image: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e 
+          port: 5432
+          replicas: 1
+          resources:
+            limits:
+              cpu: "1"
+              memory: 0.5Gi
+          serviceAccountTemplate:
+            metadata:
+              annotations:
+                eks.amazonaws.com/role-arn: arn:aws:iam::012345678901:role/aws-iam-role-iam
+          sharedirStorage: 1Gi
+          stop: false
+          storage: 1Gi
+          storageClass: "gp3-enc"
+          uid: 999
+        "#;
+
+        let cdb: CoreDB = serde_yaml::from_str(cdb_yaml).expect("Failed to parse YAML");
+        let snapshot = create_cluster_backup_volume_snapshot(&cdb);
+        let backups_result = cnpg_scheduled_backup(&cdb).unwrap();
+        let (s3_backup, volume_snapshot_backup) = &backups_result[0];
+
+        // Set an expected ClusterBackupVolumeSnapshot object
+        let expected_snapshot = ClusterBackupVolumeSnapshot {
+            class_name: Some("csi-vsc".to_string()), // Expected to match the YAML input
+            online: Some(true),
+            online_configuration: Some(ClusterBackupVolumeSnapshotOnlineConfiguration {
+                wait_for_archive: Some(true),
+                immediate_checkpoint: Some(true),
+            }),
+            snapshot_owner_reference: Some(
+                ClusterBackupVolumeSnapshotSnapshotOwnerReference::Cluster,
+            ),
+            ..ClusterBackupVolumeSnapshot::default()
+        };
+
+        // Assert to make sure that the snapshot.snapshot_class and expected_snapshot.snapshot_class are the same
+        assert_eq!(snapshot, expected_snapshot);
+
+        // Assert to make sure that the ScheduledBackup method is set to VolumeSnapshot
+        if let Some(volume_snapshot_backup) = volume_snapshot_backup {
+            assert_eq!(
+                volume_snapshot_backup.spec.method,
+                Some(ScheduledBackupMethod::VolumeSnapshot)
+            );
+        } else {
+            panic!("Expected volume snapshot backup to be Some, but was None");
+        }
+
+        // Assert to make sure that the ScheduledBackup method is set to BarmanObjectStore
+        assert_eq!(
+            s3_backup.spec.method,
+            Some(ScheduledBackupMethod::BarmanObjectStore)
+        );
     }
 }
