@@ -18,14 +18,22 @@ struct TokenResponse {
     token: String,
 }
 
-pub async fn execute() -> Result<(), anyhow::Error> {
+pub fn execute() -> Result<(), anyhow::Error> {
+    let rt = tokio::runtime::Runtime::new().expect("Failed to create a runtime");
+
     let lifetime = token_lifetime()?;
     let login_url = "https://cloud.tembo.io/loginjwt?isCli=true&expiry=".to_owned() + &lifetime;
-    webbrowser::open(&login_url)?;
 
+    rt.block_on(handle_tokio(login_url))?;
+
+    Ok(())
+}
+
+async fn handle_tokio(login_url: String) -> Result<(), anyhow::Error> {
+
+    webbrowser::open(&login_url)?;
     let notify = Arc::new(Notify::new());
     let notify_clone = notify.clone();
-
     tokio::spawn(async move {
         if let Err(e) = start_server(notify_clone).await {
             eprintln!("Server error: {}", e);
@@ -42,6 +50,7 @@ pub async fn execute() -> Result<(), anyhow::Error> {
 
     Ok(())
 }
+
 
 #[post("/")]
 async fn handle_request(
@@ -65,7 +74,6 @@ async fn start_server(notify: Arc<Notify>) -> Result<()> {
 
     let server = HttpServer::new(move || {
         let cors = Cors::default()
-            .allowed_origin("https://pr-462.dkwugv8ig5mdu.amplifyapp.com")
             .allowed_origin("https://local.tembo.io")
             .allowed_origin("https://cloud.tembo.io")
             .allowed_methods(vec!["GET", "POST"])
@@ -100,17 +108,29 @@ fn token_lifetime() -> Result<String> {
 }
 
 fn save_token_to_file(token: &str) -> Result<(), Error> {
-    let home_dir = dirs::home_dir().expect("Could not find home directory");
+    let home_dir = dirs::home_dir().ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Could not find home directory"))?;
     let credentials_path = home_dir.join(".tembo/credentials");
 
-    let new_contents = format!(
-        "version = \"1.0\"\n\n[[profile]]\nname = 'prod'\ntembo_access_token = \'{}\'\ntembo_host = 'https://api.tembo.io'\ntembo_data_host = 'https://api.data-1.use1.tembo.io'",
-        token
-    );
+    if credentials_path.exists() {
+        let contents = fs::read_to_string(&credentials_path)?;
+        let lines: Vec<String> = contents.lines().map(|line| line.to_string()).collect();
 
-    fs::write(&credentials_path, new_contents)?;
-
-    println!("Token updated in credentials file");
+        let new_lines: Vec<String> = lines
+            .into_iter()
+            .map(|line| {
+                if line.starts_with("tembo_access_token") {
+                    format!("tembo_access_token = '{}'", token)
+                } else {
+                    line
+                }
+            })
+            .collect();
+        let new_contents = new_lines.join("\n");
+        fs::write(&credentials_path, new_contents)?;
+        println!("Token updated in credentials file");
+    } else {
+        return Err(Error::msg("Credentials file does not exist. Run \"tembo init\""));
+    }
 
     Ok(())
 }

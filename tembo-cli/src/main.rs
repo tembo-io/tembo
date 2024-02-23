@@ -1,6 +1,5 @@
 use crate::cmd::delete::DeleteCommand;
 use crate::cmd::validate::ValidateCommand;
-use crate::cmd::{apply, context, delete, init, login, logs, validate};
 use crate::cmd::{apply, context, delete, init, login, logs, top, validate};
 
 use clap::{crate_authors, crate_version, Args, Parser, Subcommand};
@@ -45,8 +44,7 @@ struct GlobalOpts {
     verbose: bool,
 }
 
-#[tokio::main]
-async fn main() -> Result<(), anyhow::Error> {
+fn main() -> Result<(), anyhow::Error> {
     let app = App::parse();
 
     match app.command {
@@ -78,7 +76,7 @@ async fn main() -> Result<(), anyhow::Error> {
             delete::execute()?;
         }
         SubCommands::Login(_login_cmd) => {
-            login::execute().await?;
+            login::execute()?;
         }
         SubCommands::Top(_top_cmd) => {
             top::execute(app.global_opts.verbose)?;
