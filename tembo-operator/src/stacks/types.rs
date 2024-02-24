@@ -16,15 +16,16 @@ use utoipa::ToSchema;
 pub enum StackType {
     API,
     DataWarehouse,
-    Standard,
-    MessageQueue,
+    Geospatial,
     MachineLearning,
+    MessageQueue,
+    MongoAlternative,
     OLAP,
     #[default]
     OLTP,
+    RAG,
+    Standard,
     VectorDB,
-    Geospatial,
-    MongoAlternative,
 }
 
 impl std::str::FromStr for StackType {
@@ -34,14 +35,15 @@ impl std::str::FromStr for StackType {
         match value {
             "API" => Ok(StackType::API),
             "DataWarehouse" => Ok(StackType::DataWarehouse),
-            "Standard" => Ok(StackType::Standard),
-            "MessageQueue" => Ok(StackType::MessageQueue),
+            "Geospatial" => Ok(StackType::Geospatial),
             "MachineLearning" => Ok(StackType::MachineLearning),
+            "MessageQueue" => Ok(StackType::MessageQueue),
+            "MongoAlternative" => Ok(StackType::MongoAlternative),
             "OLAP" => Ok(StackType::OLAP),
             "OLTP" => Ok(StackType::OLTP),
+            "RAG" => Ok(StackType::RAG),
+            "Standard" => Ok(StackType::Standard),
             "VectorDB" => Ok(StackType::VectorDB),
-            "Geospatial" => Ok(StackType::Geospatial),
-            "MongoAlternative" => Ok(StackType::MongoAlternative),
             _ => Err("invalid value"),
         }
     }
@@ -52,14 +54,15 @@ impl StackType {
         match self {
             StackType::API => "API",
             StackType::DataWarehouse => "DataWarehouse",
-            StackType::Standard => "Standard",
-            StackType::MessageQueue => "MessageQueue",
+            StackType::Geospatial => "Geospatial",
             StackType::MachineLearning => "MachineLearning",
+            StackType::MessageQueue => "MessageQueue",
+            StackType::MongoAlternative => "MongoAlternative",
             StackType::OLAP => "OLAP",
             StackType::OLTP => "OLTP",
+            StackType::RAG => "RAG",
+            StackType::Standard => "Standard",
             StackType::VectorDB => "VectorDB",
-            StackType::Geospatial => "Geospatial",
-            StackType::MongoAlternative => "MongoAlternative",
         }
     }
 }
@@ -236,14 +239,15 @@ mod tests {
         let all_stacks = vec![
             StackType::API,
             StackType::DataWarehouse,
-            StackType::Standard,
-            StackType::MessageQueue,
+            StackType::Geospatial,
             StackType::MachineLearning,
+            StackType::MessageQueue,
+            StackType::MongoAlternative,
             StackType::OLAP,
             StackType::OLTP,
+            StackType::RAG,
+            StackType::Standard,
             StackType::VectorDB,
-            StackType::Geospatial,
-            StackType::MongoAlternative,
         ];
 
         for stack in all_stacks {
@@ -257,14 +261,17 @@ mod tests {
                 StackType::DataWarehouse => {
                     get_stack(StackType::DataWarehouse);
                 }
-                StackType::Standard => {
-                    get_stack(StackType::Standard);
+                StackType::Geospatial => {
+                    get_stack(StackType::Geospatial);
+                }
+                StackType::MachineLearning => {
+                    get_stack(StackType::MachineLearning);
                 }
                 StackType::MessageQueue => {
                     get_stack(StackType::MessageQueue);
                 }
-                StackType::MachineLearning => {
-                    get_stack(StackType::MachineLearning);
+                StackType::MongoAlternative => {
+                    get_stack(StackType::MongoAlternative);
                 }
                 StackType::OLAP => {
                     get_stack(StackType::OLAP);
@@ -272,14 +279,14 @@ mod tests {
                 StackType::OLTP => {
                     get_stack(StackType::OLTP);
                 }
+                StackType::RAG => {
+                    get_stack(StackType::RAG);
+                }
+                StackType::Standard => {
+                    get_stack(StackType::Standard);
+                }
                 StackType::VectorDB => {
                     get_stack(StackType::VectorDB);
-                }
-                StackType::Geospatial => {
-                    get_stack(StackType::Geospatial);
-                }
-                StackType::MongoAlternative => {
-                    get_stack(StackType::MongoAlternative);
                 }
             }
         }
