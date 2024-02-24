@@ -36,6 +36,9 @@ pub async fn reconcile_volume_snapshot_restore(
     // Apply the VolumeSnapshotContent and VolumeSnapshot
     apply_volume_snapshot_content(cdb, &client, &vsc).await?;
 
+    // Once we apply the VolumeSnapshotContent, we need to wait for it to become ready
+    is_snapshot_content_ready(cdb, &client, &vsc).await?;
+
     // Apply the VolumeSnapshot
     apply_volume_snapshot(cdb, &client, &vs).await?;
 
@@ -99,6 +102,60 @@ async fn is_snapshot_ready(
     } else {
         error!(
             "VolumeSnapshot {} not found for instance {}",
+            name,
+            cdb.name_any()
+        );
+        Err(Action::requeue(tokio::time::Duration::from_secs(30)))
+    }
+}
+
+async fn is_snapshot_content_ready(
+    cdb: &CoreDB,
+    client: &Client,
+    vsc: &VolumeSnapshotContent,
+) -> Result<(), Action> {
+    let name = vsc.metadata.name.as_ref().ok_or_else(|| {
+        error!(
+            "VolumeSnapshotContent name is empty for instance: {}.",
+            cdb.name_any()
+        );
+        Action::requeue(tokio::time::Duration::from_secs(300))
+    })?;
+
+    let vsc_api: Api<VolumeSnapshotContent> = Api::all(client.clone());
+    let lp = ListParams::default().fields(&format!("metadata.name={}", name));
+
+    // Fetch the VolumeSnapshotContent to check its status
+    let res = vsc_api.list(&lp).await.map_err(|e| {
+        warn!(
+            "Error listing VolumeSnapshotContent {} for instance {}: {}",
+            name,
+            cdb.name_any(),
+            e,
+        );
+        Action::requeue(tokio::time::Duration::from_secs(30))
+    })?;
+
+    // Check if the VolumeSnapshotContent is ready
+    if let Some(status) = res.items.first().and_then(|vsc| vsc.status.as_ref()) {
+        if status.ready_to_use.unwrap_or(false) {
+            info!(
+                "VolumeSnapshotContent {} is ready for instance {}.",
+                name,
+                cdb.name_any()
+            );
+            Ok(())
+        } else {
+            warn!(
+                "VolumeSnapshotContent {} is not ready yet for instance {}.",
+                name,
+                cdb.name_any()
+            );
+            Err(Action::requeue(tokio::time::Duration::from_secs(10)))
+        }
+    } else {
+        error!(
+            "VolumeSnapshotContent {} not found for instance {}",
             name,
             cdb.name_any()
         );
@@ -241,8 +298,6 @@ fn generate_volume_snapshot_content(
             },
             volume_snapshot_class_name: Some(volume_snapshot_class_name.to_string()),
             volume_snapshot_ref: VolumeSnapshotContentVolumeSnapshotRef {
-                api_version: Some("snapshot.storage.k8s.io/v1".to_string()),
-                kind: Some("VolumeSnapshot".to_string()),
                 name: Some(snapshot),
                 namespace: Some(namespace.clone()),
                 ..VolumeSnapshotContentVolumeSnapshotRef::default()
@@ -271,14 +326,6 @@ fn generate_volume_snapshot(
             error!("VolumeSnapshotContent name is empty for instance {}", name);
             Action::requeue(tokio::time::Duration::from_secs(300))
         })?;
-    let volume_snapshot_class_name = snapshot_content
-        .spec
-        .volume_snapshot_class_name
-        .as_ref()
-        .ok_or_else(|| {
-            error!("VolumeSnapshotClass name is empty for instance {}", name);
-            Action::requeue(tokio::time::Duration::from_secs(300))
-        })?;
 
     let vs = VolumeSnapshot {
         metadata: ObjectMeta {
@@ -291,7 +338,7 @@ fn generate_volume_snapshot(
                 volume_snapshot_content_name: Some(volume_snapshot_content_name.to_string()),
                 ..VolumeSnapshotSource::default()
             },
-            volume_snapshot_class_name: Some(volume_snapshot_class_name.to_string()),
+            ..VolumeSnapshotSpec::default()
         },
         status: None,
     };
@@ -542,10 +589,6 @@ mod tests {
         assert_eq!(
             result.spec.source.volume_snapshot_content_name,
             Some("test-snapshot-content".to_string())
-        );
-        assert_eq!(
-            result.spec.volume_snapshot_class_name,
-            Some("test-class".to_string())
         );
         // The namespace of the generated VolumeSnapshot should match the namespace of the CoreDB
         assert_eq!(result.metadata.namespace.unwrap(), "default");
