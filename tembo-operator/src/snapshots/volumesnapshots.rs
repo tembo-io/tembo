@@ -3,10 +3,12 @@ use crate::{
     snapshots::{
         volumesnapshotcontents_crd::{
             VolumeSnapshotContent, VolumeSnapshotContentDeletionPolicy,
-            VolumeSnapshotContentSource, VolumeSnapshotContentSpec,
+            VolumeSnapshotContentSource, VolumeSnapshotContentSpec, VolumeSnapshotContentStatus,
             VolumeSnapshotContentVolumeSnapshotRef,
         },
-        volumesnapshots_crd::{VolumeSnapshot, VolumeSnapshotSource, VolumeSnapshotSpec},
+        volumesnapshots_crd::{
+            VolumeSnapshot, VolumeSnapshotSource, VolumeSnapshotSpec, VolumeSnapshotStatus,
+        },
     },
     Context,
 };
@@ -304,7 +306,7 @@ fn generate_volume_snapshot_content(
             },
             ..VolumeSnapshotContentSpec::default()
         },
-        status: None,
+        status: Some(VolumeSnapshotContentStatus::default()),
     };
 
     Ok(vsc)
@@ -340,7 +342,7 @@ fn generate_volume_snapshot(
             },
             ..VolumeSnapshotSpec::default()
         },
-        status: None,
+        status: Some(VolumeSnapshotStatus::default()),
     };
     Ok(vs)
 }
