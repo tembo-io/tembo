@@ -773,14 +773,27 @@ fn get_postgres_config(
     let mut postgres_config = String::from("");
     let mut shared_preload_libraries: Vec<Library> = Vec::new();
 
+    println!("Postgres Config: {:?}", postgres_configs);
     if let Some(ps_config) = postgres_configs {
         for p_config in ps_config.clone().into_iter() {
             match p_config.name.as_str() {
                 "shared_preload_libraries" => {
-                    shared_preload_libraries.push(Library {
-                        name: p_config.value.to_string(),
-                        priority: MAX_INT32,
-                    });
+                    match p_config.value {
+                        ControllerConfigValue::Single(val) => {
+                            shared_preload_libraries.push(Library {
+                                name: val.to_string(),
+                                priority: MAX_INT32,
+                            });
+                        }
+                        ControllerConfigValue::Multiple(vals) => {
+                            for val in vals {
+                                shared_preload_libraries.push(Library {
+                                    name: val.to_string(),
+                                    priority: MAX_INT32,
+                                });
+                            }
+                        }
+                    };
                 }
                 _ => {
                     match p_config.value {
