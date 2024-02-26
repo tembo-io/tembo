@@ -844,7 +844,7 @@ fn get_postgres_config(
             let config = l
                 .into_iter()
                 .unique_by(|f| f.name.clone())
-                .sorted_by_key(|s| s.priority)
+                .sorted_by_key(|s| (s.priority, s.name.clone()))
                 .map(|x| x.name.to_string() + ",")
                 .collect::<String>();
 
