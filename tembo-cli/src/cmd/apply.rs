@@ -777,10 +777,22 @@ fn get_postgres_config(
         for p_config in ps_config.clone().into_iter() {
             match p_config.name.as_str() {
                 "shared_preload_libraries" => {
-                    shared_preload_libraries.push(Library {
-                        name: p_config.value.to_string(),
-                        priority: MAX_INT32,
-                    });
+                    match p_config.value {
+                        ControllerConfigValue::Single(val) => {
+                            shared_preload_libraries.push(Library {
+                                name: val.to_string(),
+                                priority: MAX_INT32,
+                            });
+                        }
+                        ControllerConfigValue::Multiple(vals) => {
+                            for val in vals {
+                                shared_preload_libraries.push(Library {
+                                    name: val.to_string(),
+                                    priority: MAX_INT32,
+                                });
+                            }
+                        }
+                    };
                 }
                 _ => {
                     match p_config.value {
@@ -844,7 +856,7 @@ fn get_postgres_config(
             let config = l
                 .into_iter()
                 .unique_by(|f| f.name.clone())
-                .sorted_by_key(|s| s.priority)
+                .sorted_by_key(|s| (s.priority, s.name.clone()))
                 .map(|x| x.name.to_string() + ",")
                 .collect::<String>();
 
