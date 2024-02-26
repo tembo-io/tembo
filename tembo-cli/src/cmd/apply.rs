@@ -773,7 +773,6 @@ fn get_postgres_config(
     let mut postgres_config = String::from("");
     let mut shared_preload_libraries: Vec<Library> = Vec::new();
 
-    println!("Postgres Config: {:?}", postgres_configs);
     if let Some(ps_config) = postgres_configs {
         for p_config in ps_config.clone().into_iter() {
             match p_config.name.as_str() {
