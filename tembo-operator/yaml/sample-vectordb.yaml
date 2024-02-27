@@ -5,7 +5,7 @@ metadata:
 spec:
   image: "quay.io/tembo/standard-cnpg:15-a0a5ab5"
   appServices:
-    - image: quay.io/tembo/vector-serve:32ce013
+    - image: quay.io/tembo/vector-serve:7343bf4
       name: embeddings
       env:
         - name: TMPDIR
