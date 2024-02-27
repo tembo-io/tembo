@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 import json
 import logging
-from typing import Optional
+from typing import Any, Optional
 
 from llama_index.core import SimpleDirectoryReader
 from llama_index.core.node_parser import SentenceSplitter
@@ -9,13 +9,13 @@ import psycopg
 
 
 @dataclass
-class TemboRAGcontroller:
+class TemboRAG:
     project_name: str
     chunk_size: Optional[int] = None
     chat_model: str = "gpt-3.5-turbo"
     sentence_transformer: str = "sentence-transformers/all-MiniLM-L12-v2"
     connection_string: Optional[str] = None
-    _table_name: str = "vectorize._data_{project_name}"
+    table_name: str = "vectorize._data_{project_name}"
 
     # post-init
     sentence_splitter: SentenceSplitter = field(
@@ -26,6 +26,74 @@ class TemboRAGcontroller:
         chunk_size = self.chunk_size or get_context_size(self.chat_model)
         self.sentence_splitter = SentenceSplitter(chunk_size=chunk_size)
         self.chunk_size = chunk_size
+
+    def query(
+        self,
+        query: str,
+        connection_string: Optional[str] = None,
+        chat_model: Optional[str] = None,
+        prompt_template: Optional[str] = None,
+        num_context: Optional[int] = None,
+        force_trim: Optional[bool] = None,
+        api_key: Optional[str] = None,
+    ):
+        connection_string = connection_string or self.connection_string
+        chat_model = chat_model or self.chat_model
+
+        if not connection_string:
+            raise ValueError("No connection string provided")
+        q = """
+        SELECT vectorize.rag(
+            agent_name => %s,
+            query => %s,
+            chat_model => %s
+        """
+        bind_params = (self.project_name, query, chat_model)
+        if prompt_template is not None:
+            q = q + ",task => %s"
+            bind_params = bind_params + (prompt_template,)
+        if api_key is not None:
+            q = q + ",api_key => %s"
+            bind_params = bind_params + (api_key,)
+        if num_context is not None:
+            q = q + ",num_context => %s"
+            bind_params = bind_params + (num_context,)
+        if force_trim is not None:
+            q = q + ",force_trim => %s"
+            bind_params = bind_params + (force_trim,)
+        q = q + ");"
+
+        with psycopg.connect(connection_string, autocommit=True) as conn:
+            cur = conn.cursor()
+            resp = cur.execute(q, bind_params).fetchone()
+
+        return ChatResponse(**resp[0])
+
+    def _prepare_query_params(
+        self,
+        query: str,
+        chat_model: Optional[str] = None,
+        prompt_template: Optional[str] = None,
+        num_context: Optional[int] = None,
+        force_trim: Optional[bool] = None,
+        api_key: Optional[str] = None,
+    ) -> tuple[str, tuple]:
+        q = "SELECT vectorize.rag(agent_name => %s,query => %s,chat_model => %s"
+        bind_params = (self.project_name, query, chat_model)
+        if prompt_template is not None:
+            q = q + ",task => %s"
+            bind_params = bind_params + (prompt_template,)
+        if api_key is not None:
+            q = q + ",api_key => %s"
+            bind_params = bind_params + (api_key,)
+        if num_context is not None:
+            q = q + ",num_context => %s"
+            bind_params = bind_params + (num_context,)
+        if force_trim is not None:
+            q = q + ",force_trim => %s"
+            bind_params = bind_params + (force_trim,)
+        q = q + ");"
+        return q, bind_params
 
     def prepare_from_directory(
         self, document_dir: str, **kwargs
@@ -39,7 +107,7 @@ class TemboRAGcontroller:
                     chunk.metadata["file_name"],
                     chunk.id_,
                     json.dumps(chunk.metadata),
-                    chunk.get_content(),
+                    chunk.get_content().replace("'", "''"),
                 )
             )
         logging.info("Prepared %s chunks", len(chunks_for_copy))
@@ -101,7 +169,7 @@ class TemboRAGcontroller:
                     copy.write_row(row)
 
     def _init_table(self, project_name: str, connection_string: str):
-        table = self._table_name.format(project_name=project_name)
+        table = self.table_name.format(project_name=project_name)
         q = f"""
         CREATE TABLE IF NOT EXISTS {table} (
             record_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
@@ -114,6 +182,12 @@ class TemboRAGcontroller:
         with psycopg.connect(connection_string, autocommit=True) as conn:
             cur = conn.cursor()
             cur.execute(q)
+
+
+@dataclass
+class ChatResponse:
+    context: list[dict[str, Any]]
+    chat_response: str
 
 
 def get_context_size(model):
