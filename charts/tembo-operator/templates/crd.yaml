@@ -157,7 +157,8 @@ spec:
                             path:
                               type: string
                             port:
-                              type: string
+                              format: int32
+                              type: integer
                           required:
                           - initialDelaySeconds
                           - path
@@ -172,7 +173,8 @@ spec:
                             path:
                               type: string
                             port:
-                              type: string
+                              format: int32
+                              type: integer
                           required:
                           - initialDelaySeconds
                           - path
