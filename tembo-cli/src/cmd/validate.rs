@@ -5,7 +5,7 @@ use crate::tui::{error, info, white_confirmation};
 use anyhow::Error;
 use clap::Args;
 use std::{collections::HashMap, fs, path::Path, str::FromStr};
-use tembo::cli::context::list_credential_profiles;
+use tembo::cli::context::{list_context, list_credential_profiles};
 
 /// Validates the tembo.toml file, context file, etc.
 #[derive(Args)]
@@ -20,6 +20,8 @@ pub fn execute(verbose: bool) -> Result<(), anyhow::Error> {
             tembo_context_file_path()
         ));
         has_error = true
+    } else {
+        list_context()?;
     }
     if verbose {
         info("Context file exists");
