@@ -1,8 +1,11 @@
 use std::fs;
 
-use anyhow::{anyhow, bail, Ok};
+use anyhow::Error;
+use anyhow::{anyhow, bail};
 use serde::Deserialize;
 use serde::Serialize;
+
+use crate::tui;
 
 // TODO: Move this to a template file
 pub const CONTEXT_DEFAULT_TEXT: &str = "version = \"1.0\"
@@ -88,46 +91,74 @@ pub fn tembo_credentials_file_path() -> String {
     tembo_home_dir() + "/credentials"
 }
 
-pub fn list_context() -> Result<Context, anyhow::Error> {
+pub fn list_context() -> Result<Option<Context>, anyhow::Error> {
     let filename = tembo_context_file_path();
 
     let contents = fs::read_to_string(&filename)
         .map_err(|err| anyhow!("Error reading file {filename}: {err}"))?;
 
-    let context: Context =
-        toml::from_str(&contents).map_err(|err| anyhow!("Error reading file {filename}: {err}"))?;
+    let maybe_context: Result<Context, toml::de::Error> = toml::from_str(&contents);
 
-    Ok(context)
+    match maybe_context {
+        Ok(context) => Ok(Some(context)),
+        Err(err) => {
+            eprintln!("\nInvalid context file {filename}\n");
+
+            tui::error(&format!("Error: {}", err.message()));
+
+            eprintln!("\nExample context file: \n\n{}", CONTEXT_DEFAULT_TEXT);
+
+            Err(Error::msg("Error listing tembo context!"))
+        }
+    }
 }
 
 pub fn get_current_context() -> Result<Environment, anyhow::Error> {
-    let context = list_context()?;
+    let maybe_context = list_context()?;
 
-    let profiles = list_credential_profiles()?;
+    if let Some(context) = maybe_context {
+        let maybe_profiles = list_credential_profiles()?;
 
-    for mut env in context.environment {
-        if let Some(_is_set) = env.set {
-            if let Some(profile) = &env.profile {
-                let credential = profiles.iter().rev().find(|c| &c.name == profile).unwrap();
+        if let Some(profiles) = maybe_profiles {
+            for mut env in context.environment {
+                if let Some(_is_set) = env.set {
+                    if let Some(profile) = &env.profile {
+                        let credential =
+                            profiles.iter().rev().find(|c| &c.name == profile).unwrap();
 
-                env.selected_profile = Some(credential.to_owned());
+                        env.selected_profile = Some(credential.to_owned());
+                    }
+
+                    return Ok(env);
+                }
             }
-
-            return Ok(env);
         }
     }
 
     bail!("Tembo context not set");
 }
 
-pub fn list_credential_profiles() -> Result<Vec<Profile>, anyhow::Error> {
+pub fn list_credential_profiles() -> Result<Option<Vec<Profile>>, anyhow::Error> {
     let filename = tembo_credentials_file_path();
 
     let contents = fs::read_to_string(&filename)
         .map_err(|err| anyhow!("Error reading file {filename}: {err}"))?;
 
-    let credential: Credential = toml::from_str(&contents)
-        .map_err(|err| anyhow!("Issue with the format of the TOML file {filename}: {err}"))?;
+    let maybe_credential: Result<Credential, toml::de::Error> = toml::from_str(&contents);
 
-    Ok(credential.profile)
+    match maybe_credential {
+        Ok(credential) => Ok(Some(credential.profile)),
+        Err(err) => {
+            eprintln!("\nInvalid credentials file {filename}\n");
+
+            tui::error(&format!("Error: {}", err.message()));
+
+            eprintln!(
+                "\nExample credentials file: \n\n{}",
+                CREDENTIALS_DEFAULT_TEXT
+            );
+
+            Err(Error::msg("Error listing tembo credentials profiles!"))
+        }
+    }
 }
