@@ -211,7 +211,7 @@ pub struct Probes {
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, JsonSchema, PartialEq)]
 pub struct Probe {
     pub path: String,
-    pub port: String,
+    pub port: i32,
     // this should never be negative
     #[serde(rename = "initialDelaySeconds")]
     pub initial_delay_seconds: u32,

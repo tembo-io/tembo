@@ -4,6 +4,57 @@ metadata:
   name: sample-vectordb
 spec:
   image: "quay.io/tembo/standard-cnpg:15-a0a5ab5"
+  appServices:
+    - image: quay.io/tembo/vector-serve:32ce013
+      name: embeddings
+      env:
+        - name: TMPDIR
+          value: /models
+        - name: BATCH_SIZE
+          value: "1000"
+        - name: XDG_CACHE_HOME
+          value: /models/.cache
+      routing:
+        - port: 3000
+          ingressPath: /vectordb
+          middlewares:
+            - map-embeddings
+      middlewares:
+        - replacePathRegex:
+            name: map-embeddings
+            config:
+              regex: ^\/vectordb\/?
+              replacement: /v1/embeddings
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1500Mi
+        limits:
+          cpu: 4000m
+          memory: 1500Mi
+      probes:
+        readiness:
+          path: /ready
+          port: 3000
+          initialDelaySeconds: 10
+        liveness:
+          path: /alive
+          port: 3000
+          initialDelaySeconds: 10
+      storage:
+        volumeMounts:
+        - mountPath: /models
+          name: hf-data-vol
+        volumes:
+        - ephemeral:
+            volumeClaimTemplate:
+              spec:
+                accessModes:
+                - ReadWriteOnce
+                resources:
+                  requests:
+                    storage: 2Gi
+          name: hf-data-vol
   trunk_installs:
     - name: pgmq
       version: 1.1.1
