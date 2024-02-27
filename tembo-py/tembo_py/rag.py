@@ -42,32 +42,20 @@ class TemboRAG:
 
         if not connection_string:
             raise ValueError("No connection string provided")
-        q = """
-        SELECT vectorize.rag(
-            agent_name => %s,
-            query => %s,
-            chat_model => %s
-        """
-        bind_params = (self.project_name, query, chat_model)
-        if prompt_template is not None:
-            q = q + ",task => %s"
-            bind_params = bind_params + (prompt_template,)
-        if api_key is not None:
-            q = q + ",api_key => %s"
-            bind_params = bind_params + (api_key,)
-        if num_context is not None:
-            q = q + ",num_context => %s"
-            bind_params = bind_params + (num_context,)
-        if force_trim is not None:
-            q = q + ",force_trim => %s"
-            bind_params = bind_params + (force_trim,)
-        q = q + ");"
+        q, bind_params = self._prepare_query_params(
+            query=query,
+            chat_model=chat_model,
+            prompt_template=prompt_template,
+            num_context=num_context,
+            force_trim=force_trim,
+            api_key=api_key,
+        )
 
         with psycopg.connect(connection_string, autocommit=True) as conn:
             cur = conn.cursor()
             resp = cur.execute(q, bind_params).fetchone()
 
-        return ChatResponse(**resp[0])
+        return ChatResponse(**resp[0])  # type: ignore
 
     def _prepare_query_params(
         self,
@@ -82,16 +70,16 @@ class TemboRAG:
         bind_params = (self.project_name, query, chat_model)
         if prompt_template is not None:
             q = q + ",task => %s"
-            bind_params = bind_params + (prompt_template,)
+            bind_params = bind_params + (prompt_template,)  # type: ignore
         if api_key is not None:
             q = q + ",api_key => %s"
-            bind_params = bind_params + (api_key,)
+            bind_params = bind_params + (api_key,)  # type: ignore
         if num_context is not None:
             q = q + ",num_context => %s"
-            bind_params = bind_params + (num_context,)
+            bind_params = bind_params + (num_context,)  # type: ignore
         if force_trim is not None:
             q = q + ",force_trim => %s"
-            bind_params = bind_params + (force_trim,)
+            bind_params = bind_params + (force_trim,)  # type: ignore
         q = q + ");"
         return q, bind_params
 
@@ -122,7 +110,7 @@ class TemboRAG:
         if not connection_string:
             raise ValueError("No connection string provided")
         self._init_table(self.project_name, connection_string)
-        table = self._table_name.format(project_name=self.project_name)
+        table = self.table_name.format(project_name=self.project_name)
         self._load_docs(table, documents, connection_string)
 
     def init_rag(
@@ -143,7 +131,7 @@ class TemboRAG:
             transformer => %s
         );
         """
-        schema, table = self._table_name.format(project_name=self.project_name).split(
+        schema, table = self.table_name.format(project_name=self.project_name).split(
             "."
         )
         with psycopg.connect(connection_string, autocommit=True) as conn:
