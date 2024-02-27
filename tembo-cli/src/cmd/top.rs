@@ -1,31 +1,22 @@
-use crate::cli::context::{get_current_context, Environment, Profile, Target};
+use crate::cli::context::{get_current_context, Environment};
 use crate::cli::tembo_config::InstanceSettings;
 use crate::cmd::apply::get_instance_settings;
 use crate::Args;
 use anyhow::anyhow;
 use anyhow::{Context, Result};
 use crossterm::{
-    cursor::{MoveTo, MoveUp},
     execute,
     terminal::{Clear, ClearType},
 };
-use hyper::header::ACCEPT;
 use reqwest::header::HeaderMap;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::convert::TryInto;
-use std::fmt;
 use std::io::{stdout, Write};
-use temboclient::models::{instance, instance_event};
-use temboclient::{
-    apis::{
-        configuration::Configuration,
-        instance_api::{create_instance, get_all, get_instance, put_instance},
-    },
-    models::connection_info,
-};
+use temboclient::apis::configuration::Configuration;
+use temboclient::apis::instance_api::get_all;
+use temboclient::apis::instance_api::get_instance;
 use tokio::runtime::Runtime;
-use tokio::time::{interval, Duration};
+use tokio::time::Duration;
 
 #[derive(Args)]
 pub struct TopCommand {}
@@ -39,7 +30,7 @@ pub struct MetricsResponse {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct MetricsData {
-    pub resultType: String,
+    pub result_type: String,
     pub result: Vec<MetricResult>,
 }
 
@@ -101,8 +92,8 @@ async fn fetch_metrics_loop(
     loop {
         execute!(stdout, Clear(ClearType::All))?;
 
-        for (key, value) in &instance_settings {
-            let org_name = get_instance_org_name(&config, &env, &value.instance_name).await?;
+        for value in instance_settings.values() {
+            let org_name = get_instance_org_name(config, &env, &value.instance_name).await?;
             let namespace = format!("org-{}-inst-{}", org_name, &value.instance_name);
             let namespace_encoded = urlencoding::encode(&namespace);
 
@@ -249,7 +240,7 @@ async fn get_instance_org_name(
                 instance_name
             ))
         }
-        Err(e) => return Err(e.into()),
+        Err(e) => return Err(e),
     };
     let org_id = env
         .org_id
