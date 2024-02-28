@@ -29,7 +29,7 @@ pub const MULTI_VAL_CONFIGS_PRIORITY_LIST: [&str; 3] =
     ["citus", "pg_stat_statements", "pg_stat_kcache"];
 
 // configurations that are not allowed to be set by the user
-pub const DISALLOWED_CONFIGS: [&str; 66] = [
+pub const DISALLOWED_CONFIGS: [&str; 65] = [
     "allow_system_table_mods",
     "archive_cleanup_command",
     "archive_command",
@@ -81,7 +81,6 @@ pub const DISALLOWED_CONFIGS: [&str; 66] = [
     "ssl_ecdh_curve",
     "ssl_key_file",
     "ssl_max_protocol_version",
-    "ssl_min_protocol_version",
     "ssl_passphrase_command",
     "ssl_passphrase_command_supports_reload",
     "ssl_prefer_server_ciphers",

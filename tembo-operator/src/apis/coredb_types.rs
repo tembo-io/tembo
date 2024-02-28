@@ -24,6 +24,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use tracing::error;
 use utoipa::ToSchema;
 
+const TLS_MIN_VERSION: &str = "TLSv1.2";
+
 /// Stack type defines the stack configuration for the CoreDB instance.  This is
 /// mainly used for the [https://tembo.io](https://tembo.io) platform to allow
 /// for the deployment of pre-configured Postgres instances.
@@ -632,6 +634,11 @@ impl CoreDBSpec {
             }
         }
 
+        let default_settings = vec![PgConfig {
+            name: "ssl_min_protocol_version".to_owned(),
+            value: ConfigValue::Single(TLS_MIN_VERSION.to_string()),
+        }];
+
         // Order matters - to ensure anything down stream does not have to worry about ordering,
         // set these into a BTreeSet now
         // 1. stack configs
@@ -640,6 +647,9 @@ impl CoreDBSpec {
         // 4. overrides
         let mut pg_configs: BTreeMap<String, PgConfig> = BTreeMap::new();
 
+        for p in default_settings {
+            pg_configs.insert(p.name.clone(), p);
+        }
         for p in stack_configs {
             pg_configs.insert(p.name.clone(), p);
         }
