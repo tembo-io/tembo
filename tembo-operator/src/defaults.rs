@@ -4,6 +4,7 @@ use k8s_openapi::{
 };
 use std::collections::BTreeMap;
 
+use crate::apis::coredb_types::CoreDB;
 use crate::{
     apis::coredb_types::{
         Backup, ConnectionPooler, PgBouncer, S3Credentials, ServiceAccountTemplate, VolumeSnapshot,
@@ -78,6 +79,30 @@ pub fn default_dw_image_uri() -> String {
     let repo = default_repository();
     let image = default_dw_image();
     format!("{}/{}", repo, image)
+}
+
+pub fn postgres_major_version_from_cdb(coredb: &CoreDB) -> Result<i32, String> {
+    let image = coredb.spec.image.clone();
+    parse_postgres_major_version(&image)
+}
+pub fn parse_postgres_major_version(image: &str) -> Result<i32, String> {
+    let parts: Vec<&str> = image.split(':').collect();
+    if parts.len() != 2 {
+        return Err("Invalid image format".to_string());
+    }
+    let version_part = parts[1];
+    let version_section = version_part
+        .split('-')
+        .next()
+        .ok_or("Version section not found")?;
+    let version_numbers: Vec<&str> = version_section.split('.').collect();
+    if version_numbers.is_empty() {
+        return Err("Version number not found".to_string());
+    }
+    match version_numbers[0].parse::<i32>() {
+        Ok(major_version) => Ok(major_version),
+        Err(_) => Err("Failed to parse major version".to_string()),
+    }
 }
 
 pub fn default_storage() -> Quantity {
@@ -217,4 +242,36 @@ pub fn default_volume_snapshot() -> Option<VolumeSnapshot> {
         enabled: false,
         snapshot_class: None,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_postgres_major_version() {
+        let examples = vec![
+            (
+                "387894460527.dkr.ecr.us-east-1.amazonaws.com/tembo-io/standard-cnpg:16.1-d15f2dc",
+                16,
+            ),
+            ("quay.io/tembo-io/standard-cnpg:14.10-d15f2dc", 14),
+            (
+                "387894460527.dkr.ecr.us-east-1.amazonaws.com/tembo-io/standard-cnpg:15-a0a5ab5",
+                15,
+            ),
+        ];
+
+        for (input, expected) in examples {
+            assert_eq!(parse_postgres_major_version(input).unwrap(), expected);
+        }
+
+        // Test for error handling
+        assert!(parse_postgres_major_version("invalid/image/format").is_err());
+        // Adding a test case for error handling when version section is not found
+        assert!(parse_postgres_major_version(
+            "387894460527.dkr.ecr.us-east-1.amazonaws.com/tembo-io/standard-cnpg:"
+        )
+        .is_err());
+    }
 }
