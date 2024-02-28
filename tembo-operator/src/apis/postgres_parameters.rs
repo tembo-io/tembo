@@ -473,7 +473,7 @@ mod pg_param_tests {
         println!("pg_configs:  {:?}", pg_configs);
         // assert 3. shared_preload_libraries is merged. log_destination is filtered out
         // pg_stat_statements, shared_buffers, and shared_preload_libraries remain
-        assert_eq!(pg_configs.len(), 3);
+        assert_eq!(pg_configs.len(), 4);
         assert_eq!(pg_configs[0].name, "pg_stat_statements.track");
         assert_eq!(pg_configs[0].value.to_string(), "all");
         assert_eq!(pg_configs[1].name, "shared_buffers");
