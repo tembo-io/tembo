@@ -11,7 +11,6 @@ use crate::{
 
 const DEFAULT_MAINTENANCE_WORK_MEM_MB: i32 = 64;
 const DEFAULT_EFFECTIVE_IO_CONCURRENCY: i32 = 100;
-const TLS_MIN_VERSION: &str = "TLSv1.2";
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, JsonSchema, PartialEq)]
 #[serde(rename_all = "lowercase")]
@@ -68,10 +67,6 @@ pub fn standard_config_engine(stack: &Stack) -> Vec<PgConfig> {
         PgConfig {
             name: "effective_io_concurrency".to_owned(),
             value: ConfigValue::Single(effective_io_concurrency.to_string()),
-        },
-        PgConfig {
-            name: "ssl_min_protocol_version".to_owned(),
-            value: ConfigValue::Single(TLS_MIN_VERSION.to_string()),
         },
     ]
 }
@@ -136,10 +131,6 @@ pub fn olap_config_engine(stack: &Stack) -> Vec<PgConfig> {
         PgConfig {
             name: "columnar.min_parallel_processes".to_owned(),
             value: ConfigValue::Single(columnar_min_parallel_processes.to_string()),
-        },
-        PgConfig {
-            name: "ssl_min_protocol_version".to_owned(),
-            value: ConfigValue::Single(TLS_MIN_VERSION.to_string()),
         },
     ]
 }
