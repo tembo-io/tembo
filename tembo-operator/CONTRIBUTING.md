@@ -1,6 +1,6 @@
 # Contributing to the Tembo Kubernetes Operator
 Welcome! And thank you for your consideration to contribute to the Tembo Kubernetes Operator!
-We'll offer the following points up front for orientation:
+Here are some quick pointers for orientation:
 - Check out the project's [README](https://github.com/tembo-io/tembo/blob/main/tembo-operator/README.md) to learn about the less technical aspects.
 - Questions or comments? We'd love to hear from you on our [Tembo Slack Channel](https://join.slack.com/t/tembocommunity/shared_invite/zt-277pu7chi-NHtvHWvLhHwyK0Y5Y6vTPw)!
 
@@ -12,7 +12,6 @@ We'll offer the following points up front for orientation:
     3. [Loading Docker images](#3.-loading-docker-images)
     4. [Connect via psql](#4.-connect-via-psql)
     5. [Exec into the pod](#5.-exec-into-the-pod)
-3. CRD
 
 ## Prerequisites
 
@@ -21,7 +20,6 @@ We'll offer the following points up front for orientation:
 - [psql](https://www.postgresql.org/docs/current/app-psql.html) - Terminal-based front-end to PostgreSQL
 - [kind](https://github.com/kubernetes-sigs/kind) — simplifies creation of local Kubernetes clusters using Docker (_**K**ubernetes **IN** **D**ocker_)
 - [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl) — Kubernetes primary CLI; Docker may include this, but if not be sure to install it
-- [helm](https://helm.sh) — the Kubernetes package manager
 - [just](https://github.com/casey/just) — simplifies running complex project-specific commands. If you find new useful command, consider adding it to the `justfile`
 
 ## Running locally
@@ -35,20 +33,21 @@ git clone https://github.com/tembo-io/tembo.git
 ```
 cd /tembo/tembo-operator
 ```
-Once there, run the following to start the Tembo Operator:
+From there, run the following to start the Tembo Operator:
 ```
 just start-kind
 ```
+Once complete, you can execute the following:
 ```
 just run
 ```
-This operation will be running continuously, so we advise opening a new workspace in your termainal.
+This operation will be running continuously, so we advise opening a new termainal workspace.
 
 ### 2. Applying YAML files
 
-Apply sample YAML, but this can be extended to your own development.
+The tembo-operator directory comes complete with a set of sample YAML files, found at `/tembo/tembo-operator/yaml`.
 
-There is a directory containing sample YAMLs to load, at the path `/tembo/tembo-operator/YAML` and can be loaded from the tembo-operator directory in the following example:
+Apply sample YAML, but this can be extended to your own development.
 
 ```bash
 kubectl apply -f yaml/sample-standard.yaml
@@ -64,13 +63,11 @@ sample-standard-1   1/1     Running   0          14s
 
 ### 3. Loading Docker images
 
-Instead of a sample YAML file, you may prefer to work with a Docker image.
+Within the sample YAML files, you will notice a specific image being used.
+In the case of `sample-standard.yaml` it's `image: "quay.io/tembo/standard-cnpg:15-a0a5ab5"`
 
-This has been laid out more extensively in our [tembo-images README](https://github.com/tembo-io/tembo-images/blob/main/README.md) file.
-
-```
-kind load docker-image <your-docker-image>
-```
+Introducing a custom image can add another exciting layer of complexity in the development proecess.
+The process of building a custom Docker container and loading it to a local Docker registry is covered in our [tembo-images README](https://github.com/tembo-io/tembo-images/blob/main/README.md) file.
 
 ### 4. Connect via psql
 
@@ -105,17 +102,7 @@ psql postgres://postgres:$PGPASSWORD@sample-coredb.localhost:5432
 kubectl exec -it sample-standard-1 -- /bin/bash
 ```
 
-## Connecting your local docker registry and kind kubernetes cluster
-
-
-
-## Enter pod for further testing and exploration
-
-
-
-## Metrics with OpenTelemetry (TDB)
-
-
-
 ## Testing
+
+:bulb: Note that the integration tests assume you already have installed or are running the operator connected to the cluster.
 
