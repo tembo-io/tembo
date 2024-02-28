@@ -13,6 +13,7 @@ use std::{collections::HashSet, sync::Arc, time::Duration};
 use tracing::{debug, error, info, instrument, warn};
 
 use crate::apis::coredb_types::CoreDBStatus;
+use crate::defaults::postgres_major_version_from_cdb;
 
 // Syncroniously merge and deduplicate pods
 #[instrument(skip(non_fenced_pods, fenced_names) fields(trace_id))]
@@ -431,10 +432,10 @@ pub async fn check_for_so_files(
         return Err(Action::requeue(Duration::from_secs(10)));
     }
 
-    // TODO(ianstanton) The postgres version should be configurable in the future, not hardcoded
+    let postgres_version = postgres_major_version_from_cdb(cdb).unwrap_or(15);
     let cmd = vec![
         "ls".to_owned(),
-        "/var/lib/postgresql/data/tembo/15/lib".to_owned(),
+        format!("/var/lib/postgresql/data/tembo/{}/lib", postgres_version).to_owned(),
     ];
 
     let result = cdb.exec(pod_name.to_string(), client.clone(), &cmd).await;
