@@ -803,7 +803,6 @@ mod test {
         let _ = delete_namespace(client.clone(), &namespace).await;
     }
 
-
     #[tokio::test]
     #[ignore]
     async fn functional_test_basic_cnpg_pg16() {
