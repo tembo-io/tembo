@@ -1,5 +1,6 @@
 # Contributing to the Tembo Kubernetes Operator
-Welcome! And thank you for your consideration to contribute to the Tembo Kubernetes Operator!
+Welcome!
+And thank you for your consideration to contribute to the Tembo Kubernetes Operator.
 Here are some quick pointers for orientation:
 - Check out the project's [README](https://github.com/tembo-io/tembo/blob/main/tembo-operator/README.md) to learn about the less technical aspects.
 - Questions or comments? We'd love to hear from you on our [Tembo Slack Channel](https://join.slack.com/t/tembocommunity/shared_invite/zt-277pu7chi-NHtvHWvLhHwyK0Y5Y6vTPw)!
@@ -27,21 +28,23 @@ Here are some quick pointers for orientation:
 ### 1. Initial setup
 
 If you haven't already, go ahead and clone the tembo repository to your local machine and navigate to the `tembo-operator` directory.
-```
+
+
+```bash
 git clone https://github.com/tembo-io/tembo.git
 ```
-```
+```bash
 cd /tembo/tembo-operator
 ```
 From there, run the following to start the Tembo Operator:
-```
+```bash
 just start-kind
 ```
 Once complete, you can execute the following:
-```
+```bash
 just run
 ```
-This operation will be running continuously, so we advise opening a new termainal workspace.
+This operation will be running continuously, so we advise opening a new terminal workspace.
 
 ### 2. Applying YAML files
 
@@ -66,17 +69,17 @@ sample-standard-1   1/1     Running   0          14s
 Within the sample YAML files, you will notice a specific image being used.
 In the case of `sample-standard.yaml` it's `image: "quay.io/tembo/standard-cnpg:15-a0a5ab5"`
 
-Introducing a custom image can add another exciting layer of complexity in the development proecess.
+Introducing a custom image can add another exciting layer of complexity in the development process.
 The process of building a custom Docker container and loading it to a local Docker registry is covered in our [tembo-images README](https://github.com/tembo-io/tembo-images/blob/main/README.md) file.
 
 ### 4. Connect via psql
 
 #### 4.1 Revealing password
 
-```
+```bash
 kubectl get secrets/sample-standard-connection -o=jsonpath='{.data.password}'
 ```
-```
+```bash
 echo <your-encoded-secret> | base64 --decode
 ```
 
