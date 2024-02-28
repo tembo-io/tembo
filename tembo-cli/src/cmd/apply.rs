@@ -563,12 +563,13 @@ fn get_extensions(
     maybe_extensions: Option<HashMap<String, tembo_config::Extension>>,
 ) -> Vec<Extension> {
     let mut vec_extensions: Vec<Extension> = vec![];
-    let mut vec_extension_location: Vec<ExtensionInstallLocation> = vec![];
 
     if let Some(extensions) = maybe_extensions {
         for (name, extension) in extensions.into_iter() {
+            let mut vec_extension_location: Vec<ExtensionInstallLocation> = vec![];
+
             vec_extension_location.push(ExtensionInstallLocation {
-                database: None,
+                database: Some("postgres".to_string()),
                 schema: None,
                 version: None,
                 enabled: extension.enabled,
