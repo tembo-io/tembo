@@ -836,9 +836,9 @@ mod test {
             "metadata": {
                 "name": name
             },
-            "image": "quay.io/tembo/standard-cnpg:16-a0a5ab5",
             "spec": {
                 "replicas": 1,
+                "image": "quay.io/tembo/standard-cnpg:16-a0a5ab5",
                 "extensions": [{
                         "name": "cube",
                         "description": "fake description",
