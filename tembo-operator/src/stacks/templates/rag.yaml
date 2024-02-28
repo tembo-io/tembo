@@ -1,4 +1,4 @@
-name: rag
+name: RAG
 description: A Tembo Postgres Stack configured for retrieval augmented generation (RAG).
 repository: "quay.io/tembo"
 organization: tembo
