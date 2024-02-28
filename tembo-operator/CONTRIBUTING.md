@@ -1,17 +1,17 @@
 # Contributing to the Tembo Kubernetes Operator
 Welcome! And thank you for your consideration to contribute to the Tembo Kubernetes Operator!
 We'll offer the following points up front for orientation:
-- Check out the project's [README](https://github.com/tembo-io/tembo/blob/main/tembo-operator/README.md) to learn more about the hows and whys.
-- Questions or comments? We'd love to hear from you on our [Tembo Slack Channel](https://join.slack.com/t/tembocommunity/shared_invite/zt-277pu7chi-NHtvHWvLhHwyK0Y5Y6vTPw)
+- Check out the project's [README](https://github.com/tembo-io/tembo/blob/main/tembo-operator/README.md) to learn about the less technical aspects.
+- Questions or comments? We'd love to hear from you on our [Tembo Slack Channel](https://join.slack.com/t/tembocommunity/shared_invite/zt-277pu7chi-NHtvHWvLhHwyK0Y5Y6vTPw)!
 
 ## Table of Contents
 1. [Prerequisites](#prerequisites)
 2. [Running locally with Kind](#running-locally)
     1. [Initial setup](#1.-initial-setup)
-    2. [Applying YAML files](#2.-applying-yaml-files)
+    2. [Applying YAML files](#2.-applying-YAML-files)
     3. [Loading Docker images](#3.-loading-docker-images)
     4. [Connect via psql](#4.-connect-via-psql)
-    5. []()
+    5. [Exec into the pod](#5.-exec-into-the-pod)
 3. CRD
 
 ## Prerequisites
@@ -46,9 +46,9 @@ This operation will be running continuously, so we advise opening a new workspac
 
 ### 2. Applying YAML files
 
-Apply sample yaml, but this can be extended to your own development.
+Apply sample YAML, but this can be extended to your own development.
 
-There is a directory containing sample yamls to load, at the path `/tembo/tembo-operator/yaml` and can be loaded from the tembo-operator directory in the following example:
+There is a directory containing sample YAMLs to load, at the path `/tembo/tembo-operator/YAML` and can be loaded from the tembo-operator directory in the following example:
 
 ```bash
 kubectl apply -f yaml/sample-standard.yaml
@@ -64,12 +64,42 @@ sample-standard-1   1/1     Running   0          14s
 
 ### 3. Loading Docker images
 
-[README](https://github.com/tembo-io/tembo-images/blob/main/README.md)
+Instead of a sample YAML file, you may prefer to work with a Docker image.
+
+This has been laid out more extensively in our [tembo-images README](https://github.com/tembo-io/tembo-images/blob/main/README.md) file.
+
+```
+kind load docker-image <your-docker-image>
+```
 
 ### 4. Connect via psql
 
+#### 4.1 Revealing password
 
-### 5. kubectl exec into pod
+```
+kubectl get secrets/sample-standard-connection -o=jsonpath='{.data.password}'
+```
+```
+echo <your-encoded-secret> | base64 --decode
+```
+
+#### 4.2 Saving password
+
+```bash
+export PGPASSWORD=$(kubectl get secrets/sample-coredb-connection --template={{.data.password}} | base64 -D)
+```
+
+Add the following line to /etc/hosts
+```
+127.0.0.1 sample-coredb.localhost
+```
+
+```bash
+psql postgres://postgres:$PGPASSWORD@sample-coredb.localhost:5432
+```
+
+
+### 5. Exec into the pod
 
 ```bash
 kubectl exec -it sample-standard-1 -- /bin/bash
