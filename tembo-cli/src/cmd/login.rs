@@ -14,7 +14,7 @@ use webbrowser;
 pub struct LoginCommand {}
 
 #[derive(Deserialize)]
-struct TokenResponse {
+struct TokenRequest {
     token: String,
 }
 
@@ -22,7 +22,7 @@ pub fn execute() -> Result<(), anyhow::Error> {
     let rt = tokio::runtime::Runtime::new().expect("Failed to create a runtime");
 
     let lifetime = token_lifetime()?;
-    let login_url = "https://local.tembo.io/cli-success?isCli=true&expiry=".to_owned() + &lifetime;
+    let login_url = "https://cloud.tembo.io/cli-success?isCli=true&expiry=".to_owned() + &lifetime;
 
     rt.block_on(handle_tokio(login_url))?;
 
@@ -52,7 +52,7 @@ async fn handle_tokio(login_url: String) -> Result<(), anyhow::Error> {
 
 #[post("/")]
 async fn handle_request(
-    body: web::Json<TokenResponse>,
+    body: web::Json<TokenRequest>,
     notify: web::Data<Arc<Notify>>,
 ) -> impl Responder {
     let token = &body.token;
@@ -74,6 +74,7 @@ async fn start_server(notify: Arc<Notify>) -> Result<()> {
         let cors = Cors::default()
             .allowed_origin("https://local.tembo.io")
             .allowed_origin("https://cloud.tembo.io")
+            .allowed_origin("https://cloud.cdb-dev.com")
             .allowed_methods(vec!["GET", "POST"])
             .allowed_headers(vec![header::AUTHORIZATION, header::ACCEPT])
             .allowed_header(header::CONTENT_TYPE)
@@ -94,7 +95,7 @@ async fn start_server(notify: Arc<Notify>) -> Result<()> {
 }
 
 fn token_lifetime() -> Result<String> {
-    println!("Enter the token lifetime in days (e.g., 1, 7, 30): ");
+    println!("Enter the token lifetime in days (1, 7, 30, 365): ");
     io::stdout().flush()?;
 
     let mut lifetime = String::new();
