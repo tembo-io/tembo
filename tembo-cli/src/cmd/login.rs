@@ -22,7 +22,7 @@ pub fn execute() -> Result<(), anyhow::Error> {
     let rt = tokio::runtime::Runtime::new().expect("Failed to create a runtime");
 
     let lifetime = token_lifetime()?;
-    let login_url = "https://cloud.tembo.io/loginjwt?isCli=true&expiry=".to_owned() + &lifetime;
+    let login_url = "https://local.tembo.io/cli-success?isCli=true&expiry=".to_owned() + &lifetime;
 
     rt.block_on(handle_tokio(login_url))?;
 
