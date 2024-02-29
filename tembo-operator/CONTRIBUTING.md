@@ -36,26 +36,26 @@ git clone https://github.com/tembo-io/tembo.git
 ```bash
 cd /tembo/tembo-operator
 ```
-From there, run the following to start the Tembo Operator:
+From there, run the following to initiate a local Kubernetes cluster:
 ```bash
 just start-kind
 ```
-Once complete, you can execute the following:
+Once complete, you can execute the following to start the Tembo Operator:
 ```bash
 just run
 ```
-This operation will be running continuously, so we advise opening a new terminal workspace.
+:bulb: This operation will be running continuously, so we advise opening a new terminal workspace.
 
 ### 2. Applying YAML files
 
-The tembo-operator directory comes complete with a set of sample YAML files, found at `/tembo/tembo-operator/yaml`.
+The `tembo-operator directory comes complete with a set of sample YAML files, found at `/tembo/tembo-operator/yaml`.
 
-Apply sample YAML, but this can be extended to your own development.
+You can try out any of the sample YAML files, for example by running the following:
 
 ```bash
 kubectl apply -f yaml/sample-standard.yaml
 ```
-Confirm by running the following:
+After some moments, confirm the newly-made kubernetes pod:
 ```bash
 kubectl get pods
 ```
@@ -69,12 +69,41 @@ sample-standard-1   1/1     Running   0          14s
 Within the sample YAML files, you will notice a specific image being used.
 In the case of `sample-standard.yaml` it's `image: "quay.io/tembo/standard-cnpg:15-a0a5ab5"`
 
-Introducing a custom image can add another exciting layer of complexity in the development process.
-The process of building a custom Docker container and loading it to a local Docker registry is covered in our [tembo-images README](https://github.com/tembo-io/tembo-images/blob/main/README.md) file.
+You may desire to create a in addition to the images at [Tembo's Quay Repository](https://quay.io/organization/tembo).
+
+#### 3.1. Building the image
+
+```bash
+docker build -t localhost:5000/my-custom-image:15-0.0.1 .
+```
+
+#### 3.2. Push to local docker registry
+
+```bash
+docker push localhost:5000/my-custom-image:15-0.0.1
+```
+
+```bash
+docker images
+```
+
+#### 3.3. Apply custom image and connecting 
+
+```bash
+kind load docker-image my-custom-image:15-0.0.1
+```
+
+```bash
+kubectl apply -f yaml/sample-standard.yaml
+```
+
+```bash
+kind load docker-image my-custom-image:15-0.0.1
+```
 
 ### 4. Connect via psql
 
-#### 4.1 Revealing password
+#### 4.1. Revealing password
 
 ```bash
 kubectl get secrets/sample-standard-connection -o=jsonpath='{.data.password}'
@@ -83,7 +112,7 @@ kubectl get secrets/sample-standard-connection -o=jsonpath='{.data.password}'
 echo <your-encoded-secret> | base64 --decode
 ```
 
-#### 4.2 Saving password
+#### 4.2. Saving password
 
 ```bash
 export PGPASSWORD=$(kubectl get secrets/sample-coredb-connection --template={{.data.password}} | base64 -D)
