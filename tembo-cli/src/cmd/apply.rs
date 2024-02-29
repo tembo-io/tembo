@@ -594,7 +594,7 @@ fn get_extensions(
                 vec![ExtensionInstallLocation {
                     database: Some("postgres".to_string()),
                     schema: None,
-                    version: Some(Some(version)),
+                    version: Some(version),
                     enabled: extension.enabled,
                 }];
 
@@ -936,16 +936,16 @@ async fn get_loadable_libraries(
 async fn get_extension_latest_version(
     name: String,
     maybe_version: Option<String>,
-) -> Result<String, anyhow::Error> {
+) -> Result<Option<String>, anyhow::Error> {
     if let Some(version) = maybe_version {
-        return Ok(version);
+        return Ok(Some(version));
     }
 
     let trunk_projects = get_trunk_projects(&name).await?;
 
     // If more than 1 trunk_project is returned then skip getting version
     if trunk_projects.len() > 1 {
-        return Ok("".to_string());
+        return Ok(None);
     }
 
     let trunk_project = &trunk_projects[0];
@@ -955,10 +955,10 @@ async fn get_extension_latest_version(
             if trunk_extension.extension_name != name {
                 continue;
             }
-            return Ok(trunk_extension.version.clone());
+            return Ok(Some(trunk_extension.version.clone()));
         }
     }
-    Ok("".to_string())
+    Ok(None)
 }
 
 async fn get_trunk_projects(name: &String) -> Result<Vec<TrunkProject>, Error> {
