@@ -1,4 +1,4 @@
-name: pgmq-py CI workflow
+name: tembo-py CI workflow
 
 defaults:
   run:

@@ -2,6 +2,7 @@
 
 [![License](https://img.shields.io/badge/license-PostgreSQL-blue)](https://github.com/tembo-io/tembo/blob/main/LICENSE)
 [![OSSRank](https://shields.io/endpoint?url=https://ossrank.com/shield/3811)](https://ossrank.com/p/3811)
+[![Static Badge](https://img.shields.io/badge/%40tembo-community?logo=slack&label=slack)](https://join.slack.com/t/tembocommunity/shared_invite/zt-293gc1k0k-3K8z~eKW1SEIfrqEI~5_yw)
 
 Tembo aims to improve the experience developers have with deploying, managing, and scaling Postgres. Tembo is under active development that you are free to use anything that we have open-sourced.
 

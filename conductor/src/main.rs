@@ -8,7 +8,10 @@ use conductor::{
     delete_namespace, generate_rand_schedule, generate_spec, get_coredb_error_without_status,
     get_one, get_pg_conn, lookup_role_arn, restart_coredb, types,
 };
-use controller::apis::coredb_types::{Backup, CoreDBSpec, S3Credentials, ServiceAccountTemplate};
+use controller::apis::coredb_types::{
+    Backup, CoreDBSpec, S3Credentials, ServiceAccountTemplate, VolumeSnapshot,
+};
+use controller::cloudnativepg::VOLUME_SNAPSHOT_CLASS_NAME;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use kube::Client;
 use log::{debug, error, info, warn};
@@ -140,9 +143,9 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         let event_msg: types::StateToControlPlane = match read_msg.message.event_type {
             // every event is for a single namespace
             Event::Create | Event::Update | Event::Restore => {
-                info!("{}: Got create or update event", read_msg.msg_id);
+                info!("{}: Got create, restore or update event", read_msg.msg_id);
 
-                // (todo: nhudson) in thr future move this to be more specific
+                // (todo: nhudson) in the future move this to be more specific
                 // to the event that we are taking action on.  For now just create
                 // the stack without checking.
 
@@ -174,6 +177,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     &read_msg,
                     &mut coredb_spec,
                     is_cloud_formation,
+                    &client,
                 )
                 .await
                 {
@@ -603,6 +607,7 @@ async fn init_cloud_perms(
     read_msg: &Message<CRUDevent>,
     coredb_spec: &mut CoreDBSpec,
     is_cloud_formation: bool,
+    client: &Client,
 ) -> Result<(), ConductorError> {
     if !is_cloud_formation {
         return Ok(());
@@ -637,6 +642,10 @@ async fn init_cloud_perms(
         }),
     };
 
+    // "Feature flag" VolumeSnapshot restore for specific org_id's
+    // This will be removed at a later date, for now we gatekeep
+    let volume_snapshot = gen_volume_snapshot_spec(read_msg);
+
     // Format Backup spec in CoreDBSpec
     let backup = Backup {
         destinationPath: Some(format!(
@@ -653,13 +662,86 @@ async fn init_cloud_perms(
             inherit_from_iam_role: Some(true),
             ..Default::default()
         }),
+        volume_snapshot,
         ..Default::default()
     };
+
+    // if read_msg.message.event_type is Event::Restore, we want to append the restore
+    // spec to possibly enable volumeSnapshots
+    if read_msg.message.event_type == Event::Restore {
+        let namespace = read_msg
+            .message
+            .spec
+            .as_ref()
+            .and_then(|spec| spec.restore.as_ref())
+            .map(|restore| &restore.server_name)
+            .ok_or_else(|| {
+                ConductorError::NameOrNamespaceNotFound("Namespace not found".to_string())
+            })?;
+        // Lookup the CoreDB of the instance we are restoring from
+        let restore_spec = lookup_coredb(client.clone(), namespace).await?;
+
+        // Check if volume snapshots are enabled on the CoreDB we are restoring from
+        let volume_snapshot_enabled = restore_spec
+            .backup
+            .volume_snapshot
+            .map_or(false, |vs| vs.enabled);
+
+        // Ensure a restore spec exists, otherwise return an error
+        let restore =
+            coredb_spec
+                .restore
+                .as_mut()
+                .ok_or(ConductorError::CoreDBRestoreSpecNotFound(
+                    namespace.to_string(),
+                ))?;
+
+        // Set volume_snapshot based on the determined value
+        info!(
+            "Restore from volume snapshot in namespace: {} {}",
+            namespace, volume_snapshot_enabled
+        );
+        restore.volume_snapshot = Some(volume_snapshot_enabled);
+    }
 
     coredb_spec.backup = backup;
     coredb_spec.serviceAccountTemplate = service_account_template;
 
     Ok(())
+}
+
+// For restore events we need to lookup the CoreDB of the instance we are restoring from
+// to check if volume snapshots are enabled. If they are we need to enable them on the
+// CoreDB we are restoring to.
+async fn lookup_coredb(client: Client, namespace: &str) -> Result<CoreDBSpec, ConductorError> {
+    let spec = get_one(client, namespace).await;
+    match spec {
+        Ok(s) => Ok(s.spec),
+        Err(e) => Err(e),
+    }
+}
+
+// gen_volume_snapshot is a glorified feature flag for volume snapshot restore
+// if the org_id matches from the list then we return true, else we return false.
+fn gen_volume_snapshot_spec(msg: &Message<CRUDevent>) -> Option<VolumeSnapshot> {
+    // Set a list of org_id's that are allowed to use volume snapshots
+    // We need to set orgs in dev, staging and prod to use volume snapshots
+    // tembo-test prod: org_2UJ2WPYFsE42Cos6mlmIuwIIJ4V
+    // tembo-test dev/staging: org_2YW4TYIMI1LeOqJTXIyvkHOHCUo
+    let orgs = ["org_2YW4TYIMI1LeOqJTXIyvkHOHCUo"];
+
+    if orgs.contains(&msg.message.org_id.as_str()) {
+        info!("Volume snapshot enabled for org_id: {}", msg.message.org_id);
+        Some(VolumeSnapshot {
+            enabled: true,
+            snapshot_class: Some(VOLUME_SNAPSHOT_CLASS_NAME.to_string()),
+        })
+    } else {
+        Some(VolumeSnapshot {
+            enabled: false,
+            ..Default::default()
+        })
+    }
 }
 
 fn from_env_default(key: &str, default: &str) -> String {

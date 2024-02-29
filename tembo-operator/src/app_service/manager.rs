@@ -228,7 +228,7 @@ fn generate_deployment(
             let readiness_probe = Probe {
                 http_get: Some(HTTPGetAction {
                     path: Some(probes.readiness.path),
-                    port: IntOrString::String(probes.readiness.port),
+                    port: IntOrString::Int(probes.readiness.port),
                     ..HTTPGetAction::default()
                 }),
                 initial_delay_seconds: Some(probes.readiness.initial_delay_seconds as i32),
@@ -237,7 +237,7 @@ fn generate_deployment(
             let liveness_probe = Probe {
                 http_get: Some(HTTPGetAction {
                     path: Some(probes.liveness.path),
-                    port: IntOrString::String(probes.liveness.port),
+                    port: IntOrString::Int(probes.liveness.port),
                     ..HTTPGetAction::default()
                 }),
                 initial_delay_seconds: Some(probes.liveness.initial_delay_seconds as i32),
