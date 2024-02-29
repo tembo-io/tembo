@@ -428,24 +428,29 @@ fn update_existing_instance(
     config: &Configuration,
     env: &Environment,
 ) {
-    let instance = get_update_instance(value);
+    let maybe_instance = get_update_instance(value);
 
-    let v = Runtime::new().unwrap().block_on(put_instance(
-        config,
-        env.org_id.clone().unwrap().as_str(),
-        instance_id,
-        instance,
-    ));
-
-    match v {
-        Ok(result) => {
-            white_confirmation(&format!(
-                "Instance update started for Instance Id: {}",
-                result.instance_id.color(colors::sql_u()).bold()
+    match maybe_instance {
+        Ok(instance) => {
+            let v = Runtime::new().unwrap().block_on(put_instance(
+                config,
+                env.org_id.clone().unwrap().as_str(),
+                instance_id,
+                instance,
             ));
+
+            match v {
+                Ok(result) => {
+                    white_confirmation(&format!(
+                        "Instance update started for Instance Id: {}",
+                        result.instance_id.color(colors::sql_u()).bold()
+                    ));
+                }
+                Err(error) => eprintln!("Error updating instance: {}", error),
+            };
         }
         Err(error) => eprintln!("Error updating instance: {}", error),
-    };
+    }
 }
 
 fn create_new_instance(
@@ -453,22 +458,30 @@ fn create_new_instance(
     config: &Configuration,
     env: Environment,
 ) -> Result<String, String> {
-    let instance = get_create_instance(value);
+    let maybe_instance = get_create_instance(value);
 
-    let v = Runtime::new().unwrap().block_on(create_instance(
-        config,
-        env.org_id.clone().unwrap().as_str(),
-        instance,
-    ));
-
-    match v {
-        Ok(result) => {
-            white_confirmation(&format!(
-                "Instance creation started for instance_name: {}",
-                result.instance_name.color(colors::sql_u()).bold()
+    match maybe_instance {
+        Ok(instance) => {
+            let v = Runtime::new().unwrap().block_on(create_instance(
+                config,
+                env.org_id.clone().unwrap().as_str(),
+                instance,
             ));
 
-            Ok(result.instance_id)
+            match v {
+                Ok(result) => {
+                    white_confirmation(&format!(
+                        "Instance creation started for instance_name: {}",
+                        result.instance_name.color(colors::sql_u()).bold()
+                    ));
+
+                    Ok(result.instance_id)
+                }
+                Err(error) => {
+                    eprintln!("Error creating instance: {}", error);
+                    Err(error.to_string())
+                }
+            }
         }
         Err(error) => {
             eprintln!("Error creating instance: {}", error);
@@ -477,8 +490,10 @@ fn create_new_instance(
     }
 }
 
-fn get_create_instance(instance_settings: &InstanceSettings) -> CreateInstance {
-    return CreateInstance {
+fn get_create_instance(
+    instance_settings: &InstanceSettings,
+) -> Result<CreateInstance, anyhow::Error> {
+    return Ok(CreateInstance {
         cpu: Cpu::from_str(instance_settings.cpu.as_str()).unwrap(),
         memory: Memory::from_str(instance_settings.memory.as_str()).unwrap(),
         environment: temboclient::models::Environment::from_str(
@@ -491,18 +506,20 @@ fn get_create_instance(instance_settings: &InstanceSettings) -> CreateInstance {
         replicas: Some(instance_settings.replicas),
         app_services: None,
         connection_pooler: None,
-        extensions: Some(Some(get_extensions(instance_settings.extensions.clone()))),
+        extensions: Some(Some(get_extensions(instance_settings.extensions.clone())?)),
         extra_domains_rw: Some(instance_settings.extra_domains_rw.clone()),
         ip_allow_list: Some(instance_settings.ip_allow_list.clone()),
         trunk_installs: Some(Some(get_trunk_installs(
             instance_settings.extensions.clone(),
         ))),
         postgres_configs: Some(Some(get_postgres_config_cloud(instance_settings))),
-    };
+    });
 }
 
-fn get_update_instance(instance_settings: &InstanceSettings) -> UpdateInstance {
-    return UpdateInstance {
+fn get_update_instance(
+    instance_settings: &InstanceSettings,
+) -> Result<UpdateInstance, anyhow::Error> {
+    return Ok(UpdateInstance {
         cpu: Cpu::from_str(instance_settings.cpu.as_str()).unwrap(),
         memory: Memory::from_str(instance_settings.memory.as_str()).unwrap(),
         environment: temboclient::models::Environment::from_str(
@@ -513,14 +530,14 @@ fn get_update_instance(instance_settings: &InstanceSettings) -> UpdateInstance {
         replicas: instance_settings.replicas,
         app_services: None,
         connection_pooler: None,
-        extensions: Some(Some(get_extensions(instance_settings.extensions.clone()))),
+        extensions: Some(Some(get_extensions(instance_settings.extensions.clone())?)),
         extra_domains_rw: Some(instance_settings.extra_domains_rw.clone()),
         ip_allow_list: Some(instance_settings.ip_allow_list.clone()),
         trunk_installs: Some(Some(get_trunk_installs(
             instance_settings.extensions.clone(),
         ))),
         postgres_configs: Some(Some(get_postgres_config_cloud(instance_settings))),
-    };
+    });
 }
 
 fn get_postgres_config_cloud(instance_settings: &InstanceSettings) -> Vec<PgConfig> {
@@ -561,19 +578,25 @@ fn get_postgres_config_cloud(instance_settings: &InstanceSettings) -> Vec<PgConf
 
 fn get_extensions(
     maybe_extensions: Option<HashMap<String, tembo_config::Extension>>,
-) -> Vec<Extension> {
+) -> Result<Vec<Extension>, anyhow::Error> {
     let mut vec_extensions: Vec<Extension> = vec![];
 
     if let Some(extensions) = maybe_extensions {
         for (name, extension) in extensions.into_iter() {
-            let mut vec_extension_location: Vec<ExtensionInstallLocation> = vec![];
+            let version = Runtime::new()
+                .unwrap()
+                .block_on(get_extension_latest_version(
+                    name.clone(),
+                    extension.version,
+                ))?;
 
-            vec_extension_location.push(ExtensionInstallLocation {
-                database: Some("postgres".to_string()),
-                schema: None,
-                version: None,
-                enabled: extension.enabled,
-            });
+            let vec_extension_location: Vec<ExtensionInstallLocation> =
+                vec![ExtensionInstallLocation {
+                    database: Some("postgres".to_string()),
+                    schema: None,
+                    version: Some(Some(version)),
+                    enabled: extension.enabled,
+                }];
 
             vec_extensions.push(Extension {
                 name: name.to_owned(),
@@ -583,7 +606,7 @@ fn get_extensions(
         }
     }
 
-    vec_extensions
+    Ok(vec_extensions)
 }
 
 fn get_extensions_controller(
@@ -880,16 +903,8 @@ async fn get_loadable_libraries(
     maybe_extensions: Option<&Vec<ControllerExtension>>,
 ) -> Result<Vec<Library>, anyhow::Error> {
     if let Some(extensions) = maybe_extensions {
-        let trunk_projects_url =
-            "https://registry.pgtrunk.io/api/v1/trunk-projects?extension-name=";
-
         for ext in extensions.iter() {
-            let response = reqwest::get(format!("{}{}", trunk_projects_url, ext.name))
-                .await?
-                .text()
-                .await?;
-
-            let trunk_projects: Vec<TrunkProject> = serde_json::from_str(&response)?;
+            let trunk_projects = get_trunk_projects(&ext.name).await?;
 
             // If more than 1 trunk_project is returned then skip adding "shared_preload_libraries"
             if trunk_projects.len() > 1 {
@@ -916,6 +931,44 @@ async fn get_loadable_libraries(
         }
     }
     Ok(shared_preload_libraries)
+}
+
+async fn get_extension_latest_version(
+    name: String,
+    maybe_version: Option<String>,
+) -> Result<String, anyhow::Error> {
+    if let Some(version) = maybe_version {
+        return Ok(version);
+    }
+
+    let trunk_projects = get_trunk_projects(&name).await?;
+
+    // If more than 1 trunk_project is returned then skip getting version
+    if trunk_projects.len() > 1 {
+        return Ok("".to_string());
+    }
+
+    let trunk_project = &trunk_projects[0];
+
+    if let Some(extensions) = trunk_project.extensions.as_ref() {
+        for trunk_extension in extensions.iter() {
+            if trunk_extension.extension_name != name {
+                continue;
+            }
+            return Ok(trunk_extension.version.clone());
+        }
+    }
+    Ok("".to_string())
+}
+
+async fn get_trunk_projects(name: &String) -> Result<Vec<TrunkProject>, Error> {
+    let trunk_projects_url = "https://registry.pgtrunk.io/api/v1/trunk-projects?extension-name=";
+    let response = reqwest::get(format!("{}{}", trunk_projects_url, name))
+        .await?
+        .text()
+        .await?;
+    let trunk_projects: Vec<TrunkProject> = serde_json::from_str(&response)?;
+    Ok(trunk_projects)
 }
 
 pub fn get_rendered_dockercompose(
