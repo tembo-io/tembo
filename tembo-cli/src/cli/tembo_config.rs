@@ -107,6 +107,7 @@ fn default_extensions() -> Option<HashMap<String, Extension>> {
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct Extension {
+    pub version: Option<String>,
     pub enabled: bool,
     pub trunk_project: Option<String>,
     pub trunk_project_version: Option<String>,
@@ -118,19 +119,20 @@ pub struct Library {
     pub priority: i32,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct TrunkProject {
     pub name: String,
     pub extensions: Option<Vec<TrunkExtension>>,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct TrunkExtension {
     pub extension_name: String,
     pub loadable_libraries: Option<Vec<LoadableLibrary>>,
+    pub version: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Clone)]
 pub struct LoadableLibrary {
     pub library_name: String,
     pub priority: i32,
