@@ -634,7 +634,7 @@ fn get_extensions(
                             "Current version of extension {} installed is different than version on trunk",
                             name);
                         let ext_locations = extension_mismatch.unwrap().locations.clone();
-                        if ext_locations.len() > 0 {
+                        if !ext_locations.is_empty() {
                             if let Some(existing_version) = ext_locations[0].clone().version {
                                 version = existing_version
                             } else {
