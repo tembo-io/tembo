@@ -630,15 +630,18 @@ fn get_extensions(
                             name
                         )));
                     } else {
+                        let version_error = format!(
+                            "Current version of extension {} installed is different than version on trunk",
+                            name);
                         let ext_locations = extension_mismatch.unwrap().locations.clone();
                         if ext_locations.len() > 0 {
                             if let Some(existing_version) = ext_locations[0].clone().version {
                                 version = existing_version
+                            } else {
+                                return Err(Error::msg(version_error));
                             }
                         } else {
-                            return Err(Error::msg(format!(
-                            "Current version of extension {} installed is different than version on trunk",
-                            name)));
+                            return Err(Error::msg(version_error));
                         }
                     }
                 }
