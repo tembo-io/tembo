@@ -612,7 +612,7 @@ fn get_extensions(
 
     if let Some(extensions) = maybe_extensions {
         for (name, extension) in extensions.into_iter() {
-            let version = Runtime::new().unwrap().block_on(get_extension_version(
+            let mut version = Runtime::new().unwrap().block_on(get_extension_version(
                 name.clone(),
                 extension.clone().version,
             ))?;
@@ -630,7 +630,19 @@ fn get_extensions(
                             name
                         )));
                     } else {
-                        continue;
+                        let version_error = format!(
+                            "Current version of extension {} installed is different than version on trunk",
+                            name);
+                        let ext_locations = extension_mismatch.unwrap().locations.clone();
+                        if !ext_locations.is_empty() {
+                            if let Some(existing_version) = ext_locations[0].clone().version {
+                                version = existing_version
+                            } else {
+                                return Err(Error::msg(version_error));
+                            }
+                        } else {
+                            return Err(Error::msg(version_error));
+                        }
                     }
                 }
             }
