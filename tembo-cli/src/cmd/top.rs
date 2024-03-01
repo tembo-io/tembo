@@ -143,7 +143,7 @@ async fn fetch_metrics_loop(
 
                 match (result1, result2) {
                     (Ok(metrics_response1), Ok(metrics_response2)) => {
-                        let raw_value1: f64 = match metrics_response1.data.result.get(0) {
+                        let raw_value1: f64 = match metrics_response1.data.result.first() {
                             Some(metric_result) => match metric_result.value.1.parse::<f64>() {
                                 Ok(parsed_value) => parsed_value,
                                 Err(_) => {
@@ -159,7 +159,7 @@ async fn fetch_metrics_loop(
                                 0.0
                             }
                         };
-                        let raw_value2: f64 = match metrics_response2.data.result.get(0) {
+                        let raw_value2: f64 = match metrics_response2.data.result.first() {
                             Some(metric_result) => match metric_result.value.1.parse::<f64>() {
                                 Ok(parsed_value) => parsed_value,
                                 Err(_) => {
