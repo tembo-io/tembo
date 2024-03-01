@@ -26,6 +26,8 @@ use tembo::cli::tembo_config::Library;
 use tembo_stacks::apps::app::merge_app_reqs;
 use tembo_stacks::apps::app::merge_options;
 use tembo_stacks::apps::types::MergedConfigs;
+use temboclient::models::ExtensionStatus;
+use temboclient::models::Instance;
 use temboclient::{
     apis::{
         configuration::Configuration,
@@ -120,7 +122,7 @@ fn tembo_cloud_apply(
         match result {
             Ok(i) => i,
             Err(error) => {
-                tui::error(&format!("Error creating instance: {}", error));
+                tui::error(&format!("{}", error));
                 return Ok(());
             }
         }
@@ -288,10 +290,13 @@ pub fn tembo_cloud_apply_instance(
         ..Default::default()
     };
 
-    let mut instance_id = get_instance_id(&instance_settings.instance_name, &config, env)?;
+    let maybe_instance = get_maybe_instance(&instance_settings.instance_name, &config, env)?;
 
-    if let Some(env_instance_id) = &instance_id {
-        update_existing_instance(env_instance_id, instance_settings, &config, env);
+    let instance_id;
+
+    if let Some(env_instance) = &maybe_instance {
+        instance_id = Some(env_instance.clone().instance_id);
+        update_existing_instance(env_instance, instance_settings, &config, env)?;
     } else {
         let new_inst_req = create_new_instance(instance_settings, &config, env.clone());
         match new_inst_req {
@@ -317,7 +322,7 @@ pub fn tembo_cloud_apply_instance(
         if connection_info.is_some() {
             let conn_info = get_conn_info_with_creds(
                 profile.clone(),
-                &instance_id,
+                instance_id,
                 connection_info,
                 env.clone(),
             )?;
@@ -341,7 +346,7 @@ pub fn tembo_cloud_apply_instance(
 
 fn get_conn_info_with_creds(
     profile: Profile,
-    instance_id: &Option<String>,
+    instance_id: Option<String>,
     connection_info: Option<Box<ConnectionInfo>>,
     env: Environment,
 ) -> Result<ConnectionInfo, anyhow::Error> {
@@ -372,11 +377,11 @@ fn get_conn_info_with_creds(
     Ok(conn_info)
 }
 
-pub fn get_instance_id(
+pub fn get_maybe_instance(
     instance_name: &str,
     config: &Configuration,
     env: &Environment,
-) -> Result<Option<String>, anyhow::Error> {
+) -> Result<Option<Instance>, anyhow::Error> {
     let v = Runtime::new()
         .unwrap()
         .block_on(get_all(config, env.org_id.clone().unwrap().as_str()));
@@ -388,11 +393,24 @@ pub fn get_instance_id(
                 .find(|instance| instance.instance_name == instance_name);
 
             if let Some(instance) = maybe_instance {
-                return Ok(Some(instance.clone().instance_id));
+                return Ok(Some(instance.clone()));
             }
         }
         Err(error) => eprintln!("Error getting instance: {}", error),
     };
+    Ok(None)
+}
+
+pub fn get_instance_id(
+    instance_name: &str,
+    config: &Configuration,
+    env: &Environment,
+) -> Result<Option<String>, anyhow::Error> {
+    let maybe_instance = get_maybe_instance(instance_name, config, env)?;
+
+    if let Some(instance) = maybe_instance {
+        return Ok(Some(instance.instance_id));
+    }
     Ok(None)
 }
 
@@ -423,20 +441,20 @@ pub fn is_instance_up(
 }
 
 fn update_existing_instance(
-    instance_id: &str,
+    instance: &Instance,
     value: &InstanceSettings,
     config: &Configuration,
     env: &Environment,
-) {
-    let maybe_instance = get_update_instance(value);
+) -> Result<(), anyhow::Error> {
+    let maybe_instance = get_update_instance(instance, value);
 
     match maybe_instance {
-        Ok(instance) => {
+        Ok(update_instance) => {
             let v = Runtime::new().unwrap().block_on(put_instance(
                 config,
                 env.org_id.clone().unwrap().as_str(),
-                instance_id,
-                instance,
+                &instance.instance_id,
+                update_instance,
             ));
 
             match v {
@@ -446,11 +464,14 @@ fn update_existing_instance(
                         result.instance_id.color(colors::sql_u()).bold()
                     ));
                 }
-                Err(error) => eprintln!("Error updating instance: {}", error),
+                Err(error) => {
+                    return Err(Error::msg(format!("Error updating instance: {}", error)))
+                }
             };
         }
-        Err(error) => eprintln!("Error updating instance: {}", error),
+        Err(error) => return Err(Error::msg(format!("Error updating instance: {}", error))),
     }
+    Ok(())
 }
 
 fn create_new_instance(
@@ -506,7 +527,10 @@ fn get_create_instance(
         replicas: Some(instance_settings.replicas),
         app_services: None,
         connection_pooler: None,
-        extensions: Some(Some(get_extensions(instance_settings.extensions.clone())?)),
+        extensions: Some(Some(get_extensions(
+            instance_settings.extensions.clone(),
+            &None,
+        )?)),
         extra_domains_rw: Some(instance_settings.extra_domains_rw.clone()),
         ip_allow_list: Some(instance_settings.ip_allow_list.clone()),
         trunk_installs: Some(Some(get_trunk_installs(
@@ -517,6 +541,7 @@ fn get_create_instance(
 }
 
 fn get_update_instance(
+    instance: &Instance,
     instance_settings: &InstanceSettings,
 ) -> Result<UpdateInstance, anyhow::Error> {
     return Ok(UpdateInstance {
@@ -530,7 +555,10 @@ fn get_update_instance(
         replicas: instance_settings.replicas,
         app_services: None,
         connection_pooler: None,
-        extensions: Some(Some(get_extensions(instance_settings.extensions.clone())?)),
+        extensions: Some(Some(get_extensions(
+            instance_settings.extensions.clone(),
+            &instance.extensions,
+        )?)),
         extra_domains_rw: Some(instance_settings.extra_domains_rw.clone()),
         ip_allow_list: Some(instance_settings.ip_allow_list.clone()),
         trunk_installs: Some(Some(get_trunk_installs(
@@ -578,17 +606,34 @@ fn get_postgres_config_cloud(instance_settings: &InstanceSettings) -> Vec<PgConf
 
 fn get_extensions(
     maybe_extensions: Option<HashMap<String, tembo_config::Extension>>,
+    maybe_existing_extensions: &Option<Option<Vec<ExtensionStatus>>>,
 ) -> Result<Vec<Extension>, anyhow::Error> {
     let mut vec_extensions: Vec<Extension> = vec![];
 
     if let Some(extensions) = maybe_extensions {
         for (name, extension) in extensions.into_iter() {
-            let version = Runtime::new()
-                .unwrap()
-                .block_on(get_extension_latest_version(
-                    name.clone(),
-                    extension.version,
-                ))?;
+            let version = Runtime::new().unwrap().block_on(get_extension_version(
+                name.clone(),
+                extension.clone().version,
+            ))?;
+
+            // Handle extension version change during an update
+            if let Some(Some(existing_extensions)) = maybe_existing_extensions {
+                let extension_mismatch = existing_extensions
+                    .iter()
+                    .find(|f| f.name == name && f.locations[0].version != Some(version.clone()));
+
+                if extension_mismatch.is_some() {
+                    if extension.version.is_some() {
+                        return Err(Error::msg(format!(
+                            "Current version of extension {} installed is different than version specified in tembo.toml",
+                            name
+                        )));
+                    } else {
+                        continue;
+                    }
+                }
+            }
 
             let vec_extension_location: Vec<ExtensionInstallLocation> =
                 vec![ExtensionInstallLocation {
@@ -933,7 +978,7 @@ async fn get_loadable_libraries(
     Ok(shared_preload_libraries)
 }
 
-async fn get_extension_latest_version(
+async fn get_extension_version(
     name: String,
     maybe_version: Option<String>,
 ) -> Result<Option<String>, anyhow::Error> {
@@ -943,8 +988,8 @@ async fn get_extension_latest_version(
 
     let trunk_projects = get_trunk_projects(&name).await?;
 
-    // If more than 1 trunk_project is returned then skip getting version
-    if trunk_projects.len() > 1 {
+    // If trunk projects returned is not exactly 1 then skip getting version
+    if trunk_projects.len() != 1 {
         return Ok(None);
     }
 
