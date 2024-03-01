@@ -29,7 +29,6 @@ Here are some quick pointers for orientation:
 
 If you haven't already, go ahead and clone the tembo repository to your local machine and navigate to the `tembo-operator` directory.
 
-
 ```bash
 git clone https://github.com/tembo-io/tembo.git
 ```
@@ -64,20 +63,31 @@ NAME                READY   STATUS    RESTARTS   AGE
 sample-standard-1   1/1     Running   0          14s
 ```
 
+The next section deals with creating and loading Docker images.
+If you'd like to skip it, click the following to learn how to [connect via psql](#4.-connect-via-psql).
+
 ### 3. Loading Docker images
 
-Within the sample YAML files, you will notice a specific image being used.
+Within the sample YAML files, notice a specific image being used.
 In the case of `sample-standard.yaml` it's `image: "quay.io/tembo/standard-cnpg:15-a0a5ab5"`
 
-You may desire to create a in addition to the images at [Tembo's Quay Repository](https://quay.io/organization/tembo).
+Should you desire to create a custom image, in addition to those found at [Tembo's Quay Repository](https://quay.io/organization/tembo), begin by creating a Dockerfile.
 
-#### 3.1. Building the image
+#### 3.1.
+
+#### 3.2. Building the image
+
+[test](https://github.com/tembo-io/tembo-images)
 
 ```bash
 docker build -t localhost:5000/my-custom-image:15-0.0.1 .
 ```
 
 #### 3.2. Push to local docker registry
+
+```bash
+docker run -d -p 5000:5000 --restart=always --name registry registry:2
+```
 
 ```bash
 docker push localhost:5000/my-custom-image:15-0.0.1
@@ -95,10 +105,6 @@ kind load docker-image my-custom-image:15-0.0.1
 
 ```bash
 kubectl apply -f yaml/sample-standard.yaml
-```
-
-```bash
-kind load docker-image my-custom-image:15-0.0.1
 ```
 
 ### 4. Connect via psql
