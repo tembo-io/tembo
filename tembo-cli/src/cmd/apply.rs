@@ -14,6 +14,8 @@ use itertools::Itertools;
 use log::info;
 use spinoff::spinners;
 use spinoff::Spinner;
+use temboclient::apis::instance_api::patch_instance;
+use temboclient::models::PatchInstance;
 use std::fmt::Write;
 use std::{
     collections::HashMap,
@@ -31,11 +33,11 @@ use temboclient::models::Instance;
 use temboclient::{
     apis::{
         configuration::Configuration,
-        instance_api::{create_instance, get_all, get_instance, put_instance},
+        instance_api::{create_instance, get_all, get_instance},
     },
     models::{
         ConnectionInfo, Cpu, CreateInstance, Extension, ExtensionInstallLocation, Memory, PgConfig,
-        StackType, State, Storage, TrunkInstall, UpdateInstance,
+        StackType, State, Storage, TrunkInstall,
     },
 };
 use tembodataclient::apis::secrets_api::get_secret_v1;
@@ -446,11 +448,11 @@ fn update_existing_instance(
     config: &Configuration,
     env: &Environment,
 ) -> Result<(), anyhow::Error> {
-    let maybe_instance = get_update_instance(instance, value);
+    let maybe_instance = get_patch_instance(instance, value);
 
     match maybe_instance {
         Ok(update_instance) => {
-            let v = Runtime::new().unwrap().block_on(put_instance(
+            let v = Runtime::new().unwrap().block_on(patch_instance(
                 config,
                 env.org_id.clone().unwrap().as_str(),
                 &instance.instance_id,
@@ -540,19 +542,19 @@ fn get_create_instance(
     });
 }
 
-fn get_update_instance(
+fn get_patch_instance(
     instance: &Instance,
     instance_settings: &InstanceSettings,
-) -> Result<UpdateInstance, anyhow::Error> {
-    return Ok(UpdateInstance {
-        cpu: Cpu::from_str(instance_settings.cpu.as_str()).unwrap(),
-        memory: Memory::from_str(instance_settings.memory.as_str()).unwrap(),
-        environment: temboclient::models::Environment::from_str(
+) -> Result<PatchInstance, anyhow::Error> {
+    return Ok(PatchInstance {
+        cpu: Some(Some(Cpu::from_str(instance_settings.cpu.as_str()).unwrap())),
+        memory: Some(Some(Memory::from_str(instance_settings.memory.as_str()).unwrap())),
+        environment: Some(Some(temboclient::models::Environment::from_str(
             instance_settings.environment.as_str(),
         )
-        .unwrap(),
-        storage: Storage::from_str(instance_settings.storage.as_str()).unwrap(),
-        replicas: instance_settings.replicas,
+        .unwrap())),
+        storage: Some(Some(Storage::from_str(instance_settings.storage.as_str()).unwrap())),
+        replicas: Some(Some(instance_settings.replicas)),
         app_services: None,
         connection_pooler: None,
         extensions: Some(Some(get_extensions(

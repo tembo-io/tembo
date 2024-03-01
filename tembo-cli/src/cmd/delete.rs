@@ -51,6 +51,8 @@ fn execute_tembo_cloud(env: Environment) -> Result<(), anyhow::Error> {
                 )),
                 Err(error) => tui::error(&format!("Error deleting instance: {}", error)),
             };
+        } else {
+            tui::error(&format!("No instance with name {} found", &value.instance_name));
         }
     }
 
