@@ -14,8 +14,6 @@ use itertools::Itertools;
 use log::info;
 use spinoff::spinners;
 use spinoff::Spinner;
-use temboclient::apis::instance_api::patch_instance;
-use temboclient::models::PatchInstance;
 use std::fmt::Write;
 use std::{
     collections::HashMap,
@@ -28,8 +26,10 @@ use tembo::cli::tembo_config::Library;
 use tembo_stacks::apps::app::merge_app_reqs;
 use tembo_stacks::apps::app::merge_options;
 use tembo_stacks::apps::types::MergedConfigs;
+use temboclient::apis::instance_api::patch_instance;
 use temboclient::models::ExtensionStatus;
 use temboclient::models::Instance;
+use temboclient::models::PatchInstance;
 use temboclient::{
     apis::{
         configuration::Configuration,
@@ -548,12 +548,16 @@ fn get_patch_instance(
 ) -> Result<PatchInstance, anyhow::Error> {
     return Ok(PatchInstance {
         cpu: Some(Some(Cpu::from_str(instance_settings.cpu.as_str()).unwrap())),
-        memory: Some(Some(Memory::from_str(instance_settings.memory.as_str()).unwrap())),
-        environment: Some(Some(temboclient::models::Environment::from_str(
-            instance_settings.environment.as_str(),
-        )
-        .unwrap())),
-        storage: Some(Some(Storage::from_str(instance_settings.storage.as_str()).unwrap())),
+        memory: Some(Some(
+            Memory::from_str(instance_settings.memory.as_str()).unwrap(),
+        )),
+        environment: Some(Some(
+            temboclient::models::Environment::from_str(instance_settings.environment.as_str())
+                .unwrap(),
+        )),
+        storage: Some(Some(
+            Storage::from_str(instance_settings.storage.as_str()).unwrap(),
+        )),
         replicas: Some(Some(instance_settings.replicas)),
         app_services: None,
         connection_pooler: None,
