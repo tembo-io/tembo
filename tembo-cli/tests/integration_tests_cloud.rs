@@ -71,6 +71,12 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
         assert!(true, "Instance isn't Deleting")
     }
 
+    replace_vars_in_file(
+        "tembo.toml".to_string(),
+        "instance_name = \"{instance_name}\"",
+        &format!("instance_name = \"minimal\""),
+    )?;
+
     Ok(())
 }
 
