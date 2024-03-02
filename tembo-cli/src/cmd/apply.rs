@@ -22,7 +22,6 @@ use std::{
     thread::sleep,
     time::Duration,
 };
-use tembo::cli::tembo_config::Library;
 use tembo_stacks::apps::app::merge_app_reqs;
 use tembo_stacks::apps::app::merge_options;
 use tembo_stacks::apps::types::MergedConfigs;
@@ -49,6 +48,7 @@ use crate::cli::file_utils::FileUtils;
 use crate::cli::sqlx_utils::SqlxUtils;
 use crate::cli::tembo_config;
 use crate::cli::tembo_config::InstanceSettings;
+use crate::cli::tembo_config::Library;
 use crate::cli::tembo_config::OverlayInstanceSettings;
 use crate::cli::tembo_config::TrunkProject;
 use crate::tui;

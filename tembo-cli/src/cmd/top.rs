@@ -1,9 +1,9 @@
 use crate::cli::context::{get_current_context, Environment};
 use crate::cli::tembo_config::InstanceSettings;
 use crate::cmd::apply::get_instance_settings;
-use crate::Args;
 use anyhow::anyhow;
 use anyhow::{Context, Result};
+use clap::Args;
 use crossterm::{
     execute,
     terminal::{Clear, ClearType},
