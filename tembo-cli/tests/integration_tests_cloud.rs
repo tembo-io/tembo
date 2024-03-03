@@ -73,8 +73,8 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
 
     replace_vars_in_file(
         "tembo.toml".to_string(),
-        "instance_name = \"{instance_name}\"",
-        &format!("instance_name = \"minimal\""),
+        &format!("instance_name = \"{instance_name}\""),
+        "instance_name = \"minimal\"",
     )?;
 
     Ok(())
