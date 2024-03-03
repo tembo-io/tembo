@@ -30,7 +30,7 @@ pub struct MetricsResponse {
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct MetricsData {
-    pub result_type: String,
+    pub resultType: String,
     pub result: Vec<MetricResult>,
 }
 
