@@ -1,5 +1,5 @@
-use crate::apply::{get_instance_id, get_instance_settings};
 use crate::cli::context::{get_current_context, Target};
+use crate::cmd::apply::{get_instance_id, get_instance_settings};
 use anyhow::{Context, Result};
 use clap::Args;
 use reqwest::blocking::Client;
