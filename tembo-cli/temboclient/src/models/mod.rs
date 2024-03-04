@@ -14,6 +14,8 @@ pub mod app_type_one_of_3;
 pub use self::app_type_one_of_3::AppTypeOneOf3;
 pub mod app_type_one_of_4;
 pub use self::app_type_one_of_4::AppTypeOneOf4;
+pub mod app_type_one_of_5;
+pub use self::app_type_one_of_5::AppTypeOneOf5;
 pub mod connection_info;
 pub use self::connection_info::ConnectionInfo;
 pub mod connection_pooler;

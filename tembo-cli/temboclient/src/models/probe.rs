@@ -15,11 +15,11 @@ pub struct Probe {
     #[serde(rename = "path")]
     pub path: String,
     #[serde(rename = "port")]
-    pub port: String,
+    pub port: i32,
 }
 
 impl Probe {
-    pub fn new(initial_delay_seconds: i32, path: String, port: String) -> Probe {
+    pub fn new(initial_delay_seconds: i32, path: String, port: i32) -> Probe {
         Probe {
             initial_delay_seconds,
             path,

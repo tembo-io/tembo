@@ -10,13 +10,8 @@
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Instance {
-    #[serde(
-        rename = "app_services",
-        default,
-        with = "::serde_with::rust::double_option",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub app_services: Option<Option<Vec<crate::models::AppType>>>,
+    //#[serde(rename = "app_services", default, with = "::serde_with::rust::double_option", skip_serializing_if = "Option::is_none")]
+    //pub app_services: Option<Option<Vec<crate::models::AppType>>>,
     #[serde(
         rename = "connection_info",
         default,
@@ -84,6 +79,9 @@ pub struct Instance {
         skip_serializing_if = "Option::is_none"
     )]
     pub postgres_configs: Option<Option<Vec<crate::models::PgConfig>>>,
+    /// Major Postgres version this instance is using. Currently: 14, 15 or 16
+    #[serde(rename = "postgres_version")]
+    pub postgres_version: i32,
     #[serde(rename = "replicas")]
     pub replicas: i32,
     #[serde(
@@ -117,13 +115,14 @@ impl Instance {
         memory: crate::models::Memory,
         organization_id: String,
         organization_name: String,
+        postgres_version: i32,
         replicas: i32,
         stack_type: crate::models::StackType,
         state: crate::models::State,
         storage: crate::models::Storage,
     ) -> Instance {
         Instance {
-            app_services: None,
+            //app_services: None,
             connection_info: None,
             connection_pooler: None,
             cpu,
@@ -140,6 +139,7 @@ impl Instance {
             organization_id,
             organization_name,
             postgres_configs: None,
+            postgres_version,
             replicas,
             runtime_config: None,
             stack_type,

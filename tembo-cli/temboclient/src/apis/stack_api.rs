@@ -79,10 +79,8 @@ pub async fn get_entity(
 
     let local_var_client = &local_var_configuration.client;
 
-    let local_var_uri_str = format!(
-        "{}/api/v1/stacks/{:?}",
-        local_var_configuration.base_path, r#type
-    );
+    let local_var_uri_str =
+        format!("{}/api/v1/stacks/{type:?}", local_var_configuration.base_path, type=r#type);
     let mut local_var_req_builder =
         local_var_client.request(reqwest::Method::GET, local_var_uri_str.as_str());
 
