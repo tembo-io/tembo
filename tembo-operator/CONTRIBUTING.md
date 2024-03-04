@@ -15,6 +15,7 @@ Here are some quick pointers for orientation:
     5. [Exec into the pod](#5.-exec-into-the-pod)
 3. [Updating the CRD (CustomResourceDefinition)](#updating-the-crd)
     1. [Making and applying changes](#1.-making-and-applying-changes)
+4. [Testing](#testing)
 
 ## Prerequisites
 
@@ -189,3 +190,12 @@ Once completed, run the following:
 ```bash
 just generate-crd
 ```
+
+## Testing
+
+After making any changes, you can run `just fmt` for invoke `cargo +nightly fmt`.
+Moreover, it's good practice to create tests for any new feature introduction.
+
+The Tembo Operator `integration_tests.rs` file can be found [here](https://github.com/tembo-io/tembo/blob/main/tembo-operator/tests/integration_tests.rs), but also at the file path `tembo/tembo-operator/tests/integration_tests.rs`
+
+The tests can be run by invoking `just run`.
