@@ -567,7 +567,7 @@ fn get_create_instance(
         trunk_installs: Some(Some(get_trunk_installs(
             instance_settings.extensions.clone(),
         ))),
-        postgres_configs: Some(Some(get_postgres_config_cloud(instance_settings))),
+        postgres_configs: Some(Some(get_postgres_config_cloud(instance_settings)?)),
         pg_version: Some(instance_settings.pg_version.into()),
     });
 }
@@ -600,11 +600,13 @@ fn get_patch_instance(
         trunk_installs: Some(Some(get_trunk_installs(
             instance_settings.extensions.clone(),
         ))),
-        postgres_configs: Some(Some(get_postgres_config_cloud(instance_settings))),
+        postgres_configs: Some(Some(get_postgres_config_cloud(instance_settings)?)),
     });
 }
 
-fn get_postgres_config_cloud(instance_settings: &InstanceSettings) -> Vec<PgConfig> {
+fn get_postgres_config_cloud(
+    instance_settings: &InstanceSettings,
+) -> Result<Vec<PgConfig>, anyhow::Error> {
     let mut pg_configs: Vec<PgConfig> = vec![];
 
     if instance_settings.postgres_configurations.is_some() {
@@ -632,12 +634,33 @@ fn get_postgres_config_cloud(instance_settings: &InstanceSettings) -> Vec<PgConf
                         })
                     }
                 }
-                _ => {}
+                Value::Integer(int) => pg_configs.push(PgConfig {
+                    name: key.to_owned(),
+                    value: int.to_string(),
+                }),
+                Value::Boolean(bool) => pg_configs.push(PgConfig {
+                    name: key.to_owned(),
+                    value: bool.to_string(),
+                }),
+                Value::Datetime(dttm) => pg_configs.push(PgConfig {
+                    name: key.to_owned(),
+                    value: dttm.to_string(),
+                }),
+                Value::Float(fl) => pg_configs.push(PgConfig {
+                    name: key.to_owned(),
+                    value: fl.to_string(),
+                }),
+                _ => {
+                    return Err(Error::msg(format!(
+                        "Error processing postgres_config: {}",
+                        key.to_owned()
+                    )));
+                }
             }
         }
     }
 
-    pg_configs
+    Ok(pg_configs)
 }
 
 fn get_extensions(
