@@ -8,22 +8,22 @@ The key differentiators of the Tembo Operator are:
 - Concept of Stacks
 - Easily integrate Apps to run alongside Postgres
 
-## Getting Started
+## Table of Contents
 
-It's fairly straightforward to get started running Tembo Operator locally for development and testing. We'll first cover simply running the existing code before moving on to how to make local changes and see them reflected in your local cluster.
+1. [Quick start](#quick-started)
+    1. [Cluster operations](#cluster-operations)
+2. [Examples](#examples)
+    1. [Trying out Postgres extensions](#trying-out-postgres-extensions)
+    2. [Trying out Tembo Stacks](#trying-out-tembo-stacks) 
+3. [Metrics with OpenTelemetry](#opentelemetry)
 
-### Tooling
+## Quick Start
 
-Whatever your OS and IDE combination, the following tools are required for performing the steps in this section:
+It's fairly straightforward to get started running the Tembo Operator locally. 
 
-  - [Rust](https://www.rust-lang.org/) — implementation language of Tembo Operator
-  - [psql](https://www.postgresql.org/docs/current/app-psql.html) — version 14 or higher is necessary because of Operator's use of [Server Name Indication](https://en.wikipedia.org/wiki/Server_Name_Indication)
-  - [Docker Engine](https://docs.docker.com/engine/install/) — for running local containers
-  - [kind](https://github.com/kubernetes-sigs/kind) — simplifies creation of local Kubernetes clusters using Docker (_**K**ubernetes **IN** **D**ocker_)
-  - [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl) — Kubernetes primary CLI; Docker may include this, but if not be sure to install it
-  - [helm](https://helm.sh) — the Kubernetes package manager
-  - [just](https://github.com/casey/just) — simplifies running complex project-specific commands. If you find new useful command, consider adding it to the `justfile`
-  
+There are a number of prerequisite software that you'll need before getting started.
+Please refer to the project's [contributing guide](./CONTRIBUTING.md), which lays these out in detail.
+
 ### Cluster Operation
 
 To destroy any existing cluster and start the containers needed for a new one, simply run:
@@ -49,13 +49,6 @@ just install-chart
 
 #### Integration testing
 
-To automatically set up a local cluster for functional testing, use this script.
-This will start a local kind cluster, annotate the `default` namespace for testing
-and install the CRD definition.
-
-```bash
-just start-kind
-```
 
 Or, you can follow the below steps.
 
@@ -98,7 +91,7 @@ Apply the CRD from [cached file](charts/coredb-operator/templates/crd.yaml), or 
 just install-crd
 ```
 
-### OpenTelemetry (TDB)
+### OpenTelemetry
 
 Setup an OpenTelemetry Collector in your cluster. [Tempo](https://github.com/grafana/helm-charts/tree/main/charts/tempo) / [opentelemetry-operator](https://github.com/open-telemetry/opentelemetry-helm-charts/tree/main/charts/opentelemetry-operator) / [grafana agent](https://github.com/grafana/helm-charts/tree/main/charts/agent-operator) should all work out of the box. If your collector does not support grpc otlp you need to change the exporter in [`main.rs`](./src/main.rs).
 
