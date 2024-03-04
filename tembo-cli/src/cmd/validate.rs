@@ -3,7 +3,7 @@ use crate::cli::context::{
 };
 use crate::cli::file_utils::FileUtils;
 use crate::cli::tembo_config::InstanceSettings;
-use crate::tui::{error, info, white_confirmation};
+use crate::tui::{self, error, info, white_confirmation};
 use anyhow::Error;
 use clap::Args;
 use std::{collections::HashMap, fs, path::Path, str::FromStr};
@@ -49,10 +49,19 @@ pub fn execute(verbose: bool) -> Result<(), anyhow::Error> {
         file_path.push_str("/tembo.toml");
 
         let contents = fs::read_to_string(&file_path)?;
-        let config: HashMap<String, InstanceSettings> = toml::from_str(&contents)?;
+        let config: Result<HashMap<String, InstanceSettings>, toml::de::Error> =
+            toml::from_str(&contents);
+
+        match config.clone() {
+            Ok(i) => i,
+            Err(error) => {
+                tui::error(&format!("{}", error));
+                return Ok(());
+            }
+        };
 
         // Validate the config
-        match validate_config(config, verbose) {
+        match validate_config(config.unwrap(), verbose) {
             std::result::Result::Ok(_) => (),
             std::result::Result::Err(e) => {
                 error(&format!("Error validating config: {}", e));
@@ -215,7 +224,7 @@ fn validate_stack_type(
             Ok(())
         }
         std::result::Result::Err(_) => Err(Error::msg(format!(
-            "Invalid stack types setting in section '{}': {}",
+            "Invalid stack type setting in section '{}': {}",
             section, stack_types
         ))),
     }
