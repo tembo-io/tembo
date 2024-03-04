@@ -14,6 +14,7 @@ Here are some quick pointers for orientation:
     4. [Connect via psql](#4.-connect-via-psql)
     5. [Exec into the pod](#5.-exec-into-the-pod)
 3. [Updating the CRD (CustomResourceDefinition)](#updating-the-crd)
+    1. [Making and applying changes](#1.-making-and-applying-changes)
 
 ## Prerequisites
 
@@ -165,14 +166,14 @@ kubectl exec -it sample-standard-1 -- /bin/bash
 
 The Tembo Operator utilizes a Kubernetes CRD (CustomResourceDefinition) with the name `CoreDB`.
 
-If you're not familiar with CRDs, please refer to the official [Kubernetes documentation on CRDs](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/#customresourcedefinitions) to learn more.
+If you're not familiar with this topic, please refer to the official [Kubernetes documentation on CRDs](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/#customresourcedefinitions) to learn more.
 
-### 1. Making changes
+### 1. Making and applying changes
 Edit the [CoreDBSpec struct](./src/controller.rs) as needed.
+This may include, but isn't limited to changes to:
 
-- `> just generate-crd`
+Once complelete, run the following:
 
-### 2. Confirming successful changes
-
-
-
+```bash
+just generate-crd
+```
