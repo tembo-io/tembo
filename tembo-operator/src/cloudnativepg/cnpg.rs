@@ -68,6 +68,7 @@ use kube::{
 };
 use serde_json::json;
 use std::{collections::BTreeMap, sync::Arc};
+use k8s_openapi::api::core::v1::Service;
 use tokio::time::Duration;
 use tracing::{debug, error, info, instrument, warn};
 
@@ -1178,9 +1179,60 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
         return Err(Action::requeue(Duration::from_secs(10)));
     }
 
+    reconcile_metrics_service(cdb, ctx.clone()).await?;
+
     Ok(())
 }
 
+pub async fn reconcile_metrics_service(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {
+    let client = ctx.client.clone();
+    let name = format!("{}-metrics", cdb.name_any());
+    let namespace = cdb.namespace().unwrap();
+    let service_api: Api<Service> = Api::namespaced(client.clone(), &namespace);
+
+    let owner_reference = cdb.controller_owner_ref(&()).unwrap();
+
+    // Constructing the selector to match pods by cluster name and role
+    let selector = std::collections::BTreeMap::from([
+        ("cnpg.io/cluster".to_string(), cdb.name_any()), // Assuming the label for cluster name is `cnpg.io/cluster`
+        ("role".to_string(), "primary".to_string()), // Assuming the label for role is `role`
+    ]);
+
+    // Constructing the Service object
+    let service = Service {
+        metadata: ObjectMeta {
+            name: Some(name.clone()),
+            namespace: Some(namespace.clone()),
+            owner_references: Some(vec![owner_reference]),
+            ..ObjectMeta::default()
+        },
+        spec: Some(k8s_openapi::api::core::v1::ServiceSpec {
+            ports: Some(vec![k8s_openapi::api::core::v1::ServicePort {
+                name: Some("metrics".to_string()),
+                port: 9187,
+                target_port: Some(k8s_openapi::apimachinery::pkg::util::intstr::IntOrString::Int(9187)),
+                protocol: Some("TCP".to_string()),
+                ..Default::default()
+            }]),
+            selector: Some(selector),
+            type_: Some("ClusterIP".to_string()),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+
+    debug!("Reconciling metrics service for {}", cdb.name_any());
+    let ps = PatchParams::apply("cntrlr").force();
+    let _o = service_api
+        .patch(&name, &ps, &Patch::Apply(&service))
+        .await
+        .map_err(|e| {
+            error!("Error patching Service: {}", e);
+            Action::requeue(std::time::Duration::from_secs(300))
+        })?;
+
+    Ok(())
+}
 // Reconcile a Pooler
 #[instrument(skip(cdb, ctx) fields(trace_id, instance_name = %cdb.name_any()))]
 pub async fn reconcile_pooler(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {

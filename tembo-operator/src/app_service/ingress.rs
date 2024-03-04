@@ -189,9 +189,42 @@ fn generate_middlewares(
     traefik_middlwares
 }
 
+pub fn generate_ingress_routes(
+    appsvc: &AppService,
+    resource_name: &str,
+    namespace: &str,
+    host_matcher: String,
+    coredb_name: &str,
+) -> Option<Vec<IngressRouteRoutes>> {
+    let mut routes = generate_ingress_routes_apps(appsvc, resource_name, namespace, host_matcher.clone(), coredb_name);
+    let matcher = format!("{host_matcher} && Path(`/metrics`)");
+    let monitoring_route = IngressRouteRoutes {
+        kind: IngressRouteRoutesKind::Rule,
+        r#match: matcher.clone(),
+        services: Some(vec![IngressRouteRoutesServices {
+            name: format!("{resource_name}-metrics"),
+            port: Some(IntOrString::Int(9187)),
+            // namespace attribute is NOT a kubernetes namespace
+            // it is the Traefik provider namespace: https://doc.traefik.io/traefik/v3.0/providers/overview/#provider-namespace
+            // https://doc.traefik.io/traefik/v3.0/routing/providers/kubernetes-crd/#kind-middleware
+            namespace: None,
+            kind: Some(IngressRouteRoutesServicesKind::Service),
+            ..IngressRouteRoutesServices::default()
+        }]),
+        ..IngressRouteRoutes::default()
+    };
+    match routes {
+        Some(ref mut r) => r.push(monitoring_route),
+        None => {
+            routes = Some(vec![monitoring_route]);
+        }
+    }
+    return routes
+}
+
 // generates Kubernetes IngressRoute template for an appService
 // maps the specified
-pub fn generate_ingress_routes(
+pub fn generate_ingress_routes_apps(
     appsvc: &AppService,
     resource_name: &str,
     namespace: &str,
