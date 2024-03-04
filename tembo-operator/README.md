@@ -35,29 +35,6 @@ Once the `kind` cluster has been started, you can start a local copy of Operator
 just run
 ```
 
-
-
-  
-To build and run the operator locally
-
-```bash
-just start-kind
-just run
-```
-
-- Or, you can run with auto reloading your local changes.
-- First, install cargo-watch
-
-```bash
-cargo install cargo-watch
-```
-
-- Then, run with auto reload
-
-```bash
-just watch
-```
-
 ### Install on an existing cluster
 
 ```bash
