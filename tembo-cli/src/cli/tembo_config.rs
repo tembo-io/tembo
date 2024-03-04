@@ -30,7 +30,7 @@ pub struct InstanceSettings {
     pub stack_type: String,
     pub postgres_configurations: Option<HashMap<String, Value>>,
     #[serde(default = "default_pg_version")]
-    pub pg_version: u8,
+    pub pg_version: i32,
     #[serde(
         deserialize_with = "deserialize_extensions",
         default = "default_extensions"
@@ -54,7 +54,7 @@ pub struct OverlayInstanceSettings {
     pub extensions: Option<HashMap<String, Extension>>,
     pub extra_domains_rw: Option<Vec<String>>,
     pub ip_allow_list: Option<Vec<String>>,
-    pub pg_version: Option<u8>,
+    pub pg_version: Option<i32>,
 }
 
 // If a trunk project name is not specified, then assume
@@ -79,7 +79,7 @@ where
 }
 
 /// Default to Postgres 15
-fn default_pg_version() -> u8 {
+fn default_pg_version() -> i32 {
     15
 }
 

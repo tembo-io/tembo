@@ -539,6 +539,7 @@ fn get_create_instance(
             instance_settings.extensions.clone(),
         ))),
         postgres_configs: Some(Some(get_postgres_config_cloud(instance_settings))),
+        pg_version: Some(instance_settings.pg_version)
     });
 }
 

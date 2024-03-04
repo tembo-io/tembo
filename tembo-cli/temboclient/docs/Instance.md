@@ -21,6 +21,7 @@ Name | Type | Description | Notes
 **organization_id** | **String** |  | 
 **organization_name** | **String** |  | 
 **postgres_configs** | Option<[**Vec<crate::models::PgConfig>**](PgConfig.md)> |  | [optional]
+**postgres_version** | **i32** | Major Postgres version this instance is using. Currently: 14, 15 or 16 | 
 **replicas** | **i32** |  | 
 **runtime_config** | Option<[**Vec<crate::models::PgConfig>**](PgConfig.md)> |  | [optional]
 **stack_type** | [**crate::models::StackType**](StackType.md) |  | 
