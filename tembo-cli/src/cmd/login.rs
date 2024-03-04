@@ -1,10 +1,11 @@
 use crate::cli::context::{
-    get_current_context, tembo_context_file_path, update_access_token, Context, Profile,
+    get_current_context, tembo_context_file_path, tembo_credentials_file_path, Context, Credential,
+    Profile,
 };
-use crate::tui::error as errors;
+use crate::tui::error;
 use actix_cors::Cors;
 use actix_web::{http::header, post, web, App, HttpResponse, HttpServer, Responder};
-use anyhow::{anyhow, Error, Result};
+use anyhow::{anyhow, Result};
 use clap::Args;
 use serde::Deserialize;
 use std::fs;
@@ -125,14 +126,14 @@ fn read_context() -> Result<String, anyhow::Error> {
     let contents = match fs::read_to_string(&filename) {
         Ok(c) => c,
         Err(e) => {
-            errors(&format!("Couldn't read context file {}: {}", filename, e));
+            error(&format!("Couldn't read context file {}: {}", filename, e));
             return Err(e.into());
         }
     };
     let mut data: Context = match toml::from_str(&contents) {
         Ok(d) => d,
         Err(e) => {
-            errors(&format!("Unable to load data. Error: `{}`", e));
+            error(&format!("Unable to load data. Error: `{}`", e));
             return Err(e.into());
         }
     };
@@ -144,4 +145,28 @@ fn read_context() -> Result<String, anyhow::Error> {
         }
     }
     Err(anyhow!("Now "))
+}
+
+pub fn update_access_token(
+    profile_name: &str,
+    new_access_token: &str,
+) -> Result<(), anyhow::Error> {
+    let credentials_file_path = tembo_credentials_file_path();
+    let contents = fs::read_to_string(&credentials_file_path)?;
+    let mut credentials: Credential = toml::from_str(&contents)?;
+
+    for profile in &mut credentials.profile {
+        if profile.name == profile_name {
+            profile.tembo_access_token = new_access_token.to_string();
+            break;
+        }
+    }
+
+    let modified_contents = toml::to_string(&credentials)
+        .map_err(|e| anyhow!("Failed to serialize modified credentials: {}", e))?;
+
+    fs::write(&credentials_file_path, modified_contents)
+        .map_err(|e| anyhow!("Failed to write modified credentials back to file: {}", e))?;
+
+    Ok(())
 }
