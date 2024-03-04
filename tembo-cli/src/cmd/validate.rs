@@ -126,7 +126,7 @@ fn validate_environment(env: &str, section: &str, verbose: bool) -> Result<(), a
             Ok(())
         }
         std::result::Result::Err(_) => Err(Error::msg(format!(
-            "Invalid environment setting in section '{}': {}",
+            "Invalid environment setting in section '{}': {}. Values allowed: dev, test, prod",
             section, env
         ))),
     }
@@ -141,7 +141,7 @@ fn validate_cpu(cpu: &str, section: &str, verbose: bool) -> Result<(), anyhow::E
             Ok(())
         }
         std::result::Result::Err(_) => Err(Error::msg(format!(
-            "Invalid cpu setting in section '{}': {}",
+            "Invalid cpu setting in section '{}': {}. Example cpu setting: 1",
             section, cpu
         ))),
     }
@@ -159,7 +159,7 @@ fn validate_memory(memory: &str, section: &str, verbose: bool) -> Result<(), any
             Ok(())
         }
         std::result::Result::Err(_) => Err(Error::msg(format!(
-            "Invalid memory setting in section '{}': {}",
+            "Invalid memory setting in section '{}': {}. Example memory setting: 8Gi",
             section, memory
         ))),
     }
@@ -177,7 +177,7 @@ fn validate_storage(storage: &str, section: &str, verbose: bool) -> Result<(), a
             Ok(())
         }
         std::result::Result::Err(_) => Err(Error::msg(format!(
-            "Invalid storage setting in section '{}': {}",
+            "Invalid storage setting in section '{}': {}. Example storage setting: 10Gi",
             section, storage
         ))),
     }
