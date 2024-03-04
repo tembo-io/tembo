@@ -140,7 +140,7 @@ echo <your-encoded-secret> | base64 --decode
 #### 4.2. Saving password
 
 ```bash
-export PGPASSWORD=$(kubectl get secrets/sample-coredb-connection --template={{.data.password}} | base64 -D)
+export PGPASSWORD=$(kubectl get secrets/sample-standard-connection --template={{.data.password}} | base64 -D)
 ```
 
 Add the following line to /etc/hosts
@@ -154,11 +154,8 @@ psql postgres://postgres:$PGPASSWORD@sample-standard.localhost:5432
 
 ### 5. Exec into the pod
 
+Run the following if you are interested in exploring the pod, for example to see where files are saved.
+
 ```bash
 kubectl exec -it sample-standard-1 -- /bin/bash
 ```
-
-## Testing
-
-:bulb: Note that the integration tests assume you already have installed or are running the operator connected to the cluster.
-
