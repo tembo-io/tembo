@@ -15,14 +15,12 @@ The key differentiators of the Tembo Operator are:
 2. [Examples](#examples)
     1. [Trying out Postgres extensions](#trying-out-postgres-extensions)
     2. [Trying out Tembo Stacks](#trying-out-tembo-stacks) 
-3. [Metrics with OpenTelemetry](#opentelemetry)
+3. [Observability with OpenTelemetry and Jaeger](#observability-with-opentelemetry-and-jaeger)
 
 ## Quick Start
 
-It's fairly straightforward to get started running the Tembo Operator locally. 
-
-There are a number of prerequisite software that you'll need before getting started.
-Please refer to the project's [contributing guide](./CONTRIBUTING.md), which lays these out in detail.
+While it's fairly straightforward to get started running the Tembo Operator locally, there are a number of prerequisite software that you'll need before getting started.
+For an exhaustive list, please refer to the project's [contributing guide](./CONTRIBUTING.md).
 
 ### Cluster Operation
 
@@ -34,7 +32,7 @@ just start-kind
 
 In addition to starting the cluster, a fair number of necessary dependencies are installed by subtasks. Check out the definition in the `justfile` if you're curious, it's all pretty composable.
 
-Once the `kind` cluster has been started, you can start a local copy of Operator to use it. Again, it's pretty easy:
+Once the `kind` cluster has been started, you can start a local copy of the Tembo Operator to use it. Again, it's pretty easy:
 
 ```bash
 just run
@@ -91,7 +89,29 @@ Apply the CRD from [cached file](charts/coredb-operator/templates/crd.yaml), or 
 just install-crd
 ```
 
-### OpenTelemetry
+## Observability with OpenTelemetry and Jaeger
+
+[OpenTelemetry](https://opentelemetry.io/) is an observability framework that focuses on generation, collection, management, and export of telemetry.
+By integrating it in the Tembo Operator, users are able to gain more insights into their operations.
+
+### Starting out
+
+If you haven't already, you can start a local Kubernetes cluster by running the following:
+
+```bash
+just start-kind
+```
+
+Once complete, simply run:
+
+```bash
+just run-telemetry
+```
+
+You're all set to visit the below URL and navigate your telemetry:
+```
+http://localhost:16686
+```
 
 Setup an OpenTelemetry Collector in your cluster. [Tempo](https://github.com/grafana/helm-charts/tree/main/charts/tempo) / [opentelemetry-operator](https://github.com/open-telemetry/opentelemetry-helm-charts/tree/main/charts/opentelemetry-operator) / [grafana agent](https://github.com/grafana/helm-charts/tree/main/charts/agent-operator) should all work out of the box. If your collector does not support grpc otlp you need to change the exporter in [`main.rs`](./src/main.rs).
 
@@ -108,35 +128,6 @@ cargo run
 ```sh
 OPENTELEMETRY_ENDPOINT_URL=https://0.0.0.0:55680 RUST_LOG=info,kube=trace,controller=debug cargo run --features=telemetry
 ```
-
-### In-cluster
-
-Compile the controller with:
-
-```sh
-just compile
-```
-
-Build an image with:
-
-```sh
-just build
-```
-
-Push the image to your local registry with:
-
-```sh
-docker push localhost:5001/controller:<tag>
-```
-
-Edit the [deployment](./yaml/deployment.yaml)'s image tag appropriately, then run:
-
-```sh
-kubectl apply -f yaml/deployment.yaml
-kubectl port-forward service/coredb-controller 8080:80
-```
-
-**NB**: namespace is assumed to be `default`. If you need a different namespace, you can replace `default` with whatever you want in the yaml and set the namespace in your current-context to get all the commands here to work.
 
 ## Usage
 
