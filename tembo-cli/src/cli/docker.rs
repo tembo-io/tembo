@@ -125,10 +125,8 @@ impl Docker {
         } else {
             let output = match ShellCommand::new("sh").arg("-c").arg(command).output() {
                 Ok(output) => output,
-                Err(_) => {
-                    sp.unwrap()
-                        .stop_with_message("- Tembo instances failed to start");
-                    bail!("There was an issue starting the instances")
+                Err(err) => {
+                    return Err(Error::msg(format!("Issue starting the instances: {}", err)))
                 }
             };
             let stderr = String::from_utf8(output.stderr).unwrap();
