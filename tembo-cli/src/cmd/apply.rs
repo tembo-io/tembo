@@ -277,7 +277,7 @@ fn process_app_services(
     instance_setting: &mut InstanceSettings,
 ) {
     let local_pgrst_db_uri = format!(
-        "postgresql://postgres:postgres@:{}5432/postgres",
+        "postgresql://postgres:postgres@{}:5432/postgres",
         &instance_setting.instance_name
     );
     const PGRST_DB_URI_NAME: &str = "PGRST_DB_URI";
