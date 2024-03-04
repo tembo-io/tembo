@@ -198,4 +198,4 @@ Moreover, it's good practice to create tests for any new feature introduction.
 
 The Tembo Operator `integration_tests.rs` file can be found [here](https://github.com/tembo-io/tembo/blob/main/tembo-operator/tests/integration_tests.rs), but also at the file path `tembo/tembo-operator/tests/integration_tests.rs`
 
-The tests can be run by invoking `just run`.
+The tests can be run by invoking `just test`.
