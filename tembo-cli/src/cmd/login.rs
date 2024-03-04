@@ -1,6 +1,10 @@
+use crate::cli::context::{
+    get_current_context, tembo_context_file_path, update_access_token, Context, Profile,
+};
+use crate::tui::error as errors;
 use actix_cors::Cors;
 use actix_web::{http::header, post, web, App, HttpResponse, HttpServer, Responder};
-use anyhow::{Error, Result};
+use anyhow::{anyhow, Error, Result};
 use clap::Args;
 use serde::Deserialize;
 use std::fs;
@@ -19,14 +23,24 @@ struct TokenRequest {
 }
 
 pub fn execute() -> Result<(), anyhow::Error> {
+    let env = get_current_context()?;
+    let profile = env
+        .selected_profile
+        .as_ref()
+        .ok_or_else(|| anyhow!("Cannot log in to the local context, please select a tembo-cloud context before logging in"))?;
+    let login_url = url(profile)?;
     let rt = tokio::runtime::Runtime::new().expect("Failed to create a runtime");
-
-    let lifetime = token_lifetime()?;
-    let login_url = "https://cloud.tembo.io/cli-success?isCli=true&expiry=".to_owned() + &lifetime;
 
     rt.block_on(handle_tokio(login_url))?;
 
     Ok(())
+}
+
+fn url(profile: &Profile) -> Result<String, anyhow::Error> {
+    let lifetime = token_lifetime()?;
+    let modified_tembo_host = profile.tembo_host.replace("api", "cloud");
+    let login_url = modified_tembo_host.clone() + "/cli-success?isCli=true&expiry=" + &lifetime;
+    Ok(login_url)
 }
 
 async fn handle_tokio(login_url: String) -> Result<(), anyhow::Error> {
@@ -56,8 +70,8 @@ async fn handle_request(
     notify: web::Data<Arc<Notify>>,
 ) -> impl Responder {
     let token = &body.token;
-
-    if let Err(e) = save_token_to_file(token) {
+    let profile_name = read_context();
+    if let Err(e) = update_access_token(&profile_name.unwrap(), token) {
         println!("Failed to save token: {}", e);
         return HttpResponse::InternalServerError().body("Failed to save token");
     }
@@ -106,33 +120,28 @@ fn token_lifetime() -> Result<String> {
     Ok(lifetime)
 }
 
-fn save_token_to_file(token: &str) -> Result<(), Error> {
-    let home_dir = dirs::home_dir()
-        .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "Could not find home directory"))?;
-    let credentials_path = home_dir.join(".tembo/credentials");
-
-    if credentials_path.exists() {
-        let contents = fs::read_to_string(&credentials_path)?;
-        let lines: Vec<String> = contents.lines().map(|line| line.to_string()).collect();
-
-        let new_lines: Vec<String> = lines
-            .into_iter()
-            .map(|line| {
-                if line.starts_with("tembo_access_token") {
-                    format!("tembo_access_token = '{}'", token)
-                } else {
-                    line
-                }
-            })
-            .collect();
-        let new_contents = new_lines.join("\n");
-        fs::write(&credentials_path, new_contents)?;
-        println!("Token updated in credentials file");
-    } else {
-        return Err(Error::msg(
-            "Credentials file does not exist. Run \"tembo init\"",
-        ));
+fn read_context() -> Result<String, anyhow::Error> {
+    let filename = tembo_context_file_path();
+    let contents = match fs::read_to_string(&filename) {
+        Ok(c) => c,
+        Err(e) => {
+            errors(&format!("Couldn't read context file {}: {}", filename, e));
+            return Err(e.into());
+        }
+    };
+    let mut data: Context = match toml::from_str(&contents) {
+        Ok(d) => d,
+        Err(e) => {
+            errors(&format!("Unable to load data. Error: `{}`", e));
+            return Err(e.into());
+        }
+    };
+    for e in data.environment.iter_mut() {
+        if e.set == Some(true) {
+            if e.name != "local" {
+                return Ok(e.name.clone());
+            }
+        }
     }
-
-    Ok(())
+    Err(anyhow!("Now "))
 }

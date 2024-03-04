@@ -1,5 +1,4 @@
-use crate::cli::context::Profile;
-use crate::cli::context::{get_current_context, Environment};
+use crate::cli::context::{get_current_context, Environment, Profile};
 use crate::cli::tembo_config::InstanceSettings;
 use crate::cmd::apply::get_instance_settings;
 use anyhow::anyhow;

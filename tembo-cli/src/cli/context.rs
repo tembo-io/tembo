@@ -162,3 +162,27 @@ pub fn list_credential_profiles() -> Result<Option<Vec<Profile>>, anyhow::Error>
         }
     }
 }
+
+pub fn update_access_token(
+    profile_name: &str,
+    new_access_token: &str,
+) -> Result<(), anyhow::Error> {
+    let credentials_file_path = tembo_credentials_file_path(); // Implement this function to return the path to your credentials file.
+    let contents = fs::read_to_string(&credentials_file_path)?;
+    let mut credentials: Credential = toml::from_str(&contents)?;
+
+    for profile in &mut credentials.profile {
+        if profile.name == profile_name {
+            profile.tembo_access_token = new_access_token.to_string();
+            break;
+        }
+    }
+
+    let modified_contents = toml::to_string(&credentials)
+        .map_err(|e| anyhow!("Failed to serialize modified credentials: {}", e))?;
+
+    fs::write(&credentials_file_path, modified_contents)
+        .map_err(|e| anyhow!("Failed to write modified credentials back to file: {}", e))?;
+
+    Ok(())
+}
