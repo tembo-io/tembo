@@ -1,5 +1,5 @@
-use crate::tui::{colors, white_confirmation};
-use anyhow::{bail, Context};
+use crate::tui::{self, colors, white_confirmation};
+use anyhow::{bail, Context, Error};
 use colorful::{Color, Colorful};
 use simplelog::*;
 use spinoff::{spinners, Spinner};
@@ -119,7 +119,27 @@ impl Docker {
         };
 
         let command = "docker-compose up -d --build";
-        run_command(command, verbose)?;
+
+        if verbose {
+            run_command(command, verbose)?;
+        } else {
+            let output = match ShellCommand::new("sh").arg("-c").arg(command).output() {
+                Ok(output) => output,
+                Err(err) => {
+                    return Err(Error::msg(format!("Issue starting the instances: {}", err)))
+                }
+            };
+            let stderr = String::from_utf8(output.stderr).unwrap();
+
+            if !output.status.success() {
+                tui::error(&format!(
+                    "\nThere was an issue starting the instances: {}",
+                    stderr
+                ));
+
+                return Err(Error::msg("Error running docker-compose up!"));
+            }
+        }
 
         show_message("Docker Compose Up completed", false);
 
@@ -127,7 +147,7 @@ impl Docker {
     }
 
     pub fn docker_compose_down(verbose: bool) -> Result<(), anyhow::Error> {
-        let path = Path::new("docker-compose.yml");
+        let path: &Path = Path::new("docker-compose.yml");
         if !path.exists() {
             if verbose {
                 println!(
@@ -168,7 +188,12 @@ impl Docker {
         let stderr = String::from_utf8(output.stderr).unwrap();
 
         if !output.status.success() {
-            bail!("There was an issue stopping the instances: {}", stderr)
+            tui::error(&format!(
+                "\nThere was an issue stopping the instances: {}",
+                stderr
+            ));
+
+            return Err(Error::msg("Error running docker-compose down!"));
         }
 
         Ok(())
@@ -187,7 +212,6 @@ pub fn run_command(command: &str, verbose: bool) -> Result<(), anyhow::Error> {
     if verbose {
         let stdout = BufReader::new(child.stdout.take().expect("Failed to open stdout"));
         let stderr = BufReader::new(child.stderr.take().expect("Failed to open stderr"));
-
         let stdout_handle = thread::spawn(move || {
             for line in stdout.lines() {
                 match line {
@@ -196,7 +220,6 @@ pub fn run_command(command: &str, verbose: bool) -> Result<(), anyhow::Error> {
                 }
             }
         });
-
         let stderr_handle = thread::spawn(move || {
             for line in stderr.lines() {
                 match line {
@@ -213,7 +236,7 @@ pub fn run_command(command: &str, verbose: bool) -> Result<(), anyhow::Error> {
     let status = child.wait().expect("Failed to wait on child");
 
     if !status.success() {
-        bail!("Command executed with failures");
+        return Err(Error::msg("Command executed with failures!"));
     }
 
     Ok(())
