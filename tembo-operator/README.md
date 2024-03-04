@@ -1,7 +1,12 @@
 # Tembo Operator
 
-The Tembo Operator is responsible for reconciling the differences between desired and actual cluster state.
-_Pad this out with around three sentences of explanation of the purpose of this component_.
+The Tembo Operator is a Kubernetes Operator used for creating, updating, and deleting Postgres instances.
+
+The key differentiators of the Tembo Operator are:
+
+- Unique extension management experience
+- Concept of Stacks
+- Easily integrate Apps to run alongside Postgres
 
 ## Getting Started
 
