@@ -31,6 +31,7 @@ pub struct MetricsResponse {
     pub data: MetricsData,
 }
 
+#[allow(non_snake_case)]
 #[derive(Serialize, Deserialize, Debug)]
 pub struct MetricsData {
     pub resultType: String,
