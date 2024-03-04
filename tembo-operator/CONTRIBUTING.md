@@ -1,6 +1,6 @@
 # Contributing to the Tembo Kubernetes Operator
 Welcome!
-And thank you for your consideration to contribute to the Tembo Kubernetes Operator.
+And thank you for your interest in contributing to the Tembo Kubernetes Operator.
 Here are some quick pointers for orientation:
 - Check out the project's [README](https://github.com/tembo-io/tembo/blob/main/tembo-operator/README.md) to learn about the less technical aspects.
 - Questions or comments? We'd love to hear from you on our [Tembo Slack Channel](https://join.slack.com/t/tembocommunity/shared_invite/zt-277pu7chi-NHtvHWvLhHwyK0Y5Y6vTPw)!
@@ -19,9 +19,9 @@ Here are some quick pointers for orientation:
 - [Rust](https://www.rust-lang.org/learn/get-started) - Toolchain including `rustc`, `cargo`, and `rustfmt`
 - [Docker Engine](https://docs.docker.com/engine/install/) - For running local containers
 - [psql](https://www.postgresql.org/docs/current/app-psql.html) - Terminal-based front-end to PostgreSQL
-- [kind](https://github.com/kubernetes-sigs/kind) — simplifies creation of local Kubernetes clusters using Docker (_**K**ubernetes **IN** **D**ocker_)
-- [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl) — Kubernetes primary CLI; Docker may include this, but if not be sure to install it
-- [just](https://github.com/casey/just) — simplifies running complex project-specific commands. If you find new useful command, consider adding it to the `justfile`
+- [kind](https://github.com/kubernetes-sigs/kind) — Simplifies creation of local Kubernetes clusters using Docker (_**K**ubernetes **IN** **D**ocker_)
+- [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl) — Kubernetes primary CLI
+- [just](https://github.com/casey/just) — Simplifies running complex, project-specific commands. If you find a new, useful command, consider adding it to the `justfile`
 
 ## Running locally
 
@@ -33,13 +33,18 @@ If you haven't already, go ahead and clone the tembo repository to your local ma
 git clone https://github.com/tembo-io/tembo.git
 ```
 ```bash
-cd /tembo/tembo-operator
+cd tembo/tembo-operator
 ```
-From there, run the following to initiate a local Kubernetes cluster:
+
+From there, initiate a local Kubernetes cluster:
 ```bash
 just start-kind
 ```
-Once complete, you can execute the following to start the Tembo Operator:
+:bulb: Details on this command, as well as others that invoke `just` can be found within the directory's `justfile`.
+
+:wrench: If you encounter an error, confirm that your Docker engine is running.
+
+Once complete, start the Tembo Operator:
 ```bash
 just run
 ```
@@ -47,7 +52,7 @@ just run
 
 ### 2. Applying YAML files
 
-The `tembo-operator directory comes complete with a set of sample YAML files, found at `/tembo/tembo-operator/yaml`.
+The `tembo-operator` directory comes complete with a set of sample YAML files, found at `tembo/tembo-operator/yaml`.
 
 You can try out any of the sample YAML files, for example by running the following:
 
@@ -73,7 +78,11 @@ In the case of `sample-standard.yaml` it's `image: "quay.io/tembo/standard-cnpg:
 
 Should you desire to create a custom image, in addition to those found at [Tembo's Quay Repository](https://quay.io/organization/tembo), begin by creating a Dockerfile.
 
+If you're searching for a reference, consider the Dockerfiles , found in the [tembo-images repository](https://github.com/tembo-io/tembo-images). 
+
 #### 3.1.
+
+
 
 #### 3.2. Building the image
 
@@ -109,14 +118,24 @@ kubectl apply -f yaml/sample-standard.yaml
 
 ### 4. Connect via psql
 
+Connecting via psql will require a password, which is linked to your current Kubernetes session.
+Sections `4.1` and `4.2` will illustrate how to respectively reveal the password, if you're work is more sessions-based, and how to save the password for later use. 
+
 #### 4.1. Revealing password
 
 ```bash
 kubectl get secrets/sample-standard-connection -o=jsonpath='{.data.password}'
 ```
+
+The resultant is an encoded password made up of letters and numbers, ending with two equal signs `==`.
+
+Ignore any characters past those, such as a percent symbol `%`.
+
 ```bash
 echo <your-encoded-secret> | base64 --decode
 ```
+
+:bulb: The echo statement's output can be used as the password when entering the pod either `psql` or `exec`.
 
 #### 4.2. Saving password
 
@@ -130,9 +149,8 @@ Add the following line to /etc/hosts
 ```
 
 ```bash
-psql postgres://postgres:$PGPASSWORD@sample-coredb.localhost:5432
+psql postgres://postgres:$PGPASSWORD@sample-standard.localhost:5432
 ```
-
 
 ### 5. Exec into the pod
 
