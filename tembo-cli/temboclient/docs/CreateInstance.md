@@ -13,6 +13,7 @@ Name | Type | Description | Notes
 **instance_name** | **String** |  | 
 **ip_allow_list** | Option<**Vec<String>**> |  | [optional]
 **memory** | [**crate::models::Memory**](Memory.md) |  | 
+**pg_version** | Option<**i32**> |  | [optional]
 **postgres_configs** | Option<[**Vec<crate::models::PgConfig>**](PgConfig.md)> |  | [optional]
 **replicas** | Option<**i32**> |  | [optional]
 **stack_type** | [**crate::models::StackType**](StackType.md) |  | 

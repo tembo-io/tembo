@@ -9,19 +9,15 @@
  */
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-pub struct AppTypeOneOf4 {
-    #[serde(rename = "pganalyze", deserialize_with = "Option::deserialize")]
-    pub pganalyze: Option<Box<crate::models::AppConfig>>,
+pub struct AppTypeOneOf5 {
+    #[serde(rename = "custom")]
+    pub custom: Box<crate::models::AppService>,
 }
 
-impl AppTypeOneOf4 {
-    pub fn new(pganalyze: Option<crate::models::AppConfig>) -> AppTypeOneOf4 {
-        AppTypeOneOf4 {
-            pganalyze: if let Some(x) = pganalyze {
-                Some(Box::new(x))
-            } else {
-                None
-            },
+impl AppTypeOneOf5 {
+    pub fn new(custom: crate::models::AppService) -> AppTypeOneOf5 {
+        AppTypeOneOf5 {
+            custom: Box::new(custom),
         }
     }
 }

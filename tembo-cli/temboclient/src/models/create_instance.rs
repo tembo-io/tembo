@@ -53,6 +53,8 @@ pub struct CreateInstance {
     pub ip_allow_list: Option<Option<Vec<String>>>,
     #[serde(rename = "memory")]
     pub memory: crate::models::Memory,
+    #[serde(rename = "pg_version", skip_serializing_if = "Option::is_none")]
+    pub pg_version: Option<i32>,
     #[serde(
         rename = "postgres_configs",
         default,
@@ -94,6 +96,7 @@ impl CreateInstance {
             instance_name,
             ip_allow_list: None,
             memory,
+            pg_version: None,
             postgres_configs: None,
             replicas: None,
             stack_type,
