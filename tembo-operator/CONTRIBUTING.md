@@ -168,11 +168,9 @@ The Tembo Operator utilizes a Kubernetes CRD (CustomResourceDefinition) with the
 
 If you're not familiar with this topic, please refer to the official [Kubernetes documentation on CRDs](https://kubernetes.io/docs/concepts/extend-kubernetes/api-extension/custom-resources/#customresourcedefinitions) to learn more.
 
-### 1. Making and applying changes
 Edit the [CoreDBSpec struct](./src/controller.rs) as needed.
-This may include, but isn't limited to changes to:
 
-Once complelete, run the following:
+Once completed, run the following:
 
 ```bash
 just generate-crd
