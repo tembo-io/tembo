@@ -366,6 +366,7 @@ fn get_conn_info_with_creds(
     ));
 
     if result.is_err() {
+        println!();
         return Err(Error::msg("Error fetching instance credentials!"));
     }
 
