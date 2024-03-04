@@ -267,10 +267,20 @@ fn docker_apply_instance(
 
     Docker::build(instance_setting.instance_name.clone(), verbose)?;
 
-    const LOCAL_PGRST_DB_URI: &str =
-        "postgresql://postgres:postgres@{{instance.instance_name}}:5432/postgres";
-    const PGRST_DB_URI_NAME: &str = "PGRST_DB_URI";
+    process_app_services(app_services, &mut instance_setting);
 
+    Ok(instance_setting)
+}
+
+fn process_app_services(
+    app_services: Option<Vec<AppService>>,
+    instance_setting: &mut InstanceSettings,
+) {
+    let local_pgrst_db_uri = format!(
+        "postgresql://postgres:postgres@:{}5432/postgres",
+        &instance_setting.instance_name
+    );
+    const PGRST_DB_URI_NAME: &str = "PGRST_DB_URI";
     if app_services.is_some() {
         let mut controller_app_svcs: HashMap<String, AppService> = Default::default();
         for cas in app_services.unwrap().iter_mut() {
@@ -283,7 +293,7 @@ fn docker_apply_instance(
                     if env_var.value.is_none() {
                         cas.env.as_mut().unwrap().push(EnvVar {
                             name: PGRST_DB_URI_NAME.to_string(),
-                            value: Some(LOCAL_PGRST_DB_URI.to_string()),
+                            value: Some(local_pgrst_db_uri.to_string()),
                             value_from_platform: None,
                         });
                     }
@@ -294,8 +304,6 @@ fn docker_apply_instance(
 
         instance_setting.controller_app_services = Some(controller_app_svcs);
     }
-
-    Ok(instance_setting)
 }
 
 pub fn tembo_cloud_apply_instance(
