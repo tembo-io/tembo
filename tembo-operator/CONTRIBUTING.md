@@ -75,31 +75,34 @@ If you'd like to skip it, click the following to learn how to [connect via psql]
 
 ### 3. Loading Docker images
 
-Within the sample YAML files, notice a specific image being used.
+In each sample YAML file, notice a specific image being used.
 In the case of `sample-standard.yaml` it's `image: "quay.io/tembo/standard-cnpg:15-a0a5ab5"`
 
-Should you desire to create a custom image, in addition to those found at [Tembo's Quay Repository](https://quay.io/organization/tembo), begin by creating a Dockerfile.
+The `standard-cnpg` image, as well as the other images hosted at [Tembo's Quay Repository](https://quay.io/organization/tembo), are made using Dockerfiles.
+The source material, as well as additional metadata, can be found within the [tembo-images repository](https://github.com/tembo-io/tembo-images).
 
-If you're searching for a reference, consider the Dockerfiles , found in the [tembo-images repository](https://github.com/tembo-io/tembo-images). 
+#### 3.1. Building the image
 
-#### 3.1.
-
-
-
-#### 3.2. Building the image
-
-[test](https://github.com/tembo-io/tembo-images)
-
-```bash
-docker build -t localhost:5000/my-custom-image:15-0.0.1 .
-```
-
-#### 3.2. Push to local docker registry
+First start your local Docker registry:
 
 ```bash
 docker run -d -p 5000:5000 --restart=always --name registry registry:2
 ```
 
+Then within the same directory as your Dockerfile, run the following:
+
+```bash
+docker build -t localhost:5000/my-custom-image:15-0.0.1 .
+```
+
+:bulb: Note that not only are the `my-custom-image` name and `15-0.0.1` customizable, but they will crucial in upcomming steps.
+Bear this in mind as you define your own names and tags.
+
+#### 3.2. Push to local Docker registry
+
+You can confirm that your local Docker registry is running by invoking `docker ps`.
+
+Then you can push the newly-created image and check for it by running the following:
 ```bash
 docker push localhost:5000/my-custom-image:15-0.0.1
 ```
@@ -109,6 +112,8 @@ docker images
 ```
 
 #### 3.3. Apply custom image and connecting 
+
+If you'd like to then 
 
 ```bash
 kind load docker-image my-custom-image:15-0.0.1
