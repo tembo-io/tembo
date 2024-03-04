@@ -113,11 +113,20 @@ docker images
 
 #### 3.3. Apply custom image and connecting 
 
-If you'd like to then 
+Say, for example you'd like to update the image of the `sample-standard.yaml` file.
+You would begin by replacing the image parameter with the following:
+
+```yaml
+image: my-custom-image:15-0.0.1
+```
+
+Before applying, load the custom image into your kind cluster by running the following:
 
 ```bash
 kind load docker-image my-custom-image:15-0.0.1
 ```
+
+Once complete, go ahead any apply the yaml file:
 
 ```bash
 kubectl apply -f yaml/sample-standard.yaml
