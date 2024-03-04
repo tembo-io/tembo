@@ -13,6 +13,7 @@ pub struct TemboConfig {
 
 // Config struct holds to data from the `[config]` section.
 #[derive(Serialize, Deserialize, Debug, Clone)]
+#[serde(deny_unknown_fields)]
 pub struct InstanceSettings {
     pub environment: String,
     pub instance_name: String,
@@ -25,6 +26,7 @@ pub struct InstanceSettings {
     #[serde(default = "default_replicas")]
     pub replicas: i32,
     #[serde(default = "default_stack_type")]
+    #[serde(alias = "stack")]
     pub stack_type: String,
     pub postgres_configurations: Option<HashMap<String, Value>>,
     #[serde(default = "default_pg_version")]
