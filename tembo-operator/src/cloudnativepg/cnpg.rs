@@ -1,3 +1,7 @@
+use crate::ingress_route_crd::{
+    IngressRoute, IngressRouteRoutes, IngressRouteRoutesKind, IngressRouteRoutesServices,
+    IngressRouteRoutesServicesKind, IngressRouteSpec, IngressRouteTls,
+};
 use crate::{
     apis::{
         coredb_types::{CoreDB, S3Credentials},
@@ -60,7 +64,10 @@ use crate::{
     Context, RESTARTED_AT,
 };
 use chrono::{DateTime, NaiveDateTime, Offset};
+use k8s_openapi::api::core::v1::Service;
+use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
+use kube::api::PostParams;
 use kube::{
     api::{DeleteParams, ListParams, Patch, PatchParams},
     runtime::{controller::Action, wait::Condition},
@@ -1178,9 +1185,125 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
         return Err(Action::requeue(Duration::from_secs(10)));
     }
 
+    reconcile_metrics_service(cdb, ctx.clone()).await?;
+    reconcile_metrics_ingress_route(cdb, ctx.clone()).await?;
+
     Ok(())
 }
 
+pub async fn reconcile_metrics_ingress_route(
+    cdb: &CoreDB,
+    ctx: Arc<Context>,
+) -> Result<(), Action> {
+    let domain = match std::env::var("DATA_PLANE_BASEDOMAIN") {
+        Ok(domain) => domain,
+        Err(_) => {
+            debug!("DATA_PLANE_BASEDOMAIN is not set");
+            return Ok(());
+        }
+    };
+
+    let client = ctx.client.clone();
+    let coredb_name = cdb.name_any();
+    let namespace = cdb.namespace().unwrap_or_default();
+
+    let host_matcher = format!("Host(`{coredb_name}.{domain}`)");
+    let matcher = format!("{} && Path(`/metrics`)", host_matcher);
+
+    let monitoring_route = IngressRouteRoutes {
+        kind: IngressRouteRoutesKind::Rule,
+        r#match: matcher.clone(),
+        services: Some(vec![IngressRouteRoutesServices {
+            name: format!("{coredb_name}-metrics"),
+            port: Some(IntOrString::Int(9187)),
+            // namespace attribute is NOT a kubernetes namespace
+            // it is the Traefik provider namespace: https://doc.traefik.io/traefik/v3.0/providers/overview/#provider-namespace
+            // https://doc.traefik.io/traefik/v3.0/routing/providers/kubernetes-crd/#kind-middleware
+            namespace: None,
+            kind: Some(IngressRouteRoutesServicesKind::Service),
+            ..IngressRouteRoutesServices::default()
+        }]),
+        ..IngressRouteRoutes::default()
+    };
+
+    let owner_reference = cdb.controller_owner_ref(&()).unwrap();
+    let ingress_route_name = format!("{}-metrics", coredb_name);
+
+    let ingress_route = IngressRoute {
+        metadata: ObjectMeta {
+            name: Some(ingress_route_name.clone()),
+            namespace: Some(namespace.clone()),
+            owner_references: Some(vec![owner_reference]),
+            ..ObjectMeta::default()
+        },
+        spec: IngressRouteSpec {
+            entry_points: Some(vec!["websecure".to_string()]),
+            routes: vec![monitoring_route],
+            tls: Some(IngressRouteTls::default()),
+        },
+    };
+
+    let ingress_api: Api<IngressRoute> = Api::namespaced(client, &namespace);
+    let _pp = PostParams::default();
+
+    let ps = PatchParams::apply("cntrlr").force();
+    let _o = ingress_api
+        .patch(&ingress_route_name, &ps, &Patch::Apply(&ingress_route))
+        .await
+        .map_err(|e| {
+            error!("Error patching metrics ingress route: {}", e);
+            Action::requeue(Duration::from_secs(300))
+        })?;
+    Ok(())
+}
+
+pub async fn reconcile_metrics_service(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {
+    let client = ctx.client.clone();
+    let name = format!("{}-metrics", cdb.name_any());
+    let namespace = cdb.namespace().unwrap();
+    let service_api: Api<Service> = Api::namespaced(client.clone(), &namespace);
+
+    let owner_reference = cdb.controller_owner_ref(&()).unwrap();
+
+    let selector = std::collections::BTreeMap::from([
+        ("cnpg.io/cluster".to_string(), cdb.name_any()),
+        ("role".to_string(), "primary".to_string()),
+    ]);
+
+    let service = Service {
+        metadata: ObjectMeta {
+            name: Some(name.clone()),
+            namespace: Some(namespace.clone()),
+            owner_references: Some(vec![owner_reference]),
+            ..ObjectMeta::default()
+        },
+        spec: Some(k8s_openapi::api::core::v1::ServiceSpec {
+            ports: Some(vec![k8s_openapi::api::core::v1::ServicePort {
+                name: Some("metrics".to_string()),
+                port: 9187,
+                target_port: Some(IntOrString::Int(9187)),
+                protocol: Some("TCP".to_string()),
+                ..Default::default()
+            }]),
+            selector: Some(selector),
+            type_: Some("ClusterIP".to_string()),
+            ..Default::default()
+        }),
+        ..Default::default()
+    };
+
+    debug!("Reconciling metrics service for {}", cdb.name_any());
+    let ps = PatchParams::apply("cntrlr").force();
+    let _o = service_api
+        .patch(&name, &ps, &Patch::Apply(&service))
+        .await
+        .map_err(|e| {
+            error!("Error patching Service: {}", e);
+            Action::requeue(Duration::from_secs(300))
+        })?;
+
+    Ok(())
+}
 // Reconcile a Pooler
 #[instrument(skip(cdb, ctx) fields(trace_id, instance_name = %cdb.name_any()))]
 pub async fn reconcile_pooler(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {

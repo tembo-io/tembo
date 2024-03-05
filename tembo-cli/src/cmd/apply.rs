@@ -5,6 +5,7 @@ use colorful::Colorful;
 use controller::apis::postgres_parameters::ConfigValue as ControllerConfigValue;
 use controller::apis::postgres_parameters::PgConfig as ControllerPgConfig;
 use controller::app_service::types::AppService;
+use controller::app_service::types::EnvVar;
 use controller::extensions::types::Extension as ControllerExtension;
 use controller::extensions::types::ExtensionInstallLocation as ControllerExtensionInstallLocation;
 use controller::extensions::types::TrunkInstall as ControllerTrunkInstall;
@@ -266,16 +267,43 @@ fn docker_apply_instance(
 
     Docker::build(instance_setting.instance_name.clone(), verbose)?;
 
+    process_app_services(app_services, &mut instance_setting);
+
+    Ok(instance_setting)
+}
+
+fn process_app_services(
+    app_services: Option<Vec<AppService>>,
+    instance_setting: &mut InstanceSettings,
+) {
+    let local_pgrst_db_uri = format!(
+        "postgresql://postgres:postgres@{}:5432/postgres",
+        &instance_setting.instance_name
+    );
+    const PGRST_DB_URI_NAME: &str = "PGRST_DB_URI";
     if app_services.is_some() {
         let mut controller_app_svcs: HashMap<String, AppService> = Default::default();
-        for cas in app_services.unwrap().iter() {
+        for cas in app_services.unwrap().iter_mut() {
+            if let Some(env_vars) = cas.env.as_mut() {
+                let maybe_env_var = env_vars
+                    .iter_mut()
+                    .find_or_first(|f| f.name == *PGRST_DB_URI_NAME);
+
+                if let Some(env_var) = maybe_env_var {
+                    if env_var.value.is_none() {
+                        cas.env.as_mut().unwrap().push(EnvVar {
+                            name: PGRST_DB_URI_NAME.to_string(),
+                            value: Some(local_pgrst_db_uri.to_string()),
+                            value_from_platform: None,
+                        });
+                    }
+                }
+            }
             controller_app_svcs.insert(cas.name.clone(), cas.to_owned());
         }
 
         instance_setting.controller_app_services = Some(controller_app_svcs);
     }
-
-    Ok(instance_setting)
 }
 
 pub fn tembo_cloud_apply_instance(
@@ -287,7 +315,7 @@ pub fn tembo_cloud_apply_instance(
         .as_ref()
         .with_context(|| "Expected [environment] to have a selected profile")?;
     let config = Configuration {
-        base_path: profile.tembo_host.clone(),
+        base_path: profile.get_tembo_host(),
         bearer_access_token: Some(profile.tembo_access_token.clone()),
         ..Default::default()
     };
@@ -353,7 +381,7 @@ fn get_conn_info_with_creds(
     env: Environment,
 ) -> Result<ConnectionInfo, anyhow::Error> {
     let dataplane_config = tembodataclient::apis::configuration::Configuration {
-        base_path: profile.tembo_data_host,
+        base_path: profile.get_tembo_data_host(),
         bearer_access_token: Some(profile.tembo_access_token),
         ..Default::default()
     };
@@ -366,6 +394,7 @@ fn get_conn_info_with_creds(
     ));
 
     if result.is_err() {
+        println!();
         return Err(Error::msg("Error fetching instance credentials!"));
     }
 
@@ -538,7 +567,7 @@ fn get_create_instance(
         trunk_installs: Some(Some(get_trunk_installs(
             instance_settings.extensions.clone(),
         ))),
-        postgres_configs: Some(Some(get_postgres_config_cloud(instance_settings))),
+        postgres_configs: Some(Some(get_postgres_config_cloud(instance_settings)?)),
         pg_version: Some(instance_settings.pg_version.into()),
     });
 }
@@ -571,11 +600,13 @@ fn get_patch_instance(
         trunk_installs: Some(Some(get_trunk_installs(
             instance_settings.extensions.clone(),
         ))),
-        postgres_configs: Some(Some(get_postgres_config_cloud(instance_settings))),
+        postgres_configs: Some(Some(get_postgres_config_cloud(instance_settings)?)),
     });
 }
 
-fn get_postgres_config_cloud(instance_settings: &InstanceSettings) -> Vec<PgConfig> {
+fn get_postgres_config_cloud(
+    instance_settings: &InstanceSettings,
+) -> Result<Vec<PgConfig>, anyhow::Error> {
     let mut pg_configs: Vec<PgConfig> = vec![];
 
     if instance_settings.postgres_configurations.is_some() {
@@ -603,12 +634,33 @@ fn get_postgres_config_cloud(instance_settings: &InstanceSettings) -> Vec<PgConf
                         })
                     }
                 }
-                _ => {}
+                Value::Integer(int) => pg_configs.push(PgConfig {
+                    name: key.to_owned(),
+                    value: int.to_string(),
+                }),
+                Value::Boolean(bool) => pg_configs.push(PgConfig {
+                    name: key.to_owned(),
+                    value: bool.to_string(),
+                }),
+                Value::Datetime(dttm) => pg_configs.push(PgConfig {
+                    name: key.to_owned(),
+                    value: dttm.to_string(),
+                }),
+                Value::Float(fl) => pg_configs.push(PgConfig {
+                    name: key.to_owned(),
+                    value: fl.to_string(),
+                }),
+                _ => {
+                    return Err(Error::msg(format!(
+                        "Error processing postgres_config: {}",
+                        key.to_owned()
+                    )));
+                }
             }
         }
     }
 
-    pg_configs
+    Ok(pg_configs)
 }
 
 fn get_extensions(

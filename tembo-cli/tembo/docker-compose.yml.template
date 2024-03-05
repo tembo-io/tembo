@@ -40,7 +40,6 @@ services:
     platform: linux/amd64
     {% endif %}
     environment:
-      PGRST_DB_URI: "postgresql://postgres:postgres@{{instance.instance_name}}:5432/postgres"
       {% if app_services.env -%}
       {% for env in app_services.env -%}
       {% if env.value -%}

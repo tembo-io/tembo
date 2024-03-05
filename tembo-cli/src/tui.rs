@@ -107,7 +107,7 @@ pub fn instance_started(server_url: &str, stack: &str, instance_type: &str) {
         "started".bg_rgb(255, 125, 127).color(Color::White).bold(),
         format_args!(
             "{} {}",
-            "Url:".color(Color::White).bold(),
+            "Connection String:".color(Color::White).bold(),
             server_url.bold()
         ),
         stack.color(colors::grey()).bold()

@@ -1,5 +1,6 @@
 use crate::cli::context::{tembo_context_file_path, Context};
 use crate::tui::{colors, error};
+use anyhow::Error;
 use clap::Args;
 use colorful::Colorful;
 use std::fs::{self, File};
@@ -34,12 +35,23 @@ pub fn execute(args: &ContextSetArgs) -> Result<(), anyhow::Error> {
 
     let name = args.name.clone();
 
+    let mut is_set = false;
     for e in data.environment.iter_mut() {
         if e.name == name {
-            e.set = Some(true)
+            e.set = Some(true);
+            is_set = true
         } else {
             e.set = None
         }
+    }
+
+    if !is_set {
+        error(&format!(
+            "Environment {} not found in Context file ({})",
+            name,
+            tembo_context_file_path()
+        ));
+        return Err(Error::msg("Error setting context"));
     }
 
     if let Err(e) = write_config_to_file(&data, &tembo_context_file_path()) {
