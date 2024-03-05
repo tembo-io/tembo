@@ -108,9 +108,13 @@ CREATE EXTENSION pgmq CASCADE;
 
 ### 2. Trying out Tembo Stacks
 
-:bulb: The following steps assume you have gone through the [quick start section](#quick-start).
+In the above example, we utilize the `sample-standard.yaml` file, but there are others that offer distinct configurations.
+Check out the others in the yaml directory.
+Here are some select options to apply just as `sample-standard.yaml` was:
 
-
+- Try out the [Message Queue Stack](https://tembo.io/docs/tembo-stacks/message-queue) with [sample-message-queue.yaml](./yaml/sample-message-queue.yaml).
+- Try out the [OLAP Stack](https://tembo.io/docs/tembo-stacks/olap) with [sample-olap.yaml](./yaml/sample-olap.yaml).
+- Try out the [MongoAlternative Stack](https://tembo.io/docs/tembo-stacks/mongo-alternative) with [sample-document.yaml](./yaml/sample-document.yaml).
 
 ## Observability with OpenTelemetry and Jaeger
 
