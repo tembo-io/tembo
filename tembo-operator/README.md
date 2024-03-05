@@ -48,13 +48,63 @@ Simultaneously,
 
 :bulb: The following steps assume you have gone through the [quick start section](#quick-start).
 
-Begin by confirming that the cluster is running:
+Start by applying a YAML template of your choosing, hosted at [./yaml](./yaml):
 
 ```bash
-kubectl get namespaces
+kubectl apply -f yaml/sample-standard.yaml
 ```
 
+One established, `psql` into the pod.
+This will require a password, the instructions of which are outlined in the CONTRIBUTING.md file's [Connect via psql](https://github.com/tembo-io/tembo/blob/main/tembo-operator/CONTRIBUTING.md#4-connect-via-psql) section.
 
+```bash
+psql postgres://postgres:$PGPASSWORD@sample-standard.localhost:5432
+```
+
+This will allow you to see the enabled extensions with:
+
+```sql
+\dx
+```
+
+As well as the to-be-enabled extensions that have already been installed:
+
+```sql
+SELECT * FROM pg_available_extensions;
+```
+
+Go ahead an exit Postgres with `\q` and the pod with `ctl-d`.
+
+Now try to `exec` into the pod via:
+
+```bash
+kubectl exec -it sample-standard-1 -- /bin/bash
+```
+
+As mentioned above, the Tembo Operator comes pre-packaged with added Postgres extension management.
+This comes in the form of the [Trunk](https://pgt.dev/) extension registry, which can be used from within the Kubernetes pod.
+
+Try running the following:
+
+```bash
+trunk install pgmq
+```
+
+:bulb: Note that you can choose to install any extension found within the Trunk registry.
+
+Considering that you should still be in the pod, simply run `psql` and you should find yourself in the Postgres instance.
+
+As before, try running
+
+```sql
+SELECT * FROM pg_available_extensions WHERE name = 'pgmq'
+```
+
+You should see the extension in the results, from which you can run to enable:
+
+```sql
+CREATE EXTENSION pgmq CASCADE;
+```
 
 ### 2. Trying out Tembo Stacks
 
