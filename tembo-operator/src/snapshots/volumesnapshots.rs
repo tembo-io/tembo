@@ -51,88 +51,14 @@ pub async fn reconcile_volume_snapshot_restore(
     let vsc = generate_volume_snapshot_content(cdb, &ogvsc)?;
     let vs = generate_volume_snapshot(cdb, &vsc)?;
 
-    // Apply the VolumeSnapshotContent and VolumeSnapshot
-    apply_volume_snapshot_content(cdb, &client, &vsc).await?;
+    // Apply the VolumeSnapshot and VolumeSnapshotContent
     apply_volume_snapshot(cdb, &client, &vs).await?;
-
-    // Patch the VolumeSnapshotContent to set the UID of the VolumeSnapshot
-    patch_volume_snapshot_content(cdb, &client, &vsc, &vs).await?;
+    apply_volume_snapshot_content(cdb, &client, &vs, &vsc).await?;
 
     // We need to wait for the snapshot to become ready before we can proceed
     is_snapshot_ready(cdb, &client, &vs).await?;
 
     Ok(vs)
-}
-
-// Patch the VolumeSnapshotContent to set the UID of the VolumeSnapshot
-async fn patch_volume_snapshot_content(
-    cdb: &CoreDB,
-    client: &Client,
-    vsc: &VolumeSnapshotContent,
-    vs: &VolumeSnapshot,
-) -> Result<(), Action> {
-    let vsc_name = vsc.metadata.name.as_ref().ok_or_else(|| {
-        error!(
-            "VolumeSnapshotContent name is empty for instance: {}.",
-            cdb.name_any()
-        );
-        Action::requeue(tokio::time::Duration::from_secs(300))
-    })?;
-
-    // Lookup the VolumeSnapshot UID
-    let vs_name = vs.metadata.name.as_ref().ok_or_else(|| {
-        error!(
-            "VolumeSnapshot name is empty for instance: {}.",
-            cdb.name_any()
-        );
-        Action::requeue(tokio::time::Duration::from_secs(300))
-    })?;
-    let ls = format!("metadata.name={}", vs_name);
-    let new_vs = lookup_volume_snapshot(client, vs_name.to_string(), ls).await?;
-
-    // Find the UID of new_vs
-    let vs_uid = new_vs.metadata.uid.as_ref().ok_or_else(|| {
-        error!(
-            "VolumeSnapshot UID is empty for instance: {}.",
-            cdb.name_any()
-        );
-        Action::requeue(tokio::time::Duration::from_secs(300))
-    })?;
-
-    // Apply VolumeSnapshotContent (All Namespaces)
-    let vsc_api: Api<VolumeSnapshotContent> = Api::all(client.clone());
-    debug!(
-        "Patching VolumeSnapshotContent for instance: {}",
-        vsc_name.to_string()
-    );
-    let ps = PatchParams::apply("cntrlr").force();
-
-    let mut vsc = vsc.clone();
-    vsc.spec.volume_snapshot_ref = VolumeSnapshotContentVolumeSnapshotRef {
-        api_version: Some("snapshot.storage.k8s.io/v1".to_string()),
-        kind: Some("VolumeSnapshot".to_string()),
-        name: Some(vs.metadata.name.clone().unwrap()),
-        namespace: Some(vs.metadata.namespace.clone().unwrap()),
-        uid: Some(vs_uid.clone()),
-        ..VolumeSnapshotContentVolumeSnapshotRef::default()
-    };
-
-    match vsc_api.patch(vsc_name, &ps, &Patch::Apply(&vsc)).await {
-        Ok(_) => debug!(
-            "VolumeSnapshotContent patched successfully for {}.",
-            cdb.name_any()
-        ),
-        Err(e) => {
-            error!(
-                "Failed to patch VolumeSnapshotContent for instance {}: {}",
-                cdb.name_any(),
-                e
-            );
-            return Err(Action::requeue(tokio::time::Duration::from_secs(300)));
-        }
-    }
-
-    Ok(())
 }
 
 async fn is_snapshot_ready(
@@ -248,6 +174,7 @@ async fn apply_volume_snapshot(
 async fn apply_volume_snapshot_content(
     cdb: &CoreDB,
     client: &Client,
+    volume_snapshot: &VolumeSnapshot,
     volume_snapshot_content: &VolumeSnapshotContent,
 ) -> Result<(), Action> {
     let name = cdb.name_any();
@@ -263,15 +190,42 @@ async fn apply_volume_snapshot_content(
             Action::requeue(tokio::time::Duration::from_secs(300))
         })?;
 
+    // Lookup the VolumeSnapshot UID
+    let vs_name = volume_snapshot.metadata.name.as_ref().ok_or_else(|| {
+        error!(
+            "VolumeSnapshot name is empty for instance: {}.",
+            cdb.name_any()
+        );
+        Action::requeue(tokio::time::Duration::from_secs(300))
+    })?;
+    let ls = format!("metadata.name={}", vs_name);
+    let new_vs = lookup_volume_snapshot(client, vs_name.to_string(), ls).await?;
+
+    // Find the UID of new_vs
+    let new_vs_uid = new_vs.metadata.uid.as_ref().ok_or_else(|| {
+        error!(
+            "VolumeSnapshot UID is empty for instance: {}.",
+            cdb.name_any()
+        );
+        Action::requeue(tokio::time::Duration::from_secs(300))
+    })?;
+
+    let mut vsc = volume_snapshot_content.clone();
+    vsc.spec.volume_snapshot_ref = VolumeSnapshotContentVolumeSnapshotRef {
+        api_version: Some("snapshot.storage.k8s.io/v1".to_string()),
+        kind: Some("VolumeSnapshot".to_string()),
+        name: Some(new_vs.metadata.name.clone().unwrap()),
+        namespace: Some(new_vs.metadata.namespace.clone().unwrap()),
+        uid: Some(new_vs_uid.clone()),
+        ..VolumeSnapshotContentVolumeSnapshotRef::default()
+    };
+
     // Apply VolumeSnapshotContent (All Namespaces)
-    let vs_api: Api<VolumeSnapshotContent> = Api::all(client.clone());
+    let vsc_api: Api<VolumeSnapshotContent> = Api::all(client.clone());
     debug!("Patching VolumeSnapshotContent for instance: {}", name);
     let ps = PatchParams::apply("cntrlr").force();
 
-    match vs_api
-        .patch(vsc_name, &ps, &Patch::Apply(volume_snapshot_content))
-        .await
-    {
+    match vsc_api.patch(vsc_name, &ps, &Patch::Apply(&vsc)).await {
         Ok(_) => debug!("VolumeSnapshotContent created successfully for {}.", name),
         Err(e) => {
             error!(
