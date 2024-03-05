@@ -158,8 +158,6 @@ $ curl 0.0.0.0:8080/
 [Jaeger](https://www.jaegertracing.io/), on the other hand, is an observability platform with a companion UI that ingests the OpenTelemetry data.
 By integrating both into the Tembo Operator, users are able to gain more insights into their operations.
 
-### Setting up
-
 If you haven't already, you can start a local Kubernetes cluster by running the following:
 
 ```bash
