@@ -310,29 +310,11 @@ fn generate_volume_snapshot_content(
             Action::requeue(tokio::time::Duration::from_secs(300))
         })?;
     let snapshot = format!("{}-restore-vs", name);
-    let restore_from_name = cdb
-        .spec
-        .restore
-        .as_ref()
-        .map(|r| r.server_name.clone())
-        .ok_or_else(|| {
-            error!(
-                "CoreDB restore server_name is empty for instance {}",
-                cdb.name_any()
-            );
-            Action::requeue(tokio::time::Duration::from_secs(300))
-        })?;
-
-    let mut vsc_labels = BTreeMap::new();
-    vsc_labels.insert("cnpg.io/cluster".to_string(), name.clone());
-    vsc_labels.insert("tembo.io/restore".to_string(), "true".to_string());
-    vsc_labels.insert("tembo.io/restore-from".to_string(), restore_from_name);
 
     let vsc = VolumeSnapshotContent {
         metadata: ObjectMeta {
             name: Some(format!("{}-restore-vsc", name)),
             namespace: Some(namespace.clone()),
-            labels: Some(vsc_labels),
             ..ObjectMeta::default()
         },
         spec: VolumeSnapshotContentSpec {
@@ -382,29 +364,11 @@ fn generate_volume_snapshot(
             error!("VolumeSnapshotClass name is empty for instance {}", name);
             Action::requeue(tokio::time::Duration::from_secs(300))
         })?;
-    let restore_from_name = cdb
-        .spec
-        .restore
-        .as_ref()
-        .map(|r| r.server_name.clone())
-        .ok_or_else(|| {
-            error!(
-                "CoreDB restore server_name is empty for instance {}",
-                cdb.name_any()
-            );
-            Action::requeue(tokio::time::Duration::from_secs(300))
-        })?;
-
-    let mut vsc_labels = BTreeMap::new();
-    vsc_labels.insert("cnpg.io/cluster".to_string(), name.clone());
-    vsc_labels.insert("tembo.io/restore".to_string(), "true".to_string());
-    vsc_labels.insert("tembo.io/restore-from".to_string(), restore_from_name);
 
     let vs = VolumeSnapshot {
         metadata: ObjectMeta {
             name: Some(format!("{}-restore-vs", name)),
             namespace: Some(namespace),
-            labels: Some(vsc_labels),
             ..ObjectMeta::default()
         },
         spec: VolumeSnapshotSpec {
