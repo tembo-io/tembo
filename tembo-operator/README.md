@@ -16,7 +16,7 @@ The key differentiators of the Tembo Operator are:
     1. [Trying out Postgres extensions](#1-trying-out-postgres-extensions)
     2. [Trying out Tembo Stacks](#2-trying-out-tembo-stacks) 
 3. [Observability with OpenTelemetry and Jaeger](#observability-with-opentelemetry-and-jaeger)
-4. [Usage](#usage)
+4. [Additional usage](#additional-usage)
 
 ## Quick Start
 
@@ -44,7 +44,7 @@ just run
 With the cluster running, you're ready to test some of the built-in features of the Tembo Operator.
 Simultaneously, 
 
-### 1. Trying out Postgres extensions
+### 1. Trying out Postgres Extensions
 
 :bulb: The following steps assume you have gone through the [quick start section](#quick-start).
 
@@ -141,7 +141,7 @@ From there, you're all set to visit the below URL and navigate your telemetry:
 http://localhost:16686
 ```
 
-## Usage
+## Additional Usage
 
 In either of the run scenarios, your app is listening on port `8080`, and it will observe events.
 
@@ -155,7 +155,7 @@ kubectl edit coredb sample-coredb # change replicas
 
 The reconciler will run and write the status object on every change. You should see results in the logs of the pod, or on the .status object outputs of `kubectl get coredb -o yaml`.
 
-### Webapp output
+### Webapp Output
 
 The sample web server exposes some example metrics and debug information you can inspect with `curl`.
 
