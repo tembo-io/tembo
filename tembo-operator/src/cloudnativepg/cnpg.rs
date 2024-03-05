@@ -1,5 +1,3 @@
-
-
 use crate::ingress_route_crd::{
     IngressRoute, IngressRouteRoutes, IngressRouteRoutesKind, IngressRouteRoutesServices,
     IngressRouteRoutesServicesKind, IngressRouteSpec, IngressRouteTls,
@@ -1254,7 +1252,7 @@ pub async fn reconcile_metrics_ingress_route(
         .await
         .map_err(|e| {
             error!("Error patching metrics ingress route: {}", e);
-            Action::requeue(std::time::Duration::from_secs(300))
+            Action::requeue(Duration::from_secs(300))
         })?;
     Ok(())
 }
@@ -1267,13 +1265,11 @@ pub async fn reconcile_metrics_service(cdb: &CoreDB, ctx: Arc<Context>) -> Resul
 
     let owner_reference = cdb.controller_owner_ref(&()).unwrap();
 
-    // Constructing the selector to match pods by cluster name and role
     let selector = std::collections::BTreeMap::from([
-        ("cnpg.io/cluster".to_string(), cdb.name_any()), // Assuming the label for cluster name is `cnpg.io/cluster`
-        ("role".to_string(), "primary".to_string()),     // Assuming the label for role is `role`
+        ("cnpg.io/cluster".to_string(), cdb.name_any()),
+        ("role".to_string(), "primary".to_string()),
     ]);
 
-    // Constructing the Service object
     let service = Service {
         metadata: ObjectMeta {
             name: Some(name.clone()),
@@ -1285,9 +1281,7 @@ pub async fn reconcile_metrics_service(cdb: &CoreDB, ctx: Arc<Context>) -> Resul
             ports: Some(vec![k8s_openapi::api::core::v1::ServicePort {
                 name: Some("metrics".to_string()),
                 port: 9187,
-                target_port: Some(
-                    k8s_openapi::apimachinery::pkg::util::intstr::IntOrString::Int(9187),
-                ),
+                target_port: Some(IntOrString::Int(9187)),
                 protocol: Some("TCP".to_string()),
                 ..Default::default()
             }]),
@@ -1305,7 +1299,7 @@ pub async fn reconcile_metrics_service(cdb: &CoreDB, ctx: Arc<Context>) -> Resul
         .await
         .map_err(|e| {
             error!("Error patching Service: {}", e);
-            Action::requeue(std::time::Duration::from_secs(300))
+            Action::requeue(Duration::from_secs(300))
         })?;
 
     Ok(())
