@@ -20,7 +20,7 @@ The key differentiators of the Tembo Operator are:
 
 ## Quick Start
 
-While it's fairly straightforward to get started running the Tembo Operator locally, there are a number of prerequisite software that you'll need before getting started.
+While it's fairly straightforward to get started running the Tembo Operator locally, there are prerequisites that you'll need before getting started.
 For an exhaustive list, please refer to the project's [contributing guide](./CONTRIBUTING.md).
 
 ### Cluster Operations
@@ -31,7 +31,7 @@ To destroy any existing cluster and start the containers needed for a new one, s
 just start-kind
 ```
 
-In addition to starting the cluster, a fair number of necessary dependencies are installed by subtasks. Check out the definition in the `justfile` if you're curious, it's all pretty composable.
+In addition to starting the cluster, several necessary dependencies are installed by subtasks. Check out the definition in the `justfile` if you're curious, it's all pretty composable.
 
 Once the `kind` cluster has been started, you can start a local copy of the Tembo Operator to use it. Again, it's pretty easy:
 
@@ -42,7 +42,6 @@ just run
 ## Examples
 
 With the cluster running, you're ready to test some of the built-in features of the Tembo Operator.
-Simultaneously, 
 
 ### 1. Trying out Postgres Extensions
 
@@ -54,7 +53,7 @@ Start by applying a YAML template of your choosing, hosted at [./yaml](./yaml):
 kubectl apply -f yaml/sample-standard.yaml
 ```
 
-One established, `psql` into the pod.
+Once established, `psql` into the pod.
 This will require a password, the instructions of which are outlined in the CONTRIBUTING.md file's [Connect via psql](https://github.com/tembo-io/tembo/blob/main/tembo-operator/CONTRIBUTING.md#4-connect-via-psql) section.
 
 ```bash
@@ -73,7 +72,7 @@ As well as the to-be-enabled extensions that have already been installed:
 SELECT * FROM pg_available_extensions;
 ```
 
-Go ahead an exit Postgres with `\q` and the pod with `ctl-d`.
+Go ahead and exit Postgres with `\q` and the pod with `Ctl-D`.
 
 Now try to `exec` into the pod via:
 
