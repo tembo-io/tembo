@@ -13,8 +13,8 @@ The key differentiators of the Tembo Operator are:
 1. [Quick start](#quick-start)
     1. [Cluster operations](#cluster-operations)
 2. [Examples](#examples)
-    1. [Trying out Postgres extensions](#1.-trying-out-postgres-extensions)
-    2. [Trying out Tembo Stacks](#2.-trying-out-tembo-stacks) 
+    1. [Trying out Postgres extensions](#1-trying-out-postgres-extensions)
+    2. [Trying out Tembo Stacks](#2-trying-out-tembo-stacks) 
 3. [Observability with OpenTelemetry and Jaeger](#observability-with-opentelemetry-and-jaeger)
 4. [Usage](#usage)
 
