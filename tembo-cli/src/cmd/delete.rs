@@ -30,7 +30,7 @@ fn execute_tembo_cloud(env: Environment) -> Result<(), anyhow::Error> {
 
     let profile = env.clone().selected_profile.unwrap();
     let config = Configuration {
-        base_path: profile.tembo_host,
+        base_path: profile.get_tembo_host(),
         bearer_access_token: Some(profile.tembo_access_token),
         ..Default::default()
     };
