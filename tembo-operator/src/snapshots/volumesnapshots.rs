@@ -17,7 +17,7 @@ use kube::{
     runtime::controller::Action,
     Api, ResourceExt,
 };
-use std::{collections::BTreeMap, sync::Arc};
+use std::sync::Arc;
 use tracing::{debug, error, info, warn};
 
 // Main function to reconcile the VolumeSnapshotContent and VolumeSnapshot
@@ -65,6 +65,15 @@ async fn patch_volume_snapshot_content(
         Action::requeue(tokio::time::Duration::from_secs(300))
     })?;
 
+    // Name for the VolumeSnapshot
+    let vs_name = vs.metadata.name.as_ref().ok_or_else(|| {
+        error!(
+            "VolumeSnapshot name is empty for instance: {}.",
+            cdb.name_any()
+        );
+        Action::requeue(tokio::time::Duration::from_secs(300))
+    })?;
+
     // Namespace for the VolumeSnapshot
     let vs_ns = vs.metadata.namespace.as_ref().ok_or_else(|| {
         error!(
@@ -76,7 +85,7 @@ async fn patch_volume_snapshot_content(
 
     // Look up the VolumeSnapshot to get the UID
     let vs_api: Api<VolumeSnapshot> = Api::namespaced(client.clone(), vs_ns);
-    let lp = ListParams::default().fields(&format!("metadata.name={}", name));
+    let lp = ListParams::default().fields(&format!("metadata.name={}", vs_name));
     let res = vs_api.list(&lp).await.map_err(|e| {
         warn!(
             "Error listing VolumeSnapshots {} in namespace {} for instance {}: {}",
@@ -93,7 +102,9 @@ async fn patch_volume_snapshot_content(
         Some(uid) => uid.to_string(),
         None => {
             error!(
-                "VolumeSnapshot UID is empty for instance: {}.",
+                "VolumeSnapshot UID is empty for snapshot {} in namespace {}: {}.",
+                vs_name,
+                vs_ns,
                 cdb.name_any()
             );
             return Err(Action::requeue(tokio::time::Duration::from_secs(10)));
