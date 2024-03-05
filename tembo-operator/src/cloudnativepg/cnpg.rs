@@ -1,3 +1,9 @@
+
+
+use crate::ingress_route_crd::{
+    IngressRoute, IngressRouteRoutes, IngressRouteRoutesKind, IngressRouteRoutesServices,
+    IngressRouteRoutesServicesKind, IngressRouteSpec, IngressRouteTls,
+};
 use crate::{
     apis::{
         coredb_types::{CoreDB, S3Credentials},
@@ -60,7 +66,10 @@ use crate::{
     Context, RESTARTED_AT,
 };
 use chrono::{DateTime, NaiveDateTime, Offset};
+use k8s_openapi::api::core::v1::Service;
+use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
+use kube::api::PostParams;
 use kube::{
     api::{DeleteParams, ListParams, Patch, PatchParams},
     runtime::{controller::Action, wait::Condition},
@@ -68,14 +77,8 @@ use kube::{
 };
 use serde_json::json;
 use std::{collections::BTreeMap, sync::Arc};
-use k8s_openapi::api::core::v1::Service;
-use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
-use kube::api::PostParams;
 use tokio::time::Duration;
 use tracing::{debug, error, info, instrument, warn};
-use crate::app_service::ingress::reconcile_ingress;
-use crate::app_service::types::AppService;
-use crate::ingress_route_crd::{IngressRoute, IngressRouteRoutes, IngressRouteRoutesKind, IngressRouteRoutesServices, IngressRouteRoutesServicesKind, IngressRouteSpec, IngressRouteTls};
 
 pub struct PostgresConfig {
     pub postgres_parameters: Option<BTreeMap<String, String>>,
@@ -1190,13 +1193,16 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
     Ok(())
 }
 
-pub async fn reconcile_metrics_ingress_route(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {
+pub async fn reconcile_metrics_ingress_route(
+    cdb: &CoreDB,
+    ctx: Arc<Context>,
+) -> Result<(), Action> {
     let domain = match std::env::var("DATA_PLANE_BASEDOMAIN") {
         Ok(domain) => domain,
         Err(_) => {
             debug!("DATA_PLANE_BASEDOMAIN is not set");
-            return Ok(())
-        },
+            return Ok(());
+        }
     };
 
     let client = ctx.client.clone();
@@ -1240,7 +1246,7 @@ pub async fn reconcile_metrics_ingress_route(cdb: &CoreDB, ctx: Arc<Context>) ->
     };
 
     let ingress_api: Api<IngressRoute> = Api::namespaced(client, &namespace);
-    let pp = PostParams::default();
+    let _pp = PostParams::default();
 
     let ps = PatchParams::apply("cntrlr").force();
     let _o = ingress_api
@@ -1250,7 +1256,7 @@ pub async fn reconcile_metrics_ingress_route(cdb: &CoreDB, ctx: Arc<Context>) ->
             error!("Error patching metrics ingress route: {}", e);
             Action::requeue(std::time::Duration::from_secs(300))
         })?;
-    return Ok(());
+    Ok(())
 }
 
 pub async fn reconcile_metrics_service(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {
@@ -1264,7 +1270,7 @@ pub async fn reconcile_metrics_service(cdb: &CoreDB, ctx: Arc<Context>) -> Resul
     // Constructing the selector to match pods by cluster name and role
     let selector = std::collections::BTreeMap::from([
         ("cnpg.io/cluster".to_string(), cdb.name_any()), // Assuming the label for cluster name is `cnpg.io/cluster`
-        ("role".to_string(), "primary".to_string()), // Assuming the label for role is `role`
+        ("role".to_string(), "primary".to_string()),     // Assuming the label for role is `role`
     ]);
 
     // Constructing the Service object
@@ -1279,7 +1285,9 @@ pub async fn reconcile_metrics_service(cdb: &CoreDB, ctx: Arc<Context>) -> Resul
             ports: Some(vec![k8s_openapi::api::core::v1::ServicePort {
                 name: Some("metrics".to_string()),
                 port: 9187,
-                target_port: Some(k8s_openapi::apimachinery::pkg::util::intstr::IntOrString::Int(9187)),
+                target_port: Some(
+                    k8s_openapi::apimachinery::pkg::util::intstr::IntOrString::Int(9187),
+                ),
                 protocol: Some("TCP".to_string()),
                 ..Default::default()
             }]),

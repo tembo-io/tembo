@@ -189,7 +189,6 @@ fn generate_middlewares(
     traefik_middlwares
 }
 
-
 // generates Kubernetes IngressRoute template for an appService
 // maps the specified
 pub fn generate_ingress_routes(
