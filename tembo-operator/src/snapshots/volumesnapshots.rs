@@ -41,7 +41,7 @@ pub async fn reconcile_volume_snapshot_restore(
             Action::requeue(tokio::time::Duration::from_secs(300))
         })?;
     let cnpg_ls = format!("cnpg.io/cluster={}", cdb_name);
-    let ogvs = lookup_volume_snapshot(&client, cdb_name, cnpg_ls).await?;
+    let ogvs = lookup_volume_snapshot(&client, &cdb_name, &cdb_name, cnpg_ls).await?;
 
     // Lookup the VolumeSnapshotContent of the original instance
     let ogvsc = lookup_volume_snapshot_content(cdb, &client, ogvs).await?;
@@ -62,8 +62,15 @@ pub async fn reconcile_volume_snapshot_restore(
         );
         Action::requeue(tokio::time::Duration::from_secs(300))
     })?;
+    let new_vs_ns = vs.metadata.namespace.as_ref().ok_or_else(|| {
+        error!(
+            "VolumeSnapshot namespace is empty for instance: {}.",
+            cdb.name_any()
+        );
+        Action::requeue(tokio::time::Duration::from_secs(300))
+    })?;
     let ls = format!("metadata.name={}", new_vs_name);
-    let new_vs = lookup_volume_snapshot(&client, new_vs_name.to_string(), ls).await?;
+    let new_vs = lookup_volume_snapshot(&client, new_vs_name, new_vs_ns, ls).await?;
     patch_volume_snapshot_content(cdb, &client, &vsc, &new_vs).await?;
 
     // We need to wait for the snapshot to become ready before we can proceed
@@ -382,10 +389,11 @@ fn generate_volume_snapshot(
 // original instance you are restoring from
 async fn lookup_volume_snapshot(
     client: &Client,
-    name: String,
+    name: &String,
+    namespace: &str,
     label_selector: String,
 ) -> Result<VolumeSnapshot, Action> {
-    let volume_snapshot_api: Api<VolumeSnapshot> = Api::namespaced(client.clone(), &name);
+    let volume_snapshot_api: Api<VolumeSnapshot> = Api::namespaced(client.clone(), namespace);
 
     let lp = ListParams::default().labels(&label_selector);
     let result = volume_snapshot_api.list(&lp).await.map_err(|e| {
