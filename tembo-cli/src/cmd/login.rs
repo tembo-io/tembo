@@ -39,7 +39,7 @@ pub fn execute() -> Result<(), anyhow::Error> {
 
 fn url(profile: &Profile) -> Result<String, anyhow::Error> {
     let lifetime = token_lifetime()?;
-    let modified_tembo_host = profile.tembo_host.replace("api", "cloud");
+    let modified_tembo_host = profile.get_tembo_host().replace("api", "cloud");
     let login_url = modified_tembo_host.clone() + "/cli-success?isCli=true&expiry=" + &lifetime;
     Ok(login_url)
 }

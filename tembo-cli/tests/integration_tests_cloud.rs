@@ -47,7 +47,7 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
     let env = get_current_context()?;
     let profile = env.clone().selected_profile.unwrap();
     let config = Configuration {
-        base_path: profile.tembo_host,
+        base_path: profile.get_tembo_host(),
         bearer_access_token: Some(profile.tembo_access_token),
         ..Default::default()
     };
