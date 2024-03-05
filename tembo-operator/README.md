@@ -1,6 +1,6 @@
 # Tembo Operator
 
-The Tembo Operator is a Kubernetes Operator used for creating, updating, and deleting Postgres instances.
+The Tembo Operator is a Kubernetes Operator used for creating, updating, and deleting PostgreSQL (Postgres) instances.
 
 The key differentiators of the Tembo Operator are:
 
@@ -10,12 +10,13 @@ The key differentiators of the Tembo Operator are:
 
 ## Table of Contents
 
-1. [Quick start](#quick-started)
+1. [Quick start](#quick-start)
     1. [Cluster operations](#cluster-operations)
 2. [Examples](#examples)
     1. [Trying out Postgres extensions](#trying-out-postgres-extensions)
     2. [Trying out Tembo Stacks](#trying-out-tembo-stacks) 
 3. [Observability with OpenTelemetry and Jaeger](#observability-with-opentelemetry-and-jaeger)
+4. [Usage](#usage)
 
 ## Quick Start
 
@@ -38,63 +39,36 @@ Once the `kind` cluster has been started, you can start a local copy of the Temb
 just run
 ```
 
-### Install on an existing cluster
+## Examples
+
+With the cluster running, you're ready to test some of the built-in features of the Tembo Operator.
+Simultaneously, 
+
+### 1. Trying out Postgres extensions
+
+:bulb: The following steps assume you have gone through the [quick start section](#quick-start).
+
+Begin by confirming that the cluster is running:
 
 ```bash
-just install-depedencies
-just install-chart
+kubectl get namespaces
 ```
 
-#### Integration testing
 
 
-Or, you can follow the below steps.
+### 2. Trying out Tembo Stacks
 
-- Connect to a cluster that is safe to run the tests against
-- Set your kubecontext to any namespace, and label it to indicate it is safe to run tests against this cluster (do not do against non-test clusters)
+:bulb: The following steps assume you have gone through the [quick start section](#quick-start).
 
-```bash
-NAMESPACE=<namespace> just annotate
-```
 
-- Start or install the controller you want to test (see the following sections), do this in a separate shell from where you will run the tests
-
-```
-export DATA_PLANE_BASEDOMAIN=localhost
-cargo run
-```
-
-- Run the integration tests
-  > Note: for integration tests to work you will need to be logged in on `plat-dev` via CLI under the "PowerUserAccess" role found here: https://d-9067aa6f32.awsapps.com/start (click "Command line or programmatic access")
-
-```bash
-cargo test -- --ignored
-```
-
-- The integration tests assume you already have installed or are running the operator connected to the cluster.
-
-#### Other testing notes
-
-- Include the `--nocapture` flag to show print statements during test runs
-
-### Cluster
-
-As an example; install [`kind`](https://kind.sigs.k8s.io/docs/user/quick-start/#installation). Once installed, follow [these instructions](https://kind.sigs.k8s.io/docs/user/local-registry/) to create a kind cluster connected to a local image registry.
-
-### CRD
-
-Apply the CRD from [cached file](charts/coredb-operator/templates/crd.yaml), or pipe it from `crdgen` (best if changing it):
-
-```sh
-just install-crd
-```
 
 ## Observability with OpenTelemetry and Jaeger
 
 [OpenTelemetry](https://opentelemetry.io/) is an observability framework that focuses on generation, collection, management, and export of telemetry.
-By integrating it in the Tembo Operator, users are able to gain more insights into their operations.
+[Jaeger](https://www.jaegertracing.io/), on the other hand, is an observability platform with a companion UI that ingests the OpenTelemetry data.
+By integrating both into the Tembo Operator, users are able to gain more insights into their operations.
 
-### Starting out
+### Setting up
 
 If you haven't already, you can start a local Kubernetes cluster by running the following:
 
@@ -108,25 +82,9 @@ Once complete, simply run:
 just run-telemetry
 ```
 
-You're all set to visit the below URL and navigate your telemetry:
+From there, you're all set to visit the below URL and navigate your telemetry:
 ```
 http://localhost:16686
-```
-
-Setup an OpenTelemetry Collector in your cluster. [Tempo](https://github.com/grafana/helm-charts/tree/main/charts/tempo) / [opentelemetry-operator](https://github.com/open-telemetry/opentelemetry-helm-charts/tree/main/charts/opentelemetry-operator) / [grafana agent](https://github.com/grafana/helm-charts/tree/main/charts/agent-operator) should all work out of the box. If your collector does not support grpc otlp you need to change the exporter in [`main.rs`](./src/main.rs).
-
-## Running
-
-### Locally
-
-```sh
-cargo run
-```
-
-- Or, with optional telemetry (change as per requirements):
-
-```sh
-OPENTELEMETRY_ENDPOINT_URL=https://0.0.0.0:55680 RUST_LOG=info,kube=trace,controller=debug cargo run --features=telemetry
 ```
 
 ## Usage
