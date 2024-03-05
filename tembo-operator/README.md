@@ -15,8 +15,8 @@ The key differentiators of the Tembo Operator are:
 2. [Examples](#examples)
     1. [Trying out Postgres extensions](#1-trying-out-postgres-extensions)
     2. [Trying out Tembo Stacks](#2-trying-out-tembo-stacks) 
-3. [Observability with OpenTelemetry and Jaeger](#observability-with-opentelemetry-and-jaeger)
-4. [Additional usage](#additional-usage)
+3. [Observability with curl](#observability-with-curl)
+4. [Observability with OpenTelemetry and Jaeger](#observability-with-opentelemetry-and-jaeger)
 
 ## Quick Start
 
@@ -116,42 +116,9 @@ Here are some select options to apply just as `sample-standard.yaml` was:
 - Try out the [OLAP Stack](https://tembo.io/docs/tembo-stacks/olap) with [sample-olap.yaml](./yaml/sample-olap.yaml).
 - Try out the [MongoAlternative Stack](https://tembo.io/docs/tembo-stacks/mongo-alternative) with [sample-document.yaml](./yaml/sample-document.yaml).
 
-## Observability with OpenTelemetry and Jaeger
+## Observability with curl
 
-[OpenTelemetry](https://opentelemetry.io/) is an observability framework that focuses on generation, collection, management, and export of telemetry.
-[Jaeger](https://www.jaegertracing.io/), on the other hand, is an observability platform with a companion UI that ingests the OpenTelemetry data.
-By integrating both into the Tembo Operator, users are able to gain more insights into their operations.
-
-### Setting up
-
-If you haven't already, you can start a local Kubernetes cluster by running the following:
-
-```bash
-just start-kind
-```
-
-Once complete, simply run:
-
-```bash
-just run-telemetry
-```
-
-From there, you're all set to visit the below URL and navigate your telemetry:
-```
-http://localhost:16686
-```
-
-## Additional Usage
-
-In either of the run scenarios, your app is listening on port `8080`, and it will observe events.
-
-Try some of:
-
-```sh
-kubectl apply -f yaml/sample-coredb.yaml
-kubectl delete coredb sample-coredb
-kubectl edit coredb sample-coredb # change replicas
-```
+In either of the above scenarios, your app is listening on port `8080`, and it will observe events.
 
 The reconciler will run and write the status object on every change. You should see results in the logs of the pod, or on the .status object outputs of `kubectl get coredb -o yaml`.
 
@@ -159,7 +126,7 @@ The reconciler will run and write the status object on every change. You should 
 
 The sample web server exposes some example metrics and debug information you can inspect with `curl`.
 
-```sh
+```bash
 $ kubectl apply -f yaml/sample-coredb.yaml
 $ curl 0.0.0.0:8080/metrics
 # HELP cdb_controller_reconcile_duration_seconds The duration of reconcile to complete in seconds
@@ -185,4 +152,27 @@ $ curl 0.0.0.0:8080/
 {"last_event":"2019-07-17T22:31:37.591320068Z"}
 ```
 
-The metrics will be auto-scraped if you have a standard [`PodMonitor` for `prometheus.io/scrape`](https://github.com/prometheus-community/helm-charts/blob/b69e89e73326e8b504102a75d668dc4351fcdb78/charts/prometheus/values.yaml#L1608-L1650).
+## Observability with OpenTelemetry and Jaeger
+
+[OpenTelemetry](https://opentelemetry.io/) is an observability framework that focuses on generation, collection, management, and export of telemetry.
+[Jaeger](https://www.jaegertracing.io/), on the other hand, is an observability platform with a companion UI that ingests the OpenTelemetry data.
+By integrating both into the Tembo Operator, users are able to gain more insights into their operations.
+
+### Setting up
+
+If you haven't already, you can start a local Kubernetes cluster by running the following:
+
+```bash
+just start-kind
+```
+
+Once complete, simply run:
+
+```bash
+just run-telemetry
+```
+
+From there, you're all set to visit the below URL and navigate your telemetry:
+```
+http://localhost:16686
+```
