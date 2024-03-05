@@ -80,7 +80,7 @@ async fn fetch_metrics_loop(
 ) -> Result<()> {
     let mut stdout = stdout();
     let client = reqwest::Client::new();
-    let url = profile.tembo_data_host.clone();
+    let url = profile.get_tembo_data_host();
 
     let mut headers = HeaderMap::new();
     headers.insert("Accept", "application/json".parse()?);
@@ -260,7 +260,7 @@ pub fn execute(verbose: bool, top_command: TopCommand) -> Result<(), anyhow::Err
         .as_ref()
         .context("Expected environment to have a selected profile")?;
     let config = Configuration {
-        base_path: profile.tembo_host.clone(),
+        base_path: profile.get_tembo_host(),
         bearer_access_token: Some(profile.tembo_access_token.clone()),
         ..Default::default()
     };

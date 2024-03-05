@@ -88,9 +88,9 @@ pub fn cloud_logs() -> Result<()> {
     let env = get_current_context()?;
     let org_id = env.org_id.clone().unwrap_or_default();
     let profile = env.selected_profile.clone().unwrap();
-    let tembo_data_host = profile.clone().tembo_data_host;
+    let tembo_data_host = profile.get_tembo_data_host();
     let config = Configuration {
-        base_path: profile.tembo_host,
+        base_path: profile.get_tembo_host(),
         bearer_access_token: Some(profile.tembo_access_token.clone()),
         ..Default::default()
     };

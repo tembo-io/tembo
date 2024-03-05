@@ -315,7 +315,7 @@ pub fn tembo_cloud_apply_instance(
         .as_ref()
         .with_context(|| "Expected [environment] to have a selected profile")?;
     let config = Configuration {
-        base_path: profile.tembo_host.clone(),
+        base_path: profile.get_tembo_host(),
         bearer_access_token: Some(profile.tembo_access_token.clone()),
         ..Default::default()
     };
@@ -381,7 +381,7 @@ fn get_conn_info_with_creds(
     env: Environment,
 ) -> Result<ConnectionInfo, anyhow::Error> {
     let dataplane_config = tembodataclient::apis::configuration::Configuration {
-        base_path: profile.tembo_data_host,
+        base_path: profile.get_tembo_data_host(),
         bearer_access_token: Some(profile.tembo_access_token),
         ..Default::default()
     };
