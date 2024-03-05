@@ -82,7 +82,6 @@ async fn fetch_metrics_loop(
 ) -> Result<()> {
     let mut stdout = stdout();
     let client = reqwest::Client::new();
-
     let url = profile.get_tembo_data_host();
     let mut table = Table::new();
     table.add_row(row!["Instance", "CPU", "Storage", "Memory"]);
