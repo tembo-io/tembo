@@ -69,8 +69,13 @@ use kube::{
 use serde_json::json;
 use std::{collections::BTreeMap, sync::Arc};
 use k8s_openapi::api::core::v1::Service;
+use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
+use kube::api::PostParams;
 use tokio::time::Duration;
 use tracing::{debug, error, info, instrument, warn};
+use crate::app_service::ingress::reconcile_ingress;
+use crate::app_service::types::AppService;
+use crate::ingress_route_crd::{IngressRoute, IngressRouteRoutes, IngressRouteRoutesKind, IngressRouteRoutesServices, IngressRouteRoutesServicesKind, IngressRouteSpec, IngressRouteTls};
 
 pub struct PostgresConfig {
     pub postgres_parameters: Option<BTreeMap<String, String>>,
@@ -1180,8 +1185,72 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
     }
 
     reconcile_metrics_service(cdb, ctx.clone()).await?;
+    reconcile_metrics_ingress_route(cdb, ctx.clone()).await?;
 
     Ok(())
+}
+
+pub async fn reconcile_metrics_ingress_route(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {
+    let domain = match std::env::var("DATA_PLANE_BASEDOMAIN") {
+        Ok(domain) => domain,
+        Err(_) => {
+            debug!("DATA_PLANE_BASEDOMAIN is not set");
+            return Ok(())
+        },
+    };
+
+    let client = ctx.client.clone();
+    let coredb_name = cdb.name_any();
+    let namespace = cdb.namespace().unwrap_or_default();
+
+    let host_matcher = format!("Host(`{coredb_name}.{domain}`)");
+    let matcher = format!("{} && Path(`/metrics`)", host_matcher);
+
+    let monitoring_route = IngressRouteRoutes {
+        kind: IngressRouteRoutesKind::Rule,
+        r#match: matcher.clone(),
+        services: Some(vec![IngressRouteRoutesServices {
+            name: format!("{coredb_name}-metrics"),
+            port: Some(IntOrString::Int(9187)),
+            // namespace attribute is NOT a kubernetes namespace
+            // it is the Traefik provider namespace: https://doc.traefik.io/traefik/v3.0/providers/overview/#provider-namespace
+            // https://doc.traefik.io/traefik/v3.0/routing/providers/kubernetes-crd/#kind-middleware
+            namespace: None,
+            kind: Some(IngressRouteRoutesServicesKind::Service),
+            ..IngressRouteRoutesServices::default()
+        }]),
+        ..IngressRouteRoutes::default()
+    };
+
+    let owner_reference = cdb.controller_owner_ref(&()).unwrap();
+    let ingress_route_name = format!("{}-metrics", coredb_name);
+
+    let ingress_route = IngressRoute {
+        metadata: ObjectMeta {
+            name: Some(ingress_route_name.clone()),
+            namespace: Some(namespace.clone()),
+            owner_references: Some(vec![owner_reference]),
+            ..ObjectMeta::default()
+        },
+        spec: IngressRouteSpec {
+            entry_points: Some(vec!["websecure".to_string()]),
+            routes: vec![monitoring_route],
+            tls: Some(IngressRouteTls::default()),
+        },
+    };
+
+    let ingress_api: Api<IngressRoute> = Api::namespaced(client, &namespace);
+    let pp = PostParams::default();
+
+    let ps = PatchParams::apply("cntrlr").force();
+    let _o = ingress_api
+        .patch(&ingress_route_name, &ps, &Patch::Apply(&ingress_route))
+        .await
+        .map_err(|e| {
+            error!("Error patching metrics ingress route: {}", e);
+            Action::requeue(std::time::Duration::from_secs(300))
+        })?;
+    return Ok(());
 }
 
 pub async fn reconcile_metrics_service(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {
