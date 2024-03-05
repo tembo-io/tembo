@@ -17,7 +17,7 @@ use kube::{
     runtime::controller::Action,
     Api, ResourceExt,
 };
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 use tracing::{debug, error, info, warn};
 
 // Main function to reconcile the VolumeSnapshotContent and VolumeSnapshot
@@ -27,21 +27,8 @@ pub async fn reconcile_volume_snapshot_restore(
 ) -> Result<VolumeSnapshot, Action> {
     let client = ctx.client.clone();
 
-    // Lookup the VolumeSnapshot of the original instance
-    let cdb_name = cdb
-        .spec
-        .restore
-        .as_ref()
-        .map(|r| r.server_name.clone())
-        .ok_or_else(|| {
-            error!(
-                "CoreDB restore server_name is empty for instance {}",
-                cdb.name_any()
-            );
-            Action::requeue(tokio::time::Duration::from_secs(300))
-        })?;
-    let cnpg_ls = format!("cnpg.io/cluster={}", cdb_name);
-    let ogvs = lookup_volume_snapshot(&client, &cdb_name, &cdb_name, cnpg_ls).await?;
+    // Lookup the VolumeSnapshot from the original instance
+    let ogvs = lookup_volume_snapshot(cdb, &client).await?;
 
     // Lookup the VolumeSnapshotContent of the original instance
     let ogvsc = lookup_volume_snapshot_content(cdb, &client, ogvs).await?;
@@ -54,27 +41,11 @@ pub async fn reconcile_volume_snapshot_restore(
     apply_volume_snapshot_content(cdb, &client, &vsc).await?;
     apply_volume_snapshot(cdb, &client, &vs).await?;
 
-    // Patch the VolumeSnapshotContent with the UID of the VolumeSnapshot
-    let new_vs_name = vs.metadata.name.as_ref().ok_or_else(|| {
-        error!(
-            "VolumeSnapshot name is empty for instance: {}.",
-            cdb.name_any()
-        );
-        Action::requeue(tokio::time::Duration::from_secs(300))
-    })?;
-    let new_vs_ns = vs.metadata.namespace.as_ref().ok_or_else(|| {
-        error!(
-            "VolumeSnapshot namespace is empty for instance: {}.",
-            cdb.name_any()
-        );
-        Action::requeue(tokio::time::Duration::from_secs(300))
-    })?;
-    let ls = format!("metadata.name={}", new_vs_name);
-    let new_vs = lookup_volume_snapshot(&client, new_vs_name, new_vs_ns, ls).await?;
-    patch_volume_snapshot_content(cdb, &client, &vsc, &new_vs).await?;
-
     // We need to wait for the snapshot to become ready before we can proceed
     is_snapshot_ready(cdb, &client, &vs).await?;
+
+    // Patch the VolumeSnapshotContent with the UID of the VolumeSnapshot
+    patch_volume_snapshot_content(cdb, &client, &vsc, &vs).await?;
 
     Ok(vs)
 }
@@ -94,20 +65,42 @@ async fn patch_volume_snapshot_content(
         Action::requeue(tokio::time::Duration::from_secs(300))
     })?;
 
-    // Apply VolumeSnapshotContent (All Namespaces)
-    let vsc_api: Api<VolumeSnapshotContent> = Api::all(client.clone());
-    debug!("Patching VolumeSnapshotContent for instance: {}", name);
-    let ps = PatchParams::apply("cntrlr").force();
-
-    // Check if the VolumeSnapshot (vs) has a UID, requeue if it doesn't
-    let vs_uid = vs.metadata.uid.as_ref().ok_or_else(|| {
+    // Namespace for the VolumeSnapshot
+    let vs_ns = vs.metadata.namespace.as_ref().ok_or_else(|| {
         error!(
-            "VolumeSnapshot UID is empty for instance: {}.",
+            "VolumeSnapshot namespace is empty for instance: {}.",
             cdb.name_any()
         );
-        Action::requeue(tokio::time::Duration::from_secs(10))
+        Action::requeue(tokio::time::Duration::from_secs(300))
     })?;
 
+    // Look up the VolumeSnapshot to get the UID
+    let vs_api: Api<VolumeSnapshot> = Api::namespaced(client.clone(), vs_ns);
+    let lp = ListParams::default().fields(&format!("metadata.name={}", name));
+    let res = vs_api.list(&lp).await.map_err(|e| {
+        warn!(
+            "Error listing VolumeSnapshots {} in namespace {} for instance {}: {}",
+            vsc_name,
+            vs_ns,
+            cdb.name_any(),
+            e,
+        );
+        Action::requeue(tokio::time::Duration::from_secs(30))
+    })?;
+
+    // Check if the VolumeSnapshot (vs) has a UID, requeue if it doesn't
+    let vs_uid = match res.items.first().and_then(|vs| vs.metadata.uid.as_ref()) {
+        Some(uid) => uid.to_string(),
+        None => {
+            error!(
+                "VolumeSnapshot UID is empty for instance: {}.",
+                cdb.name_any()
+            );
+            return Err(Action::requeue(tokio::time::Duration::from_secs(10)));
+        }
+    };
+
+    // Update the VolumeSnapshotContent with the UID of the VolumeSnapshot
     let mut new_vsc = vsc.clone();
     new_vsc.spec.volume_snapshot_ref = VolumeSnapshotContentVolumeSnapshotRef {
         api_version: Some("snapshot.storage.k8s.io/v1".to_string()),
@@ -117,6 +110,11 @@ async fn patch_volume_snapshot_content(
         uid: Some(vs_uid.to_string()),
         ..VolumeSnapshotContentVolumeSnapshotRef::default()
     };
+
+    // Apply VolumeSnapshotContent (All Namespaces)
+    let vsc_api: Api<VolumeSnapshotContent> = Api::all(client.clone());
+    debug!("Patching VolumeSnapshotContent for instance: {}", name);
+    let ps = PatchParams::apply("cntrlr").force();
 
     match vsc_api.patch(vsc_name, &ps, &Patch::Apply(&new_vsc)).await {
         Ok(_) => debug!("VolumeSnapshotContent patched successfully for {}.", name),
@@ -312,11 +310,29 @@ fn generate_volume_snapshot_content(
             Action::requeue(tokio::time::Duration::from_secs(300))
         })?;
     let snapshot = format!("{}-restore-vs", name);
+    let restore_from_name = cdb
+        .spec
+        .restore
+        .as_ref()
+        .map(|r| r.server_name.clone())
+        .ok_or_else(|| {
+            error!(
+                "CoreDB restore server_name is empty for instance {}",
+                cdb.name_any()
+            );
+            Action::requeue(tokio::time::Duration::from_secs(300))
+        })?;
+
+    let mut vsc_labels = BTreeMap::new();
+    vsc_labels.insert("cnpg.io/cluster".to_string(), name.clone());
+    vsc_labels.insert("tembo.io/restore".to_string(), "true".to_string());
+    vsc_labels.insert("tembo.io/restore-from".to_string(), restore_from_name);
 
     let vsc = VolumeSnapshotContent {
         metadata: ObjectMeta {
             name: Some(format!("{}-restore-vsc", name)),
             namespace: Some(namespace.clone()),
+            labels: Some(vsc_labels),
             ..ObjectMeta::default()
         },
         spec: VolumeSnapshotContentSpec {
@@ -366,11 +382,29 @@ fn generate_volume_snapshot(
             error!("VolumeSnapshotClass name is empty for instance {}", name);
             Action::requeue(tokio::time::Duration::from_secs(300))
         })?;
+    let restore_from_name = cdb
+        .spec
+        .restore
+        .as_ref()
+        .map(|r| r.server_name.clone())
+        .ok_or_else(|| {
+            error!(
+                "CoreDB restore server_name is empty for instance {}",
+                cdb.name_any()
+            );
+            Action::requeue(tokio::time::Duration::from_secs(300))
+        })?;
+
+    let mut vsc_labels = BTreeMap::new();
+    vsc_labels.insert("cnpg.io/cluster".to_string(), name.clone());
+    vsc_labels.insert("tembo.io/restore".to_string(), "true".to_string());
+    vsc_labels.insert("tembo.io/restore-from".to_string(), restore_from_name);
 
     let vs = VolumeSnapshot {
         metadata: ObjectMeta {
             name: Some(format!("{}-restore-vs", name)),
             namespace: Some(namespace),
+            labels: Some(vsc_labels),
             ..ObjectMeta::default()
         },
         spec: VolumeSnapshotSpec {
@@ -387,14 +421,27 @@ fn generate_volume_snapshot(
 
 // lookup_volume_snapshot function looks up the VolumeSnapshot object from the
 // original instance you are restoring from
-async fn lookup_volume_snapshot(
-    client: &Client,
-    name: &String,
-    namespace: &str,
-    label_selector: String,
-) -> Result<VolumeSnapshot, Action> {
-    let volume_snapshot_api: Api<VolumeSnapshot> = Api::namespaced(client.clone(), namespace);
+async fn lookup_volume_snapshot(cdb: &CoreDB, client: &Client) -> Result<VolumeSnapshot, Action> {
+    // name will be the name of the original instance
+    let name = cdb
+        .spec
+        .restore
+        .as_ref()
+        .map(|r| r.server_name.clone())
+        .ok_or_else(|| {
+            error!(
+                "CoreDB restore server_name is empty for instance {}",
+                cdb.name_any()
+            );
+            Action::requeue(tokio::time::Duration::from_secs(300))
+        })?;
 
+    // todo: This is a temporary fix to get the VolumeSnapshot from the same namespace as the
+    // instance you are attempting to restore from.  We need to figure out a better way of
+    // doing this in case someone wants to name a namespace differently than the instance name.
+    let volume_snapshot_api: Api<VolumeSnapshot> = Api::namespaced(client.clone(), &name);
+
+    let label_selector = format!("cnpg.io/cluster={}", name);
     let lp = ListParams::default().labels(&label_selector);
     let result = volume_snapshot_api.list(&lp).await.map_err(|e| {
         error!("Error listing VolumeSnapshots for instance {}: {}", name, e);
