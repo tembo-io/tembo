@@ -133,6 +133,16 @@ pub fn cloud_logs() -> Result<()> {
     Ok(())
 }
 
+fn format_log_line(line: &str) -> Option<String> {
+    if line.trim().is_empty() {
+        None
+    } else if line.contains("LOG:") {
+        Some(line.to_string())
+    } else {
+        Some(format!("System Message: {}", line))
+    }
+}
+
 pub fn docker_logs(instance_name: &str) -> Result<()> {
     println!("\nFetching logs for instance: {}\n", instance_name);
     let output = Command::new("docker")
@@ -153,7 +163,12 @@ pub fn docker_logs(instance_name: &str) -> Result<()> {
     let logs_stdout = String::from_utf8_lossy(&output.stdout);
     let logs_stderr = String::from_utf8_lossy(&output.stderr);
 
-    println!("{}{}", logs_stdout, logs_stderr);
+    let all_logs = format!("{}{}", logs_stdout, logs_stderr);
+
+    all_logs
+        .lines()
+        .filter_map(format_log_line)
+        .for_each(|line| println!("{}", line));
 
     Ok(())
 }

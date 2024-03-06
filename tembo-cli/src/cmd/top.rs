@@ -8,6 +8,7 @@ use crossterm::{
     execute,
     terminal::{Clear, ClearType},
 };
+use prettytable::{row, Table};
 use reqwest::header::HeaderMap;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -77,10 +78,13 @@ async fn fetch_metrics_loop(
     env: Environment,
     instance_settings: HashMap<String, InstanceSettings>,
     profile: &Profile,
+    tail: bool,
 ) -> Result<()> {
     let mut stdout = stdout();
     let client = reqwest::Client::new();
     let url = profile.get_tembo_data_host();
+    let mut table = Table::new();
+    table.add_row(row!["Instance", "CPU", "Storage", "Memory"]);
 
     let mut headers = HeaderMap::new();
     headers.insert("Accept", "application/json".parse()?);
@@ -90,14 +94,18 @@ async fn fetch_metrics_loop(
         .expect("JWT Token is not configured");
     headers.insert("Authorization", format!("Bearer {}", jwt_token).parse()?);
 
-    execute!(stdout, Clear(ClearType::All))?;
+    if tail {
+        execute!(stdout, Clear(ClearType::All))?;
+    }
 
     for value in instance_settings.values() {
         let org_name = get_instance_org_name(config, &env, &value.instance_name).await?;
         let namespace = format!("org-{}-inst-{}", org_name, &value.instance_name);
         let namespace_encoded = urlencoding::encode(&namespace);
 
-        println!("Instance: {}", &value.instance_name);
+        let mut cpu_value = String::new();
+        let mut memory_value = String::new();
+        let mut storage_value = String::new();
 
         let metric_queries = vec![
                 (
@@ -126,13 +134,6 @@ async fn fetch_metrics_loop(
                         namespace_encoded
                     )
                 ),
-                /*Doubtful if we would need Connections(Need to consult Steven)
-                (
-                    "Connections",
-                    format!("max by (pod) (cnpg_backends_max_tx_duration_seconds{{namespace=\"{}\"}})", namespace_encoded),
-                    format!(""
-                    )
-                ),*/
                 ];
 
         for (query_name, query1, query2) in &metric_queries {
@@ -173,15 +174,13 @@ async fn fetch_metrics_loop(
                             0.0
                         }
                     };
-
-                    let value1 = format!("{:.2}", raw_value1.abs());
-
-                    if *query_name == "Storage" || *query_name == "Memory" {
-                        let value2 = format!("{:.2}", raw_value2.abs());
-                        println!("{}: {} | {}%", query_name, value2, value1);
-                    } else {
-                        let value2 = format!("{}", raw_value2.abs());
-                        println!("{}: {} | {}%", query_name, value2, value1);
+                    match *query_name {
+                        "Cpu" => cpu_value = format!("{:.2}/{:.2}%", raw_value2, raw_value1),
+                        "Memory" => memory_value = format!("{:.2}/{:.2}%", raw_value2, raw_value1),
+                        "Storage" => {
+                            storage_value = format!("{:.2}/{:.2}%", raw_value2, raw_value1)
+                        }
+                        _ => (),
                     }
                 }
                 (Err(e), _) | (_, Err(e)) => {
@@ -189,10 +188,14 @@ async fn fetch_metrics_loop(
                 }
             }
         }
-
-        println!();
+        table.add_row(row![
+            value.instance_name,
+            cpu_value,
+            storage_value,
+            memory_value
+        ]);
     }
-
+    table.printstd();
     stdout.flush()?;
     Ok(())
 }
@@ -271,9 +274,14 @@ pub fn execute(verbose: bool, top_command: TopCommand) -> Result<(), anyhow::Err
         let rt = Runtime::new().map_err(|e| anyhow!("Failed to create Tokio runtime: {}", e))?;
         rt.block_on(async {
             loop {
-                if let Err(e) =
-                    fetch_metrics_loop(&config, env.clone(), instance_settings.clone(), profile)
-                        .await
+                if let Err(e) = fetch_metrics_loop(
+                    &config,
+                    env.clone(),
+                    instance_settings.clone(),
+                    profile,
+                    true,
+                )
+                .await
                 {
                     eprintln!("Error fetching metrics: {}", e);
                 }
@@ -283,8 +291,14 @@ pub fn execute(verbose: bool, top_command: TopCommand) -> Result<(), anyhow::Err
     } else {
         let rt = Runtime::new().map_err(|e| anyhow!("Failed to create Tokio runtime: {}", e))?;
         rt.block_on(async {
-            if let Err(e) =
-                fetch_metrics_loop(&config, env.clone(), instance_settings.clone(), profile).await
+            if let Err(e) = fetch_metrics_loop(
+                &config,
+                env.clone(),
+                instance_settings.clone(),
+                profile,
+                false,
+            )
+            .await
             {
                 eprintln!("Error fetching metrics: {}", e);
             }

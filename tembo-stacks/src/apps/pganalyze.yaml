@@ -5,4 +5,32 @@ appServices:
     env:
       - name: DB_URL
         valueFromPlatform: ReadWriteConnection
-
+trunk_installs:
+  - name: auto_explain
+    version: 15.3.0
+extensions:
+  - name: auto_explain
+    description: "Log execution plans of slow queries"
+    locations:
+      - database: postgres
+        enabled: true
+        version: 15.3.0
+postgres_config:
+  - name: auto_explain.log_format
+    value: json
+  - name: auto_explain.log_min_duration
+    value: 1s
+  - name: auto_explain.log_analyze
+    value: on
+  - name: auto_explain.log_buffers
+    value: on
+  - name: auto_explain.log_timing
+    value: off
+  - name: auto_explain.log_triggers
+    value: on
+  - name: auto_explain.log_verbose
+    value: on
+  - name: auto_explain.log_nested_statements
+    value: on
+  - name: log_line_prefix
+    value: '%m [%p] %q[user=%u,app=%a] ',db=%d
