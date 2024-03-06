@@ -1,4 +1,42 @@
-FROM quay.io/tembo/tembo-local:latest
+FROM quay.io/tembo/standard-cnpg:15-a0a5ab5
+
+USER root
+
+RUN apt-get update && \
+    apt-get install -y vim openssl && \
+    apt-get autoremove -y && \
+    apt-get clean -y && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN chown -R postgres:postgres $PGDATA && \
+    chmod -R 0700 $PGDATA
+# Set up the environment for the data directory
+ENV PGDATA /var/lib/postgresql/data2
+RUN mkdir -p $PGDATA && \
+    chown -R postgres:postgres $PGDATA && \
+    chmod -R 0700 $PGDATA
+
+# Generate self-signed certificate
+RUN openssl req -new -newkey rsa:4096 -days 365 -nodes -x509 \
+    -subj "/CN=*.local.tembo.io" \
+    -keyout /var/lib/postgresql/server.key \
+    -out /var/lib/postgresql/server.crt && \
+    chown postgres:postgres /var/lib/postgresql/server.* && \
+    chmod 600 /var/lib/postgresql/server.key
+
+USER postgres
+
+# Initialize the database
+RUN pg_ctl -c init
+
+# Set permissive authentication (for local testing)
+RUN echo "hostssl all all 0.0.0.0/0 trust" >> ${PGDATA}/pg_hba.conf
+
+# Set environment variables
+ENV PGHOST=localhost
+ENV PGPORT=5432
+ENV PGDATABASE=postgres
+ENV PGUSER=postgres
 
 {% for trunk_install in trunk_installs %}
 {% if trunk_install.version %}
@@ -11,3 +49,5 @@ RUN trunk install {{trunk_install.name}}
 # Optional:
 # Specify extra Postgres configurations by copying into this directory
 COPY postgres.conf $PGDATA/extra-configs
+
+CMD ["postgres"]
