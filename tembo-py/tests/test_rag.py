@@ -1,7 +1,6 @@
 from tembo_py.rag import TemboRAG
 
 
-
 def test_rag():
     ctrl = TemboRAG("test", chunk_size=201)
     chunks = ctrl.prepare_from_directory("tests/fixtures")
@@ -36,6 +35,7 @@ def test_prepare_bind_params():
     assert bind_params[5] == num_context
     assert bind_params[6] == force_trim
 
+
 def test_add_prompt_template():
     project_name = "test_add_prompt_template"
     prompt_name = "example_prompt123"
@@ -51,9 +51,13 @@ def test_add_prompt_template():
 
     # Verify the record was inserted correctly by establishing a new database connection for verification
     import psycopg
+
     with psycopg.connect(connection_string) as conn:
         with conn.cursor() as cur:
-            cur.execute("SELECT prompt_type, sys_prompt, user_prompt FROM vectorize.prompts WHERE prompt_type = %s", (prompt_name,))
+            cur.execute(
+                "SELECT prompt_type, sys_prompt, user_prompt FROM vectorize.prompts WHERE prompt_type = %s",
+                (prompt_name,),
+            )
             result = cur.fetchone()
 
     # Assertions to verify that the data was inserted as expected
@@ -61,4 +65,3 @@ def test_add_prompt_template():
     assert result[0] == prompt_name, "prompt_type does not match"
     assert result[1] == sys_prompt, "sys_prompt does not match"
     assert result[2] == user_prompt, "user_prompt does not match"
-

@@ -171,7 +171,13 @@ class TemboRAG:
             cur = conn.cursor()
             cur.execute(q)
 
-    def add_prompt_template(self, prompt_name: str, sys_prompt: str, user_prompt: str, connection_string: Optional[str] = None):
+    def add_prompt_template(
+        self,
+        prompt_name: str,
+        sys_prompt: str,
+        user_prompt: str,
+        connection_string: Optional[str] = None,
+    ):
         """
         Adds a new prompt template to the vectorize.prompts table.
 
@@ -185,12 +191,13 @@ class TemboRAG:
             raise ValueError("No connection string provided")
 
         insert_query = """INSERT INTO vectorize.prompts (prompt_type, sys_prompt, user_prompt) VALUES (%s, %s, %s)"""
-        
+
         # Execute the insert query with the provided parameters
         with psycopg.connect(connection_string) as conn:
             with conn.cursor() as cur:
                 cur.execute(insert_query, (prompt_name, sys_prompt, user_prompt))
             conn.commit()
+
 
 @dataclass
 class ChatResponse:
