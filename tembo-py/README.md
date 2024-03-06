@@ -4,6 +4,11 @@ The official Python client for Tembo.io
 
 For more technical information and ways to get involved, please refer to the [contributing guide](./CONTRIBUTING.md).
 
+## Prerequisites
+
+- [Python](https://www.python.org/) - Programming language and companion `pip` package manager
+- [Docker Engine](https://docs.docker.com/engine/install/) - For running local containers
+
 ## Installation
 
 The [tembo-py library](https://pypi.org/project/tembo-py/) is hosted on pypi.org and can be installed using the following `pip` command.
@@ -12,16 +17,14 @@ The [tembo-py library](https://pypi.org/project/tembo-py/) is hosted on pypi.org
 pip install tembo-py
 ```
 
-## Example
-
-### Adding Custom Prompts
+## Example: Adding Custom Prompts
 
 Within the [rag.py](./tembo_py/rag.py) file's `TemboRAG` class, the `add_prompt_template` method introduces the ability to add custom prompts.
 For the purposes of this example we will consider a local environment.
 
-#### Running PostgreSQL
+#### 1. Running PostgreSQL
 
-Before even touching python, let's go ahead and start a Postgres instance.
+Before even touching Python, let's go ahead and start a Postgres instance.
 If you'd like, you can run the following to clone and enter the `tembo-py` repository:
 
 ```bash
@@ -37,13 +40,27 @@ Then run the following command to start a Postgres instance:
 make run.postgres
 ```
 
-#### Create a New Python File
+From there, `psql` into Postgres and enable the [pg_vectorize](https://github.com/tembo-io/pg_vectorize) extension.
+
+:bulb: Note that the password is by default `postgres`.
+
+```bash
+psql -h localhost -p 5432 -U postgres -W
+```
+
+```sql
+CREATE EXTENSION vectorize CASCADE;
+```
+
+#### 2. Create a New Python File
+
+Exit Postgres and create a new Python file:
 
 ```bash
 touch example_tembo.py
 ```
 
-#### Define Your Custom Prompt
+#### 3. Define Your Custom Prompt
 
 Using your preferred text editor or IDE, you can create the following script:
 
@@ -91,7 +108,7 @@ if __name__ == "__main__":
     add_prompt_template_to_db()
 ```
 
-#### Executing the Python File and Confirming Success
+#### 4. Executing the Python File and Confirming Success
 
 ```bash
 python3 example_tembo.py
@@ -113,11 +130,7 @@ You can now enter Postgres to confirm the insertion of your custom prompt.
 psql -h localhost -p 5432 -U postgres -W
 ```
 
-```sql
-CREATE EXTENSION vectorize CASCADE;
-```
-
-Run the following SELECT statement to confirm your new addition:
+As `pg_vectorize` was enabled above, run the following SELECT statement to confirm your new addition:
 
 ```sql
 SELECT * FROM vectorize.prompts;
