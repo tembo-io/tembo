@@ -38,9 +38,9 @@ def test_prepare_bind_params():
 
 def test_add_prompt_template():
     project_name = "test_add_prompt_template"
-    prompt_name = "example_prompt123"
-    sys_prompt = "System prompt text for example123"
-    user_prompt = "User prompt text for example123"
+    prompt_name = "example_prompt"
+    sys_prompt = "System prompt text for example"
+    user_prompt = "User prompt text for example"
     connection_string = "postgresql://postgres:postgres@localhost:5432/postgres"
 
     # Init TemboRAG instance
