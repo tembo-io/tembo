@@ -578,6 +578,9 @@ fn get_app_services(
     let mut vec_app_types: Vec<temboclient::models::AppType> = vec![];
     let mut env_vars: Vec<temboclient::models::EnvVar> = vec![];
 
+    // TODO: Find a better way to handle this.
+    // It is done so that other app_types are skipped in the request
+    // We use #[serde(skip_serializing_if = "Option::is_none")] to skip app_types
     env_vars.push(temboclient::models::EnvVar {
         name: "test".to_string(),
         value: Some(Some("test".to_string())),
