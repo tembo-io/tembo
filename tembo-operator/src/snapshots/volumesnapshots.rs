@@ -466,7 +466,6 @@ fn find_closest_snapshot(
     snapshots: Vec<VolumeSnapshot>,
     recovery_target_time: Option<DateTime<Utc>>,
 ) -> Option<VolumeSnapshot> {
-    // Transform snapshots into a Vec of tuples with end time (if available) and the snapshot
     let transformed_snapshots: Vec<(Option<DateTime<Utc>>, VolumeSnapshot)> = snapshots
         .into_iter()
         .map(|snapshot| {
@@ -483,13 +482,17 @@ fn find_closest_snapshot(
 
     match recovery_target_time {
         Some(target_time) => {
-            // When a recovery target time is specified, find the closest snapshot before that time
+            // Filter snapshots to only include those before the target time
             transformed_snapshots
                 .into_iter()
                 .filter_map(|(end_time, snapshot)| {
-                    end_time.map(|end_time| {
-                        let duration = (target_time - end_time).num_seconds().abs();
-                        (duration, snapshot)
+                    end_time.and_then(|end_time| {
+                        if end_time <= target_time {
+                            let duration = (target_time - end_time).num_seconds().abs();
+                            Some((duration, snapshot))
+                        } else {
+                            None
+                        }
                     })
                 })
                 .min_by_key(|(duration, _)| *duration)
