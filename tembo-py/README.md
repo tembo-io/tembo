@@ -31,7 +31,7 @@ git clone https://github.com/tembo-io/tembo.git
 cd tembo/tembo-py
 ```
 
-Then run the following command:
+Then run the following command to start a Postgres instance:
 
 ```bash
 make run.postgres
@@ -44,6 +44,8 @@ touch example_tembo.py
 ```
 
 #### Define Your Custom Prompt
+
+Using your preferred text editor or IDE, you can create the following script:
 
 ```python
 from tembo_py.rag import TemboRAG
@@ -95,6 +97,18 @@ if __name__ == "__main__":
 python3 example_tembo.py
 ```
 
+If successful, you should see the following:
+
+```text
+Prompt 'example_prompt' successfully added to the database.
+System Prompt: System prompt text for example
+User Prompt: User prompt text for example
+```
+
+You can now enter Postgres to confirm the insertion of your custom prompt.
+
+:bulb: Note that the password is by default `postgres`.
+
 ```bash
 psql -h localhost -p 5432 -U postgres -W
 ```
@@ -109,3 +123,11 @@ Run the following SELECT statement to confirm your new addition:
 SELECT * FROM vectorize.prompts;
 ```
 
+After running `\x` for better formatting, you will a new addition similar to the following:
+
+```sql
+-[ RECORD 2 ]-------------------------------
+prompt_type | example_prompt
+sys_prompt  | System prompt text for example
+user_prompt | User prompt text for example
+```
