@@ -15,23 +15,23 @@ name = 'local'
 target = 'docker'
 set = true
 
-#[[environment]]
-#name = 'prod'
-#target = 'tembo-cloud'
-#org_id can be found in your tembo cloud url. Example: org_2bVDi36rsJNot2gwzP37enwxzMk
-#org_id = 'Org ID here'
-#profile = 'prod'
+# [[environment]]
+# name = 'prod'
+# target = 'tembo-cloud'
+# org_id can be found in your tembo cloud url. Example: org_2bVDi36rsJNot2gwzP37enwxzMk
+# org_id = 'Org ID here'
+# profile = 'prod'
 ";
 
 // TODO: Move this to a template file
 pub const CREDENTIALS_DEFAULT_TEXT: &str = "version = \"1.0\"
 
-#[[profile]]
-#name = 'prod'
-#Generate an Access Token either through 'tembo login' or visit 'https://cloud.tembo.io/generate-jwt'
-#tembo_access_token = 'Access token here'
-#tembo_host = 'https://api.tembo.io'
-#tembo_data_host = 'https://api.data-1.use1.tembo.io'
+# [[profile]]
+# name = 'prod'
+# Generate an Access Token either through 'tembo login' or visit 'https://cloud.tembo.io/generate-jwt'
+# tembo_access_token = 'Access token here'
+# tembo_host = 'https://api.tembo.io'
+# tembo_data_host = 'https://api.data-1.use1.tembo.io'
 ";
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
