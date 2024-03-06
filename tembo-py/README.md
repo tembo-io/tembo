@@ -12,25 +12,30 @@ The [tembo-py library](https://pypi.org/project/tembo-py/) is hosted on pypi.org
 pip install tembo-py
 ```
 
-## Adding Custom Prompts
+## Example
+
+### Adding Custom Prompts
 
 Within the [rag.py](./tembo_py/rag.py) file's `TemboRAG` class, the `add_prompt_template` method introduces the ability to add custom prompts.
+For the purposes of this example we will consider a local environment.
 
-### Create a New Python File
+#### Create a New Python File
+
+```bash
+touch example_tembo.py
+```
+
+#### Define Your Custom Prompt
 
 
 
-### Define Your Custom Prompt
-
-
-
-### Running PostgreSQL
+#### Running PostgreSQL
 
 ```bash
 make run.postgres
 ```
 
-### Executing the Python File and Confirming Success
+#### Executing the Python File and Confirming Success
 
 ```bash
 psql -h localhost -p 5432 -U postgres -W
