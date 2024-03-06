@@ -576,82 +576,98 @@ fn get_app_services(
     maybe_app_services: Option<Vec<tembo_stacks::apps::types::AppType>>,
 ) -> Result<Option<Option<Vec<temboclient::models::AppType>>>, anyhow::Error> {
     let mut vec_app_types: Vec<temboclient::models::AppType> = vec![];
-    let mut env_vars: Vec<temboclient::models::EnvVar> = vec![];
-
-    // TODO: Find a better way to handle this.
-    // It is done so that other app_types are skipped in the request
-    // We use #[serde(skip_serializing_if = "Option::is_none")] to skip app_types
-    env_vars.push(temboclient::models::EnvVar {
-        name: "test".to_string(),
-        value: Some(Some("test".to_string())),
-        value_from_platform: None,
-    });
-
-    let app_config = temboclient::models::AppConfig {
-        env: Some(Some(env_vars)),
-        resources: None,
-    };
 
     if let Some(app_services) = maybe_app_services {
         for app_type in app_services.iter() {
             match app_type {
-                tembo_stacks::apps::types::AppType::RestAPI(_) => {
-                    vec_app_types.push(temboclient::models::AppType::new(
-                        Some(app_config.clone()),
+                tembo_stacks::apps::types::AppType::RestAPI(maybe_app_config) => vec_app_types
+                    .push(temboclient::models::AppType::new(
+                        get_final_app_config(maybe_app_config)?,
                         None,
+                        None,
+                        None,
+                        None,
+                        None,
+                    )),
+                tembo_stacks::apps::types::AppType::HTTP(maybe_app_config) => {
+                    vec_app_types.push(temboclient::models::AppType::new(
+                        None,
+                        get_final_app_config(maybe_app_config)?,
                         None,
                         None,
                         None,
                         None,
                     ))
                 }
-                tembo_stacks::apps::types::AppType::HTTP(_) => {
+                tembo_stacks::apps::types::AppType::MQ(maybe_app_config) => {
                     vec_app_types.push(temboclient::models::AppType::new(
                         None,
-                        Some(app_config.clone()),
                         None,
+                        get_final_app_config(maybe_app_config)?,
                         None,
                         None,
                         None,
                     ))
                 }
-                tembo_stacks::apps::types::AppType::MQ(_) => {
-                    vec_app_types.push(temboclient::models::AppType::new(
-                        None,
-                        None,
-                        Some(app_config.clone()),
+                tembo_stacks::apps::types::AppType::Embeddings(maybe_app_config) => vec_app_types
+                    .push(temboclient::models::AppType::new(
                         None,
                         None,
                         None,
-                    ))
-                }
-                tembo_stacks::apps::types::AppType::Embeddings(_) => {
-                    vec_app_types.push(temboclient::models::AppType::new(
+                        get_final_app_config(maybe_app_config)?,
                         None,
                         None,
-                        None,
-                        Some(app_config.clone()),
-                        None,
-                        None,
-                    ))
-                }
-                tembo_stacks::apps::types::AppType::PgAnalyze(_) => {
-                    vec_app_types.push(temboclient::models::AppType::new(
+                    )),
+                tembo_stacks::apps::types::AppType::PgAnalyze(maybe_app_config) => vec_app_types
+                    .push(temboclient::models::AppType::new(
                         None,
                         None,
                         None,
                         None,
-                        Some(app_config.clone()),
+                        get_final_app_config(maybe_app_config)?,
                         None,
-                    ))
-                }
+                    )),
                 tembo_stacks::apps::types::AppType::Custom(_) => vec_app_types.push(
                     temboclient::models::AppType::new(None, None, None, None, None, None),
                 ),
             }
         }
     }
+
     Ok(Some(Some(vec_app_types)))
+}
+
+fn get_final_app_config(
+    maybe_app_config: &Option<tembo_stacks::apps::types::AppConfig>,
+) -> Result<Option<temboclient::models::AppConfig>, anyhow::Error> {
+    let mut final_env_vars: Vec<temboclient::models::EnvVar> = vec![];
+
+    if let Some(a_config) = maybe_app_config {
+        if let Some(env_vars) = a_config.env.clone() {
+            for env_var in env_vars {
+                final_env_vars.push(temboclient::models::EnvVar {
+                    name: env_var.name,
+                    value: Some(env_var.value),
+                    value_from_platform: None,
+                });
+            }
+        }
+    }
+
+    if final_env_vars.is_empty() {
+        // TODO: Find a better way to handle this.
+        // It is done so that other app_types are skipped in the request
+        // We use #[serde(skip_serializing_if = "Option::is_none")] to skip app_types
+        final_env_vars.push(temboclient::models::EnvVar {
+            name: "test".to_string(),
+            value: Some(Some("test".to_string())),
+            value_from_platform: None,
+        });
+    }
+    Ok(Some(temboclient::models::AppConfig {
+        env: Some(Some(final_env_vars.clone())),
+        resources: None,
+    }))
 }
 
 fn get_patch_instance(
