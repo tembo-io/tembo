@@ -462,41 +462,6 @@ async fn lookup_volume_snapshot(cdb: &CoreDB, client: &Client) -> Result<VolumeS
     })
 }
 
-// fn find_closest_snapshot(
-//     snapshots: Vec<VolumeSnapshot>,
-//     recovery_target_time: Option<DateTime<Utc>>,
-// ) -> Option<VolumeSnapshot> {
-//     // Transform snapshots into a Vec of tuples with end time and the snapshot
-//     let transformed_snapshots: Vec<(Option<DateTime<Utc>>, VolumeSnapshot)> = snapshots
-//         .into_iter()
-//         .map(|snapshot| {
-//             let end_time = snapshot
-//                 .metadata
-//                 .annotations
-//                 .as_ref()
-//                 .and_then(|ann| ann.get("cnpg.io/backupEndTime"))
-//                 .and_then(|end_time_str| DateTime::parse_from_rfc3339(end_time_str).ok())
-//                 .map(|dt| dt.with_timezone(&Utc));
-//             (end_time, snapshot)
-//         })
-//         .collect();
-//
-//     // Now work with the transformed list to find the closest snapshot
-//     transformed_snapshots
-//         .into_iter()
-//         .filter_map(|(end_time, snapshot)| {
-//             if let (Some(end_time), Some(target_time)) = (end_time, recovery_target_time) {
-//                 if end_time <= target_time {
-//                     let duration = (target_time - end_time).num_seconds().abs();
-//                     return Some((duration, snapshot));
-//                 }
-//             }
-//             None
-//         })
-//         .min_by_key(|(duration, _)| *duration)
-//         .map(|(_, snapshot)| snapshot)
-// }
-
 fn find_closest_snapshot(
     snapshots: Vec<VolumeSnapshot>,
     recovery_target_time: Option<DateTime<Utc>>,
