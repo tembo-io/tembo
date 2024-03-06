@@ -18,11 +18,31 @@ Within the [rag.py](./tembo_py/rag.py) file's `TemboRAG` class, the `add_prompt_
 
 ### Create a New Python File
 
+
+
 ### Define Your Custom Prompt
+
+
 
 ### Running PostgreSQL
 
+```bash
+make run.postgres
+```
+
 ### Executing the Python File and Confirming Success
 
+```bash
+psql -h localhost -p 5432 -U postgres -W
+```
 
+```sql
+CREATE EXTENSION vectorize CASCADE;
+```
+
+Run the following SELECT statement to confirm your new addition:
+
+```sql
+SELECT * FROM vectorize.prompts;
+```
 
