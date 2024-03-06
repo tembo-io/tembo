@@ -42,12 +42,13 @@ python3 --version
 poetry --version
 ```
 
-
 ```bash
 poetry update
 ```
 
-#### 1.3. Establish Poetry
+#### 1.3. Establish Poetry in the Working Directory
+
+From within `tembo/tembo-py` run the following:
 
 ```bash
 poetry install
