@@ -1111,12 +1111,11 @@ fn get_postgres_config(
 
     postgres_config.push_str(
         "
-    listen_addresses = '*'
-    include_dir = 'extra-configs'
-    ssl = on
-    ssl_cert_file = '/var/lib/postgresql/server.crt'
-    ssl_key_file = '/var/lib/postgresql/server.key'
-    ssl_min_protocol_version = 'TLSv1.2'",
+listen_addresses = '*'
+ssl = 'on'
+ssl_cert_file = '/var/lib/postgresql/server.crt'
+ssl_key_file = '/var/lib/postgresql/server.key'
+ssl_min_protocol_version = 'TLSv1.2'",
     );
 
     Ok(postgres_config)

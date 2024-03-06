@@ -29,8 +29,11 @@ USER postgres
 # Initialize the database
 RUN pg_ctl -c init
 
+
 # Set permissive authentication (for local testing)
 RUN echo "hostssl all all 0.0.0.0/0 trust" >> ${PGDATA}/pg_hba.conf
+RUN echo "include_dir = 'extra-configs'" >> ${PGDATA}/postgresql.conf
+RUN mkdir -p $PGDATA/extra-configs
 
 # Set environment variables
 ENV PGHOST=localhost
@@ -48,6 +51,6 @@ RUN trunk install {{trunk_install.name}}
 
 # Optional:
 # Specify extra Postgres configurations by copying into this directory
-COPY postgres.conf $PGDATA/extra-configs
+COPY postgres.conf $PGDATA/extra-configs/postgres.conf
 
 CMD ["postgres"]
