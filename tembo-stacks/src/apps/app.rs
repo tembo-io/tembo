@@ -362,6 +362,15 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_app_specs() {
+        assert!(EMBEDDINGS.app_services.is_some());
+        assert!(HTTP.app_services.is_some());
+        assert!(MQ.app_services.is_some());
+        assert!(PGANALYZE.app_services.is_some());
+        assert!(RESTAPI.app_services.is_some());
+    }
+
+    #[test]
     fn test_merge_apps() {
         let user_apps = vec![
             AppService {
