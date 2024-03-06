@@ -1562,6 +1562,10 @@ fn cnpg_scheduled_backup(
         status: None,
     };
 
+    // Becasue the snapshot name can easily be over the character limit for k8s
+    // we will need to trim the name to 43 characters and append "-snap"
+    let snap_name = generate_scheduled_backup_snapshot_name(name);
+
     // Set a ScheduledBackup to backup to volume snapshot if enabled
     let volume_snapshot_scheduled_backup = cdb
         .spec
@@ -1571,7 +1575,7 @@ fn cnpg_scheduled_backup(
         .filter(|vs| vs.enabled)
         .map(|_| ScheduledBackup {
             metadata: ObjectMeta {
-                name: Some(name.to_string() + "-snap"),
+                name: Some(snap_name),
                 namespace: Some(namespace),
                 ..ObjectMeta::default()
             },
@@ -1594,6 +1598,16 @@ fn cnpg_scheduled_backup(
         s3_scheduled_backup,
         volume_snapshot_scheduled_backup,
     )])
+}
+
+// generate_scheduled_backup_snapshot_name generates a snapshot name for a scheduled backup
+// by appending "-snap" to the name and trimming the name to 43 characters if necessary
+fn generate_scheduled_backup_snapshot_name(name: &str) -> String {
+    // Trim the name to 43 characters if necessary
+    let trimmed_name = if name.len() > 43 { &name[..43] } else { name };
+
+    // Append "-snap" to the trimmed name
+    format!("{}-snap", trimmed_name)
 }
 
 // Reconcile a SheduledBackup
@@ -2992,6 +3006,29 @@ mod tests {
         assert_eq!(
             s3_backup.spec.method,
             Some(ScheduledBackupMethod::BarmanObjectStore)
+        );
+    }
+    #[test]
+    fn test_generate_scheduled_backup_snapshot_name() {
+        // Longer than 43 characters
+        let long_name = "thin-heartbreaking-knowledgeable-spoonbills-obnoxious-tough-lumpy-lapwing";
+        assert_eq!(
+            generate_scheduled_backup_snapshot_name(long_name),
+            "thin-heartbreaking-knowledgeable-spoonbills-snap"
+        );
+
+        // Exactly 43 characters
+        let exact_length_name = "lying-high-pitched-guanaco-absent-aardvarks";
+        assert_eq!(
+            generate_scheduled_backup_snapshot_name(exact_length_name),
+            "lying-high-pitched-guanaco-absent-aardvarks-snap"
+        );
+
+        // Shorter than 43 characters
+        let short_name = "stormy-capybara";
+        assert_eq!(
+            generate_scheduled_backup_snapshot_name(short_name),
+            "stormy-capybara-snap"
         );
     }
 }
