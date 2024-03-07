@@ -514,7 +514,7 @@ fn cnpg_cluster_bootstrap_recovery_volume_snapshots(
     cdb: &CoreDB,
 ) -> Option<ClusterBootstrapRecoveryVolumeSnapshots> {
     if let Some(restore) = &cdb.spec.restore {
-        if restore.volume_snapshot.is_some() {
+        if restore.volume_snapshot == Some(true) {
             return Some(ClusterBootstrapRecoveryVolumeSnapshots {
                 storage: ClusterBootstrapRecoveryVolumeSnapshotsStorage {
                     // todo: Work on getting this from the VolumeSnapshot we created
