@@ -642,9 +642,11 @@ async fn init_cloud_perms(
         }),
     };
 
-    // "Feature flag" VolumeSnapshot restore for specific org_id's
-    // This will be removed at a later date, for now we gatekeep
-    let volume_snapshot = gen_volume_snapshot_spec(read_msg);
+    // Enable VolumeSnapshots for all instances being created
+    let volume_snapshot = Some(VolumeSnapshot {
+        enabled: true,
+        snapshot_class: Some(VOLUME_SNAPSHOT_CLASS_NAME.to_string()),
+    });
 
     // Format Backup spec in CoreDBSpec
     let backup = Backup {
@@ -681,11 +683,9 @@ async fn init_cloud_perms(
         // Lookup the CoreDB of the instance we are restoring from
         let restore_spec = lookup_coredb(client.clone(), namespace).await?;
 
-        // Check if volume snapshots are enabled on the CoreDB we are restoring from
-        let volume_snapshot_enabled = restore_spec
-            .backup
-            .volume_snapshot
-            .map_or(false, |vs| vs.enabled);
+        // Check if volume snapshots are enabled on the CoreDBSpec we are restoring from
+        // use volume_snapshot_enabled feature flag to only enable for specific org_id's
+        let volume_snapshot_enabled = is_volume_snapshot_enabled(read_msg, &restore_spec);
 
         // Ensure a restore spec exists, otherwise return an error
         let restore =
@@ -721,9 +721,9 @@ async fn lookup_coredb(client: Client, namespace: &str) -> Result<CoreDBSpec, Co
     }
 }
 
-// gen_volume_snapshot is a glorified feature flag for volume snapshot restore
+// is_volume_snapshot_enabled is a glorified feature flag for volume snapshot restore
 // if the org_id matches from the list then we return true, else we return false.
-fn gen_volume_snapshot_spec(msg: &Message<CRUDevent>) -> Option<VolumeSnapshot> {
+fn is_volume_snapshot_enabled(msg: &Message<CRUDevent>, cdb_spec: &CoreDBSpec) -> bool {
     // Set a list of org_id's that are allowed to use volume snapshots
     // We need to set orgs in dev, staging and prod to use volume snapshots
     // tembo-test prod: org_2UJ2WPYFsE42Cos6mlmIuwIIJ4V
@@ -731,16 +731,21 @@ fn gen_volume_snapshot_spec(msg: &Message<CRUDevent>) -> Option<VolumeSnapshot> 
     let orgs = ["org_2YW4TYIMI1LeOqJTXIyvkHOHCUo"];
 
     if orgs.contains(&msg.message.org_id.as_str()) {
-        info!("Volume snapshot enabled for org_id: {}", msg.message.org_id);
-        Some(VolumeSnapshot {
-            enabled: true,
-            snapshot_class: Some(VOLUME_SNAPSHOT_CLASS_NAME.to_string()),
-        })
+        info!(
+            "Volume snapshot restore enabled for org_id: {}",
+            msg.message.org_id
+        );
+        cdb_spec
+            .backup
+            .volume_snapshot
+            .as_ref()
+            .map_or(false, |vs| vs.enabled)
     } else {
-        Some(VolumeSnapshot {
-            enabled: false,
-            ..Default::default()
-        })
+        info!(
+            "Volume snapshot restore disabled for org_id: {}",
+            msg.message.org_id
+        );
+        false
     }
 }
 
