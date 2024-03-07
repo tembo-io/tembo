@@ -687,6 +687,11 @@ async fn init_cloud_perms(
         // use volume_snapshot_enabled feature flag to only enable for specific org_id's
         let volume_snapshot_enabled = is_volume_snapshot_enabled(read_msg, &restore_spec);
 
+        info!(
+            "Volume snapshot restore is {} for instance_id {} in org_id: {}",
+            volume_snapshot_enabled, read_msg.message.inst_id, read_msg.message.org_id
+        );
+
         // Ensure a restore spec exists, otherwise return an error
         let restore =
             coredb_spec
@@ -732,8 +737,8 @@ fn is_volume_snapshot_enabled(msg: &Message<CRUDevent>, cdb_spec: &CoreDBSpec) -
 
     if orgs.contains(&msg.message.org_id.as_str()) {
         info!(
-            "Volume snapshot restore enabled for org_id: {}",
-            msg.message.org_id
+            "Volume snapshot restore enabled for instance_id {} in org_id: {}",
+            msg.message.inst_id, msg.message.org_id
         );
         cdb_spec
             .backup
@@ -742,8 +747,8 @@ fn is_volume_snapshot_enabled(msg: &Message<CRUDevent>, cdb_spec: &CoreDBSpec) -
             .map_or(false, |vs| vs.enabled)
     } else {
         info!(
-            "Volume snapshot restore disabled for org_id: {}",
-            msg.message.org_id
+            "Volume snapshot restore disabled for instance_id {} in org_id: {}",
+            msg.message.inst_id, msg.message.org_id
         );
         false
     }

@@ -1022,7 +1022,7 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
     // the VolumeSnapshotContent and VolumeSnapshot so that the Cluster will have
     // something to restore from.
     if let Some(restore) = &cdb.spec.restore {
-        if restore.volume_snapshot.is_some() {
+        if restore.volume_snapshot == Some(true) {
             debug!("Reconciling VolumeSnapshotContent and VolumeSnapshot for restore");
             reconcile_volume_snapshot_restore(cdb, ctx.clone()).await?;
         }
