@@ -1,4 +1,4 @@
-FROM quay.io/tembo/standard-cnpg:15-a0a5ab5
+FROM quay.io/tembo/{{image_with_version}}
 
 USER root
 
