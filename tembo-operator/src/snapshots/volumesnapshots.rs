@@ -412,6 +412,11 @@ async fn lookup_volume_snapshot(cdb: &CoreDB, client: &Client) -> Result<VolumeS
             Action::requeue(tokio::time::Duration::from_secs(300))
         })?;
 
+    debug!(
+        "Looking up VolumeSnapshots for original instance: {}",
+        og_instance_name
+    );
+
     // todo: This is a temporary fix to get the VolumeSnapshot from the same namespace as the
     // instance you are attempting to restore from.  We need to figure out a better way of
     // doing this in case someone wants to name a namespace differently than the instance name.
@@ -420,12 +425,7 @@ async fn lookup_volume_snapshot(cdb: &CoreDB, client: &Client) -> Result<VolumeS
         Api::namespaced(client.clone(), &og_instance_name);
 
     let label_selector = format!("cnpg.io/cluster={}", og_instance_name);
-    // Look for snapshots that are for the primary instance only, we currently do not
-    // support restoring from replicas
-    let field_selector = format!("metadata.annotations.cnpg.io/instanceRole={}", "primary");
-    let lp = ListParams::default()
-        .labels(&label_selector)
-        .fields(&field_selector);
+    let lp = ListParams::default().labels(&label_selector);
     let result = volume_snapshot_api.list(&lp).await.map_err(|e| {
         error!(
             "Error listing VolumeSnapshots for instance {}: {}",
@@ -433,6 +433,12 @@ async fn lookup_volume_snapshot(cdb: &CoreDB, client: &Client) -> Result<VolumeS
         );
         Action::requeue(tokio::time::Duration::from_secs(300))
     })?;
+
+    debug!(
+        "Found {} VolumeSnapshots for instance {}",
+        result.items.len(),
+        og_instance_name
+    );
 
     // Set recovery_target_time if it's set in the CoreDB spec as DateTime<Utc>
     let recovery_target_time: Option<DateTime<Utc>> = cdb
@@ -443,23 +449,50 @@ async fn lookup_volume_snapshot(cdb: &CoreDB, client: &Client) -> Result<VolumeS
         .and_then(|time_str| DateTime::parse_from_rfc3339(time_str).ok())
         .map(|dt| dt.with_timezone(&Utc));
 
+    debug!("Recovery target time: {:?}", recovery_target_time);
+
     // Filter snapshots that are ready to use and sort them by creation timestamp in descending order
     let snapshots: Vec<VolumeSnapshot> = result
         .into_iter()
         .filter(|vs| {
             vs.status
                 .as_ref()
-                .map(|s| s.ready_to_use.unwrap_or(false))
-                .unwrap_or(false)
+                .map_or(false, |s| s.ready_to_use.unwrap_or(false))
+        })
+        .filter(|vs| {
+            vs.metadata
+                .annotations
+                .as_ref()
+                .and_then(|ann| ann.get("cnpg.io/instanceRole"))
+                .map_or(false, |role| role == "primary")
         })
         .collect();
 
-    let closest_snapshot_to_recovery_time = find_closest_snapshot(snapshots, recovery_target_time);
+    debug!(
+        "Filtered {} VolumeSnapshots for primary role and readiness",
+        snapshots.len()
+    );
 
-    closest_snapshot_to_recovery_time.ok_or_else(|| {
-        error!("No VolumeSnapshot found for instance {}", og_instance_name);
-        Action::requeue(tokio::time::Duration::from_secs(300))
-    })
+    match find_closest_snapshot(snapshots, recovery_target_time) {
+        Some(snapshot) => {
+            debug!(
+                "Selected VolumeSnapshot: {}",
+                snapshot
+                    .metadata
+                    .name
+                    .as_deref()
+                    .map_or("unknown", |name| name)
+            );
+            Ok(snapshot)
+        }
+        None => {
+            error!(
+                "No suitable VolumeSnapshot found for instance {}",
+                og_instance_name
+            );
+            Err(Action::requeue(tokio::time::Duration::from_secs(300)))
+        }
+    }
 }
 
 fn find_closest_snapshot(
