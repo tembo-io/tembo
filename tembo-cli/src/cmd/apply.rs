@@ -10,6 +10,7 @@ use controller::extensions::types::Extension as ControllerExtension;
 use controller::extensions::types::ExtensionInstallLocation as ControllerExtensionInstallLocation;
 use controller::extensions::types::TrunkInstall as ControllerTrunkInstall;
 use controller::stacks::get_stack;
+use controller::stacks::types::Stack;
 use controller::stacks::types::StackType as ControllerStackType;
 use itertools::Itertools;
 use log::info;
@@ -240,10 +241,11 @@ fn docker_apply_instance(
         stack.app_services.clone(),
         extensions,
         trunk_installs,
-        stack.postgres_config,
+        stack.postgres_config.clone(),
     )?;
 
-    let rendered_dockerfile: String = get_rendered_dockerfile(&trunk_installs)?;
+    let rendered_dockerfile: String =
+        get_rendered_dockerfile(&trunk_installs, &stack, instance_setting.pg_version)?;
 
     FileUtils::create_file(
         DOCKERFILE_NAME.to_string(),
@@ -988,6 +990,8 @@ pub fn get_instance_settings(
 
 pub fn get_rendered_dockerfile(
     trunk_installs: &Option<Vec<ControllerTrunkInstall>>,
+    stack: &Stack,
+    pg_version: u8,
 ) -> Result<String, anyhow::Error> {
     // Include the Dockerfile template directly into the binary
     let contents = include_str!("../../tembo/Dockerfile.template");
@@ -996,6 +1000,14 @@ pub fn get_rendered_dockerfile(
     let _ = tera.add_raw_template("dockerfile", contents);
     let mut context = Context::new();
 
+    let image = match pg_version.into() {
+        14 => &stack.images.pg14,
+        15 => &stack.images.pg15,
+        16 => &stack.images.pg16,
+        _ => &stack.images.pg15,
+    };
+
+    context.insert("image_with_version", &image);
     context.insert("trunk_installs", &trunk_installs);
 
     let rendered_dockerfile = tera.render("dockerfile", &context).unwrap();
@@ -1108,6 +1120,15 @@ fn get_postgres_config(
             return Err(error);
         }
     }
+
+    postgres_config.push_str(
+        "
+listen_addresses = '*'
+ssl = 'on'
+ssl_cert_file = '/var/lib/postgresql/server.crt'
+ssl_key_file = '/var/lib/postgresql/server.key'
+ssl_min_protocol_version = 'TLSv1.2'",
+    );
 
     Ok(postgres_config)
 }
