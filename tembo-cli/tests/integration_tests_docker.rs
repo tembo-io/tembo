@@ -6,11 +6,14 @@ use predicates::prelude::*;
 use sqlx::postgres::PgConnectOptions;
 use std::env;
 use std::error::Error;
+use std::fs::File;
+use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::process::Command;
 use std::thread::sleep;
 use std::time::Duration;
 use tembo::cli::sqlx_utils::SqlxUtils;
+use test_case::test_case;
 
 const CARGO_BIN: &str = "tembo";
 
@@ -24,12 +27,21 @@ fn help() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+#[test_case(14)]
+#[test_case(15)]
+#[test_case(16)]
 #[tokio::test]
-async fn minimal() -> Result<(), Box<dyn Error>> {
+async fn minimal(version: i32) -> Result<(), Box<dyn Error>> {
     let root_dir = env!("CARGO_MANIFEST_DIR");
     let test_dir = PathBuf::from(root_dir).join("examples").join("minimal");
 
     env::set_current_dir(&test_dir)?;
+
+    replace_vars_in_file(
+        "tembo.toml".to_string(),
+        "pg_version = 15",
+        &format!("pg_version = {version}"),
+    )?;
 
     // tembo init
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
@@ -218,5 +230,20 @@ async fn get_output_from_sql(instance_name: String, sql: String) -> Result<Strin
 async fn assert_can_connect(instance_name: String) -> Result<(), Box<dyn Error>> {
     let result: String = get_output_from_sql(instance_name, "SELECT 1".to_string()).await?;
     assert!(result.contains('1'), "Query did not return 1");
+    Ok(())
+}
+
+fn replace_vars_in_file(
+    file_path: String,
+    word_from: &str,
+    word_to: &str,
+) -> Result<(), Box<dyn Error>> {
+    let mut src = File::open(&file_path)?;
+    let mut data = String::new();
+    src.read_to_string(&mut data)?;
+    drop(src);
+    let new_data = data.replace(&*word_from, &*word_to);
+    let mut dst = File::create(&file_path)?;
+    dst.write(new_data.as_bytes())?;
     Ok(())
 }
