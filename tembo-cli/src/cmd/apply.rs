@@ -1117,18 +1117,20 @@ fn get_postgres_config(
 
     match maybe_final_loadable_libs {
         Ok(l) => {
-            let config = l
-                .into_iter()
-                .unique_by(|f| f.name.clone())
-                .sorted_by_key(|s| (s.priority, s.name.clone()))
-                .map(|x| x.name.to_string() + ",")
-                .collect::<String>();
+            if !l.is_empty() {
+                let config = l
+                    .into_iter()
+                    .unique_by(|f| f.name.clone())
+                    .sorted_by_key(|s| (s.priority, s.name.clone()))
+                    .map(|x| x.name.to_string() + ",")
+                    .collect::<String>();
 
-            let final_libs = config.split_at(config.len() - 1);
+                let final_libs = config.split_at(config.len() - 1);
 
-            let libs_config = format!("shared_preload_libraries = '{}'", final_libs.0);
+                let libs_config = format!("shared_preload_libraries = '{}'", final_libs.0);
 
-            postgres_config.push_str(&libs_config);
+                postgres_config.push_str(&libs_config);
+            }
         }
         Err(error) => {
             return Err(error);
