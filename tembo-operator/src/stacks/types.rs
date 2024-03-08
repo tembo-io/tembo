@@ -25,6 +25,7 @@ pub enum StackType {
     OLTP,
     RAG,
     Standard,
+    Timeseries,
     VectorDB,
 }
 
@@ -62,6 +63,7 @@ impl StackType {
             StackType::OLTP => "OLTP",
             StackType::RAG => "RAG",
             StackType::Standard => "Standard",
+            StackType::Timeseries => "Timeseries",
             StackType::VectorDB => "VectorDB",
         }
     }
@@ -284,6 +286,9 @@ mod tests {
                 }
                 StackType::Standard => {
                     get_stack(StackType::Standard);
+                }
+                StackType::Timeseries => {
+                    get_stack(StackType::Timeseries);
                 }
                 StackType::VectorDB => {
                     get_stack(StackType::VectorDB);
