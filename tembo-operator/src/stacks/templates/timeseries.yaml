@@ -1,0 +1,94 @@
+name: Timeseries
+description: A Postgres instance equipped with configuration and extensions for time-series workloads.
+repository: "quay.io/tembo"
+organization: tembo
+images:
+  14: "standard-cnpg:14-a0a5ab5"
+  15: "standard-cnpg:15-a0a5ab5"
+  16: "standard-cnpg:16-a0a5ab5"
+stack_version: 0.1.0
+compute_templates:
+  - cpu: 0.25
+    memory: 1Gi
+    instance_class: GeneralPurpose
+  - cpu: 0.5
+    memory: 2Gi
+    instance_class: GeneralPurpose
+  - cpu: 1
+    memory: 4Gi
+    instance_class: GeneralPurpose
+  - cpu: 2
+    memory: 8Gi
+    instance_class: GeneralPurpose
+  - cpu: 4
+    memory: 16Gi
+    instance_class: GeneralPurpose
+  - cpu: 8
+    memory: 32Gi
+    instance_class: GeneralPurpose
+  - cpu: 0.5
+    memory: 1Gi
+    instance_class: ComputeOptimized
+  - cpu: 1
+    memory: 2Gi
+    instance_class: ComputeOptimized
+  - cpu: 2
+    memory: 4Gi
+    instance_class: ComputeOptimized
+  - cpu: 4
+    memory: 8Gi
+    instance_class: ComputeOptimized
+  - cpu: 8
+    memory: 16Gi
+    instance_class: ComputeOptimized
+  - cpu: 16
+    memory: 32Gi
+    instance_class: ComputeOptimized
+  - cpu: 0.5
+    memory: 4Gi
+    instance_class: MemoryOptimized
+  - cpu: 1
+    memory: 8Gi
+    instance_class: MemoryOptimized
+  - cpu: 2
+    memory: 16Gi
+    instance_class: MemoryOptimized
+  - cpu: 4
+    memory: 32Gi
+    instance_class: MemoryOptimized
+postgres_config_engine: olap
+postgres_config:
+  - name: autovacuum_vacuum_scale_factor
+    value: 0.05
+  - name: autovacuum_vacuum_insert_scale_factor
+    value: 0.05
+  - name: checkpoint_completion_target
+    value: 0.95
+  - name: checkpoint_timeout
+    value: 30min
+  - name: pg_stat_statements.track
+    value: top
+  - name: shared_preload_libraries
+    value: pg_stat_statements
+  - name: track_io_timing
+    value: 'on'
+  - name: wal_level
+    value: logical
+trunk_installs:
+  - name: timeseries
+    version: 0.1.1
+  - name: pg_partman
+    version: 5.0.1
+  - name: pg_stat_statements
+    version: 1.10.0
+extensions:
+  - name: timeseries
+    locations:
+      - database: postgres
+        enabled: true
+        version: 0.1.1
+  - name: pg_stat_statements
+    locations:
+      - database: postgres
+        enabled: true
+        version: 1.10.0
