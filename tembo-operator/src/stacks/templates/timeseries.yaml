@@ -75,7 +75,7 @@ postgres_config:
   - name: wal_level
     value: logical
 trunk_installs:
-  - name: timeseries
+  - name: pg_timeseries
     version: 0.1.1
   - name: pg_partman
     version: 5.0.1

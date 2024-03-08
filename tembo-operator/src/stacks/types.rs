@@ -44,6 +44,7 @@ impl std::str::FromStr for StackType {
             "OLTP" => Ok(StackType::OLTP),
             "RAG" => Ok(StackType::RAG),
             "Standard" => Ok(StackType::Standard),
+            "Timeseries" => Ok(StackType::Timeseries),
             "VectorDB" => Ok(StackType::VectorDB),
             _ => Err("invalid value"),
         }
@@ -249,6 +250,7 @@ mod tests {
             StackType::OLTP,
             StackType::RAG,
             StackType::Standard,
+            StackType::Timeseries,
             StackType::VectorDB,
         ];
 
