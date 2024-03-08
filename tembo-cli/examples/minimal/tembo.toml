@@ -1,3 +1,4 @@
 [minimal]
 environment = "prod"
 instance_name = "minimal"
+pg_version = 14

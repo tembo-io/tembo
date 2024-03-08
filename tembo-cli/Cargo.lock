@@ -4065,6 +4065,7 @@ dependencies = [
  "temboclient",
  "tembodataclient",
  "tera",
+ "test-case",
  "tiny-gradient",
  "tokio",
  "toml",
@@ -4185,6 +4186,19 @@ name = "termtree"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3369f5ac52d5eb6ab48c6b4ffdc8efbcad6b89c765749064ba298f2c68a16a76"
+
+[[package]]
+name = "test-case"
+version = "2.0.0-rc2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "afa682de28cc0b0156c64fc49aa323cde4c0fb69d75d42286a94597b8f278131"
+dependencies = [
+ "cfg-if",
+ "proc-macro-error",
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+]
 
 [[package]]
 name = "thiserror"
