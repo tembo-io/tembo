@@ -54,47 +54,31 @@ rag.init_rag(connection_string="postgresql://postgres:wJj00hgPWnh5qalf@org-evan-
 ## Adding Custom Prompts
 
 Within the [rag.py](./tembo_py/rag.py) file's `TemboRAG` class, the `add_prompt_template` method introduces the ability to add custom prompts.
-For the purposes of this example we will consider a local environment.
 
-#### 1. Running PostgreSQL
-
-Before even touching Python, let's go ahead and start a Postgres instance.
-If you'd like, you can run the following to clone and enter the `tembo-py` repository:
+### 1. Connect to Postgres
 
 ```bash
-git clone https://github.com/tembo-io/tembo.git
-```
-```bash
-cd tembo/tembo-py
+psql postgresql://postgres:<your-password>@<your-TemboHost>:5432/postgres
 ```
 
-Then run the following command to start a Postgres instance:
-
-```bash
-make run.postgres
-```
-
-From there, `psql` into Postgres and enable the [pg_vectorize](https://github.com/tembo-io/pg_vectorize) extension.
-
-:bulb: Note that the password is by default `postgres`.
-
-```bash
-psql -h localhost -p 5432 -U postgres -W
-```
+From there, enable the [pg_vectorize](https://github.com/tembo-io/pg_vectorize) extension.
 
 ```sql
 CREATE EXTENSION vectorize CASCADE;
 ```
 
-#### 2. Create a New Python File
+The chat completion model only supports OpenAI (embeddings can come from more sources), for now.
+Enter the OpenAI API key into the configuration below:
 
-Exit Postgres and create a new Python file:
-
-```bash
-touch example_tembo.py
+```sql
+ALTER SYSTEM SET vectorize.openai_key TO '<your api key>';
 ```
 
-#### 3. Define Your Custom Prompt
+```sql
+SELECT pg_reload_conf();
+``````
+
+### 2. Define Your Custom Prompt
 
 Using your preferred text editor or IDE, you can create the following script:
 
@@ -134,12 +118,6 @@ python3 example_tembo.py
 
 If successful, you should see the following:
 
-```text
-Prompt 'example_prompt' successfully added to the database.
-System Prompt: System prompt text for example
-User Prompt: User prompt text for example
-```
-
 You can now enter Postgres to confirm the insertion of your custom prompt.
 
 :bulb: Note that the password is by default `postgres`.
@@ -154,11 +132,3 @@ As `pg_vectorize` was enabled above, run the following SELECT statement to confi
 SELECT * FROM vectorize.prompts;
 ```
 
-After running `\x` for better formatting, you will a new addition similar to the following:
-
-```sql
--[ RECORD 2 ]-------------------------------
-prompt_type | example_prompt
-sys_prompt  | System prompt text for example
-user_prompt | User prompt text for example
-```
