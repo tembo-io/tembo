@@ -77,6 +77,46 @@ async fn minimal(version: i32) -> Result<(), Box<dyn Error>> {
 }
 
 #[tokio::test]
+async fn vector() -> Result<(), Box<dyn Error>> {
+    let root_dir = env!("CARGO_MANIFEST_DIR");
+    let test_dir = PathBuf::from(root_dir).join("examples").join("vector");
+
+    env::set_current_dir(&test_dir)?;
+
+    // tembo init
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("init");
+    cmd.assert().success();
+
+    // tembo context set --name local
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("context");
+    cmd.arg("set");
+    cmd.arg("--name");
+    cmd.arg("local");
+    cmd.assert().success();
+
+    // tembo apply
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("--verbose");
+    cmd.arg("apply");
+    cmd.assert().success();
+
+    // check can connect
+    assert_can_connect("vector".to_str()).await?;
+
+    // tembo delete
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("delete");
+    let _ = cmd.ok();
+
+    // check can't connect
+    assert!(assert_can_connect("vector".to_str()).await.is_err());
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn data_warehouse() -> Result<(), Box<dyn Error>> {
     let instance_name = "data-warehouse";
 
@@ -186,7 +226,7 @@ async fn multiple_instances() -> Result<(), Box<dyn Error>> {
     let mut easy = Easy::new();
     easy.url(&format!(
         "http://{}.local.tembo.io:8000/restapi/v1/todos",
-        instance2_name.to_string()
+        instance2_name
     ))
     .unwrap();
     easy.perform().unwrap();

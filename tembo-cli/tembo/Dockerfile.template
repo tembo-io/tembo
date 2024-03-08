@@ -3,7 +3,7 @@ FROM quay.io/tembo/{{image_with_version}}
 USER root
 
 RUN apt-get update && \
-    apt-get install -y vim openssl && \
+    apt-get install -y git vim openssl && \
     apt-get autoremove -y && \
     apt-get clean -y && \
     rm -rf /var/lib/apt/lists/*
@@ -29,7 +29,6 @@ USER postgres
 # Initialize the database
 RUN pg_ctl -c init
 
-
 # Set permissive authentication (for local testing)
 RUN echo "hostssl all all 0.0.0.0/0 trust" >> ${PGDATA}/pg_hba.conf
 RUN echo "include_dir = 'extra-configs'" >> ${PGDATA}/postgresql.conf
@@ -42,7 +41,26 @@ ENV PGDATABASE=postgres
 ENV PGUSER=postgres
 
 {% for trunk_install in trunk_installs %}
+{% if trunk_install.name == "pgvector" %}
 {% if trunk_install.version %}
+{% set VECTOR_VER = trunk_install.version %}
+{% else %}
+{% set VECTOR_VER = "0.6.0" %}
+{% endif %}
+# Install vector from source, this extension uses
+# chip-native optimizations, so binary distributions
+# are not compatible on Docker, when running on a Mac.
+USER root
+RUN mkdir /tmp/workdir && \
+    cd /tmp/workdir && \
+    git clone https://github.com/pgvector/pgvector.git && \
+    cd pgvector && \
+    git fetch origin v{{VECTOR_VER}} && \
+    git checkout v{{VECTOR_VER}} && \
+    make && make install && \
+    rm -rf /tmp/workdir
+USER postgres
+{% elif trunk_install.version %}
 RUN trunk install --version {{trunk_install.version}} {{trunk_install.name}}
 {% else %}
 RUN trunk install {{trunk_install.name}}
