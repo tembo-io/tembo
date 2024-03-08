@@ -4019,7 +4019,7 @@ dependencies = [
 
 [[package]]
 name = "tembo-cli"
-version = "0.20.1"
+version = "0.20.2"
 dependencies = [
  "actix-cors",
  "actix-service",
@@ -4093,7 +4093,7 @@ dependencies = [
 
 [[package]]
 name = "temboclient"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "reqwest",
  "serde",
@@ -4106,7 +4106,7 @@ dependencies = [
 
 [[package]]
 name = "tembodataclient"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "reqwest",
  "serde",
