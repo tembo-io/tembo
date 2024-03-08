@@ -4,6 +4,13 @@ The official Python client for Tembo.io
 
 For more technical information and ways to get involved, please refer to the [contributing guide](./CONTRIBUTING.md).
 
+## Table of Contents
+
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Prepare and Insert Sample Documents](#prepare-and-insert-sample-documents)
+- [Adding Custom Prompts](#adding-custom-prompts)
+
 ## Prerequisites
 
 - [Python](https://www.python.org/) - Programming language and companion `pip` package manager
@@ -17,20 +24,10 @@ The [tembo-py library](https://pypi.org/project/tembo-py/) is hosted on pypi.org
 pip install tembo-py
 ```
 
-## Prepare and Insert Sample Documents
+## Prepare Contextual Basis
 
-The 
-
-```bash
-git clone https://github.com/tembo-io/website.git
-```
-
-```bash
-mkdir tembo_docs
-
-find "website/docusaurus/docs" -type f -name "*.md" -exec cp {} "tembo_docs" \;
-find "website/landing/src/content/blog" -type f -name "*.md" -exec cp {} "tembo_docs" \;
-```
+Before jumping in, it's important to have material to offer the model as context.
+The [RAG Stack official documentation](https://tembo.io/docs/tembo-stacks/rag#build-a-support-agent-with-tembo-rag) does a good job reviewing this in detail, so we will highlight some key points.
 
 ```bash
 from tembo_py.rag import TemboRAG
@@ -46,7 +43,15 @@ chunks = rag.prepare_from_directory("./tembo_docs")
 rag.load_documents(chunks)
 ```
 
-## Example: Adding Custom Prompts
+Now that the table is loaded into Postgres, you can run the following:
+
+```python
+rag.init_rag(connection_string="postgresql://postgres:wJj00hgPWnh5qalf@org-evan-test-inst-evan-mar-rag-test.data-1.use1.tembo-development.com:5432/postgres",
+             transformer="sentence-transformers/all-MiniLM-L12-v2"
+)
+```
+
+## Adding Custom Prompts
 
 Within the [rag.py](./tembo_py/rag.py) file's `TemboRAG` class, the `add_prompt_template` method introduces the ability to add custom prompts.
 For the purposes of this example we will consider a local environment.
