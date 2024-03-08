@@ -32,13 +32,19 @@ spec:
         - image: {{ (index .Values "controller").image.repository }}:{{ (index .Values "controller").image.tag | toString }}
           imagePullPolicy: {{ (index .Values "controller").image.pullPolicy }}
           name: tembo-controller
-          {{- with (index .Values "controller").extraEnv }}
           env:
+            {{- with (index .Values "controller").env }}
+            {{- range . }}
+            - name: {{ .name }}
+              value: {{ .value | quote }}
+            {{- end }}
+            {{- end }}
+            {{- with (index .Values "controller").extraEnv }}
             {{- range . }}
             - name: {{ .name }}
               value: {{ tpl (.value | quote) $ }}
             {{- end }}
-          {{- end }}
+            {{- end }}
           {{- if (index .Values "controller").resources }}
           resources:
             {{- toYaml (index .Values "controller").resources | nindent 12 }}

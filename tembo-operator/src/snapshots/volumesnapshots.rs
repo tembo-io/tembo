@@ -499,44 +499,47 @@ fn find_closest_snapshot(
     snapshots: Vec<VolumeSnapshot>,
     recovery_target_time: Option<DateTime<Utc>>,
 ) -> Option<VolumeSnapshot> {
-    let transformed_snapshots: Vec<(Option<DateTime<Utc>>, VolumeSnapshot)> = snapshots
+    let filtered_snapshots: Vec<_> = snapshots
         .into_iter()
-        .map(|snapshot| {
-            let end_time = snapshot
+        .filter_map(|snapshot| {
+            let end_time_str = snapshot
                 .metadata
                 .annotations
-                .as_ref()
-                .and_then(|ann| ann.get("cnpg.io/backupEndTime"))
-                .and_then(|end_time_str| DateTime::parse_from_rfc3339(end_time_str).ok())
-                .map(|dt| dt.with_timezone(&Utc));
-            (end_time, snapshot)
+                .as_ref()?
+                .get("cnpg.io/snapshotEndTime")?;
+            let end_time = DateTime::parse_from_rfc3339(end_time_str)
+                .ok()?
+                .with_timezone(&Utc);
+            Some((snapshot, end_time))
         })
         .collect();
 
+    debug!(
+        "Filtered snapshots based on end time: {:?}",
+        filtered_snapshots
+    );
+
     match recovery_target_time {
         Some(target_time) => {
-            // Filter snapshots to only include those before the target time
-            transformed_snapshots
+            debug!("Recovery target time is specified: {:?}", target_time);
+            let closest_snapshot = filtered_snapshots
                 .into_iter()
-                .filter_map(|(end_time, snapshot)| {
-                    end_time.and_then(|end_time| {
-                        if end_time <= target_time {
-                            let duration = (target_time - end_time).num_seconds().abs();
-                            Some((duration, snapshot))
-                        } else {
-                            None
-                        }
-                    })
-                })
-                .min_by_key(|(duration, _)| *duration)
-                .map(|(_, snapshot)| snapshot)
+                .filter(|(_, end_time)| *end_time <= target_time)
+                .min_by_key(|(_, end_time)| (target_time - *end_time).num_seconds().abs())
+                .map(|(snapshot, _)| snapshot);
+
+            debug!("Selected closest snapshot: {:?}", closest_snapshot);
+            closest_snapshot
         }
         None => {
-            // When no recovery target time is specified, find the latest snapshot
-            transformed_snapshots
+            debug!("No recovery target time specified, selecting the latest snapshot.");
+            let latest_snapshot = filtered_snapshots
                 .into_iter()
-                .filter_map(|(end_time, snapshot)| end_time.map(|_| snapshot))
-                .max_by_key(|snapshot| snapshot.metadata.creation_timestamp.clone())
+                .max_by_key(|(_, end_time)| *end_time)
+                .map(|(snapshot, _)| snapshot);
+
+            debug!("Selected latest snapshot: {:?}", latest_snapshot);
+            latest_snapshot
         }
     }
 }
@@ -736,11 +739,11 @@ mod tests {
         assert_eq!(result.metadata.namespace.unwrap(), "default");
     }
 
-    fn create_volume_snapshot(name: &str, backup_end_time: &str) -> VolumeSnapshot {
+    fn create_volume_snapshot(name: &str, snapshot_end_time: &str) -> VolumeSnapshot {
         let mut annotations = BTreeMap::new();
         annotations.insert(
-            "cnpg.io/backupEndTime".to_string(),
-            backup_end_time.to_string(),
+            "cnpg.io/snapshotEndTime".to_string(),
+            snapshot_end_time.to_string(),
         );
 
         VolumeSnapshot {
@@ -759,36 +762,34 @@ mod tests {
     #[test]
     fn test_find_closest_snapshot_pitr() {
         let recovery_target_time_str = "2024-03-06T00:00:00Z";
-        let recovery_target_time = DateTime::parse_from_rfc3339(recovery_target_time_str).unwrap();
+        let recovery_target_time = DateTime::parse_from_rfc3339(recovery_target_time_str)
+            .unwrap()
+            .with_timezone(&Utc);
 
         let snapshots = vec![
             create_volume_snapshot("snapshot1", "2024-03-05T23:50:00Z"),
             create_volume_snapshot("snapshot2", "2024-03-05T22:00:00Z"),
-            // (snapshot3) closest to target time
             create_volume_snapshot("snapshot3", "2024-03-05T23:55:00Z"),
             create_volume_snapshot("snapshot4", "2024-03-05T21:00:00Z"),
             create_volume_snapshot("snapshot5", "2024-03-06T00:01:00Z"),
         ];
 
         let closest_snapshot =
-            find_closest_snapshot(snapshots, Some(recovery_target_time.into())).unwrap();
+            find_closest_snapshot(snapshots, Some(recovery_target_time)).unwrap();
         assert_eq!(closest_snapshot.metadata.name.unwrap(), "snapshot3");
     }
 
     #[test]
     fn test_find_latest_snapshot_when_target_time_empty() {
-        let recovery_target_time: Option<DateTime<Utc>> = None;
         let snapshots = vec![
             create_volume_snapshot("snapshot1", "2024-03-05T20:00:00Z"),
             create_volume_snapshot("snapshot2", "2024-03-05T22:00:00Z"),
             create_volume_snapshot("snapshot3", "2024-03-05T23:00:00Z"),
             create_volume_snapshot("snapshot4", "2024-03-05T21:00:00Z"),
-            // (snapshot5) closest to target time/latest
             create_volume_snapshot("snapshot5", "2024-03-06T00:01:00Z"),
         ];
 
-        // No recovery_target_time specified (None)
-        let closest_snapshot = find_closest_snapshot(snapshots, recovery_target_time).unwrap();
-        assert_eq!(closest_snapshot.metadata.name.unwrap(), "snapshot5");
+        let latest_snapshot = find_closest_snapshot(snapshots, None).unwrap();
+        assert_eq!(latest_snapshot.metadata.name.unwrap(), "snapshot5");
     }
 }
