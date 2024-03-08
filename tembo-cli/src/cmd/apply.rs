@@ -1090,7 +1090,8 @@ fn get_postgres_config(
                 }
                 _ => {
                     if value.is_str() {
-                        let _ = writeln!(postgres_config, "{} = '{value}'", key.as_str());
+                        let val = value.as_str().unwrap();
+                        let _ = writeln!(postgres_config, "{} = '{val}'", key.as_str());
                     }
                     if value.is_table() {
                         for row in value.as_table().iter() {
