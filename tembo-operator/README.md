@@ -1,178 +1,131 @@
 # Tembo Operator
 
-## Requirements
+The Tembo Operator is a Kubernetes Operator used for creating, updating, and deleting PostgreSQL (Postgres) instances.
 
-- A Kubernetes cluster: [kind](https://github.com/kubernetes-sigs/kind)
-- [rust](https://www.rust-lang.org/)
-- [just](https://github.com/casey/just)
-- [helm](https://helm.sh/)
-- Opentelemetry collector (**optional**)
+The key differentiators of the Tembo Operator are:
 
-### Rust Linting
+- Unique extension management experience
+- Concept of Stacks
+- Easily integrate Apps to run alongside Postgres
 
-Run linting with `cargo fmt` and `clippy`
+## Table of Contents
 
-Clippy:
+1. [Quick start](#quick-start)
+    1. [Cluster operations](#cluster-operations)
+2. [Examples](#examples)
+    1. [Trying out Postgres extensions](#1-trying-out-postgres-extensions)
+    2. [Trying out Tembo Stacks](#2-trying-out-tembo-stacks) 
+3. [Observability with curl](#observability-with-curl)
+4. [Observability with OpenTelemetry and Jaeger](#observability-with-opentelemetry-and-jaeger)
 
-```bash
-rustup component add clippy
-cargo clippy
-```
+## Quick Start
 
-cargo fmt:
+While it's fairly straightforward to get started running the Tembo Operator locally, there are prerequisites that you'll need before getting started.
+For an exhaustive list, please refer to the project's [contributing guide](./CONTRIBUTING.md).
 
-```bash
-rustup toolchain install nightly
-rustup component add rustfmt --toolchain nightly
-cargo +nightly fmt
-```
+### Cluster Operations
 
-### Running Locally
-
-To build and run the operator locally
+To destroy any existing cluster and start the containers needed for a new one, simply run:
 
 ```bash
 just start-kind
+```
+
+In addition to starting the cluster, several necessary dependencies are installed by subtasks. Check out the definition in the `justfile` if you're curious, it's all pretty composable.
+
+Once the `kind` cluster has been started, you can start a local copy of the Tembo Operator to use it. Again, it's pretty easy:
+
+```bash
 just run
 ```
 
-- Or, you can run with auto reloading your local changes.
-- First, install cargo-watch
+## Examples
+
+With the cluster running, you're ready to test some of the built-in features of the Tembo Operator.
+
+### 1. Trying out Postgres Extensions
+
+:bulb: The following steps assume you have gone through the [quick start section](#quick-start).
+
+Start by applying a YAML template of your choosing, hosted at [./yaml](./yaml):
 
 ```bash
-cargo install cargo-watch
+kubectl apply -f yaml/sample-standard.yaml
 ```
 
-- Then, run with auto reload
+Once established, `psql` into the pod.
+This will require a password, the instructions of which are outlined in the CONTRIBUTING.md file's [Connect via psql](https://github.com/tembo-io/tembo/blob/main/tembo-operator/CONTRIBUTING.md#4-connect-via-psql) section.
 
 ```bash
-just watch
+psql postgres://postgres:$PGPASSWORD@sample-standard.localhost:5432
 ```
 
-### Install on an existing cluster
+This will allow you to see the enabled extensions with:
+
+```sql
+\dx
+```
+
+As well as the to-be-enabled extensions that have already been installed:
+
+```sql
+SELECT * FROM pg_available_extensions;
+```
+
+Go ahead and exit Postgres with `\q` and the pod with `Ctl-D`.
+
+Now try to `exec` into the pod via:
 
 ```bash
-just install-depedencies
-just install-chart
+kubectl exec -it sample-standard-1 -- /bin/bash
 ```
 
-#### Integration testing
+As mentioned above, the Tembo Operator comes pre-packaged with added Postgres extension management.
+This comes in the form of the [Trunk](https://pgt.dev/) extension registry, which can be used from within the Kubernetes pod.
 
-To automatically set up a local cluster for functional testing, use this script.
-This will start a local kind cluster, annotate the `default` namespace for testing
-and install the CRD definition.
+Try running the following:
 
 ```bash
-just start-kind
+trunk install pgmq
 ```
 
-Or, you can follow the below steps.
+:bulb: Note that you can choose to install any extension found within the Trunk registry.
 
-- Connect to a cluster that is safe to run the tests against
-- Set your kubecontext to any namespace, and label it to indicate it is safe to run tests against this cluster (do not do against non-test clusters)
+Considering that you should still be in the pod, simply run `psql` and you should find yourself in the Postgres instance.
 
-```bash
-NAMESPACE=<namespace> just annotate
+As before, try running
+
+```sql
+SELECT * FROM pg_available_extensions WHERE name = 'pgmq'
 ```
 
-- Start or install the controller you want to test (see the following sections), do this in a separate shell from where you will run the tests
+You should see the extension in the results, from which you can run to enable:
 
-```
-export DATA_PLANE_BASEDOMAIN=localhost
-cargo run
-```
-
-- Run the integration tests
-  > Note: for integration tests to work you will need to be logged in on `plat-dev` via CLI under the "PowerUserAccess" role found here: https://d-9067aa6f32.awsapps.com/start (click "Command line or programmatic access")
-
-```bash
-cargo test -- --ignored
+```sql
+CREATE EXTENSION pgmq CASCADE;
 ```
 
-- The integration tests assume you already have installed or are running the operator connected to the cluster.
+### 2. Trying out Tembo Stacks
 
-#### Other testing notes
+In the above example, we utilize the `sample-standard.yaml` file, but there are others that offer distinct configurations.
+Check out the others in the yaml directory.
+Here are some select options to apply just as `sample-standard.yaml` was:
 
-- Include the `--nocapture` flag to show print statements during test runs
+- Try out the [Message Queue Stack](https://tembo.io/docs/tembo-stacks/message-queue) with [sample-message-queue.yaml](./yaml/sample-message-queue.yaml).
+- Try out the [OLAP Stack](https://tembo.io/docs/tembo-stacks/olap) with [sample-olap.yaml](./yaml/sample-olap.yaml).
+- Try out the [MongoAlternative Stack](https://tembo.io/docs/tembo-stacks/mongo-alternative) with [sample-document.yaml](./yaml/sample-document.yaml).
 
-### Cluster
+## Observability with curl
 
-As an example; install [`kind`](https://kind.sigs.k8s.io/docs/user/quick-start/#installation). Once installed, follow [these instructions](https://kind.sigs.k8s.io/docs/user/local-registry/) to create a kind cluster connected to a local image registry.
-
-### CRD
-
-Apply the CRD from [cached file](charts/coredb-operator/templates/crd.yaml), or pipe it from `crdgen` (best if changing it):
-
-```sh
-just install-crd
-```
-
-### OpenTelemetry (TDB)
-
-Setup an OpenTelemetry Collector in your cluster. [Tempo](https://github.com/grafana/helm-charts/tree/main/charts/tempo) / [opentelemetry-operator](https://github.com/open-telemetry/opentelemetry-helm-charts/tree/main/charts/opentelemetry-operator) / [grafana agent](https://github.com/grafana/helm-charts/tree/main/charts/agent-operator) should all work out of the box. If your collector does not support grpc otlp you need to change the exporter in [`main.rs`](./src/main.rs).
-
-## Running
-
-### Locally
-
-```sh
-cargo run
-```
-
-- Or, with optional telemetry (change as per requirements):
-
-```sh
-OPENTELEMETRY_ENDPOINT_URL=https://0.0.0.0:55680 RUST_LOG=info,kube=trace,controller=debug cargo run --features=telemetry
-```
-
-### In-cluster
-
-Compile the controller with:
-
-```sh
-just compile
-```
-
-Build an image with:
-
-```sh
-just build
-```
-
-Push the image to your local registry with:
-
-```sh
-docker push localhost:5001/controller:<tag>
-```
-
-Edit the [deployment](./yaml/deployment.yaml)'s image tag appropriately, then run:
-
-```sh
-kubectl apply -f yaml/deployment.yaml
-kubectl port-forward service/coredb-controller 8080:80
-```
-
-**NB**: namespace is assumed to be `default`. If you need a different namespace, you can replace `default` with whatever you want in the yaml and set the namespace in your current-context to get all the commands here to work.
-
-## Usage
-
-In either of the run scenarios, your app is listening on port `8080`, and it will observe events.
-
-Try some of:
-
-```sh
-kubectl apply -f yaml/sample-coredb.yaml
-kubectl delete coredb sample-coredb
-kubectl edit coredb sample-coredb # change replicas
-```
+In either of the above scenarios, your app is listening on port `8080`, and it will observe events.
 
 The reconciler will run and write the status object on every change. You should see results in the logs of the pod, or on the .status object outputs of `kubectl get coredb -o yaml`.
 
-### Webapp output
+### Webapp Output
 
 The sample web server exposes some example metrics and debug information you can inspect with `curl`.
 
-```sh
+```bash
 $ kubectl apply -f yaml/sample-coredb.yaml
 $ curl 0.0.0.0:8080/metrics
 # HELP cdb_controller_reconcile_duration_seconds The duration of reconcile to complete in seconds
@@ -198,38 +151,25 @@ $ curl 0.0.0.0:8080/
 {"last_event":"2019-07-17T22:31:37.591320068Z"}
 ```
 
-The metrics will be auto-scraped if you have a standard [`PodMonitor` for `prometheus.io/scrape`](https://github.com/prometheus-community/helm-charts/blob/b69e89e73326e8b504102a75d668dc4351fcdb78/charts/prometheus/values.yaml#L1608-L1650).
+## Observability with OpenTelemetry and Jaeger
 
-## Development
+[OpenTelemetry](https://opentelemetry.io/) is an observability framework that focuses on generation, collection, management, and export of telemetry.
+[Jaeger](https://www.jaegertracing.io/), on the other hand, is an observability platform with a companion UI that ingests the OpenTelemetry data.
+By integrating both into the Tembo Operator, users are able to gain more insights into their operations.
 
-Updating the CRD:
-
-- Edit the [CoreDBSpec struct](./src/controller.rs) as needed.
-
-- `> just generate-crd`
-
-### Connecting to Postgres locally
-
-Start a tembo instance
-
-```
-kubectl apply -f yaml/sample-coredb.yaml
-```
-
-Get the connection password and save it as an environment variable.
+If you haven't already, you can start a local Kubernetes cluster by running the following:
 
 ```bash
-export PGPASSWORD=$(kubectl get secrets/sample-coredb-connection --template={{.data.password}} | base64 -D)
+just start-kind
 ```
 
-Add the following line to `/etc/hosts`
+Once complete, simply run:
 
 ```bash
-127.0.0.1 sample-coredb.localhost
+just run-telemetry
 ```
 
-Connect to the running Postgres instance:
-
-```bash
-psql postgres://postgres:$PGPASSWORD@sample-coredb.localhost:5432
+From there, you're all set to visit the below URL and navigate your telemetry:
+```
+http://localhost:16686
 ```

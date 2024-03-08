@@ -556,7 +556,7 @@ fn get_create_instance(
         stack_type: StackType::from_str(instance_settings.stack_type.as_str()).unwrap(),
         storage: Storage::from_str(instance_settings.storage.as_str()).unwrap(),
         replicas: Some(instance_settings.replicas),
-        app_services: None,
+        app_services: get_app_services(instance_settings.app_services.clone())?,
         connection_pooler: None,
         extensions: Some(Some(get_extensions(
             instance_settings.extensions.clone(),
@@ -570,6 +570,88 @@ fn get_create_instance(
         postgres_configs: Some(Some(get_postgres_config_cloud(instance_settings)?)),
         pg_version: Some(instance_settings.pg_version.into()),
     });
+}
+
+fn get_app_services(
+    maybe_app_services: Option<Vec<tembo_stacks::apps::types::AppType>>,
+) -> Result<Option<Option<Vec<temboclient::models::AppType>>>, anyhow::Error> {
+    let mut vec_app_types: Vec<temboclient::models::AppType> = vec![];
+    let mut env_vars: Vec<temboclient::models::EnvVar> = vec![];
+
+    // TODO: Find a better way to handle this.
+    // It is done so that other app_types are skipped in the request
+    // We use #[serde(skip_serializing_if = "Option::is_none")] to skip app_types
+    env_vars.push(temboclient::models::EnvVar {
+        name: "test".to_string(),
+        value: Some(Some("test".to_string())),
+        value_from_platform: None,
+    });
+
+    let app_config = temboclient::models::AppConfig {
+        env: Some(Some(env_vars)),
+        resources: None,
+    };
+
+    if let Some(app_services) = maybe_app_services {
+        for app_type in app_services.iter() {
+            match app_type {
+                tembo_stacks::apps::types::AppType::RestAPI(_) => {
+                    vec_app_types.push(temboclient::models::AppType::new(
+                        Some(app_config.clone()),
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                    ))
+                }
+                tembo_stacks::apps::types::AppType::HTTP(_) => {
+                    vec_app_types.push(temboclient::models::AppType::new(
+                        None,
+                        Some(app_config.clone()),
+                        None,
+                        None,
+                        None,
+                        None,
+                    ))
+                }
+                tembo_stacks::apps::types::AppType::MQ(_) => {
+                    vec_app_types.push(temboclient::models::AppType::new(
+                        None,
+                        None,
+                        Some(app_config.clone()),
+                        None,
+                        None,
+                        None,
+                    ))
+                }
+                tembo_stacks::apps::types::AppType::Embeddings(_) => {
+                    vec_app_types.push(temboclient::models::AppType::new(
+                        None,
+                        None,
+                        None,
+                        Some(app_config.clone()),
+                        None,
+                        None,
+                    ))
+                }
+                tembo_stacks::apps::types::AppType::PgAnalyze(_) => {
+                    vec_app_types.push(temboclient::models::AppType::new(
+                        None,
+                        None,
+                        None,
+                        None,
+                        Some(app_config.clone()),
+                        None,
+                    ))
+                }
+                tembo_stacks::apps::types::AppType::Custom(_) => vec_app_types.push(
+                    temboclient::models::AppType::new(None, None, None, None, None, None),
+                ),
+            }
+        }
+    }
+    Ok(Some(Some(vec_app_types)))
 }
 
 fn get_patch_instance(
@@ -589,7 +671,7 @@ fn get_patch_instance(
             Storage::from_str(instance_settings.storage.as_str()).unwrap(),
         )),
         replicas: Some(Some(instance_settings.replicas)),
-        app_services: None,
+        app_services: get_app_services(instance_settings.app_services.clone())?,
         connection_pooler: None,
         extensions: Some(Some(get_extensions(
             instance_settings.extensions.clone(),
