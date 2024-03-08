@@ -1008,10 +1008,12 @@ pub fn get_rendered_dockerfile(
     };
 
     // Sorts trunk_installs so the installation order is deterministic, also make sure vector is last
-    if let Some(mut installs) = trunk_installs.as_ref().map(|installs| installs.clone()) {
+    if let Some(mut installs) = trunk_installs.as_ref().cloned() {
         // Sort by name, but ensure "vector" is always last
         installs.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
-        let (non_vector, vector): (Vec<_>, Vec<_>) = installs.into_iter().partition(|i| i.name.to_lowercase() != "vector");
+        let (non_vector, vector): (Vec<_>, Vec<_>) = installs
+            .into_iter()
+            .partition(|i| i.name.to_lowercase() != "vector");
         let sorted_installs = [non_vector, vector].concat();
 
         context.insert("trunk_installs", &sorted_installs);
