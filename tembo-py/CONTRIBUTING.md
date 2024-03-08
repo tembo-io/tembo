@@ -11,7 +11,7 @@ And thank you for your interest in contributing to this Python library.
 
 ## Prerequisites
 
-- [Python](https://www.python.org/)
+- [Python](https://www.python.org/) - Programming language and companion `pip` package manager
 - [Poetry](https://python-poetry.org/) - Python packaging and dependency management
 - [Docker Engine](https://docs.docker.com/engine/install/) - For running local containers
 

@@ -17,6 +17,35 @@ The [tembo-py library](https://pypi.org/project/tembo-py/) is hosted on pypi.org
 pip install tembo-py
 ```
 
+## Prepare and Insert Sample Documents
+
+The 
+
+```bash
+git clone https://github.com/tembo-io/website.git
+```
+
+```bash
+mkdir tembo_docs
+
+find "website/docusaurus/docs" -type f -name "*.md" -exec cp {} "tembo_docs" \;
+find "website/landing/src/content/blog" -type f -name "*.md" -exec cp {} "tembo_docs" \;
+```
+
+```bash
+from tembo_py.rag import TemboRAG
+
+rag = TemboRAG(
+    project_name="tembo_support",
+    chat_model="gpt-3.5-turbo",
+    connection_string="postgresql://postgres:<your-password>@<your-TemboHost>:5432/postgres"
+)
+
+chunks = rag.prepare_from_directory("./tembo_docs")
+
+rag.load_documents(chunks)
+```
+
 ## Example: Adding Custom Prompts
 
 Within the [rag.py](./tembo_py/rag.py) file's `TemboRAG` class, the `add_prompt_template` method introduces the ability to add custom prompts.
@@ -65,50 +94,34 @@ touch example_tembo.py
 Using your preferred text editor or IDE, you can create the following script:
 
 ```python
-from tembo_py.rag import TemboRAG
-import psycopg
+     rag.add_prompt_template(
+              <prompt_type>, # The title of the prompt.
+              <sys_prompt>,  # Priming the system characteristics.
+              <user_prompt>  # Any information brought by the user.
+          )
+```
 
-# Constants
-PROJECT_NAME = "test_add_prompt_template"
-PROMPT_NAME = "example_prompt"
-SYS_PROMPT = "System prompt text for example"
-USER_PROMPT = "User prompt text for example"
-CONNECTION_STRING = "postgresql://postgres:postgres@localhost:5432/postgres"
+This will look something like this:
 
-def initialize_tembo_rag(project_name, connection_string):
-    """
-    Initialize TemboRAG instance.
-    """
-    return TemboRAG(project_name=project_name, connection_string=connection_string)
-
-def add_prompt_template_to_db():
-    # Initialize TemboRAG instance
-    tembo_rag = initialize_tembo_rag(PROJECT_NAME, CONNECTION_STRING)
-
-    # Add the prompt template
-    tembo_rag.add_prompt_template(PROMPT_NAME, SYS_PROMPT, USER_PROMPT)
-
-    # Connect to the database to verify the insertion
-    with psycopg.connect(CONNECTION_STRING) as conn:
-        with conn.cursor() as cur:
-            cur.execute(
-                "SELECT prompt_type, sys_prompt, user_prompt FROM vectorize.prompts WHERE prompt_type = %s",
-                (PROMPT_NAME,)
-            )
-            result = cur.fetchone()
-
-    if result:
-        print(f"Prompt '{PROMPT_NAME}' successfully added to the database.")
-        print(f"System Prompt: {result[1]}")
-        print(f"User Prompt: {result[2]}")
-    else:
-        print("Failed to add the prompt to the database.")
-
-if __name__ == "__main__":
-    add_prompt_template_to_db()
+```python
+     rag.add_prompt_template(
+              "booyah", 
+              "You are a Postgres expert and are tasked with helping users find answers in Tembo documentation. You should prioritize answering questions using the provided context, but can draw from your expert Postgres experience where documentation is lacking. Avoid statements like based on the documentation... and also you love to say booyah! alot.",
+              "Context information is below.\n---------------------\n{{ context_str }}\n---------------------\nGiven the Tembo documentation information and your expert Postgres knowledge, answer the question.\n Question: {{ query_str }}\nAnswer:"
+          )
 ```
 
 #### 4. Executing the Python File and Confirming Success
+
+```python
+if __name__ == "__main__":
+    question = "Tell me a joke about the geospatial stack."
+    prompt_template_name = "booyah" 
+    print(f"Querying: {question}")
+    result = ensure_prompt_and_query(question, prompt_template_name)
+    print("Response:", result)
+```
+
 
 ```bash
 python3 example_tembo.py
