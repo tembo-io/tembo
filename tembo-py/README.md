@@ -8,7 +8,7 @@ For more technical information and ways to get involved, please refer to the [co
 
 - [Prerequisites](#prerequisites)
 - [Installation](#installation)
-- [Prepare and Insert Sample Documents](#prepare-and-insert-sample-documents)
+- [Prepare Contextual Basis](#prepare-contextual-basis)
 - [Adding Custom Prompts](#adding-custom-prompts)
 
 ## Prerequisites
@@ -27,7 +27,7 @@ pip install tembo-py
 ## Prepare Contextual Basis
 
 Before jumping in, it's important to have material to offer the model as context.
-The [RAG Stack official documentation](https://tembo.io/docs/tembo-stacks/rag#build-a-support-agent-with-tembo-rag) does a good job reviewing this in detail, so we will highlight some key points.
+The [RAG Stack official documentation](https://tembo.io/docs/tembo-stacks/rag#build-a-support-agent-with-tembo-rag) does a good job reviewing this in detail, so at this point we will assume you have data ready to load.
 
 ```bash
 from tembo_py.rag import TemboRAG
@@ -38,7 +38,7 @@ rag = TemboRAG(
     connection_string="postgresql://postgres:<your-password>@<your-TemboHost>:5432/postgres"
 )
 
-chunks = rag.prepare_from_directory("./tembo_docs")
+chunks = rag.prepare_from_directory("./tembo_docs") # File path to your loadable data
 
 rag.load_documents(chunks)
 ```
@@ -46,7 +46,7 @@ rag.load_documents(chunks)
 Now that the table is loaded into Postgres, you can run the following:
 
 ```python
-rag.init_rag(connection_string="postgresql://postgres:wJj00hgPWnh5qalf@org-evan-test-inst-evan-mar-rag-test.data-1.use1.tembo-development.com:5432/postgres",
+rag.init_rag(connection_string="postgresql://postgres:<your-password>@<your-TemboHost>:5432/postgres",
              transformer="sentence-transformers/all-MiniLM-L12-v2"
 )
 ```
@@ -93,18 +93,16 @@ Using your preferred text editor or IDE, you can create the following script:
 This will look something like this:
 
 ```python
+def ensure_prompt_and_query(query_string, prompt_template_name):
+    """Establish prompt and perform a query."""
+
      rag.add_prompt_template(
               "booyah", 
               "You are a Postgres expert and are tasked with helping users find answers in Tembo documentation. You should prioritize answering questions using the provided context, but can draw from your expert Postgres experience where documentation is lacking. Avoid statements like based on the documentation... and also you love to say booyah! alot.",
               "Context information is below.\n---------------------\n{{ context_str }}\n---------------------\nGiven the Tembo documentation information and your expert Postgres knowledge, answer the question.\n Question: {{ query_str }}\nAnswer:"
           )
-```
-
-#### 4. Executing the Python File and Confirming Success
-
-```python
 if __name__ == "__main__":
-    question = "Tell me a joke about the geospatial stack."
+    question = "What are some real world applications of the geospatial stack?"
     prompt_template_name = "booyah" 
     print(f"Querying: {question}")
     result = ensure_prompt_and_query(question, prompt_template_name)
@@ -112,23 +110,22 @@ if __name__ == "__main__":
 ```
 
 
+
+### 3. Executing the Python File and Confirming Success
+
 ```bash
 python3 example_tembo.py
 ```
 
-If successful, you should see the following:
+If successful, you should see something similar to the following:
 
-You can now enter Postgres to confirm the insertion of your custom prompt.
-
-:bulb: Note that the password is by default `postgres`.
-
-```bash
-psql -h localhost -p 5432 -U postgres -W
+```text
+Querying: What are some real world applications of the geospatial stack?
+Response: Booyah! The Tembo Geospatial Stack opens up a world of possibilities for real-world applications leveraging its spatial database capabilities in Postgres. Some common applications include:
+1. Mapping and spatial analysis for urban planning and development.
+2. Location-based services for businesses such as geotargeted advertising or route optimization for delivery services.
+3. Environmental monitoring and management, such as tracking wildlife habitats or analyzing climate data.
+4. Disaster response and emergency management for planning evacuation routes or assessing impact areas.
+5. Infrastructure design and management, like optimizing transportation networks or locating new facilities based on geographical factors.
+The Tembo Geospatial Stack empowers users to efficiently handle spatial objects, execute location queries, and tackle GIS workloads for a wide range of industries and use cases.
 ```
-
-As `pg_vectorize` was enabled above, run the following SELECT statement to confirm your new addition:
-
-```sql
-SELECT * FROM vectorize.prompts;
-```
-
