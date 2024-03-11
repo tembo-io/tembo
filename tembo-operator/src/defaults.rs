@@ -11,7 +11,7 @@ use crate::{
     },
     cloudnativepg::poolers::{PoolerPgbouncerPoolMode, PoolerTemplateSpecContainersResources},
     extensions::types::{Extension, TrunkInstall},
-    stacks::{types::ImagePerPgVersion, DATAWAREHOUSE, ML, STANDARD},
+    stacks::{types::ImagePerPgVersion},
 };
 
 pub fn default_replicas() -> i32 {
@@ -50,16 +50,11 @@ pub fn default_repository() -> String {
 }
 
 pub fn default_images() -> ImagePerPgVersion {
-    // Note: this will recurse infinitely if standard.yaml doesn't have `images` set
-    STANDARD.images.clone()
-}
-
-pub fn default_llm_image() -> String {
-    ML.images.pg15.clone()
-}
-
-pub fn default_dw_image() -> String {
-    DATAWAREHOUSE.images.pg15.clone()
+    ImagePerPgVersion {
+        pg14: "standard-cnpg:14-a0a5ab5".to_string(),
+        pg15: "standard-cnpg:15-a0a5ab5".to_string(),
+        pg16: "standard-cnpg:16-a0a5ab5".to_string(),
+    }
 }
 
 pub fn default_image_uri() -> String {
@@ -67,18 +62,6 @@ pub fn default_image_uri() -> String {
     let image = default_images();
     let image_for_pg_15 = image.pg15;
     format!("{}/{}", repo, image_for_pg_15)
-}
-
-pub fn default_llm_image_uri() -> String {
-    let repo = default_repository();
-    let image = default_llm_image();
-    format!("{}/{}", repo, image)
-}
-
-pub fn default_dw_image_uri() -> String {
-    let repo = default_repository();
-    let image = default_dw_image();
-    format!("{}/{}", repo, image)
 }
 
 pub fn postgres_major_version_from_cdb(coredb: &CoreDB) -> Result<i32, String> {
