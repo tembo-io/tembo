@@ -10,6 +10,7 @@ use crate::{
     },
     Context,
 };
+use chrono::{DateTime, Utc};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use kube::{
     api::{ListParams, Patch, PatchParams},
@@ -398,7 +399,7 @@ fn generate_volume_snapshot(
 // original instance you are restoring from
 async fn lookup_volume_snapshot(cdb: &CoreDB, client: &Client) -> Result<VolumeSnapshot, Action> {
     // name will be the name of the original instance
-    let name = cdb
+    let og_instance_name = cdb
         .spec
         .restore
         .as_ref()
@@ -411,47 +412,136 @@ async fn lookup_volume_snapshot(cdb: &CoreDB, client: &Client) -> Result<VolumeS
             Action::requeue(tokio::time::Duration::from_secs(300))
         })?;
 
+    debug!(
+        "Looking up VolumeSnapshots for original instance: {}",
+        og_instance_name
+    );
+
     // todo: This is a temporary fix to get the VolumeSnapshot from the same namespace as the
     // instance you are attempting to restore from.  We need to figure out a better way of
     // doing this in case someone wants to name a namespace differently than the instance name.
-    let volume_snapshot_api: Api<VolumeSnapshot> = Api::namespaced(client.clone(), &name);
+    // At Tembo we assume that the namespace and the name of the instance name are the same.
+    let volume_snapshot_api: Api<VolumeSnapshot> =
+        Api::namespaced(client.clone(), &og_instance_name);
 
-    let label_selector = format!("cnpg.io/cluster={}", name);
+    let label_selector = format!("cnpg.io/cluster={}", og_instance_name);
     let lp = ListParams::default().labels(&label_selector);
     let result = volume_snapshot_api.list(&lp).await.map_err(|e| {
-        error!("Error listing VolumeSnapshots for instance {}: {}", name, e);
+        error!(
+            "Error listing VolumeSnapshots for instance {}: {}",
+            og_instance_name, e
+        );
         Action::requeue(tokio::time::Duration::from_secs(300))
     })?;
 
+    debug!(
+        "Found {} VolumeSnapshots for instance {}",
+        result.items.len(),
+        og_instance_name
+    );
+
+    // Set recovery_target_time if it's set in the CoreDB spec as DateTime<Utc>
+    let recovery_target_time: Option<DateTime<Utc>> = cdb
+        .spec
+        .restore
+        .as_ref()
+        .and_then(|r| r.recovery_target_time.as_deref())
+        .and_then(|time_str| DateTime::parse_from_rfc3339(time_str).ok())
+        .map(|dt| dt.with_timezone(&Utc));
+
+    debug!("Recovery target time: {:?}", recovery_target_time);
+
     // Filter snapshots that are ready to use and sort them by creation timestamp in descending order
-    let mut snapshots: Vec<VolumeSnapshot> = result
-        .items
+    let snapshots: Vec<VolumeSnapshot> = result
         .into_iter()
         .filter(|vs| {
             vs.status
                 .as_ref()
-                .map(|s| s.ready_to_use.unwrap_or(false))
-                .unwrap_or(false)
+                .map_or(false, |s| s.ready_to_use.unwrap_or(false))
+        })
+        .filter(|vs| {
+            vs.metadata
+                .annotations
+                .as_ref()
+                .and_then(|ann| ann.get("cnpg.io/instanceRole"))
+                .map_or(false, |role| role == "primary")
         })
         .collect();
 
-    debug!("Found {} VolumeSnapshots for {}", snapshots.len(), name);
+    debug!(
+        "Filtered {} VolumeSnapshots for primary role and readiness",
+        snapshots.len()
+    );
 
-    if snapshots.is_empty() {
-        error!("No ready VolumeSnapshots found for {}", name);
-        return Err(Action::requeue(tokio::time::Duration::from_secs(300)));
+    match find_closest_snapshot(snapshots, recovery_target_time) {
+        Some(snapshot) => {
+            debug!(
+                "Selected VolumeSnapshot: {}",
+                snapshot
+                    .metadata
+                    .name
+                    .as_deref()
+                    .map_or("unknown", |name| name)
+            );
+            Ok(snapshot)
+        }
+        None => {
+            error!(
+                "No suitable VolumeSnapshot found for instance {}",
+                og_instance_name
+            );
+            Err(Action::requeue(tokio::time::Duration::from_secs(300)))
+        }
     }
+}
 
-    snapshots.sort_by(|a, b| {
-        b.metadata
-            .creation_timestamp
-            .cmp(&a.metadata.creation_timestamp)
-    });
+fn find_closest_snapshot(
+    snapshots: Vec<VolumeSnapshot>,
+    recovery_target_time: Option<DateTime<Utc>>,
+) -> Option<VolumeSnapshot> {
+    let filtered_snapshots: Vec<_> = snapshots
+        .into_iter()
+        .filter_map(|snapshot| {
+            let end_time_str = snapshot
+                .metadata
+                .annotations
+                .as_ref()?
+                .get("cnpg.io/snapshotEndTime")?;
+            let end_time = DateTime::parse_from_rfc3339(end_time_str)
+                .ok()?
+                .with_timezone(&Utc);
+            Some((snapshot, end_time))
+        })
+        .collect();
 
-    snapshots.first().cloned().ok_or_else(|| {
-        error!("Error getting first snapshot for instance {}", name);
-        Action::requeue(tokio::time::Duration::from_secs(300))
-    })
+    debug!(
+        "Filtered snapshots based on end time: {:?}",
+        filtered_snapshots
+    );
+
+    match recovery_target_time {
+        Some(target_time) => {
+            debug!("Recovery target time is specified: {:?}", target_time);
+            let closest_snapshot = filtered_snapshots
+                .into_iter()
+                .filter(|(_, end_time)| *end_time <= target_time)
+                .min_by_key(|(_, end_time)| (target_time - *end_time).num_seconds().abs())
+                .map(|(snapshot, _)| snapshot);
+
+            debug!("Selected closest snapshot: {:?}", closest_snapshot);
+            closest_snapshot
+        }
+        None => {
+            debug!("No recovery target time specified, selecting the latest snapshot.");
+            let latest_snapshot = filtered_snapshots
+                .into_iter()
+                .max_by_key(|(_, end_time)| *end_time)
+                .map(|(snapshot, _)| snapshot);
+
+            debug!("Selected latest snapshot: {:?}", latest_snapshot);
+            latest_snapshot
+        }
+    }
 }
 
 async fn lookup_volume_snapshot_content(
@@ -496,7 +586,9 @@ mod tests {
             VolumeSnapshotContentStatus,
         },
     };
+    use chrono::DateTime;
     use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+    use std::collections::BTreeMap;
 
     #[test]
     fn test_generate_volume_snapshot_content() {
@@ -645,5 +737,59 @@ mod tests {
         );
         // The namespace of the generated VolumeSnapshot should match the namespace of the CoreDB
         assert_eq!(result.metadata.namespace.unwrap(), "default");
+    }
+
+    fn create_volume_snapshot(name: &str, snapshot_end_time: &str) -> VolumeSnapshot {
+        let mut annotations = BTreeMap::new();
+        annotations.insert(
+            "cnpg.io/snapshotEndTime".to_string(),
+            snapshot_end_time.to_string(),
+        );
+
+        VolumeSnapshot {
+            metadata: ObjectMeta {
+                name: Some(name.to_string()),
+                annotations: Some(annotations),
+                ..ObjectMeta::default()
+            },
+            spec: VolumeSnapshotSpec {
+                ..VolumeSnapshotSpec::default()
+            },
+            status: None,
+        }
+    }
+
+    #[test]
+    fn test_find_closest_snapshot_pitr() {
+        let recovery_target_time_str = "2024-03-06T00:00:00Z";
+        let recovery_target_time = DateTime::parse_from_rfc3339(recovery_target_time_str)
+            .unwrap()
+            .with_timezone(&Utc);
+
+        let snapshots = vec![
+            create_volume_snapshot("snapshot1", "2024-03-05T23:50:00Z"),
+            create_volume_snapshot("snapshot2", "2024-03-05T22:00:00Z"),
+            create_volume_snapshot("snapshot3", "2024-03-05T23:55:00Z"),
+            create_volume_snapshot("snapshot4", "2024-03-05T21:00:00Z"),
+            create_volume_snapshot("snapshot5", "2024-03-06T00:01:00Z"),
+        ];
+
+        let closest_snapshot =
+            find_closest_snapshot(snapshots, Some(recovery_target_time)).unwrap();
+        assert_eq!(closest_snapshot.metadata.name.unwrap(), "snapshot3");
+    }
+
+    #[test]
+    fn test_find_latest_snapshot_when_target_time_empty() {
+        let snapshots = vec![
+            create_volume_snapshot("snapshot1", "2024-03-05T20:00:00Z"),
+            create_volume_snapshot("snapshot2", "2024-03-05T22:00:00Z"),
+            create_volume_snapshot("snapshot3", "2024-03-05T23:00:00Z"),
+            create_volume_snapshot("snapshot4", "2024-03-05T21:00:00Z"),
+            create_volume_snapshot("snapshot5", "2024-03-06T00:01:00Z"),
+        ];
+
+        let latest_snapshot = find_closest_snapshot(snapshots, None).unwrap();
+        assert_eq!(latest_snapshot.metadata.name.unwrap(), "snapshot5");
     }
 }

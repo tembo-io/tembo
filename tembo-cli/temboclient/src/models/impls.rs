@@ -79,6 +79,8 @@ impl FromStr for StackType {
             "OLTP" => Ok(StackType::Oltp),
             "DataWarehouse" => Ok(StackType::DataWarehouse),
             "Geospatial" => Ok(StackType::Geospatial),
+            "MongoAlternative" => Ok(StackType::MongoAlternative),
+            "RAG" => Ok(StackType::Rag),
             _ => Err(()),
         }
     }

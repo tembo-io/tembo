@@ -10,6 +10,7 @@ use controller::extensions::types::Extension as ControllerExtension;
 use controller::extensions::types::ExtensionInstallLocation as ControllerExtensionInstallLocation;
 use controller::extensions::types::TrunkInstall as ControllerTrunkInstall;
 use controller::stacks::get_stack;
+use controller::stacks::types::Stack;
 use controller::stacks::types::StackType as ControllerStackType;
 use itertools::Itertools;
 use log::info;
@@ -240,10 +241,11 @@ fn docker_apply_instance(
         stack.app_services.clone(),
         extensions,
         trunk_installs,
-        stack.postgres_config,
+        stack.postgres_config.clone(),
     )?;
 
-    let rendered_dockerfile: String = get_rendered_dockerfile(&trunk_installs)?;
+    let rendered_dockerfile: String =
+        get_rendered_dockerfile(&trunk_installs, &stack, instance_setting.pg_version)?;
 
     FileUtils::create_file(
         DOCKERFILE_NAME.to_string(),
@@ -988,6 +990,8 @@ pub fn get_instance_settings(
 
 pub fn get_rendered_dockerfile(
     trunk_installs: &Option<Vec<ControllerTrunkInstall>>,
+    stack: &Stack,
+    pg_version: u8,
 ) -> Result<String, anyhow::Error> {
     // Include the Dockerfile template directly into the binary
     let contents = include_str!("../../tembo/Dockerfile.template");
@@ -996,6 +1000,28 @@ pub fn get_rendered_dockerfile(
     let _ = tera.add_raw_template("dockerfile", contents);
     let mut context = Context::new();
 
+    let image = match pg_version.into() {
+        14 => &stack.images.pg14,
+        15 => &stack.images.pg15,
+        16 => &stack.images.pg16,
+        _ => &stack.images.pg15,
+    };
+
+    // Sorts trunk_installs so the installation order is deterministic, also make sure vector is last
+    if let Some(mut installs) = trunk_installs.as_ref().cloned() {
+        // Sort by name, but ensure "vector" is always last
+        installs.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        let (non_vector, vector): (Vec<_>, Vec<_>) = installs
+            .into_iter()
+            .partition(|i| i.name.to_lowercase() != "vector");
+        let sorted_installs = [non_vector, vector].concat();
+
+        context.insert("trunk_installs", &sorted_installs);
+    } else {
+        context.insert("trunk_installs", &Vec::<ControllerTrunkInstall>::new());
+    }
+
+    context.insert("image_with_version", &image);
     context.insert("trunk_installs", &trunk_installs);
 
     let rendered_dockerfile = tera.render("dockerfile", &context).unwrap();
@@ -1064,7 +1090,8 @@ fn get_postgres_config(
                 }
                 _ => {
                     if value.is_str() {
-                        let _ = writeln!(postgres_config, "{} = '{value}'", key.as_str());
+                        let val = value.as_str().unwrap();
+                        let _ = writeln!(postgres_config, "{} = '{val}'", key.as_str());
                     }
                     if value.is_table() {
                         for row in value.as_table().iter() {
@@ -1091,23 +1118,34 @@ fn get_postgres_config(
 
     match maybe_final_loadable_libs {
         Ok(l) => {
-            let config = l
-                .into_iter()
-                .unique_by(|f| f.name.clone())
-                .sorted_by_key(|s| (s.priority, s.name.clone()))
-                .map(|x| x.name.to_string() + ",")
-                .collect::<String>();
+            if !l.is_empty() {
+                let config = l
+                    .into_iter()
+                    .unique_by(|f| f.name.clone())
+                    .sorted_by_key(|s| (s.priority, s.name.clone()))
+                    .map(|x| x.name.to_string() + ",")
+                    .collect::<String>();
 
-            let final_libs = config.split_at(config.len() - 1);
+                let final_libs = config.split_at(config.len() - 1);
 
-            let libs_config = format!("shared_preload_libraries = '{}'", final_libs.0);
+                let libs_config = format!("shared_preload_libraries = '{}'", final_libs.0);
 
-            postgres_config.push_str(&libs_config);
+                postgres_config.push_str(&libs_config);
+            }
         }
         Err(error) => {
             return Err(error);
         }
     }
+
+    postgres_config.push_str(
+        "
+listen_addresses = '*'
+ssl = 'on'
+ssl_cert_file = '/var/lib/postgresql/server.crt'
+ssl_key_file = '/var/lib/postgresql/server.key'
+ssl_min_protocol_version = 'TLSv1.2'",
+    );
 
     Ok(postgres_config)
 }

@@ -50,6 +50,15 @@ controller:
       port: http
       path: /metrics
 
+  # -- Set default env values currently used by the controller.
+  env:
+    # -- ENABLE_BACKUP will enable backups to object store (S3)
+    - name: ENABLE_BACKUP
+      value: "true"
+    # -- ENABLE_VOLUME_SNAPSHOT enables the use of external-snapshotter controller.  Requires VolumeSnapshot and VolumeSnapshotContent CRDs from external-snapshotter.
+    - name: ENABLE_VOLUME_SNAPSHOT
+      value: "false"
+
   extraEnv: []
 
   # -- Annotations to be added to the deployment

@@ -10,6 +10,7 @@ use crate::{
             cnpg_cluster_from_cdb, reconcile_cnpg, reconcile_cnpg_scheduled_backup,
             reconcile_pooler,
         },
+        VOLUME_SNAPSHOT_CLASS_NAME,
     },
     config::Config,
     exec::{ExecCommand, ExecOutput},
@@ -256,6 +257,13 @@ impl CoreDB {
 
         reconcile_generic_metrics_configmap(self, ctx.clone()).await?;
 
+        // Before we reconcile CNPG, we need to make sure that spec.backup.volumeSnapshot is
+        // enabled in the CoreDB spec if cfg.enable_volume_snapshot = true.  If it's not
+        // then we should enable it, otherwise it should be a no-op.
+        if cfg.enable_volume_snapshot {
+            self.enable_volume_snapshot(ctx.clone()).await?;
+        }
+
         reconcile_cnpg(self, ctx.clone()).await?;
         if cfg.enable_backup {
             reconcile_cnpg_scheduled_backup(self, ctx.clone()).await?;
@@ -356,6 +364,60 @@ impl CoreDB {
         // Check back every 90-150 seconds
         let jitter = rand::thread_rng().gen_range(0..60);
         Ok(Action::requeue(Duration::from_secs(90 + jitter)))
+    }
+
+    // enable_volume_snapshot makes sure that the CoreDB spec has the spec.backup.volumeSnapshot
+    // enabled.  If it's already enabled, then do nothing.
+    #[instrument(skip(self, ctx))]
+    async fn enable_volume_snapshot(&self, ctx: Arc<Context>) -> Result<(), Action> {
+        // Check if the CoreDB already has the spec.backup.volumeSnapshot enabled
+        if self
+            .spec
+            .backup
+            .volume_snapshot
+            .as_ref()
+            .map(|e| e.enabled)
+            .unwrap_or(false)
+        {
+            return Ok(());
+        }
+        let client = ctx.client.clone();
+        let name = self.name_any();
+        let namespace = self
+            .metadata
+            .namespace
+            .clone()
+            .expect("CoreDB should have a namespace");
+
+        // Setup the client for the CoreDB
+        let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
+
+        // Create the patch to enable the spec.backup.volumeSnapshot
+        let patch = json!({
+            "spec": {
+                "backup": {
+                    "volumeSnapshot": {
+                        "enabled": true,
+                        "snapshotClass": VOLUME_SNAPSHOT_CLASS_NAME
+                    }
+                }
+            }
+        });
+        let patch_params = PatchParams {
+            field_manager: Some("cntrlr".to_string()),
+            ..PatchParams::default()
+        };
+        let patch_status = Patch::Merge(patch.clone());
+        match coredbs.patch(&name, &patch_params, &patch_status).await {
+            Ok(_) => {
+                debug!("Successfully updated CoreDB status for {}", name);
+                Ok(())
+            }
+            Err(e) => {
+                error!("Error updating CoreDB status for {}: {:?}", name, e);
+                Err(Action::requeue(Duration::from_secs(10)))
+            }
+        }
     }
 
     // Finalizer cleanup (the object was deleted, ensure nothing is orphaned)

@@ -1,3 +1,5 @@
 [minimal]
 environment = "prod"
 instance_name = "minimal"
+pg_version = 15
+stack_type = "Standard"

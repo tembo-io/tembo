@@ -1,3 +1,75 @@
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+use tembo_controller::{
+    apis::postgres_parameters::PgConfig,
+    app_service::types::AppService,
+    defaults::{default_images, default_repository},
+    extensions::types::{Extension, TrunkInstall},
+    postgres_exporter::QueryConfig,
+    stacks::config_engines::{
+        mq_config_engine, olap_config_engine, standard_config_engine, ConfigEngine,
+    },
+};
+use utoipa::ToSchema;
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema, PartialEq, ToSchema)]
+pub enum StackType {
+    API,
+    DataWarehouse,
+    Geospatial,
+    MachineLearning,
+    MessageQueue,
+    MongoAlternative,
+    OLAP,
+    #[default]
+    OLTP,
+    RAG,
+    Standard,
+    Timeseries,
+    VectorDB,
+}
+
+impl std::str::FromStr for StackType {
+    type Err = &'static str;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "API" => Ok(StackType::API),
+            "DataWarehouse" => Ok(StackType::DataWarehouse),
+            "Geospatial" => Ok(StackType::Geospatial),
+            "MachineLearning" => Ok(StackType::MachineLearning),
+            "MessageQueue" => Ok(StackType::MessageQueue),
+            "MongoAlternative" => Ok(StackType::MongoAlternative),
+            "OLAP" => Ok(StackType::OLAP),
+            "OLTP" => Ok(StackType::OLTP),
+            "RAG" => Ok(StackType::RAG),
+            "Standard" => Ok(StackType::Standard),
+            "Timeseries" => Ok(StackType::Timeseries),
+            "VectorDB" => Ok(StackType::VectorDB),
+            _ => Err("invalid value"),
+        }
+    }
+}
+
+impl StackType {
+    pub fn as_str(&self) -> &str {
+        match self {
+            StackType::API => "API",
+            StackType::DataWarehouse => "DataWarehouse",
+            StackType::Geospatial => "Geospatial",
+            StackType::MachineLearning => "MachineLearning",
+            StackType::MessageQueue => "MessageQueue",
+            StackType::MongoAlternative => "MongoAlternative",
+            StackType::OLAP => "OLAP",
+            StackType::OLTP => "OLTP",
+            StackType::RAG => "RAG",
+            StackType::Standard => "Standard",
+            StackType::Timeseries => "Timeseries",
+            StackType::VectorDB => "VectorDB",
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use tembo_controller::apis::postgres_parameters::PgConfig;
