@@ -38,7 +38,7 @@ rag.load_documents(chunks)
 Now that the table is loaded into Postgres, you can run the following:
 
 ```python
-rag.init_rag(connection_string="postgresql://postgres:<your-password>@<your-TemboHost>:5432/postgres",
+rag.init_rag(
              transformer="sentence-transformers/all-MiniLM-L12-v2"
 )
 ```
