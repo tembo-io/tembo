@@ -4,14 +4,9 @@ The official Python client for Tembo.io
 
 ## Table of Contents
 
-- [Prerequisites](#prerequisites)
 - [Installation](#installation)
-- [Prepare Contextual Basis](#prepare-contextual-basis)
+- [Interacting with RAG](#interacting-with-rag)
 - [Adding Custom Prompts](#adding-custom-prompts)
-
-## Prerequisites
-
-- [Python](https://www.python.org/) - Programming language and companion `pip` package manager
 
 ## Installation
 
@@ -21,9 +16,9 @@ The [tembo-py library](https://pypi.org/project/tembo-py/) is hosted on pypi.org
 pip install tembo-py
 ```
 
-## Prepare Contextual Basis
+## Interacting with RAG
 
-Before jumping in, it's important to have material to offer the model as context.
+Interacting with the RAG Stack requires the loading of ..
 The [RAG Stack official documentation](https://tembo.io/docs/tembo-stacks/rag#build-a-support-agent-with-tembo-rag) does a good job reviewing this in detail, so keep the following points brief.
 
 ```python
@@ -73,52 +68,36 @@ ALTER SYSTEM SET vectorize.openai_key TO '<your api key>';
 
 ```sql
 SELECT pg_reload_conf();
-``````
+```
 
 ### 2. Define Your Custom Prompt
 
-Using your preferred text editor or IDE, you can create the following script:
+The following outlines the parameters that you can adjust in your custom template:
 
 ```python
      rag.add_prompt_template(
-              <prompt_type>, # The title of the prompt.
-              <sys_prompt>,  # Priming the system characteristics.
-              <user_prompt>  # Any information brought by the user.
+        <prompt_type>, # The title of the prompt.
+        <sys_prompt>,  # Priming the system characteristics.
+        <user_prompt>  # Any information brought by the user.
           )
 ```
 
 The end result will look something like the following:
 
-:bulb: Note the `if` statement is where you can input a query.
-
 ```python
-def ensure_prompt_and_query(query_string, prompt_template_name):
-    """Establish prompt and perform a query."""
+rag.add_prompt_template(
+    "booyah", 
+    "You are a Postgres expert and are tasked with helping users find answers in Tembo documentation. You should prioritize answering questions using the provided context, but can draw from your expert Postgres experience where documentation is lacking. Avoid statements like based on the documentation... and also you love to say booyah! alot.",
+    "Context information is below.\n---------------------\n{{ context_str }}\n---------------------\nGiven the Tembo documentation information and your expert Postgres knowledge, answer the question.\n Question: {{ query_str }}\nAnswer:"
+)
 
-     rag.add_prompt_template(
-              "booyah", 
-              "You are a Postgres expert and are tasked with helping users find answers in Tembo documentation. You should prioritize answering questions using the provided context, but can draw from your expert Postgres experience where documentation is lacking. Avoid statements like based on the documentation... and also you love to say booyah! alot.",
-              "Context information is below.\n---------------------\n{{ context_str }}\n---------------------\nGiven the Tembo documentation information and your expert Postgres knowledge, answer the question.\n Question: {{ query_str }}\nAnswer:"
-          )
-if __name__ == "__main__":
-    question = "What are some real world applications of the geospatial stack?"
-    prompt_template_name = "booyah" 
-    print(f"Querying: {question}")
-    result = ensure_prompt_and_query(question, prompt_template_name)
-    print("Response:", result)
-```
+query_string = "What are some real world applications of the geospatial stack?"
+prompt_template_name = "booyah"
 
+response = return rag.query(query=query_string, prompt_template=prompt_template_name).chat_response
 
+print(response)
 
-### 3. Executing the Python File and Confirming Success
-
-```bash
-python3 example_tembo.py
-```
-
-If successful, you should see something similar to the following:
-
-```text
 Querying: What are some real world applications of the geospatial stack?
 Response: Booyah! The Tembo Geospatial Stack opens up a world of possibilities for real-world applications leveraging its spatial database capabilities in Postgres. Some common applications include:
 1. Mapping and spatial analysis for urban planning and development.
@@ -128,3 +107,4 @@ Response: Booyah! The Tembo Geospatial Stack opens up a world of possibilities f
 5. Infrastructure design and management, like optimizing transportation networks or locating new facilities based on geographical factors.
 The Tembo Geospatial Stack empowers users to efficiently handle spatial objects, execute location queries, and tackle GIS workloads for a wide range of industries and use cases.
 ```
+
