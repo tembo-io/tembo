@@ -129,6 +129,7 @@ mod tests {
             StackType::OLTP,
             StackType::RAG,
             StackType::Standard,
+            StackType::Timeseries,
             StackType::VectorDB,
         ];
 
