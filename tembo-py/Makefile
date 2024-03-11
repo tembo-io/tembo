@@ -14,13 +14,14 @@ setup:
 	curl -sSL https://install.python-poetry.org | POETRY_VERSION=${POETRY_VERSION} python3 -
 	poetry install
 
-test:
+run.postgres:
+	docker run -p 5432:5432 --name tembo-postgres -e POSTGRES_PASSWORD=postgres -d quay.io/tembo/vectorize-pg:latest
+
+test: 
+	run.postgres
 	poetry run pytest -s \
 		--ignore=tests/integration_tests \
 		--cov=./ \
 		--cov-report=xml:coverage-report-unit-tests.xml \
 		--junitxml=coverage-junit-unit-tests.xml \
 		--cov-report term
-
-run.postgres:
-	docker run -p 5432:5432 --name tembo-postgres -e POSTGRES_PASSWORD=postgres -d quay.io/tembo/vectorize-pg:latest
