@@ -9,9 +9,7 @@ use controller::app_service::types::EnvVar;
 use controller::extensions::types::Extension as ControllerExtension;
 use controller::extensions::types::ExtensionInstallLocation as ControllerExtensionInstallLocation;
 use controller::extensions::types::TrunkInstall as ControllerTrunkInstall;
-use controller::stacks::get_stack;
 use controller::stacks::types::Stack;
-use controller::stacks::types::StackType as ControllerStackType;
 use itertools::Itertools;
 use log::info;
 use spinoff::spinners;
@@ -27,6 +25,8 @@ use std::{
 use tembo_stacks::apps::app::merge_app_reqs;
 use tembo_stacks::apps::app::merge_options;
 use tembo_stacks::apps::types::MergedConfigs;
+use tembo_stacks::stacks::get_stack;
+use tembo_stacks::stacks::types::StackType as ControllerStackType;
 use temboclient::apis::instance_api::patch_instance;
 use temboclient::models::ExtensionStatus;
 use temboclient::models::Instance;
