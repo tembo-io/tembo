@@ -196,7 +196,6 @@ class TemboRAG:
         with psycopg.connect(connection_string) as conn:
             with conn.cursor() as cur:
                 cur.execute(insert_query, (prompt_name, sys_prompt, user_prompt))
-            conn.commit()
 
 
 @dataclass
