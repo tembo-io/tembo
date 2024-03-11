@@ -1,15 +1,5 @@
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use tembo_controller::{
-    apis::postgres_parameters::PgConfig,
-    app_service::types::AppService,
-    defaults::{default_images, default_repository},
-    extensions::types::{Extension, TrunkInstall},
-    postgres_exporter::QueryConfig,
-    stacks::config_engines::{
-        mq_config_engine, olap_config_engine, standard_config_engine, ConfigEngine,
-    },
-};
 use utoipa::ToSchema;
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema, PartialEq, ToSchema)]
@@ -176,6 +166,9 @@ mod tests {
                 }
                 StackType::Standard => {
                     get_stack(StackType::Standard);
+                }
+                StackType::Timeseries => {
+                    get_stack(StackType::Timeseries);
                 }
                 StackType::VectorDB => {
                     get_stack(StackType::VectorDB);

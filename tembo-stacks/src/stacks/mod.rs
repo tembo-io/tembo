@@ -27,9 +27,8 @@ lazy_static! {
         serde_yaml::from_str(include_str!("specs/rag.yaml")).expect("rag.yaml not found");
     pub static ref STANDARD: Stack =
         serde_yaml::from_str(include_str!("specs/standard.yaml")).expect("standard.yaml not found");
-    pub static ref TIMESERIES: Stack =
-        serde_yaml::from_str(include_str!("templates/timeseries.yaml"))
-            .expect("timeseries.yaml not found");
+    pub static ref TIMESERIES: Stack = serde_yaml::from_str(include_str!("specs/timeseries.yaml"))
+        .expect("timeseries.yaml not found");
     pub static ref VECTOR_DB: Stack =
         serde_yaml::from_str(include_str!("specs/vectordb.yaml")).expect("vectordb.yaml not found");
 }
