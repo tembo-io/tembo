@@ -2,6 +2,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+#[cfg_attr(test, derive(strum_macros::EnumIter, strum_macros::Display))]
 #[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema, PartialEq, ToSchema)]
 pub enum StackType {
     API,
@@ -63,6 +64,7 @@ impl StackType {
 #[cfg(test)]
 mod tests {
     use crate::stacks::{get_stack, types::StackType};
+    use strum::IntoEnumIterator;
     use tembo_controller::apis::postgres_parameters::PgConfig;
     use tembo_controller::stacks::types::Infrastructure;
 
@@ -118,26 +120,7 @@ mod tests {
 
     #[test]
     fn test_all_stack_deserialization() {
-        // must not panic when reading any stack definitions from yaml
-        let all_stacks = vec![
-            StackType::API,
-            StackType::DataWarehouse,
-            StackType::Geospatial,
-            StackType::MachineLearning,
-            StackType::MessageQueue,
-            StackType::MongoAlternative,
-            StackType::OLAP,
-            StackType::OLTP,
-            StackType::RAG,
-            StackType::Standard,
-            StackType::Timeseries,
-            StackType::VectorDB,
-        ];
-
-        for stack in all_stacks {
-            // this is overly verbose, but we want to ensure each Stack can be deserialized from yaml
-            // pattern match on the StackType enum, which if a new stack is added, this test will fail until its updated
-            // guarantees all StackTypes are tested
+        for stack in StackType::iter() {
             match stack {
                 StackType::API => {
                     get_stack(StackType::API);
@@ -176,6 +159,20 @@ mod tests {
                     get_stack(StackType::VectorDB);
                 }
             }
+        }
+    }
+
+    #[test]
+    fn test_all_stack_variants() {
+        for variant in StackType::iter() {
+            let stack_str = variant.as_str();
+            // from string back to StackType
+            let stack_type = stack_str.parse::<StackType>();
+            assert!(
+                stack_type.is_ok(),
+                "stack type missing from_str {:?}",
+                stack_str
+            )
         }
     }
 }
