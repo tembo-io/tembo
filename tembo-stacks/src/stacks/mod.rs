@@ -1,6 +1,7 @@
 pub mod types;
 
-use tembo_controller::stacks::types::{Stack, StackType};
+use crate::stacks::types::StackType;
+use tembo_controller::stacks::types::Stack;
 
 use lazy_static::lazy_static;
 

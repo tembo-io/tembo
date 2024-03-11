@@ -62,8 +62,9 @@ impl StackType {
 
 #[cfg(test)]
 mod tests {
+    use crate::stacks::{get_stack, types::StackType};
     use tembo_controller::apis::postgres_parameters::PgConfig;
-    use tembo_controller::stacks::{get_stack, types::Infrastructure, types::StackType};
+    use tembo_controller::stacks::types::Infrastructure;
 
     #[test]
     fn test_stacks_definitions() {
