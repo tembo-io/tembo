@@ -14,15 +14,16 @@ A tembo stack is a pre-built, use case specific Postgres deployment which enable
 
 |Name|Replacement for|
 |----|---------------|
-|[OLTP](oltp.md)| Amazon RDS |
-|[OLAP](olap.md)| Snowflake, Bigquery |
-|[Machine Learning](machine-learning.md)| MindsDB |
-|[Message Queue](message-queue.md)| Amazon SQS, RabbitMQ, Redis |
-|[Data Warehouse](datawarehouse.md)| Snowflake, Bigquery |
-|[Mongo Alternative on Postgres](mongo-alternative.md)| MongoDB |
-|[Geospatial](geospatial.md)| ESRI, Oracle |
-|[Vector DB](vector-db.md)| Pinecone, Weaviate |
-|[Standard](standard.md)| Amazon RDS |
+|[OLTP](./src/stacks/specs/oltp.yaml)| Amazon RDS |
+|[OLAP](./src/stacks/specs/olap.yaml)| Snowflake, Bigquery |
+|[Machine Learning](./src/stacks/specs/machine_learning.yaml)| MindsDB |
+|[Message Queue](./src/stacks/specs/message_queue.yaml)| Amazon SQS, RabbitMQ, Redis |
+|[Data Warehouse](./src/stacks/specs/data_warehouse.yaml)| Snowflake, Bigquery |
+|[Mongo Alternative on Postgres](./src/stacks/specs/mongo_alternative.yaml)| MongoDB |
+|[Geospatial](./src/stacks/specs/gis.yaml)| ESRI, Oracle |
+|[Vector DB](./src/stacks/specs/vectordb.yaml)| Pinecone, Weaviate |
+|[Time Series](./src/stacks/specs/timeseries.yaml)| InfluxDB, TimescaleDB |
+|[Standard](./src/stacks/specs/standard.yaml)| Amazon RDS |
 
 We are actively working on additional Stacks. Check out the [Tembo Roadmap](https://roadmap.tembo.io/roadmap) and upvote the stacks you'd like to see next.
 
