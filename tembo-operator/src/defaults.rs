@@ -11,7 +11,7 @@ use crate::{
     },
     cloudnativepg::poolers::{PoolerPgbouncerPoolMode, PoolerTemplateSpecContainersResources},
     extensions::types::{Extension, TrunkInstall},
-    stacks::{types::ImagePerPgVersion},
+    stacks::types::ImagePerPgVersion,
 };
 
 pub fn default_replicas() -> i32 {
