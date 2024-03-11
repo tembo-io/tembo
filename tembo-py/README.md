@@ -18,8 +18,8 @@ pip install tembo-py
 
 ## Interacting with RAG
 
-Interacting with the RAG Stack requires the loading of ..
-The [RAG Stack official documentation](https://tembo.io/docs/tembo-stacks/rag#build-a-support-agent-with-tembo-rag) does a good job reviewing this in detail, so keep the following points brief.
+Interacting with the RAG Stack requires processing documents in chunks and loading them in to Postgres.
+The `tembo-py` client is designed for this type of work and is outlined in detail within the [RAG Stack official documentation](https://tembo.io/docs/tembo-stacks/rag#build-a-support-agent-with-tembo-rag).
 
 ```python
 from tembo_py.rag import TemboRAG
@@ -94,7 +94,7 @@ rag.add_prompt_template(
 query_string = "What are some real world applications of the geospatial stack?"
 prompt_template_name = "booyah"
 
-response = return rag.query(query=query_string, prompt_template=prompt_template_name).chat_response
+response = rag.query(query=query_string, prompt_template=prompt_template_name).chat_response
 
 print(response)
 
