@@ -19,7 +19,7 @@ pip install tembo-py
 ## Interacting with RAG
 
 Interacting with the RAG Stack requires processing documents in chunks and loading them in to Postgres.
-The `tembo-py` client is designed for this type of work and is outlined in detail within the [RAG Stack official documentation](https://tembo.io/docs/tembo-stacks/rag#build-a-support-agent-with-tembo-rag).
+The `tembo-py` client is designed for this type of work, which is outlined in detail within the [RAG Stack official documentation](https://tembo.io/docs/tembo-stacks/rag#build-a-support-agent-with-tembo-rag).
 
 ```python
 from tembo_py.rag import TemboRAG
@@ -45,7 +45,7 @@ rag.init_rag(connection_string="postgresql://postgres:<your-password>@<your-Temb
 
 ## Adding Custom Prompts
 
-Within the [rag.py](./tembo_py/rag.py) file's `TemboRAG` class, the `add_prompt_template` method introduces the ability to add custom prompts.
+If you'd like to add a custom prompt, begin by confirming that `pg_vectorize` is enabled and that you've set your openai api key.
 
 ### 1. Connect to Postgres
 
