@@ -2,8 +2,6 @@
 
 The official Python client for Tembo.io
 
-For more technical information and ways to get involved, please refer to the [contributing guide](./CONTRIBUTING.md).
-
 ## Table of Contents
 
 - [Prerequisites](#prerequisites)
@@ -14,7 +12,6 @@ For more technical information and ways to get involved, please refer to the [co
 ## Prerequisites
 
 - [Python](https://www.python.org/) - Programming language and companion `pip` package manager
-- [Docker Engine](https://docs.docker.com/engine/install/) - For running local containers
 
 ## Installation
 
@@ -27,9 +24,9 @@ pip install tembo-py
 ## Prepare Contextual Basis
 
 Before jumping in, it's important to have material to offer the model as context.
-The [RAG Stack official documentation](https://tembo.io/docs/tembo-stacks/rag#build-a-support-agent-with-tembo-rag) does a good job reviewing this in detail, so at this point we will assume you have data ready to load.
+The [RAG Stack official documentation](https://tembo.io/docs/tembo-stacks/rag#build-a-support-agent-with-tembo-rag) does a good job reviewing this in detail, so keep the following points brief.
 
-```bash
+```python
 from tembo_py.rag import TemboRAG
 
 rag = TemboRAG(
@@ -90,7 +87,9 @@ Using your preferred text editor or IDE, you can create the following script:
           )
 ```
 
-This will look something like this:
+The end result will look something like the following:
+
+:bulb: Note the `if` statement is where you can input a query.
 
 ```python
 def ensure_prompt_and_query(query_string, prompt_template_name):
