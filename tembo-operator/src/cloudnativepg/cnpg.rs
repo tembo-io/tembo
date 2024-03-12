@@ -54,7 +54,6 @@ use crate::{
     },
     config::Config,
     configmap::custom_metrics_configmap_settings,
-    defaults::{default_dw_image_uri, default_image_uri, default_llm_image_uri},
     errors::ValueError,
     is_postgres_ready, patch_cdb_status_merge,
     postgres_exporter::EXPORTER_CONFIGMAP_PREFIX,
@@ -514,7 +513,7 @@ fn cnpg_cluster_bootstrap_recovery_volume_snapshots(
     cdb: &CoreDB,
 ) -> Option<ClusterBootstrapRecoveryVolumeSnapshots> {
     if let Some(restore) = &cdb.spec.restore {
-        if restore.volume_snapshot.is_some() {
+        if restore.volume_snapshot == Some(true) {
             return Some(ClusterBootstrapRecoveryVolumeSnapshots {
                 storage: ClusterBootstrapRecoveryVolumeSnapshotsStorage {
                     // todo: Work on getting this from the VolumeSnapshot we created
@@ -669,16 +668,7 @@ pub fn cnpg_cluster_from_cdb(
     debug!("Annotations: {:?}", annotations);
 
     // set the container image
-    // Check if the cdb.spec.image is set, if not then figure out which image to use.
-    let image = if cdb.spec.image.is_empty() {
-        match cdb.spec.stack.as_ref().map(|s| s.name.to_lowercase()) {
-            Some(ref name) if name == "machinelearning" => default_llm_image_uri(),
-            Some(ref name) if name == "datawarehouse" => default_dw_image_uri(),
-            _ => default_image_uri(),
-        }
-    } else {
-        cdb.spec.image.clone()
-    };
+    let image = cdb.spec.image.clone();
 
     let certificates = create_cluster_certificates(cdb);
     let mut metrics = vec![ClusterMonitoringCustomQueriesConfigMap {
@@ -1022,7 +1012,7 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
     // the VolumeSnapshotContent and VolumeSnapshot so that the Cluster will have
     // something to restore from.
     if let Some(restore) = &cdb.spec.restore {
-        if restore.volume_snapshot.is_some() {
+        if restore.volume_snapshot == Some(true) {
             debug!("Reconciling VolumeSnapshotContent and VolumeSnapshot for restore");
             reconcile_volume_snapshot_restore(cdb, ctx.clone()).await?;
         }

@@ -362,6 +362,25 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_app_specs() {
+        assert!(EMBEDDINGS.app_services.is_some());
+        assert!(HTTP.app_services.is_some());
+        assert!(MQ.app_services.is_some());
+        assert!(PGANALYZE.app_services.is_some());
+        assert!(RESTAPI.app_services.is_some());
+    }
+
+    #[test]
+    fn test_pganalyze_spec() {
+        let cfg = PGANALYZE.postgres_config.clone().unwrap();
+        for c in cfg {
+            if c.name == "log_line_prefix" {
+                assert_eq!(c.value.to_string(), "'%m [%p] %q[user=%u,app=%a] ',db=%d")
+            }
+        }
+    }
+
+    #[test]
     fn test_merge_apps() {
         let user_apps = vec![
             AppService {

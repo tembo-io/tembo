@@ -49,10 +49,10 @@ appServices:
         value: postgres
 trunk_installs:
   - name: pg_graphql
-    version: 1.4.1
+    version: 1.4.4
 extensions:
   - name: pg_graphql
     locations:
       - database: postgres
         enabled: true
-        version: 1.4.1
+        version: 1.4.4

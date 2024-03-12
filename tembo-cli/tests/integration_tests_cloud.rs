@@ -119,7 +119,7 @@ fn replace_vars_in_file(
     let mut data = String::new();
     src.read_to_string(&mut data)?;
     drop(src);
-    let new_data = data.replace(&*word_from, &*word_to);
+    let new_data = data.replace(word_from, word_to);
     let mut dst = File::create(&file_path)?;
     dst.write(new_data.as_bytes())?;
     Ok(())
