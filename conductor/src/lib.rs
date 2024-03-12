@@ -17,8 +17,11 @@ use kube::api::{DeleteParams, ListParams, Patch, PatchParams};
 use chrono::{DateTime, SecondsFormat, Utc};
 use kube::{Api, Client, ResourceExt};
 use log::{debug, info};
-use rand::Rng;
 use serde_json::{from_str, to_string, Value};
+use std::{
+    collections::hash_map::DefaultHasher,
+    hash::{Hash, Hasher},
+};
 
 pub type Result<T, E = ConductorError> = std::result::Result<T, E>;
 
@@ -478,12 +481,19 @@ async fn get_stack_outputs(
     Ok(stack_outputs)
 }
 
-pub fn generate_rand_schedule() -> String {
-    // Generate a random minute and hour between 4am and 10am UTC
-    let mut rng = rand::thread_rng();
-    let minute: u8 = rng.gen_range(0..60);
-    let hour: u8 = rng.gen_range(4..10);
+// Generate a random cron expression based on the input string
+pub fn generate_cron_expression(input: &str) -> String {
+    // Create a hasher instance
+    let mut hasher = DefaultHasher::new();
+    // Hash the input string
+    input.hash(&mut hasher);
+    let hash = hasher.finish();
 
+    // Generate hour and minute for the cron expression
+    let hour = (hash % 24) as u8; // Hours: 0-23
+    let minute = (hash % 60) as u8; // Minutes: 0-59
+
+    // Construct the 5-term cron expression for a daily job
     format!("{} {} * * *", minute, hour)
 }
 
@@ -517,5 +527,49 @@ mod tests {
 
         assert_eq!(String::from_utf8(decoded_user).unwrap(), "mock_user");
         assert_eq!(String::from_utf8(decoded_pw).unwrap(), "mock_pw");
+    }
+
+    #[test]
+    fn test_valid_cron_expression() {
+        let input = "test_string";
+        let cron_expression = generate_cron_expression(input);
+        let parts: Vec<&str> = cron_expression.split_whitespace().collect();
+
+        assert_eq!(parts.len(), 5);
+        assert_eq!(parts[2], "*");
+        assert_eq!(parts[3], "*");
+        assert_eq!(parts[4], "*");
+
+        let minute: u8 = parts[0].parse().expect("Expected minute to be a number");
+        let hour: u8 = parts[1].parse().expect("Expected hour to be a number");
+
+        assert!(minute < 60, "Minute should be less than 60");
+        assert!(hour < 24, "Hour should be less than 24");
+    }
+
+    #[test]
+    fn test_deterministic_output() {
+        let input = "consistent_input";
+        let first_run = generate_cron_expression(input);
+        let second_run = generate_cron_expression(input);
+
+        assert_eq!(
+            first_run, second_run,
+            "Cron expressions should match for the same input"
+        );
+    }
+
+    #[test]
+    fn test_different_inputs_produce_different_outputs() {
+        let input_one = "input_one";
+        let input_two = "input_two";
+
+        let output_one = generate_cron_expression(input_one);
+        let output_two = generate_cron_expression(input_two);
+
+        assert_ne!(
+            output_one, output_two,
+            "Different inputs should produce different cron expressions"
+        );
     }
 }

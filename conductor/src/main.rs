@@ -5,7 +5,7 @@ use conductor::extensions::extensions_still_processing;
 use conductor::monitoring::CustomMetrics;
 use conductor::{
     create_cloudformation, create_namespace, create_or_update, delete, delete_cloudformation,
-    delete_namespace, generate_rand_schedule, generate_spec, get_coredb_error_without_status,
+    delete_namespace, generate_cron_expression, generate_spec, get_coredb_error_without_status,
     get_one, get_pg_conn, lookup_role_arn, restart_coredb, types,
 };
 use controller::apis::coredb_types::{
@@ -648,30 +648,27 @@ async fn init_cloud_perms(
         snapshot_class: Some(VOLUME_SNAPSHOT_CLASS_NAME.to_string()),
     });
 
-    // Format Backup spec in CoreDBSpec
-    // If read_msg.message.event_type is Event::Update we want to use the existing backup
-    // configuration spec
-    if read_msg.message.event_type != Event::Update {
-        // Directly assign a new Backup object to coredb_spec.backup for non-Update events
-        coredb_spec.backup = Backup {
-            destinationPath: Some(format!(
-                "s3://{}/coredb/{}/org-{}-inst-{}",
-                backup_archive_bucket,
-                &read_msg.message.organization_name,
-                &read_msg.message.organization_name,
-                &read_msg.message.dbname
-            )),
-            encryption: Some(String::from("AES256")),
-            retentionPolicy: Some(String::from("30")),
-            schedule: Some(generate_rand_schedule()),
-            s3_credentials: Some(S3Credentials {
-                inherit_from_iam_role: Some(true),
-                ..Default::default()
-            }),
-            volume_snapshot,
+    let instance_name_slug = format!(
+        "org-{}-inst-{}",
+        &read_msg.message.organization_name, &read_msg.message.dbname
+    );
+    let backup = Backup {
+        destinationPath: Some(format!(
+            "s3://{}/coredb/{}/{}",
+            backup_archive_bucket, &read_msg.message.organization_name, &instance_name_slug
+        )),
+        encryption: Some(String::from("AES256")),
+        retentionPolicy: Some(String::from("30")),
+        schedule: Some(generate_cron_expression(&instance_name_slug)),
+        s3_credentials: Some(S3Credentials {
+            inherit_from_iam_role: Some(true),
             ..Default::default()
-        };
-    }
+        }),
+        volume_snapshot,
+        ..Default::default()
+    };
+
+    coredb_spec.backup = backup;
     coredb_spec.serviceAccountTemplate = service_account_template;
 
     Ok(())

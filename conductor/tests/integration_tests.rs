@@ -248,6 +248,8 @@ mod test {
             locations: vec![install_location],
         });
         let num_expected_extensions = spec.extensions.len();
+        // Get the current CoreDB spec
+        let current_coredb = coredb_resource.clone();
         // println!("Updated spec: {:?}", spec.clone());
         let msg = types::CRUDevent {
             organization_name: org_name.clone(),
@@ -302,6 +304,20 @@ mod test {
         };
 
         println!("start_time: {:?}", stdout);
+
+        // Since we have updated lets check the status of the CoreDB from current_coredb
+        let update_coredb = coredb_api.get(&namespace).await.unwrap();
+        let old_backup_spec = current_coredb.spec.backup.clone();
+        let new_backup_spec = update_coredb.spec.backup.clone();
+
+        // assert that the backup.schedule for old_backup_spec are equal to new_backup_spec
+        assert_eq!(old_backup_spec.schedule, new_backup_spec.schedule);
+
+        // assert that the destination paths for old_backup_spec are equal to new_backup_spec
+        assert_eq!(
+            old_backup_spec.destinationPath,
+            new_backup_spec.destinationPath
+        );
 
         // Lets now test sending an Event::Restart to the queue and see if the
         // pod restarts correctly.
