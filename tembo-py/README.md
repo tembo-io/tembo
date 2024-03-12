@@ -39,7 +39,7 @@ Now that the table is loaded into Postgres, you can run the following:
 
 ```python
 rag.init_rag(
-             transformer="sentence-transformers/all-MiniLM-L12-v2"
+    transformer="sentence-transformers/all-MiniLM-L12-v2"
 )
 ```
 
