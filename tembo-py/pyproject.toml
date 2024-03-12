@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "tembo-py"
-version = "0.2.0"
+version = "0.3.0"
 description = "The official Python client for Tembo.io"
 authors = ["Adam Hendel <adam@tembo.io>"]
 license = "Apache-2"

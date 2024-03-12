@@ -34,3 +34,34 @@ def test_prepare_bind_params():
     assert bind_params[4] == api_key
     assert bind_params[5] == num_context
     assert bind_params[6] == force_trim
+
+
+def test_add_prompt_template():
+    project_name = "test_add_prompt_template"
+    prompt_name = "example_prompt"
+    sys_prompt = "System prompt text for example"
+    user_prompt = "User prompt text for example"
+    connection_string = "postgresql://postgres:postgres@localhost:5432/postgres"
+
+    # Init TemboRAG instance
+    ctrl = TemboRAG(project_name=project_name, connection_string=connection_string)
+
+    # Execute the function under test
+    ctrl.add_prompt_template(prompt_name, sys_prompt, user_prompt)
+
+    # Verify the record was inserted correctly by establishing a new database connection for verification
+    import psycopg
+
+    with psycopg.connect(connection_string) as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                "SELECT prompt_type, sys_prompt, user_prompt FROM vectorize.prompts WHERE prompt_type = %s",
+                (prompt_name,),
+            )
+            result = cur.fetchone()
+
+    # Assertions to verify that the data was inserted as expected
+    assert result is not None, "No record found in the database"
+    assert result[0] == prompt_name, "prompt_type does not match"
+    assert result[1] == sys_prompt, "sys_prompt does not match"
+    assert result[2] == user_prompt, "user_prompt does not match"
