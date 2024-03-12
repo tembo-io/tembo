@@ -472,6 +472,11 @@ pub async fn get_all_extensions(
     Ok(ext_spec)
 }
 
+pub enum ToggleError {
+    WithDescription(String),
+    WithAction(Action),
+}
+
 /// Handles create/drop an extension location
 /// On failure, returns an error message
 #[instrument(skip(cdb, ctx), fields(cdb_name = %cdb.name_any(), ext_name, ext_loc))]
@@ -480,7 +485,7 @@ pub async fn toggle_extension(
     ext_name: &str,
     ext_loc: ExtensionInstallLocation,
     ctx: Arc<Context>,
-) -> Result<(), String> {
+) -> Result<(), ToggleError> {
     let coredb_name = cdb
         .metadata
         .name
@@ -491,7 +496,9 @@ pub async fn toggle_extension(
             "Extension is not formatted properly. Skipping operation. {}",
             &coredb_name
         );
-        return Err("Extension name is not formatted properly".to_string());
+        return Err(ToggleError::WithDescription(
+            "Extension name is not formatted properly".into(),
+        ));
     }
     let database_name = ext_loc.database.to_owned();
     if !check_input(&database_name) {
@@ -499,10 +506,13 @@ pub async fn toggle_extension(
             "Database name is not formatted properly. Skipping operation. {}",
             &coredb_name
         );
-        return Err("Database name is not formatted properly".to_string());
+        return Err(ToggleError::WithDescription(
+            "Database name is not formatted properly".into(),
+        ));
     }
 
-    let command = types::generate_extension_enable_cmd(ext_name, &ext_loc)?;
+    let command = types::generate_extension_enable_cmd(ext_name, &ext_loc)
+        .map_err(ToggleError::WithDescription)?;
 
     let result = cdb
         .psql(command.clone(), database_name.clone(), ctx.clone())
@@ -523,10 +533,10 @@ pub async fn toggle_extension(
                 );
                 match psql_output.stderr {
                     Some(stderr) => {
-                        return Err(stderr);
+                        return Err(ToggleError::WithDescription(stderr));
                     }
                     None => {
-                        return Err("Failed to enable extension, and found no output. Please try again. If this issue persists, contact support.".to_string());
+                        return Err(ToggleError::WithDescription("Failed to enable extension, and found no output. Please try again. If this issue persists, contact support.".to_string()));
                     }
                 }
             }
@@ -536,10 +546,7 @@ pub async fn toggle_extension(
                 "Failed to reconcile extension because of kube exec error: {:?}",
                 e
             );
-            return Err(
-                "Could not connect to database, try again. If problem persists, please contact support."
-                    .to_string(),
-            );
+            return Err(ToggleError::WithAction(e));
         }
     }
     Ok(())

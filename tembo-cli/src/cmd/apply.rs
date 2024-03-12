@@ -9,8 +9,7 @@ use controller::app_service::types::EnvVar;
 use controller::extensions::types::Extension as ControllerExtension;
 use controller::extensions::types::ExtensionInstallLocation as ControllerExtensionInstallLocation;
 use controller::extensions::types::TrunkInstall as ControllerTrunkInstall;
-use controller::stacks::get_stack;
-use controller::stacks::types::StackType as ControllerStackType;
+use controller::stacks::types::Stack;
 use itertools::Itertools;
 use log::info;
 use spinoff::spinners;
@@ -26,6 +25,8 @@ use std::{
 use tembo_stacks::apps::app::merge_app_reqs;
 use tembo_stacks::apps::app::merge_options;
 use tembo_stacks::apps::types::MergedConfigs;
+use tembo_stacks::stacks::get_stack;
+use tembo_stacks::stacks::types::StackType as ControllerStackType;
 use temboclient::apis::instance_api::patch_instance;
 use temboclient::models::ExtensionStatus;
 use temboclient::models::Instance;
@@ -240,10 +241,11 @@ fn docker_apply_instance(
         stack.app_services.clone(),
         extensions,
         trunk_installs,
-        stack.postgres_config,
+        stack.postgres_config.clone(),
     )?;
 
-    let rendered_dockerfile: String = get_rendered_dockerfile(&trunk_installs)?;
+    let rendered_dockerfile: String =
+        get_rendered_dockerfile(&trunk_installs, &stack, instance_setting.pg_version)?;
 
     FileUtils::create_file(
         DOCKERFILE_NAME.to_string(),
@@ -576,82 +578,98 @@ fn get_app_services(
     maybe_app_services: Option<Vec<tembo_stacks::apps::types::AppType>>,
 ) -> Result<Option<Option<Vec<temboclient::models::AppType>>>, anyhow::Error> {
     let mut vec_app_types: Vec<temboclient::models::AppType> = vec![];
-    let mut env_vars: Vec<temboclient::models::EnvVar> = vec![];
-
-    // TODO: Find a better way to handle this.
-    // It is done so that other app_types are skipped in the request
-    // We use #[serde(skip_serializing_if = "Option::is_none")] to skip app_types
-    env_vars.push(temboclient::models::EnvVar {
-        name: "test".to_string(),
-        value: Some(Some("test".to_string())),
-        value_from_platform: None,
-    });
-
-    let app_config = temboclient::models::AppConfig {
-        env: Some(Some(env_vars)),
-        resources: None,
-    };
 
     if let Some(app_services) = maybe_app_services {
         for app_type in app_services.iter() {
             match app_type {
-                tembo_stacks::apps::types::AppType::RestAPI(_) => {
-                    vec_app_types.push(temboclient::models::AppType::new(
-                        Some(app_config.clone()),
+                tembo_stacks::apps::types::AppType::RestAPI(maybe_app_config) => vec_app_types
+                    .push(temboclient::models::AppType::new(
+                        get_final_app_config(maybe_app_config)?,
                         None,
+                        None,
+                        None,
+                        None,
+                        None,
+                    )),
+                tembo_stacks::apps::types::AppType::HTTP(maybe_app_config) => {
+                    vec_app_types.push(temboclient::models::AppType::new(
+                        None,
+                        get_final_app_config(maybe_app_config)?,
                         None,
                         None,
                         None,
                         None,
                     ))
                 }
-                tembo_stacks::apps::types::AppType::HTTP(_) => {
+                tembo_stacks::apps::types::AppType::MQ(maybe_app_config) => {
                     vec_app_types.push(temboclient::models::AppType::new(
                         None,
-                        Some(app_config.clone()),
                         None,
+                        get_final_app_config(maybe_app_config)?,
                         None,
                         None,
                         None,
                     ))
                 }
-                tembo_stacks::apps::types::AppType::MQ(_) => {
-                    vec_app_types.push(temboclient::models::AppType::new(
-                        None,
-                        None,
-                        Some(app_config.clone()),
+                tembo_stacks::apps::types::AppType::Embeddings(maybe_app_config) => vec_app_types
+                    .push(temboclient::models::AppType::new(
                         None,
                         None,
                         None,
-                    ))
-                }
-                tembo_stacks::apps::types::AppType::Embeddings(_) => {
-                    vec_app_types.push(temboclient::models::AppType::new(
+                        get_final_app_config(maybe_app_config)?,
                         None,
                         None,
-                        None,
-                        Some(app_config.clone()),
-                        None,
-                        None,
-                    ))
-                }
-                tembo_stacks::apps::types::AppType::PgAnalyze(_) => {
-                    vec_app_types.push(temboclient::models::AppType::new(
+                    )),
+                tembo_stacks::apps::types::AppType::PgAnalyze(maybe_app_config) => vec_app_types
+                    .push(temboclient::models::AppType::new(
                         None,
                         None,
                         None,
                         None,
-                        Some(app_config.clone()),
+                        get_final_app_config(maybe_app_config)?,
                         None,
-                    ))
-                }
+                    )),
                 tembo_stacks::apps::types::AppType::Custom(_) => vec_app_types.push(
                     temboclient::models::AppType::new(None, None, None, None, None, None),
                 ),
             }
         }
     }
+
     Ok(Some(Some(vec_app_types)))
+}
+
+fn get_final_app_config(
+    maybe_app_config: &Option<tembo_stacks::apps::types::AppConfig>,
+) -> Result<Option<temboclient::models::AppConfig>, anyhow::Error> {
+    let mut final_env_vars: Vec<temboclient::models::EnvVar> = vec![];
+
+    if let Some(a_config) = maybe_app_config {
+        if let Some(env_vars) = a_config.env.clone() {
+            for env_var in env_vars {
+                final_env_vars.push(temboclient::models::EnvVar {
+                    name: env_var.name,
+                    value: Some(env_var.value),
+                    value_from_platform: None,
+                });
+            }
+        }
+    }
+
+    if final_env_vars.is_empty() {
+        // TODO: Find a better way to handle this.
+        // It is done so that other app_types are skipped in the request
+        // We use #[serde(skip_serializing_if = "Option::is_none")] to skip app_types
+        final_env_vars.push(temboclient::models::EnvVar {
+            name: "test".to_string(),
+            value: Some(Some("test".to_string())),
+            value_from_platform: None,
+        });
+    }
+    Ok(Some(temboclient::models::AppConfig {
+        env: Some(Some(final_env_vars.clone())),
+        resources: None,
+    }))
 }
 
 fn get_patch_instance(
@@ -972,6 +990,8 @@ pub fn get_instance_settings(
 
 pub fn get_rendered_dockerfile(
     trunk_installs: &Option<Vec<ControllerTrunkInstall>>,
+    stack: &Stack,
+    pg_version: u8,
 ) -> Result<String, anyhow::Error> {
     // Include the Dockerfile template directly into the binary
     let contents = include_str!("../../tembo/Dockerfile.template");
@@ -980,6 +1000,28 @@ pub fn get_rendered_dockerfile(
     let _ = tera.add_raw_template("dockerfile", contents);
     let mut context = Context::new();
 
+    let image = match pg_version.into() {
+        14 => &stack.images.pg14,
+        15 => &stack.images.pg15,
+        16 => &stack.images.pg16,
+        _ => &stack.images.pg15,
+    };
+
+    // Sorts trunk_installs so the installation order is deterministic, also make sure vector is last
+    if let Some(mut installs) = trunk_installs.as_ref().cloned() {
+        // Sort by name, but ensure "vector" is always last
+        installs.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        let (non_vector, vector): (Vec<_>, Vec<_>) = installs
+            .into_iter()
+            .partition(|i| i.name.to_lowercase() != "vector");
+        let sorted_installs = [non_vector, vector].concat();
+
+        context.insert("trunk_installs", &sorted_installs);
+    } else {
+        context.insert("trunk_installs", &Vec::<ControllerTrunkInstall>::new());
+    }
+
+    context.insert("image_with_version", &image);
     context.insert("trunk_installs", &trunk_installs);
 
     let rendered_dockerfile = tera.render("dockerfile", &context).unwrap();
@@ -1048,7 +1090,8 @@ fn get_postgres_config(
                 }
                 _ => {
                     if value.is_str() {
-                        let _ = writeln!(postgres_config, "{} = '{value}'", key.as_str());
+                        let val = value.as_str().unwrap();
+                        let _ = writeln!(postgres_config, "{} = '{val}'", key.as_str());
                     }
                     if value.is_table() {
                         for row in value.as_table().iter() {
@@ -1075,23 +1118,34 @@ fn get_postgres_config(
 
     match maybe_final_loadable_libs {
         Ok(l) => {
-            let config = l
-                .into_iter()
-                .unique_by(|f| f.name.clone())
-                .sorted_by_key(|s| (s.priority, s.name.clone()))
-                .map(|x| x.name.to_string() + ",")
-                .collect::<String>();
+            if !l.is_empty() {
+                let config = l
+                    .into_iter()
+                    .unique_by(|f| f.name.clone())
+                    .sorted_by_key(|s| (s.priority, s.name.clone()))
+                    .map(|x| x.name.to_string() + ",")
+                    .collect::<String>();
 
-            let final_libs = config.split_at(config.len() - 1);
+                let final_libs = config.split_at(config.len() - 1);
 
-            let libs_config = format!("shared_preload_libraries = '{}'", final_libs.0);
+                let libs_config = format!("shared_preload_libraries = '{}'", final_libs.0);
 
-            postgres_config.push_str(&libs_config);
+                postgres_config.push_str(&libs_config);
+            }
         }
         Err(error) => {
             return Err(error);
         }
     }
+
+    postgres_config.push_str(
+        "
+listen_addresses = '*'
+ssl = 'on'
+ssl_cert_file = '/var/lib/postgresql/server.crt'
+ssl_key_file = '/var/lib/postgresql/server.key'
+ssl_min_protocol_version = 'TLSv1.2'",
+    );
 
     Ok(postgres_config)
 }

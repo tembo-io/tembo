@@ -189,7 +189,7 @@ mod tests {
     async fn docker_logs() -> Result<(), Box<dyn Error>> {
         let test_dir = PathBuf::from(ROOT_DIR).join("examples").join("set");
 
-        env::set_current_dir(&test_dir)?;
+        env::set_current_dir(test_dir)?;
 
         // tembo init
         let mut cmd = Command::cargo_bin(CARGO_BIN)?;
