@@ -27,6 +27,8 @@ use crate::{
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 use tracing::{error, info, warn};
 
+use super::database_queries::ToggleError;
+
 pub async fn reconcile_extension_toggle_state(
     cdb: &CoreDB,
     ctx: Arc<Context>,
@@ -150,7 +152,10 @@ async fn toggle_extensions(
             .await
             {
                 Ok(_) => {}
-                Err(error_message) => {
+                Err(ToggleError::WithAction(action)) => {
+                    return Err(action);
+                }
+                Err(ToggleError::WithDescription(error_message)) => {
                     let mut location_status = match types::get_location_status(
                         cdb,
                         &extension_to_toggle.name,
