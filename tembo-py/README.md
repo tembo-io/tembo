@@ -45,7 +45,7 @@ rag.init_rag(
 
 ## Adding Custom Prompts
 
-If you'd like to add a custom prompt, begin by confirming that `pg_vectorize` is enabled and that you've set your openai api key.
+If you'd like to add a custom prompt, begin by confirming that [pg_vectorize](https://github.com/tembo-io/pg_vectorize) is enabled and that you've set your openai api key.
 
 ### 1. Connect to Postgres
 
@@ -53,7 +53,7 @@ If you'd like to add a custom prompt, begin by confirming that `pg_vectorize` is
 psql postgresql://postgres:<your-password>@<your-TemboHost>:5432/postgres
 ```
 
-From there, enable the [pg_vectorize](https://github.com/tembo-io/pg_vectorize) extension.
+From there, enable the `pg_vectorize` extension.
 
 ```sql
 CREATE EXTENSION vectorize CASCADE;
@@ -75,11 +75,11 @@ SELECT pg_reload_conf();
 The following outlines the parameters that you can adjust in your custom template:
 
 ```python
-     rag.add_prompt_template(
-        <prompt_type>, # The title of the prompt.
-        <sys_prompt>,  # Priming the system characteristics.
-        <user_prompt>  # Any information brought by the user.
-          )
+rag.add_prompt_template(
+    <prompt_type>, # The title of the prompt.
+    <sys_prompt>,  # Priming the system characteristics.
+    <user_prompt>  # Any information brought by the user.
+)
 ```
 
 The end result will look something like the following:
