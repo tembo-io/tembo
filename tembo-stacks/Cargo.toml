@@ -19,3 +19,8 @@ serde_yaml = "0.9.21"
 tembo-controller = { package = "controller", version = "0.41.0" }
 tracing = "0.1"
 utoipa = { version = "3", features = ["actix_extras", "chrono"] }
+
+[dev-dependencies]
+strum = "0.26.2"
+strum_macros = "0.26.2"
+serde_json = "1.0.114"
