@@ -24,3 +24,6 @@ test: run.postgres
 
 run.postgres:
 	docker run -p 5432:5432 --name tembo-postgres -e POSTGRES_PASSWORD=postgres -d quay.io/tembo/vectorize-pg:latest
+	sleep 5
+	docker exec tembo-postgres psql -U postgres -c 'CREATE EXTENSION IF NOT EXISTS vectorize CASCADE;'
+
