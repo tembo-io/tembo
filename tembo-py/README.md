@@ -72,7 +72,7 @@ SELECT pg_reload_conf();
 
 ### 2. Define Your Custom Prompt
 
-The following outlines the parameters that you can adjust in your custom template:
+The following outlines the parameters that you can adjust in your particular use case:
 
 ```python
 rag.add_prompt_template(
