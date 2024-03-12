@@ -651,10 +651,7 @@ async fn init_cloud_perms(
     // Format Backup spec in CoreDBSpec
     // If read_msg.message.event_type is Event::Update we want to use the existing backup
     // configuration spec
-    if read_msg.message.event_type == Event::Update {
-        // Since Backup is always present, there's no need to clone it for an update.
-        // Just return here since we are not updating anything.
-    } else {
+    if read_msg.message.event_type != Event::Update {
         // Directly assign a new Backup object to coredb_spec.backup for non-Update events
         coredb_spec.backup = Backup {
             destinationPath: Some(format!(
