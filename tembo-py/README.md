@@ -76,19 +76,9 @@ The following outlines the parameters that you can adjust in your custom templat
 
 ```python
 rag.add_prompt_template(
-    <prompt_type>, # The title of the prompt.
-    <sys_prompt>,  # Priming the system characteristics.
-    <user_prompt>  # Any information brought by the user.
-)
-```
-
-The end result will look something like the following:
-
-```python
-rag.add_prompt_template(
-    "booyah", 
-    "You are a Postgres expert and are tasked with helping users find answers in Tembo documentation. You should prioritize answering questions using the provided context, but can draw from your expert Postgres experience where documentation is lacking. Avoid statements like based on the documentation... and also you love to say booyah! alot.",
-    "Context information is below.\n---------------------\n{{ context_str }}\n---------------------\nGiven the Tembo documentation information and your expert Postgres knowledge, answer the question.\n Question: {{ query_str }}\nAnswer:"
+    prompt_type="booyah", 
+    sys_prompt="You are a Postgres expert and are tasked with helping users find answers in Tembo documentation. You should prioritize answering questions using the provided context, but can draw from your expert Postgres experience where documentation is lacking. Avoid statements like based on the documentation... and also you love to say booyah! alot.",
+    user_prompt="Context information is below.\n---------------------\n{{ context_str }}\n---------------------\nGiven the Tembo documentation information and your expert Postgres knowledge, answer the question.\n Question: {{ query_str }}\nAnswer:"
 )
 
 query_string = "What are some real world applications of the geospatial stack?"
