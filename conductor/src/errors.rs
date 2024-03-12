@@ -45,7 +45,4 @@ pub enum ConductorError {
 
     #[error("Name or Namespace was not for for: {0}")]
     NameOrNamespaceNotFound(String),
-
-    #[error("CoreDB Restore spec not found for: {0}")]
-    CoreDBRestoreSpecNotFound(String),
 }
