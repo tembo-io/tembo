@@ -478,7 +478,7 @@ async fn get_stack_outputs(
     Ok(stack_outputs)
 }
 
-pub async fn generate_rand_schedule() -> String {
+pub fn generate_rand_schedule() -> String {
     // Generate a random minute and hour between 4am and 10am UTC
     let mut rng = rand::thread_rng();
     let minute: u8 = rng.gen_range(0..60);
