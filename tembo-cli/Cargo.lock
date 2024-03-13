@@ -699,9 +699,9 @@ checksum = "c2459377285ad874054d797f3ccebf984978aa39129f6eafde5cdc8315b612f8"
 
 [[package]]
 name = "controller"
-version = "0.37.9"
+version = "0.41.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4c618d1ed4bed347e910f55a2b931fd956902b8d2bfee31caf71f3008e1acf16"
+checksum = "c4ac57378e00e1734748fcede9a13c56c188a590584eb297c3f4f84faffd2c7a"
 dependencies = [
  "actix-web",
  "anyhow",
@@ -4019,7 +4019,7 @@ dependencies = [
 
 [[package]]
 name = "tembo-cli"
-version = "0.19.0"
+version = "0.20.3"
 dependencies = [
  "actix-cors",
  "actix-service",
@@ -4065,6 +4065,7 @@ dependencies = [
  "temboclient",
  "tembodataclient",
  "tera",
+ "test-case",
  "tiny-gradient",
  "tokio",
  "toml",
@@ -4074,9 +4075,9 @@ dependencies = [
 
 [[package]]
 name = "tembo-stacks"
-version = "0.3.9"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "572fedb3f90ac3eaa9b891b2435085d9db64b229451d0b31d97399bfa3fba604"
+checksum = "92b4a71fb663abc7cd15a49816753096ba532803513db60646a96cae9499320a"
 dependencies = [
  "anyhow",
  "controller",
@@ -4092,7 +4093,7 @@ dependencies = [
 
 [[package]]
 name = "temboclient"
-version = "1.0.0"
+version = "1.0.1"
 dependencies = [
  "reqwest",
  "serde",
@@ -4105,7 +4106,7 @@ dependencies = [
 
 [[package]]
 name = "tembodataclient"
-version = "0.0.1"
+version = "0.0.2"
 dependencies = [
  "reqwest",
  "serde",
@@ -4185,6 +4186,19 @@ name = "termtree"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3369f5ac52d5eb6ab48c6b4ffdc8efbcad6b89c765749064ba298f2c68a16a76"
+
+[[package]]
+name = "test-case"
+version = "2.0.0-rc2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "afa682de28cc0b0156c64fc49aa323cde4c0fb69d75d42286a94597b8f278131"
+dependencies = [
+ "cfg-if",
+ "proc-macro-error",
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+]
 
 [[package]]
 name = "thiserror"
