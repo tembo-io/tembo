@@ -26,12 +26,37 @@ set = true
 // TODO: Move this to a template file
 pub const CREDENTIALS_DEFAULT_TEXT: &str = "version = \"1.0\"
 
+# Remove commented out profile to setup your environment
+
 # [[profile]]
 # name = 'prod'
 # Generate an Access Token either through 'tembo login' or visit 'https://cloud.tembo.io/generate-jwt'
 # tembo_access_token = 'Access token here'
 # tembo_host = 'https://api.tembo.io'
 # tembo_data_host = 'https://api.data-1.use1.tembo.io'
+";
+
+pub const CONTEXT_EXAMPLE_TEXT: &str = "version = \"1.0\"
+
+[[environment]]
+name = 'local'
+target = 'docker'
+set = true
+
+[[environment]]
+name = 'prod'
+target = 'tembo-cloud'
+org_id = 'Your Org ID here'
+profile = 'prod'
+";
+
+pub const CREDENTIALS_EXAMPLE_TEXT: &str = "version = \"1.0\"
+
+[[profile]]
+name = 'prod'
+tembo_access_token = 'Your Access token here'
+tembo_host = 'https://api.tembo.io'
+tembo_data_host = 'https://api.data-1.use1.tembo.io'
 ";
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
@@ -118,7 +143,7 @@ pub fn list_context() -> Result<Option<Context>, anyhow::Error> {
 
             tui::error(&format!("Error: {}", err.message()));
 
-            eprintln!("\nExample context file: \n\n{}", CONTEXT_DEFAULT_TEXT);
+            eprintln!("\nExample context file: \n\n{}", CONTEXT_EXAMPLE_TEXT);
 
             Err(Error::msg("Error listing tembo context!"))
         }
@@ -167,7 +192,7 @@ pub fn list_credential_profiles() -> Result<Option<Vec<Profile>>, anyhow::Error>
 
             eprintln!(
                 "\nExample credentials file: \n\n{}",
-                CREDENTIALS_DEFAULT_TEXT
+                CREDENTIALS_EXAMPLE_TEXT
             );
 
             Err(Error::msg("Error listing tembo credentials profiles!"))
