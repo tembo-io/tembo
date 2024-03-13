@@ -1,5 +1,5 @@
-name: RAG
-description: A Tembo Postgres Stack configured for retrieval augmented generation (RAG).
+name: VectorDB
+description: A Tembo Postgres Stack configured to support vector data types, storage, and operations.
 repository: "quay.io/tembo"
 organization: tembo
 images:
@@ -77,7 +77,7 @@ extensions:
     locations:
     - database: postgres
       enabled: true
-      version: 1.5.2
+      version: 1.6.2
   - name: pgmq
     locations:
     - database: postgres

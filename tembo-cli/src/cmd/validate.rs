@@ -65,10 +65,18 @@ pub fn execute(verbose: bool) -> Result<(), anyhow::Error> {
         };
 
         // Validate the config
-        match validate_config(config.unwrap(), verbose) {
+        match validate_config(config.clone().unwrap(), verbose) {
             std::result::Result::Ok(_) => (),
             std::result::Result::Err(e) => {
                 error(&format!("Error validating config: {}", e));
+                has_error = true;
+            }
+        }
+
+        match validate_support(&config.unwrap()) {
+            Ok(_) => (),
+            Err(e) => {
+                tui::error(&format!("{}", e));
                 has_error = true;
             }
         }
@@ -83,6 +91,34 @@ pub fn execute(verbose: bool) -> Result<(), anyhow::Error> {
 
     white_confirmation("Configuration is valid");
 
+    Ok(())
+}
+
+fn validate_support(config: &HashMap<String, InstanceSettings>) -> Result<(), anyhow::Error> {
+    for settings in config.values() {
+        validate_stack_support(settings, 14, "OLAP")?;
+        validate_stack_support(settings, 14, "VectorDB")?;
+        validate_stack_support(settings, 16, "DataWarehouse")?;
+        validate_stack_support(settings, 16, "MachineLearning")?;
+        validate_stack_support(settings, 16, "MessageQueue")?;
+        validate_stack_support(settings, 16, "OLAP")?;
+        validate_stack_support(settings, 16, "RAG")?;
+        validate_stack_support(settings, 16, "VectorDB")?;
+    }
+    Ok(())
+}
+
+fn validate_stack_support(
+    settings: &InstanceSettings,
+    pg_version: u8,
+    stack_type: &str,
+) -> Result<(), anyhow::Error> {
+    if settings.pg_version == pg_version && settings.stack_type == stack_type {
+        return Err(Error::msg(format!(
+            "Support for the {} stack on Postgres version {} is coming soon!",
+            stack_type, pg_version
+        )));
+    }
     Ok(())
 }
 

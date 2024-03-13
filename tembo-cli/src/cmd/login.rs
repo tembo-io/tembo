@@ -142,10 +142,8 @@ fn read_context() -> Result<String, anyhow::Error> {
         }
     };
     for e in data.environment.iter_mut() {
-        if e.set == Some(true) {
-            if e.name != "local" {
-                return Ok(e.name.clone());
-            }
+        if e.set == Some(true) && e.name != "local" {
+            return Ok(e.name.clone());
         }
     }
     Err(anyhow!("Now "))
