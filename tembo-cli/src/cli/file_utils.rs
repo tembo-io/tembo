@@ -3,7 +3,7 @@ use simplelog::*;
 use std::env;
 use std::fs::{self, File};
 use std::io::Write;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 pub struct FileUtils {}
 
@@ -54,35 +54,23 @@ impl FileUtils {
     }
 
     pub fn download_file(
-        file_path: &str,
-        download_location: &str,
-        recreate: bool,
+        source: &PathBuf,
+        destination: &Path,
+        overwrite: bool,
     ) -> std::io::Result<()> {
-        let path = Path::new(&download_location);
-        if !recreate && path.exists() {
-            info!("Tembo {} file exists", download_location);
+        // Check if the destination file exists and if overwrite is false, return early
+        if !overwrite && destination.exists() {
+            println!(
+                "Tembo.toml file exists in this path {}",
+                destination.display()
+            );
             return Ok(());
         }
 
-        let mut dst = Vec::new();
-        let mut easy = Easy::new();
-        easy.url(file_path).unwrap();
-        let _redirect = easy.follow_location(true);
+        // Copy the file from the source to the destination
+        fs::copy(source, destination)?;
 
-        {
-            let mut transfer = easy.transfer();
-            transfer
-                .write_function(|data| {
-                    dst.extend_from_slice(data);
-                    Ok(data.len())
-                })
-                .unwrap();
-            transfer.perform().unwrap();
-        }
-        {
-            let mut file = File::create(download_location)?;
-            file.write_all(dst.as_slice())?;
-        }
+        println!("File copied successfully to {}", destination.display());
         Ok(())
     }
 

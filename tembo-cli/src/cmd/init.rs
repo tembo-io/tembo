@@ -5,6 +5,8 @@ use crate::cli::context::{
 use crate::cli::file_utils::FileUtils;
 use crate::tui::confirmation;
 use clap::Args;
+use std::env;
+use std::path::Path;
 
 /// Initializes a local environment. Creates a sample context and configuration files.
 #[derive(Args)]
@@ -43,10 +45,15 @@ pub fn execute() -> Result<(), anyhow::Error> {
     }
 
     let filename = "tembo.toml";
-    let filepath =
-        "https://raw.githubusercontent.com/tembo-io/tembo/main/tembo-cli/examples/single-instance/tembo.toml";
+    let cargo_manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
 
-    FileUtils::download_file(filepath, filename, false)?;
+    let relative_path = "tembo-cli/examples/single-instance/tembo.toml"; // Relative path from the project root
+    let filepath = Path::new(&cargo_manifest_dir).join(relative_path);
+
+    // Assuming you want to copy the file to the current working directory
+    let destination_path = Path::new(&FileUtils::get_current_working_dir()).join("tembo.toml");
+
+    FileUtils::download_file(&filepath, &destination_path, false)?;
 
     confirmation("Tembo initialized successfully!");
 
