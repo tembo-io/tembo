@@ -154,25 +154,37 @@ pub fn get_current_context() -> Result<Environment, anyhow::Error> {
     let maybe_context = list_context()?;
 
     if let Some(context) = maybe_context {
-        let maybe_profiles = list_credential_profiles()?;
-
-        if let Some(profiles) = maybe_profiles {
-            for mut env in context.environment {
-                if let Some(_is_set) = env.set {
-                    if let Some(profile) = &env.profile {
-                        let credential =
-                            profiles.iter().rev().find(|c| &c.name == profile).unwrap();
-
-                        env.selected_profile = Some(credential.to_owned());
-                    }
-
+        for env in context.environment {
+            if let Some(true) = env.set {
+                if env.name == "local" {
                     return Ok(env);
+                } else {
+                    let maybe_profiles = list_credential_profiles()?;
+
+                    if let Some(profiles) = maybe_profiles {
+                        if let Some(profile_name) = &env.profile {
+                            let credential = profiles
+                                .iter()
+                                .rev()
+                                .find(|c| &c.name == profile_name)
+                                .ok_or_else(|| anyhow!("Profile not found in credentials"))?;
+
+                            let mut env_with_profile = env.clone();
+                            env_with_profile.selected_profile = Some(credential.clone());
+
+                            return Ok(env_with_profile);
+                        } else {
+                            bail!("Environment is not set up properly. Check out your context");
+                        }
+                    } else {
+                        bail!("Credentials file not found or invalid");
+                    }
                 }
             }
         }
     }
 
-    bail!("Tembo context not set");
+    bail!("Environment is not set up properly. Check out your context");
 }
 
 pub fn list_credential_profiles() -> Result<Option<Vec<Profile>>, anyhow::Error> {

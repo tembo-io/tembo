@@ -1,5 +1,6 @@
 use crate::cli::context::{
     list_context, list_credential_profiles, tembo_context_file_path, tembo_credentials_file_path,
+    Target,
 };
 use crate::cli::file_utils::FileUtils;
 use crate::cli::tembo_config::InstanceSettings;
@@ -7,6 +8,7 @@ use crate::tui::{self, error, info, white_confirmation};
 use anyhow::Error;
 use clap::Args;
 use std::{collections::HashMap, fs, path::Path, str::FromStr};
+use tembo::cli::context::get_current_context;
 
 /// Validates the tembo.toml file, context file, etc.
 #[derive(Args)]
@@ -35,7 +37,9 @@ pub fn execute(verbose: bool) -> Result<(), anyhow::Error> {
         );
         has_error = true
     } else {
-        list_credential_profiles()?;
+        if get_current_context()?.target == Target::TemboCloud.to_string() {
+            list_credential_profiles()?;
+        }
     }
     if verbose {
         info("Credentials file exists");
