@@ -341,7 +341,7 @@ impl CoreDB {
             };
             // Update the timestamp if it's been more than 30 seconds since the last update
             if current_fully_reconciled_at.map_or(true, |last_reconciled| {
-                current_time > last_reconciled + Duration::from_secs(30)
+                current_time > last_reconciled + Duration::from_secs(cfg.reconcile_timestamp_ttl)
             }) {
                 Some(current_time)
             } else {
@@ -363,7 +363,9 @@ impl CoreDB {
         info!("Fully reconciled {}", self.name_any());
         // Check back every 90-150 seconds
         let jitter = rand::thread_rng().gen_range(0..60);
-        Ok(Action::requeue(Duration::from_secs(90 + jitter)))
+        Ok(Action::requeue(Duration::from_secs(
+            cfg.reconcile_ttl + jitter,
+        )))
     }
 
     // enable_volume_snapshot makes sure that the CoreDB spec has the spec.backup.volumeSnapshot
