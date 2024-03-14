@@ -13,7 +13,7 @@ use temboclient::apis::instance_api::get_all;
 use temboclient::models::{Instance, State};
 
 const CARGO_BIN: &str = "tembo";
-/*
+
 #[tokio::test]
 async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
     let root_dir = env!("CARGO_MANIFEST_DIR");
@@ -78,7 +78,7 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
     )?;
 
     Ok(())
-}*/
+}
 
 fn setup_env(instance_name: &String) -> Result<(), Box<dyn Error>> {
     replace_vars_in_file(tembo_context_file_path(), "ORG_ID", &env::var("ORG_ID")?)?;
