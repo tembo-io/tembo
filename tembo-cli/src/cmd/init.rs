@@ -47,7 +47,7 @@ pub fn execute() -> Result<(), anyhow::Error> {
     let cargo_manifest_dir =
         env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR env var not set");
 
-    let relative_path = "tembo/tembo-cli/examples/single-instance/tembo.toml";
+    let relative_path = "examples/single-instance/tembo.toml";
     let filepath = Path::new(&cargo_manifest_dir).join(relative_path);
 
     if !filepath.exists() {
