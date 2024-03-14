@@ -44,13 +44,20 @@ pub fn execute() -> Result<(), anyhow::Error> {
         }
     }
 
-    let cargo_manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+    let cargo_manifest_dir =
+        env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR env var not set");
 
     let relative_path = "tembo/tembo-cli/examples/single-instance/tembo.toml";
     let filepath = Path::new(&cargo_manifest_dir).join(relative_path);
 
-    let destination_path = Path::new(&FileUtils::get_current_working_dir()).join("tembo.toml");
+    if !filepath.exists() {
+        return Err(anyhow::anyhow!(
+            "The specified file was not found: {}",
+            filepath.display()
+        ));
+    }
 
+    let destination_path = Path::new(&FileUtils::get_current_working_dir()).join("tembo.toml");
     FileUtils::download_file(&filepath, &destination_path, false)?;
 
     confirmation("Tembo initialized successfully!");

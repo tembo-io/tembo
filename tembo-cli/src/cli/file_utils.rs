@@ -1,4 +1,3 @@
-use curl::easy::Easy;
 use simplelog::*;
 use std::env;
 use std::fs::{self, File};
@@ -68,7 +67,6 @@ impl FileUtils {
 
         fs::copy(source, destination)?;
 
-        println!("File copied successfully to {}", destination.display());
         Ok(())
     }
 
