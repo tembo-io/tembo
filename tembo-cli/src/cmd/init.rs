@@ -13,7 +13,7 @@ pub struct InitCommand {}
 
 pub fn execute() -> Result<(), anyhow::Error> {
     // Determine if running tests
-    let is_test_env = cfg!(test) || env::var("RUNNING_TESTS").is_ok();
+    let is_test_env = env::var("RUNNING_TESTS").is_ok();
 
     let context_text = if is_test_env {
         CONTEXT_EXAMPLE_TEXT
@@ -27,8 +27,6 @@ pub fn execute() -> Result<(), anyhow::Error> {
         CREDENTIALS_DEFAULT_TEXT
     };
 
-    print!("{}", context_text);
-
     match FileUtils::create_dir("home directory".to_string(), tembo_home_dir()) {
         Ok(t) => t,
         Err(e) => {
@@ -39,8 +37,8 @@ pub fn execute() -> Result<(), anyhow::Error> {
     match FileUtils::create_file(
         "context".to_string(),
         tembo_context_file_path(),
-        CONTEXT_EXAMPLE_TEXT.to_string(),
-        false,
+        context_text.to_string(),
+        true,
     ) {
         Ok(t) => t,
         Err(e) => {
@@ -51,8 +49,8 @@ pub fn execute() -> Result<(), anyhow::Error> {
     match FileUtils::create_file(
         "credentials".to_string(),
         tembo_credentials_file_path(),
-        CREDENTIALS_EXAMPLE_TEXT.to_string(),
-        false,
+        credentials_text.to_string(),
+        true,
     ) {
         Ok(t) => t,
         Err(e) => {

@@ -20,6 +20,7 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
     let test_dir = PathBuf::from(root_dir).join("examples").join("minimal");
 
     env::set_current_dir(&test_dir)?;
+    env::set_var("RUNNING_TESTS", "true");
 
     // tembo init
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
@@ -70,6 +71,7 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
     } else {
         assert!(true, "Instance isn't Deleting")
     }
+    env::remove_var("RUNNING_TESTS");
 
     replace_vars_in_file(
         "tembo.toml".to_string(),
