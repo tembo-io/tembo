@@ -46,7 +46,7 @@ set = true
 [[environment]]
 name = 'prod'
 target = 'tembo-cloud'
-org_id = 'Your Org ID here'
+org_id = 'ORG_ID'
 profile = 'prod'
 ";
 
@@ -54,7 +54,7 @@ pub const CREDENTIALS_EXAMPLE_TEXT: &str = "version = \"1.0\"
 
 [[profile]]
 name = 'prod'
-tembo_access_token = 'Your Access token here'
+tembo_access_token = 'ACCESS_TOKEN'
 tembo_host = 'https://api.tembo.io'
 tembo_data_host = 'https://api.data-1.use1.tembo.io'
 ";

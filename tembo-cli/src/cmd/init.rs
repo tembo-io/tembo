@@ -40,7 +40,7 @@ pub fn execute() -> Result<(), anyhow::Error> {
     match FileUtils::create_file(
         "context".to_string(),
         tembo_context_file_path(),
-        context_text.to_string(),
+        CONTEXT_EXAMPLE_TEXT.to_string(),
         false,
     ) {
         Ok(t) => t,
@@ -52,7 +52,7 @@ pub fn execute() -> Result<(), anyhow::Error> {
     match FileUtils::create_file(
         "credentials".to_string(),
         tembo_credentials_file_path(),
-        credentials_text.to_string(),
+        CONTEXT_EXAMPLE_TEXT.to_string(),
         false,
     ) {
         Ok(t) => t,
