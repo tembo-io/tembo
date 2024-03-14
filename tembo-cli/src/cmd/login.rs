@@ -1,3 +1,4 @@
+use crate::cli::context::Environment;
 use crate::cli::context::{
     get_current_context, tembo_context_file_path, tembo_credentials_file_path, Context, Credential,
     Profile,
@@ -11,20 +12,39 @@ use serde::Deserialize;
 use std::fs;
 use std::io::{self, Write};
 use std::sync::Arc;
+use std::sync::Mutex;
 use tokio::sync::Notify;
 use tokio::time::{self, Duration};
 use webbrowser;
 
+struct SharedState {
+    token: Mutex<Option<String>>,
+}
+
 #[derive(Args)]
-pub struct LoginCommand {}
+#[clap(author, version, about, long_about = None)]
+pub struct LoginCommand {
+    #[clap(long)]
+    pub organization_id: Option<String>,
+
+    #[clap(long)]
+    pub profile: Option<String>,
+
+    #[clap(long)]
+    pub tembo_host: Option<String>,
+
+    #[clap(long)]
+    pub tembo_data_host: Option<String>,
+}
 
 #[derive(Deserialize)]
 struct TokenRequest {
     token: String,
 }
 
-pub fn execute() -> Result<(), anyhow::Error> {
+pub fn execute(login_cmd: LoginCommand) -> Result<(), anyhow::Error> {
     let env = get_current_context()?;
+
     if env.target == "tembo-cloud" {
         let profile = env
             .selected_profile
@@ -32,8 +52,7 @@ pub fn execute() -> Result<(), anyhow::Error> {
             .ok_or_else(|| anyhow!("Environment not setup properly"))?;
         let login_url = url(profile)?;
         let rt = tokio::runtime::Runtime::new().expect("Failed to create a runtime");
-
-        rt.block_on(handle_tokio(login_url))?;
+        rt.block_on(handle_tokio(login_url, login_cmd))?;
     } else {
         print!("Cannot log in to the local context, please select a tembo-cloud context before logging in");
     }
@@ -48,12 +67,17 @@ fn url(profile: &Profile) -> Result<String, anyhow::Error> {
     Ok(login_url)
 }
 
-async fn handle_tokio(login_url: String) -> Result<(), anyhow::Error> {
+async fn handle_tokio(login_url: String, cmd: LoginCommand) -> Result<(), anyhow::Error> {
     webbrowser::open(&login_url)?;
     let notify = Arc::new(Notify::new());
     let notify_clone = notify.clone();
+    let profile_name = read_context();
+    let shared_state = web::Data::new(SharedState {
+        token: Mutex::new(None),
+    });
+    let shared_state_clone = shared_state.clone();
     tokio::spawn(async move {
-        if let Err(e) = start_server(notify_clone).await {
+        if let Err(e) = start_server(notify_clone, shared_state_clone).await {
             eprintln!("Server error: {}", e);
         }
     });
@@ -65,6 +89,11 @@ async fn handle_tokio(login_url: String) -> Result<(), anyhow::Error> {
             println!("Operation timed out. Server is being stopped.");
         }
     }
+    if let Some(token) = shared_state.token.lock().unwrap().as_ref() {
+        let _ = execute_command(cmd, token, &profile_name.unwrap());
+    } else {
+        println!("No token was received.");
+    }
 
     Ok(())
 }
@@ -73,20 +102,19 @@ async fn handle_tokio(login_url: String) -> Result<(), anyhow::Error> {
 async fn handle_request(
     body: web::Json<TokenRequest>,
     notify: web::Data<Arc<Notify>>,
+    shared_state: web::Data<SharedState>,
 ) -> impl Responder {
-    let token = &body.token;
-    let profile_name = read_context();
-    if let Err(e) = update_access_token(&profile_name.unwrap(), token) {
-        println!("Failed to save token: {}", e);
-        return HttpResponse::InternalServerError().body("Failed to save token");
-    }
+    let token = body.token.clone();
+
+    let mut token_storage = shared_state.token.lock().unwrap();
+    *token_storage = Some(token.clone());
 
     notify.notify_one();
 
     HttpResponse::Ok().body(format!("Token received and saved: {}", token))
 }
 
-async fn start_server(notify: Arc<Notify>) -> Result<()> {
+async fn start_server(notify: Arc<Notify>, shared_state: web::Data<SharedState>) -> Result<()> {
     let notify_data = web::Data::new(notify.clone());
 
     let server = HttpServer::new(move || {
@@ -101,6 +129,7 @@ async fn start_server(notify: Arc<Notify>) -> Result<()> {
             .max_age(3600);
 
         App::new()
+            .app_data(shared_state.clone())
             .app_data(notify_data.clone())
             .wrap(cors)
             .service(handle_request)
@@ -169,6 +198,95 @@ pub fn update_access_token(
 
     fs::write(&credentials_file_path, modified_contents)
         .map_err(|e| anyhow!("Failed to write modified credentials back to file: {}", e))?;
+
+    Ok(())
+}
+
+pub fn update_context(org_id: &str, profile_name: &str) -> Result<(), anyhow::Error> {
+    let context_file_path = tembo_context_file_path();
+    let contents = fs::read_to_string(&context_file_path)?;
+    let mut data: Context = toml::from_str(&contents)?;
+
+    let new_env = Environment {
+        name: profile_name.to_string(),
+        target: "tembo-cloud".to_string(),
+        org_id: Some(org_id.to_string()),
+        profile: Some(profile_name.to_string()),
+        set: Some(false),
+        selected_profile: None,
+    };
+    data.environment.push(new_env);
+
+    let modified_contents = toml::to_string(&data)?;
+    fs::write(&context_file_path, modified_contents)?;
+
+    Ok(())
+}
+
+pub fn update_or_create_profile(
+    profile_name: &str,
+    new_access_token: &str,
+    tembo_host: &str,
+    tembo_data_host: &str,
+) -> Result<(), anyhow::Error> {
+    let credentials_file_path = tembo_credentials_file_path();
+    let contents = fs::read_to_string(&credentials_file_path)?;
+    let mut credentials: Credential = toml::from_str(&contents)?;
+
+    let profile_opt = credentials
+        .profile
+        .iter_mut()
+        .find(|p| p.name == profile_name);
+
+    match profile_opt {
+        Some(profile) => {
+            profile.tembo_access_token = new_access_token.to_string();
+        }
+        None => {
+            let new_profile = Profile {
+                name: profile_name.to_string(),
+                tembo_access_token: new_access_token.to_string(),
+                tembo_host: tembo_host.to_string(),
+                tembo_data_host: tembo_data_host.to_string(),
+            };
+            credentials.profile.push(new_profile);
+        }
+    }
+
+    let modified_contents = toml::to_string(&credentials)?;
+    fs::write(&credentials_file_path, modified_contents)?;
+
+    Ok(())
+}
+
+pub fn execute_command(
+    cmd: LoginCommand,
+    new_access_token: &str,
+    profile_name: &str,
+) -> Result<(), anyhow::Error> {
+    let profile = cmd.profile;
+    let org_id = cmd.organization_id;
+    let default_tembo_host = "https://api.tembo.io";
+    let default_tembo_data_host = "https://api.data-1.use1.tembo.io";
+
+    let tembo_host = cmd
+        .tembo_host
+        .unwrap_or_else(|| default_tembo_host.to_string());
+    let tembo_data_host = cmd
+        .tembo_data_host
+        .unwrap_or_else(|| default_tembo_data_host.to_string());
+
+    if profile.is_some() && org_id.is_some() {
+        update_or_create_profile(
+            &profile.clone().unwrap(),
+            new_access_token,
+            &tembo_host.clone(),
+            &tembo_data_host.clone(),
+        )?;
+        update_context(&org_id.unwrap(), &profile.clone().unwrap())?;
+    } else {
+        let _ = update_access_token(profile_name, new_access_token);
+    }
 
     Ok(())
 }
