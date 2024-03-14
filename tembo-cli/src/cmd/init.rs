@@ -1,6 +1,6 @@
 use crate::cli::context::{
     tembo_context_file_path, tembo_credentials_file_path, tembo_home_dir, CONTEXT_DEFAULT_TEXT,
-    CREDENTIALS_DEFAULT_TEXT, CONTEXT_EXAMPLE_TEXT, CREDENTIALS_EXAMPLE_TEXT,
+    CONTEXT_EXAMPLE_TEXT, CREDENTIALS_DEFAULT_TEXT, CREDENTIALS_EXAMPLE_TEXT,
 };
 use crate::cli::file_utils::FileUtils;
 use crate::tui::confirmation;
@@ -12,7 +12,6 @@ use std::env;
 pub struct InitCommand {}
 
 pub fn execute() -> Result<(), anyhow::Error> {
-
     // Determine if running tests
     let is_test_env = cfg!(test) || env::var("RUNNING_TESTS").is_ok();
 
@@ -28,8 +27,8 @@ pub fn execute() -> Result<(), anyhow::Error> {
         CREDENTIALS_DEFAULT_TEXT
     };
 
-    print!("{}",context_text);
-    
+    print!("{}", context_text);
+
     match FileUtils::create_dir("home directory".to_string(), tembo_home_dir()) {
         Ok(t) => t,
         Err(e) => {
@@ -52,7 +51,7 @@ pub fn execute() -> Result<(), anyhow::Error> {
     match FileUtils::create_file(
         "credentials".to_string(),
         tembo_credentials_file_path(),
-        CONTEXT_EXAMPLE_TEXT.to_string(),
+        CREDENTIALS_EXAMPLE_TEXT.to_string(),
         false,
     ) {
         Ok(t) => t,

@@ -45,6 +45,16 @@ struct TokenRequest {
 pub fn execute(login_cmd: LoginCommand) -> Result<(), anyhow::Error> {
     let env = get_current_context()?;
 
+    match (&login_cmd.organization_id, &login_cmd.profile) {
+        (Some(_), None) | (None, Some(_)) => {
+            return Err(anyhow!(
+                "Both 'organization_id' and 'profile' must be specified."
+            ));
+        }
+        (None, None) => {}
+        _ => {}
+    }
+
     if env.target == "tembo-cloud" {
         let profile = env
             .selected_profile
@@ -54,7 +64,7 @@ pub fn execute(login_cmd: LoginCommand) -> Result<(), anyhow::Error> {
         let rt = tokio::runtime::Runtime::new().expect("Failed to create a runtime");
         rt.block_on(handle_tokio(login_url, login_cmd))?;
     } else {
-        print!("Cannot log in to the local context, please select a tembo-cloud context before logging in");
+        print!("Cannot log in to the local context. Please select a context, or initialize a new context with tembo login --profile < name your profile > --organization-id < Your Tembo Cloud organization ID >");
     }
 
     Ok(())
