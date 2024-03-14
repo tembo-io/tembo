@@ -1139,8 +1139,6 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
     // We need to check if the cdb.replicas is changing from 1 -> 2.  If it is, we need to take a
     // snapshot if snapshots are enabled.  We will need to wait on the snapshot to complete before
     // allowing the new Cluster configuration to be applied.
-    //
-    //todo: convert match_cluster into current_cluster
     match maybe_cluster {
         Ok(ref cluster) => {
             if check_cluster_instance_count(cdb, cluster) {
@@ -1158,7 +1156,6 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
                 "Cluster does not exist, cannot check instance count for instance: {}",
                 &name
             );
-            return Err(Action::requeue(Duration::from_secs(300)));
         }
     };
 
