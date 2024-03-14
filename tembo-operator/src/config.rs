@@ -4,6 +4,8 @@ use std::env;
 pub struct Config {
     pub enable_backup: bool,
     pub enable_volume_snapshot: bool,
+    pub reconcile_timestamp_ttl: u64,
+    pub reconcile_ttl: u64,
 }
 
 impl Default for Config {
@@ -13,6 +15,12 @@ impl Default for Config {
             enable_volume_snapshot: from_env_default("ENABLE_VOLUME_SNAPSHOT", "false")
                 .parse()
                 .unwrap(),
+            // The time to live for recociling the reconcile timestamp
+            reconcile_timestamp_ttl: from_env_default("RECONCILE_TIMESTAMP_TTL", "30")
+                .parse()
+                .unwrap(),
+            // The time to live for reconciling the entire instance
+            reconcile_ttl: from_env_default("RECONCILE_TTL", "90").parse().unwrap(),
         }
     }
 }
