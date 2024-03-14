@@ -44,13 +44,11 @@ pub fn execute() -> Result<(), anyhow::Error> {
         }
     }
 
-    let filename = "tembo.toml";
     let cargo_manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
 
-    let relative_path = "tembo-cli/examples/single-instance/tembo.toml"; // Relative path from the project root
+    let relative_path = "tembo/tembo-cli/examples/single-instance/tembo.toml";
     let filepath = Path::new(&cargo_manifest_dir).join(relative_path);
 
-    // Assuming you want to copy the file to the current working directory
     let destination_path = Path::new(&FileUtils::get_current_working_dir()).join("tembo.toml");
 
     FileUtils::download_file(&filepath, &destination_path, false)?;

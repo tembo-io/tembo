@@ -58,7 +58,6 @@ impl FileUtils {
         destination: &Path,
         overwrite: bool,
     ) -> std::io::Result<()> {
-        // Check if the destination file exists and if overwrite is false, return early
         if !overwrite && destination.exists() {
             println!(
                 "Tembo.toml file exists in this path {}",
@@ -67,7 +66,6 @@ impl FileUtils {
             return Ok(());
         }
 
-        // Copy the file from the source to the destination
         fs::copy(source, destination)?;
 
         println!("File copied successfully to {}", destination.display());
