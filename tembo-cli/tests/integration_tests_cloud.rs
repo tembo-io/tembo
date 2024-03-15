@@ -5,6 +5,7 @@ use std::error::Error;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::PathBuf;
+use std::time::Duration;
 use tembo::cli::context::{
     get_current_context, tembo_context_file_path, tembo_credentials_file_path, Environment,
 };
@@ -21,16 +22,19 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
 
     env::set_current_dir(&test_dir)?;
 
+    println!("Will run tembo init");
     // tembo init
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
     cmd.arg("init");
     cmd.assert().success();
+
 
     let charset = "abcdefghijklmnopqrstuvwxyz";
     let instance_name = generate(10, charset);
 
     setup_env(&instance_name)?;
 
+    println!("Will run tembo context set");
     // tembo context set --name local
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
     cmd.arg("context");
@@ -39,10 +43,15 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
     cmd.arg("prod");
     cmd.assert().success();
 
+    println!("Will run tembo apply");
     // tembo apply
     let mut cmd = Command::cargo_bin(CARGO_BIN).unwrap();
     cmd.arg("apply");
     cmd.assert().success();
+    let output = cmd.output().unwrap();
+    println!("tembo apply output:\n stdout {}\n stderr {}", std::str::from_utf8(&output.stdout).unwrap(), std::str::from_utf8(&output.stderr).unwrap());
+
+    tokio::time::sleep(Duration::from_secs(20)).await;
 
     let env = get_current_context()?;
     let profile = env.clone().selected_profile.unwrap();
@@ -52,11 +61,22 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
         ..Default::default()
     };
 
-    let maybe_instance = get_instance(&instance_name, &config, &env).await?;
-    if let Some(instance) = maybe_instance {
-        assert_eq!(instance.state, State::Up, "Instance isn't Up")
-    } else {
-        assert!(false, "Instance isn't Up")
+    for attempt in 1..=5 {
+        println!("---- Attempt {attempt}");
+        tokio::time::sleep(Duration::from_secs(25)).await;
+        let maybe_instance = get_instance(&instance_name, &config, &env).await?;
+        if let Some(instance) = maybe_instance {
+            println!("Instance is {:?}", instance.state);
+            if instance.state == State::Up {
+                break;
+            }
+            
+            if attempt == 5 {
+                assert_eq!(instance.state, State::Up, "Instance isn't Up")
+            }
+        } else if attempt == 5 {
+            panic!("Failed to get instance");
+        }
     }
 
     // tembo delete
@@ -132,10 +152,12 @@ pub async fn get_instance(
 ) -> Result<Option<Instance>, anyhow::Error> {
     let v = get_all(config, env.org_id.clone().unwrap().as_str()).await;
 
+    println!("Instance name: {instance_name}");
     println!("OrgID: {}", env.org_id.clone().unwrap().as_str());
 
     match v {
         Ok(result) => {
+            println!("{}", serde_json::to_string_pretty(&result).unwrap());
             let maybe_instance = result
                 .iter()
                 .find(|instance| instance.instance_name == instance_name);
