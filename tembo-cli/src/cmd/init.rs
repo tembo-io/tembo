@@ -5,8 +5,38 @@ use crate::cli::context::{
 use crate::cli::file_utils::FileUtils;
 use crate::tui::confirmation;
 use clap::Args;
-use std::env;
-use std::path::Path;
+
+pub const TEMBO_DEFAULT_TEXT: &str = r#"[test-instance]
+environment = "dev"
+instance_name = "test-instance"
+cpu = "1"
+memory = "2Gi"
+storage = "10Gi"
+replicas = 1
+stack_type = "Standard"
+
+[test-instance.postgres_configurations]
+shared_preload_libraries = 'pg_stat_statements'
+statement_timeout = 60
+pg_partman_bgw.dbname = 'postgres'
+pg_partman_bgw.interval = "60"
+pg_partman_bgw.role = 'postgres'
+
+[test-instance.extensions.pg_jsonschema]
+enabled = true
+trunk_project = "pg_jsonschema"
+trunk_project_version = "0.1.4"
+
+[test-instance.extensions.pgmq]
+enabled = true
+trunk_project = "pgmq"
+trunk_project_version = "0.33.3"
+
+[test-instance.extensions.pg_partman]
+enabled = true
+trunk_project = "pg_partman"
+trunk_project_version = "4.7.4"
+"#;
 
 /// Initializes a local environment. Creates a sample context and configuration files.
 #[derive(Args)]
@@ -44,21 +74,7 @@ pub fn execute() -> Result<(), anyhow::Error> {
         }
     }
 
-    let cargo_manifest_dir =
-        env::var("CARGO_MANIFEST_DIR").expect("CARGO_MANIFEST_DIR env var not set");
-
-    let relative_path = "examples/single-instance/tembo.toml";
-    let filepath = Path::new(&cargo_manifest_dir).join(relative_path);
-
-    if !filepath.exists() {
-        return Err(anyhow::anyhow!(
-            "The specified file was not found: {}",
-            filepath.display()
-        ));
-    }
-
-    let destination_path = Path::new(&FileUtils::get_current_working_dir()).join("tembo.toml");
-    FileUtils::download_file(&filepath, &destination_path, false)?;
+    let _ = FileUtils::save_tembo_toml(TEMBO_DEFAULT_TEXT);
 
     confirmation("Tembo initialized successfully!");
 

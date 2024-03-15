@@ -2,7 +2,7 @@ use simplelog::*;
 use std::env;
 use std::fs::{self, File};
 use std::io::Write;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 pub struct FileUtils {}
 
@@ -52,20 +52,12 @@ impl FileUtils {
         Ok(())
     }
 
-    pub fn download_file(
-        source: &PathBuf,
-        destination: &Path,
-        overwrite: bool,
-    ) -> std::io::Result<()> {
-        if !overwrite && destination.exists() {
-            println!(
-                "Tembo.toml file exists in this path {}",
-                destination.display()
-            );
-            return Ok(());
-        }
+    pub fn save_tembo_toml(default_text: &str) -> Result<(), Box<dyn std::error::Error>> {
+        let parent_dir = FileUtils::get_current_working_dir();
+        let tembo_toml_path = Path::new(&parent_dir).join("tembo.toml");
 
-        fs::copy(source, destination)?;
+        let mut file = File::create(&tembo_toml_path)?;
+        file.write_all(default_text.as_bytes())?;
 
         Ok(())
     }
