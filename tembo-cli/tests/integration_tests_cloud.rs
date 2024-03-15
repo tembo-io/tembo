@@ -55,7 +55,7 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
 
     for attempt in 1..=5 {
         println!("---- Attempt {attempt}");
-        tokio::time::sleep(Duration::from_secs(25)).await;
+        tokio::time::sleep(Duration::from_secs(200)).await;
         let maybe_instance = get_instance(&instance_name, &config, &env).await?;
         if let Some(instance) = maybe_instance {
             println!("Instance is {:?}", instance.state);
