@@ -11,6 +11,7 @@ use tembo::cli::context::{
 use temboclient::apis::configuration::Configuration;
 use temboclient::apis::instance_api::get_all;
 use temboclient::models::{Instance, State};
+use tokio::time::Duration;
 
 const CARGO_BIN: &str = "tembo";
 
@@ -52,13 +53,22 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
         ..Default::default()
     };
 
-    let maybe_instance = get_instance(&instance_name, &config, &env).await?;
-    if let Some(instance) = maybe_instance {
-        assert_eq!(instance.state, State::Up, "Instance isn't Up")
-    } else {
-        assert!(false, "Instance isn't Up")
-    }
+    for attempt in 1..=5 {
+        println!("---- Attempt {attempt}");
+        tokio::time::sleep(Duration::from_secs(25)).await;
+        let maybe_instance = get_instance(&instance_name, &config, &env).await?;
+        if let Some(instance) = maybe_instance {
+            println!("Instance is {:?}", instance.state);
+            if instance.state == State::Up {
+                break;
+            }
 
+            if attempt == 5 {
+                assert_eq!(instance.state, State::Up, "Instance isn't Up")
+            }
+        } else if attempt == 5 {
+            panic!("Failed to get instance");
+        }}
     // tembo delete
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
     cmd.arg("delete");
