@@ -5,6 +5,7 @@ use std::error::Error;
 use std::fs::File;
 use std::io::{Read, Write};
 use std::path::PathBuf;
+use std::time::Duration;
 use tembo::cli::context::{
     get_current_context, tembo_context_file_path, tembo_credentials_file_path, Environment,
 };
@@ -52,17 +53,31 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
         ..Default::default()
     };
 
-    let maybe_instance = get_instance(&instance_name, &config, &env).await?;
-    if let Some(instance) = maybe_instance {
-        assert_eq!(instance.state, State::Up, "Instance isn't Up")
-    } else {
-        assert!(false, "Instance isn't Up")
+    for attempt in 1..=5 {
+        let maybe_instance = get_instance(&instance_name, &config, &env).await?;
+        if let Some(instance) = maybe_instance {
+            println!("Instance is {:?}", instance.state);
+            if instance.state == State::Up {
+                break;
+            }
+
+            if attempt == 5 {
+                assert_eq!(instance.state, State::Up, "Instance isn't Up")
+            }
+        } else if attempt == 5 {
+            panic!("Failed to create instance");
+        }
+
+        // Wait a bit until trying again
+        tokio::time::sleep(Duration::from_secs(30)).await;
     }
 
     // tembo delete
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
     cmd.arg("delete");
     let _ = cmd.ok();
+
+    tokio::time::sleep(Duration::from_secs(10)).await;
 
     let maybe_instance = get_instance(&instance_name, &config, &env).await?;
     if let Some(instance) = maybe_instance {
