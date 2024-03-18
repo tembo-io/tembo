@@ -76,7 +76,7 @@ postgres_config:
     value: logical
 trunk_installs:
   - name: pg_timeseries
-    version: 0.1.1
+    version: 0.1.2
   - name: pg_partman
     version: 5.0.1
   - name: pg_stat_statements
@@ -86,7 +86,7 @@ extensions:
     locations:
       - database: postgres
         enabled: true
-        version: 0.1.1
+        version: 0.1.2
   - name: pg_stat_statements
     locations:
       - database: postgres
