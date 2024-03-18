@@ -44,6 +44,8 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
     let mut cmd = Command::cargo_bin(CARGO_BIN).unwrap();
     cmd.arg("apply");
     cmd.assert().success();
+    let output = cmd.output().unwrap();
+    println!("tembo apply output:\n stdout {}\n stderr {}", std::str::from_utf8(&output.stdout).unwrap(), std::str::from_utf8(&output.stderr).unwrap());
 
     let env = get_current_context()?;
     let profile = env.clone().selected_profile.unwrap();
