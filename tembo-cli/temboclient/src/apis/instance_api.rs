@@ -11,7 +11,8 @@
 use reqwest;
 
 use super::{configuration, Error};
-use crate::{apis::ResponseContent, models::InstanceEvent};
+use crate::apis::ResponseContent;
+use crate::models::InstanceEvent;
 
 /// struct for typed errors of method [`create_instance`]
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -134,7 +135,6 @@ pub async fn create_instance(
     local_var_req_builder = local_var_req_builder.json(&create_instance);
 
     let local_var_req = local_var_req_builder.build()?;
-
     let local_var_resp = local_var_client.execute(local_var_req).await?;
 
     let local_var_status = local_var_resp.status();
