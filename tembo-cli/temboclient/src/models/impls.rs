@@ -81,6 +81,7 @@ impl FromStr for StackType {
             "Geospatial" => Ok(StackType::Geospatial),
             "MongoAlternative" => Ok(StackType::MongoAlternative),
             "RAG" => Ok(StackType::Rag),
+            "Timeseries" => Ok(StackType::Timeseries),
             _ => Err(()),
         }
     }
