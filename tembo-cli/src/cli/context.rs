@@ -7,7 +7,6 @@ use serde::Serialize;
 
 use crate::tui;
 
-// TODO: Move this to a template file
 pub const CONTEXT_DEFAULT_TEXT: &str = "version = \"1.0\"
 
 [[environment]]
@@ -23,7 +22,6 @@ set = true
 # profile = 'prod'
 ";
 
-// TODO: Move this to a template file
 pub const CREDENTIALS_DEFAULT_TEXT: &str = "version = \"1.0\"
 
 # Remove commented out profile to setup your environment

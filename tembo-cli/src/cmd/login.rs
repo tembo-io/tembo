@@ -26,10 +26,9 @@ struct TokenRequest {
 pub fn execute() -> Result<(), anyhow::Error> {
     let env = get_current_context()?;
     if env.target == "tembo-cloud" {
-        let profile = env
-            .selected_profile
-            .as_ref()
-            .ok_or_else(|| anyhow!("Environment not setup properly"))?;
+        let profile = env.selected_profile.as_ref().ok_or_else(|| {
+            anyhow!("Tembo-Cloud Environment is not setup properly. Run 'tembo init'")
+        })?;
         let login_url = url(profile)?;
         let rt = tokio::runtime::Runtime::new().expect("Failed to create a runtime");
 
