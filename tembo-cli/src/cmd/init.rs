@@ -3,7 +3,6 @@ use crate::cli::context::{
     CREDENTIALS_DEFAULT_TEXT,
 };
 use crate::cli::file_utils::FileUtils;
-use crate::tui::confirmation;
 use clap::Args;
 
 pub const TEMBO_DEFAULT_TEXT: &str = r#"[test-instance]
@@ -75,8 +74,6 @@ pub fn execute() -> Result<(), anyhow::Error> {
     }
 
     let _ = FileUtils::save_tembo_toml(TEMBO_DEFAULT_TEXT);
-
-    confirmation("Tembo initialized successfully!");
 
     Ok(())
 }

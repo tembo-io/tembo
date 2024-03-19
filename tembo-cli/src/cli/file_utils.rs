@@ -1,3 +1,4 @@
+use crate::tui::confirmation;
 use simplelog::*;
 use std::env;
 use std::fs::{self, File};
@@ -56,10 +57,16 @@ impl FileUtils {
         let parent_dir = FileUtils::get_current_working_dir();
         let tembo_toml_path = Path::new(&parent_dir).join("tembo.toml");
 
-        let mut file = File::create(&tembo_toml_path)?;
-        file.write_all(default_text.as_bytes())?;
+        if tembo_toml_path.exists() {
+            print!("Tembo.toml file already exists in this path");
+            Ok(())
+        } else {
+            let mut file = File::create(&tembo_toml_path)?;
+            file.write_all(default_text.as_bytes())?;
+            confirmation("Tembo.toml initialized successfully!");
 
-        Ok(())
+            Ok(())
+        }
     }
 
     pub fn get_current_working_dir() -> String {
