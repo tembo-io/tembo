@@ -131,7 +131,7 @@ openapi-generator generate -i https://api.tembo.io/api-docs/openapi.json  -g rus
 #![allow(clippy::all)]
 ```
 
-* Create `/temboclient/src/models/impls.rs` file & add following code to it:
+* Create `temboclient/src/models/impls.rs` file & add following code to it:
 
 ```
 use std::str::FromStr;
@@ -215,13 +215,14 @@ impl FromStr for StackType {
             "OLTP" => Ok(StackType::Oltp),
             "DataWarehouse" => Ok(StackType::DataWarehouse),
             "Geospatial" => Ok(StackType::Geospatial),
+            "Timeseries" => Ok(StackType::Timeseries),
             _ => Err(()),
         }
     }
 }
 ```
 
-* Add following line towards the end of `/temboclient/src/models/mod.rs`
+* Add following line towards the end of `temboclient/src/models/mod.rs`
 
 ```
 pub mod impls;
