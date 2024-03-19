@@ -6,35 +6,13 @@ use crate::cli::file_utils::FileUtils;
 use clap::Args;
 
 pub const TEMBO_DEFAULT_TEXT: &str = r#"[test-instance]
-environment = "dev"
+environment = "prod"
 instance_name = "test-instance"
-cpu = "1"
-memory = "2Gi"
+cpu = "0.25"
+memory = "1Gi"
 storage = "10Gi"
 replicas = 1
 stack_type = "Standard"
-
-[test-instance.postgres_configurations]
-shared_preload_libraries = 'pg_stat_statements'
-statement_timeout = 60
-pg_partman_bgw.dbname = 'postgres'
-pg_partman_bgw.interval = "60"
-pg_partman_bgw.role = 'postgres'
-
-[test-instance.extensions.pg_jsonschema]
-enabled = true
-trunk_project = "pg_jsonschema"
-trunk_project_version = "0.1.4"
-
-[test-instance.extensions.pgmq]
-enabled = true
-trunk_project = "pgmq"
-trunk_project_version = "0.33.3"
-
-[test-instance.extensions.pg_partman]
-enabled = true
-trunk_project = "pg_partman"
-trunk_project_version = "4.7.4"
 "#;
 
 /// Initializes a local environment. Creates a sample context and configuration files.
