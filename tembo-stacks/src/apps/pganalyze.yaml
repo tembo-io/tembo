@@ -1,10 +1,12 @@
 name: !pganalyze
 appServices:
-  - image: quay.io/pganalyze/collector:v0.53.0
+  - image: quay.io/tembo/pganalyze-collector:0.54.0-alpha1
     name: pganalyze
     env:
       - name: DB_URL
         valueFromPlatform: ReadWriteConnection
+      - name: PGA_API_SYSTEM_TYPE
+        value: tembo
 trunk_installs:
   - name: auto_explain
     version: 15.3.0
