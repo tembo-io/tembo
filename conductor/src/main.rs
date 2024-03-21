@@ -20,6 +20,7 @@ use opentelemetry::sdk::metrics::{controllers, processors, selectors};
 use opentelemetry::{global, KeyValue};
 use pgmq::{Message, PGMQueueExt};
 use sqlx::error::Error;
+use sqlx::postgres::PgPoolOptions;
 use std::env;
 use std::sync::{Arc, Mutex};
 use std::{thread, time};
@@ -62,7 +63,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         .expect("error parsing IS_CLOUD_FORMATION");
 
     // Connect to pgmq
-    let queue = PGMQueueExt::new(pg_conn_url, 5).await?;
+    let queue = PGMQueueExt::new(pg_conn_url.clone(), 5).await?;
     queue.init().await?;
 
     // Create queues if they do not exist
@@ -71,6 +72,15 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
 
     // Infer the runtime environment and try to create a Kubernetes Client
     let client = Client::try_default().await?;
+
+    // Connection Pool
+    let db_pool = PgPoolOptions::new()
+        .connect(&pg_conn_url)
+        .await
+        .map_err(|e| {
+            error!("Failed to create PG pool: {}", e);
+            ConductorError::DatabaseError(e.to_string())
+        })?;
 
     loop {
         // Read from queue (check for new message)
@@ -96,6 +106,41 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
 
         let org_id = read_msg.message.org_id.clone();
         let instance_id = read_msg.message.inst_id.clone();
+        let namespace = format!(
+            "org-{}-inst-{}",
+            read_msg.message.organization_name, read_msg.message.dbname
+        );
+        info!("{}: Using namespace {}", read_msg.msg_id, &namespace);
+
+        if read_msg.message.event_type != Event::Delete {
+            let namespace_exists = match sqlx::query!(
+                "SELECT EXISTS(SELECT 1 FROM deleted_instances WHERE namespace = $1)",
+                namespace
+            )
+            .fetch_one(&db_pool)
+            .await
+            {
+                Ok(result) => result.exists,
+                Err(e) => {
+                    error!("Database query error: {}", e);
+                    continue;
+                }
+            };
+
+            if namespace_exists.is_some() {
+                info!(
+                    "{}: Namespace {} marked as deleted, archiving message.",
+                    read_msg.msg_id, namespace
+                );
+                if let Err(e) = queue
+                    .archive(&control_plane_events_queue, read_msg.msg_id)
+                    .await
+                {
+                    error!("Failed to archive message: {}", e);
+                }
+                continue;
+            }
+        }
 
         metrics
             .conductor_total
@@ -132,12 +177,6 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
             );
             continue;
         }
-
-        let namespace = format!(
-            "org-{}-inst-{}",
-            read_msg.message.organization_name, read_msg.message.dbname
-        );
-        info!("{}: Using namespace {}", read_msg.msg_id, &namespace);
 
         // Based on message_type in message, create, update, delete CoreDB
         let event_msg: types::StateToControlPlane = match read_msg.message.event_type {
@@ -375,6 +414,22 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                 )
                 .await?;
 
+                let insert_query = sqlx::query!(
+                    "INSERT INTO deleted_instances (namespace) VALUES ($1) ON CONFLICT (namespace) DO NOTHING",
+                    namespace
+                );
+
+                match insert_query.execute(&db_pool).await {
+                    Ok(_) => info!(
+                        "Namespace inserted into deleted_instances table or already exists: {}",
+                        &namespace
+                    ),
+                    Err(e) => error!(
+                        "Failed to insert namespace into deleted_instances table: {}",
+                        e
+                    ),
+                }
+
                 // report state
                 types::StateToControlPlane {
                     data_plane_id: read_msg.message.data_plane_id,
@@ -507,6 +562,19 @@ async fn main() -> std::io::Result<()> {
     let exporter = opentelemetry_prometheus::exporter(controller).init();
     let meter = global::meter("actix_web");
     let custom_metrics = CustomMetrics::new(&meter);
+    let pg_conn_url =
+        env::var("POSTGRES_QUEUE_CONNECTION").expect("POSTGRES_QUEUE_CONNECTION must be set");
+    let db_pool = PgPoolOptions::new()
+        .connect(&pg_conn_url)
+        .await
+        .expect("Failed to create PG pool");
+
+    sqlx::migrate!("./migrations")
+        .run(&db_pool)
+        .await
+        .expect("Failed to run database migrations");
+
+    log::info!("Database migrations have been successfully applied.");
 
     let background_threads: Arc<Mutex<Vec<tokio::task::JoinHandle<()>>>> =
         Arc::new(Mutex::new(Vec::new()));
@@ -588,6 +656,7 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .app_data(web::Data::new(custom_metrics.clone()))
             .app_data(web::Data::new(background_threads.clone()))
+            .app_data(web::Data::new(db_pool.clone()))
             .wrap(RequestTracing::new())
             .route(
                 "/metrics",
