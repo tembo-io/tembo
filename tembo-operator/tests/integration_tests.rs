@@ -5018,6 +5018,16 @@ CREATE EVENT TRIGGER pgrst_watch
         )
         .await;
 
+        // Query the database to make sure the pgbouncer role has usage privilege
+        let _usage_privilege_result = wait_until_psql_contains(
+            context.clone(),
+            coredb_resource.clone(),
+            "SELECT has_schema_privilege('cnpg_pooler_pgbouncer', 'public', 'USAGE') AS has_usage_permission;".to_string(),
+            "t".to_string(),
+            false,
+        )
+        .await;
+
         // Update coredb to disable pooler
         let _coredb_json = serde_json::json!({
             "apiVersion": API_VERSION,

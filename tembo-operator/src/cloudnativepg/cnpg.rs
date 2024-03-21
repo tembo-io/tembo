@@ -1434,6 +1434,15 @@ BEGIN
     END LOOP;
     CLOSE db_list;
 
+    -- Check and grant USAGE privilege on the public schema if not already granted
+    IF NOT EXISTS (
+        SELECT 1 
+        FROM information_schema.role_usage_grants 
+        WHERE grantee = 'cnpg_pooler_pgbouncer' AND object_schema = 'public' AND privilege_type = 'USAGE'
+    ) THEN
+        EXECUTE 'GRANT USAGE ON SCHEMA public TO cnpg_pooler_pgbouncer;';
+    END IF;
+
     -- Check if the function exists, if not create it
     IF NOT EXISTS (
         SELECT 1
