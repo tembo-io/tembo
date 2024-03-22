@@ -56,13 +56,27 @@ fn generate_resource(
     namespace: &str,
     oref: OwnerReference,
     domain: Option<String>,
+    annotations: &BTreeMap<String, String>,
 ) -> AppServiceResources {
     let resource_name = format!("{}-{}", coredb_name, appsvc.name.clone());
-    let service = appsvc
-        .routing
-        .as_ref()
-        .map(|_| generate_service(appsvc, coredb_name, &resource_name, namespace, oref.clone()));
-    let deployment = generate_deployment(appsvc, coredb_name, &resource_name, namespace, oref);
+    let service = appsvc.routing.as_ref().map(|_| {
+        generate_service(
+            appsvc,
+            coredb_name,
+            &resource_name,
+            namespace,
+            oref.clone(),
+            annotations,
+        )
+    });
+    let deployment = generate_deployment(
+        appsvc,
+        coredb_name,
+        &resource_name,
+        namespace,
+        oref,
+        annotations,
+    );
 
     // If DATA_PLANE_BASEDOMAIN is not set, don't generate IngressRoutes, IngressRouteTCPs, or EntryPoints
     if domain.is_none() {
@@ -151,6 +165,7 @@ fn generate_service(
     resource_name: &str,
     namespace: &str,
     oref: OwnerReference,
+    annotations: &BTreeMap<String, String>,
 ) -> Service {
     let mut selector_labels: BTreeMap<String, String> = BTreeMap::new();
 
@@ -191,6 +206,7 @@ fn generate_service(
             namespace: Some(namespace.to_owned()),
             labels: Some(labels.clone()),
             owner_references: Some(vec![oref]),
+            annotations: Some(annotations.clone()),
             ..ObjectMeta::default()
         },
         spec: Some(ServiceSpec {
@@ -209,6 +225,7 @@ fn generate_deployment(
     resource_name: &str,
     namespace: &str,
     oref: OwnerReference,
+    annotations: &BTreeMap<String, String>,
 ) -> Deployment {
     let mut labels: BTreeMap<String, String> = BTreeMap::new();
     labels.insert("app".to_owned(), resource_name.to_string());
@@ -220,6 +237,7 @@ fn generate_deployment(
         namespace: Some(namespace.to_owned()),
         labels: Some(labels.clone()),
         owner_references: Some(vec![oref]),
+        annotations: Some(annotations.clone()),
         ..ObjectMeta::default()
     };
 
@@ -580,6 +598,25 @@ async fn apply_resources(resources: Vec<AppServiceResources>, client: &Client, n
     has_errors
 }
 
+// generate_appsvc_annotations generates the annotations for the AppService resources
+fn generate_appsvc_annotations(cdb: &CoreDB) -> BTreeMap<String, String> {
+    cdb.metadata.annotations.as_ref().map_or_else(
+        || {
+            error!(
+                "failed to generate annotations for AppService: {}, error: No annotations found",
+                cdb.name_any()
+            );
+            BTreeMap::new()
+        },
+        |annotations| {
+            annotations
+                .iter()
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect()
+        },
+    )
+}
+
 pub async fn reconcile_app_services(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {
     let client = ctx.client.clone();
     let ns = cdb.namespace().unwrap();
@@ -587,6 +624,9 @@ pub async fn reconcile_app_services(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(
     let oref = cdb.controller_owner_ref(&()).unwrap();
     let deployment_api: Api<Deployment> = Api::namespaced(client.clone(), &ns);
     let service_api: Api<Service> = Api::namespaced(client.clone(), &ns);
+
+    // Generate labels to attach to the AppService resources
+    let annotations = generate_appsvc_annotations(cdb);
 
     let desired_deployments = match cdb.spec.app_services.clone() {
         Some(appsvcs) => appsvcs
@@ -705,7 +745,16 @@ pub async fn reconcile_app_services(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(
     // Iterate over each AppService and process routes
     let resources: Vec<AppServiceResources> = appsvcs
         .iter()
-        .map(|appsvc| generate_resource(appsvc, &coredb_name, &ns, oref.clone(), domain.to_owned()))
+        .map(|appsvc| {
+            generate_resource(
+                appsvc,
+                &coredb_name,
+                &ns,
+                oref.clone(),
+                domain.to_owned(),
+                &annotations,
+            )
+        })
         .collect();
     let apply_errored = apply_resources(resources.clone(), &client, &ns).await;
 
@@ -848,4 +897,78 @@ pub async fn prepare_apps_connection_secret(client: Client, cdb: &CoreDB) -> Res
         .await?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{apis::coredb_types::CoreDB, app_service::manager::generate_appsvc_annotations};
+    use std::collections::BTreeMap;
+
+    #[test]
+    fn test_generate_appsvc_annotations() {
+        // Create a CoreDB object
+        let cdb_yaml = r#"
+            apiVersion: coredb.io/v1alpha1
+            kind: CoreDB
+            metadata:
+              name: test
+              namespace: default
+              annotations:
+                tembo.io/data_plane_id: org_jQ7nBcX8uPzLkYdGtW1fvHOqMRST
+                tembo.io/entity_name: VectorDB
+                tembo.io/instance_id: inst_4836271985012_bZTnPq_85
+                tembo.io/org_id: org_jQ7nBcX8uPzLkYdGtW1fvHOqMRST
+            spec:
+              backup:
+                destinationPath: s3://tembo-backup/sample-standard-backup
+                encryption: ""
+                retentionPolicy: "30"
+                schedule: 17 9 * * *
+                endpointURL: http://minio:9000
+                volumeSnapshot:
+                  enabled: true
+                  snapshotClass: "csi-vsc"
+              image: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e 
+              port: 5432
+              replicas: 1
+              resources:
+                limits:
+                  cpu: "1"
+                  memory: 0.5Gi
+              serviceAccountTemplate:
+                metadata:
+                  annotations:
+                    eks.amazonaws.com/role-arn: arn:aws:iam::012345678901:role/aws-iam-role-iam
+              sharedirStorage: 1Gi
+              stop: false
+              storage: 1Gi
+              storageClass: "gp3-enc"
+              uid: 999
+        "#;
+        let coredb: CoreDB = serde_yaml::from_str(cdb_yaml).expect("Failed to parse YAML");
+
+        let annotataions = generate_appsvc_annotations(&coredb);
+
+        // Create the expected labels
+        let expected_annotations: BTreeMap<String, String> = vec![
+            (
+                "tembo.io/data_plane_id".to_string(),
+                "org_jQ7nBcX8uPzLkYdGtW1fvHOqMRST".to_string(),
+            ),
+            ("tembo.io/entity_name".to_string(), "VectorDB".to_string()),
+            (
+                "tembo.io/instance_id".to_string(),
+                "inst_4836271985012_bZTnPq_85".to_string(),
+            ),
+            (
+                "tembo.io/org_id".to_string(),
+                "org_jQ7nBcX8uPzLkYdGtW1fvHOqMRST".to_string(),
+            ),
+        ]
+        .into_iter()
+        .collect();
+
+        // Assert that the generated labels match the expected labels
+        assert_eq!(annotataions, expected_annotations);
+    }
 }
