@@ -569,7 +569,7 @@ async fn main() -> std::io::Result<()> {
         .await
         .expect("Failed to create PG pool");
 
-    sqlx::migrate!("../migrations")
+    sqlx::migrate!("./migrations")
         .run(&db_pool)
         .await
         .expect("Failed to run database migrations");

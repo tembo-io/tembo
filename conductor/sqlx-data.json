@@ -1,0 +1,35 @@
+{
+  "db": "PostgreSQL",
+  "741b48fdac2f6e940c057d27953b8df6619b4042d6d63ab57d5a86265d0eacfe": {
+    "describe": {
+      "columns": [
+        {
+          "name": "exists",
+          "ordinal": 0,
+          "type_info": "Bool"
+        }
+      ],
+      "nullable": [
+        null
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      }
+    },
+    "query": "SELECT EXISTS(SELECT 1 FROM deleted_instances WHERE namespace = $1)"
+  },
+  "f2556876a34f6128668dc9f5987c200acbf7974cc7f7c3c927d8031f828b8783": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Varchar"
+        ]
+      }
+    },
+    "query": "INSERT INTO deleted_instances (namespace) VALUES ($1) ON CONFLICT (namespace) DO NOTHING"
+  }
+}
