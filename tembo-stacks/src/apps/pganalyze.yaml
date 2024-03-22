@@ -7,6 +7,17 @@ appServices:
         valueFromPlatform: ReadWriteConnection
       - name: PGA_API_SYSTEM_TYPE
         value: tembo
+    storage:
+      volumes:
+        - name: scratch
+          emptyDir: {}
+      volumeMounts:
+        - name: scratch
+          mountPath: /tmp
+          subPath: tmp
+        - name: scratch
+          mountPath: /state
+          subPath: state
 trunk_installs:
   - name: auto_explain
     version: 15.3.0
