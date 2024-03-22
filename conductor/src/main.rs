@@ -82,6 +82,13 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
             ConductorError::DatabaseError(e.to_string())
         })?;
 
+    sqlx::migrate!("./migrations")
+        .run(&db_pool)
+        .await
+        .expect("Failed to run database migrations");
+
+    log::info!("Database migrations have been successfully applied.");
+
     loop {
         // Read from queue (check for new message)
         // messages that dont fit a CRUDevent will error
@@ -562,19 +569,6 @@ async fn main() -> std::io::Result<()> {
     let exporter = opentelemetry_prometheus::exporter(controller).init();
     let meter = global::meter("actix_web");
     let custom_metrics = CustomMetrics::new(&meter);
-    let pg_conn_url =
-        env::var("POSTGRES_QUEUE_CONNECTION").expect("POSTGRES_QUEUE_CONNECTION must be set");
-    let db_pool = PgPoolOptions::new()
-        .connect(&pg_conn_url)
-        .await
-        .expect("Failed to create PG pool");
-
-    sqlx::migrate!("./migrations")
-        .run(&db_pool)
-        .await
-        .expect("Failed to run database migrations");
-
-    log::info!("Database migrations have been successfully applied.");
 
     let background_threads: Arc<Mutex<Vec<tokio::task::JoinHandle<()>>>> =
         Arc::new(Mutex::new(Vec::new()));
@@ -656,7 +650,6 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .app_data(web::Data::new(custom_metrics.clone()))
             .app_data(web::Data::new(background_threads.clone()))
-            .app_data(web::Data::new(db_pool.clone()))
             .wrap(RequestTracing::new())
             .route(
                 "/metrics",
