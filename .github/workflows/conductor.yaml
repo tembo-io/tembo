@@ -72,6 +72,7 @@ jobs:
         run: |
           set -xe
           cargo install cargo-watch
+          export SQLX_OFFLINE=true
           cargo build
           # Start conductor in the background
           just watch > conductor-output.txt 2>&1 &
