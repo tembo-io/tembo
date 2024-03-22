@@ -71,7 +71,6 @@ fmt:
 watch:
 	POSTGRES_QUEUE_CONNECTION=postgresql://postgres:postgres@0.0.0.0:5431/postgres \
 	SQLX_OFFLINE=true \
-	DATABASE_URL=postgresql://postgres:postgres@0.0.0.0:5431/postgres \
 	RUST_BACKTRACE=1 \
 	RUST_LOG={{RUST_LOG}} \
 	CONTROL_PLANE_EVENTS_QUEUE=myqueue_control_plane \

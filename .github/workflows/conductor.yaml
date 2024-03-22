@@ -33,8 +33,6 @@ jobs:
       matrix:
         kube_version:
           - "1.25.8"
-    env:
-      DATABASE_URL: postgresql://postgres:postgres@0.0.0.0:5431/postgres
     steps:
       - uses: actions/checkout@v4
       - name: Install system dependencies
