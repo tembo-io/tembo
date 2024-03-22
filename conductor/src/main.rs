@@ -121,20 +121,22 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
 
         if read_msg.message.event_type != Event::Delete {
             let namespace_exists = match sqlx::query!(
-                "SELECT EXISTS(SELECT 1 FROM deleted_instances WHERE namespace = $1)",
-                namespace
+                "SELECT * FROM deleted_instances WHERE namespace = $1;",
+                &namespace
             )
-            .fetch_one(&db_pool)
+            .fetch_optional(&db_pool)
             .await
             {
-                Ok(result) => result.exists,
+                Ok(Some(_)) => true,
+                Ok(None) => false,
                 Err(e) => {
                     error!("Database query error: {}", e);
                     continue;
                 }
             };
+            println!("{}", namespace_exists);
 
-            if namespace_exists.is_some() {
+            if namespace_exists {
                 info!(
                     "{}: Namespace {} marked as deleted, archiving message.",
                     read_msg.msg_id, namespace
