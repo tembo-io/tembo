@@ -102,6 +102,7 @@ jobs:
       - name: Determine which tags to publish
         id: tags
         run: |
+          cd conductor
           cargo sqlx prepare --merged --check
           BRANCH_NAME="${{ needs.find_directories.outputs.branch_name }}"
           if [ "${BRANCH_NAME}" == "main" ]; then
