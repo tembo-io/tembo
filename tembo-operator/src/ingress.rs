@@ -260,7 +260,6 @@ pub async fn reconcile_postgres_ing_route_tcp(
     port: IntOrString,
     middleware_names: Vec<String>,
 ) -> Result<(), OperatorError> {
-
     let service_name_rw = format!("{}-rw", service_name_prefix);
     let service_name_rw = service_name_rw.as_str();
     let ingress_name_prefix_rw = format!("{}rw-", ingress_name_prefix);
@@ -355,7 +354,8 @@ pub async fn reconcile_postgres_ing_route_tcp(
         present_matchers_list.push(matcher_actual.clone());
 
         // Check if either the service name or port are mismatched
-        if !(app_svc_label || service_name_actual == service_name_rw && service_port_actual == port) {
+        if !(app_svc_label || service_name_actual == service_name_rw && service_port_actual == port)
+        {
             // This situation should only occur when the service name or port is changed, for example during cut-over from
             // CoreDB operator managing the service to CNPG managing the service.
             warn!(
@@ -460,7 +460,7 @@ pub async fn reconcile_postgres_ing_route_tcp(
             &ro_ingress_route_tcp_name_new,
             &ro_ingress_route_tcp_to_apply,
         )
-            .await?;
+        .await?;
     } else {
         debug!(
             "There is already a read-only IngressRouteTCP for this matcher, so we don't need to create a new one: {}",

@@ -148,7 +148,7 @@ impl CoreDB {
                         Action::requeue(Duration::from_secs(300))
                     })?;
 
-                let service_name_prefix = format!("{}", self.name_any().as_str());
+                let service_name_prefix = self.name_any().as_str().to_string();
                 let name_prefix = format!("{}-", self.name_any().as_str());
                 reconcile_postgres_ing_route_tcp(
                     self,
