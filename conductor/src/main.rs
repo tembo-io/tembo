@@ -82,7 +82,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
             ConductorError::DatabaseError(e.to_string())
         })?;
 
-    sqlx::migrate!("./migrations")
+    sqlx::migrate!("./conductor/migrations")
         .run(&db_pool)
         .await
         .expect("Failed to run database migrations");
