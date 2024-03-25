@@ -74,6 +74,7 @@ jobs:
       - name: Start postgres
         run: |
             set -xe
+            cargo install just
             just run-postgres
             just run-migrations
       - name: Determine which tags to publish
