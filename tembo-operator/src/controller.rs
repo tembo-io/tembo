@@ -148,16 +148,16 @@ impl CoreDB {
                         Action::requeue(Duration::from_secs(300))
                     })?;
 
-                let service_name_read_write = format!("{}-rw", self.name_any().as_str());
-                let prefix_read_write = format!("{}-rw-", self.name_any().as_str());
+                let service_name_prefix = format!("{}", self.name_any().as_str());
+                let name_prefix = format!("{}-", self.name_any().as_str());
                 reconcile_postgres_ing_route_tcp(
                     self,
                     ctx.clone(),
                     self.name_any().as_str(),
                     basedomain.as_str(),
                     ns.as_str(),
-                    prefix_read_write.as_str(),
-                    service_name_read_write.as_str(),
+                    name_prefix.as_str(),
+                    service_name_prefix.as_str(),
                     IntOrString::Int(5432),
                     vec![middleware_name.clone()],
                 )
@@ -169,6 +169,8 @@ impl CoreDB {
                     // IngressRouteTCP does not have expected errors during reconciliation.
                     Action::requeue(Duration::from_secs(300))
                 })?;
+
+                let service_name_read_write = format!("{}-rw", service_name_prefix);
 
                 reconcile_extra_postgres_ing_route_tcp(
                     self,
