@@ -7,6 +7,7 @@ RUN apt-get update && \
 COPY tembo-operator ./tembo-operator
 WORKDIR /build
 
+COPY sqlx-data.json .
 COPY Cargo.toml .
 COPY Cargo.lock .
 COPY ./src ./src
