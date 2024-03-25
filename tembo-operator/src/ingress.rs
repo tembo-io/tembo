@@ -274,7 +274,7 @@ pub async fn reconcile_postgres_ing_route_tcp(
     let mut present_ing_route_tcp_names_list: Vec<String> = vec![];
 
     // Check for all existing IngressRouteTCPs in this namespace
-    // Filter out any that are not for this DB or do not have the correct prefix
+    // Filter out any that are not for this DB, do not have the correct prefix, or do not have matching service name
     for ingress_route_tcp in &ingress_route_tcps {
         // Get labels for this ingress route tcp
         let labels = ingress_route_tcp
@@ -321,9 +321,6 @@ pub async fn reconcile_postgres_ing_route_tcp(
             "Detected ingress route tcp endpoint {}.{}",
             ingress_route_tcp_name, namespace
         );
-        // Save list of names so we can pick a name that doesn't exist,
-        // if we need to create a new ingress route tcp.
-        present_ing_route_tcp_names_list.push(ingress_route_tcp_name.clone());
 
         // Get the settings of our ingress route tcp, so we can update to a new
         // endpoint, if needed.
@@ -334,12 +331,21 @@ pub async fn reconcile_postgres_ing_route_tcp(
             .expect("Ingress route has no services")[0]
             .name
             .clone();
+
+        if service_name_actual.as_str() != service_name {
+            continue;
+        }
+
         let service_port_actual = ingress_route_tcp.spec.routes[0]
             .services
             .as_ref()
             .expect("Ingress route has no services")[0]
             .port
             .clone();
+
+        // Save list of names so we can pick a name that doesn't exist,
+        // if we need to create a new ingress route tcp.
+        present_ing_route_tcp_names_list.push(ingress_route_tcp_name.clone());
 
         // Keep the existing matcher (domain name) when updating an existing IngressRouteTCP,
         // so that we do not break connection strings with domain name updates.
