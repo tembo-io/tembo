@@ -94,6 +94,7 @@ jobs:
       - name: Start postgres
         run: |
             set -xe
+            cargo install sqlx-cli --version="0.6.3"
             cd conductor
             cargo install just
             just run-postgres
@@ -101,7 +102,6 @@ jobs:
       - name: Determine which tags to publish
         id: tags
         run: |
-          cargo install sqlx-cli --version="0.6.3"
           cargo sqlx prepare --merged --check
           BRANCH_NAME="${{ needs.find_directories.outputs.branch_name }}"
           if [ "${BRANCH_NAME}" == "main" ]; then
