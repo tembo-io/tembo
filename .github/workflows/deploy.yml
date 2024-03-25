@@ -58,6 +58,10 @@ jobs:
           repository: tembo-io/tembo
           path: ./.tembo
           ref: 3714d336a0efdfc82234db7ccb708ecf80346e84
+      - name: Install Rust stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
       - name: Determine which tags to publish
         id: tags
         run: |

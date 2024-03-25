@@ -24,3 +24,4 @@ RUN set -eux; \
     apt-get clean; \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 COPY --from=builder /usr/local/cargo/bin/* /usr/local/bin/
+COPY --from=builder /build/migrations /migrations
