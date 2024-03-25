@@ -71,6 +71,11 @@ jobs:
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
+      - name: Start postgres
+        run: |
+            set -xe
+            just run-postgres
+            just run-migrations
       - name: Determine which tags to publish
         id: tags
         run: |
