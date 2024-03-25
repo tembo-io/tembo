@@ -94,6 +94,7 @@ jobs:
       - name: Start postgres
         run: |
             set -xe
+            cd conductor
             cargo install just
             just run-postgres
             just run-migrations
