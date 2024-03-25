@@ -1436,8 +1436,8 @@ BEGIN
 
     -- Check and grant USAGE privilege on the public schema if not already granted
     IF NOT EXISTS (
-        SELECT 1 
-        FROM information_schema.role_usage_grants 
+        SELECT 1
+        FROM information_schema.role_usage_grants
         WHERE grantee = 'cnpg_pooler_pgbouncer' AND object_schema = 'public' AND privilege_type = 'USAGE'
     ) THEN
         EXECUTE 'GRANT USAGE ON SCHEMA public TO cnpg_pooler_pgbouncer;';
@@ -1469,7 +1469,7 @@ BEGIN
         EXECUTE 'REVOKE ALL ON FUNCTION user_search(text) FROM public;';
         EXECUTE 'GRANT EXECUTE ON FUNCTION user_search(text) TO cnpg_pooler_pgbouncer;';
     END IF;
-    
+
 END;
 $$;"#;
 
@@ -2584,7 +2584,7 @@ mod tests {
             schedule: 55 7 * * *
             volumeSnapshot:
               enabled: false
-          image: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e 
+          image: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e
           port: 5432
           postgresExporterEnabled: true
           postgresExporterImage: quay.io/prometheuscommunity/postgres-exporter:v0.12.1
@@ -2879,7 +2879,7 @@ mod tests {
           name: test
           namespace: default
         spec:
-          image: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e 
+          image: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e
           port: 5432
           postgresExporterEnabled: true
           postgresExporterImage: quay.io/prometheuscommunity/postgres-exporter:v0.12.1
@@ -2911,7 +2911,7 @@ mod tests {
           name: test
           namespace: default
         spec:
-          image: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e 
+          image: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e
           port: 5432
           postgresExporterEnabled: true
           postgresExporterImage: quay.io/prometheuscommunity/postgres-exporter:v0.12.1
@@ -2951,7 +2951,7 @@ mod tests {
             volumeSnapshot:
               enabled: true
               snapshotClass: "csi-vsc"
-          image: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e 
+          image: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e
           port: 5432
           replicas: 1
           resources:
