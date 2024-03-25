@@ -611,7 +611,15 @@ fn generate_appsvc_annotations(cdb: &CoreDB) -> BTreeMap<String, String> {
         |annotations| {
             annotations
                 .iter()
-                .map(|(k, v)| (k.clone(), v.clone()))
+                .map(|(k, v)| {
+                    if k == "tembo.io/org_id" {
+                        // Change key to "tembo.io/organization_id" if it matches "tembo.io/org_id"
+                        ("tembo.io/organization_id".to_string(), v.clone())
+                    } else {
+                        // Otherwise, clone the key and value as is
+                        (k.clone(), v.clone())
+                    }
+                })
                 .collect()
         },
     )
@@ -961,7 +969,7 @@ mod tests {
                 "inst_4836271985012_bZTnPq_85".to_string(),
             ),
             (
-                "tembo.io/org_id".to_string(),
+                "tembo.io/organization_id".to_string(),
                 "org_jQ7nBcX8uPzLkYdGtW1fvHOqMRST".to_string(),
             ),
         ]
