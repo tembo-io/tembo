@@ -15,12 +15,11 @@ use std::sync::Arc;
 
 use crate::{
     apis::coredb_types::CoreDB,
-    app_service::types::COMPONENT_NAME,
     errors::OperatorError,
     traefik::middleware_tcp_crd::{MiddlewareTCP, MiddlewareTCPIpAllowList, MiddlewareTCPSpec},
     Context,
 };
-use tracing::{debug, error, info, warn};
+use tracing::{debug, error, info};
 
 pub const VALID_IPV4_CIDR_BLOCK: &str = "^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(/(3[0-2]|2[0-9]|1[0-9]|[0-9]))?$";
 
@@ -237,18 +236,6 @@ async fn delete_ingress_route_tcp(
     Ok(())
 }
 
-// 1) We should never delete or update the hostname of an ingress route tcp.
-//    Instead, just create another one if the hostname does not match.
-//    This allows for domain name reconfiguration (e.g. coredb.io -> tembo.io),
-//    with the old connection string still working.
-//
-// 2) We should replace the service and port target of all ingress route tcp
-//    During a migration, the Service target will change, for example from CoreDB-operator managed
-//    to CNPG managed read-write endpoints.
-//
-// 3) We should allow for additional ingress route tcp to be created for different use cases
-//    For example read-only endpoints, we should not accidentally handle these other
-//    IngressRouteTCP in this code, so we check that we are working with the correct type of Service.
 pub async fn reconcile_postgres_ing_route_tcp(
     cdb: &CoreDB,
     ctx: Arc<Context>,
@@ -264,236 +251,27 @@ pub async fn reconcile_postgres_ing_route_tcp(
     // Initialize kube api for ingress route tcp
     let ingress_route_tcp_api: Api<IngressRouteTCP> = Api::namespaced(client, namespace);
     let owner_reference = cdb.controller_owner_ref(&()).unwrap();
-
-    // get all IngressRouteTCPs in the namespace
-    // After CNPG migration is done, this can look for only ingress route tcp with the correct owner reference
-    let ingress_route_tcps = ingress_route_tcp_api.list(&Default::default()).await?;
-
-    // We will save information about the existing ingress route tcp(s) in these vectors
-    let mut present_matchers_list: Vec<String> = vec![];
-    let mut present_ing_route_tcp_names_list: Vec<String> = vec![];
-
-    // Check for all existing IngressRouteTCPs in this namespace
-    // Filter out any that are not for this DB, do not have the correct prefix, or do not have matching service name
-    for ingress_route_tcp in &ingress_route_tcps {
-        // Get labels for this ingress route tcp
-        let labels = ingress_route_tcp
-            .metadata
-            .labels
-            .clone()
-            .unwrap_or_default();
-        // Check whether labels includes component=appService
-        let app_svc_label = labels
-            .get("component")
-            .map(|component| component == COMPONENT_NAME)
-            .unwrap_or(false);
-
-        let ingress_route_tcp_name = match ingress_route_tcp.metadata.name.clone() {
-            Some(ingress_route_tcp_name) => {
-                if app_svc_label {
-                    debug!(
-                        "Skipping ingress route tcp with appService label: {}",
-                        ingress_route_tcp_name
-                    );
-                    continue;
-                }
-
-                if !(ingress_route_tcp_name.starts_with(ingress_name_prefix)
-                    || ingress_route_tcp_name == cdb.name_any())
-                {
-                    debug!(
-                        "Skipping ingress route tcp without prefix {}: {}",
-                        ingress_name_prefix, ingress_route_tcp_name
-                    );
-                    continue;
-                }
-                ingress_route_tcp_name
-            }
-            None => {
-                error!(
-                    "IngressRouteTCP {}.{}, does not have a name.",
-                    subdomain, basedomain
-                );
-                return Err(OperatorError::IngressRouteTCPName);
-            }
-        };
-        debug!(
-            "Detected ingress route tcp endpoint {}.{}",
-            ingress_route_tcp_name, namespace
-        );
-
-        // Get the settings of our ingress route tcp, so we can update to a new
-        // endpoint, if needed.
-
-        let service_name_actual = ingress_route_tcp.spec.routes[0]
-            .services
-            .as_ref()
-            .expect("Ingress route has no services")[0]
-            .name
-            .clone();
-
-        if service_name_actual.as_str() != service_name {
-            continue;
-        }
-
-        let service_port_actual = ingress_route_tcp.spec.routes[0]
-            .services
-            .as_ref()
-            .expect("Ingress route has no services")[0]
-            .port
-            .clone();
-
-        // Save list of names so we can pick a name that doesn't exist,
-        // if we need to create a new ingress route tcp.
-        present_ing_route_tcp_names_list.push(ingress_route_tcp_name.clone());
-
-        // Keep the existing matcher (domain name) when updating an existing IngressRouteTCP,
-        // so that we do not break connection strings with domain name updates.
-        let matcher_actual = ingress_route_tcp.spec.routes[0].r#match.clone();
-
-        // Save the matchers to know if we need to create a new ingress route tcp or not.
-        present_matchers_list.push(matcher_actual.clone());
-
-        // Check if either the service name or port are mismatched
-        if !(app_svc_label || service_name_actual == service_name && service_port_actual == port) {
-            // This situation should only occur when the service name or port is changed, for example during cut-over from
-            // CoreDB operator managing the service to CNPG managing the service.
-            warn!(
-                "Postgres IngressRouteTCP {}.{}, does not match the service name or port. Updating service or port and leaving the match rule the same.",
-                ingress_route_tcp_name, namespace
-            );
-
-            // We will keep the matcher and the name the same, but update the service name and port.
-            // Also, we will set ownership.
-            let ingress_route_tcp_to_apply = postgres_ingress_route_tcp(
-                ingress_route_tcp_name.clone(),
-                namespace.to_string(),
-                owner_reference.clone(),
-                matcher_actual,
-                service_name.to_string(),
-                middleware_names.clone(),
-                port.clone(),
-            );
-            // Apply this ingress route tcp
-            apply_ingress_route_tcp(
-                ingress_route_tcp_api.clone(),
-                namespace,
-                &ingress_route_tcp_name,
-                &ingress_route_tcp_to_apply,
-            )
-            .await?;
-        }
-    }
-
-    // At this point in the code, all applicable IngressRouteTCPs are pointing to the right
-    // service and port. Now, we just need to create a new IngressRouteTCP if we do not already
-    // have one for the specified domain name.
-
-    // Build the expected IngressRouteTCP matcher we expect to find
+    let ingress_route_tcp_name = format!("{}0", ingress_name_prefix);
     let newest_matcher = format!("HostSNI(`{subdomain}.{basedomain}`)");
 
-    if !present_matchers_list.contains(&newest_matcher) {
-        // In this block, we are creating a new IngressRouteTCP
+    let ingress_route_tcp_to_apply = postgres_ingress_route_tcp(
+        ingress_route_tcp_name.clone(),
+        namespace.to_string(),
+        owner_reference.clone(),
+        newest_matcher.clone(),
+        service_name.to_string(),
+        middleware_names.clone(),
+        port.clone(),
+    );
 
-        // Pick a name for a new ingress route tcp that doesn't already exist
-        let mut index = 0;
-        let mut ingress_route_tcp_name_new = format!("{}{}", ingress_name_prefix, index);
-        while present_ing_route_tcp_names_list.contains(&ingress_route_tcp_name_new) {
-            index += 1;
-            ingress_route_tcp_name_new = format!("{}{}", ingress_name_prefix, index);
-        }
-        let ingress_route_tcp_name_new = ingress_route_tcp_name_new;
-
-        let ingress_route_tcp_to_apply = postgres_ingress_route_tcp(
-            ingress_route_tcp_name_new.clone(),
-            namespace.to_string(),
-            owner_reference.clone(),
-            newest_matcher.clone(),
-            service_name.to_string(),
-            middleware_names.clone(),
-            port.clone(),
-        );
-        // Apply this ingress route tcp
-        apply_ingress_route_tcp(
-            ingress_route_tcp_api.clone(),
-            namespace,
-            &ingress_route_tcp_name_new,
-            &ingress_route_tcp_to_apply,
-        )
-        .await?;
-    } else {
-        debug!(
-            "There is already an IngressRouteTCP for this matcher, so we don't need to create a new one: {}",
-            newest_matcher
-        );
-    }
-
-    // Check that all the existing IngressRouteTCPs include the middleware(s),
-    // and add them if they don't.
-    let mut middlewares_to_add = Vec::new();
-    for middleware_name in middleware_names.iter() {
-        middlewares_to_add.push(IngressRouteTCPRoutesMiddlewares {
-            name: middleware_name.clone(),
-            // Warning: 'namespace' field does not mean kubernetes namespace,
-            // it means Traefik 'provider' namespace.
-            // The IngressRouteTCP will by default look in the same Kubernetes namespace,
-            // so this should be set to None.
-            // https://doc.traefik.io/traefik/providers/overview/#provider-namespace
-            namespace: None,
-        });
-    }
-    let middlewares_to_add = match middlewares_to_add.len() {
-        0 => None,
-        _ => Some(middlewares_to_add),
-    };
-
-    for ingress_route_tcp in ingress_route_tcps {
-        // Get labels for this ingress route tcp
-        let labels = ingress_route_tcp
-            .metadata
-            .labels
-            .clone()
-            .unwrap_or_default();
-        // Check whether labels includes component=appService
-        let app_svc_label = labels
-            .get("component")
-            .map(|component| component == COMPONENT_NAME)
-            .unwrap_or(false);
-        let ingress_route_tcp_name = ingress_route_tcp.metadata.name.clone().unwrap();
-        if present_ing_route_tcp_names_list.contains(&ingress_route_tcp_name) {
-            // Skip any ingress route tcp that is not matched for this database
-            continue;
-        }
-        // Check if the middleware is already included
-        let mut needs_middleware_update = false;
-        for route in &ingress_route_tcp.spec.routes {
-            if route.middlewares != middlewares_to_add {
-                needs_middleware_update = true;
-                break;
-            }
-        }
-        if needs_middleware_update && !app_svc_label {
-            info!(
-                "Adding middleware to existing IngressRouteTCP {} for db {}",
-                &ingress_route_tcp_name,
-                cdb.metadata.name.clone().unwrap()
-            );
-            // We need to add the middleware to this ingress route tcp
-            let mut ingress_route_tcp_to_apply = ingress_route_tcp.clone();
-            for route in &mut ingress_route_tcp_to_apply.spec.routes {
-                route.middlewares = middlewares_to_add.clone();
-            }
-
-            // Apply this ingress route tcp
-            apply_ingress_route_tcp(
-                ingress_route_tcp_api.clone(),
-                namespace,
-                &ingress_route_tcp_name,
-                &ingress_route_tcp_to_apply,
-            )
-            .await?;
-        }
-    }
+    // Apply this ingress route tcp
+    apply_ingress_route_tcp(
+        ingress_route_tcp_api.clone(),
+        namespace,
+        &ingress_route_tcp_name,
+        &ingress_route_tcp_to_apply,
+    )
+    .await?;
 
     Ok(())
 }
