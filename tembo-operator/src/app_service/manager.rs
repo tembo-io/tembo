@@ -602,7 +602,7 @@ async fn apply_resources(resources: Vec<AppServiceResources>, client: &Client, n
 fn generate_appsvc_annotations(cdb: &CoreDB) -> BTreeMap<String, String> {
     cdb.metadata.annotations.as_ref().map_or_else(
         || {
-            error!(
+            debug!(
                 "failed to generate annotations for AppService: {}, error: No annotations found",
                 cdb.name_any()
             );
