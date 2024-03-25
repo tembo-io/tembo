@@ -1652,6 +1652,16 @@ mod test {
             .unwrap_or_else(|_| {
                 panic!("Expected to find ingress route TCP {}", ing_route_tcp_name)
             });
+        let ing_route_tcp_name = format!("{}-ro-0", name);
+        let ingress_route_tcp_api: Api<IngressRouteTCP> =
+            Api::namespaced(client.clone(), &namespace);
+        // Get the ingress route tcp
+        let ing_route_tcp = ingress_route_tcp_api
+            .get(&ing_route_tcp_name)
+            .await
+            .unwrap_or_else(|_| {
+                panic!("Expected to find ingress route TCP {}", ing_route_tcp_name)
+            });
         let service_name = ing_route_tcp.spec.routes[0]
             .services
             .clone()
