@@ -25,7 +25,6 @@ jobs:
         run: |
           echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
           echo "BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_OUTPUT
-          sudo apt-get install -y pkg-config libssl-dev git
       - name: Find directories with Dockerfiles that changed
         id: find_directories
         uses: ./.github/actions/find-changed-directories
@@ -51,6 +50,11 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.find_directories.outputs.build_images) }}
     steps:
+      - name: Install system dependencies
+        run: |
+          set -xe
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev git
       - name: Check out the repo
         uses: actions/checkout@v4
       - name: Check out the coredb repo to reuse some actions
