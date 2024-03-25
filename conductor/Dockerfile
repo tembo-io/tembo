@@ -10,6 +10,7 @@ WORKDIR /build
 COPY Cargo.toml .
 COPY Cargo.lock .
 COPY ./src ./src
+COPY ./migrations ./migrations
 
 RUN cargo install --path .
 
