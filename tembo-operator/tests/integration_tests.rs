@@ -1662,6 +1662,26 @@ mod test {
         // The coredb service is named the same as the coredb resource
         assert_eq!(&service_name, format!("{}-rw", name).as_str());
 
+        let ing_route_tcp_name = format!("{}-ro-0", name);
+        let ingress_route_tcp_api: Api<IngressRouteTCP> =
+            Api::namespaced(client.clone(), &namespace);
+        // Get the ingress route tcp
+        let ing_route_tcp = ingress_route_tcp_api
+            .get(&ing_route_tcp_name)
+            .await
+            .unwrap_or_else(|_| {
+                panic!("Expected to find ingress route TCP {}", ing_route_tcp_name)
+            });
+        let service_name = ing_route_tcp.spec.routes[0]
+            .services
+            .clone()
+            .expect("Ingress route has no services")[0]
+            .name
+            .clone();
+        // Assert the ingress route tcp service points to coredb service
+        // The coredb service is named the same as the coredb resource
+        assert_eq!(&service_name, format!("{}-ro", name).as_str());
+
         let coredb_json = serde_json::json!({
             "apiVersion": API_VERSION,
             "kind": kind,

@@ -148,6 +148,29 @@ impl CoreDB {
                         Action::requeue(Duration::from_secs(300))
                     })?;
 
+                let service_name_read_only = format!("{}-ro", self.name_any().as_str());
+                let prefix_read_only = format!("{}-ro-", self.name_any().as_str());
+                let read_only_subdomain = format!("{}-ro", self.name_any().as_str());
+                reconcile_postgres_ing_route_tcp(
+                    self,
+                    ctx.clone(),
+                    &read_only_subdomain,
+                    basedomain.as_str(),
+                    ns.as_str(),
+                    prefix_read_only.as_str(),
+                    service_name_read_only.as_str(),
+                    IntOrString::Int(5432),
+                    vec![middleware_name.clone()],
+                )
+                .await
+                .map_err(|e| {
+                    error!("Error reconciling postgres ingress route: {:?}", e);
+                    // For unexpected errors, we should requeue for several minutes at least,
+                    // for expected, "waiting" type of requeuing, those should be shorter, just a few seconds.
+                    // IngressRouteTCP does not have expected errors during reconciliation.
+                    Action::requeue(Duration::from_secs(300))
+                })?;
+
                 let service_name_read_write = format!("{}-rw", self.name_any().as_str());
                 let prefix_read_write = format!("{}-rw-", self.name_any().as_str());
                 reconcile_postgres_ing_route_tcp(
