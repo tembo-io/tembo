@@ -61,7 +61,7 @@ jobs:
       - name: Determine which tags to publish
         id: tags
         run: |
-          brew install sqlx-cli --version="0.6.3"
+          cargo install sqlx-cli --version="0.6.3"
           cargo sqlx prepare --merged 
           BRANCH_NAME="${{ needs.find_directories.outputs.branch_name }}"
           if [ "${BRANCH_NAME}" == "main" ]; then
