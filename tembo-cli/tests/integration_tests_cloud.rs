@@ -96,24 +96,50 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
 }
 
 fn setup_env(instance_name: &String) -> Result<(), Box<dyn Error>> {
-    replace_vars_in_file(tembo_context_file_path(), "ORG_ID", &env::var("ORG_ID")?)?;
+    let context_template = "# [[environment]]
+# name = 'prod'
+# target = 'tembo-cloud'
+# org_id can be found in your tembo cloud url. Example: org_2bVDi36rsJNot2gwzP37enwxzMk
+# org_id = 'Org ID here'
+# profile = 'prod'";
+
+    let context_replacement = format!(
+        "[[environment]]
+name = 'prod'
+target = 'tembo-cloud'
+org_id = '{}'
+profile = 'prod'",
+        env::var("ORG_ID")?
+    );
 
     replace_vars_in_file(
-        tembo_credentials_file_path(),
-        "ACCESS_TOKEN",
-        &env::var("ACCESS_TOKEN")?,
+        tembo_context_file_path(),
+        context_template,
+        &context_replacement,
     )?;
 
-    replace_vars_in_file(
-        tembo_credentials_file_path(),
-        "https://api.tembo.io",
-        &env::var("TEMBO_HOST")?,
-    )?;
+    let profile_template = "# [[profile]]
+# name = 'prod'
+# Generate an Access Token either through 'tembo login' or visit 'https://cloud.tembo.io/generate-jwt'
+# tembo_access_token = 'Access token here'
+# tembo_host = 'https://api.tembo.io'
+# tembo_data_host = 'https://api.data-1.use1.tembo.io'";
+
+    let profile_replacement = format!(
+        "[[profile]]
+name = 'prod'
+tembo_access_token = '{}'
+tembo_host = '{}'
+tembo_data_host = '{}'",
+        env::var("ACCESS_TOKEN")?,
+        env::var("TEMBO_HOST")?,
+        env::var("TEMBO_DATA_HOST")?
+    );
 
     replace_vars_in_file(
         tembo_credentials_file_path(),
-        "https://api.data-1.use1.tembo.io",
-        &env::var("TEMBO_DATA_HOST")?,
+        profile_template,
+        &profile_replacement,
     )?;
 
     replace_vars_in_file(
