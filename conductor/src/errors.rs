@@ -13,8 +13,8 @@ pub enum ConductorError {
     #[error("kube error {0}")]
     KubeError(#[from] kube::Error),
 
-    #[error("Error Database")]
-    DatabaseError(String),
+    #[error("Error with Connection Pool")]
+    ConnectionPoolError(String),
 
     // No status reported
     #[error("no status reported")]

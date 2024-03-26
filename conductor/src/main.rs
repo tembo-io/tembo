@@ -79,7 +79,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         .await
         .map_err(|e| {
             error!("Failed to create PG pool: {}", e);
-            ConductorError::DatabaseError(e.to_string())
+            ConductorError::ConnectionPoolError(e.to_string())
         })?;
 
     sqlx::migrate!("./migrations")

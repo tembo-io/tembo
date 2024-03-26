@@ -32,9 +32,6 @@ install-tempo:
 		tempo grafana/tempo \
 	  --namespace monitoring
 
-run-migrations:
-	sqlx migrate run --database-url postgresql://postgres:postgres@0.0.0.0:5431/postgres
-
 enable-cnpg-default-namespace:
 	kubectl label namespace default "tembo-pod-init.tembo.io/watch"="true"
 	kubectl delete pods -n tembo-system -l app=tembo-pod-init
