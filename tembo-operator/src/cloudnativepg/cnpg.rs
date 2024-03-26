@@ -62,14 +62,13 @@ use crate::{
     trunk::extensions_that_require_load,
     Context, RESTARTED_AT,
 };
-use chrono::{DateTime, NaiveDateTime, Offset};
-use futures::{StreamExt, TryStreamExt};
+use chrono::{DateTime, NaiveDateTime, Offset, Utc};
 use k8s_openapi::api::core::v1::Service;
 use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
 use kube::api::PostParams;
 use kube::{
-    api::{DeleteParams, ListParams, Patch, PatchParams, WatchEvent, WatchParams},
+    api::{DeleteParams, ListParams, Patch, PatchParams},
     runtime::{controller::Action, wait::Condition},
     Api, Resource, ResourceExt,
 };
@@ -1142,11 +1141,32 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
     match maybe_cluster {
         Ok(ref cluster) => {
             if check_cluster_instance_count(cdb, cluster) {
-                // Take a snapshot if snapshots are enabled
-                if cdb.spec.backup.volume_snapshot.as_ref().map(|v| v.enabled) == Some(true) {
-                    // call function create_replica_snapshot to create a snapshot (backup) of the current primary.
-                    // This will create a new snapshot and return when the snapshot is completed
-                    create_replica_snapshot(cdb, ctx.clone()).await?;
+                // Set bool if snapshots are enabled
+                let snapshots_enabled = cdb.spec.backup.volume_snapshot.as_ref().map(|v| v.enabled);
+
+                // Check when last backup was taken from Cluster.status.lastSuccessfulBackup.
+                // If longer than 60 minutes and snapshots_enabled is true then take a snapshot
+                if Some(true) == snapshots_enabled {
+                    let last_backup = cluster
+                        .status
+                        .as_ref()
+                        .and_then(|s| s.last_successful_backup.as_ref())
+                        .and_then(|l| l.parse::<DateTime<Utc>>().ok());
+                    let now = Utc::now();
+                    let duration = now.signed_duration_since(last_backup.unwrap_or(now));
+                    if duration.num_minutes() > 60 {
+                        // Check to see if we have any current backups in a running or pending state
+                        match check_backups(&namespace, ctx.clone()).await {
+                            Ok(_) => {
+                                debug!("No active backups detected for instance {}, proceeding with snapshot creation", &name);
+                                create_replica_snapshot(cdb, ctx.clone()).await?;
+                            }
+                            Err(action) => {
+                                // requeue if we have active backups
+                                return Err(action);
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -1204,6 +1224,38 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
     Ok(())
 }
 
+// check_backups will check if any backups are currently in a running or pending state
+async fn check_backups(namespace: &str, ctx: Arc<Context>) -> Result<(), Action> {
+    let backup_api: Api<Backup> = Api::namespaced(ctx.client.clone(), namespace);
+
+    // List all backups
+    let lp = ListParams::default();
+    let backups = backup_api.list(&lp).await.map_err(|e| {
+        error!("Error listing backups: {}", e);
+        Action::requeue(Duration::from_secs(30))
+    })?;
+
+    // Filter backups based on phase
+    let active_backups = backups
+        .iter()
+        .filter(|b| {
+            b.status
+                .as_ref()
+                .and_then(|s| s.phase.as_deref())
+                .map(|p| p == "running" || p == "pending")
+                .unwrap_or(false)
+        })
+        .collect::<Vec<_>>();
+
+    if !active_backups.is_empty() {
+        // If there are active backups, requeue
+        warn!("Active backups detected, requeuing in 30 seconds");
+        return Err(Action::requeue(Duration::from_secs(30)));
+    }
+
+    Ok(())
+}
+
 // create_replica_snapshot creates a snapshot (backup) of the current primary instance
 // so we can create a new replica from it.
 #[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any()))]
@@ -1251,118 +1303,56 @@ async fn create_replica_snapshot(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), 
         Action::requeue(Duration::from_secs(300))
     })?;
 
-    let backup_status = wait_for_backup_status(backup_name, namespace, ctx.clone()).await?;
-
-    if backup_status {
-        info!("Replica snapshot completed for instance: {}", name);
-        Ok(())
-    } else {
-        error!(
-            "Replica snapshot not ready or failed for instance: {}",
-            name
-        );
-        Err(Action::requeue(Duration::from_secs(30)))
-    }
+    // Wait for the backup to complete before proceeding
+    check_backup_status(backup_name, namespace, ctx.clone()).await
 }
 
-// wait_for_backup_status waits for the backup to complete
-#[instrument(skip(ctx), fields(trace_id, backup_name = %backup_name.to_string(), namespace = %namespace.to_string()))]
-async fn wait_for_backup_status(
+// check_backup_status will check the status of a backup and return a Result or an Action
+async fn check_backup_status(
     backup_name: &str,
     namespace: &str,
     ctx: Arc<Context>,
-) -> Result<bool, Action> {
+) -> Result<(), Action> {
     let backup_api: Api<Backup> = Api::namespaced(ctx.client.clone(), namespace);
 
-    loop {
-        let wp = WatchParams::default()
-            .fields(format!("metadata.name={}", backup_name).as_str())
-            .timeout(10);
-        let mut backup_stream = backup_api
-            .watch(&wp, "0")
-            .await
-            .map_err(|e| {
-                error!(
-                    "Error watching backup {} status: {}",
-                    backup_name.to_string(),
-                    e
-                );
-                Action::requeue(Duration::from_secs(30))
-            })?
-            .boxed();
-
-        while let Some(event) = match backup_stream.try_next().await {
-            Ok(event) => event,
-            Err(e) => {
-                error!(
-                    "Error watching backup {} status: {}",
-                    backup_name.to_string(),
-                    e
-                );
-                return Err(Action::requeue(Duration::from_secs(30)));
+    match backup_api.get(backup_name).await {
+        Ok(backup) => match backup.status.as_ref().and_then(|s| s.phase.as_deref()) {
+            Some("completed") => {
+                debug!("Backup {} completed", backup_name);
+                Ok(())
             }
-        } {
-            match event {
-                WatchEvent::Added(backup) | WatchEvent::Modified(backup) => {
-                    let phase = backup.status.as_ref().and_then(|s| s.phase.as_deref());
-                    match phase {
-                        Some("completed") => return Ok(true),
-                        Some("failed") => {
-                            error!("Backup {} failed", backup_name.to_string());
-                            return Ok(false);
-                        }
-                        Some("pending") => {
-                            warn!("Backup {} is still pending", backup_name.to_string());
-                            return Err(Action::requeue(Duration::from_secs(30)));
-                        }
-                        Some("running") => {
-                            warn!("Backup {} is still running", backup_name.to_string());
-                            return Err(Action::requeue(Duration::from_secs(30)));
-                        }
-                        Some("finalizing") => {
-                            warn!("Backup {} is still finalizing", backup_name.to_string());
-                            return Err(Action::requeue(Duration::from_secs(30)));
-                        }
-                        Some(_) => {
-                            error!(
-                                "Backup {} has an unknown phase status",
-                                backup_name.to_string()
-                            );
-                            return Err(Action::requeue(Duration::from_secs(30)));
-                        }
-                        None => {
-                            error!("Backup {} has no phase status", backup_name.to_string());
-                            return Err(Action::requeue(Duration::from_secs(300)));
-                        }
-                    }
-                }
-                WatchEvent::Deleted(_) => {
-                    error!(
-                        "Backup resource {} unexpectedly deleted",
-                        backup_name.to_string()
-                    );
-                    return Err(Action::requeue(Duration::from_secs(30)));
-                }
-                WatchEvent::Error(e) => {
-                    error!(
-                        "Error watching backup {} status: {}",
-                        backup_name.to_string(),
-                        e
-                    );
-                    return Err(Action::requeue(Duration::from_secs(30)));
-                }
-                WatchEvent::Bookmark(_) => {
-                    // Bookmark events can be ignored
-                }
+            Some("running") | Some("pending") | Some("finalizing") => {
+                debug!(
+                    "Backup {} is still processing (phase: {}). Requeuing...",
+                    backup_name,
+                    backup
+                        .status
+                        .as_ref()
+                        .and_then(|s| s.phase.as_deref())
+                        .unwrap_or_default()
+                );
+                Err(Action::requeue(Duration::from_secs(30)))
             }
+            Some("failed") => {
+                error!("Backup {} has failed.", backup_name);
+                Err(Action::requeue(Duration::from_secs(300)))
+            }
+            _ => {
+                error!("Backup {} is in an unexpected state.", backup_name);
+                Err(Action::requeue(Duration::from_secs(60)))
+            }
+        },
+        Err(kube::Error::Api(ae)) if ae.code == 404 => {
+            info!(
+                "Backup {} not found. It may not have been created yet, or the name is incorrect.",
+                backup_name
+            );
+            Err(Action::requeue(Duration::from_secs(30)))
         }
-
-        // If the watch stream ended without reaching the "completed" phase,
-        // start a new watch stream and continue waiting.
-        info!(
-            "Backup {} did not complete in the current watch stream, starting a new stream",
-            backup_name.to_string()
-        );
+        Err(e) => {
+            error!("Error fetching backup {}: {}", backup_name, e);
+            Err(Action::requeue(Duration::from_secs(30)))
+        }
     }
 }
 

@@ -4166,7 +4166,8 @@ CREATE EVENT TRIGGER pgrst_watch
         // Wait for Postgres to restart
         {
             let started = Utc::now();
-            let max_wait_time = chrono::Duration::seconds(TIMEOUT_SECONDS_POD_READY as _);
+            let max_wait_time =
+                chrono::TimeDelta::try_seconds(TIMEOUT_SECONDS_POD_READY as _).unwrap();
             let mut running_became_true = false;
             while Utc::now().signed_duration_since(started) < max_wait_time {
                 if status_running(&coredbs, &name).await.not() {
@@ -4220,7 +4221,7 @@ CREATE EVENT TRIGGER pgrst_watch
     async fn functional_test_status_configs() {
         async fn runtime_cfg(coredbs: &Api<CoreDB>, name: &str) -> Option<Vec<PgConfig>> {
             let started_waiting = Utc::now();
-            let max_wait_time = chrono::Duration::seconds(45);
+            let max_wait_time = chrono::TimeDelta::try_seconds(45).unwrap();
 
             while Utc::now().signed_duration_since(started_waiting) <= max_wait_time {
                 let coredb = coredbs.get(name).await.expect("spec not found");
