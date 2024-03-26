@@ -7,6 +7,8 @@ RUN apt-get update && \
 COPY tembo-operator ./tembo-operator
 WORKDIR /build
 
+ENV SQLX_OFFLINE=true
+
 COPY sqlx-data.json .
 COPY Cargo.toml .
 COPY Cargo.lock .
@@ -25,4 +27,3 @@ RUN set -eux; \
     apt-get clean; \
     rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
 COPY --from=builder /usr/local/cargo/bin/* /usr/local/bin/
-COPY --from=builder /build/migrations /migrations

@@ -44,41 +44,12 @@ jobs:
       - self-hosted
       - dind
       - large-8x8
-    env:
-      DATABASE_URL: "postgresql://postgres:postgres@0.0.0.0:5431/postgres"
-      POSTGRES_CONNECTION: "postgresql://postgres:postgres@0.0.0.0:5431/postgres"
-      POSTGRES_QUEUE_CONNECTION: "postgresql://postgres:postgres@0.0.0.0:5431/postgres"
     needs:
       - find_directories
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.find_directories.outputs.build_images) }}
     steps:
-      - uses: actions/checkout@v4
-      - name: Install system dependencies
-        run: |
-          set -xe
-          sudo apt-get update
-          sudo apt-get install -y pkg-config libssl-dev git
-      - uses: azure/setup-helm@v3
-      - uses: extractions/setup-just@v1
-      - name: Install kind
-        uses: helm/kind-action@v1.7.0
-        with:
-          install_only: true
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: "conductor-functional-test"
-          workspaces: |
-            conductor
-      - name: Setup local test cluster
-        run: |
-          set -xe
-          export KUBE_VERSION=${{ matrix.kube_version }}
-          just start-kind
       - name: Check out the repo
         uses: actions/checkout@v4
       - name: Check out the coredb repo to reuse some actions
@@ -87,23 +58,9 @@ jobs:
           repository: tembo-io/tembo
           path: ./.tembo
           ref: 3714d336a0efdfc82234db7ccb708ecf80346e84
-      - name: Install Rust stable toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-      - name: Start postgres
-        run: |
-            set -xe
-            cargo install sqlx-cli --version="0.6.3"
-            cd conductor
-            cargo install just
-            just run-postgres
-            just run-migrations
       - name: Determine which tags to publish
         id: tags
         run: |
-          cd conductor
-          cargo sqlx prepare --merged --check
           BRANCH_NAME="${{ needs.find_directories.outputs.branch_name }}"
           if [ "${BRANCH_NAME}" == "main" ]; then
             echo "tag_latest=true" >> $GITHUB_OUTPUT
