@@ -120,7 +120,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         info!("{}: Using namespace {}", read_msg.msg_id, &namespace);
 
         if read_msg.message.event_type != Event::Delete {
-            let namespace_exists = match sqlx::query!(
+            let namespace_already_deleted = match sqlx::query!(
                 "SELECT * FROM deleted_instances WHERE namespace = $1;",
                 &namespace
             )
@@ -134,9 +134,8 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     continue;
                 }
             };
-            println!("{}", namespace_exists);
 
-            if namespace_exists {
+            if namespace_already_deleted {
                 info!(
                     "{}: Namespace {} marked as deleted, archiving message.",
                     read_msg.msg_id, namespace
