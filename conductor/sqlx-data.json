@@ -1,0 +1,41 @@
+{
+  "db": "PostgreSQL",
+  "0d0aceb02d6bec4daa1e3b7f7a8636ccbbeaa012fcce04d392268c4968e75a9e": {
+    "describe": {
+      "columns": [
+        {
+          "name": "namespace",
+          "ordinal": 0,
+          "type_info": "Varchar"
+        },
+        {
+          "name": "deleted_at",
+          "ordinal": 1,
+          "type_info": "Timestamptz"
+        }
+      ],
+      "nullable": [
+        false,
+        true
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      }
+    },
+    "query": "SELECT * FROM deleted_instances WHERE namespace = $1;"
+  },
+  "f2556876a34f6128668dc9f5987c200acbf7974cc7f7c3c927d8031f828b8783": {
+    "describe": {
+      "columns": [],
+      "nullable": [],
+      "parameters": {
+        "Left": [
+          "Varchar"
+        ]
+      }
+    },
+    "query": "INSERT INTO deleted_instances (namespace) VALUES ($1) ON CONFLICT (namespace) DO NOTHING"
+  }
+}
