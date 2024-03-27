@@ -14,11 +14,12 @@ name = 'local'
 target = 'docker'
 set = true
 
-[[environment]]
-name = 'prod'
-target = 'tembo-cloud'
-org_id = 'Org ID here'
-profile = 'prod'
+# [[environment]]
+# name = 'prod'
+# target = 'tembo-cloud'
+# org_id can be found in your tembo cloud url. Example: org_2bVDi36rsJNot2gwzP37enwxzMk
+# org_id = 'Org ID here'
+# profile = 'prod'
 ";
 
 pub const CREDENTIALS_DEFAULT_TEXT: &str = "version = \"1.0\"

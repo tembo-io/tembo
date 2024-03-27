@@ -32,6 +32,32 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
 
     setup_env(&instance_name)?;
 
+    replace_vars_in_file(
+        tembo_context_file_path(),
+        "# name = 'prod'",
+        "name = 'prod'",
+    )?;
+    replace_vars_in_file(
+        tembo_context_file_path(),
+        "# target = 'tembo-cloud'",
+        "target = 'tembo-cloud'",
+    )?;
+    replace_vars_in_file(
+        tembo_context_file_path(),
+        "# org_id = 'Org ID here'",
+        "org_id = 'Org ID here'",
+    )?;
+    replace_vars_in_file(
+        tembo_context_file_path(),
+        "# profile = 'prod'",
+        "[[environment]]",
+    )?;
+    replace_vars_in_file(
+        tembo_context_file_path(),
+        "# [[environment]]",
+        "[[environment]]",
+    )?;
+
 
     let env = get_current_context()?;
     println!("{:?}",env);
@@ -91,11 +117,12 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
 }
 
 fn setup_env(instance_name: &String) -> Result<(), Box<dyn Error>> {
-    let context_template = "[[environment]]
-name = 'prod'
-target = 'tembo-cloud'
-org_id = 'Org ID here'
-profile = 'prod'
+    let context_template = "# [[environment]]
+# name = 'prod'
+# target = 'tembo-cloud'
+# org_id can be found in your tembo cloud url. Example: org_2bVDi36rsJNot2gwzP37enwxzMk
+# org_id = 'Org ID here'
+# profile = 'prod'
 ";
 
     let context_replacement = format!(
@@ -136,6 +163,32 @@ tembo_data_host = '{}'",
         tembo_credentials_file_path(),
         profile_template,
         &profile_replacement,
+    )?;
+
+    replace_vars_in_file(
+        tembo_context_file_path(),
+        "# name = 'prod'",
+        "name = 'prod'",
+    )?;
+    replace_vars_in_file(
+        tembo_context_file_path(),
+        "# target = 'tembo-cloud'",
+        "target = 'tembo-cloud'",
+    )?;
+    replace_vars_in_file(
+        tembo_context_file_path(),
+        "# org_id = 'Org ID here'",
+        "org_id = 'Org ID heres'",
+    )?;
+    replace_vars_in_file(
+        tembo_context_file_path(),
+        "# profile = 'prod'",
+        "[[environment]]",
+    )?;
+    replace_vars_in_file(
+        tembo_context_file_path(),
+        "# [[environment]]",
+        "[[environment]]",
     )?;
 
     replace_vars_in_file(
