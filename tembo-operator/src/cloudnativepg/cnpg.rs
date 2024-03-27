@@ -65,8 +65,11 @@ use crate::{
 use chrono::{DateTime, NaiveDateTime, Offset, Utc};
 use k8s_openapi::api::core::v1::Service;
 use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
-use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
-use kube::api::PostParams;
+use k8s_openapi::{
+    api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta,
+    apimachinery::pkg::apis::meta::v1::Time,
+};
+use kube::api::{ObjectList, PostParams};
 use kube::{
     api::{DeleteParams, ListParams, Patch, PatchParams},
     runtime::{controller::Action, wait::Condition},
@@ -1240,21 +1243,7 @@ async fn create_backup_if_needed(
         Action::requeue(Duration::from_secs(300))
     })?;
 
-    let currently_running_volume_snaps = backups.iter().any(|b| {
-        b.status
-            .as_ref()
-            .and_then(|s| s.phase.as_deref())
-            .map_or(false, |p| {
-                p == "running" || p == "pending" || p == "finishing"
-            })
-            && b.metadata.creation_timestamp.as_ref().map_or(false, |c| {
-                now.signed_duration_since(c.0).num_minutes() <= 60
-            })
-            && b.spec
-                .method
-                .as_ref()
-                .map_or(false, |m| m == &BackupMethod::VolumeSnapshot)
-    });
+    let currently_running_volume_snaps = has_currently_running_volume_snaps(&backups, Time(now));
 
     if currently_running_volume_snaps {
         warn!("Active backups detected, requeuing in 30 seconds");
@@ -1269,6 +1258,23 @@ async fn create_backup_if_needed(
     );
     // Remove the `return` keyword here
     Err(Action::requeue(Duration::from_secs(30)))
+}
+
+fn has_currently_running_volume_snaps(backups: &ObjectList<Backup>, now: Time) -> bool {
+    backups.items.iter().any(|b| {
+        matches!(
+            b.status.as_ref().and_then(|s| s.phase.as_deref()),
+            Some("running" | "pending" | "finishing")
+        ) && b
+            .metadata
+            .creation_timestamp
+            .as_ref()
+            .map_or(false, |creation_time| {
+                let duration = now.0.signed_duration_since(creation_time.0);
+                duration.num_minutes() <= 60
+            })
+            && matches!(b.spec.method.as_ref(), Some(BackupMethod::VolumeSnapshot))
+    })
 }
 
 // create_replica_snapshot creates a snapshot (backup) of the current primary instance
@@ -1319,27 +1325,23 @@ async fn create_replica_snapshot(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), 
 
 // Checks to see if the instance count is changing from 1 -> 2
 fn replicas_increasing(cdb: &CoreDB, cluster: &Cluster) -> bool {
-    // Get the replica count from the CoreDB object
+    // Desired replicas from the CoreDB object
     let cdb_replicas: i64 = cdb.spec.replicas.into();
 
-    // Get the replica count from the Cluster object
-    let cluster_instances = cluster.spec.instances;
+    // Current instances from Cluster status
+    let current_instances = cluster.status.as_ref().and_then(|s| s.instances);
 
-    // Check if the cdb_replica is greater than the cluster_replica
-    if cdb_replicas == 2 || cluster_instances == 2 {
-        // Check current instance count from Cluster status
-        let current_instances = cluster.status.as_ref().and_then(|s| s.instances);
-        if current_instances == Some(1) {
-            info!(
-                "Instance count is changing from 1 to 2 for instance {}. cdb_replicas: {}, cluster_instances: {}",
-                cdb.name_any(), cdb_replicas, cluster_instances
-            );
-            return true;
-        }
+    // Check if transitioning from 1 to 2
+    if matches!((cdb_replicas, current_instances), (2, Some(1))) {
+        info!(
+            "Instance count is changing from 1 to 2 for instance {}. Desired cdb_replicas: {}, Current instances: {}",
+            cdb.name_any(), cdb_replicas, current_instances.unwrap()
+        );
+        return true;
     } else {
         debug!(
-            "Instance count is not changing for instance {}. cdb_replicas: {}, cluster_instances: {}",
-            cdb.name_any(), cdb_replicas, cluster_instances
+            "No transition from 1 to 2 detected for instance {}. Desired cdb_replicas: {}, Current instances: {}",
+            cdb.name_any(), cdb_replicas, current_instances.unwrap()
         );
     }
 
@@ -2379,9 +2381,14 @@ mod tests {
     use super::*;
     use crate::{
         apis::coredb_types::{CoreDB, CoreDBSpec},
-        cloudnativepg::clusters::{Cluster, ClusterSpec, ClusterStatus},
+        cloudnativepg::{
+            backups::{Backup, BackupSpec, BackupStatus},
+            clusters::{Cluster, ClusterSpec, ClusterStatus},
+        },
     };
+    use chrono::{TimeDelta, Utc};
     use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+    use kube::api::ListMeta;
     use serde_json::json;
     use std::collections::BTreeMap;
 
@@ -3292,5 +3299,57 @@ mod tests {
             }),
         };
         assert!(!replicas_increasing(&cdb, &cluster));
+    }
+
+    #[test]
+    fn test_has_currently_running_volume_snaps() {
+        let now = Utc::now();
+
+        let backup_running = Backup {
+            metadata: ObjectMeta {
+                creation_timestamp: Some(Time(now - TimeDelta::try_minutes(60).unwrap())),
+                ..ObjectMeta::default()
+            },
+            spec: BackupSpec {
+                method: Some(BackupMethod::VolumeSnapshot),
+                ..BackupSpec::default()
+            },
+            status: Some(BackupStatus {
+                phase: Some("running".to_string()),
+                ..BackupStatus::default()
+            }),
+        };
+
+        let backup_completed = Backup {
+            metadata: ObjectMeta {
+                creation_timestamp: Some(Time(now - TimeDelta::try_minutes(90).unwrap())),
+                ..ObjectMeta::default()
+            },
+            spec: BackupSpec {
+                method: Some(BackupMethod::VolumeSnapshot),
+                ..BackupSpec::default()
+            },
+            status: Some(BackupStatus {
+                phase: Some("completed".to_string()),
+                ..BackupStatus::default()
+            }),
+        };
+
+        let backups_list = ObjectList {
+            items: vec![backup_running.clone(), backup_completed.clone()],
+            metadata: ListMeta::default(),
+        };
+
+        assert!(has_currently_running_volume_snaps(&backups_list, Time(now)));
+
+        let backups_list = ObjectList {
+            items: vec![backup_completed.clone()],
+            metadata: ListMeta::default(),
+        };
+
+        assert!(!has_currently_running_volume_snaps(
+            &backups_list,
+            Time(now)
+        ));
     }
 }
