@@ -3,6 +3,7 @@ use random_string::generate;
 use std::env;
 use std::error::Error;
 use std::fs::File;
+use regex::Regex;
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::time::Duration;
@@ -42,6 +43,7 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
 
 
     let env = get_current_context()?;
+    println!("{:?}",env);
     let profile = env.clone().selected_profile.unwrap();
     let config = Configuration {
         base_path: profile.get_tembo_host(),
@@ -89,7 +91,7 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
     }
 
     replace_vars_in_file(
-        "tembo.toml".to_string(),
+        "tembo.toml".to_string().into(),
         &format!("instance_name = \"{instance_name}\""),
         "instance_name = \"minimal\"",
     )?;
@@ -115,7 +117,7 @@ profile = 'prod'",
     );
 
     replace_vars_in_file(
-        tembo_context_file_path(),
+        tembo_context_file_path().into(),
         context_template,
         &context_replacement,
     )?;
@@ -139,13 +141,13 @@ tembo_data_host = '{}'",
     );
 
     replace_vars_in_file(
-        tembo_credentials_file_path(),
+        tembo_credentials_file_path().into(),
         profile_template,
         &profile_replacement,
     )?;
 
     replace_vars_in_file(
-        "tembo.toml".to_string(),
+        "tembo.toml".to_string().into(),
         "instance_name = \"minimal\"",
         &format!("instance_name = \"{instance_name}\""),
     )?;
@@ -154,17 +156,20 @@ tembo_data_host = '{}'",
 }
 
 fn replace_vars_in_file(
-    file_path: String,
-    word_from: &str,
-    word_to: &str,
+    file_path: PathBuf,
+    pattern: &str,
+    replacement: &str,
 ) -> Result<(), Box<dyn Error>> {
-    let mut src = File::open(&file_path)?;
-    let mut data = String::new();
-    src.read_to_string(&mut data)?;
-    drop(src);
-    let new_data = data.replace(word_from, word_to);
-    let mut dst = File::create(&file_path)?;
-    dst.write_all(new_data.as_bytes())?;
+    let mut file_contents = {
+        let mut fc = String::new();
+        File::open(&file_path)?.read_to_string(&mut fc)?;
+        fc
+    };
+
+    let re = Regex::new(pattern)?;
+    let new_contents = re.replace_all(&file_contents, replacement).to_string();
+
+    File::create(&file_path)?.write_all(new_contents.as_bytes())?;
 
     Ok(())
 }
