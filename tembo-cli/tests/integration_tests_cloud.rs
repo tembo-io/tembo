@@ -40,10 +40,6 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
     cmd.arg("prod");
     cmd.assert().success();
 
-    // tembo apply
-    let mut cmd = Command::cargo_bin(CARGO_BIN).unwrap();
-    cmd.arg("apply");
-    cmd.assert().success();
 
     let env = get_current_context()?;
     let profile = env.clone().selected_profile.unwrap();
@@ -52,6 +48,12 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
         bearer_access_token: Some(profile.tembo_access_token),
         ..Default::default()
     };
+
+    // tembo apply
+    let mut cmd = Command::cargo_bin(CARGO_BIN).unwrap();
+    cmd.arg("apply");
+    cmd.assert().success();
+
 
     for attempt in 1..=5 {
         let maybe_instance = get_instance(&instance_name, &config, &env).await?;
