@@ -91,12 +91,12 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
 }
 
 fn setup_env(instance_name: &String) -> Result<(), Box<dyn Error>> {
-    let context_template = "# [[environment]]
-# name = 'prod'
-# target = 'tembo-cloud'
-# org_id can be found in your tembo cloud url. Example: org_2bVDi36rsJNot2gwzP37enwxzMk
-# org_id = 'Org ID here'
-# profile = 'prod'";
+    let context_template = "[[environment]]
+name = 'prod'
+target = 'tembo-cloud'
+org_id = 'Org ID here'
+profile = 'prod'
+";
 
     let context_replacement = format!(
         "[[environment]]
