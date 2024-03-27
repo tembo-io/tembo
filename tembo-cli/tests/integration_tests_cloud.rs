@@ -32,32 +32,6 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
 
     setup_env(&instance_name)?;
 
-    replace_vars_in_file(
-        tembo_context_file_path(),
-        "# name = 'prod'",
-        "name = 'prod'",
-    )?;
-    replace_vars_in_file(
-        tembo_context_file_path(),
-        "# target = 'tembo-cloud'",
-        "target = 'tembo-cloud'",
-    )?;
-    replace_vars_in_file(
-        tembo_context_file_path(),
-        "# org_id = 'Org ID here'",
-        "org_id = 'Org ID here'",
-    )?;
-    replace_vars_in_file(
-        tembo_context_file_path(),
-        "# profile = 'prod'",
-        "[[environment]]",
-    )?;
-    replace_vars_in_file(
-        tembo_context_file_path(),
-        "# [[environment]]",
-        "[[environment]]",
-    )?;
-
 
     let env = get_current_context()?;
     println!("{:?}",env);
@@ -167,28 +141,8 @@ tembo_data_host = '{}'",
 
     replace_vars_in_file(
         tembo_context_file_path(),
-        "# name = 'prod'",
-        "name = 'prod'",
-    )?;
-    replace_vars_in_file(
-        tembo_context_file_path(),
-        "# target = 'tembo-cloud'",
-        "target = 'tembo-cloud'",
-    )?;
-    replace_vars_in_file(
-        tembo_context_file_path(),
-        "# org_id = 'Org ID here'",
-        "org_id = 'Org ID heres'",
-    )?;
-    replace_vars_in_file(
-        tembo_context_file_path(),
-        "# profile = 'prod'",
-        "[[environment]]",
-    )?;
-    replace_vars_in_file(
-        tembo_context_file_path(),
-        "# [[environment]]",
-        "[[environment]]",
+        "instance_name = \"minimal\"",
+        &format!("instance_name = \"{instance_name}\""),
     )?;
 
     replace_vars_in_file(
