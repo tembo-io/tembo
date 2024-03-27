@@ -1135,11 +1135,8 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
         }
     }
 
-    match maybe_cluster {
-        Ok(cluster) => {
-            create_backup_if_needed(cdb, &ctx, &cluster).await?
-        },
-        Err(_) => {}
+    if let Ok(cluster) = maybe_cluster {
+        create_backup_if_needed(cdb, &ctx, &cluster).await?;
     }
 
     // For manual changes conflicting with the operator, we have .force()
@@ -1187,11 +1184,17 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
     Ok(())
 }
 
-async fn create_backup_if_needed(cdb: &CoreDB, ctx: &Arc<Context>, cluster: &Cluster) -> Result<(), Action> {
-
+async fn create_backup_if_needed(
+    cdb: &CoreDB,
+    ctx: &Arc<Context>,
+    cluster: &Cluster,
+) -> Result<(), Action> {
     let name = cdb.name_any();
     let namespace = cluster.metadata.namespace.as_ref().ok_or_else(|| {
-        error!("Cluster namespace is empty for instance: {}.", name.as_str());
+        error!(
+            "Cluster namespace is empty for instance: {}.",
+            name.as_str()
+        );
         Action::requeue(tokio::time::Duration::from_secs(300))
     })?;
 
@@ -1203,10 +1206,11 @@ async fn create_backup_if_needed(cdb: &CoreDB, ctx: &Arc<Context>, cluster: &Clu
     }
 
     // check if snapshots are enabled, if not return OK
-    if cdb.spec.backup.volume_snapshot.is_none() {
-        return Ok(());
-    }
-    if !cdb.spec.backup.volume_snapshot.expect("We just checked this is not none").enabled {
+    if let Some(volume_snapshot) = &cdb.spec.backup.volume_snapshot {
+        if !volume_snapshot.enabled {
+            return Ok(());
+        }
+    } else {
         return Ok(());
     }
 
@@ -1237,9 +1241,19 @@ async fn create_backup_if_needed(cdb: &CoreDB, ctx: &Arc<Context>, cluster: &Clu
     })?;
 
     let currently_running_volume_snaps = backups.iter().any(|b| {
-        b.status.as_ref().and_then(|s| s.phase.as_deref()).map_or(false, |p| p == "running" || p == "pending" || p == "finishing") &&
-            b.metadata.creation_timestamp.as_ref().map_or(false, |c| now.signed_duration_since(c.0).num_minutes() <= 60) &&
-            b.spec.method.as_ref().map_or(false, |m| m == &BackupMethod::VolumeSnapshot)
+        b.status
+            .as_ref()
+            .and_then(|s| s.phase.as_deref())
+            .map_or(false, |p| {
+                p == "running" || p == "pending" || p == "finishing"
+            })
+            && b.metadata.creation_timestamp.as_ref().map_or(false, |c| {
+                now.signed_duration_since(c.0).num_minutes() <= 60
+            })
+            && b.spec
+                .method
+                .as_ref()
+                .map_or(false, |m| m == &BackupMethod::VolumeSnapshot)
     });
 
     if currently_running_volume_snaps {
@@ -1249,8 +1263,12 @@ async fn create_backup_if_needed(cdb: &CoreDB, ctx: &Arc<Context>, cluster: &Clu
 
     create_replica_snapshot(cdb, ctx.clone()).await?;
 
-    info!("Created a new backup for {}, requeuing in 30 seconds", name.as_str());
-    return Err(Action::requeue(Duration::from_secs(30)));
+    info!(
+        "Created a new backup for {}, requeuing in 30 seconds",
+        name.as_str()
+    );
+    // Remove the `return` keyword here
+    Err(Action::requeue(Duration::from_secs(30)))
 }
 
 // create_replica_snapshot creates a snapshot (backup) of the current primary instance
@@ -1288,7 +1306,7 @@ async fn create_replica_snapshot(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), 
     // Apply the new backup object
     let ps = PatchParams::apply("cntrlr").force();
 
-    let result = backup_api
+    let _ = backup_api
         .patch(&name, &ps, &Patch::Apply(&backup))
         .await
         .map_err(|e| {
