@@ -160,12 +160,12 @@ fn replace_vars_in_file(
 ) -> Result<(), Box<dyn Error>> {
     let mut src = File::open(&file_path)?;
     let mut data = String::new();
-    println!("{:?}",src.read_to_string(&mut data)?);
     src.read_to_string(&mut data)?;
     drop(src);
     let new_data = data.replace(word_from, word_to);
     let mut dst = File::create(&file_path)?;
-    dst.write(new_data.as_bytes())?;
+    dst.write_all(new_data.as_bytes())?;
+
     Ok(())
 }
 
