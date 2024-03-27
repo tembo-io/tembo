@@ -8,7 +8,10 @@ use crate::{
         postgres_parameters::MergeError,
     },
     cloudnativepg::{
-        backups::{Backup, BackupCluster, BackupMethod, BackupSpec, BackupTarget},
+        backups::{
+            Backup, BackupCluster, BackupMethod, BackupOnlineConfiguration, BackupSpec,
+            BackupTarget,
+        },
         clusters::{
             Cluster, ClusterAffinity, ClusterBackup, ClusterBackupBarmanObjectStore,
             ClusterBackupBarmanObjectStoreData, ClusterBackupBarmanObjectStoreDataCompression,
@@ -1262,17 +1265,19 @@ async fn create_backup_if_needed(
 
 fn has_currently_running_volume_snaps(backups: &ObjectList<Backup>, now: Time) -> bool {
     backups.items.iter().any(|b| {
-        matches!(
-            b.status.as_ref().and_then(|s| s.phase.as_deref()),
-            Some("running" | "pending" | "finishing")
-        ) && b
-            .metadata
-            .creation_timestamp
+        (b.status
             .as_ref()
-            .map_or(false, |creation_time| {
-                let duration = now.0.signed_duration_since(creation_time.0);
-                duration.num_minutes() <= 60
-            })
+            .and_then(|s| s.phase.as_deref())
+            .map_or(true, |phase| {
+                phase.is_empty() || matches!(phase, "running" | "pending" | "finishing")
+            }))
+            && b.metadata
+                .creation_timestamp
+                .as_ref()
+                .map_or(false, |creation_time| {
+                    let duration = now.0.signed_duration_since(creation_time.0);
+                    duration.num_minutes() <= 60
+                })
             && matches!(b.spec.method.as_ref(), Some(BackupMethod::VolumeSnapshot))
     })
 }
@@ -1290,12 +1295,13 @@ async fn create_replica_snapshot(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), 
     // Setup the API to Backup
     let backup_api: Api<Backup> = Api::namespaced(ctx.client.clone(), namespace);
 
+    // Generate snapshot name.  Should be name + replica + date (replica-20240327045600) but also less than 54 characters
+    let snapshot_name = generate_snapshot_name(&name);
+
     // Gererate the Backup object
     let backup = Backup {
         metadata: ObjectMeta {
-            // TODO: name with timestamp or random string, otherwise collide
-            // Also keep name short to avoid naming length issue
-            name: Some(format!("{}-replica-snapshot", name)),
+            name: Some(snapshot_name),
             namespace: Some(namespace.to_string()),
             ..ObjectMeta::default()
         },
@@ -1303,8 +1309,11 @@ async fn create_replica_snapshot(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), 
             cluster: BackupCluster { name: name.clone() },
             method: Some(BackupMethod::VolumeSnapshot),
             online: Some(true),
+            online_configuration: Some(BackupOnlineConfiguration {
+                immediate_checkpoint: Some(true),
+                ..BackupOnlineConfiguration::default()
+            }),
             target: Some(BackupTarget::Primary),
-            ..BackupSpec::default()
         },
         status: None,
     };
@@ -1321,6 +1330,21 @@ async fn create_replica_snapshot(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), 
         })?;
 
     return Ok(());
+}
+
+// generate_snapshot_name generates a snapshot name based on the instance name and the current timestamp
+fn generate_snapshot_name(name: &str) -> String {
+    let now = Utc::now();
+    let timestamp = now.format("%Y%m%d%H%M%S").to_string();
+
+    let max_name_len = 54 - 9 - timestamp.len();
+    let truncated_name = if name.len() > max_name_len {
+        &name[..max_name_len]
+    } else {
+        name
+    };
+
+    format!("{}-replica-{}", truncated_name, timestamp)
 }
 
 // Checks to see if the instance count is changing from 1 -> 2
@@ -3320,6 +3344,36 @@ mod tests {
             }),
         };
 
+        let backup_pending = Backup {
+            metadata: ObjectMeta {
+                creation_timestamp: Some(Time(now - TimeDelta::try_minutes(60).unwrap())),
+                ..ObjectMeta::default()
+            },
+            spec: BackupSpec {
+                method: Some(BackupMethod::VolumeSnapshot),
+                ..BackupSpec::default()
+            },
+            status: Some(BackupStatus {
+                phase: Some("pending".to_string()),
+                ..BackupStatus::default()
+            }),
+        };
+
+        let backup_finishing = Backup {
+            metadata: ObjectMeta {
+                creation_timestamp: Some(Time(now - TimeDelta::try_minutes(60).unwrap())),
+                ..ObjectMeta::default()
+            },
+            spec: BackupSpec {
+                method: Some(BackupMethod::VolumeSnapshot),
+                ..BackupSpec::default()
+            },
+            status: Some(BackupStatus {
+                phase: Some("finishing".to_string()),
+                ..BackupStatus::default()
+            }),
+        };
+
         let backup_completed = Backup {
             metadata: ObjectMeta {
                 creation_timestamp: Some(Time(now - TimeDelta::try_minutes(90).unwrap())),
@@ -3335,8 +3389,25 @@ mod tests {
             }),
         };
 
+        // Check if there is a currently running volume snapshot
         let backups_list = ObjectList {
             items: vec![backup_running.clone(), backup_completed.clone()],
+            metadata: ListMeta::default(),
+        };
+
+        assert!(has_currently_running_volume_snaps(&backups_list, Time(now)));
+
+        // Check if there is a currently pending volume snapshot
+        let backups_list = ObjectList {
+            items: vec![backup_pending.clone(), backup_completed.clone()],
+            metadata: ListMeta::default(),
+        };
+
+        assert!(has_currently_running_volume_snaps(&backups_list, Time(now)));
+
+        // Check if there is a currently finishing volume snapshot
+        let backups_list = ObjectList {
+            items: vec![backup_finishing.clone(), backup_completed.clone()],
             metadata: ListMeta::default(),
         };
 
@@ -3351,5 +3422,24 @@ mod tests {
             &backups_list,
             Time(now)
         ));
+    }
+
+    #[test]
+    fn test_generate_snapshot_name() {
+        // Test case 1: Name fits within 54 characters
+        let name1 = "my-snapshot";
+        let snapshot_name1 = generate_snapshot_name(name1);
+        assert!(snapshot_name1.starts_with(name1));
+        assert!(snapshot_name1.ends_with(&Utc::now().format("%Y%m%d%H%M%S").to_string()));
+        assert!(snapshot_name1.len() <= 54);
+
+        // Test case 2: Name exceeds 54 characters
+        let name2 = "a-very-long-snapshot-name-that-exceeds-54-characters";
+        let snapshot_name2 = generate_snapshot_name(name2);
+        let timestamp_len = Utc::now().format("%Y%m%d%H%M%S").to_string().len();
+        let max_name_len = 54 - 9 - timestamp_len;
+        assert!(snapshot_name2.starts_with(&name2[..max_name_len]));
+        assert!(snapshot_name2.ends_with(&Utc::now().format("%Y%m%d%H%M%S").to_string()));
+        assert!(snapshot_name2.len() <= 54);
     }
 }
