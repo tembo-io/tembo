@@ -75,7 +75,7 @@ fn main() -> Result<(), anyhow::Error> {
             delete::execute()?;
         }
         SubCommands::Login(_login_cmd) => {
-            login::execute()?;
+            login::execute(_login_cmd)?;
         }
         SubCommands::Top(_top_cmd) => {
             top::execute(app.global_opts.verbose, _top_cmd)?;
