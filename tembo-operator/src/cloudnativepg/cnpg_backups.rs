@@ -53,7 +53,7 @@ pub async fn create_backup_if_needed(
     } else {
         return Ok(());
     }
-    info!(
+    debug!(
         "Replicas are increasing and snapshots are enabled for instance: {}",
         name.as_str()
     );
@@ -66,7 +66,7 @@ pub async fn create_backup_if_needed(
         .and_then(|s| s.last_successful_backup.as_ref())
         .and_then(|l| l.parse::<DateTime<Utc>>().ok());
 
-    info!(
+    debug!(
         "Last backup for instance {} was at: {:?}",
         name.as_str(),
         last_backup
@@ -75,7 +75,7 @@ pub async fn create_backup_if_needed(
     let now = Utc::now();
     let duration = now.signed_duration_since(last_backup.unwrap_or(now));
     if duration.num_minutes() <= 60 {
-        info!(
+        debug!(
             "Last backup for instance {} was taken {:?}m ago, continue without taking a new backup",
             name.as_str(),
             duration.num_minutes(),
@@ -83,7 +83,7 @@ pub async fn create_backup_if_needed(
         return Ok(());
     }
 
-    info!(
+    debug!(
         "Last backup for instance {} was taken {:?}m ago, taking a new backup",
         name.as_str(),
         duration.num_minutes(),
@@ -157,7 +157,7 @@ fn has_currently_running_volume_snaps(backups: &ObjectList<Backup>, now: Time) -
         }
 
         if status_match {
-            info!(
+            debug!(
                 "Backup {} is currently in progress or has no status.",
                 b.metadata.name.as_deref().unwrap_or("unknown")
             );
@@ -165,7 +165,7 @@ fn has_currently_running_volume_snaps(backups: &ObjectList<Backup>, now: Time) -
         }
 
         if creation_time_match {
-            info!(
+            debug!(
                 "Backup {} was created within the last 60 minutes.",
                 b.metadata.name.as_deref().unwrap_or("unknown")
             );
@@ -173,7 +173,7 @@ fn has_currently_running_volume_snaps(backups: &ObjectList<Backup>, now: Time) -
         }
     }
 
-    info!("No currently running or recent backups found.");
+    debug!("No currently running or recent backups found.");
     false
 }
 
