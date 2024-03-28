@@ -405,7 +405,6 @@ fn get_conn_info_with_creds(
     let map = result.as_ref().unwrap();
 
     conn_info.user = map.get("username").unwrap().to_string();
-    conn_info.password = map.get("password").unwrap().to_string();
 
     Ok(conn_info)
 }
@@ -1244,7 +1243,6 @@ fn construct_connection_string(info: ConnectionInfo) -> String {
     format!(
         "postgresql://{}:{}@{}:{}/{}",
         info.user,
-        urlencoding::encode(&info.password),
         info.host,
         info.port,
         "postgres"
