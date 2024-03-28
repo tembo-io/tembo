@@ -1662,6 +1662,26 @@ mod test {
         // The coredb service is named the same as the coredb resource
         assert_eq!(&service_name, format!("{}-rw", name).as_str());
 
+        let ing_route_tcp_name = format!("{}-ro-0", name);
+        let ingress_route_tcp_api: Api<IngressRouteTCP> =
+            Api::namespaced(client.clone(), &namespace);
+        // Get the ingress route tcp
+        let ing_route_tcp = ingress_route_tcp_api
+            .get(&ing_route_tcp_name)
+            .await
+            .unwrap_or_else(|_| {
+                panic!("Expected to find ingress route TCP {}", ing_route_tcp_name)
+            });
+        let service_name = ing_route_tcp.spec.routes[0]
+            .services
+            .clone()
+            .expect("Ingress route has no services")[0]
+            .name
+            .clone();
+        // Assert the ingress route tcp service points to coredb service
+        // The coredb service is named the same as the coredb resource
+        assert_eq!(&service_name, format!("{}-ro", name).as_str());
+
         let coredb_json = serde_json::json!({
             "apiVersion": API_VERSION,
             "kind": kind,
@@ -1788,14 +1808,14 @@ mod test {
 
     #[tokio::test]
     #[ignore]
-    async fn functional_test_ingress_route_tcp_adopt_existing_ing_route_tcp() {
+    async fn functional_test_ingress_route_tcp_ignore_existing_ing_route_tcp() {
         // Initialize the Kubernetes client
         let client = kube_client().await;
 
         // Configurations
         let mut rng = rand::thread_rng();
         let suffix = rng.gen_range(0..100000);
-        let name = &format!("test-ingress-route-tcp-adopt-{}", suffix.clone());
+        let name = &format!("test-ingress-route-tcp-ignore-{}", suffix.clone());
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
             Err(e) => {
@@ -1806,7 +1826,7 @@ mod test {
         let kind = "CoreDB";
         let replicas = 1;
 
-        // Create an ingress route tcp to be adopted
+        // Create an ingress route tcp to be ignored
         let ing = serde_json::json!({
             "apiVersion": "traefik.containo.us/v1alpha1",
             "kind": "IngressRouteTCP",
@@ -1817,7 +1837,7 @@ mod test {
                 "entryPoints": ["postgresql"],
                 "routes": [
                     {
-                        "match": format!("HostSNI(`{name}.localhost`)"),
+                        "match": format!("HostSNI(`{name}-old.localhost`)"),
                         "services": [
                             {
                                 "name": format!("{name}"),
@@ -1869,142 +1889,16 @@ mod test {
         // Get the ingress route tcp
         let get_result = ingress_route_tcp_api.get(&ing_route_tcp_name).await;
         assert!(
-            get_result.is_err(),
-            "Expected to not find ingress route TCP with name {}",
+            get_result.is_ok(),
+            "Expected to find ingress route TCP with name {}",
             ing_route_tcp_name
         );
 
-        // This TCP route is the one we adopted
+        // This TCP route is the one we ignored
         let _get_result = ingress_route_tcp_api
             .get(name)
             .await
             .unwrap_or_else(|_| panic!("Expected to find ingress route TCP {}", name));
-
-        // Cleanup CoreDB resource
-        coredbs.delete(name, &Default::default()).await.unwrap();
-        println!("Waiting for CoreDB to be deleted: {}", &name);
-        let _assert_coredb_deleted = tokio::time::timeout(
-            Duration::from_secs(TIMEOUT_SECONDS_COREDB_DELETED),
-            await_condition(coredbs.clone(), name, conditions::is_deleted("")),
-        )
-        .await
-        .unwrap_or_else(|_| {
-            panic!(
-                "CoreDB {} was not deleted after waiting {} seconds",
-                name, TIMEOUT_SECONDS_COREDB_DELETED
-            )
-        });
-        println!("CoreDB resource deleted {}", name);
-
-        // Delete namespace
-        let _ = delete_namespace(client.clone(), &namespace).await;
-    }
-
-    #[tokio::test]
-    #[ignore]
-    async fn functional_test_ingress_route_tcp_adopt_existing_and_dont_break_domain_name() {
-        // Initialize the Kubernetes client
-        let client = kube_client().await;
-
-        // Configurations
-        let mut rng = rand::thread_rng();
-        let suffix = rng.gen_range(0..100000);
-        let name = &format!("test-ingress-route-tcp-domain-{}", suffix.clone());
-        let namespace = match create_namespace(client.clone(), name).await {
-            Ok(namespace) => namespace,
-            Err(e) => {
-                eprintln!("Error creating namespace: {}", e);
-                std::process::exit(1);
-            }
-        };
-        let kind = "CoreDB";
-        let replicas = 1;
-
-        let old_matcher = format!("HostSNI(`{name}.other-host`)");
-        // Create an ingress route tcp to be adopted
-        let ing = serde_json::json!({
-            "apiVersion": "traefik.containo.us/v1alpha1",
-            "kind": "IngressRouteTCP",
-            "metadata": {
-                "name": name,
-            },
-            "spec": {
-                "entryPoints": ["postgresql"],
-                "routes": [
-                    {
-                        "match": old_matcher,
-                        "services": [
-                            {
-                                "name": "incorrect-service-name",
-                                "port": 1234,
-                            },
-                        ],
-                    },
-                ],
-                "tls": {
-                    "passthrough": true,
-                },
-            },
-        });
-
-        let ingress_route_tcp_api: Api<IngressRouteTCP> =
-            Api::namespaced(client.clone(), &namespace);
-        let params = PatchParams::apply("functional-test-ingress-route-tcp");
-        let _o = ingress_route_tcp_api
-            .patch(name, &params, &Patch::Apply(&ing))
-            .await
-            .unwrap();
-
-        // Create a pod we can use to run commands in the cluster
-        let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
-
-        // Apply a basic configuration of CoreDB
-        println!("Creating CoreDB resource {}", &name);
-        let _test_metric_decr = format!("coredb_integration_test_{}", suffix.clone());
-        let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
-        let coredb_json = serde_json::json!({
-            "apiVersion": API_VERSION,
-            "kind": kind,
-            "metadata": {
-                "name": name
-            },
-            "spec": {
-                "replicas": replicas,
-            }
-        });
-        let patch = Patch::Apply(&coredb_json);
-        let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
-
-        // Wait for Pod to be created
-        let pod_name = format!("{}-1", name);
-        pod_ready_and_running(pods.clone(), pod_name.clone()).await;
-
-        // This TCP route is the one we adopted
-        let ingress_route_tcp = ingress_route_tcp_api
-            .get(name)
-            .await
-            .unwrap_or_else(|_| panic!("Expected to find ingress route TCP {}", name));
-
-        let actual_matcher_adopted_route = ingress_route_tcp.spec.routes[0].r#match.clone();
-        assert_eq!(actual_matcher_adopted_route, old_matcher);
-
-        let new_matcher = format!("HostSNI(`{name}.localhost`)");
-        // This TCP route is the new one
-        let ing_route_tcp_name = format!("{}-rw-0", name);
-        let ingress_route_tcp = ingress_route_tcp_api
-            .get(ing_route_tcp_name.as_str())
-            .await
-            .unwrap_or_else(|_| {
-                panic!("Expected to find ingress route TCP {}", ing_route_tcp_name)
-            });
-
-        let actual_matcher_new_route = ingress_route_tcp.spec.routes[0].r#match.clone();
-        assert_eq!(actual_matcher_new_route, new_matcher);
-
-        // Delete ingress_route_tcp_api
-        let _ = ingress_route_tcp_api
-            .delete(name, &Default::default())
-            .await;
 
         // Cleanup CoreDB resource
         coredbs.delete(name, &Default::default()).await.unwrap();
@@ -4272,7 +4166,8 @@ CREATE EVENT TRIGGER pgrst_watch
         // Wait for Postgres to restart
         {
             let started = Utc::now();
-            let max_wait_time = chrono::Duration::seconds(TIMEOUT_SECONDS_POD_READY as _);
+            let max_wait_time =
+                chrono::TimeDelta::try_seconds(TIMEOUT_SECONDS_POD_READY as _).unwrap();
             let mut running_became_true = false;
             while Utc::now().signed_duration_since(started) < max_wait_time {
                 if status_running(&coredbs, &name).await.not() {
@@ -4326,7 +4221,7 @@ CREATE EVENT TRIGGER pgrst_watch
     async fn functional_test_status_configs() {
         async fn runtime_cfg(coredbs: &Api<CoreDB>, name: &str) -> Option<Vec<PgConfig>> {
             let started_waiting = Utc::now();
-            let max_wait_time = chrono::Duration::seconds(45);
+            let max_wait_time = chrono::TimeDelta::try_seconds(45).unwrap();
 
             while Utc::now().signed_duration_since(started_waiting) <= max_wait_time {
                 let coredb = coredbs.get(name).await.expect("spec not found");
@@ -5014,6 +4909,16 @@ CREATE EVENT TRIGGER pgrst_watch
             coredb_resource.clone(),
             "SELECT rolname FROM pg_roles;".to_string(),
             "cnpg_pooler_pgbouncer".to_string(),
+            false,
+        )
+        .await;
+
+        // Query the database to make sure the pgbouncer role has usage privilege
+        let _usage_privilege_result = wait_until_psql_contains(
+            context.clone(),
+            coredb_resource.clone(),
+            "SELECT has_schema_privilege('cnpg_pooler_pgbouncer', 'public', 'USAGE') AS has_usage_permission;".to_string(),
+            "t".to_string(),
             false,
         )
         .await;

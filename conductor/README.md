@@ -15,6 +15,7 @@ Local development involves running Kubernetes and a Postgres container locally i
 Prerequisites:
 - rust / cargo
 - docker
+- [helm](https://helm.sh/docs/intro/install/)
 - [kind](https://kind.sigs.k8s.io/)
 - [just](https://github.com/casey/just)
 - [cargo-watch](https://crates.io/crates/cargo-watch)
