@@ -8,7 +8,7 @@ use crate::{
         postgres_parameters::MergeError,
     },
     cloudnativepg::{
-        backups::{Backup, BackupCluster, BackupMethod, BackupSpec, BackupTarget},
+        backups::Backup,
         clusters::{
             Cluster, ClusterAffinity, ClusterBackup, ClusterBackupBarmanObjectStore,
             ClusterBackupBarmanObjectStoreData, ClusterBackupBarmanObjectStoreDataCompression,
@@ -43,6 +43,7 @@ use crate::{
             ClusterServiceAccountTemplate, ClusterServiceAccountTemplateMetadata, ClusterSpec,
             ClusterStorage, ClusterSuperuserSecret,
         },
+        cnpg_backups::create_backup_if_needed,
         poolers::{
             Pooler, PoolerCluster, PoolerPgbouncer, PoolerSpec, PoolerTemplate, PoolerTemplateSpec,
             PoolerTemplateSpecContainers, PoolerType,
@@ -62,7 +63,7 @@ use crate::{
     trunk::extensions_that_require_load,
     Context, RESTARTED_AT,
 };
-use chrono::{DateTime, NaiveDateTime, Offset, Utc};
+use chrono::{DateTime, NaiveDateTime, Offset};
 use k8s_openapi::api::core::v1::Service;
 use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
@@ -598,24 +599,32 @@ fn cnpg_cluster_storage_class(cdb: &CoreDB) -> Option<String> {
 }
 
 // Check replica count to enable HA
-fn cnpg_high_availability(cdb: &CoreDB) -> Option<ClusterReplicationSlots> {
-    if cdb.spec.replicas > 1 {
-        Some(ClusterReplicationSlots {
-            high_availability: Some(ClusterReplicationSlotsHighAvailability {
-                enabled: Some(true),
-                ..ClusterReplicationSlotsHighAvailability::default()
-            }),
-            update_interval: Some(30),
-        })
-    } else {
-        Some(ClusterReplicationSlots {
-            high_availability: Some(ClusterReplicationSlotsHighAvailability {
-                enabled: Some(false),
-                ..ClusterReplicationSlotsHighAvailability::default()
-            }),
-            update_interval: Some(30),
-        })
-    }
+fn cnpg_high_availability() -> Option<ClusterReplicationSlots> {
+    // if cdb.spec.replicas > 1 {
+    //     Some(ClusterReplicationSlots {
+    //         high_availability: Some(ClusterReplicationSlotsHighAvailability {
+    //             enabled: Some(true),
+    //             ..ClusterReplicationSlotsHighAvailability::default()
+    //         }),
+    //         update_interval: Some(30),
+    //     })
+    // } else {
+    //     Some(ClusterReplicationSlots {
+    //         high_availability: Some(ClusterReplicationSlotsHighAvailability {
+    //             enabled: Some(false),
+    //             ..ClusterReplicationSlotsHighAvailability::default()
+    //         }),
+    //         update_interval: Some(30),
+    //     })
+    // }
+    // Since CNPG 1.21, replication slots are always enabled
+    Some(ClusterReplicationSlots {
+        high_availability: Some(ClusterReplicationSlotsHighAvailability {
+            enabled: Some(true),
+            ..ClusterReplicationSlotsHighAvailability::default()
+        }),
+        update_interval: Some(30),
+    })
 }
 
 fn default_cluster_annotations(cdb: &CoreDB) -> BTreeMap<String, String> {
@@ -644,7 +653,7 @@ pub fn cnpg_cluster_from_cdb(
     let (bootstrap, external_clusters, superuser_secret) = cnpg_cluster_bootstrap_from_cdb(cdb);
     let (backup, service_account_template) = cnpg_backup_configuration(cdb, &cfg);
     let storage = cnpg_cluster_storage(cdb);
-    let replication = cnpg_high_availability(cdb);
+    let replication = cnpg_high_availability();
 
     let PostgresConfig {
         postgres_parameters,
@@ -1135,49 +1144,9 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
         }
     }
 
-    // We need to check if the cdb.replicas is changing from 1 -> 2.  If it is, we need to take a
-    // snapshot if snapshots are enabled.  We will need to wait on the snapshot to complete before
-    // allowing the new Cluster configuration to be applied.
-    match maybe_cluster {
-        Ok(ref cluster) => {
-            if check_cluster_instance_count(cdb, cluster) {
-                // Set bool if snapshots are enabled
-                let snapshots_enabled = cdb.spec.backup.volume_snapshot.as_ref().map(|v| v.enabled);
-
-                // Check when last backup was taken from Cluster.status.lastSuccessfulBackup.
-                // If longer than 60 minutes and snapshots_enabled is true then take a snapshot
-                if Some(true) == snapshots_enabled {
-                    let last_backup = cluster
-                        .status
-                        .as_ref()
-                        .and_then(|s| s.last_successful_backup.as_ref())
-                        .and_then(|l| l.parse::<DateTime<Utc>>().ok());
-                    let now = Utc::now();
-                    let duration = now.signed_duration_since(last_backup.unwrap_or(now));
-                    if duration.num_minutes() > 60 {
-                        // Check to see if we have any current backups in a running or pending state
-                        match check_backups(&namespace, ctx.clone()).await {
-                            Ok(_) => {
-                                debug!("No active backups detected for instance {}, proceeding with snapshot creation", &name);
-                                create_replica_snapshot(cdb, ctx.clone()).await?;
-                            }
-                            Err(action) => {
-                                // requeue if we have active backups
-                                return Err(action);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        Err(_) => {
-            // If the cluster does not exist, error
-            error!(
-                "Cluster does not exist, cannot check instance count for instance: {}",
-                &name
-            );
-        }
-    };
+    if let Ok(cluster) = maybe_cluster {
+        create_backup_if_needed(cdb, &ctx, &cluster).await?;
+    }
 
     // For manual changes conflicting with the operator, we have .force()
     //
@@ -1222,167 +1191,6 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
     reconcile_metrics_ingress_route(cdb, ctx.clone()).await?;
 
     Ok(())
-}
-
-// check_backups will check if any backups are currently in a running or pending state
-async fn check_backups(namespace: &str, ctx: Arc<Context>) -> Result<(), Action> {
-    let backup_api: Api<Backup> = Api::namespaced(ctx.client.clone(), namespace);
-
-    // List all backups
-    let lp = ListParams::default();
-    let backups = backup_api.list(&lp).await.map_err(|e| {
-        error!("Error listing backups: {}", e);
-        Action::requeue(Duration::from_secs(30))
-    })?;
-
-    // Filter backups based on phase
-    let active_backups = backups
-        .iter()
-        .filter(|b| {
-            b.status
-                .as_ref()
-                .and_then(|s| s.phase.as_deref())
-                .map(|p| p == "running" || p == "pending")
-                .unwrap_or(false)
-        })
-        .collect::<Vec<_>>();
-
-    if !active_backups.is_empty() {
-        // If there are active backups, requeue
-        warn!("Active backups detected, requeuing in 30 seconds");
-        return Err(Action::requeue(Duration::from_secs(30)));
-    }
-
-    Ok(())
-}
-
-// create_replica_snapshot creates a snapshot (backup) of the current primary instance
-// so we can create a new replica from it.
-#[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any()))]
-async fn create_replica_snapshot(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {
-    let name = cdb.name_any();
-    let namespace = cdb.metadata.namespace.as_ref().ok_or_else(|| {
-        error!("CoreDB namespace is empty for instance: {}.", name);
-        Action::requeue(tokio::time::Duration::from_secs(300))
-    })?;
-
-    // Setup the API to Backup
-    let backup_api: Api<Backup> = Api::namespaced(ctx.client.clone(), namespace);
-
-    // Gererate the Backup object
-    let backup = Backup {
-        metadata: ObjectMeta {
-            name: Some(format!("{}-replica-snapshot", name)),
-            namespace: Some(namespace.to_string()),
-            ..ObjectMeta::default()
-        },
-        spec: BackupSpec {
-            cluster: BackupCluster { name: name.clone() },
-            method: Some(BackupMethod::VolumeSnapshot),
-            online: Some(true),
-            target: Some(BackupTarget::Primary),
-            ..BackupSpec::default()
-        },
-        status: None,
-    };
-
-    // Apply the new backup object
-    let ps = PatchParams::apply("cntrlr").force();
-
-    let result = backup_api
-        .patch(&name, &ps, &Patch::Apply(&backup))
-        .await
-        .map_err(|e| {
-            error!("Error patching backup: {}", e);
-            Action::requeue(Duration::from_secs(300))
-        })?;
-
-    // Wait for the backup to complete
-    let backup_name = result.metadata.name.as_ref().ok_or_else(|| {
-        error!("Backup name is empty for instance: {}.", name);
-        Action::requeue(Duration::from_secs(300))
-    })?;
-
-    // Wait for the backup to complete before proceeding
-    check_backup_status(backup_name, namespace, ctx.clone()).await
-}
-
-// check_backup_status will check the status of a backup and return a Result or an Action
-async fn check_backup_status(
-    backup_name: &str,
-    namespace: &str,
-    ctx: Arc<Context>,
-) -> Result<(), Action> {
-    let backup_api: Api<Backup> = Api::namespaced(ctx.client.clone(), namespace);
-
-    match backup_api.get(backup_name).await {
-        Ok(backup) => match backup.status.as_ref().and_then(|s| s.phase.as_deref()) {
-            Some("completed") => {
-                debug!("Backup {} completed", backup_name);
-                Ok(())
-            }
-            Some("running") | Some("pending") | Some("finalizing") => {
-                debug!(
-                    "Backup {} is still processing (phase: {}). Requeuing...",
-                    backup_name,
-                    backup
-                        .status
-                        .as_ref()
-                        .and_then(|s| s.phase.as_deref())
-                        .unwrap_or_default()
-                );
-                Err(Action::requeue(Duration::from_secs(30)))
-            }
-            Some("failed") => {
-                error!("Backup {} has failed.", backup_name);
-                Err(Action::requeue(Duration::from_secs(300)))
-            }
-            _ => {
-                error!("Backup {} is in an unexpected state.", backup_name);
-                Err(Action::requeue(Duration::from_secs(60)))
-            }
-        },
-        Err(kube::Error::Api(ae)) if ae.code == 404 => {
-            info!(
-                "Backup {} not found. It may not have been created yet, or the name is incorrect.",
-                backup_name
-            );
-            Err(Action::requeue(Duration::from_secs(30)))
-        }
-        Err(e) => {
-            error!("Error fetching backup {}: {}", backup_name, e);
-            Err(Action::requeue(Duration::from_secs(30)))
-        }
-    }
-}
-
-// Checks to see if the instance count is changing from 1 -> 2
-fn check_cluster_instance_count(cdb: &CoreDB, cluster: &Cluster) -> bool {
-    // Get the replica count from the CoreDB object
-    let cdb_replicas: i64 = cdb.spec.replicas.into();
-
-    // Get the replica count from the Cluster object
-    let cluster_instances = cluster.spec.instances;
-
-    // Check if the cdb_replica is greater than the cluster_replica
-    if cdb_replicas == 2 || cluster_instances == 2 {
-        // Check current instance count from Cluster status
-        let current_instances = cluster.status.as_ref().and_then(|s| s.instances);
-        if current_instances == Some(1) {
-            info!(
-                "Instance count is changing from 1 to 2 for instance {}. cdb_replicas: {}, cluster_instances: {}",
-                cdb.name_any(), cdb_replicas, cluster_instances
-            );
-            return true;
-        }
-    } else {
-        debug!(
-            "Instance count is not changing for instance {}. cdb_replicas: {}, cluster_instances: {}",
-            cdb.name_any(), cdb_replicas, cluster_instances
-        );
-    }
-
-    false
 }
 
 pub async fn reconcile_metrics_ingress_route(
@@ -2416,11 +2224,7 @@ async fn does_cluster_exist(cdb: &CoreDB, ctx: Arc<Context>) -> Result<bool, Act
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        apis::coredb_types::{CoreDB, CoreDBSpec},
-        cloudnativepg::clusters::{Cluster, ClusterSpec, ClusterStatus},
-    };
-    use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+    use crate::{apis::coredb_types::CoreDB, cloudnativepg::clusters::Cluster};
     use serde_json::json;
     use std::collections::BTreeMap;
 
@@ -3238,98 +3042,5 @@ mod tests {
             generate_scheduled_backup_snapshot_name(short_name),
             "stormy-capybara-snap"
         );
-    }
-
-    #[test]
-    fn test_check_cluster_instance_count() {
-        // Case 1: Scaling from 1 to 2 instances
-        let cdb = CoreDB {
-            metadata: ObjectMeta {
-                name: Some("test-cluster".to_string()),
-                namespace: Some("test".to_string()),
-                ..ObjectMeta::default()
-            },
-            spec: CoreDBSpec {
-                replicas: 2,
-                ..CoreDBSpec::default()
-            },
-            status: None,
-        };
-        let cluster = Cluster {
-            metadata: ObjectMeta {
-                name: Some("test-cluster".to_string()),
-                namespace: Some("test".to_string()),
-                ..ObjectMeta::default()
-            },
-            spec: ClusterSpec {
-                instances: 2,
-                ..ClusterSpec::default()
-            },
-            status: Some(ClusterStatus {
-                instances: Some(1),
-                ..ClusterStatus::default()
-            }),
-        };
-        assert!(check_cluster_instance_count(&cdb, &cluster));
-
-        // Case 2: No scaling, current instances already 2
-        let cdb = CoreDB {
-            metadata: ObjectMeta {
-                name: Some("test-cluster".to_string()),
-                namespace: Some("test".to_string()),
-                ..ObjectMeta::default()
-            },
-            spec: CoreDBSpec {
-                replicas: 2,
-                ..CoreDBSpec::default()
-            },
-            status: None,
-        };
-        let cluster = Cluster {
-            metadata: ObjectMeta {
-                name: Some("test-cluster".to_string()),
-                namespace: Some("test".to_string()),
-                ..ObjectMeta::default()
-            },
-            spec: ClusterSpec {
-                instances: 2,
-                ..ClusterSpec::default()
-            },
-            status: Some(ClusterStatus {
-                instances: Some(2),
-                ..ClusterStatus::default()
-            }),
-        };
-        assert!(!check_cluster_instance_count(&cdb, &cluster));
-
-        // Case 3: No scaling, replicas and instances not 2
-        let cdb = CoreDB {
-            metadata: ObjectMeta {
-                name: Some("test-cluster".to_string()),
-                namespace: Some("test".to_string()),
-                ..ObjectMeta::default()
-            },
-            spec: CoreDBSpec {
-                replicas: 1,
-                ..CoreDBSpec::default()
-            },
-            status: None,
-        };
-        let cluster = Cluster {
-            metadata: ObjectMeta {
-                name: Some("test-cluster".to_string()),
-                namespace: Some("test".to_string()),
-                ..ObjectMeta::default()
-            },
-            spec: ClusterSpec {
-                instances: 1,
-                ..ClusterSpec::default()
-            },
-            status: Some(ClusterStatus {
-                instances: Some(1),
-                ..ClusterStatus::default()
-            }),
-        };
-        assert!(!check_cluster_instance_count(&cdb, &cluster));
     }
 }
