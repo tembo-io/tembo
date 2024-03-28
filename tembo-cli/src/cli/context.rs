@@ -7,6 +7,28 @@ use serde::Serialize;
 
 use crate::tui;
 
+pub const CONTEXT_EXAMPLE_TEXT: &str = "version = \"1.0\"
+
+[[environment]]
+name = 'local'
+target = 'docker'
+    
+[[environment]]
+name = 'prod'
+target = 'tembo-cloud'
+org_id = 'ORG_ID'
+profile = 'prod'
+set = true";
+
+pub const CREDENTIALS_EXAMPLE_TEXT: &str = "version = \"1.0\"
+    
+[[profile]]
+name = 'prod'
+tembo_access_token = 'ACCESS_TOKEN'
+tembo_host = 'https://api.tembo.io'
+tembo_data_host = 'https://api.data-1.use1.tembo.io'
+";
+
 pub const CONTEXT_DEFAULT_TEXT: &str = "version = \"1.0\"
 
 [[environment]]

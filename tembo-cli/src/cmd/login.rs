@@ -1,4 +1,3 @@
-use crate::cli::context::Environment;
 use crate::cli::context::{
     get_current_context, tembo_context_file_path, tembo_credentials_file_path, Context, Credential,
     Profile,
@@ -10,6 +9,7 @@ use anyhow::{anyhow, Result};
 use clap::Args;
 use serde::Deserialize;
 use std::fs;
+use std::fs::OpenOptions;
 use std::io::{self, Write};
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -43,28 +43,31 @@ struct TokenRequest {
 }
 
 pub fn execute(login_cmd: LoginCommand) -> Result<(), anyhow::Error> {
-    let env = get_current_context()?;
-
     match (&login_cmd.organization_id, &login_cmd.profile) {
+        (Some(_), Some(_)) => {
+            execute_command(&login_cmd)?;
+        }
         (Some(_), None) | (None, Some(_)) => {
             return Err(anyhow!(
                 "Both 'organization_id' and 'profile' must be specified."
             ));
         }
-        (None, None) => {}
         _ => {}
     }
 
+    let env = get_current_context()?;
+    let profile = env
+        .selected_profile
+        .as_ref()
+        .ok_or_else(|| anyhow!("Environment not setup properly"))?;
+    let profile_name = read_context(login_cmd.profile.clone())?;
+
     if env.target == "tembo-cloud" {
-        let profile = env.selected_profile.as_ref().ok_or_else(|| {
-            anyhow!("Tembo-Cloud Environment is not setup properly. Run 'tembo init'")
-        })?;
         let login_url = url(profile)?;
         let rt = tokio::runtime::Runtime::new().expect("Failed to create a runtime");
-
-        rt.block_on(handle_tokio(login_url))?;
+        rt.block_on(handle_tokio(login_url, &profile_name))?;
     } else {
-        print!("Cannot log in to the local context, please select a tembo-cloud context before logging in");
+        print!("Cannot log in to the local context. Please select a context, or initialize a new context with tembo login --profile < name your profile > --organization-id < Your Tembo Cloud organization ID >");
     }
 
     Ok(())
@@ -77,11 +80,10 @@ fn url(profile: &Profile) -> Result<String, anyhow::Error> {
     Ok(login_url)
 }
 
-async fn handle_tokio(login_url: String, cmd: LoginCommand) -> Result<(), anyhow::Error> {
+async fn handle_tokio(login_url: String, profile_name: &str) -> Result<(), anyhow::Error> {
     webbrowser::open(&login_url)?;
     let notify = Arc::new(Notify::new());
     let notify_clone = notify.clone();
-    let profile_name = read_context();
     let shared_state = web::Data::new(SharedState {
         token: Mutex::new(None),
     });
@@ -100,7 +102,7 @@ async fn handle_tokio(login_url: String, cmd: LoginCommand) -> Result<(), anyhow
         }
     }
     if let Some(token) = shared_state.token.lock().unwrap().as_ref() {
-        let _ = execute_command(cmd, token, &profile_name.unwrap());
+        let _ = update_access_token(&profile_name, token);
     } else {
         println!("No token was received.");
     }
@@ -164,7 +166,7 @@ fn token_lifetime() -> Result<String> {
     Ok(lifetime)
 }
 
-fn read_context() -> Result<String, anyhow::Error> {
+fn read_context(cmd: Option<String>) -> Result<String, anyhow::Error> {
     let filename = tembo_context_file_path();
     let contents = match fs::read_to_string(&filename) {
         Ok(c) => c,
@@ -181,7 +183,9 @@ fn read_context() -> Result<String, anyhow::Error> {
         }
     };
     for e in data.environment.iter_mut() {
-        if e.set == Some(true) && e.name != "local" {
+        if cmd.is_some() {
+            return Ok(cmd.unwrap());
+        } else if e.set == Some(true) && e.name != "local" {
             return Ok(e.name.clone());
         }
     }
@@ -214,89 +218,65 @@ pub fn update_access_token(
 
 pub fn update_context(org_id: &str, profile_name: &str) -> Result<(), anyhow::Error> {
     let context_file_path = tembo_context_file_path();
-    let contents = fs::read_to_string(&context_file_path)?;
-    let mut data: Context = toml::from_str(&contents)?;
 
-    let new_env = Environment {
-        name: profile_name.to_string(),
-        target: "tembo-cloud".to_string(),
-        org_id: Some(org_id.to_string()),
-        profile: Some(profile_name.to_string()),
-        set: Some(false),
-        selected_profile: None,
-    };
-    data.environment.push(new_env);
-
-    let modified_contents = toml::to_string(&data)?;
-    fs::write(&context_file_path, modified_contents)?;
+    let new_env = format!(
+        "\n[[environment]]\nname = {:?}\ntarget = {:?}\norg_id = {:?}\nprofile = {:?}",
+        profile_name, "tembo-cloud", org_id, profile_name,
+    );
+    append_to_file(&context_file_path, new_env)?;
 
     Ok(())
 }
 
-pub fn update_or_create_profile(
+pub fn update_profile(
     profile_name: &str,
-    new_access_token: &str,
     tembo_host: &str,
     tembo_data_host: &str,
 ) -> Result<(), anyhow::Error> {
     let credentials_file_path = tembo_credentials_file_path();
     let contents = fs::read_to_string(&credentials_file_path)?;
-    let mut credentials: Credential = toml::from_str(&contents)?;
 
-    let profile_opt = credentials
-        .profile
-        .iter_mut()
-        .find(|p| p.name == profile_name);
-
-    match profile_opt {
-        Some(profile) => {
-            profile.tembo_access_token = new_access_token.to_string();
-        }
-        None => {
-            let new_profile = Profile {
-                name: profile_name.to_string(),
-                tembo_access_token: new_access_token.to_string(),
-                tembo_host: tembo_host.to_string(),
-                tembo_data_host: tembo_data_host.to_string(),
-            };
-            credentials.profile.push(new_profile);
-        }
+    if contents.contains(&format!("[[profile]]\nname = \"{}\"", profile_name)) {
+        return Ok(());
     }
-
-    let modified_contents = toml::to_string(&credentials)?;
-    fs::write(&credentials_file_path, modified_contents)?;
+    let new_profile = format!(
+        "\n\n[[profile]]\nname = {:?}\ntembo_access_token = {:?}\ntembo_host = {:?}\ntembo_data_host = {:?}",
+        profile_name, "Processing....", tembo_host, tembo_data_host
+    );
+    append_to_file(&credentials_file_path, new_profile)?;
 
     Ok(())
 }
 
-pub fn execute_command(
-    cmd: LoginCommand,
-    new_access_token: &str,
-    profile_name: &str,
-) -> Result<(), anyhow::Error> {
-    let profile = cmd.profile;
-    let org_id = cmd.organization_id;
+fn append_to_file(file_path: &str, content: String) -> io::Result<()> {
+    let mut file = OpenOptions::new()
+        .write(true)
+        .append(true)
+        .open(file_path)?;
+    writeln!(file, "{}", content)?;
+    Ok(())
+}
+
+pub fn execute_command(cmd: &LoginCommand) -> Result<(), anyhow::Error> {
+    let profile = &cmd.profile;
+    let org_id = &cmd.organization_id;
     let default_tembo_host = "https://api.tembo.io";
     let default_tembo_data_host = "https://api.data-1.use1.tembo.io";
 
-    let tembo_host = cmd
+    let tembo_host = &cmd
         .tembo_host
+        .clone()
         .unwrap_or_else(|| default_tembo_host.to_string());
-    let tembo_data_host = cmd
+    let tembo_data_host = &cmd
         .tembo_data_host
+        .clone()
         .unwrap_or_else(|| default_tembo_data_host.to_string());
 
-    if profile.is_some() && org_id.is_some() {
-        update_or_create_profile(
-            &profile.clone().unwrap(),
-            new_access_token,
-            &tembo_host.clone(),
-            &tembo_data_host.clone(),
-        )?;
-        update_context(&org_id.unwrap(), &profile.clone().unwrap())?;
-    } else {
-        let _ = update_access_token(profile_name, new_access_token);
-    }
-
+    update_profile(
+        &profile.clone().unwrap(),
+        &tembo_host.clone(),
+        &tembo_data_host.clone(),
+    )?;
+    update_context(&org_id.clone().unwrap(), &profile.clone().unwrap())?;
     Ok(())
 }

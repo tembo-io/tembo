@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 use tembo::cli::context::{
     get_current_context, tembo_context_file_path, tembo_credentials_file_path, Environment,
+    CONTEXT_EXAMPLE_TEXT, CREDENTIALS_EXAMPLE_TEXT,
 };
 use temboclient::apis::configuration::Configuration;
 use temboclient::apis::instance_api::get_all;
@@ -21,31 +22,9 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
     let test_dir = PathBuf::from(root_dir).join("examples").join("minimal");
 
     env::set_current_dir(&test_dir)?;
-  
-    let context_example_text = "version = \"1.0\"
 
-[[environment]]
-name = 'local'
-target = 'docker'
-    
-[[environment]]
-name = 'prod'
-target = 'tembo-cloud'
-org_id = 'ORG_ID'
-profile = 'prod'
-set = true";
-
-    let crendentials_example_text = "version = \"1.0\"
-    
-[[profile]]
-name = 'prod'
-tembo_access_token = 'ACCESS_TOKEN'
-tembo_host = 'https://api.tembo.io'
-tembo_data_host = 'https://api.data-1.use1.tembo.io'
-";
-
-    replace_file(tembo_context_file_path(), context_example_text)?;
-    replace_file(tembo_credentials_file_path(), crendentials_example_text)?;
+    replace_file(tembo_context_file_path(), CONTEXT_EXAMPLE_TEXT)?;
+    replace_file(tembo_credentials_file_path(), CREDENTIALS_EXAMPLE_TEXT)?;
 
     // tembo init
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
