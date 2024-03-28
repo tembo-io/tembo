@@ -155,13 +155,23 @@ pub async fn reconcile_network_policies(client: Client, namespace: &str) -> Resu
                       "kubernetes.io/metadata.name": "minio"
                     }
                   }
-                },
+                }
+              ]
+            },
+            {
+              "to": [
                 {
                   "namespaceSelector": {
                     "matchLabels": {
                       "kubernetes.io/metadata.name": "traefik"
                     }
                   }
+                }
+              ],
+              "ports": [
+                {
+                  "protocol": "TCP",
+                  "port": 443
                 }
               ]
             }
