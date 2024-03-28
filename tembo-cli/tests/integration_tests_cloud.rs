@@ -21,6 +21,30 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
     let test_dir = PathBuf::from(root_dir).join("examples").join("minimal");
 
     env::set_current_dir(&test_dir)?;
+    let context_example_text = "version = \"1.0\"
+
+[[environment]]
+name = 'local'
+target = 'docker'
+    
+[[environment]]
+name = 'prod'
+target = 'tembo-cloud'
+org_id = 'ORG_ID'
+profile = 'prod'
+set = true";
+
+    let crendentials_example_text = "version = \"1.0\"
+    
+[[profile]]
+name = 'prod'
+tembo_access_token = 'ACCESS_TOKEN'
+tembo_host = 'https://api.tembo.io'
+tembo_data_host = 'https://api.data-1.use1.tembo.io'
+";
+
+    replace_file(tembo_context_file_path(), context_example_text)?;
+    replace_file(tembo_credentials_file_path(), crendentials_example_text)?;
 
     // tembo init
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
@@ -32,7 +56,7 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
 
     setup_env(&instance_name)?;
 
-    // tembo context set --name local
+    // tembo context set --name prod
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
     cmd.arg("context");
     cmd.arg("set");
@@ -40,20 +64,19 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
     cmd.arg("prod");
     cmd.assert().success();
 
+    // tembo apply
+    let mut cmd = Command::cargo_bin(CARGO_BIN).unwrap();
+    cmd.arg("apply");
+    cmd.assert().success();
 
     let env = get_current_context()?;
+    println!("{:?}", env);
     let profile = env.clone().selected_profile.unwrap();
     let config = Configuration {
         base_path: profile.get_tembo_host(),
         bearer_access_token: Some(profile.tembo_access_token),
         ..Default::default()
     };
-
-    // tembo apply
-    let mut cmd = Command::cargo_bin(CARGO_BIN).unwrap();
-    cmd.arg("apply");
-    cmd.assert().success();
-
 
     for attempt in 1..=5 {
         let maybe_instance = get_instance(&instance_name, &config, &env).await?;
@@ -98,50 +121,24 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
 }
 
 fn setup_env(instance_name: &String) -> Result<(), Box<dyn Error>> {
-    let context_template = "# [[environment]]
-# name = 'prod'
-# target = 'tembo-cloud'
-# org_id can be found in your tembo cloud url. Example: org_2bVDi36rsJNot2gwzP37enwxzMk
-# org_id = 'Org ID here'
-# profile = 'prod'";
-
-    let context_replacement = format!(
-        "[[environment]]
-name = 'prod'
-target = 'tembo-cloud'
-org_id = '{}'
-profile = 'prod'",
-        env::var("ORG_ID")?
-    );
-
-    replace_vars_in_file(
-        tembo_context_file_path(),
-        context_template,
-        &context_replacement,
-    )?;
-
-    let profile_template = "# [[profile]]
-# name = 'prod'
-# Generate an Access Token either through 'tembo login' or visit 'https://cloud.tembo.io/generate-jwt'
-# tembo_access_token = 'Access token here'
-# tembo_host = 'https://api.tembo.io'
-# tembo_data_host = 'https://api.data-1.use1.tembo.io'";
-
-    let profile_replacement = format!(
-        "[[profile]]
-name = 'prod'
-tembo_access_token = '{}'
-tembo_host = '{}'
-tembo_data_host = '{}'",
-        env::var("ACCESS_TOKEN")?,
-        env::var("TEMBO_HOST")?,
-        env::var("TEMBO_DATA_HOST")?
-    );
+    replace_vars_in_file(tembo_context_file_path(), "ORG_ID", &env::var("ORG_ID")?)?;
 
     replace_vars_in_file(
         tembo_credentials_file_path(),
-        profile_template,
-        &profile_replacement,
+        "ACCESS_TOKEN",
+        &env::var("ACCESS_TOKEN")?,
+    )?;
+
+    replace_vars_in_file(
+        tembo_credentials_file_path(),
+        "https://api.tembo.io",
+        &env::var("TEMBO_HOST")?,
+    )?;
+
+    replace_vars_in_file(
+        tembo_credentials_file_path(),
+        "https://api.data-1.use1.tembo.io",
+        &env::var("TEMBO_DATA_HOST")?,
     )?;
 
     replace_vars_in_file(
@@ -160,12 +157,20 @@ fn replace_vars_in_file(
 ) -> Result<(), Box<dyn Error>> {
     let mut src = File::open(&file_path)?;
     let mut data = String::new();
-    println!("{:?}",data);
     src.read_to_string(&mut data)?;
     drop(src);
     let new_data = data.replace(word_from, word_to);
     let mut dst = File::create(&file_path)?;
     dst.write(new_data.as_bytes())?;
+    drop(dst);
+
+    Ok(())
+}
+
+fn replace_file(file_path: String, word_to: &str) -> Result<(), Box<dyn Error>> {
+    let mut dst = File::create(&file_path)?;
+    dst.write_all(word_to.as_bytes())?;
+    drop(dst);
     Ok(())
 }
 
