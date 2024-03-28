@@ -26,13 +26,13 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
 [[environment]]
 name = 'local'
 target = 'docker'
-set = true
     
 [[environment]]
 name = 'prod'
 target = 'tembo-cloud'
 org_id = 'Org ID here'
-profile = 'prod'";
+profile = 'prod'
+set = true";
 
     let crendentials_example_text = "version = \"1.0\"
     
