@@ -1,10 +1,7 @@
 use crate::{
     apis::coredb_types::CoreDB,
     cloudnativepg::{
-        backups::{
-            Backup, BackupCluster, BackupMethod, BackupOnlineConfiguration, BackupSpec,
-            BackupTarget,
-        },
+        backups::{Backup, BackupCluster, BackupMethod, BackupSpec, BackupTarget},
         clusters::Cluster,
     },
     Context,
@@ -195,13 +192,7 @@ async fn create_replica_snapshot(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), 
     let snapshot_name = generate_snapshot_name(&name, &timestamp);
 
     // Generate the labels for the backup object
-    let labels = BTreeMap::from([
-        (String::from("cnpg.io/cluster"), name.clone()),
-        (
-            String::from("cnpg.io/immediateBackup"),
-            String::from("true"),
-        ),
-    ]);
+    let labels = BTreeMap::from([(String::from("cnpg.io/cluster"), name.clone())]);
 
     // Gererate the Backup object
     let backup = Backup {
@@ -214,12 +205,7 @@ async fn create_replica_snapshot(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), 
         spec: BackupSpec {
             cluster: BackupCluster { name: name.clone() },
             method: Some(BackupMethod::VolumeSnapshot),
-            online: Some(true),
-            online_configuration: Some(BackupOnlineConfiguration {
-                immediate_checkpoint: Some(true),
-                ..BackupOnlineConfiguration::default()
-            }),
-            target: Some(BackupTarget::Primary),
+            ..BackupSpec::default()
         },
         status: None,
     };
