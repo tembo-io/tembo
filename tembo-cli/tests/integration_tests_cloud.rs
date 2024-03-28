@@ -30,7 +30,7 @@ target = 'docker'
 [[environment]]
 name = 'prod'
 target = 'tembo-cloud'
-org_id = 'Org ID here'
+org_id = 'ORG_ID'
 profile = 'prod'
 set = true";
 
@@ -38,7 +38,7 @@ set = true";
     
 [[profile]]
 name = 'prod'
-tembo_access_token = 'Access token here'
+tembo_access_token = 'ACCESS_TOKEN'
 tembo_host = 'https://api.tembo.io'
 tembo_data_host = 'https://api.data-1.use1.tembo.io'
 ";
