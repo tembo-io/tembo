@@ -56,6 +56,11 @@ tembo_data_host = 'https://api.data-1.use1.tembo.io'
 
     setup_env(&instance_name)?;
 
+    // tembo apply
+    let mut cmd = Command::cargo_bin(CARGO_BIN).unwrap();
+    cmd.arg("apply");
+    cmd.assert().success();
+
     let env = get_current_context()?;
     println!("{:?}", env);
     let profile = env.clone().selected_profile.unwrap();
@@ -64,11 +69,6 @@ tembo_data_host = 'https://api.data-1.use1.tembo.io'
         bearer_access_token: Some(profile.tembo_access_token),
         ..Default::default()
     };
-
-    // tembo apply
-    let mut cmd = Command::cargo_bin(CARGO_BIN).unwrap();
-    cmd.arg("apply");
-    cmd.assert().success();
 
     for attempt in 1..=5 {
         let maybe_instance = get_instance(&instance_name, &config, &env).await?;
@@ -153,7 +153,8 @@ fn replace_vars_in_file(
     drop(src);
     let new_data = data.replace(word_from, word_to);
     let mut dst = File::create(&file_path)?;
-    dst.write_all(new_data.as_bytes())?;
+    dst.write(new_data.as_bytes())?;
+    drop(dst);
 
     Ok(())
 }
