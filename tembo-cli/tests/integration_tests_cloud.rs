@@ -43,8 +43,8 @@ tembo_host = 'https://api.tembo.io'
 tembo_data_host = 'https://api.data-1.use1.tembo.io'
 ";
 
-    just_replace(tembo_context_file_path(), context_example_text)?;
-    just_replace(tembo_credentials_file_path(), crendentials_example_text)?;
+    replace_file(tembo_context_file_path(), context_example_text)?;
+    replace_file(tembo_credentials_file_path(), crendentials_example_text)?;
 
     // tembo init
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
@@ -55,6 +55,14 @@ tembo_data_host = 'https://api.data-1.use1.tembo.io'
     let instance_name = generate(10, charset);
 
     setup_env(&instance_name)?;
+
+    // tembo context set --name prod
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("context");
+    cmd.arg("set");
+    cmd.arg("--name");
+    cmd.arg("prod");
+    cmd.assert().success();
 
     // tembo apply
     let mut cmd = Command::cargo_bin(CARGO_BIN).unwrap();
@@ -159,7 +167,7 @@ fn replace_vars_in_file(
     Ok(())
 }
 
-fn just_replace(file_path: String, word_to: &str) -> Result<(), Box<dyn Error>> {
+fn replace_file(file_path: String, word_to: &str) -> Result<(), Box<dyn Error>> {
     let mut dst = File::create(&file_path)?;
     dst.write_all(word_to.as_bytes())?;
     drop(dst);
