@@ -352,7 +352,7 @@ pub fn tembo_cloud_apply_instance(
             is_instance_up(instance_id.as_ref().unwrap().clone(), &config, env)?;
 
         if connection_info.is_some() {
-            let conn_info = get_conn_info_with_creds(
+            let (conn_info, password) = get_conn_info_with_creds(
                 profile.clone(),
                 instance_id,
                 connection_info,
@@ -366,7 +366,7 @@ pub fn tembo_cloud_apply_instance(
                 "Instance is up!".bold()
             ));
             clean_console();
-            let connection_string = construct_connection_string(conn_info);
+            let connection_string = construct_connection_string(conn_info, password);
             instance_started(&connection_string, &instance_settings.stack_type, "cloud");
 
             break;
@@ -381,7 +381,7 @@ fn get_conn_info_with_creds(
     instance_id: Option<String>,
     connection_info: Option<Box<ConnectionInfo>>,
     env: Environment,
-) -> Result<ConnectionInfo, anyhow::Error> {
+) -> Result<(ConnectionInfo, String), anyhow::Error> {
     let dataplane_config = tembodataclient::apis::configuration::Configuration {
         base_path: profile.get_tembo_data_host(),
         bearer_access_token: Some(profile.tembo_access_token),
@@ -405,8 +405,9 @@ fn get_conn_info_with_creds(
     let map = result.as_ref().unwrap();
 
     conn_info.user = map.get("username").unwrap().to_string();
+    let password = map.get("password").unwrap().to_string();
 
-    Ok(conn_info)
+    Ok((conn_info, password))
 }
 
 pub fn get_maybe_instance(
@@ -1239,10 +1240,11 @@ pub fn get_rendered_dockercompose(
     Ok(rendered_dockercompose)
 }
 
-fn construct_connection_string(info: ConnectionInfo) -> String {
+fn construct_connection_string(info: ConnectionInfo, password: String) -> String {
     format!(
         "postgresql://{}:{}@{}:{}/{}",
         info.user,
+        urlencoding::encode(&password),
         info.host,
         info.port,
         "postgres"
