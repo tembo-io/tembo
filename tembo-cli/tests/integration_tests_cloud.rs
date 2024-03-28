@@ -90,7 +90,6 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
     } else {
         assert!(true, "Instance isn't Deleting")
     }
-    env::remove_var("RUNNING_TESTS");
 
     replace_vars_in_file(
         "tembo.toml".to_string(),

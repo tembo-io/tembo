@@ -49,7 +49,7 @@ pub fn execute(login_cmd: LoginCommand) -> Result<(), anyhow::Error> {
         }
         (Some(_), None) | (None, Some(_)) => {
             return Err(anyhow!(
-                "Both 'organization_id' and 'profile' must be specified."
+                "Both --organization_id and --profile flags are required when specifying one. Please include values for both flags."
             ));
         }
         _ => {}
