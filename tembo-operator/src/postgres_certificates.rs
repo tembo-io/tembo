@@ -113,8 +113,10 @@ pub async fn reconcile_certificates(
         Ok(basedomain) => {
             let extra_domain_name = format!("{}.{}", coredb_name, basedomain);
             let extra_pooler_domain_name = format!("{}-pooler.{}", coredb_name, basedomain);
+            let extra_ro_domain_name = format!("{}-ro.{}", coredb_name, basedomain);
             dns_names.push(extra_domain_name);
             dns_names.push(extra_pooler_domain_name);
+            dns_names.push(extra_ro_domain_name);
         }
         Err(_) => {
             debug!("DATA_PLANE_BASEDOMAIN not set, not adding custom DNS name");

@@ -104,8 +104,18 @@ pub fn merge_app_reqs(
                         pg_analyze_app_svc = merge_app_configs(pg_analyze_app_svc, cfg);
                     }
                     user_app_services.push(pg_analyze_app_svc);
-                    // pganalyze only has app_service containers
-                    // no extensions or trunk installs
+                    // Handle extensions from pganalyze app
+                    if let Some(extensions) = pg_analyze.extensions {
+                        fin_app_extensions.extend(extensions);
+                    }
+                    // Handle trunk installs from pganalyze app
+                    if let Some(trunks) = pg_analyze.trunk_installs {
+                        fin_app_trunk_installs.extend(trunks);
+                    }
+                    // Handle postgres_config from pganalyze app
+                    if let Some(pg_cfg) = pg_analyze.postgres_config {
+                        final_pg_configs.extend(pg_cfg);
+                    }
                 }
                 AppType::Custom(custom_app) => {
                     user_app_services.push(custom_app);

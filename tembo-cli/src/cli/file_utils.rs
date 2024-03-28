@@ -1,4 +1,4 @@
-use curl::easy::Easy;
+use crate::tui::confirmation;
 use simplelog::*;
 use std::env;
 use std::fs::{self, File};
@@ -53,37 +53,20 @@ impl FileUtils {
         Ok(())
     }
 
-    pub fn download_file(
-        file_path: &str,
-        download_location: &str,
-        recreate: bool,
-    ) -> std::io::Result<()> {
-        let path = Path::new(&download_location);
-        if !recreate && path.exists() {
-            info!("Tembo {} file exists", download_location);
-            return Ok(());
-        }
+    pub fn save_tembo_toml(default_text: &str) -> Result<(), Box<dyn std::error::Error>> {
+        let parent_dir = FileUtils::get_current_working_dir();
+        let tembo_toml_path = Path::new(&parent_dir).join("tembo.toml");
 
-        let mut dst = Vec::new();
-        let mut easy = Easy::new();
-        easy.url(file_path).unwrap();
-        let _redirect = easy.follow_location(true);
+        if tembo_toml_path.exists() {
+            print!("Tembo.toml file already exists in this path");
+            Ok(())
+        } else {
+            let mut file = File::create(&tembo_toml_path)?;
+            file.write_all(default_text.as_bytes())?;
+            confirmation("Tembo.toml initialized successfully!");
 
-        {
-            let mut transfer = easy.transfer();
-            transfer
-                .write_function(|data| {
-                    dst.extend_from_slice(data);
-                    Ok(data.len())
-                })
-                .unwrap();
-            transfer.perform().unwrap();
+            Ok(())
         }
-        {
-            let mut file = File::create(download_location)?;
-            file.write_all(dst.as_slice())?;
-        }
-        Ok(())
     }
 
     pub fn get_current_working_dir() -> String {

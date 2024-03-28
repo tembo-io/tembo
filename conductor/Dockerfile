@@ -7,9 +7,13 @@ RUN apt-get update && \
 COPY tembo-operator ./tembo-operator
 WORKDIR /build
 
+ENV SQLX_OFFLINE=true
+
+COPY sqlx-data.json .
 COPY Cargo.toml .
 COPY Cargo.lock .
 COPY ./src ./src
+COPY ./migrations ./migrations
 
 RUN cargo install --path .
 

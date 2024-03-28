@@ -3,9 +3,18 @@ use crate::cli::context::{
     CONTEXT_EXAMPLE_TEXT, CREDENTIALS_DEFAULT_TEXT, CREDENTIALS_EXAMPLE_TEXT,
 };
 use crate::cli::file_utils::FileUtils;
-use crate::tui::confirmation;
 use clap::Args;
 use std::env;
+
+pub const TEMBO_DEFAULT_TEXT: &str = r#"[test-instance]
+environment = "prod"
+instance_name = "test-instance"
+cpu = "0.25"
+memory = "1Gi"
+storage = "10Gi"
+replicas = 1
+stack_type = "Standard"
+"#;
 
 /// Initializes a local environment. Creates a sample context and configuration files.
 #[derive(Args)]
@@ -58,13 +67,7 @@ pub fn execute() -> Result<(), anyhow::Error> {
         }
     }
 
-    let filename = "tembo.toml";
-    let filepath =
-        "https://raw.githubusercontent.com/tembo-io/tembo/main/tembo-cli/examples/single-instance/tembo.toml";
-
-    FileUtils::download_file(filepath, filename, false)?;
-
-    confirmation("Tembo initialized successfully!");
+    let _ = FileUtils::save_tembo_toml(TEMBO_DEFAULT_TEXT);
 
     Ok(())
 }
