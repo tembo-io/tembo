@@ -1,6 +1,6 @@
 name: !pganalyze
 appServices:
-  - image: quay.io/tembo/pganalyze-collector:0.54.0-alpha7
+  - image: quay.io/pganalyze/collector:v0.55.0
     name: pganalyze
     env:
       - name: DB_URL

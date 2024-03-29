@@ -12,8 +12,6 @@
 pub struct ConnectionInfo {
     #[serde(rename = "host")]
     pub host: String,
-    #[serde(rename = "password")]
-    pub password: String,
     #[serde(
         rename = "pooler_host",
         default,
@@ -28,10 +26,9 @@ pub struct ConnectionInfo {
 }
 
 impl ConnectionInfo {
-    pub fn new(host: String, password: String, port: i32, user: String) -> ConnectionInfo {
+    pub fn new(host: String, port: i32, user: String) -> ConnectionInfo {
         ConnectionInfo {
             host,
-            password,
             pooler_host: None,
             port,
             user,

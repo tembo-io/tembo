@@ -7,7 +7,6 @@ use serde::Serialize;
 
 use crate::tui;
 
-// TODO: Move this to a template file
 pub const CONTEXT_DEFAULT_TEXT: &str = "version = \"1.0\"
 
 [[environment]]
@@ -15,21 +14,24 @@ name = 'local'
 target = 'docker'
 set = true
 
-[[environment]]
-name = 'prod'
-target = 'tembo-cloud'
-org_id = 'ORG_ID'
-profile = 'prod'
+# [[environment]]
+# name = 'prod'
+# target = 'tembo-cloud'
+# org_id can be found in your tembo cloud url. Example: org_2bVDi36rsJNot2gwzP37enwxzMk
+# org_id = 'Org ID here'
+# profile = 'prod'
 ";
 
-// TODO: Move this to a template file
 pub const CREDENTIALS_DEFAULT_TEXT: &str = "version = \"1.0\"
 
-[[profile]]
-name = 'prod'
-tembo_access_token = 'ACCESS_TOKEN'
-tembo_host = 'https://api.tembo.io'
-tembo_data_host = 'https://api.data-1.use1.tembo.io'
+# Remove commented out profile to setup your environment
+
+# [[profile]]
+# name = 'prod'
+# Generate an Access Token either through 'tembo login' or visit 'https://cloud.tembo.io/generate-jwt'
+# tembo_access_token = 'Access token here'
+# tembo_host = 'https://api.tembo.io'
+# tembo_data_host = 'https://api.data-1.use1.tembo.io'
 ";
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
@@ -127,25 +129,37 @@ pub fn get_current_context() -> Result<Environment, anyhow::Error> {
     let maybe_context = list_context()?;
 
     if let Some(context) = maybe_context {
-        let maybe_profiles = list_credential_profiles()?;
-
-        if let Some(profiles) = maybe_profiles {
-            for mut env in context.environment {
-                if let Some(_is_set) = env.set {
-                    if let Some(profile) = &env.profile {
-                        let credential =
-                            profiles.iter().rev().find(|c| &c.name == profile).unwrap();
-
-                        env.selected_profile = Some(credential.to_owned());
-                    }
-
+        for env in context.environment {
+            if let Some(true) = env.set {
+                if env.name == "local" {
                     return Ok(env);
+                } else {
+                    let maybe_profiles = list_credential_profiles()?;
+
+                    if let Some(profiles) = maybe_profiles {
+                        if let Some(profile_name) = &env.profile {
+                            let credential = profiles
+                                .iter()
+                                .rev()
+                                .find(|c| &c.name == profile_name)
+                                .ok_or_else(|| anyhow!("Profile not found in credentials"))?;
+
+                            let mut env_with_profile = env.clone();
+                            env_with_profile.selected_profile = Some(credential.clone());
+
+                            return Ok(env_with_profile);
+                        } else {
+                            bail!("Environment is not set up properly. Check out your context");
+                        }
+                    } else {
+                        bail!("Credentials file not found or invalid");
+                    }
                 }
             }
         }
     }
 
-    bail!("Tembo context not set");
+    bail!("Environment is not set up properly. Check out your context");
 }
 
 pub fn list_credential_profiles() -> Result<Option<Vec<Profile>>, anyhow::Error> {
