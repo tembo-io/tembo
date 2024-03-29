@@ -8,6 +8,7 @@ use conductor::{
     delete_namespace, generate_cron_expression, generate_spec, get_coredb_error_without_status,
     get_one, get_pg_conn, lookup_role_arn, restart_coredb, types,
 };
+
 use controller::apis::coredb_types::{
     Backup, CoreDBSpec, S3Credentials, ServiceAccountTemplate, VolumeSnapshot,
 };
@@ -727,7 +728,8 @@ async fn init_cloud_perms(
             inherit_from_iam_role: Some(true),
             ..Default::default()
         }),
-        volume_snapshot,
+        // TODO: disbale volumesnapshots for now
+        // volume_snapshot,
         ..Default::default()
     };
 
