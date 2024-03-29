@@ -728,8 +728,7 @@ async fn init_cloud_perms(
             inherit_from_iam_role: Some(true),
             ..Default::default()
         }),
-        // TODO: disbale volumesnapshots for now
-        // volume_snapshot,
+        volume_snapshot,
         ..Default::default()
     };
 
