@@ -1,6 +1,6 @@
 use crate::cli::context::{
     get_current_context, tembo_context_file_path, tembo_credentials_file_path, Context, Credential,
-    Profile,
+    Environment, Profile,
 };
 use crate::tui::error;
 use actix_cors::Cors;
@@ -59,16 +59,12 @@ pub fn execute(login_cmd: LoginCommand) -> Result<(), anyhow::Error> {
     let profile = env
         .selected_profile
         .as_ref()
-        .ok_or_else(|| anyhow!("Environment not setup properly"))?;
+        .ok_or_else(|| anyhow!("Cannot log in to the local context. Please select a context, or initialize a new context with tembo login --profile < name your profile > --organization-id < Your Tembo Cloud organization ID >"))?;
     let profile_name = read_context(login_cmd.profile.clone())?;
 
-    if env.target == "tembo-cloud" {
-        let login_url = url(profile)?;
-        let rt = tokio::runtime::Runtime::new().expect("Failed to create a runtime");
-        rt.block_on(handle_tokio(login_url, &profile_name))?;
-    } else {
-        print!("Cannot log in to the local context. Please select a context, or initialize a new context with tembo login --profile < name your profile > --organization-id < Your Tembo Cloud organization ID >");
-    }
+    let login_url = url(profile)?;
+    let rt = tokio::runtime::Runtime::new().expect("Failed to create a runtime");
+    rt.block_on(handle_tokio(login_url, &profile_name))?;
 
     Ok(())
 }
@@ -216,14 +212,33 @@ pub fn update_access_token(
     Ok(())
 }
 
-pub fn update_context(org_id: &str, profile_name: &str) -> Result<(), anyhow::Error> {
+fn update_context(org_id: &str, profile_name: &str) -> Result<()> {
     let context_file_path = tembo_context_file_path();
+    let mut contents = fs::read_to_string(&context_file_path)?;
+    let mut data: Context = toml::from_str(&contents)?;
 
-    let new_env = format!(
-        "\n[[environment]]\nname = {:?}\ntarget = {:?}\norg_id = {:?}\nprofile = {:?}",
-        profile_name, "tembo-cloud", org_id, profile_name,
-    );
-    append_to_file(&context_file_path, new_env)?;
+    if let Some(env) = data.environment.iter_mut().find(|p| p.set == Some(true)) {
+        env.set = Some(false);
+    }
+
+    match data.environment.iter().any(|p| p.name == profile_name) {
+        true => {
+            return Err(anyhow!("Context Environment already exists. Either try creating a new name or set it to that."));
+        }
+        false => {
+            data.environment.push(Environment {
+                name: profile_name.to_string(),
+                target: "tembo-cloud".to_string(),
+                org_id: Some(org_id.to_string()),
+                profile: Some(profile_name.to_string()),
+                set: Some(true),
+                selected_profile: None,
+            });
+
+            contents = toml::to_string(&data)?;
+            fs::write(&context_file_path, contents)?;
+        }
+    }
 
     Ok(())
 }
@@ -272,11 +287,12 @@ pub fn execute_command(cmd: &LoginCommand) -> Result<(), anyhow::Error> {
         .clone()
         .unwrap_or_else(|| default_tembo_data_host.to_string());
 
+    update_context(&org_id.clone().unwrap(), &profile.clone().unwrap())?;
+
     update_profile(
         &profile.clone().unwrap(),
         &tembo_host.clone(),
         &tembo_data_host.clone(),
     )?;
-    update_context(&org_id.clone().unwrap(), &profile.clone().unwrap())?;
     Ok(())
 }
