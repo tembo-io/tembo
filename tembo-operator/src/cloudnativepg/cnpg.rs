@@ -601,32 +601,24 @@ fn cnpg_cluster_storage_class(cdb: &CoreDB) -> Option<String> {
 }
 
 // Check replica count to enable HA
-fn cnpg_high_availability() -> Option<ClusterReplicationSlots> {
-    // if cdb.spec.replicas > 1 {
-    //     Some(ClusterReplicationSlots {
-    //         high_availability: Some(ClusterReplicationSlotsHighAvailability {
-    //             enabled: Some(true),
-    //             ..ClusterReplicationSlotsHighAvailability::default()
-    //         }),
-    //         update_interval: Some(30),
-    //     })
-    // } else {
-    //     Some(ClusterReplicationSlots {
-    //         high_availability: Some(ClusterReplicationSlotsHighAvailability {
-    //             enabled: Some(false),
-    //             ..ClusterReplicationSlotsHighAvailability::default()
-    //         }),
-    //         update_interval: Some(30),
-    //     })
-    // }
-    // Since CNPG 1.21, replication slots are always enabled
-    Some(ClusterReplicationSlots {
-        high_availability: Some(ClusterReplicationSlotsHighAvailability {
-            enabled: Some(true),
-            ..ClusterReplicationSlotsHighAvailability::default()
-        }),
-        update_interval: Some(30),
-    })
+fn cnpg_high_availability(cdb: &CoreDB) -> Option<ClusterReplicationSlots> {
+    if cdb.spec.replicas > 1 {
+        Some(ClusterReplicationSlots {
+            high_availability: Some(ClusterReplicationSlotsHighAvailability {
+                enabled: Some(true),
+                ..ClusterReplicationSlotsHighAvailability::default()
+            }),
+            update_interval: Some(30),
+        })
+    } else {
+        Some(ClusterReplicationSlots {
+            high_availability: Some(ClusterReplicationSlotsHighAvailability {
+                enabled: Some(false),
+                ..ClusterReplicationSlotsHighAvailability::default()
+            }),
+            update_interval: Some(30),
+        })
+    }
 }
 
 fn default_cluster_annotations(cdb: &CoreDB) -> BTreeMap<String, String> {
@@ -655,7 +647,7 @@ pub fn cnpg_cluster_from_cdb(
     let (bootstrap, external_clusters, superuser_secret) = cnpg_cluster_bootstrap_from_cdb(cdb);
     let (backup, service_account_template) = cnpg_backup_configuration(cdb, &cfg);
     let storage = cnpg_cluster_storage(cdb);
-    let replication = cnpg_high_availability();
+    let replication = cnpg_high_availability(cdb);
 
     let PostgresConfig {
         postgres_parameters,
