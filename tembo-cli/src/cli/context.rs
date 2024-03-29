@@ -134,7 +134,20 @@ pub fn list_context() -> Result<Option<Context>, anyhow::Error> {
     let maybe_context: Result<Context, toml::de::Error> = toml::from_str(&contents);
 
     match maybe_context {
-        Ok(context) => Ok(Some(context)),
+        Ok(mut context) => {
+            let mut count = 0;
+            for e in context.environment.iter_mut() {
+                if e.set == Some(true) {
+                    count += 1;
+                }
+            }
+
+            if count > 1 {
+                bail!("More than one environment is set to true. Check your context file");
+            } else {
+                Ok(Some(context))
+            }
+        }
         Err(err) => {
             eprintln!("\nInvalid context file {filename}\n");
 
