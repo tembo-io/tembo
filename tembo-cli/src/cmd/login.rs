@@ -1,6 +1,6 @@
 use crate::cli::context::{
     get_current_context, tembo_context_file_path, tembo_credentials_file_path, Context, Credential,
-    Environment, Profile,
+    Environment,
 };
 use crate::tui::error;
 use actix_cors::Cors;
@@ -44,39 +44,40 @@ struct TokenRequest {
 
 pub fn execute(login_cmd: LoginCommand) -> Result<(), anyhow::Error> {
     match (&login_cmd.organization_id, &login_cmd.profile) {
-        (Some(_), Some(_)) => {
-            execute_command(&login_cmd)?;
-        }
         (Some(_), None) | (None, Some(_)) => {
             return Err(anyhow!(
                 "Both --organization_id and --profile flags are required when specifying one. Please include values for both flags."
             ));
         }
-        _ => {}
+        (None, None) => {
+            let env = get_current_context()?;
+            if env.target != "tembo-cloud" {
+                return Err(anyhow!(
+                    "The local context is currently selected. Please select a context, or initialize a new context with:
+            \"tembo login --profile <profile_name> --organization-id <organization_id>\""
+                ));
+            }
+        }
+        (Some(_), Some(_)) => {}
     }
 
-    let env = get_current_context()?;
-    let profile = env
-        .selected_profile
-        .as_ref()
-        .ok_or_else(|| anyhow!("Cannot log in to the local context. Please select a context, or initialize a new context with tembo login --profile < name your profile > --organization-id < Your Tembo Cloud organization ID >"))?;
-    let profile_name = read_context(login_cmd.profile.clone())?;
-
-    let login_url = url(profile)?;
-    let rt = tokio::runtime::Runtime::new().expect("Failed to create a runtime");
-    rt.block_on(handle_tokio(login_url, &profile_name))?;
+    let login_url = url(login_cmd.tembo_host.as_deref())?;
+    let rt = tokio::runtime::Runtime::new()?;
+    rt.block_on(handle_tokio(login_url, &login_cmd))?;
 
     Ok(())
 }
 
-fn url(profile: &Profile) -> Result<String, anyhow::Error> {
+fn url(cmd: Option<&str>) -> Result<String, anyhow::Error> {
     let lifetime = token_lifetime()?;
-    let modified_tembo_host = profile.get_tembo_host().replace("api", "cloud");
-    let login_url = modified_tembo_host.clone() + "/cli-success?isCli=true&expiry=" + &lifetime;
+    let default_tembo_host = "https://api.tembo.io";
+    let modified_tembo_host = cmd.unwrap_or(default_tembo_host);
+    let tembo_host = modified_tembo_host.replace("api", "cloud");
+    let login_url = tembo_host.clone() + "/cli-success?isCli=true&expiry=" + &lifetime;
     Ok(login_url)
 }
 
-async fn handle_tokio(login_url: String, profile_name: &str) -> Result<(), anyhow::Error> {
+async fn handle_tokio(login_url: String, cmd: &LoginCommand) -> Result<(), anyhow::Error> {
     webbrowser::open(&login_url)?;
     let notify = Arc::new(Notify::new());
     let notify_clone = notify.clone();
@@ -85,22 +86,23 @@ async fn handle_tokio(login_url: String, profile_name: &str) -> Result<(), anyho
     });
     let shared_state_clone = shared_state.clone();
     tokio::spawn(async move {
-        if let Err(e) = start_server(notify_clone, shared_state_clone).await {
+        if let Err(e) = start_server(notify_clone, shared_state).await {
             eprintln!("Server error: {}", e);
         }
     });
 
     let result = time::timeout(Duration::from_secs(30), notify.notified()).await;
+    if let Some(token) = shared_state_clone.token.lock().unwrap().as_ref() {
+        let _ = execute_command(&cmd, token);
+    } else {
+        println!("No token was received.");
+    }
+
     match result {
         Ok(_) => println!("File saved and Server Closed!"),
         Err(_) => {
             println!("Operation timed out. Server is being stopped.");
         }
-    }
-    if let Some(token) = shared_state.token.lock().unwrap().as_ref() {
-        let _ = update_access_token(&profile_name, token);
-    } else {
-        println!("No token was received.");
     }
 
     Ok(())
@@ -162,7 +164,7 @@ fn token_lifetime() -> Result<String> {
     Ok(lifetime)
 }
 
-fn read_context(cmd: Option<String>) -> Result<String, anyhow::Error> {
+fn read_context() -> Result<String, anyhow::Error> {
     let filename = tembo_context_file_path();
     let contents = match fs::read_to_string(&filename) {
         Ok(c) => c,
@@ -179,13 +181,11 @@ fn read_context(cmd: Option<String>) -> Result<String, anyhow::Error> {
         }
     };
     for e in data.environment.iter_mut() {
-        if cmd.is_some() {
-            return Ok(cmd.unwrap());
-        } else if e.set == Some(true) && e.name != "local" {
+        if e.set == Some(true) && e.name != "local" {
             return Ok(e.name.clone());
         }
     }
-    Err(anyhow!("Now "))
+    Err(anyhow!("Cannot read context file "))
 }
 
 pub fn update_access_token(
@@ -223,7 +223,7 @@ fn update_context(org_id: &str, profile_name: &str) -> Result<()> {
 
     match data.environment.iter().any(|p| p.name == profile_name) {
         true => {
-            return Err(anyhow!("Context Environment already exists. Either try creating a new name or set it to that."));
+            error(&format!("Context Environment already exists. Either try creating a new name or set it to that."));
         }
         false => {
             data.environment.push(Environment {
@@ -256,7 +256,7 @@ pub fn update_profile(
     }
     let new_profile = format!(
         "\n\n[[profile]]\nname = {:?}\ntembo_access_token = {:?}\ntembo_host = {:?}\ntembo_data_host = {:?}",
-        profile_name, "Processing....", tembo_host, tembo_data_host
+        profile_name, "Access token not set yet!", tembo_host, tembo_data_host
     );
     append_to_file(&credentials_file_path, new_profile)?;
 
@@ -272,27 +272,30 @@ fn append_to_file(file_path: &str, content: String) -> io::Result<()> {
     Ok(())
 }
 
-pub fn execute_command(cmd: &LoginCommand) -> Result<(), anyhow::Error> {
-    let profile = &cmd.profile;
-    let org_id = &cmd.organization_id;
+pub fn execute_command(cmd: &LoginCommand, token: &str) -> Result<(), anyhow::Error> {
     let default_tembo_host = "https://api.tembo.io";
     let default_tembo_data_host = "https://api.data-1.use1.tembo.io";
 
-    let tembo_host = &cmd
+    let tembo_host = cmd
         .tembo_host
         .clone()
         .unwrap_or_else(|| default_tembo_host.to_string());
-    let tembo_data_host = &cmd
+    let tembo_data_host = cmd
         .tembo_data_host
         .clone()
         .unwrap_or_else(|| default_tembo_data_host.to_string());
 
-    update_context(&org_id.clone().unwrap(), &profile.clone().unwrap())?;
+    match (&cmd.profile, &cmd.organization_id) {
+        (Some(profile), Some(org_id)) => {
+            update_context(org_id, profile)?;
+            update_profile(profile, &tembo_host, &tembo_data_host)?;
+            update_access_token(profile, token)?;
+        }
+        _ => {
+            let profile_name = read_context()?;
+            update_access_token(&profile_name, token)?;
+        }
+    }
 
-    update_profile(
-        &profile.clone().unwrap(),
-        &tembo_host.clone(),
-        &tembo_data_host.clone(),
-    )?;
     Ok(())
 }
