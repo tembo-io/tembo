@@ -1,6 +1,7 @@
 pub mod backups;
 pub mod clusters;
 pub(crate) mod cnpg;
+// pub(crate) mod cnpg_backups;
 pub mod poolers;
 mod scheduledbackups;
 
