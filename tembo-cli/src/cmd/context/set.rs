@@ -1,4 +1,4 @@
-use crate::cli::context::{tembo_context_file_path, Context};
+use crate::cli::context::{list_context, tembo_context_file_path, Context};
 use crate::tui::{colors, error};
 use anyhow::Error;
 use clap::Args;
@@ -15,6 +15,7 @@ pub struct ContextSetArgs {
 }
 
 pub fn execute(args: &ContextSetArgs) -> Result<(), anyhow::Error> {
+    let _ = list_context();
     let filename = tembo_context_file_path();
 
     let contents = match fs::read_to_string(&filename) {

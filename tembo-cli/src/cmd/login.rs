@@ -1,6 +1,6 @@
 use crate::cli::context::{
-    get_current_context, tembo_context_file_path, tembo_credentials_file_path, Context, Credential,
-    Environment,
+    get_current_context, list_context, tembo_context_file_path, tembo_credentials_file_path,
+    Context, Credential, Environment,
 };
 use crate::tui::error;
 use actix_cors::Cors;
@@ -43,6 +43,7 @@ struct TokenRequest {
 }
 
 pub fn execute(login_cmd: LoginCommand) -> Result<(), anyhow::Error> {
+    let _ = list_context();
     match (&login_cmd.organization_id, &login_cmd.profile) {
         (Some(_), None) | (None, Some(_)) => {
             return Err(anyhow!(
