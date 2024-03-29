@@ -172,6 +172,10 @@ pub async fn reconcile_network_policies(client: Client, namespace: &str) -> Resu
                 {
                   "protocol": "TCP",
                   "port": 443
+                },
+                {
+                  "protocol": "TCP",
+                  "port": 8443
                 }
               ]
             }
