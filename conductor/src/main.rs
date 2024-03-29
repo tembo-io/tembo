@@ -8,7 +8,10 @@ use conductor::{
     delete_namespace, generate_cron_expression, generate_spec, get_coredb_error_without_status,
     get_one, get_pg_conn, lookup_role_arn, restart_coredb, types,
 };
-use controller::apis::coredb_types::{Backup, CoreDBSpec, S3Credentials, ServiceAccountTemplate};
+
+use controller::apis::coredb_types::{
+    Backup, CoreDBSpec, S3Credentials, ServiceAccountTemplate, VolumeSnapshot,
+};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use kube::Client;
 use log::{debug, error, info, warn};
@@ -702,12 +705,12 @@ async fn init_cloud_perms(
         }),
     };
 
-    // TODO: disbale volumesnapshots for now
+    // TODO: disbale volumesnapshots for now until we can make them work with CNPG
     // Enable VolumeSnapshots for all instances being created
-    // let volume_snapshot = Some(VolumeSnapshot {
-    //     enabled: true,
-    //     snapshot_class: Some(VOLUME_SNAPSHOT_CLASS_NAME.to_string()),
-    // });
+    let volume_snapshot = Some(VolumeSnapshot {
+        enabled: false,
+        snapshot_class: None,
+    });
 
     let instance_name_slug = format!(
         "org-{}-inst-{}",
