@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use futures::stream::StreamExt;
 
 use crate::{
-    apis::coredb_types::{CoreDB, CoreDBStatus},
+    apis::coredb_types::{CoreDB, CoreDBStatus, VolumeSnapshot},
     app_service::manager::reconcile_app_services,
     cloudnativepg::{
         backups::Backup,
@@ -133,6 +133,15 @@ fn create_volume_snapshot_patch(cfg: &Config) -> serde_json::Value {
             }
         }
     })
+}
+
+// is_volume_snapshot_update_needed checks if the volume snapshot needs to be updated in the CoreDB spec.
+fn is_volume_snapshot_update_needed(
+    volume_snapshot: Option<&VolumeSnapshot>,
+    enable_volume_snapshot: bool,
+) -> bool {
+    let current_enabled = volume_snapshot.map(|vs| vs.enabled).unwrap_or(false);
+    current_enabled != enable_volume_snapshot
 }
 
 impl CoreDB {
@@ -422,19 +431,11 @@ impl CoreDB {
         // Setup the client for the CoreDB
         let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), namespace);
 
-        // Check the current value of spec.backup.volumeSnapshot.enabled in CoreDB
-        let current_enabled = self
-            .spec
-            .backup
-            .volume_snapshot
-            .as_ref()
-            .map(|e| e.enabled)
-            .unwrap_or(false);
-
-        // If the current value matches the desired value from the config, return
-        if (current_enabled && cfg.enable_volume_snapshot)
-            || (!current_enabled && !cfg.enable_volume_snapshot)
-        {
+        // Check if an update is needed based on the current value and the desired value from the config
+        if !is_volume_snapshot_update_needed(
+            self.spec.backup.volume_snapshot.as_ref(),
+            cfg.enable_volume_snapshot,
+        ) {
             return Ok(());
         }
 
@@ -965,7 +966,7 @@ mod test {
         VOLUME_SNAPSHOT_CLASS_NAME,
     };
     use crate::config::Config;
-    use crate::controller::create_volume_snapshot_patch;
+    use crate::controller::{create_volume_snapshot_patch, is_volume_snapshot_update_needed};
     use chrono::{DateTime, NaiveDate, Utc};
     use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
     use std::sync::Arc;
@@ -1156,5 +1157,39 @@ mod test {
                 .expect("Failed to deserialize actual_patch into VolumeSnapshot");
 
         assert_eq!(actual_volume_snapshot, expected_volume_snapshot);
+    }
+
+    #[test]
+    fn test_is_volume_snapshot_update_needed() {
+        let volume_snapshot_enabled = Some(VolumeSnapshot {
+            enabled: true,
+            snapshot_class: Some(VOLUME_SNAPSHOT_CLASS_NAME.to_string()),
+        });
+        let volume_snapshot_disabled = Some(VolumeSnapshot {
+            enabled: false,
+            snapshot_class: None,
+        });
+
+        // Test cases where no update is needed
+        assert!(!is_volume_snapshot_update_needed(
+            volume_snapshot_enabled.as_ref(),
+            true
+        ));
+        assert!(!is_volume_snapshot_update_needed(
+            volume_snapshot_disabled.as_ref(),
+            false
+        ));
+        assert!(!is_volume_snapshot_update_needed(None, false));
+
+        // Test cases where an update is needed
+        assert!(is_volume_snapshot_update_needed(
+            volume_snapshot_enabled.as_ref(),
+            false
+        ));
+        assert!(is_volume_snapshot_update_needed(
+            volume_snapshot_disabled.as_ref(),
+            true
+        ));
+        assert!(is_volume_snapshot_update_needed(None, true));
     }
 }
