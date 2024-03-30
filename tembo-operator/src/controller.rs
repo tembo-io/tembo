@@ -116,6 +116,25 @@ fn error_policy(cdb: Arc<CoreDB>, error: &Error, ctx: Arc<Context>) -> Action {
     Action::requeue(Duration::from_secs(5 * 60))
 }
 
+// create_volume_snapshot_patch creates a patch for the CoreDB spec to enable or disable volumesnapshots
+// based off the value of cfg.enable_volume_snapshot.
+fn create_volume_snapshot_patch(cfg: &Config) -> serde_json::Value {
+    json!({
+        "spec": {
+            "backup": {
+                "volumeSnapshot": {
+                    "enabled": cfg.enable_volume_snapshot,
+                    "snapshotClass": if cfg.enable_volume_snapshot {
+                        Some(VOLUME_SNAPSHOT_CLASS_NAME.to_string())
+                    } else {
+                        None
+                    }
+                }
+            }
+        }
+    })
+}
+
 impl CoreDB {
     // Reconcile (for non-finalizer related changes)
     #[instrument(skip(self, ctx, cfg))]
@@ -283,9 +302,7 @@ impl CoreDB {
         // Before we reconcile CNPG, we need to make sure that spec.backup.volumeSnapshot is
         // enabled in the CoreDB spec if cfg.enable_volume_snapshot = true.  If it's not
         // then we should enable it, otherwise it should be a no-op.
-        if cfg.enable_volume_snapshot {
-            self.enable_volume_snapshot(ctx.clone()).await?;
-        }
+        self.enable_volume_snapshot(cfg, ctx.clone()).await?;
 
         reconcile_cnpg(self, ctx.clone()).await?;
         if cfg.enable_backup {
@@ -394,40 +411,35 @@ impl CoreDB {
     // enable_volume_snapshot makes sure that the CoreDB spec has the spec.backup.volumeSnapshot
     // enabled.  If it's already enabled, then do nothing.
     #[instrument(skip(self, ctx))]
-    async fn enable_volume_snapshot(&self, ctx: Arc<Context>) -> Result<(), Action> {
-        // Check if the CoreDB already has the spec.backup.volumeSnapshot enabled
-        if self
+    async fn enable_volume_snapshot(&self, cfg: &Config, ctx: Arc<Context>) -> Result<(), Action> {
+        let client = ctx.client.clone();
+        let name = self.name_any();
+        let namespace = self.metadata.namespace.as_ref().ok_or_else(|| {
+            error!("CoreDB namespace is empty for instance: {}.", name);
+            Action::requeue(tokio::time::Duration::from_secs(300))
+        })?;
+
+        // Setup the client for the CoreDB
+        let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), namespace);
+
+        // Check the current value of spec.backup.volumeSnapshot.enabled in CoreDB
+        let current_enabled = self
             .spec
             .backup
             .volume_snapshot
             .as_ref()
             .map(|e| e.enabled)
-            .unwrap_or(false)
+            .unwrap_or(false);
+
+        // If the current value matches the desired value from the config, return
+        if (current_enabled && cfg.enable_volume_snapshot)
+            || (!current_enabled && !cfg.enable_volume_snapshot)
         {
             return Ok(());
         }
-        let client = ctx.client.clone();
-        let name = self.name_any();
-        let namespace = self
-            .metadata
-            .namespace
-            .clone()
-            .expect("CoreDB should have a namespace");
 
-        // Setup the client for the CoreDB
-        let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
-
-        // Create the patch to enable the spec.backup.volumeSnapshot
-        let patch = json!({
-            "spec": {
-                "backup": {
-                    "volumeSnapshot": {
-                        "enabled": true,
-                        "snapshotClass": VOLUME_SNAPSHOT_CLASS_NAME
-                    }
-                }
-            }
-        });
+        // Create the patch to update the spec.backup.volumeSnapshot based on the config
+        let patch = create_volume_snapshot_patch(cfg);
         let patch_params = PatchParams {
             field_manager: Some("cntrlr".to_string()),
             ..PatchParams::default()
@@ -947,7 +959,13 @@ pub async fn run(state: State) {
 #[cfg(test)]
 mod test {
     use super::{reconcile, Backup, Context, CoreDB};
-    use crate::cloudnativepg::backups::{BackupCluster, BackupSpec, BackupStatus};
+    use crate::apis::coredb_types::VolumeSnapshot;
+    use crate::cloudnativepg::{
+        backups::{BackupCluster, BackupSpec, BackupStatus},
+        VOLUME_SNAPSHOT_CLASS_NAME,
+    };
+    use crate::config::Config;
+    use crate::controller::create_volume_snapshot_patch;
     use chrono::{DateTime, NaiveDate, Utc};
     use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
     use std::sync::Arc;
@@ -1094,5 +1112,49 @@ mod test {
 
         // We expect None since there are no Backups
         assert_eq!(oldest_backup_time, None);
+    }
+
+    #[test]
+    fn test_create_volume_snapshot_patch_enabled() {
+        let cfg = Config {
+            enable_volume_snapshot: true,
+            ..Config::default()
+        };
+
+        let expected_volume_snapshot = VolumeSnapshot {
+            enabled: true,
+            snapshot_class: Some(VOLUME_SNAPSHOT_CLASS_NAME.to_string()),
+        };
+
+        let actual_patch = create_volume_snapshot_patch(&cfg);
+
+        // Deserialize the actual_patch into a VolumeSnapshot instance
+        let actual_volume_snapshot: VolumeSnapshot =
+            serde_json::from_value(actual_patch["spec"]["backup"]["volumeSnapshot"].clone())
+                .expect("Failed to deserialize actual_patch into VolumeSnapshot");
+
+        assert_eq!(actual_volume_snapshot, expected_volume_snapshot);
+    }
+
+    #[test]
+    fn test_create_volume_snapshot_patch_disabled() {
+        let cfg = Config {
+            enable_volume_snapshot: false,
+            ..Config::default()
+        };
+
+        let expected_volume_snapshot = VolumeSnapshot {
+            enabled: false,
+            snapshot_class: None,
+        };
+
+        let actual_patch = create_volume_snapshot_patch(&cfg);
+
+        // Deserialize the actual_patch into a VolumeSnapshot instance
+        let actual_volume_snapshot: VolumeSnapshot =
+            serde_json::from_value(actual_patch["spec"]["backup"]["volumeSnapshot"].clone())
+                .expect("Failed to deserialize actual_patch into VolumeSnapshot");
+
+        assert_eq!(actual_volume_snapshot, expected_volume_snapshot);
     }
 }

@@ -161,7 +161,7 @@ pub struct S3CredentialsSessionToken {
 
 /// VolumeSnapshots is the type for the configuration of the volume snapshots
 /// to be used for backups instead of object storage
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct VolumeSnapshot {
     /// Enable the volume snapshots for backups
     pub enabled: bool,
