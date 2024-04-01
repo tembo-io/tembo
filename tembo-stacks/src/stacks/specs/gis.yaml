@@ -78,8 +78,12 @@ postgres_config:
   - name: shared_preload_libraries
     value: pg_stat_statements
 trunk_installs:
+  - name: fuzzystrmatch
+    version: 1.2.0
   - name: pg_stat_statements
     version: 1.10.0
+  - name: pointcloud
+    version: 1.2.5
 extensions:
   - name: pg_stat_statements
     locations:
