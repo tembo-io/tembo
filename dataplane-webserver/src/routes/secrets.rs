@@ -1,8 +1,13 @@
 use crate::secrets::types::AvailableSecret;
+use crate::secrets::validate_requested_secret;
 use crate::{config, secrets};
-use actix_web::{get, web, Error, HttpRequest, HttpResponse};
+use actix_web::error::ErrorInternalServerError;
+use actix_web::{get, patch, web, Error, HttpRequest, HttpResponse};
+use base64::prelude::*;
 use k8s_openapi::api::core::v1::Namespace;
+use k8s_openapi::api::core::v1::Secret;
 use kube::api::ListParams;
+use kube::api::{Patch, PatchParams};
 use kube::{Api, Client};
 use lazy_static::lazy_static;
 use log::{error, warn};
@@ -227,4 +232,95 @@ pub async fn get_secret_v1(
 fn is_valid_id(s: &str) -> bool {
     let re = Regex::new(r"^[A-Za-z0-9_]+$").unwrap();
     re.is_match(s)
+}
+
+#[utoipa::path(
+    context_path = "/api/v1/orgs/{org_id}/instances/{instance_id}",
+    params(
+        ("org_id" = String, Path, example="org_2T7FJA0DpaNBnELVLU1IS4XzZG0", description = "Tembo Cloud Organization ID"),
+        ("instance_id" = String, Path, example="inst_1696253936968_TblNOY_6", description = "Tembo Cloud Instance ID"),
+        ("secret_name", example="readonly-role", description = "Secret name"),
+        ("password", example="hef8wergWF9uh39hf93h", description = "New password")
+    ),
+    responses(
+        (status = 200,
+            description = "Password successfully changed."),
+        (status = 403,
+            description = "Not authorized for query"),
+    )
+)]
+#[patch("/secrets/{secret_name}/passwords/{password}")]
+async fn change_password(
+    path: web::Path<(String, String, String, String)>,
+    _cfg: web::Data<config::Config>,
+    _req: HttpRequest,
+) -> Result<HttpResponse, Error> {
+    let (org_id, instance_id, secret_name, password) = path.into_inner();
+
+    if !is_valid_id(&org_id) || !is_valid_id(&instance_id) {
+        return Ok(HttpResponse::BadRequest()
+            .json("org_id and instance_id must be alphanumeric or underscore only"));
+    }
+
+    if password.len() < 16 {
+        return Ok(HttpResponse::BadRequest().json("Password must be at least 16 characters long"));
+    }
+
+    let encoded_password = BASE64_STANDARD.encode(password.as_bytes());
+    let kubernetes_client = match Client::try_default().await {
+        Ok(client) => client,
+        Err(_) => {
+            return Ok(
+                HttpResponse::InternalServerError().json("Failed to create Kubernetes client")
+            )
+        }
+    };
+
+    let namespaces: Api<Namespace> = Api::all(kubernetes_client.clone());
+    let label_selector = format!(
+        "tembo.io/instance_id={},tembo.io/organization_id={}",
+        instance_id, org_id
+    );
+    let lp = ListParams::default().labels(&label_selector);
+    let ns_list = namespaces.list(&lp).await.map_err(|e| {
+        log::error!("Failed to list namespaces: {:?}", e);
+        ErrorInternalServerError("Failed to list namespaces")
+    })?;
+
+    let namespace = ns_list
+        .iter()
+        .next()
+        .ok_or_else(|| {
+            log::error!("No namespace found with provided labels");
+            ErrorInternalServerError("Instance not found for provided org_id and instance_id")
+        })?
+        .metadata
+        .name
+        .as_ref()
+        .unwrap()
+        .clone();
+
+    let requested_secret = match validate_requested_secret(&secret_name) {
+        Ok(secret) => secret,
+        Err(_) => return Ok(HttpResponse::Forbidden().json("Invalid secret requested")),
+    };
+    let secret_name_to_patch = (requested_secret.formatter)(&namespace);
+
+    let secrets_api: Api<Secret> = Api::namespaced(kubernetes_client, &namespace.clone());
+    let patch_data = serde_json::json!({
+    "data": {
+        "password": encoded_password
+    }
+    });
+    let params = PatchParams::default();
+    let patch_result = secrets_api
+        .patch(&secret_name_to_patch, &params, &Patch::Merge(&patch_data))
+        .await;
+
+    if let Err(e) = patch_result {
+        log::error!("Failed to update secret: {:?}", e);
+        return Err(ErrorInternalServerError("Failed to update secret"));
+    }
+
+    Ok(HttpResponse::Ok().json("Password updated successfully"))
 }
