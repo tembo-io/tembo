@@ -27,3 +27,4 @@ kube = { version = "0.86.0", features = ["runtime", "derive"] }
 k8s-openapi = { version = "0.20.0", features = ["v1_25"] }
 indexmap = "2.0.0"
 regex = "1.9.6"
+jsonwebtoken = "9.3.0"
