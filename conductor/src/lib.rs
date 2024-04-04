@@ -279,7 +279,7 @@ pub async fn get_pg_conn(
             "app_user_secret".to_string(),
         ))?;
 
-    let (postgres_user, postgres_pw) = get_field_value_from_secret(postgres_data)?;
+    let (postgres_user, _password) = get_field_value_from_secret(postgres_data)?;
     let (app_user, app_pw) = get_field_value_from_secret(app_data)?;
 
     let host = format!("{name}.{basedomain}");
@@ -303,7 +303,6 @@ pub async fn get_pg_conn(
         pooler_host,
         port: 5432,
         user: postgres_user,
-        password: postgres_pw,
         app_user,
         app_password: app_pw,
     };
