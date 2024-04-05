@@ -259,7 +259,7 @@ fn is_valid_id(s: &str) -> bool {
     )
 )]
 #[patch("/secrets/{secret_name}/passwords/{password}")]
-async fn change_password(
+async fn update_postgres_password(
     path: web::Path<(String, String, String, String)>,
     _cfg: web::Data<config::Config>,
     _req: HttpRequest,
