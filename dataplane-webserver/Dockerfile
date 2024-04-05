@@ -1,4 +1,4 @@
-FROM quay.io/coredb/rust:1.71.0-slim-buster
+FROM quay.io/tembo/rust:1.77-slim
 
 RUN apt-get update \
     && apt-get install -y pkg-config libssl-dev \
