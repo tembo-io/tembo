@@ -54,6 +54,7 @@ use crate::{
     config::Config,
     configmap::custom_metrics_configmap_settings,
     errors::ValueError,
+    extensions::database_queries::is_not_restarting,
     is_postgres_ready,
     patch_cdb_status_merge,
     postgres_exporter::EXPORTER_CONFIGMAP_PREFIX,
@@ -970,6 +971,7 @@ async fn pods_to_fence(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<String>, A
 // cdb: the CoreDB object
 // maybe_cluster, Option<Cluster> of the current CNPG cluster, if it exists
 // new_spec: the new Cluster spec to be applied
+#[instrument(skip(cdb, maybe_cluster, new_spec), fields(trace_id, instance_name = %cdb.name_any()))]
 fn update_restarted_at(
     cdb: &CoreDB,
     maybe_cluster: Option<&Cluster>,
@@ -1004,12 +1006,108 @@ fn update_restarted_at(
     restart_annotation_updated
 }
 
+// restart_and_wait_for_restart is a synchronous function that takes a CNPG cluster adds the restart annotation
+// and waits for the restart to complete.
+#[instrument(skip(cdb, ctx, prev_cluster), fields(trace_id, instance_name = %cdb.name_any()))]
+async fn restart_and_wait_for_restart(
+    cdb: &CoreDB,
+    ctx: Arc<Context>,
+    prev_cluster: Option<&Cluster>,
+) -> Result<(), Action> {
+    // Check if prev_cluster is None, if so return early
+    if prev_cluster.is_none() {
+        return Ok(());
+    }
+
+    let Some(cdb_restarted_at) = cdb.annotations().get(RESTARTED_AT) else {
+        // No need to update the annotation if it's not present in the CoreDB
+        return Ok(());
+    };
+
+    // Get the previous value of the annotation, if any
+    let previous_restarted_at =
+        prev_cluster.and_then(|cluster| cluster.annotations().get(RESTARTED_AT));
+
+    let restart_annotation_updated = previous_restarted_at != Some(cdb_restarted_at);
+
+    // If restart_annotation_updated is true then patch the Cluster with just the annotation update and wait for the restart to complete
+    if restart_annotation_updated {
+        let name = cdb.name_any();
+        let namespace = cdb.metadata.namespace.as_ref().ok_or_else(|| {
+            error!("Namespace is empty for instance: {}.", name);
+            Action::requeue(tokio::time::Duration::from_secs(300))
+        })?;
+
+        // Create a JSON patch that updates the annotations field to restart the instance
+        let restart_patch = json!({
+            "metadata": {
+                "annotations": {
+                    RESTARTED_AT: cdb_restarted_at,
+                }
+            }
+        });
+
+        // Create an instance of the Cluster API
+        let cluster_api: Api<Cluster> = Api::namespaced(ctx.client.clone(), namespace);
+
+        // Patch the Cluster with the updated annotations
+        let pp = PatchParams::apply("restart_annotation_patch");
+        let _ = cluster_api
+            .patch(&name, &pp, &Patch::Merge(&restart_patch))
+            .await
+            .map_err(|e| {
+                error!("Error patching cluster: {}", e);
+                Action::requeue(Duration::from_secs(300))
+            })?;
+
+        // Patch CoreDB status to running: false during reboot
+        let cdb_api: Api<CoreDB> = Api::namespaced(ctx.client.clone(), &namespace);
+
+        patch_cdb_status_merge(
+            &cdb_api,
+            &name,
+            json!({
+                "status": {
+                    "running": false
+                }
+            }),
+        )
+        .await?;
+        info!(
+            "Updated status.running to false in {}, requeuing 10 seconds",
+            &name
+        );
+
+        // Check if the restart is complete
+        match is_not_restarting(cdb, ctx.clone(), "postgres").await {
+            Ok(Some(_)) => {
+                info!("Restart is complete for {}", &name);
+                Ok(())
+            }
+            Ok(None) => {
+                info!("Restart is not yet complete for {}, requeuing...", &name);
+                Err(Action::requeue(Duration::from_secs(10)))
+            }
+            Err(action) => Err(action),
+        }?;
+    }
+
+    Ok(())
+}
+
 #[instrument(skip(cdb, ctx) fields(trace_id, instance_name = %cdb.name_any()))]
 pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {
+    debug!("Getting name of cluster");
+    let name = cdb.name_any();
+
+    debug!("Getting namespace of cluster");
+    let namespace = cdb.metadata.namespace.as_ref().ok_or_else(|| {
+        error!("Namespace is empty for instance: {}.", cdb.name_any());
+        Action::requeue(tokio::time::Duration::from_secs(300))
+    })?;
+
     let pods_to_fence = pods_to_fence(cdb, ctx.clone()).await?;
-    let requires_load =
-        extensions_that_require_load(ctx.client.clone(), &cdb.metadata.namespace.clone().unwrap())
-            .await?;
+    let requires_load = extensions_that_require_load(ctx.client.clone(), &namespace).await?;
 
     // TODO: reenable this once we have a work around for snapshots
     // If we are restoring and have volume snapshots enabled, make sure we setup
@@ -1025,24 +1123,27 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
     debug!("Generating CNPG spec");
     let mut cluster = cnpg_cluster_from_cdb(cdb, Some(pods_to_fence), requires_load);
 
-    debug!("Getting namespace of cluster");
-    let namespace = cluster
-        .metadata
-        .namespace
-        .clone()
-        .expect("CNPG Cluster should always have a namespace");
-    debug!("Getting name of cluster");
-    let name = cluster
-        .metadata
-        .name
-        .clone()
-        .expect("CNPG Cluster should always have a name");
-
     let cluster_api: Api<Cluster> = Api::namespaced(ctx.client.clone(), namespace.as_str());
     let maybe_cluster = cluster_api.get(&name).await;
 
     let restart_annotation_updated =
         update_restarted_at(cdb, maybe_cluster.as_ref().ok(), &mut cluster);
+
+    // Check if restart_annotation_updated is true, if so restart and wait for restart to complete.
+    // This way we restart early before doing anything else, in case a restart was issues wilst also
+    // changing something else in the cluster.
+    if restart_annotation_updated {
+        info!("Restart reuqested for instance: {}", cdb.name_any());
+        match maybe_cluster {
+            Ok(ref cluster) => {
+                restart_and_wait_for_restart(cdb, ctx.clone(), Some(cluster)).await?;
+            }
+            Err(_) => {
+                error!("Cluster not found, cannot restart and wait for restart to complete.");
+                return Err(Action::requeue(Duration::from_secs(300)));
+            }
+        }
+    }
 
     let mut _restart_required = false;
 
@@ -1160,28 +1261,6 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
             error!("Error patching cluster: {}", e);
             Action::requeue(Duration::from_secs(300))
         })?;
-
-    // If we updated the restartedAt annotation, set `status.running` in CoreDB to false
-    if restart_annotation_updated {
-        let cdb_cluster: Api<CoreDB> = Api::namespaced(ctx.client.clone(), &namespace);
-        let cluster_name = &name;
-
-        patch_cdb_status_merge(
-            &cdb_cluster,
-            cluster_name,
-            json!({
-                "status": {
-                    "running": false
-                }
-            }),
-        )
-        .await?;
-        info!(
-            "Updated status.running to false in {}, requeuing 10 seconds",
-            &name
-        );
-        return Err(Action::requeue(Duration::from_secs(10)));
-    }
 
     reconcile_metrics_service(cdb, ctx.clone()).await?;
     reconcile_metrics_ingress_route(cdb, ctx.clone()).await?;
