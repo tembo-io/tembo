@@ -5107,6 +5107,13 @@ CREATE EVENT TRIGGER pgrst_watch
 
         println!("Initial start time: {}", initial_start_time);
 
+        {
+            let pod_name = format!("{}-1", name);
+
+            pod_ready_and_running(pods.clone(), pod_name.clone()).await;
+            wait_til_status_is_filled(&coredbs, name).await;
+        }
+
         // Update CoreDB with restart annotation and replica = 2
         let replicas = 2;
         // Set restart annotation
@@ -5156,35 +5163,39 @@ CREATE EVENT TRIGGER pgrst_watch
             );
         }
 
+        // Wait for new CNPG secondary Pod to be created and running
+        // loop over replicas until they are both in a running state
+        for i in 1..=replicas {
+            let pod_name = format!("{}-{}", name, i);
+            pod_ready_and_running(pods.clone(), pod_name).await;
+        }
+
         let reboot_start_time = get_pg_start_time(&coredbs, name, context).await;
         println!("Initial start time: {}", initial_start_time);
         println!("Reboot start time: {}", reboot_start_time);
 
-        //     assert!(
-        //         reboot_start_time > initial_start_time,
-        //         "start time should've changed"
-        //     );
-        // }
-
-        // Assert that the replicas updated
+        assert!(
+            reboot_start_time > initial_start_time,
+            "start time should've changed"
+        );
 
         // Cleanup CoreDB
-        // coredbs.delete(name, &Default::default()).await.unwrap();
-        // println!("Waiting for CoreDB to be deleted: {}", &name);
-        // let _assert_coredb_deleted = tokio::time::timeout(
-        //     Duration::from_secs(TIMEOUT_SECONDS_COREDB_DELETED),
-        //     await_condition(coredbs.clone(), name, conditions::is_deleted("")),
-        // )
-        // .await
-        // .unwrap_or_else(|_| {
-        //     panic!(
-        //         "CoreDB {} was not deleted after waiting {} seconds",
-        //         name, TIMEOUT_SECONDS_COREDB_DELETED
-        //     )
-        // });
-        // println!("CoreDB resource deleted {}", name);
+        coredbs.delete(name, &Default::default()).await.unwrap();
+        println!("Waiting for CoreDB to be deleted: {}", &name);
+        let _assert_coredb_deleted = tokio::time::timeout(
+            Duration::from_secs(TIMEOUT_SECONDS_COREDB_DELETED),
+            await_condition(coredbs.clone(), name, conditions::is_deleted("")),
+        )
+        .await
+        .unwrap_or_else(|_| {
+            panic!(
+                "CoreDB {} was not deleted after waiting {} seconds",
+                name, TIMEOUT_SECONDS_COREDB_DELETED
+            )
+        });
+        println!("CoreDB resource deleted {}", name);
 
-        // // Delete namespace
-        // let _ = delete_namespace(client.clone(), &namespace).await;
+        // Delete namespace
+        let _ = delete_namespace(client.clone(), &namespace).await;
     }
 }
