@@ -38,6 +38,7 @@ async fn main() -> std::io::Result<()> {
               secrets::get_secret_names,
               secrets::get_secret_v1,
               secrets::get_secret_names_v1,
+              secrets::update_postgres_password,
               metrics::query_range,
               metrics::query,
         ),
@@ -98,6 +99,7 @@ async fn main() -> std::io::Result<()> {
                 web::scope("/api/v1/orgs/{org_id}/instances/{instance_id}")
                     .service(secrets::get_secret_names_v1)
                     .service(secrets::get_secret_v1)
+                    .service(secrets::update_postgres_password)
             )
             .service(
                 web::scope("/{namespace}/metrics")
