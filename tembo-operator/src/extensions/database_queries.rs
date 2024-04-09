@@ -301,7 +301,7 @@ pub async fn is_not_restarting(
         Ok(Some(server_started_at))
     } else {
         // Server hasn't even started restarting yet
-        error!("Restart is not complete for {}, requeuing", cdb_name);
+        warn!("Restart is not complete for {}, requeuing", cdb_name);
         Err(Action::requeue(Duration::from_secs(5)))
     }
 }
