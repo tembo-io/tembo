@@ -264,7 +264,7 @@ fn is_valid_id(s: &str) -> bool {
             description = "Not authorized for query"),
     )
 )]
-#[patch("/secrets/{secret_name}/passwords")]
+#[patch("/secrets/{secret_name}")]
 async fn update_postgres_password(
     path: web::Path<(String, String, String)>,
     updated_password: web::Json<PasswordString>,
