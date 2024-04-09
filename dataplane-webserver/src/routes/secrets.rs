@@ -54,6 +54,11 @@ lazy_static! {
     };
 }
 
+#[derive(Deserialize)]
+struct PasswordString {
+    password: String,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Claims {
     organizations: HashMap<String, String>,
@@ -251,6 +256,7 @@ fn is_valid_id(s: &str) -> bool {
         ("secret_name", example="readonly-role", description = "Secret name"),
         ("password", example="hef8wergWF9uh39hf93h", description = "New password")
     ),
+    request_body = PasswordString,
     responses(
         (status = 200,
             description = "Password successfully changed."),
@@ -258,13 +264,15 @@ fn is_valid_id(s: &str) -> bool {
             description = "Not authorized for query"),
     )
 )]
-#[patch("/secrets/{secret_name}/passwords/{password}")]
+#[patch("/secrets/{secret_name}/passwords")]
 async fn update_postgres_password(
-    path: web::Path<(String, String, String, String)>,
+    path: web::Path<(String, String, String)>,
+    updated_password: web::Json<PasswordString>,
     _cfg: web::Data<config::Config>,
     _req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let (org_id, instance_id, secret_name, password) = path.into_inner();
+    let (org_id, instance_id, secret_name) = path.into_inner();
+    let password = &updated_password.password;
     let auth_header = _req
         .headers()
         .get("Authorization")
