@@ -32,7 +32,7 @@ pub struct LoginCommand {
     #[clap(long)]
     pub profile: Option<String>,
 
-    /// Set your tembo_host for your profile
+    /// Set your tembo_host for your profile, for example api.tembo.io
     #[clap(long)]
     pub tembo_host: Option<String>,
 
