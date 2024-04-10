@@ -54,6 +54,11 @@ lazy_static! {
     };
 }
 
+#[derive(Deserialize)]
+struct PasswordString {
+    password: String,
+}
+
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Claims {
     organizations: HashMap<String, String>,
@@ -251,6 +256,7 @@ fn is_valid_id(s: &str) -> bool {
         ("secret_name", example="readonly-role", description = "Secret name"),
         ("password", example="hef8wergWF9uh39hf93h", description = "New password")
     ),
+    request_body = PasswordString,
     responses(
         (status = 200,
             description = "Password successfully changed."),
@@ -258,13 +264,15 @@ fn is_valid_id(s: &str) -> bool {
             description = "Not authorized for query"),
     )
 )]
-#[patch("/secrets/{secret_name}/passwords/{password}")]
+#[patch("/secrets/{secret_name}")]
 async fn update_postgres_password(
-    path: web::Path<(String, String, String, String)>,
+    path: web::Path<(String, String, String)>,
+    updated_password: web::Json<PasswordString>,
     _cfg: web::Data<config::Config>,
     _req: HttpRequest,
 ) -> Result<HttpResponse, Error> {
-    let (org_id, instance_id, secret_name, password) = path.into_inner();
+    let (org_id, instance_id, secret_name) = path.into_inner();
+    let password = &updated_password.password;
     let auth_header = _req
         .headers()
         .get("Authorization")
@@ -325,8 +333,9 @@ async fn update_postgres_password(
                     .clone();
 
                 let requested_secret = match validate_requested_secret(&secret_name) {
-                    Ok(secret) => secret,
-                    Err(_) => return Ok(HttpResponse::Forbidden().json("Invalid secret requested")),
+                    Ok(secret) if secret.name.ends_with("-role") => secret,
+                    Ok(_) => return Ok(HttpResponse::Forbidden().json("Password can only be patched by roles. Ex: superuser-role, readonly-role, app-role")),
+                    Err(_) => return Ok(HttpResponse::Forbidden().json("Invalid secret name. Please find valid secrets under /api/v1/orgs/{org_id}/instances/{instance_id}/secrets")),
                 };
                 let secret_name_to_patch = (requested_secret.formatter)(&namespace);
 
