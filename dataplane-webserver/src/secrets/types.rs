@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 type SecretNameFormatter = Box<dyn Fn(&str) -> String + Send + Sync>;

@@ -1,4 +1,4 @@
-use crate::secrets::types::{PasswordString, AvailableSecret};
+use crate::secrets::types::{AvailableSecret, PasswordString};
 use crate::secrets::validate_requested_secret;
 use crate::{config, secrets};
 use actix_web::error::ErrorInternalServerError;
@@ -53,7 +53,6 @@ lazy_static! {
         secrets_allow_list
     };
 }
-
 
 #[derive(Serialize, Deserialize, Debug)]
 pub struct Claims {
