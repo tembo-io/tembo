@@ -2,7 +2,7 @@ use actix_web::{middleware, web, App, HttpServer};
 
 use actix_cors::Cors;
 
-use dataplane_webserver::secrets::types::AvailableSecret;
+use dataplane_webserver::secrets::types::{PasswordString, AvailableSecret};
 use dataplane_webserver::{
     config,
     routes::health::{lively, ready},
@@ -43,7 +43,8 @@ async fn main() -> std::io::Result<()> {
               metrics::query,
         ),
         components(schemas(
-            AvailableSecret
+            AvailableSecret,
+            PasswordString
         )),
         modifiers(&SecurityAddon),
         security(("jwt_token" = [])),
