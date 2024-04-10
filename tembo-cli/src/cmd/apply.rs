@@ -68,8 +68,10 @@ const MAX_INT32: i32 = 2147483647;
 /// Deploys a tembo.toml file
 #[derive(Args)]
 pub struct ApplyCommand {
+    /// Overlays a tembo.toml by another toml for a specific context
     #[clap(long, short = 'm')]
     pub merge: Option<String>,
+    /// Set a Instance Setting on your tembo.toml file
     #[clap(long, short = 's')]
     pub set: Option<String>,
 }

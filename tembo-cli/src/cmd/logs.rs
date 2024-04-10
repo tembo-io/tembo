@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::process::Command;
 use temboclient::apis::configuration::Configuration;
 
+/// View logs for your instance
 #[derive(Args)]
 pub struct LogsCommand {}
 

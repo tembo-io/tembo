@@ -22,17 +22,21 @@ struct SharedState {
 }
 
 #[derive(Args)]
-#[clap(author, version, about, long_about = None)]
+#[clap(author, version, about = "Initiates login sequence to authenticate with Tembo", long_about = None)]
 pub struct LoginCommand {
+    /// Set your org_id for your new environment
     #[clap(long)]
     pub organization_id: Option<String>,
 
+    /// Set your profile for your new environment
     #[clap(long)]
     pub profile: Option<String>,
 
+    /// Set your tembo_host for your profile
     #[clap(long)]
     pub tembo_host: Option<String>,
 
+    /// Set your tembo_data_host for your profile
     #[clap(long)]
     pub tembo_data_host: Option<String>,
 }
