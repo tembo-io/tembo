@@ -10,7 +10,7 @@ use kube::{
 };
 use passwords::PasswordGenerator;
 use std::{collections::BTreeMap, sync::Arc};
-use tracing::debug;
+use tracing::{debug, error};
 
 #[derive(Clone)]
 pub struct RolePassword {
@@ -30,7 +30,13 @@ pub async fn reconcile_secret(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Err
     // check for existing secret
     let lp = ListParams::default()
         .labels(format!("app=coredb,coredb.io/name={}", cdb.name_any()).as_str());
-    let secrets = secret_api.list(&lp).await.expect("could not get Secrets");
+    let secrets = match secret_api.list(&lp).await {
+        Ok(secrets) => {secrets}
+        Err(e) => {
+            error!("Failed to list secrets: {}", e);
+            return Err(Error::KubeError(e));
+        }
+    };
 
     // If the secret is already created, re-use the password
     let password = match secrets.items.is_empty() {
