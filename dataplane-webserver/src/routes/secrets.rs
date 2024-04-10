@@ -1,4 +1,4 @@
-use crate::secrets::types::AvailableSecret;
+use crate::secrets::types::{AvailableSecret, PasswordString};
 use crate::secrets::validate_requested_secret;
 use crate::{config, secrets};
 use actix_web::error::ErrorInternalServerError;
@@ -52,11 +52,6 @@ lazy_static! {
         );
         secrets_allow_list
     };
-}
-
-#[derive(Deserialize)]
-struct PasswordString {
-    password: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -253,8 +248,7 @@ fn is_valid_id(s: &str) -> bool {
     params(
         ("org_id" = String, Path, example="org_2T7FJA0DpaNBnELVLU1IS4XzZG0", description = "Tembo Cloud Organization ID"),
         ("instance_id" = String, Path, example="inst_1696253936968_TblNOY_6", description = "Tembo Cloud Instance ID"),
-        ("secret_name", example="readonly-role", description = "Secret name"),
-        ("password", example="hef8wergWF9uh39hf93h", description = "New password")
+        ("secret_name", example="readonly-role", description = "Secret name")
     ),
     request_body = PasswordString,
     responses(
