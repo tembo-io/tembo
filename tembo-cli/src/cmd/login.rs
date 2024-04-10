@@ -71,7 +71,7 @@ pub fn execute(login_cmd: LoginCommand) -> Result<(), anyhow::Error> {
     let data: Context = toml::from_str(&contents)?;
     match data.environment.iter().any(|p| &p.name == login_cmd.profile.as_ref().unwrap()) {
         true => {
-            error(&format!("Context Environment already exists. Either try creating a new name or set it to that."));
+            error(&format!("An environment with the name {} already exists. Please choose a different name in the --profile flag.", login_cmd.profile.as_ref().unwrap()));
         }
         false => {
             let login_url = url(login_cmd.tembo_host.as_deref())?;
