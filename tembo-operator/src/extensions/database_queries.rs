@@ -486,11 +486,7 @@ pub async fn toggle_extension(
     ext_loc: ExtensionInstallLocation,
     ctx: Arc<Context>,
 ) -> Result<(), ToggleError> {
-    let coredb_name = cdb
-        .metadata
-        .name
-        .clone()
-        .expect("CoreDB should have a name");
+    let coredb_name = cdb.name_any();
     if !check_input(ext_name) {
         warn!(
             "Extension is not formatted properly. Skipping operation. {}",

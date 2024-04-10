@@ -185,7 +185,7 @@ pub(crate) fn update_restarted_at(
 }
 
 // patch_cluster is a async function that takes a CNPG cluster and patch applys it with the new spec
-#[instrument(skip(cdb, ctx) fields(trace_id, instance_name = %cdb.name_any()))]
+#[instrument(skip(cdb, ctx, cluster) fields(trace_id, instance_name = %cdb.name_any()))]
 pub(crate) async fn patch_cluster(
     cluster: &Cluster,
     ctx: Arc<Context>,
