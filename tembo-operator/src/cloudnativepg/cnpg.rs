@@ -1009,7 +1009,7 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
     // Check CoreDB status if status.running is false, return requeue
     let coredb_api: Api<CoreDB> = Api::namespaced(ctx.client.clone(), namespace);
     let update_coredb = coredb_api.get(&name).await.map_err(|e| {
-        error!("Error getting CoreDB: {}", e);
+        error!("Error getting CoreDB: {}, requeuing...", e);
         Action::requeue(Duration::from_secs(300))
     })?;
 

@@ -6,10 +6,12 @@ use k8s_openapi::{
 };
 use kube::{
     api::{ListParams, Patch, PatchParams},
+    runtime::controller::Action,
     Api, Resource, ResourceExt,
 };
 use passwords::PasswordGenerator;
 use std::{collections::BTreeMap, sync::Arc};
+use tokio::time::Duration;
 use tracing::{debug, error};
 
 #[derive(Clone)]
@@ -17,7 +19,7 @@ pub struct RolePassword {
     pub password: String,
 }
 
-pub async fn reconcile_secret(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Error> {
+pub async fn reconcile_secret(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {
     let client = ctx.client.clone();
     let ns = cdb.namespace().unwrap();
     let name = format!("{}-connection", cdb.name_any());
@@ -34,7 +36,7 @@ pub async fn reconcile_secret(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Err
         Ok(secrets) => secrets,
         Err(e) => {
             error!("Failed to list secrets: {}", e);
-            return Err(Error::KubeError(e));
+            return Err(Action::requeue(Duration::from_secs(300)));
         }
     };
 
@@ -77,11 +79,17 @@ pub async fn reconcile_secret(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Err
     };
 
     let ps = PatchParams::apply("cntrlr").force();
-    let _o = secret_api
-        .patch(&name, &ps, &Patch::Apply(&secret))
-        .await
-        .map_err(Error::KubeError)?;
-    Ok(())
+    let patch_status = Patch::Apply(&secret);
+    match secret_api.patch(&name, &ps, &patch_status).await {
+        Ok(_) => {
+            debug!("Successfully updated secret for instance: {}", name);
+            Ok(())
+        }
+        Err(e) => {
+            error!("Error updating secret for {}: {:?}", name, e);
+            Err(Action::requeue(Duration::from_secs(10)))
+        }
+    }
 }
 
 fn secret_data(cdb: &CoreDB, ns: &str, password: String) -> BTreeMap<String, ByteString> {

@@ -3,7 +3,7 @@ use crate::{
     extensions::types::{ExtensionInstallLocationStatus, ExtensionStatus, TrunkInstallStatus},
     get_current_coredb_resource, patch_cdb_status_merge, Context,
 };
-use kube::{runtime::controller::Action, Api};
+use kube::{runtime::controller::Action, Api, ResourceExt};
 use serde_json::json;
 use std::{sync::Arc, time::Duration};
 use tracing::{debug, error, info, instrument, warn};
@@ -83,6 +83,11 @@ pub async fn update_extensions_status(
     ext_status_updates: Vec<ExtensionStatus>,
     ctx: &Arc<Context>,
 ) -> Result<(), Action> {
+    let name = cdb.name_any();
+    let namespace = cdb.metadata.namespace.as_ref().ok_or_else(|| {
+        error!("CoreDB namespace is empty for instance: {}.", &name);
+        Action::requeue(tokio::time::Duration::from_secs(300))
+    })?;
     let patch_status = json!({
         "apiVersion": "coredb.io/v1alpha1",
         "kind": "CoreDB",
@@ -90,22 +95,8 @@ pub async fn update_extensions_status(
             "extensions": ext_status_updates
         }
     });
-    let coredb_api: Api<CoreDB> = Api::namespaced(
-        ctx.client.clone(),
-        &cdb.metadata
-            .namespace
-            .clone()
-            .expect("CoreDB should have a namespace"),
-    );
-    patch_cdb_status_merge(
-        &coredb_api,
-        &cdb.metadata
-            .name
-            .clone()
-            .expect("CoreDB should always have a name"),
-        patch_status,
-    )
-    .await?;
+    let coredb_api: Api<CoreDB> = Api::namespaced(ctx.client.clone(), namespace);
+    patch_cdb_status_merge(&coredb_api, &name, patch_status).await?;
     Ok(())
 }
 

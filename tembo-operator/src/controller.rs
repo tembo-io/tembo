@@ -291,11 +291,7 @@ impl CoreDB {
 
         debug!("Reconciling secret");
         // Superuser connection info
-        reconcile_secret(self, ctx.clone()).await.map_err(|e| {
-            error!("Error reconciling secret: {:?}", e);
-            Action::requeue(Duration::from_secs(300))
-        })?;
-
+        reconcile_secret(self, ctx.clone()).await?;
         reconcile_app_services(self, ctx.clone()).await?;
 
         if self
@@ -522,11 +518,20 @@ impl CoreDB {
             extensions_that_require_load(client.clone(), &self.metadata.namespace.clone().unwrap())
                 .await?;
         let cluster = cnpg_cluster_from_cdb(self, None, requires_load);
-        let cluster_name = cluster
-            .metadata
-            .name
-            .expect("CNPG Cluster should always have a name");
-        let namespace = self.metadata.namespace.as_deref().unwrap_or_default();
+        let cluster_name = cluster.metadata.name.as_ref().ok_or_else(|| {
+            error!(
+                "CNPG Cluster name is empty for instance: {}.",
+                self.name_any()
+            );
+            Action::requeue(tokio::time::Duration::from_secs(300))
+        })?;
+        let namespace = self.metadata.namespace.as_ref().ok_or_else(|| {
+            error!(
+                "CoreDB namespace is empty for instance: {}.",
+                self.name_any()
+            );
+            Action::requeue(tokio::time::Duration::from_secs(300))
+        })?;
         let cluster_selector = format!("cnpg.io/cluster={}", cluster_name);
         let role_selector = "role=primary";
         let list_params = ListParams::default()
@@ -585,15 +590,20 @@ impl CoreDB {
             extensions_that_require_load(client.clone(), &self.metadata.namespace.clone().unwrap())
                 .await?;
         let cluster = cnpg_cluster_from_cdb(self, None, requires_load);
-        let cluster_name = cluster
-            .metadata
-            .name
-            .expect("CNPG Cluster should always have a name");
-        let namespace = self
-            .metadata
-            .namespace
-            .clone()
-            .expect("Operator should always be namespaced");
+        let cluster_name = cluster.metadata.name.as_ref().ok_or_else(|| {
+            error!(
+                "CNPG Cluster name is empty for instance: {}.",
+                self.name_any()
+            );
+            Action::requeue(tokio::time::Duration::from_secs(300))
+        })?;
+        let namespace = self.metadata.namespace.as_ref().ok_or_else(|| {
+            error!(
+                "CoreDB namespace is empty for instance: {}.",
+                self.name_any()
+            );
+            Action::requeue(tokio::time::Duration::from_secs(300))
+        })?;
 
         // Added role labels here
         let cluster_selector =
@@ -603,7 +613,7 @@ impl CoreDB {
         let list_params_cluster = ListParams::default().labels(&cluster_selector);
         let list_params_replica = ListParams::default().labels(&replica_selector);
 
-        let pods: Api<Pod> = Api::namespaced(client, &namespace);
+        let pods: Api<Pod> = Api::namespaced(client, namespace);
         let primary_pods = pods.list(&list_params_cluster);
         let replica_pods = pods.list(&list_params_replica);
 
@@ -742,12 +752,11 @@ impl CoreDB {
         database: String,
         context: Arc<Context>,
     ) -> Result<PsqlOutput, Action> {
-        let pod_name_cnpg = self
-            .primary_pod_cnpg(context.client.clone())
-            .await?
-            .metadata
-            .name
-            .expect("All pods should have a name");
+        let pod = self.primary_pod_cnpg(context.client.clone()).await?;
+        let pod_name_cnpg = pod.metadata.name.as_ref().ok_or_else(|| {
+            error!("Pod name is empty for instance: {}.", self.name_any());
+            Action::requeue(tokio::time::Duration::from_secs(300))
+        })?;
 
         let cnpg_psql_command = PsqlCommand::new(
             pod_name_cnpg.clone(),
@@ -792,13 +801,15 @@ impl CoreDB {
         context: Arc<Context>,
     ) -> Result<Option<DateTime<Utc>>, Action> {
         let client = context.client.clone();
-        let namespace = self
-            .metadata
-            .namespace
-            .clone()
-            .expect("CoreDB should have a namespace");
-        let backup: Api<Backup> = Api::namespaced(client, &namespace);
-        let cluster_name = self.metadata.name.clone().unwrap_or_default();
+        let namespace = self.metadata.namespace.as_ref().ok_or_else(|| {
+            error!(
+                "CoreDB namespace is empty for instance: {}.",
+                self.name_any()
+            );
+            Action::requeue(tokio::time::Duration::from_secs(300))
+        })?;
+        let cluster_name = self.name_any();
+        let backup: Api<Backup> = Api::namespaced(client, namespace);
         let lp = ListParams::default().labels(&format!("cnpg.io/cluster={}", cluster_name));
         let backup_list = backup.list(&lp).await.map_err(|e| {
             error!("Error getting backups: {:?}", e);
@@ -848,19 +859,13 @@ pub async fn get_current_coredb_resource(
     cdb: &CoreDB,
     ctx: Arc<Context>,
 ) -> Result<CoreDB, Action> {
-    let coredb_api: Api<CoreDB> = Api::namespaced(
-        ctx.client.clone(),
-        &cdb.metadata
-            .namespace
-            .clone()
-            .expect("CoreDB should have a namespace"),
-    );
-    let coredb_name = cdb
-        .metadata
-        .name
-        .as_ref()
-        .expect("CoreDB should have a name");
-    let coredb = coredb_api.get(coredb_name).await.map_err(|e| {
+    let coredb_name = cdb.name_any();
+    let namespace = cdb.metadata.namespace.as_ref().ok_or_else(|| {
+        error!("Namespace is empty for instance: {}.", &coredb_name);
+        Action::requeue(tokio::time::Duration::from_secs(300))
+    })?;
+    let coredb_api: Api<CoreDB> = Api::namespaced(ctx.client.clone(), namespace);
+    let coredb = coredb_api.get(&coredb_name).await.map_err(|e| {
         error!("Error getting CoreDB resource: {:?}", e);
         Action::requeue(Duration::from_secs(10))
     })?;
@@ -962,13 +967,13 @@ pub async fn run(state: State) {
         Err(_) => panic!("Please configure your Kubernetes Context"),
     };
 
-    let docs = Api::<CoreDB>::all(client.clone());
-    if let Err(e) = docs.list(&ListParams::default().limit(1)).await {
+    let coredb = Api::<CoreDB>::all(client.clone());
+    if let Err(e) = coredb.list(&ListParams::default().limit(1)).await {
         error!("CRD is not queryable; {e:?}. Is the CRD installed?");
         info!("Installation: cargo run --bin crdgen | kubectl apply -f -");
         std::process::exit(1);
     }
-    Controller::new(docs, watcherConfig::default().any_semantic())
+    Controller::new(coredb, watcherConfig::default().any_semantic())
         .shutdown_on_signal()
         .run(reconcile, error_policy, state.create_context(client))
         .filter_map(|x| async move { std::result::Result::ok(x) })

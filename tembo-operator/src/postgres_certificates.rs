@@ -209,16 +209,17 @@ async fn apply_certificate(
             return Err(Action::requeue(Duration::from_secs(300)));
         }
     };
-    let name = certificate
-        .metadata
-        .name
-        .clone()
-        .expect("There is always a name for a certificate")
-        .clone();
+    let name = certificate.metadata.name.as_ref().ok_or_else(|| {
+        error!(
+            "Certificate name is empty in namespace: {}.",
+            namespace.to_string()
+        );
+        Action::requeue(tokio::time::Duration::from_secs(300))
+    })?;
     let params: PatchParams = PatchParams::apply("conductor").force();
     debug!("\nApplying Certificate {} in namespace {}", name, namespace);
     let _o: Certificate = match cert_api
-        .patch(&name, &params, &Patch::Apply(&certificate))
+        .patch(name, &params, &Patch::Apply(&certificate))
         .await
     {
         Ok(cert) => cert,
