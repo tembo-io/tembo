@@ -69,7 +69,11 @@ pub fn execute(login_cmd: LoginCommand) -> Result<(), anyhow::Error> {
     let context_file_path = tembo_context_file_path();
     let contents = fs::read_to_string(&context_file_path)?;
     let data: Context = toml::from_str(&contents)?;
-    match data.environment.iter().any(|p| &p.name == login_cmd.profile.as_ref().unwrap()) {
+    match data
+        .environment
+        .iter()
+        .any(|p| &p.name == login_cmd.profile.as_ref().unwrap())
+    {
         true => {
             error(&format!("An environment with the name {} already exists. Please choose a different name in the --profile flag.", login_cmd.profile.as_ref().unwrap()));
         }
@@ -113,7 +117,7 @@ async fn handle_tokio(login_url: String, cmd: &LoginCommand) -> Result<(), anyho
     }
 
     match result {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(_) => {
             println!("Operation timed out. Server is being stopped.");
         }
@@ -234,7 +238,7 @@ fn update_context(org_id: &str, profile_name: &str) -> Result<()> {
     if let Some(env) = data.environment.iter_mut().find(|p| p.set == Some(true)) {
         env.set = Some(false);
     }
-    
+
     data.environment.push(Environment {
         name: profile_name.to_string(),
         target: "tembo-cloud".to_string(),
@@ -246,7 +250,6 @@ fn update_context(org_id: &str, profile_name: &str) -> Result<()> {
 
     contents = toml::to_string(&data)?;
     fs::write(&context_file_path, contents)?;
-
 
     Ok(())
 }
