@@ -71,7 +71,7 @@ pub struct ApplyCommand {
     /// Merge the values of another tembo.toml file to this file before applying.
     #[clap(long, short = 'm')]
     pub merge: Option<String>,
-    /// Set a Instance Setting on your tembo.toml file
+    /// Replace a specific configuration in your tembo.toml file. For example, tembo apply --set standard.cpu = 0.25
     #[clap(long, short = 's')]
     pub set: Option<String>,
 }
