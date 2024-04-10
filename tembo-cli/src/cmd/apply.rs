@@ -68,8 +68,10 @@ const MAX_INT32: i32 = 2147483647;
 /// Deploys a tembo.toml file
 #[derive(Args)]
 pub struct ApplyCommand {
+    /// Merge the values of another tembo.toml file to this file before applying.
     #[clap(long, short = 'm')]
     pub merge: Option<String>,
+    /// Replace a specific configuration in your tembo.toml file. For example, tembo apply --set standard.cpu = 0.25
     #[clap(long, short = 's')]
     pub set: Option<String>,
 }
