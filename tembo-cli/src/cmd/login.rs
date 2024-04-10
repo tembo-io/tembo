@@ -28,7 +28,7 @@ pub struct LoginCommand {
     #[clap(long)]
     pub organization_id: Option<String>,
 
-    /// Set your profile for your new environment
+    /// Set a name for your new environment, for example "prod". This name will be used for the name of the environment and the credentials profile.
     #[clap(long)]
     pub profile: Option<String>,
 
