@@ -31,7 +31,7 @@ pub async fn reconcile_secret(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Err
     let lp = ListParams::default()
         .labels(format!("app=coredb,coredb.io/name={}", cdb.name_any()).as_str());
     let secrets = match secret_api.list(&lp).await {
-        Ok(secrets) => {secrets}
+        Ok(secrets) => secrets,
         Err(e) => {
             error!("Failed to list secrets: {}", e);
             return Err(Error::KubeError(e));
