@@ -22,17 +22,21 @@ struct SharedState {
 }
 
 #[derive(Args)]
-#[clap(author, version, about, long_about = None)]
+#[clap(author, version, about = "Initiates login sequence to authenticate with Tembo", long_about = None)]
 pub struct LoginCommand {
+    /// Set your org_id for your new environment
     #[clap(long)]
     pub organization_id: Option<String>,
 
+    /// Set your profile for your new environment
     #[clap(long)]
     pub profile: Option<String>,
 
+    /// Set your tembo_host for your profile
     #[clap(long)]
     pub tembo_host: Option<String>,
 
+    /// Set your tembo_data_host for your profile
     #[clap(long)]
     pub tembo_data_host: Option<String>,
 }
@@ -62,10 +66,19 @@ pub fn execute(login_cmd: LoginCommand) -> Result<(), anyhow::Error> {
         (Some(_), Some(_)) => {}
     }
 
-    let login_url = url(login_cmd.tembo_host.as_deref())?;
-    let rt = tokio::runtime::Runtime::new()?;
-    rt.block_on(handle_tokio(login_url, &login_cmd))?;
-
+    let context_file_path = tembo_context_file_path();
+    let contents = fs::read_to_string(&context_file_path)?;
+    let data: Context = toml::from_str(&contents)?;
+    match data.environment.iter().any(|p| &p.name == login_cmd.profile.as_ref().unwrap()) {
+        true => {
+            error(&format!("Context Environment already exists. Either try creating a new name or set it to that."));
+        }
+        false => {
+            let login_url = url(login_cmd.tembo_host.as_deref())?;
+            let rt = tokio::runtime::Runtime::new()?;
+            rt.block_on(handle_tokio(login_url, &login_cmd))?;
+        }
+    }
     Ok(())
 }
 
@@ -100,7 +113,7 @@ async fn handle_tokio(login_url: String, cmd: &LoginCommand) -> Result<(), anyho
     }
 
     match result {
-        Ok(_) => println!("File saved and Server Closed!"),
+        Ok(_) => {},
         Err(_) => {
             println!("Operation timed out. Server is being stopped.");
         }
@@ -221,25 +234,19 @@ fn update_context(org_id: &str, profile_name: &str) -> Result<()> {
     if let Some(env) = data.environment.iter_mut().find(|p| p.set == Some(true)) {
         env.set = Some(false);
     }
+    
+    data.environment.push(Environment {
+        name: profile_name.to_string(),
+        target: "tembo-cloud".to_string(),
+        org_id: Some(org_id.to_string()),
+        profile: Some(profile_name.to_string()),
+        set: Some(true),
+        selected_profile: None,
+    });
 
-    match data.environment.iter().any(|p| p.name == profile_name) {
-        true => {
-            error(&format!("Context Environment already exists. Either try creating a new name or set it to that."));
-        }
-        false => {
-            data.environment.push(Environment {
-                name: profile_name.to_string(),
-                target: "tembo-cloud".to_string(),
-                org_id: Some(org_id.to_string()),
-                profile: Some(profile_name.to_string()),
-                set: Some(true),
-                selected_profile: None,
-            });
+    contents = toml::to_string(&data)?;
+    fs::write(&context_file_path, contents)?;
 
-            contents = toml::to_string(&data)?;
-            fs::write(&context_file_path, contents)?;
-        }
-    }
 
     Ok(())
 }
