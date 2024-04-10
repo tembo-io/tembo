@@ -333,8 +333,9 @@ async fn update_postgres_password(
                     .clone();
 
                 let requested_secret = match validate_requested_secret(&secret_name) {
-                    Ok(secret) => secret,
-                    Err(_) => return Ok(HttpResponse::Forbidden().json("Invalid secret requested")),
+                    Ok(secret) if secret.name.ends_with("-role") => secret,
+                    Ok(_) => return Ok(HttpResponse::Forbidden().json("Password can only be patched by roles. Ex: superuser-role, readonly-role, app-role")),
+                    Err(_) => return Ok(HttpResponse::Forbidden().json("Invalid secret name. Please find valid secrets under /api/v1/orgs/{org_id}/instances/{instance_id}/secrets")),
                 };
                 let secret_name_to_patch = (requested_secret.formatter)(&namespace);
 
