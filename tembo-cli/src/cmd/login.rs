@@ -24,7 +24,7 @@ struct SharedState {
 #[derive(Args)]
 #[clap(author, version, about = "Initiates login sequence to authenticate with Tembo", long_about = None)]
 pub struct LoginCommand {
-    /// Set your org_id for your new environment
+    /// Set your Org ID for your new environment, which starts with "org_"
     #[clap(long)]
     pub organization_id: Option<String>,
 
