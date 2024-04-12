@@ -656,6 +656,9 @@ pub fn cnpg_cluster_from_cdb(
             "on".to_string(),
         );
     }
+    else {
+        annotations.remove("cnpg.io/hibernation");
+    }
 
     let (bootstrap, external_clusters, superuser_secret) = cnpg_cluster_bootstrap_from_cdb(cdb);
     let (backup, service_account_template) = cnpg_backup_configuration(cdb, &cfg);
@@ -1000,7 +1003,7 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
         Action::requeue(tokio::time::Duration::from_secs(300))
     })?;
 
-    let pods_to_fence = pods_to_fence(cdb, ctx.clone()).await?;
+    let fenced_pods = pods_to_fence(cdb, ctx.clone()).await?;
     let requires_load = extensions_that_require_load(ctx.client.clone(), namespace).await?;
 
     // TODO: reenable this once we have a work around for snapshots
@@ -1015,7 +1018,7 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
     // }
 
     debug!("Generating CNPG spec");
-    let mut cluster = cnpg_cluster_from_cdb(cdb, Some(pods_to_fence), requires_load);
+    let mut cluster = cnpg_cluster_from_cdb(cdb, Some(fenced_pods), requires_load);
 
     let cluster_api: Api<Cluster> = Api::namespaced(ctx.client.clone(), namespace.as_str());
     let maybe_cluster = cluster_api.get(&name).await;
