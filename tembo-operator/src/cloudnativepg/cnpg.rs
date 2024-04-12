@@ -643,6 +643,20 @@ pub fn cnpg_cluster_from_cdb(
     let namespace = cdb.namespace().unwrap();
     let owner_reference = cdb.controller_owner_ref(&()).unwrap();
     let mut annotations = default_cluster_annotations(cdb);
+
+    // If the cluster is stopped, set the CNPG hibernate flag, described in the
+    // docs under Declarative Hibernation. Once this is patched in, the cluster
+    // should immediately spin down all allocated Postgres pods.
+    //
+    // https://cloudnative-pg.io/documentation/current/declarative_hibernation/
+
+    if cdb.spec.stop {
+        annotations.insert(
+            "cnpg.io/hibernation".to_string(),
+            "on".to_string(),
+        );
+    }
+
     let (bootstrap, external_clusters, superuser_secret) = cnpg_cluster_bootstrap_from_cdb(cdb);
     let (backup, service_account_template) = cnpg_backup_configuration(cdb, &cfg);
     let storage = cnpg_cluster_storage(cdb);
@@ -840,6 +854,15 @@ fn extend_with_fenced_pods(pod_names_to_fence: &mut Vec<String>, fenced_pods: Op
 // pods_to_fence determines a list of pod names that should be fenced when we detect that new replicas are being created
 #[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any()))]
 async fn pods_to_fence(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<String>, Action> {
+
+    // If the cluster is stopped, nothing should be fenced. The fencing code
+    // expects to operate on pods which do not exist while the CNPG cluster
+    // is hibernating.
+
+    if cdb.spec.stop {
+        return Ok(Vec::new());
+    }
+
     // Check if there is an initial backup running, pending or completed.  We
     // should never fence a pod with an active initial backup running, pending or
     // completed.  There could be a time where we go into a reconcile loop
@@ -996,6 +1019,20 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
 
     let cluster_api: Api<Cluster> = Api::namespaced(ctx.client.clone(), namespace.as_str());
     let maybe_cluster = cluster_api.get(&name).await;
+
+    // If the cluster is in a stop state, we want to avoid performing many of
+    // the standard reconciliation steps, including those which require the
+    // cluster to be running. The restart_and_wait_for_restart routine begins
+    // this expectation, so this short-circuit should prevent that.
+
+    if cdb.spec.stop {
+        patch_cluster(&cluster, ctx.clone(), cdb).await?;
+
+        reconcile_metrics_service(cdb, ctx.clone()).await?;
+        reconcile_metrics_ingress_route(cdb, ctx.clone()).await?;
+
+        return Ok(());
+    }
 
     // Check if we are updating the cluster to reboot/restart the instance, if so do that first before
     // updating the cluster spec.  Also check to see if the image is being updated.  If do
