@@ -693,6 +693,77 @@ mod test {
             metric_name, max_retries
         ))
     }
+    async fn wait_til_status_is_filled(coredbs: &Api<CoreDB>, name: &str) {
+        let max_retries = 10; // adjust as needed
+        for attempt in 1..=max_retries {
+            let coredb = coredbs
+                .get(name)
+                .await
+                .unwrap_or_else(|_| panic!("Failed to get CoreDB: {}", name));
+
+            if coredb.status.is_some() {
+                println!("Status is filled for CoreDB: {}", name);
+                return;
+            } else {
+                println!(
+                    "Attempt {}/{}: Status not yet filled for CoreDB: {}",
+                    attempt, max_retries, name
+                );
+            }
+            tokio::time::sleep(Duration::from_secs(10)).await;
+        }
+        panic!(
+            "Failed to fetch filled status for CoreDB: {} after {} attempts",
+            name, max_retries
+        );
+    }
+
+    async fn get_pg_start_time(
+        coredbs: &Api<CoreDB>,
+        name: &str,
+        ctx: Arc<Context>,
+    ) -> DateTime<Utc> {
+        const PG_TIMESTAMP_DECL: &str = "%Y-%m-%d %H:%M:%S.%f%#z";
+
+        let coredb = coredbs.get(name).await.expect("spec not found");
+
+        let query = "SELECT pg_postmaster_start_time()".to_string();
+        let psql_output = psql_with_retry(ctx.clone(), coredb, query).await;
+        let stdout = psql_output
+            .stdout
+            .as_ref()
+            .and_then(|stdout| stdout.lines().nth(2).map(str::trim))
+            .expect("expected stdout");
+
+        DateTime::parse_from_str(stdout, PG_TIMESTAMP_DECL)
+            .unwrap()
+            .into()
+    }
+
+    async fn status_running(coredbs: &Api<CoreDB>, name: &str) -> bool {
+        let max_retries = 10;
+        let wait_duration = Duration::from_secs(2); // Adjust as needed
+
+        for attempt in 1..=max_retries {
+            let coredb = coredbs.get(name).await.expect("Failed to get CoreDB");
+
+            if coredb.status.as_ref().map_or(false, |s| s.running) {
+                println!("CoreDB {} is running", name);
+                return true;
+            } else {
+                println!(
+                    "Attempt {}/{}: CoreDB {} is not running yet",
+                    attempt, max_retries, name
+                );
+            }
+            tokio::time::sleep(wait_duration).await;
+        }
+        println!(
+            "CoreDB {} did not become running after {} attempts",
+            name, max_retries
+        );
+        false
+    }
 
     #[tokio::test]
     #[ignore]
@@ -4958,6 +5029,361 @@ CREATE EVENT TRIGGER pgrst_watch
         );
         println!("Pooler service deleted: {}", pooler_name);
 
+        // Cleanup CoreDB
+        coredbs.delete(name, &Default::default()).await.unwrap();
+        println!("Waiting for CoreDB to be deleted: {}", &name);
+        let _assert_coredb_deleted = tokio::time::timeout(
+            Duration::from_secs(TIMEOUT_SECONDS_COREDB_DELETED),
+            await_condition(coredbs.clone(), name, conditions::is_deleted("")),
+        )
+        .await
+        .unwrap_or_else(|_| {
+            panic!(
+                "CoreDB {} was not deleted after waiting {} seconds",
+                name, TIMEOUT_SECONDS_COREDB_DELETED
+            )
+        });
+        println!("CoreDB resource deleted {}", name);
+
+        // Delete namespace
+        let _ = delete_namespace(client.clone(), &namespace).await;
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn functional_test_restart_and_update_replicas() {
+        // Initialize the Kubernetes client
+        let client = kube_client().await;
+        let state = State::default();
+        let context = state.create_context(client.clone());
+
+        // Configurations
+        let mut rng = rand::thread_rng();
+        let suffix = rng.gen_range(0..100000);
+        let name = &format!("test-restart-{}", suffix);
+        let namespace = match create_namespace(client.clone(), name).await {
+            Ok(namespace) => namespace,
+            Err(e) => {
+                eprintln!("Error creating namespace: {}", e);
+                std::process::exit(1);
+            }
+        };
+
+        let kind = "CoreDB";
+        let replicas = 1;
+
+        // Create a pod we can use to run commands in the cluster
+        let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
+
+        // Apply a basic configuration of CoreDB
+        println!("Creating CoreDB resource {}", name);
+        let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
+        // Generate basic CoreDB resource to start with
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "replicas": replicas,
+            }
+        });
+        let params = PatchParams::apply("tembo-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        // Wait for CNPG Pod to be created
+        {
+            let pod_name = format!("{}-1", name);
+
+            pod_ready_and_running(pods.clone(), pod_name.clone()).await;
+            wait_til_status_is_filled(&coredbs, name).await;
+        }
+
+        // Ensure status.running is true
+        assert!(status_running(&coredbs, name).await);
+        let initial_start_time = get_pg_start_time(&coredbs, name, context.clone()).await;
+
+        println!("Initial start time: {}", initial_start_time);
+
+        {
+            let pod_name = format!("{}-1", name);
+
+            pod_ready_and_running(pods.clone(), pod_name.clone()).await;
+            wait_til_status_is_filled(&coredbs, name).await;
+        }
+
+        // Update CoreDB with restart annotation and replica = 2
+        let replicas = 2;
+        // Set restart annotation
+        let restart = Utc::now()
+            .to_rfc3339_opts(SecondsFormat::Secs, true)
+            .to_string();
+        // Update coredb to disable pooler
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name,
+                "annotations": {
+                    "kubectl.kubernetes.io/restartedAt": restart
+                }
+            },
+            "spec": {
+                "replicas": replicas,
+            }
+        });
+
+        let params = PatchParams::apply("tembo-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        // Wait for Postgres to restart
+        {
+            let started = Utc::now();
+            let max_wait_time =
+                chrono::TimeDelta::try_seconds(TIMEOUT_SECONDS_POD_READY as _).unwrap();
+            let mut running_became_true = false;
+            while Utc::now().signed_duration_since(started) < max_wait_time {
+                if status_running(&coredbs, name).await.not() {
+                    println!("status.running is still false. Retrying in 3 secs.");
+                    tokio::time::sleep(Duration::from_secs(3)).await;
+                } else {
+                    println!("status.running is now true once again!");
+
+                    running_became_true = true;
+                    break;
+                }
+            }
+
+            assert!(
+                running_became_true,
+                "status.running should've become true once restarted"
+            );
+        }
+
+        // Wait for new CNPG secondary Pod to be created and running
+        // loop over replicas until they are both in a running state
+        for i in 1..=replicas {
+            let pod_name = format!("{}-{}", name, i);
+            pod_ready_and_running(pods.clone(), pod_name).await;
+        }
+
+        let reboot_start_time = get_pg_start_time(&coredbs, name, context).await;
+        println!("Initial start time: {}", initial_start_time);
+        println!("Reboot start time: {}", reboot_start_time);
+
+        assert!(
+            reboot_start_time > initial_start_time,
+            "start time should've changed"
+        );
+
+        // Cleanup CoreDB
+        coredbs.delete(name, &Default::default()).await.unwrap();
+        println!("Waiting for CoreDB to be deleted: {}", &name);
+        let _assert_coredb_deleted = tokio::time::timeout(
+            Duration::from_secs(TIMEOUT_SECONDS_COREDB_DELETED),
+            await_condition(coredbs.clone(), name, conditions::is_deleted("")),
+        )
+        .await
+        .unwrap_or_else(|_| {
+            panic!(
+                "CoreDB {} was not deleted after waiting {} seconds",
+                name, TIMEOUT_SECONDS_COREDB_DELETED
+            )
+        });
+        println!("CoreDB resource deleted {}", name);
+
+        // Delete namespace
+        let _ = delete_namespace(client.clone(), &namespace).await;
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn functional_test_cnpg_update_image_and_params() {
+        // Initialize the Kubernetes client
+        let client = kube_client().await;
+        let state = State::default();
+        let context = state.create_context(client.clone());
+
+        // Configurations
+        let mut rng = rand::thread_rng();
+        let suffix = rng.gen_range(0..100000);
+        let name = &format!("test-cnpg-upimage-{}", suffix);
+        let namespace = match create_namespace(client.clone(), name).await {
+            Ok(namespace) => namespace,
+            Err(e) => {
+                eprintln!("Error creating namespace: {}", e);
+                std::process::exit(1);
+            }
+        };
+
+        let kind = "CoreDB";
+        let replicas = 1;
+
+        // Create a pod we can use to run commands in the cluster
+        let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
+
+        // Apply a basic configuration of CoreDB
+        println!("Creating CoreDB resource {}", name);
+        let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
+        // Generate CoreDB resource with params
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "replicas": replicas,
+            }
+        });
+        let params = PatchParams::apply("tembo-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        // Wait for CNPG Pod to be created
+        {
+            let pod_name = format!("{}-1", name);
+
+            pod_ready_and_running(pods.clone(), pod_name.clone()).await;
+            wait_til_status_is_filled(&coredbs, name).await;
+        }
+
+        // Ensure status.running is true
+        assert!(status_running(&coredbs, name).await);
+
+        // Update CNPG image and params
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "image": "quay.io/tembo/standard-cnpg:15-120cc24",
+                "replicas": replicas,
+                "trunk_installs": [
+                    {
+                        "name": "pg_partman",
+                        "version": "4.7.3",
+                    },
+                    {
+                        "name": "pgmq",
+                        "version": "1.1.1",
+                    },
+                    {
+                        "name": "pg_stat_statements",
+                        "version": "1.10.0",
+                    },
+                    {
+                        "name": "postgis",
+                        "version": "3.4.0",
+                    },
+                ],
+                "extensions": [
+                    {
+                        "name": "pg_partman",
+                        "locations": [
+                        {
+                          "enabled": true,
+                          "version": "4.7.3",
+                          "database": "postgres",
+                          "schema": "public"
+                        }]
+                    },
+                    {
+                        "name": "pgmq",
+                        "locations": [
+                        {
+                          "enabled": true,
+                          "version": "1.1.1",
+                          "database": "postgres",
+                          "schema": "public"
+                        }]
+                    },
+                    {
+                        "name": "pg_stat_statements",
+                        "locations": [
+                        {
+                          "enabled": true,
+                          "version": "1.10.0",
+                          "database": "postgres",
+                          "schema": "public"
+                        }]
+                    },
+                    {
+                        "name": "postgis",
+                        "locations": [
+                        {
+                          "enabled": true,
+                          "version": "3.4.0",
+                          "database": "postgres",
+                          "schema": "public"
+                        }]
+                    }
+                ],
+                "runtime_config": [
+                    {
+                        "name": "shared_preload_libraries",
+                        "value": "pg_stat_statements"
+                    },
+                    {
+                        "name": "pg_partman_bgw.interval",
+                        "value": "30"
+                    },
+                    {
+                        "name": "pg_partman_bgw.role",
+                        "value": "postgres"
+                    },
+                    {
+                        "name": "pg_partman_bgw.dbname",
+                        "value": "postgres"
+                    }
+                ]
+            }
+        });
+
+        // Use the patch method to update the Cluster resource
+        let params = PatchParams::apply("tembo-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        let coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        let _result = wait_until_psql_contains(
+            context.clone(),
+            coredb_resource.clone(),
+            "show shared_preload_libraries;".to_string(),
+            "pg_partman_bgw".to_string(),
+            false,
+        )
+        .await;
+
+        // Assert that shared_preload_libraries contains pg_stat_statements
+        // and pg_partman_bgw
+
+        let result = psql_with_retry(
+            context.clone(),
+            coredb_resource.clone(),
+            "show shared_preload_libraries;".to_string(),
+        )
+        .await;
+
+        let stdout = match result.stdout {
+            Some(output) => output,
+            None => panic!("stdout is None"),
+        };
+
+        assert!(stdout.contains("pg_partman_bgw"));
+        assert!(stdout.contains("pg_stat_statements"));
+
+        //assert to make sure the correct image has been updated
+        let cluster_api: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
+        let cluster = cluster_api.get(name).await.unwrap();
+        let image = cluster.spec.image.clone();
+        assert_eq!(image, "quay.io/tembo/standard-cnpg:15-120cc24");
+
+        // CLEANUP TEST
         // Cleanup CoreDB
         coredbs.delete(name, &Default::default()).await.unwrap();
         println!("Waiting for CoreDB to be deleted: {}", &name);

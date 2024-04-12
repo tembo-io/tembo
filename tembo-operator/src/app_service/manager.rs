@@ -507,7 +507,7 @@ async fn get_appservice_deployments(
     Ok(deployments
         .items
         .iter()
-        .map(|d| d.metadata.name.to_owned().expect("no name on resource"))
+        .filter_map(|d| d.metadata.name.clone())
         .collect())
 }
 
@@ -528,7 +528,7 @@ async fn get_appservice_services(
     Ok(services
         .items
         .iter()
-        .map(|d| d.metadata.name.to_owned().expect("no name on resource"))
+        .filter_map(|d| d.metadata.name.clone())
         .collect())
 }
 

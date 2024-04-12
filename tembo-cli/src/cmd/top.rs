@@ -19,6 +19,7 @@ use temboclient::apis::instance_api::get_instance;
 use tokio::runtime::Runtime;
 use tokio::time::Duration;
 
+///[EXPERIMENTAL] View Metric values of your instances
 #[derive(Args)]
 pub struct TopCommand {
     #[clap(long)]

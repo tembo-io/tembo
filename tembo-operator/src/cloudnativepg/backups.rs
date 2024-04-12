@@ -45,7 +45,7 @@ pub struct BackupCluster {
 }
 
 /// Specification of the desired behavior of the backup. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema, PartialEq)]
 pub enum BackupMethod {
     #[serde(rename = "barmanObjectStore")]
     BarmanObjectStore,

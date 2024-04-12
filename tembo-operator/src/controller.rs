@@ -2,7 +2,7 @@ use chrono::{DateTime, Utc};
 use futures::stream::StreamExt;
 
 use crate::{
-    apis::coredb_types::{CoreDB, CoreDBStatus},
+    apis::coredb_types::{CoreDB, CoreDBStatus, VolumeSnapshot},
     app_service::manager::reconcile_app_services,
     cloudnativepg::{
         backups::Backup,
@@ -110,10 +110,58 @@ async fn reconcile(cdb: Arc<CoreDB>, ctx: Arc<Context>) -> Result<Action> {
     .map_err(|e| Error::FinalizerError(Box::new(e)))
 }
 
-fn error_policy(cdb: Arc<CoreDB>, error: &Error, ctx: Arc<Context>) -> Action {
+pub(crate) fn error_policy(cdb: Arc<CoreDB>, error: &Error, ctx: Arc<Context>) -> Action {
     warn!("reconcile failed: {:?}", error);
     ctx.metrics.reconcile_failure(&cdb, error);
-    Action::requeue(Duration::from_secs(5 * 60))
+
+    // Check for 429 error code from Kubernetes API
+    match error {
+        Error::KubeError(kube_error) => match kube_error {
+            kube::Error::Api(api_error) if api_error.code == 429 => {
+                // Error is a 429 (too many requests), calculate backoff and jitter
+                let backoff: u64 = 60;
+                let max_jitter: u64 = 120;
+                let jitter: u64 = rand::thread_rng().gen_range(0..=max_jitter);
+                let backoff_with_jitter = Duration::from_secs(backoff + jitter);
+                // Log the 429 error and the calculated backoff time
+                warn!(
+                    "Received HTTP 429 Too Many Requests. Requeuing after {} seconds.",
+                    backoff_with_jitter.as_secs()
+                );
+                Action::requeue(backoff_with_jitter)
+            }
+            _ => Action::requeue(Duration::from_secs(5 * 60)),
+        },
+        _ => Action::requeue(Duration::from_secs(5 * 60)),
+    }
+}
+
+// create_volume_snapshot_patch creates a patch for the CoreDB spec to enable or disable volumesnapshots
+// based off the value of cfg.enable_volume_snapshot.
+fn create_volume_snapshot_patch(cfg: &Config) -> serde_json::Value {
+    json!({
+        "spec": {
+            "backup": {
+                "volumeSnapshot": {
+                    "enabled": cfg.enable_volume_snapshot,
+                    "snapshotClass": if cfg.enable_volume_snapshot {
+                        Some(VOLUME_SNAPSHOT_CLASS_NAME.to_string())
+                    } else {
+                        None
+                    }
+                }
+            }
+        }
+    })
+}
+
+// is_volume_snapshot_update_needed checks if the volume snapshot needs to be updated in the CoreDB spec.
+fn is_volume_snapshot_update_needed(
+    volume_snapshot: Option<&VolumeSnapshot>,
+    enable_volume_snapshot: bool,
+) -> bool {
+    let current_enabled = volume_snapshot.map(|vs| vs.enabled).unwrap_or(false);
+    current_enabled != enable_volume_snapshot
 }
 
 impl CoreDB {
@@ -243,11 +291,7 @@ impl CoreDB {
 
         debug!("Reconciling secret");
         // Superuser connection info
-        reconcile_secret(self, ctx.clone()).await.map_err(|e| {
-            error!("Error reconciling secret: {:?}", e);
-            Action::requeue(Duration::from_secs(300))
-        })?;
-
+        reconcile_secret(self, ctx.clone()).await?;
         reconcile_app_services(self, ctx.clone()).await?;
 
         if self
@@ -283,9 +327,7 @@ impl CoreDB {
         // Before we reconcile CNPG, we need to make sure that spec.backup.volumeSnapshot is
         // enabled in the CoreDB spec if cfg.enable_volume_snapshot = true.  If it's not
         // then we should enable it, otherwise it should be a no-op.
-        if cfg.enable_volume_snapshot {
-            self.enable_volume_snapshot(ctx.clone()).await?;
-        }
+        self.enable_volume_snapshot(cfg, ctx.clone()).await?;
 
         reconcile_cnpg(self, ctx.clone()).await?;
         if cfg.enable_backup {
@@ -394,40 +436,27 @@ impl CoreDB {
     // enable_volume_snapshot makes sure that the CoreDB spec has the spec.backup.volumeSnapshot
     // enabled.  If it's already enabled, then do nothing.
     #[instrument(skip(self, ctx))]
-    async fn enable_volume_snapshot(&self, ctx: Arc<Context>) -> Result<(), Action> {
-        // Check if the CoreDB already has the spec.backup.volumeSnapshot enabled
-        if self
-            .spec
-            .backup
-            .volume_snapshot
-            .as_ref()
-            .map(|e| e.enabled)
-            .unwrap_or(false)
-        {
-            return Ok(());
-        }
+    async fn enable_volume_snapshot(&self, cfg: &Config, ctx: Arc<Context>) -> Result<(), Action> {
         let client = ctx.client.clone();
         let name = self.name_any();
-        let namespace = self
-            .metadata
-            .namespace
-            .clone()
-            .expect("CoreDB should have a namespace");
+        let namespace = self.metadata.namespace.as_ref().ok_or_else(|| {
+            error!("CoreDB namespace is empty for instance: {}.", name);
+            Action::requeue(tokio::time::Duration::from_secs(300))
+        })?;
 
         // Setup the client for the CoreDB
-        let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
+        let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), namespace);
 
-        // Create the patch to enable the spec.backup.volumeSnapshot
-        let patch = json!({
-            "spec": {
-                "backup": {
-                    "volumeSnapshot": {
-                        "enabled": true,
-                        "snapshotClass": VOLUME_SNAPSHOT_CLASS_NAME
-                    }
-                }
-            }
-        });
+        // Check if an update is needed based on the current value and the desired value from the config
+        if !is_volume_snapshot_update_needed(
+            self.spec.backup.volume_snapshot.as_ref(),
+            cfg.enable_volume_snapshot,
+        ) {
+            return Ok(());
+        }
+
+        // Create the patch to update the spec.backup.volumeSnapshot based on the config
+        let patch = create_volume_snapshot_patch(cfg);
         let patch_params = PatchParams {
             field_manager: Some("cntrlr".to_string()),
             ..PatchParams::default()
@@ -489,11 +518,20 @@ impl CoreDB {
             extensions_that_require_load(client.clone(), &self.metadata.namespace.clone().unwrap())
                 .await?;
         let cluster = cnpg_cluster_from_cdb(self, None, requires_load);
-        let cluster_name = cluster
-            .metadata
-            .name
-            .expect("CNPG Cluster should always have a name");
-        let namespace = self.metadata.namespace.as_deref().unwrap_or_default();
+        let cluster_name = cluster.metadata.name.as_ref().ok_or_else(|| {
+            error!(
+                "CNPG Cluster name is empty for instance: {}.",
+                self.name_any()
+            );
+            Action::requeue(tokio::time::Duration::from_secs(300))
+        })?;
+        let namespace = self.metadata.namespace.as_ref().ok_or_else(|| {
+            error!(
+                "CoreDB namespace is empty for instance: {}.",
+                self.name_any()
+            );
+            Action::requeue(tokio::time::Duration::from_secs(300))
+        })?;
         let cluster_selector = format!("cnpg.io/cluster={}", cluster_name);
         let role_selector = "role=primary";
         let list_params = ListParams::default()
@@ -552,15 +590,20 @@ impl CoreDB {
             extensions_that_require_load(client.clone(), &self.metadata.namespace.clone().unwrap())
                 .await?;
         let cluster = cnpg_cluster_from_cdb(self, None, requires_load);
-        let cluster_name = cluster
-            .metadata
-            .name
-            .expect("CNPG Cluster should always have a name");
-        let namespace = self
-            .metadata
-            .namespace
-            .clone()
-            .expect("Operator should always be namespaced");
+        let cluster_name = cluster.metadata.name.as_ref().ok_or_else(|| {
+            error!(
+                "CNPG Cluster name is empty for instance: {}.",
+                self.name_any()
+            );
+            Action::requeue(tokio::time::Duration::from_secs(300))
+        })?;
+        let namespace = self.metadata.namespace.as_ref().ok_or_else(|| {
+            error!(
+                "CoreDB namespace is empty for instance: {}.",
+                self.name_any()
+            );
+            Action::requeue(tokio::time::Duration::from_secs(300))
+        })?;
 
         // Added role labels here
         let cluster_selector =
@@ -570,7 +613,7 @@ impl CoreDB {
         let list_params_cluster = ListParams::default().labels(&cluster_selector);
         let list_params_replica = ListParams::default().labels(&replica_selector);
 
-        let pods: Api<Pod> = Api::namespaced(client, &namespace);
+        let pods: Api<Pod> = Api::namespaced(client, namespace);
         let primary_pods = pods.list(&list_params_cluster);
         let replica_pods = pods.list(&list_params_replica);
 
@@ -709,12 +752,11 @@ impl CoreDB {
         database: String,
         context: Arc<Context>,
     ) -> Result<PsqlOutput, Action> {
-        let pod_name_cnpg = self
-            .primary_pod_cnpg(context.client.clone())
-            .await?
-            .metadata
-            .name
-            .expect("All pods should have a name");
+        let pod = self.primary_pod_cnpg(context.client.clone()).await?;
+        let pod_name_cnpg = pod.metadata.name.as_ref().ok_or_else(|| {
+            error!("Pod name is empty for instance: {}.", self.name_any());
+            Action::requeue(tokio::time::Duration::from_secs(300))
+        })?;
 
         let cnpg_psql_command = PsqlCommand::new(
             pod_name_cnpg.clone(),
@@ -759,13 +801,15 @@ impl CoreDB {
         context: Arc<Context>,
     ) -> Result<Option<DateTime<Utc>>, Action> {
         let client = context.client.clone();
-        let namespace = self
-            .metadata
-            .namespace
-            .clone()
-            .expect("CoreDB should have a namespace");
-        let backup: Api<Backup> = Api::namespaced(client, &namespace);
-        let cluster_name = self.metadata.name.clone().unwrap_or_default();
+        let namespace = self.metadata.namespace.as_ref().ok_or_else(|| {
+            error!(
+                "CoreDB namespace is empty for instance: {}.",
+                self.name_any()
+            );
+            Action::requeue(tokio::time::Duration::from_secs(300))
+        })?;
+        let cluster_name = self.name_any();
+        let backup: Api<Backup> = Api::namespaced(client, namespace);
         let lp = ListParams::default().labels(&format!("cnpg.io/cluster={}", cluster_name));
         let backup_list = backup.list(&lp).await.map_err(|e| {
             error!("Error getting backups: {:?}", e);
@@ -815,19 +859,13 @@ pub async fn get_current_coredb_resource(
     cdb: &CoreDB,
     ctx: Arc<Context>,
 ) -> Result<CoreDB, Action> {
-    let coredb_api: Api<CoreDB> = Api::namespaced(
-        ctx.client.clone(),
-        &cdb.metadata
-            .namespace
-            .clone()
-            .expect("CoreDB should have a namespace"),
-    );
-    let coredb_name = cdb
-        .metadata
-        .name
-        .as_ref()
-        .expect("CoreDB should have a name");
-    let coredb = coredb_api.get(coredb_name).await.map_err(|e| {
+    let coredb_name = cdb.name_any();
+    let namespace = cdb.metadata.namespace.as_ref().ok_or_else(|| {
+        error!("Namespace is empty for instance: {}.", &coredb_name);
+        Action::requeue(tokio::time::Duration::from_secs(300))
+    })?;
+    let coredb_api: Api<CoreDB> = Api::namespaced(ctx.client.clone(), namespace);
+    let coredb = coredb_api.get(&coredb_name).await.map_err(|e| {
         error!("Error getting CoreDB resource: {:?}", e);
         Action::requeue(Duration::from_secs(10))
     })?;
@@ -929,13 +967,13 @@ pub async fn run(state: State) {
         Err(_) => panic!("Please configure your Kubernetes Context"),
     };
 
-    let docs = Api::<CoreDB>::all(client.clone());
-    if let Err(e) = docs.list(&ListParams::default().limit(1)).await {
+    let coredb = Api::<CoreDB>::all(client.clone());
+    if let Err(e) = coredb.list(&ListParams::default().limit(1)).await {
         error!("CRD is not queryable; {e:?}. Is the CRD installed?");
         info!("Installation: cargo run --bin crdgen | kubectl apply -f -");
         std::process::exit(1);
     }
-    Controller::new(docs, watcherConfig::default().any_semantic())
+    Controller::new(coredb, watcherConfig::default().any_semantic())
         .shutdown_on_signal()
         .run(reconcile, error_policy, state.create_context(client))
         .filter_map(|x| async move { std::result::Result::ok(x) })
@@ -947,7 +985,13 @@ pub async fn run(state: State) {
 #[cfg(test)]
 mod test {
     use super::{reconcile, Backup, Context, CoreDB};
-    use crate::cloudnativepg::backups::{BackupCluster, BackupSpec, BackupStatus};
+    use crate::apis::coredb_types::VolumeSnapshot;
+    use crate::cloudnativepg::{
+        backups::{BackupCluster, BackupSpec, BackupStatus},
+        VOLUME_SNAPSHOT_CLASS_NAME,
+    };
+    use crate::config::Config;
+    use crate::controller::{create_volume_snapshot_patch, is_volume_snapshot_update_needed};
     use chrono::{DateTime, NaiveDate, Utc};
     use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
     use std::sync::Arc;
@@ -1094,5 +1138,220 @@ mod test {
 
         // We expect None since there are no Backups
         assert_eq!(oldest_backup_time, None);
+    }
+
+    #[test]
+    fn test_create_volume_snapshot_patch_enabled() {
+        let cfg = Config {
+            enable_volume_snapshot: true,
+            ..Config::default()
+        };
+
+        let expected_volume_snapshot = VolumeSnapshot {
+            enabled: true,
+            snapshot_class: Some(VOLUME_SNAPSHOT_CLASS_NAME.to_string()),
+        };
+
+        let actual_patch = create_volume_snapshot_patch(&cfg);
+
+        // Deserialize the actual_patch into a VolumeSnapshot instance
+        let actual_volume_snapshot: VolumeSnapshot =
+            serde_json::from_value(actual_patch["spec"]["backup"]["volumeSnapshot"].clone())
+                .expect("Failed to deserialize actual_patch into VolumeSnapshot");
+
+        assert_eq!(actual_volume_snapshot, expected_volume_snapshot);
+    }
+
+    #[test]
+    fn test_create_volume_snapshot_patch_disabled() {
+        let cfg = Config {
+            enable_volume_snapshot: false,
+            ..Config::default()
+        };
+
+        let expected_volume_snapshot = VolumeSnapshot {
+            enabled: false,
+            snapshot_class: None,
+        };
+
+        let actual_patch = create_volume_snapshot_patch(&cfg);
+
+        // Deserialize the actual_patch into a VolumeSnapshot instance
+        let actual_volume_snapshot: VolumeSnapshot =
+            serde_json::from_value(actual_patch["spec"]["backup"]["volumeSnapshot"].clone())
+                .expect("Failed to deserialize actual_patch into VolumeSnapshot");
+
+        assert_eq!(actual_volume_snapshot, expected_volume_snapshot);
+    }
+
+    #[test]
+    fn test_is_volume_snapshot_update_needed() {
+        let volume_snapshot_enabled = Some(VolumeSnapshot {
+            enabled: true,
+            snapshot_class: Some(VOLUME_SNAPSHOT_CLASS_NAME.to_string()),
+        });
+        let volume_snapshot_disabled = Some(VolumeSnapshot {
+            enabled: false,
+            snapshot_class: None,
+        });
+
+        // Test cases where no update is needed
+        assert!(!is_volume_snapshot_update_needed(
+            volume_snapshot_enabled.as_ref(),
+            true
+        ));
+        assert!(!is_volume_snapshot_update_needed(
+            volume_snapshot_disabled.as_ref(),
+            false
+        ));
+        assert!(!is_volume_snapshot_update_needed(None, false));
+
+        // Test cases where an update is needed
+        assert!(is_volume_snapshot_update_needed(
+            volume_snapshot_enabled.as_ref(),
+            false
+        ));
+        assert!(is_volume_snapshot_update_needed(
+            volume_snapshot_disabled.as_ref(),
+            true
+        ));
+        assert!(is_volume_snapshot_update_needed(None, true));
+    }
+
+    // Test the error_policy function, we need to mock the ctx and cdb to mimic a 429 error code
+    use crate::{error_policy, Error};
+    use futures::pin_mut;
+    use http::{Request, Response, StatusCode};
+    use hyper::Body;
+    use k8s_openapi::api::core::v1::Pod;
+    use kube::{api::Api, Client};
+    use serde_json::json;
+    use tower_test::mock;
+
+    #[tokio::test]
+    async fn test_error_policy_429() {
+        // setup a test CoreDB object
+        let coredb = CoreDB::test();
+
+        // mock the Kubernetes client and setup Context
+        let (mock_service, handle) = mock::pair::<Request<Body>, Response<Body>>();
+        let client = Client::new(mock_service, "default".to_string());
+        let ctx = Arc::new(Context {
+            client: client.clone(),
+            metrics: Default::default(),
+            diagnostics: Default::default(),
+        });
+
+        // setup the mock response 429 too many requests
+        let spawned = tokio::spawn(async move {
+            pin_mut!(handle);
+            if let Some((_request, send)) = handle.next_request().await {
+                // We don't check the specifics of the request here, focusing on the response
+                send.send_response(
+                    Response::builder()
+                        .status(StatusCode::TOO_MANY_REQUESTS)
+                        .body(Body::from(
+                            json!({
+                                "kind": "Status",
+                                "apiVersion": "v1",
+                                "metadata": {},
+                                "status": "Failure",
+                                "message": "Too Many Requests",
+                                "reason": "TooManyRequests",
+                                "code": 429
+                            })
+                            .to_string(),
+                        ))
+                        .unwrap(),
+                );
+            }
+        });
+
+        // Setup call to kubernetes api Pod
+        let pod_api: Api<Pod> = Api::namespaced(ctx.client.clone(), "default");
+        let err = pod_api.get("test-pod").await.err().unwrap();
+
+        // Convert the KubeError into your custom error type as it would in your controller logic
+        let custom_error = Error::from(err);
+
+        // Now we simulate calling the error_policy function with this error
+        let action = error_policy(Arc::new(coredb), &custom_error, ctx);
+        let action_str = format!("{:?}", action);
+
+        println!("Action: {:?}", action);
+
+        // Use regular expressions to extract the duration from the action string
+        let re = regex::Regex::new(r"requeue_after: Some\((\d+)s\)").unwrap();
+        if let Some(captures) = re.captures(&action_str) {
+            let duration_secs = captures[1].parse::<u64>().unwrap();
+            assert!((60..=180).contains(&duration_secs));
+        } else {
+            panic!("Unexpected action format: {}", action_str);
+        }
+
+        spawned.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn test_error_policy_non_429() {
+        // setup a test CoreDB object
+        let coredb = CoreDB::test();
+
+        // mock the Kubernetes client and setup Context
+        let (mock_service, handle) = mock::pair::<Request<Body>, Response<Body>>();
+        let client = Client::new(mock_service, "default".to_string());
+        let ctx = Arc::new(Context {
+            client: client.clone(),
+            metrics: Default::default(),
+            diagnostics: Default::default(),
+        });
+
+        // setup the mock response 404 Not Found
+        let spawned = tokio::spawn(async move {
+            pin_mut!(handle);
+            if let Some((_request, send)) = handle.next_request().await {
+                send.send_response(
+                    Response::builder()
+                        .status(StatusCode::NOT_FOUND)
+                        .body(Body::from(
+                            json!({
+                                "kind": "Status",
+                                "apiVersion": "v1",
+                                "metadata": {},
+                                "status": "Failure",
+                                "message": "Not Found",
+                                "reason": "NotFound",
+                                "code": 404
+                            })
+                            .to_string(),
+                        ))
+                        .unwrap(),
+                );
+            }
+        });
+
+        // Setup call to kubernetes api Pod
+        let pod_api: Api<Pod> = Api::namespaced(ctx.client.clone(), "default");
+        let err = pod_api.get("test-pod").await.err().unwrap();
+
+        // Convert the KubeError into your custom error type as it would in your controller logic
+        let custom_error = Error::from(err);
+
+        // Now we simulate calling the error_policy function with this error
+        let action = error_policy(Arc::new(coredb), &custom_error, ctx);
+        let action_str = format!("{:?}", action);
+
+        println!("Action: {:?}", action);
+
+        // Assert that the action is a requeue with a duration of 5 minutes (300 seconds)
+        let re = regex::Regex::new(r"requeue_after: Some\((\d+)s\)").unwrap();
+        if let Some(captures) = re.captures(&action_str) {
+            let duration_secs = captures[1].parse::<u64>().unwrap();
+            assert_eq!(duration_secs, 300);
+        } else {
+            panic!("Unexpected action format: {}", action_str);
+        }
+
+        spawned.await.unwrap();
     }
 }

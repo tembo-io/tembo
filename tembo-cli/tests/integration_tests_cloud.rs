@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use std::time::Duration;
 use tembo::cli::context::{
     get_current_context, tembo_context_file_path, tembo_credentials_file_path, Environment,
+    CONTEXT_EXAMPLE_TEXT, CREDENTIALS_EXAMPLE_TEXT,
 };
 use temboclient::apis::configuration::Configuration;
 use temboclient::apis::instance_api::get_all;
@@ -22,6 +23,9 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
 
     env::set_current_dir(&test_dir)?;
 
+    replace_file(tembo_context_file_path(), CONTEXT_EXAMPLE_TEXT)?;
+    replace_file(tembo_credentials_file_path(), CREDENTIALS_EXAMPLE_TEXT)?;
+
     // tembo init
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
     cmd.arg("init");
@@ -32,7 +36,7 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
 
     setup_env(&instance_name)?;
 
-    // tembo context set --name local
+    // tembo context set --name prod
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
     cmd.arg("context");
     cmd.arg("set");
@@ -46,6 +50,7 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
     cmd.assert().success();
 
     let env = get_current_context()?;
+    println!("{:?}", env);
     let profile = env.clone().selected_profile.unwrap();
     let config = Configuration {
         base_path: profile.get_tembo_host(),
@@ -137,6 +142,15 @@ fn replace_vars_in_file(
     let new_data = data.replace(word_from, word_to);
     let mut dst = File::create(&file_path)?;
     dst.write(new_data.as_bytes())?;
+    drop(dst);
+
+    Ok(())
+}
+
+fn replace_file(file_path: String, word_to: &str) -> Result<(), Box<dyn Error>> {
+    let mut dst = File::create(&file_path)?;
+    dst.write_all(word_to.as_bytes())?;
+    drop(dst);
     Ok(())
 }
 

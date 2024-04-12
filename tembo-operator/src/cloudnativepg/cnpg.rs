@@ -8,7 +8,7 @@ use crate::{
         postgres_parameters::MergeError,
     },
     cloudnativepg::{
-        backups::{Backup, BackupCluster, BackupMethod, BackupSpec, BackupTarget},
+        backups::Backup,
         clusters::{
             Cluster, ClusterAffinity, ClusterBackup, ClusterBackupBarmanObjectStore,
             ClusterBackupBarmanObjectStoreData, ClusterBackupBarmanObjectStoreDataCompression,
@@ -23,9 +23,8 @@ use crate::{
             ClusterBackupVolumeSnapshotOnlineConfiguration,
             ClusterBackupVolumeSnapshotSnapshotOwnerReference, ClusterBootstrap,
             ClusterBootstrapInitdb, ClusterBootstrapRecovery,
-            ClusterBootstrapRecoveryRecoveryTarget, ClusterBootstrapRecoveryVolumeSnapshots,
-            ClusterBootstrapRecoveryVolumeSnapshotsStorage, ClusterCertificates,
-            ClusterExternalClusters, ClusterExternalClustersBarmanObjectStore,
+            ClusterBootstrapRecoveryRecoveryTarget, ClusterCertificates, ClusterExternalClusters,
+            ClusterExternalClustersBarmanObjectStore,
             ClusterExternalClustersBarmanObjectStoreS3Credentials,
             ClusterExternalClustersBarmanObjectStoreS3CredentialsAccessKeyId,
             ClusterExternalClustersBarmanObjectStoreS3CredentialsRegion,
@@ -43,6 +42,7 @@ use crate::{
             ClusterServiceAccountTemplate, ClusterServiceAccountTemplateMetadata, ClusterSpec,
             ClusterStorage, ClusterSuperuserSecret,
         },
+        cnpg_utils::{is_image_updated, patch_cluster, restart_and_wait_for_restart},
         poolers::{
             Pooler, PoolerCluster, PoolerPgbouncer, PoolerSpec, PoolerTemplate, PoolerTemplateSpec,
             PoolerTemplateSpecContainers, PoolerType,
@@ -55,14 +55,14 @@ use crate::{
     config::Config,
     configmap::custom_metrics_configmap_settings,
     errors::ValueError,
-    is_postgres_ready, patch_cdb_status_merge,
+    is_postgres_ready,
     postgres_exporter::EXPORTER_CONFIGMAP_PREFIX,
     psql::PsqlOutput,
-    snapshots::volumesnapshots::reconcile_volume_snapshot_restore,
+    // snapshots::volumesnapshots::reconcile_volume_snapshot_restore,
     trunk::extensions_that_require_load,
-    Context, RESTARTED_AT,
+    Context,
 };
-use chrono::{DateTime, NaiveDateTime, Offset, Utc};
+use chrono::{DateTime, NaiveDateTime, Offset};
 use k8s_openapi::api::core::v1::Service;
 use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
@@ -72,7 +72,6 @@ use kube::{
     runtime::{controller::Action, wait::Condition},
     Api, Resource, ResourceExt,
 };
-use serde_json::json;
 use std::{collections::BTreeMap, sync::Arc};
 use tokio::time::Duration;
 use tracing::{debug, error, info, instrument, warn};
@@ -494,7 +493,8 @@ fn cnpg_cluster_bootstrap(cdb: &CoreDB, restore: bool) -> ClusterBootstrap {
                         ..ClusterBootstrapRecoveryRecoveryTarget::default()
                     }
                 }),
-                volume_snapshots: cnpg_cluster_bootstrap_recovery_volume_snapshots(cdb),
+                // TODO: reenable this once we have a work around for snapshots
+                // volume_snapshots: cnpg_cluster_bootstrap_recovery_volume_snapshots(cdb),
                 ..ClusterBootstrapRecovery::default()
             }),
             ..ClusterBootstrap::default()
@@ -509,25 +509,26 @@ fn cnpg_cluster_bootstrap(cdb: &CoreDB, restore: bool) -> ClusterBootstrap {
     }
 }
 
-fn cnpg_cluster_bootstrap_recovery_volume_snapshots(
-    cdb: &CoreDB,
-) -> Option<ClusterBootstrapRecoveryVolumeSnapshots> {
-    if let Some(restore) = &cdb.spec.restore {
-        if restore.volume_snapshot == Some(true) {
-            return Some(ClusterBootstrapRecoveryVolumeSnapshots {
-                storage: ClusterBootstrapRecoveryVolumeSnapshotsStorage {
-                    // todo: Work on getting this from the VolumeSnapshot we created
-                    // during the restore process
-                    name: format!("{}-restore-vs", cdb.name_any()),
-                    kind: "VolumeSnapshot".to_string(),
-                    api_group: Some("snapshot.storage.k8s.io".to_string()),
-                },
-                ..ClusterBootstrapRecoveryVolumeSnapshots::default()
-            });
-        }
-    }
-    None
-}
+// TODO: reenable this once we have a work around for snapshots
+// fn cnpg_cluster_bootstrap_recovery_volume_snapshots(
+//     _cdb: &CoreDB,
+// ) -> Option<ClusterBootstrapRecoveryVolumeSnapshots> {
+//     if let Some(restore) = &cdb.spec.restore {
+//         if restore.volume_snapshot == Some(true) {
+//             return Some(ClusterBootstrapRecoveryVolumeSnapshots {
+//                 storage: ClusterBootstrapRecoveryVolumeSnapshotsStorage {
+//                     // todo: Work on getting this from the VolumeSnapshot we created
+//                     // during the restore process
+//                     name: format!("{}-restore-vs", cdb.name_any()),
+//                     kind: "VolumeSnapshot".to_string(),
+//                     api_group: Some("snapshot.storage.k8s.io".to_string()),
+//                 },
+//                 ..ClusterBootstrapRecoveryVolumeSnapshots::default()
+//             });
+//         }
+//     }
+//     None
+// }
 
 // Get PGConfig from CoreDB and convert it to a postgres_parameters and shared_preload_libraries
 fn cnpg_postgres_config(
@@ -631,6 +632,7 @@ fn default_cluster_annotations(cdb: &CoreDB) -> BTreeMap<String, String> {
     annotations
 }
 
+#[instrument(skip(cdb), fields(trace_id, instance_name = %cdb.name_any()))]
 pub fn cnpg_cluster_from_cdb(
     cdb: &CoreDB,
     fenced_pods: Option<Vec<String>>,
@@ -964,81 +966,69 @@ async fn pods_to_fence(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<String>, A
     }
 }
 
-// cdb: the CoreDB object
-// maybe_cluster, Option<Cluster> of the current CNPG cluster, if it exists
-// new_spec: the new Cluster spec to be applied
-fn update_restarted_at(
-    cdb: &CoreDB,
-    maybe_cluster: Option<&Cluster>,
-    new_spec: &mut Cluster,
-) -> bool {
-    let Some(cdb_restarted_at) = cdb.annotations().get(RESTARTED_AT) else {
-        // No need to update the annotation if it's not present in the CoreDB
-        return false;
-    };
-
-    // Remember the previous value of the annotation, if any
-    let previous_restarted_at =
-        maybe_cluster.and_then(|cluster| cluster.annotations().get(RESTARTED_AT));
-
-    // Forward the `restartedAt` annotation from CoreDB over to the CNPG cluster,
-    // does not matter if changed or not.
-    new_spec
-        .metadata
-        .annotations
-        .as_mut()
-        .map(|cluster_annotations| {
-            cluster_annotations.insert(RESTARTED_AT.into(), cdb_restarted_at.to_owned())
-        });
-
-    let restart_annotation_updated = previous_restarted_at != Some(cdb_restarted_at);
-
-    if restart_annotation_updated {
-        let name = new_spec.metadata.name.as_deref().unwrap_or("unknown");
-        info!("restartAt changed for cluster {name}, setting to {cdb_restarted_at}.");
-    }
-
-    restart_annotation_updated
-}
-
 #[instrument(skip(cdb, ctx) fields(trace_id, instance_name = %cdb.name_any()))]
 pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {
-    let pods_to_fence = pods_to_fence(cdb, ctx.clone()).await?;
-    let requires_load =
-        extensions_that_require_load(ctx.client.clone(), &cdb.metadata.namespace.clone().unwrap())
-            .await?;
+    debug!("Getting name of cluster");
+    let name = cdb.name_any();
 
+    debug!("Getting namespace of cluster");
+    let namespace = cdb.metadata.namespace.as_ref().ok_or_else(|| {
+        error!("Namespace is empty for instance: {}.", cdb.name_any());
+        Action::requeue(tokio::time::Duration::from_secs(300))
+    })?;
+
+    let pods_to_fence = pods_to_fence(cdb, ctx.clone()).await?;
+    let requires_load = extensions_that_require_load(ctx.client.clone(), namespace).await?;
+
+    // TODO: reenable this once we have a work around for snapshots
     // If we are restoring and have volume snapshots enabled, make sure we setup
     // the VolumeSnapshotContent and VolumeSnapshot so that the Cluster will have
     // something to restore from.
-    if let Some(restore) = &cdb.spec.restore {
-        if restore.volume_snapshot == Some(true) {
-            debug!("Reconciling VolumeSnapshotContent and VolumeSnapshot for restore");
-            reconcile_volume_snapshot_restore(cdb, ctx.clone()).await?;
-        }
-    }
+    // if let Some(restore) = &cdb.spec.restore {
+    //     if restore.volume_snapshot == Some(true) {
+    //         debug!("Reconciling VolumeSnapshotContent and VolumeSnapshot for restore");
+    //         reconcile_volume_snapshot_restore(cdb, ctx.clone()).await?;
+    //     }
+    // }
 
     debug!("Generating CNPG spec");
     let mut cluster = cnpg_cluster_from_cdb(cdb, Some(pods_to_fence), requires_load);
 
-    debug!("Getting namespace of cluster");
-    let namespace = cluster
-        .metadata
-        .namespace
-        .clone()
-        .expect("CNPG Cluster should always have a namespace");
-    debug!("Getting name of cluster");
-    let name = cluster
-        .metadata
-        .name
-        .clone()
-        .expect("CNPG Cluster should always have a name");
-
     let cluster_api: Api<Cluster> = Api::namespaced(ctx.client.clone(), namespace.as_str());
     let maybe_cluster = cluster_api.get(&name).await;
 
-    let restart_annotation_updated =
-        update_restarted_at(cdb, maybe_cluster.as_ref().ok(), &mut cluster);
+    // Check if we are updating the cluster to reboot/restart the instance, if so do that first before
+    // updating the cluster spec.  Also check to see if the image is being updated.  If do
+    // update the image first before updating the cluster spec.
+    if let Ok(ref cluster) = maybe_cluster {
+        warn!("Cluster exists, checking if restart is required");
+        restart_and_wait_for_restart(cdb, ctx.clone(), Some(cluster)).await?;
+        is_image_updated(cdb, ctx.clone(), Some(cluster)).await?;
+    }
+
+    // Check CoreDB status if status.running is false, return requeue
+    let coredb_api: Api<CoreDB> = Api::namespaced(ctx.client.clone(), namespace);
+    let update_coredb = coredb_api.get(&name).await.map_err(|e| {
+        error!("Error getting CoreDB: {}, requeuing...", e);
+        Action::requeue(Duration::from_secs(300))
+    })?;
+
+    // Check update_coredb status is running: false, return requeue
+    let current_status = match update_coredb.status {
+        Some(status) => Some(status),
+        None => {
+            warn!("CoreDB status is empty for instance: {}", &name);
+            None
+        }
+    };
+
+    // Check if the CoreDB status is running: false, return requeue
+    if let Some(status) = current_status {
+        if !status.running {
+            info!("CoreDB status.running is false, requeuing 10 seconds");
+            return Err(Action::requeue(Duration::from_secs(10)));
+        }
+    }
 
     let mut _restart_required = false;
 
@@ -1135,49 +1125,10 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
         }
     }
 
-    // We need to check if the cdb.replicas is changing from 1 -> 2.  If it is, we need to take a
-    // snapshot if snapshots are enabled.  We will need to wait on the snapshot to complete before
-    // allowing the new Cluster configuration to be applied.
-    match maybe_cluster {
-        Ok(ref cluster) => {
-            if check_cluster_instance_count(cdb, cluster) {
-                // Set bool if snapshots are enabled
-                let snapshots_enabled = cdb.spec.backup.volume_snapshot.as_ref().map(|v| v.enabled);
-
-                // Check when last backup was taken from Cluster.status.lastSuccessfulBackup.
-                // If longer than 60 minutes and snapshots_enabled is true then take a snapshot
-                if Some(true) == snapshots_enabled {
-                    let last_backup = cluster
-                        .status
-                        .as_ref()
-                        .and_then(|s| s.last_successful_backup.as_ref())
-                        .and_then(|l| l.parse::<DateTime<Utc>>().ok());
-                    let now = Utc::now();
-                    let duration = now.signed_duration_since(last_backup.unwrap_or(now));
-                    if duration.num_minutes() > 60 {
-                        // Check to see if we have any current backups in a running or pending state
-                        match check_backups(&namespace, ctx.clone()).await {
-                            Ok(_) => {
-                                debug!("No active backups detected for instance {}, proceeding with snapshot creation", &name);
-                                create_replica_snapshot(cdb, ctx.clone()).await?;
-                            }
-                            Err(action) => {
-                                // requeue if we have active backups
-                                return Err(action);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-        Err(_) => {
-            // If the cluster does not exist, error
-            error!(
-                "Cluster does not exist, cannot check instance count for instance: {}",
-                &name
-            );
-        }
-    };
+    // TODO: Add back support for using VolumeSnapshots
+    // if let Ok(cluster) = maybe_cluster {
+    //     create_backup_if_needed(cdb, &ctx, &cluster).await?;
+    // }
 
     // For manual changes conflicting with the operator, we have .force()
     //
@@ -1186,203 +1137,12 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
     // Writes to objects with managed fields can be forced, in which case the value of any conflicted field will be overridden,
     // and the ownership will be transferred.
     // https://kubernetes.io/docs/reference/using-api/server-side-apply/
-    let ps = PatchParams::apply("cntrlr").force();
-
-    let _o = cluster_api
-        .patch(&name, &ps, &Patch::Apply(&cluster))
-        .await
-        .map_err(|e| {
-            error!("Error patching cluster: {}", e);
-            Action::requeue(Duration::from_secs(300))
-        })?;
-
-    // If we updated the restartedAt annotation, set `status.running` in CoreDB to false
-    if restart_annotation_updated {
-        let cdb_cluster: Api<CoreDB> = Api::namespaced(ctx.client.clone(), &namespace);
-        let cluster_name = &name;
-
-        patch_cdb_status_merge(
-            &cdb_cluster,
-            cluster_name,
-            json!({
-                "status": {
-                    "running": false
-                }
-            }),
-        )
-        .await?;
-        info!(
-            "Updated status.running to false in {}, requeuing 10 seconds",
-            &name
-        );
-        return Err(Action::requeue(Duration::from_secs(10)));
-    }
+    patch_cluster(&cluster, ctx.clone(), cdb).await?;
 
     reconcile_metrics_service(cdb, ctx.clone()).await?;
     reconcile_metrics_ingress_route(cdb, ctx.clone()).await?;
 
     Ok(())
-}
-
-// check_backups will check if any backups are currently in a running or pending state
-async fn check_backups(namespace: &str, ctx: Arc<Context>) -> Result<(), Action> {
-    let backup_api: Api<Backup> = Api::namespaced(ctx.client.clone(), namespace);
-
-    // List all backups
-    let lp = ListParams::default();
-    let backups = backup_api.list(&lp).await.map_err(|e| {
-        error!("Error listing backups: {}", e);
-        Action::requeue(Duration::from_secs(30))
-    })?;
-
-    // Filter backups based on phase
-    let active_backups = backups
-        .iter()
-        .filter(|b| {
-            b.status
-                .as_ref()
-                .and_then(|s| s.phase.as_deref())
-                .map(|p| p == "running" || p == "pending")
-                .unwrap_or(false)
-        })
-        .collect::<Vec<_>>();
-
-    if !active_backups.is_empty() {
-        // If there are active backups, requeue
-        warn!("Active backups detected, requeuing in 30 seconds");
-        return Err(Action::requeue(Duration::from_secs(30)));
-    }
-
-    Ok(())
-}
-
-// create_replica_snapshot creates a snapshot (backup) of the current primary instance
-// so we can create a new replica from it.
-#[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any()))]
-async fn create_replica_snapshot(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {
-    let name = cdb.name_any();
-    let namespace = cdb.metadata.namespace.as_ref().ok_or_else(|| {
-        error!("CoreDB namespace is empty for instance: {}.", name);
-        Action::requeue(tokio::time::Duration::from_secs(300))
-    })?;
-
-    // Setup the API to Backup
-    let backup_api: Api<Backup> = Api::namespaced(ctx.client.clone(), namespace);
-
-    // Gererate the Backup object
-    let backup = Backup {
-        metadata: ObjectMeta {
-            name: Some(format!("{}-replica-snapshot", name)),
-            namespace: Some(namespace.to_string()),
-            ..ObjectMeta::default()
-        },
-        spec: BackupSpec {
-            cluster: BackupCluster { name: name.clone() },
-            method: Some(BackupMethod::VolumeSnapshot),
-            online: Some(true),
-            target: Some(BackupTarget::Primary),
-            ..BackupSpec::default()
-        },
-        status: None,
-    };
-
-    // Apply the new backup object
-    let ps = PatchParams::apply("cntrlr").force();
-
-    let result = backup_api
-        .patch(&name, &ps, &Patch::Apply(&backup))
-        .await
-        .map_err(|e| {
-            error!("Error patching backup: {}", e);
-            Action::requeue(Duration::from_secs(300))
-        })?;
-
-    // Wait for the backup to complete
-    let backup_name = result.metadata.name.as_ref().ok_or_else(|| {
-        error!("Backup name is empty for instance: {}.", name);
-        Action::requeue(Duration::from_secs(300))
-    })?;
-
-    // Wait for the backup to complete before proceeding
-    check_backup_status(backup_name, namespace, ctx.clone()).await
-}
-
-// check_backup_status will check the status of a backup and return a Result or an Action
-async fn check_backup_status(
-    backup_name: &str,
-    namespace: &str,
-    ctx: Arc<Context>,
-) -> Result<(), Action> {
-    let backup_api: Api<Backup> = Api::namespaced(ctx.client.clone(), namespace);
-
-    match backup_api.get(backup_name).await {
-        Ok(backup) => match backup.status.as_ref().and_then(|s| s.phase.as_deref()) {
-            Some("completed") => {
-                debug!("Backup {} completed", backup_name);
-                Ok(())
-            }
-            Some("running") | Some("pending") | Some("finalizing") => {
-                debug!(
-                    "Backup {} is still processing (phase: {}). Requeuing...",
-                    backup_name,
-                    backup
-                        .status
-                        .as_ref()
-                        .and_then(|s| s.phase.as_deref())
-                        .unwrap_or_default()
-                );
-                Err(Action::requeue(Duration::from_secs(30)))
-            }
-            Some("failed") => {
-                error!("Backup {} has failed.", backup_name);
-                Err(Action::requeue(Duration::from_secs(300)))
-            }
-            _ => {
-                error!("Backup {} is in an unexpected state.", backup_name);
-                Err(Action::requeue(Duration::from_secs(60)))
-            }
-        },
-        Err(kube::Error::Api(ae)) if ae.code == 404 => {
-            info!(
-                "Backup {} not found. It may not have been created yet, or the name is incorrect.",
-                backup_name
-            );
-            Err(Action::requeue(Duration::from_secs(30)))
-        }
-        Err(e) => {
-            error!("Error fetching backup {}: {}", backup_name, e);
-            Err(Action::requeue(Duration::from_secs(30)))
-        }
-    }
-}
-
-// Checks to see if the instance count is changing from 1 -> 2
-fn check_cluster_instance_count(cdb: &CoreDB, cluster: &Cluster) -> bool {
-    // Get the replica count from the CoreDB object
-    let cdb_replicas: i64 = cdb.spec.replicas.into();
-
-    // Get the replica count from the Cluster object
-    let cluster_instances = cluster.spec.instances;
-
-    // Check if the cdb_replica is greater than the cluster_replica
-    if cdb_replicas == 2 || cluster_instances == 2 {
-        // Check current instance count from Cluster status
-        let current_instances = cluster.status.as_ref().and_then(|s| s.instances);
-        if current_instances == Some(1) {
-            info!(
-                "Instance count is changing from 1 to 2 for instance {}. cdb_replicas: {}, cluster_instances: {}",
-                cdb.name_any(), cdb_replicas, cluster_instances
-            );
-            return true;
-        }
-    } else {
-        debug!(
-            "Instance count is not changing for instance {}. cdb_replicas: {}, cluster_instances: {}",
-            cdb.name_any(), cdb_replicas, cluster_instances
-        );
-    }
-
-    false
 }
 
 pub async fn reconcile_metrics_ingress_route(
@@ -1765,53 +1525,56 @@ fn cnpg_scheduled_backup(
         status: None,
     };
 
+    // TODO: reenable this once we have a work around for snapshots
     // Becasue the snapshot name can easily be over the character limit for k8s
     // we will need to trim the name to 43 characters and append "-snap"
-    let snap_name = generate_scheduled_backup_snapshot_name(name);
+    // let snap_name = generate_scheduled_backup_snapshot_name(name);
 
     // Set a ScheduledBackup to backup to volume snapshot if enabled
-    let volume_snapshot_scheduled_backup = cdb
-        .spec
-        .backup
-        .volume_snapshot
-        .as_ref()
-        .filter(|vs| vs.enabled)
-        .map(|_| ScheduledBackup {
-            metadata: ObjectMeta {
-                name: Some(snap_name),
-                namespace: Some(namespace),
-                ..ObjectMeta::default()
-            },
-            spec: ScheduledBackupSpec {
-                backup_owner_reference: Some(ScheduledBackupBackupOwnerReference::Cluster),
-                cluster: ScheduledBackupCluster {
-                    name: name.to_string(),
-                },
-                immediate: Some(true),
-                schedule: schedule_expression_from_cdb(cdb),
-                suspend: Some(false),
-                method: Some(ScheduledBackupMethod::VolumeSnapshot),
-                ..ScheduledBackupSpec::default()
-            },
-            status: None,
-        });
+    // let volume_snapshot_scheduled_backup = cdb
+    //     .spec
+    //     .backup
+    //     .volume_snapshot
+    //     .as_ref()
+    //     .filter(|vs| vs.enabled)
+    //     .map(|_| ScheduledBackup {
+    //         metadata: ObjectMeta {
+    //             name: Some(snap_name),
+    //             namespace: Some(namespace),
+    //             ..ObjectMeta::default()
+    //         },
+    //         spec: ScheduledBackupSpec {
+    //             backup_owner_reference: Some(ScheduledBackupBackupOwnerReference::Cluster),
+    //             cluster: ScheduledBackupCluster {
+    //                 name: name.to_string(),
+    //             },
+    //             immediate: Some(true),
+    //             schedule: schedule_expression_from_cdb(cdb),
+    //             suspend: Some(false),
+    //             method: Some(ScheduledBackupMethod::VolumeSnapshot),
+    //             ..ScheduledBackupSpec::default()
+    //         },
+    //         status: None,
+    //     });
 
     // Return the ScheduledBackup objects
-    Ok(vec![(
-        s3_scheduled_backup,
-        volume_snapshot_scheduled_backup,
-    )])
+    // Ok(vec![(
+    //     s3_scheduled_backup
+    //     // volume_snapshot_scheduled_backup,
+    // )])
+    Ok(vec![(s3_scheduled_backup, None)])
 }
 
+// TODO: reenable this once we have a work around for snapshots
 // generate_scheduled_backup_snapshot_name generates a snapshot name for a scheduled backup
 // by appending "-snap" to the name and trimming the name to 43 characters if necessary
-fn generate_scheduled_backup_snapshot_name(name: &str) -> String {
-    // Trim the name to 43 characters if necessary
-    let trimmed_name = if name.len() > 43 { &name[..43] } else { name };
+// fn generate_scheduled_backup_snapshot_name(name: &str) -> String {
+//     // Trim the name to 43 characters if necessary
+//     let trimmed_name = if name.len() > 43 { &name[..43] } else { name };
 
-    // Append "-snap" to the trimmed name
-    format!("{}-snap", trimmed_name)
-}
+//     // Append "-snap" to the trimmed name
+//     format!("{}-snap", trimmed_name)
+// }
 
 // Reconcile a SheduledBackup
 #[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any()))]
@@ -2416,11 +2179,7 @@ async fn does_cluster_exist(cdb: &CoreDB, ctx: Arc<Context>) -> Result<bool, Act
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        apis::coredb_types::{CoreDB, CoreDBSpec},
-        cloudnativepg::clusters::{Cluster, ClusterSpec, ClusterStatus},
-    };
-    use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+    use crate::{apis::coredb_types::CoreDB, cloudnativepg::clusters::Cluster};
     use serde_json::json;
     use std::collections::BTreeMap;
 
@@ -3142,194 +2901,101 @@ mod tests {
         assert_eq!(cnpg_cluster_storage_class(&cdb_no_storage_class), None);
     }
 
-    #[test]
-    fn test_cnpg_cluster_volume_snapshot() {
-        let cdb_yaml = r#"
-        apiVersion: coredb.io/v1alpha1
-        kind: CoreDB
-        metadata:
-          name: test
-          namespace: default
-        spec:
-          backup:
-            destinationPath: s3://tembo-backup/sample-standard-backup
-            encryption: ""
-            retentionPolicy: "30"
-            schedule: 17 9 * * *
-            endpointURL: http://minio:9000
-            volumeSnapshot:
-              enabled: true
-              snapshotClass: "csi-vsc"
-          image: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e
-          port: 5432
-          replicas: 1
-          resources:
-            limits:
-              cpu: "1"
-              memory: 0.5Gi
-          serviceAccountTemplate:
-            metadata:
-              annotations:
-                eks.amazonaws.com/role-arn: arn:aws:iam::012345678901:role/aws-iam-role-iam
-          sharedirStorage: 1Gi
-          stop: false
-          storage: 1Gi
-          storageClass: "gp3-enc"
-          uid: 999
-        "#;
+    // #[test]
+    // fn test_cnpg_cluster_volume_snapshot() {
+    //     let cdb_yaml = r#"
+    //     apiVersion: coredb.io/v1alpha1
+    //     kind: CoreDB
+    //     metadata:
+    //       name: test
+    //       namespace: default
+    //     spec:
+    //       backup:
+    //         destinationPath: s3://tembo-backup/sample-standard-backup
+    //         encryption: ""
+    //         retentionPolicy: "30"
+    //         schedule: 17 9 * * *
+    //         endpointURL: http://minio:9000
+    //         volumeSnapshot:
+    //           enabled: true
+    //           snapshotClass: "csi-vsc"
+    //       image: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e
+    //       port: 5432
+    //       replicas: 1
+    //       resources:
+    //         limits:
+    //           cpu: "1"
+    //           memory: 0.5Gi
+    //       serviceAccountTemplate:
+    //         metadata:
+    //           annotations:
+    //             eks.amazonaws.com/role-arn: arn:aws:iam::012345678901:role/aws-iam-role-iam
+    //       sharedirStorage: 1Gi
+    //       stop: false
+    //       storage: 1Gi
+    //       storageClass: "gp3-enc"
+    //       uid: 999
+    //     "#;
 
-        let cdb: CoreDB = serde_yaml::from_str(cdb_yaml).expect("Failed to parse YAML");
-        let snapshot = create_cluster_backup_volume_snapshot(&cdb);
-        let backups_result = cnpg_scheduled_backup(&cdb).unwrap();
-        let (s3_backup, volume_snapshot_backup) = &backups_result[0];
+    //     let cdb: CoreDB = serde_yaml::from_str(cdb_yaml).expect("Failed to parse YAML");
+    //     let snapshot = create_cluster_backup_volume_snapshot(&cdb);
+    //     let backups_result = cnpg_scheduled_backup(&cdb).unwrap();
+    //     let (s3_backup, volume_snapshot_backup) = &backups_result[0];
 
-        // Set an expected ClusterBackupVolumeSnapshot object
-        let expected_snapshot = ClusterBackupVolumeSnapshot {
-            class_name: Some("csi-vsc".to_string()), // Expected to match the YAML input
-            online: Some(true),
-            online_configuration: Some(ClusterBackupVolumeSnapshotOnlineConfiguration {
-                wait_for_archive: Some(true),
-                immediate_checkpoint: Some(true),
-            }),
-            snapshot_owner_reference: Some(
-                ClusterBackupVolumeSnapshotSnapshotOwnerReference::Cluster,
-            ),
-            ..ClusterBackupVolumeSnapshot::default()
-        };
+    //     // Set an expected ClusterBackupVolumeSnapshot object
+    //     let expected_snapshot = ClusterBackupVolumeSnapshot {
+    //         class_name: Some("csi-vsc".to_string()), // Expected to match the YAML input
+    //         online: Some(true),
+    //         online_configuration: Some(ClusterBackupVolumeSnapshotOnlineConfiguration {
+    //             wait_for_archive: Some(true),
+    //             immediate_checkpoint: Some(true),
+    //         }),
+    //         snapshot_owner_reference: Some(
+    //             ClusterBackupVolumeSnapshotSnapshotOwnerReference::Cluster,
+    //         ),
+    //         ..ClusterBackupVolumeSnapshot::default()
+    //     };
 
-        // Assert to make sure that the snapshot.snapshot_class and expected_snapshot.snapshot_class are the same
-        assert_eq!(snapshot, expected_snapshot);
+    //     // Assert to make sure that the snapshot.snapshot_class and expected_snapshot.snapshot_class are the same
+    //     assert_eq!(snapshot, expected_snapshot);
 
-        // Assert to make sure that the ScheduledBackup method is set to VolumeSnapshot
-        if let Some(volume_snapshot_backup) = volume_snapshot_backup {
-            assert_eq!(
-                volume_snapshot_backup.spec.method,
-                Some(ScheduledBackupMethod::VolumeSnapshot)
-            );
-        } else {
-            panic!("Expected volume snapshot backup to be Some, but was None");
-        }
+    //     // Assert to make sure that the ScheduledBackup method is set to VolumeSnapshot
+    //     if let Some(volume_snapshot_backup) = volume_snapshot_backup {
+    //         assert_eq!(
+    //             volume_snapshot_backup.spec.method,
+    //             Some(ScheduledBackupMethod::VolumeSnapshot)
+    //         );
+    //     } else {
+    //         panic!("Expected volume snapshot backup to be Some, but was None");
+    //     }
 
-        // Assert to make sure that the ScheduledBackup method is set to BarmanObjectStore
-        assert_eq!(
-            s3_backup.spec.method,
-            Some(ScheduledBackupMethod::BarmanObjectStore)
-        );
-    }
-    #[test]
-    fn test_generate_scheduled_backup_snapshot_name() {
-        // Longer than 43 characters
-        let long_name = "thin-heartbreaking-knowledgeable-spoonbills-obnoxious-tough-lumpy-lapwing";
-        assert_eq!(
-            generate_scheduled_backup_snapshot_name(long_name),
-            "thin-heartbreaking-knowledgeable-spoonbills-snap"
-        );
+    //     // Assert to make sure that the ScheduledBackup method is set to BarmanObjectStore
+    //     assert_eq!(
+    //         s3_backup.spec.method,
+    //         Some(ScheduledBackupMethod::BarmanObjectStore)
+    //     );
+    // }
+    // #[test]
+    // fn test_generate_scheduled_backup_snapshot_name() {
+    //     // Longer than 43 characters
+    //     let long_name = "thin-heartbreaking-knowledgeable-spoonbills-obnoxious-tough-lumpy-lapwing";
+    //     assert_eq!(
+    //         generate_scheduled_backup_snapshot_name(long_name),
+    //         "thin-heartbreaking-knowledgeable-spoonbills-snap"
+    //     );
 
-        // Exactly 43 characters
-        let exact_length_name = "lying-high-pitched-guanaco-absent-aardvarks";
-        assert_eq!(
-            generate_scheduled_backup_snapshot_name(exact_length_name),
-            "lying-high-pitched-guanaco-absent-aardvarks-snap"
-        );
+    //     // Exactly 43 characters
+    //     let exact_length_name = "lying-high-pitched-guanaco-absent-aardvarks";
+    //     assert_eq!(
+    //         generate_scheduled_backup_snapshot_name(exact_length_name),
+    //         "lying-high-pitched-guanaco-absent-aardvarks-snap"
+    //     );
 
-        // Shorter than 43 characters
-        let short_name = "stormy-capybara";
-        assert_eq!(
-            generate_scheduled_backup_snapshot_name(short_name),
-            "stormy-capybara-snap"
-        );
-    }
-
-    #[test]
-    fn test_check_cluster_instance_count() {
-        // Case 1: Scaling from 1 to 2 instances
-        let cdb = CoreDB {
-            metadata: ObjectMeta {
-                name: Some("test-cluster".to_string()),
-                namespace: Some("test".to_string()),
-                ..ObjectMeta::default()
-            },
-            spec: CoreDBSpec {
-                replicas: 2,
-                ..CoreDBSpec::default()
-            },
-            status: None,
-        };
-        let cluster = Cluster {
-            metadata: ObjectMeta {
-                name: Some("test-cluster".to_string()),
-                namespace: Some("test".to_string()),
-                ..ObjectMeta::default()
-            },
-            spec: ClusterSpec {
-                instances: 2,
-                ..ClusterSpec::default()
-            },
-            status: Some(ClusterStatus {
-                instances: Some(1),
-                ..ClusterStatus::default()
-            }),
-        };
-        assert!(check_cluster_instance_count(&cdb, &cluster));
-
-        // Case 2: No scaling, current instances already 2
-        let cdb = CoreDB {
-            metadata: ObjectMeta {
-                name: Some("test-cluster".to_string()),
-                namespace: Some("test".to_string()),
-                ..ObjectMeta::default()
-            },
-            spec: CoreDBSpec {
-                replicas: 2,
-                ..CoreDBSpec::default()
-            },
-            status: None,
-        };
-        let cluster = Cluster {
-            metadata: ObjectMeta {
-                name: Some("test-cluster".to_string()),
-                namespace: Some("test".to_string()),
-                ..ObjectMeta::default()
-            },
-            spec: ClusterSpec {
-                instances: 2,
-                ..ClusterSpec::default()
-            },
-            status: Some(ClusterStatus {
-                instances: Some(2),
-                ..ClusterStatus::default()
-            }),
-        };
-        assert!(!check_cluster_instance_count(&cdb, &cluster));
-
-        // Case 3: No scaling, replicas and instances not 2
-        let cdb = CoreDB {
-            metadata: ObjectMeta {
-                name: Some("test-cluster".to_string()),
-                namespace: Some("test".to_string()),
-                ..ObjectMeta::default()
-            },
-            spec: CoreDBSpec {
-                replicas: 1,
-                ..CoreDBSpec::default()
-            },
-            status: None,
-        };
-        let cluster = Cluster {
-            metadata: ObjectMeta {
-                name: Some("test-cluster".to_string()),
-                namespace: Some("test".to_string()),
-                ..ObjectMeta::default()
-            },
-            spec: ClusterSpec {
-                instances: 1,
-                ..ClusterSpec::default()
-            },
-            status: Some(ClusterStatus {
-                instances: Some(1),
-                ..ClusterStatus::default()
-            }),
-        };
-        assert!(!check_cluster_instance_count(&cdb, &cluster));
-    }
+    //     // Shorter than 43 characters
+    //     let short_name = "stormy-capybara";
+    //     assert_eq!(
+    //         generate_scheduled_backup_snapshot_name(short_name),
+    //         "stormy-capybara-snap"
+    //     );
+    // }
 }

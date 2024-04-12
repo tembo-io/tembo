@@ -77,7 +77,7 @@ spec:
           - "postgres"
   runtime_config:
     - name: shared_buffers
-      value: "1024MB"
+      value: "512MB"
     - name: max_connections
       value: "431"
     - name: work_mem

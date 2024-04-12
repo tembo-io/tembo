@@ -301,7 +301,7 @@ pub async fn is_not_restarting(
         Ok(Some(server_started_at))
     } else {
         // Server hasn't even started restarting yet
-        error!("Restart is not complete for {}, requeuing", cdb_name);
+        warn!("Restart is not complete for {}, requeuing", cdb_name);
         Err(Action::requeue(Duration::from_secs(5)))
     }
 }
@@ -486,11 +486,7 @@ pub async fn toggle_extension(
     ext_loc: ExtensionInstallLocation,
     ctx: Arc<Context>,
 ) -> Result<(), ToggleError> {
-    let coredb_name = cdb
-        .metadata
-        .name
-        .clone()
-        .expect("CoreDB should have a name");
+    let coredb_name = cdb.name_any();
     if !check_input(ext_name) {
         warn!(
             "Extension is not formatted properly. Skipping operation. {}",
