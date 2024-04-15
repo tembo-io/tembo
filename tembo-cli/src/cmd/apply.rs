@@ -181,7 +181,8 @@ fn docker_apply(
     let mut final_instance_settings: HashMap<String, InstanceSettings> = Default::default();
 
     for (_key, instance_setting) in instance_settings.iter_mut() {
-        let final_instance_setting = docker_apply_instance(stack_arg.clone(), verbose, instance_setting.to_owned())?;
+        let final_instance_setting =
+            docker_apply_instance(stack_arg.clone(), verbose, instance_setting.to_owned())?;
         final_instance_settings.insert(
             final_instance_setting.instance_name.clone(),
             final_instance_setting,
@@ -259,10 +260,8 @@ fn docker_apply_instance(
         let mut file_path = PathBuf::from(FileUtils::get_current_working_dir());
         file_path.push(format!("{}.yaml", cleaned_stack_type));
 
-        let config_data = fs::read_to_string(&file_path)
-            .expect("File not found in the directory");
-        stack = serde_yaml::from_str(&config_data)
-            .expect("Failed to parse YAML");
+        let config_data = fs::read_to_string(&file_path).expect("File not found in the directory");
+        stack = serde_yaml::from_str(&config_data).expect("Failed to parse YAML");
     } else {
         stack = get_stack(stack_type);
     }

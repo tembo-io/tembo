@@ -253,7 +253,7 @@ fn validate_stack_type(
     section: &str,
     verbose: bool,
 ) -> Result<(), anyhow::Error> {
-    if stack_types.starts_with("Custom:"){
+    if stack_types.starts_with("Custom:") {
         Ok(())
     } else {
         match temboclient::models::StackType::from_str(stack_types) {

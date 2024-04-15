@@ -56,7 +56,7 @@ fn main() -> Result<(), anyhow::Error> {
             }
         },
         SubCommands::Init(_init_cmd) => {
-            init::execute(_init_cmd.stack_file)?;
+            init::execute()?;
         }
         SubCommands::Apply(_apply_cmd) => {
             apply::execute(
