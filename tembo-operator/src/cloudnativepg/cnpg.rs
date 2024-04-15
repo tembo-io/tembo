@@ -862,7 +862,9 @@ async fn pods_to_fence(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<String>, A
     // expects to operate on pods which do not exist while the CNPG cluster
     // is hibernating.
 
-    if cdb.spec.stop {
+    let hibernate = get_hibernate_status(&cdb, ctx.clone()).await?;
+
+    if cdb.spec.stop || hibernate {
         return Ok(Vec::new());
     }
 
@@ -1028,7 +1030,9 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
     // cluster to be running. The restart_and_wait_for_restart routine begins
     // this expectation, so this short-circuit should prevent that.
 
-    if cdb.spec.stop {
+    let hibernate = get_hibernate_status(&cdb, ctx.clone()).await?;
+
+    if cdb.spec.stop || hibernate {
         patch_cluster(&cluster, ctx.clone(), cdb).await?;
 
         reconcile_metrics_service(cdb, ctx.clone()).await?;
@@ -1879,6 +1883,41 @@ pub async fn get_fenced_pods(
         );
         Ok(None)
     }
+}
+
+/// Determine the hibernate state of the CNPG cluster resources
+/// 
+/// This function will only return true if the cnpg.io/hibernation annotation
+/// is set to "on". Otherwise the assumption is that the annotation is not set
+/// at all or is set to some other value, in which case CNPG will not hibernate.
+#[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any()))]
+pub async fn get_hibernate_status(
+    cdb: &CoreDB,
+    ctx: Arc<Context>,
+) -> Result<bool, Action> {
+    let instance_name = cdb.metadata.name.as_deref().unwrap_or_default();
+    let namespace = cdb.namespace().ok_or_else(|| {
+        error!("Namespace is not set for CoreDB instance {}", instance_name);
+        Action::requeue(Duration::from_secs(300))
+    })?;
+
+    let cluster: Api<Cluster> = Api::namespaced(ctx.client.clone(), &namespace);
+    let co = cluster.get(instance_name).await.map_err(|e| {
+        error!("Error getting cluster: {}", e);
+        Action::requeue(Duration::from_secs(300))
+    })?;
+
+    let hibernate = match co.metadata.annotations {
+        Some(ann) => ann
+            .get("cnpg.io/hibernation")
+            .map_or(false, |state| state == "on"),
+        None => {
+            info!("Cluster Status for {} is not set", instance_name);
+            return Ok(false);
+        }
+    };
+
+    Ok(hibernate)
 }
 
 // get_instance_replicas will look up cluster.spec.instances from Kubernetes and return i64 value
