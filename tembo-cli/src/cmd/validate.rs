@@ -253,20 +253,24 @@ fn validate_stack_type(
     section: &str,
     verbose: bool,
 ) -> Result<(), anyhow::Error> {
-    match temboclient::models::StackType::from_str(stack_types) {
-        std::result::Result::Ok(_) => {
-            if verbose {
-                info(&format!(
-                    "Stack types '{}' in section '{}' is valid",
-                    stack_types, section
-                ));
+    if stack_types.starts_with("Custom:"){
+        Ok(())
+    } else {
+        match temboclient::models::StackType::from_str(stack_types) {
+            std::result::Result::Ok(_) => {
+                if verbose {
+                    info(&format!(
+                        "Stack types '{}' in section '{}' is valid",
+                        stack_types, section
+                    ));
+                }
+                Ok(())
             }
-            Ok(())
+            std::result::Result::Err(_) => Err(Error::msg(format!(
+                "Invalid stack type setting in section '{}': {}",
+                section, stack_types
+            ))),
         }
-        std::result::Result::Err(_) => Err(Error::msg(format!(
-            "Invalid stack type setting in section '{}': {}",
-            section, stack_types
-        ))),
     }
 }
 

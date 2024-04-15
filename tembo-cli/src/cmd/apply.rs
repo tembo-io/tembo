@@ -75,12 +75,16 @@ pub struct ApplyCommand {
     /// Replace a specific configuration in your tembo.toml file. For example, tembo apply --set standard.cpu = 0.25
     #[clap(long, short = 's')]
     pub set: Option<String>,
+    /// Use a custom Stack locally.
+    #[clap(long)]
+    pub stack_file: Option<String>,
 }
 
 pub fn execute(
     verbose: bool,
     merge_path: Option<String>,
     set_arg: Option<String>,
+    stack_arg: Option<String>,
 ) -> Result<(), anyhow::Error> {
     info!("Running validation!");
     super::validate::execute(verbose)?;
@@ -94,7 +98,7 @@ pub fn execute(
     let instance_settings = get_instance_settings(merge_path.clone(), set_arg)?;
 
     if env.target == Target::Docker.to_string() {
-        return docker_apply(verbose, instance_settings);
+        return docker_apply(stack_arg, verbose, instance_settings);
     } else if env.target == Target::TemboCloud.to_string() {
         return tembo_cloud_apply(env, instance_settings);
     }
@@ -166,6 +170,7 @@ fn tembo_cloud_apply(
 }
 
 fn docker_apply(
+    stack_arg: Option<String>,
     verbose: bool,
     mut instance_settings: HashMap<String, InstanceSettings>,
 ) -> Result<(), anyhow::Error> {
@@ -176,7 +181,7 @@ fn docker_apply(
     let mut final_instance_settings: HashMap<String, InstanceSettings> = Default::default();
 
     for (_key, instance_setting) in instance_settings.iter_mut() {
-        let final_instance_setting = docker_apply_instance(verbose, instance_setting.to_owned())?;
+        let final_instance_setting = docker_apply_instance(stack_arg.clone(), verbose, instance_setting.to_owned())?;
         final_instance_settings.insert(
             final_instance_setting.instance_name.clone(),
             final_instance_setting,
@@ -236,6 +241,7 @@ fn docker_apply(
 }
 
 fn docker_apply_instance(
+    stack_arg: Option<String>,
     verbose: bool,
     mut instance_setting: InstanceSettings,
 ) -> Result<InstanceSettings, anyhow::Error> {
@@ -246,7 +252,20 @@ fn docker_apply_instance(
 
     let stack_type = ControllerStackType::from_str(instance_setting.stack_type.as_str())
         .unwrap_or(ControllerStackType::Standard);
-    let stack = get_stack(stack_type);
+    let stack: Stack;
+
+    if instance_setting.stack_type.starts_with("Custom:") {
+        let cleaned_stack_type = instance_setting.stack_type.replace("Custom:", "");
+        let mut file_path = PathBuf::from(FileUtils::get_current_working_dir());
+        file_path.push(format!("{}.yaml", cleaned_stack_type));
+
+        let config_data = fs::read_to_string(&file_path)
+            .expect("File not found in the directory");
+        stack = serde_yaml::from_str(&config_data)
+            .expect("Failed to parse YAML");
+    } else {
+        stack = get_stack(stack_type);
+    }
 
     let extensions = merge_options(
         stack.extensions.clone(),

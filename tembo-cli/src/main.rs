@@ -56,13 +56,14 @@ fn main() -> Result<(), anyhow::Error> {
             }
         },
         SubCommands::Init(_init_cmd) => {
-            init::execute()?;
+            init::execute(_init_cmd.stack_file)?;
         }
         SubCommands::Apply(_apply_cmd) => {
             apply::execute(
                 app.global_opts.verbose,
                 _apply_cmd.merge.clone(),
                 _apply_cmd.set.clone(),
+                _apply_cmd.stack_file.clone(),
             )?;
         }
         SubCommands::Validate(_validate_cmd) => {
