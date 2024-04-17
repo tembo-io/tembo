@@ -58,7 +58,7 @@ pub mod prometheus {
             {
                 let f64_val: f64 = seq.next_element()?
                     .ok_or_else(|| de::Error::invalid_length(0, &self))?;
-                let str_val: String = seq.next_element()?
+                let str_val: &str = seq.next_element()?
                     .ok_or_else(|| de::Error::invalid_length(1, &self))?;
     
                 let timestamp = f64_val.trunc() as i64;
@@ -143,10 +143,5 @@ mod tests {
         };
 
         assert_eq!(response, expected);
-    }
-
-    #[test]
-    fn aaaa() {
-        
     }
 }
