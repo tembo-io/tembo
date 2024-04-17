@@ -25,10 +25,12 @@ use std::env;
 use std::sync::{Arc, Mutex};
 use std::{thread, time};
 
+use crate::metrics_reporter::run_metrics_reporter;
 use crate::status_reporter::run_status_reporter;
 use conductor::routes::health::background_threads_running;
 use types::{CRUDevent, Event};
 
+mod metrics_reporter;
 mod status_reporter;
 
 // Amount of time to wait after requeueing a message for an expected failure,
@@ -579,7 +581,8 @@ async fn main() -> std::io::Result<()> {
         .expect("Failed to remember our background threads");
 
     let conductor_enabled = from_env_default("CONDUCTOR_ENABLED", "true");
-    let watcher_enabled = from_env_default("WATCHER_ENABLED", "true");
+    let status_reporter_enabled = from_env_default("WATCHER_ENABLED", "true");
+    let metrics_reported_enabled = from_env_default("METRICS_REPORTER_ENABLED", "true");
 
     if conductor_enabled != "false" {
         info!("Starting conductor");
@@ -616,7 +619,7 @@ async fn main() -> std::io::Result<()> {
         }));
     }
 
-    if watcher_enabled != "false" {
+    if status_reporter_enabled != "false" {
         info!("Starting status reporter");
         background_threads_locked.push(tokio::spawn({
             let custom_metrics_copy = custom_metrics.clone();
@@ -633,10 +636,28 @@ async fn main() -> std::io::Result<()> {
                             error!("error in conductor: {:?}", err);
                         }
                     }
-                    warn!("conductor exited, sleeping for 1 second");
+                    warn!("status_reporter exited, sleeping for 1 second");
                     thread::sleep(time::Duration::from_secs(1));
                 }
             }
+        }));
+    }
+
+    if metrics_reported_enabled != "false" {
+        info!("Starting status reporter");
+        let custom_metrics_copy = custom_metrics.clone();
+        background_threads_locked.push(tokio::spawn(async move {
+            let custom_metrics = &custom_metrics_copy;
+            if let Err(err) = run_metrics_reporter().await {
+                custom_metrics
+                    .conductor_errors
+                    .add(&opentelemetry::Context::current(), 1, &[]);
+
+                error!("error in metrics_reporter: {err}")
+            }
+
+            warn!("metrics_reporter exited, sleeping for 1 second");
+            thread::sleep(time::Duration::from_secs(1));
         }));
     }
 
