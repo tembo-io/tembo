@@ -561,11 +561,22 @@ pub struct CoreDBSpec {
     ///
     /// For more informaton on AffinityConfiguration please see the [Cloudnative-PG documentation](https://cloudnative-pg.io/documentation/1.22/cloudnative-pg.v1/#postgresql-cnpg-io-v1-AffinityConfiguration)
     ///
+    /// **Default**:
+    /// ```yaml
+    /// apiVersion: coredb.io/v1alpha1
+    /// kind: CoreDB
+    /// metadata:
+    ///   name: test-db-restore
+    /// spec:
+    ///   affinityConfiguration:
+    ///     podAntiAffinityType: preferred
+    ///     topologyKey: topology.kubernetes.io/zone
+    /// ```
     #[serde(
         rename = "affinityConfiguration",
         default = "defaults::default_affinity_configuration"
     )]
-    pub affinity_configuration: ClusterAffinity,
+    pub affinity_configuration: Option<ClusterAffinity>,
 }
 
 impl CoreDBSpec {

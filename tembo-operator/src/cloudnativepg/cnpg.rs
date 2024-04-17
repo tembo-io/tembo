@@ -647,6 +647,7 @@ pub fn cnpg_cluster_from_cdb(
     let (backup, service_account_template) = cnpg_backup_configuration(cdb, &cfg);
     let storage = cnpg_cluster_storage(cdb);
     let replication = cnpg_high_availability(cdb);
+    let affinity = cdb.spec.affinity_configuration.clone();
 
     let PostgresConfig {
         postgres_parameters,
@@ -709,7 +710,7 @@ pub fn cnpg_cluster_from_cdb(
             ..ObjectMeta::default()
         },
         spec: ClusterSpec {
-            affinity: Some(cdb.spec.affinity_configuration.clone()),
+            affinity,
             backup,
             service_account_template,
             bootstrap,

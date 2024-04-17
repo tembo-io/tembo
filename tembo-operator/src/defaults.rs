@@ -228,12 +228,12 @@ pub fn default_volume_snapshot() -> Option<VolumeSnapshot> {
     })
 }
 
-pub fn default_affinity_configuration() -> ClusterAffinity {
-    ClusterAffinity {
+pub fn default_affinity_configuration() -> Option<ClusterAffinity> {
+    Some(ClusterAffinity {
         pod_anti_affinity_type: Some("preferred".to_string()),
         topology_key: Some("topology.kubernetes.io/zone".to_string()),
         ..ClusterAffinity::default()
-    }
+    })
 }
 
 #[cfg(test)]
