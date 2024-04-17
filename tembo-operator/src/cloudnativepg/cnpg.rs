@@ -42,7 +42,10 @@ use crate::{
             ClusterServiceAccountTemplate, ClusterServiceAccountTemplateMetadata, ClusterSpec,
             ClusterStorage, ClusterSuperuserSecret,
         },
-        cnpg_utils::{is_image_updated, patch_cluster, restart_and_wait_for_restart},
+        cnpg_utils::{
+            check_cluster_hibernation_status, is_image_updated, patch_cluster,
+            restart_and_wait_for_restart,
+        },
         poolers::{
             Pooler, PoolerCluster, PoolerPgbouncer, PoolerSpec, PoolerTemplate, PoolerTemplateSpec,
             PoolerTemplateSpecContainers, PoolerType,
@@ -651,12 +654,8 @@ pub fn cnpg_cluster_from_cdb(
     // https://cloudnative-pg.io/documentation/current/declarative_hibernation/
 
     if cdb.spec.stop {
-        annotations.insert(
-            "cnpg.io/hibernation".to_string(),
-            "on".to_string(),
-        );
-    }
-    else {
+        annotations.insert("cnpg.io/hibernation".to_string(), "on".to_string());
+    } else {
         annotations.remove("cnpg.io/hibernation");
     }
 
@@ -857,17 +856,6 @@ fn extend_with_fenced_pods(pod_names_to_fence: &mut Vec<String>, fenced_pods: Op
 // pods_to_fence determines a list of pod names that should be fenced when we detect that new replicas are being created
 #[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any()))]
 async fn pods_to_fence(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<String>, Action> {
-
-    // If the cluster is stopped, nothing should be fenced. The fencing code
-    // expects to operate on pods which do not exist while the CNPG cluster
-    // is hibernating.
-
-    let hibernate = get_hibernate_status(&cdb, ctx.clone()).await?;
-
-    if cdb.spec.stop || hibernate {
-        return Ok(Vec::new());
-    }
-
     // Check if there is an initial backup running, pending or completed.  We
     // should never fence a pod with an active initial backup running, pending or
     // completed.  There could be a time where we go into a reconcile loop
@@ -1005,6 +993,25 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
         Action::requeue(tokio::time::Duration::from_secs(300))
     })?;
 
+    match check_cluster_hibernation_status(cdb, &ctx).await {
+        Ok(true) => {
+            info!(
+                "Cluster is hiberneted, skip reconciliation for instance: {}",
+                name
+            );
+            return Ok(());
+        }
+        Ok(false) => {
+            info!(
+                "Cluster is not hibernated, continue reconciliation for instance: {}",
+                name
+            );
+        }
+        Err(e) => {
+            error!("Error checking hibernation status: {:?}", e);
+            return Err(e);
+        }
+    }
     let fenced_pods = pods_to_fence(cdb, ctx.clone()).await?;
     let requires_load = extensions_that_require_load(ctx.client.clone(), namespace).await?;
 
@@ -1024,22 +1031,6 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
 
     let cluster_api: Api<Cluster> = Api::namespaced(ctx.client.clone(), namespace.as_str());
     let maybe_cluster = cluster_api.get(&name).await;
-
-    // If the cluster is in a stop state, we want to avoid performing many of
-    // the standard reconciliation steps, including those which require the
-    // cluster to be running. The restart_and_wait_for_restart routine begins
-    // this expectation, so this short-circuit should prevent that.
-
-    let hibernate = get_hibernate_status(&cdb, ctx.clone()).await?;
-
-    if cdb.spec.stop || hibernate {
-        patch_cluster(&cluster, ctx.clone(), cdb).await?;
-
-        reconcile_metrics_service(cdb, ctx.clone()).await?;
-        reconcile_metrics_ingress_route(cdb, ctx.clone()).await?;
-
-        return Ok(());
-    }
 
     // Check if we are updating the cluster to reboot/restart the instance, if so do that first before
     // updating the cluster spec.  Also check to see if the image is being updated.  If do
@@ -1885,41 +1876,6 @@ pub async fn get_fenced_pods(
     }
 }
 
-/// Determine the hibernate state of the CNPG cluster resources
-/// 
-/// This function will only return true if the cnpg.io/hibernation annotation
-/// is set to "on". Otherwise the assumption is that the annotation is not set
-/// at all or is set to some other value, in which case CNPG will not hibernate.
-#[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any()))]
-pub async fn get_hibernate_status(
-    cdb: &CoreDB,
-    ctx: Arc<Context>,
-) -> Result<bool, Action> {
-    let instance_name = cdb.metadata.name.as_deref().unwrap_or_default();
-    let namespace = cdb.namespace().ok_or_else(|| {
-        error!("Namespace is not set for CoreDB instance {}", instance_name);
-        Action::requeue(Duration::from_secs(300))
-    })?;
-
-    let cluster: Api<Cluster> = Api::namespaced(ctx.client.clone(), &namespace);
-    let co = cluster.get(instance_name).await.map_err(|e| {
-        error!("Error getting cluster: {}", e);
-        Action::requeue(Duration::from_secs(300))
-    })?;
-
-    let hibernate = match co.metadata.annotations {
-        Some(ann) => ann
-            .get("cnpg.io/hibernation")
-            .map_or(false, |state| state == "on"),
-        None => {
-            info!("Cluster Status for {} is not set", instance_name);
-            return Ok(false);
-        }
-    };
-
-    Ok(hibernate)
-}
-
 // get_instance_replicas will look up cluster.spec.instances from Kubernetes and return i64 value
 #[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any()))]
 async fn get_instance_replicas(cdb: &CoreDB, ctx: Arc<Context>) -> Result<i64, Action> {
@@ -2230,7 +2186,7 @@ async fn is_restore_backup_running_pending_completed(
 // does_cluster_exist checks if a cluster exists and returns a bool or action to
 // requeue in a result
 #[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any()))]
-async fn does_cluster_exist(cdb: &CoreDB, ctx: Arc<Context>) -> Result<bool, Action> {
+pub(crate) async fn does_cluster_exist(cdb: &CoreDB, ctx: Arc<Context>) -> Result<bool, Action> {
     let instance_name = cdb.name_any();
     let namespace = cdb.namespace().ok_or_else(|| {
         error!(
@@ -2247,6 +2203,11 @@ async fn does_cluster_exist(cdb: &CoreDB, ctx: Arc<Context>) -> Result<bool, Act
         Ok(_) => {
             debug!("Cluster {} exists", instance_name);
             Ok(true)
+        }
+        // return Ok(false) if the cluster does not exist (404)
+        Err(kube::Error::Api(ae)) if ae.code == 404 => {
+            debug!("Cluster {} does not exist", instance_name);
+            Ok(false)
         }
         Err(e) => {
             error!("Error getting cluster: {}", e);
