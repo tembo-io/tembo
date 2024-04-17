@@ -13,7 +13,7 @@ keywords:
   - postgres
   - database
 maintainers:
-  - name: Temboo
+  - name: Tembo
     url: https://tembocommunity.slack.com
 dependencies:
   - name: cloudnative-pg
