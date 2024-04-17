@@ -9,6 +9,7 @@ use crate::{
     apis::coredb_types::{
         Backup, ConnectionPooler, PgBouncer, S3Credentials, ServiceAccountTemplate, VolumeSnapshot,
     },
+    cloudnativepg::clusters::ClusterAffinity,
     cloudnativepg::poolers::{PoolerPgbouncerPoolMode, PoolerTemplateSpecContainersResources},
     extensions::types::{Extension, TrunkInstall},
     stacks::types::ImagePerPgVersion,
@@ -225,6 +226,14 @@ pub fn default_volume_snapshot() -> Option<VolumeSnapshot> {
         enabled: false,
         snapshot_class: None,
     })
+}
+
+pub fn default_affinity_configuration() -> ClusterAffinity {
+    ClusterAffinity {
+        pod_anti_affinity_type: Some("preferred".to_string()),
+        topology_key: Some("topology.kubernetes.io/zone".to_string()),
+        ..ClusterAffinity::default()
+    }
 }
 
 #[cfg(test)]

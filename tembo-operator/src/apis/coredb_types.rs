@@ -13,6 +13,7 @@ use k8s_openapi::{
     apimachinery::pkg::{api::resource::Quantity, apis::meta::v1::ObjectMeta},
 };
 
+use crate::cloudnativepg::clusters::ClusterAffinity;
 use crate::cloudnativepg::poolers::{
     PoolerPgbouncerPoolMode, PoolerTemplateSpecContainersResources,
 };
@@ -554,6 +555,17 @@ pub struct CoreDBSpec {
     /// **Default**: `None` (uses the `default` StorageClass in your cluster)
     #[serde(rename = "storageClass")]
     pub storage_class: Option<String>,
+
+    /// A AffinityConfiguration provides a way to configure the CoreDB instance to run
+    /// on specific nodes in the cluster based off of nodeSelector, nodeAffinity and tolerations
+    ///
+    /// For more informaton on AffinityConfiguration please see the [Cloudnative-PG documentation](https://cloudnative-pg.io/documentation/1.22/cloudnative-pg.v1/#postgresql-cnpg-io-v1-AffinityConfiguration)
+    ///
+    #[serde(
+        rename = "affinityConfiguration",
+        default = "defaults::default_affinity_configuration"
+    )]
+    pub affinity_configuration: ClusterAffinity,
 }
 
 impl CoreDBSpec {

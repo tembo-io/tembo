@@ -10,7 +10,7 @@ use crate::{
     cloudnativepg::{
         backups::Backup,
         clusters::{
-            Cluster, ClusterAffinity, ClusterBackup, ClusterBackupBarmanObjectStore,
+            Cluster, ClusterBackup, ClusterBackupBarmanObjectStore,
             ClusterBackupBarmanObjectStoreData, ClusterBackupBarmanObjectStoreDataCompression,
             ClusterBackupBarmanObjectStoreDataEncryption,
             ClusterBackupBarmanObjectStoreS3Credentials,
@@ -709,11 +709,7 @@ pub fn cnpg_cluster_from_cdb(
             ..ObjectMeta::default()
         },
         spec: ClusterSpec {
-            affinity: Some(ClusterAffinity {
-                pod_anti_affinity_type: Some("preferred".to_string()),
-                topology_key: Some("topology.kubernetes.io/zone".to_string()),
-                ..ClusterAffinity::default()
-            }),
+            affinity: Some(cdb.spec.affinity_configuration.clone()),
             backup,
             service_account_template,
             bootstrap,
