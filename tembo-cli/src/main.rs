@@ -63,7 +63,6 @@ fn main() -> Result<(), anyhow::Error> {
                 app.global_opts.verbose,
                 _apply_cmd.merge.clone(),
                 _apply_cmd.set.clone(),
-                _apply_cmd.stack_file.clone(),
             )?;
         }
         SubCommands::Validate(_validate_cmd) => {

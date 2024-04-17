@@ -55,6 +55,7 @@ use crate::cli::tembo_config::Library;
 use crate::cli::tembo_config::OverlayInstanceSettings;
 use crate::cli::tembo_config::TrunkProject;
 use crate::tui;
+use crate::tui::error;
 use crate::{
     cli::context::{get_current_context, Environment, Profile, Target},
     tui::{clean_console, colors, instance_started, white_confirmation},
@@ -75,16 +76,12 @@ pub struct ApplyCommand {
     /// Replace a specific configuration in your tembo.toml file. For example, tembo apply --set standard.cpu = 0.25
     #[clap(long, short = 's')]
     pub set: Option<String>,
-    /// Use a custom Stack locally.
-    #[clap(long)]
-    pub stack_file: Option<String>,
 }
 
 pub fn execute(
     verbose: bool,
     merge_path: Option<String>,
     set_arg: Option<String>,
-    stack_arg: Option<String>,
 ) -> Result<(), anyhow::Error> {
     info!("Running validation!");
     super::validate::execute(verbose)?;
@@ -98,7 +95,7 @@ pub fn execute(
     let instance_settings = get_instance_settings(merge_path.clone(), set_arg)?;
 
     if env.target == Target::Docker.to_string() {
-        return docker_apply(stack_arg, verbose, instance_settings);
+        return docker_apply(verbose, instance_settings);
     } else if env.target == Target::TemboCloud.to_string() {
         return tembo_cloud_apply(env, instance_settings);
     }
@@ -155,6 +152,9 @@ fn tembo_cloud_apply(
     instance_settings: HashMap<String, InstanceSettings>,
 ) -> Result<(), anyhow::Error> {
     for (_key, instance_setting) in instance_settings.iter() {
+        if instance_setting.stack_file.is_some() {
+            error("Stack File is only available for local testing.");
+        }
         let result = tembo_cloud_apply_instance(&env, instance_setting);
 
         match result {
@@ -170,7 +170,6 @@ fn tembo_cloud_apply(
 }
 
 fn docker_apply(
-    stack_arg: Option<String>,
     verbose: bool,
     mut instance_settings: HashMap<String, InstanceSettings>,
 ) -> Result<(), anyhow::Error> {
@@ -181,8 +180,7 @@ fn docker_apply(
     let mut final_instance_settings: HashMap<String, InstanceSettings> = Default::default();
 
     for (_key, instance_setting) in instance_settings.iter_mut() {
-        let final_instance_setting =
-            docker_apply_instance(stack_arg.clone(), verbose, instance_setting.to_owned())?;
+        let final_instance_setting = docker_apply_instance(verbose, instance_setting.to_owned())?;
         final_instance_settings.insert(
             final_instance_setting.instance_name.clone(),
             final_instance_setting,
@@ -234,7 +232,6 @@ fn docker_apply(
                 "postgres://postgres:postgres@{}.local.tembo.io:{}",
                 instance_setting.instance_name, port
             ),
-            &instance_setting.stack_type,
             "local",
         );
     }
@@ -242,7 +239,6 @@ fn docker_apply(
 }
 
 fn docker_apply_instance(
-    stack_arg: Option<String>,
     verbose: bool,
     mut instance_setting: InstanceSettings,
 ) -> Result<InstanceSettings, anyhow::Error> {
@@ -251,14 +247,16 @@ fn docker_apply_instance(
         instance_setting.instance_name.clone(),
     )?;
 
-    let stack_type = ControllerStackType::from_str(instance_setting.stack_type.as_str())
+    let stack_type = ControllerStackType::from_str(&instance_setting.stack_type.clone().unwrap())
         .unwrap_or(ControllerStackType::Standard);
     let stack: Stack;
 
-    if instance_setting.stack_type.starts_with("Custom:") {
-        let cleaned_stack_type = instance_setting.stack_type.replace("Custom:", "");
+    if instance_setting.stack_file.is_some() {
         let mut file_path = PathBuf::from(FileUtils::get_current_working_dir());
-        file_path.push(format!("{}.yaml", cleaned_stack_type));
+        let cleane_stack_file = instance_setting.stack_file.clone().unwrap();
+        let cleaned_stack_file = cleane_stack_file.trim_matches('"');
+        file_path.push(format!("{}", cleaned_stack_file));
+        println!("{:?}", file_path);
 
         let config_data = fs::read_to_string(&file_path).expect("File not found in the directory");
         stack = serde_yaml::from_str(&config_data).expect("Failed to parse YAML");
@@ -415,7 +413,10 @@ pub fn tembo_cloud_apply_instance(
             ));
             clean_console();
             let connection_string = construct_connection_string(conn_info, password);
-            instance_started(&connection_string, &instance_settings.stack_type, "cloud");
+            instance_started(
+                &connection_string,
+                &instance_settings.stack_type.clone().unwrap(),
+            );
 
             break;
         }
@@ -603,7 +604,7 @@ fn get_create_instance(
         )
         .unwrap(),
         instance_name: instance_settings.instance_name.clone(),
-        stack_type: StackType::from_str(instance_settings.stack_type.as_str()).unwrap(),
+        stack_type: StackType::from_str(&instance_settings.stack_type.as_ref().unwrap()).unwrap(),
         storage: Storage::from_str(instance_settings.storage.as_str()).unwrap(),
         replicas: Some(instance_settings.replicas),
         app_services: get_app_services(instance_settings.app_services.clone())?,
@@ -943,9 +944,11 @@ fn merge_settings(base: &InstanceSettings, overlay: OverlayInstanceSettings) -> 
         memory: overlay.memory.unwrap_or_else(|| base.memory.clone()),
         storage: overlay.storage.unwrap_or_else(|| base.storage.clone()),
         replicas: overlay.replicas.unwrap_or(base.replicas),
-        stack_type: overlay
-            .stack_type
-            .unwrap_or_else(|| base.stack_type.clone()),
+        stack_type: Some(
+            overlay
+                .stack_type
+                .unwrap_or_else(|| base.stack_type.as_ref().unwrap().clone()),
+        ),
         postgres_configurations: overlay
             .postgres_configurations
             .or_else(|| base.postgres_configurations.clone()),
@@ -960,6 +963,7 @@ fn merge_settings(base: &InstanceSettings, overlay: OverlayInstanceSettings) -> 
             .ip_allow_list
             .or_else(|| base.extra_domains_rw.clone()),
         pg_version: overlay.pg_version.unwrap_or(base.pg_version),
+        stack_file: None,
     }
 }
 
@@ -1000,7 +1004,7 @@ pub fn set_instance_settings(
                     .parse()
                     .map_err(|_| Error::msg("Invalid value for replicas"))?;
             }
-            "stack_type" => settings.stack_type = setting_value,
+            "stack_type" => settings.stack_type = Some(setting_value),
             _ => {
                 return Err(Error::msg(format!("Unknown setting: {}", setting_name)));
             }

@@ -116,10 +116,10 @@ pub fn logo<'a>() -> TemboCliLog<'a> {
     colors::gradient_rainbow(">>> T E M B O")
 }
 
-pub fn instance_started(server_url: &str, stack: &str, instance_type: &str) {
+pub fn instance_started(server_url: &str, stack: &str) {
     let bar = "┃".color(colors::sql_u()).bold();
     println!(
-        "\n{bar} {} {instance_type} instance {}: \n\n ➜ {}\n ➜ {}",
+        "\n{bar} {} instance {}: \n\n ➜ {}\n ➜ {}",
         logo(),
         "started".bg_rgb(255, 125, 127).color(Color::White).bold(),
         format_args!(

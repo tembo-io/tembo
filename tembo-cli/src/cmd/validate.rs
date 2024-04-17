@@ -113,7 +113,7 @@ fn validate_stack_support(
     pg_version: u8,
     stack_type: &str,
 ) -> Result<(), anyhow::Error> {
-    if settings.pg_version == pg_version && settings.stack_type == stack_type {
+    if settings.pg_version == pg_version && settings.stack_type.as_deref() == Some(stack_type) {
         return Err(Error::msg(format!(
             "Support for the {} stack on Postgres version {} is coming soon!",
             stack_type, pg_version
@@ -148,8 +148,10 @@ pub fn validate_config(
         validate_replicas(&replicas_str, &section, verbose)?;
 
         // Validate the stack types
-        let stack_types_str = settings.stack_type.as_str();
-        validate_stack_type(stack_types_str, &section, verbose)?;
+        if settings.stack_type.is_some() {
+            let ha = settings.stack_type;
+            validate_stack_type(&ha.unwrap(), &section, verbose)?;
+        }
     }
     Ok(())
 }
@@ -253,24 +255,20 @@ fn validate_stack_type(
     section: &str,
     verbose: bool,
 ) -> Result<(), anyhow::Error> {
-    if stack_types.starts_with("Custom:") {
-        Ok(())
-    } else {
-        match temboclient::models::StackType::from_str(stack_types) {
-            std::result::Result::Ok(_) => {
-                if verbose {
-                    info(&format!(
-                        "Stack types '{}' in section '{}' is valid",
-                        stack_types, section
-                    ));
-                }
-                Ok(())
+    match temboclient::models::StackType::from_str(stack_types) {
+        std::result::Result::Ok(_) => {
+            if verbose {
+                info(&format!(
+                    "Stack types '{}' in section '{}' is valid",
+                    stack_types, section
+                ));
             }
-            std::result::Result::Err(_) => Err(Error::msg(format!(
-                "Invalid stack type setting in section '{}': {}",
-                section, stack_types
-            ))),
+            Ok(())
         }
+        std::result::Result::Err(_) => Err(Error::msg(format!(
+            "Invalid stack type setting in section '{}': {}",
+            section, stack_types
+        ))),
     }
 }
 
