@@ -16,6 +16,9 @@ mod tui;
 #[derive(Parser)]
 #[clap(author = crate_authors!("\n"), version = crate_version!(), about = "Tembo CLI", long_about = None)]
 struct App {
+    #[arg(long, hide = true)]
+    markdown_help: bool,
+    
     #[clap(flatten)]
     global_opts: GlobalOpts,
 
@@ -44,6 +47,10 @@ struct GlobalOpts {
 }
 
 fn main() -> Result<(), anyhow::Error> {
+    if std::env::args().any(|arg| arg == "--markdown-help") {
+        clap_markdown::print_help_markdown::<App>();
+        return Ok(());
+    }
     let app = App::parse();
 
     match app.command {
