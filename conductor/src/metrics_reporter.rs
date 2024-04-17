@@ -2,10 +2,11 @@ use std::{env, fs::File, time::Duration};
 
 use anyhow::{bail, Context, Result};
 use log::info;
-use pgmq::query;
 use serde::Deserialize;
 use serde_json::Value;
 use tokio::time::interval;
+
+const METRICS_FILE: &str = include_str!("../metrics.yml");
 
 use crate::from_env_default;
 
@@ -21,11 +22,7 @@ pub struct Metrics {
 }
 
 fn load_metrics() -> Result<Metrics> {
-    let metrics_filename =
-        env::var("METRICS_FILE").with_context(|| "METRICS_FILE env var not found!")?;
-    let metrics = File::open(metrics_filename).with_context(|| "Failed to open METRICS_FILE")?;
-
-    serde_yaml::from_reader(metrics).with_context(|| "Failed to deserialize METRICS_FILE")
+    serde_yaml::from_str(METRICS_FILE).with_context(|| "Failed to deserialize METRICS_FILE")
 }
 
 pub async fn run_metrics_reporter() -> Result<()> {
@@ -49,17 +46,22 @@ pub async fn run_metrics_reporter() -> Result<()> {
 }
 
 struct Client {
-    prometheus_url: String,
+    query_url: String,
     client: reqwest::Client,
 }
 
 impl Client {
     pub fn new() -> Self {
+        let prometheus_url = from_env_default(
+            "PROMETHEUS_URL",
+            "http://monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090",
+        );
+        let query_url = format!("{prometheus_url}/api/v1/query");
+
+        info!("metrics_reporter will use '{query_url}'");
+
         Self {
-            prometheus_url: from_env_default(
-                "PROMETHEUS_URL",
-                "http://monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090",
-            ),
+            query_url,
             client: reqwest::Client::new(),
         }
     }
@@ -67,7 +69,7 @@ impl Client {
     pub async fn query(&self, query: &str) -> Result<Value> {
         let response = self
             .client
-            .get(&self.prometheus_url)
+            .get(&self.query_url)
             .query(&[("query", query)])
             .send()
             .await?;
