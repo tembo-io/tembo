@@ -1,6 +1,9 @@
 use crate::{
     apis::coredb_types::CoreDB,
-    cloudnativepg::{clusters::Cluster, cnpg::does_cluster_exist},
+    cloudnativepg::{
+        clusters::{Cluster, ClusterStatusConditionsStatus},
+        cnpg::does_cluster_exist,
+    },
     extensions::database_queries::is_not_restarting,
     patch_cdb_status_merge, Context, RESTARTED_AT,
 };
@@ -98,7 +101,7 @@ pub(crate) async fn restart_and_wait_for_restart(
 }
 
 #[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any(), running = %running))]
-async fn update_coredb_status(
+pub(crate) async fn update_coredb_status(
     cdb: &CoreDB,
     ctx: &Arc<Context>,
     running: bool,
@@ -283,7 +286,6 @@ pub(crate) async fn check_cluster_hibernation_status(
         (true, false) => {
             // If incorrectly hibernating, patch to deactivate.
             patch_hibernation_status(cdb, ctx, false, &name).await?;
-            update_coredb_status(cdb, ctx, true).await?;
             Ok(true)
         }
         (false, true) => {
@@ -354,51 +356,51 @@ pub async fn get_hibernate_status(cdb: &CoreDB, ctx: &Arc<Context>) -> Result<bo
 
 // check_cluster_status will check if the Cluster is running or not and verify the actual status to patch the
 // CoreDB status.running field.
-// pub(crate) async fn check_cluster_status(cdb: &CoreDB, ctx: &Arc<Context>) -> Result<bool, Action> {
-//     let name = cdb.name_any();
-//     let namespace = cdb.namespace().ok_or_else(|| {
-//         error!("Namespace is not set for CoreDB instance {}", name);
-//         Action::requeue(Duration::from_secs(300))
-//     })?;
+pub(crate) async fn check_cluster_status(cdb: &CoreDB, ctx: &Arc<Context>) -> Result<bool, Action> {
+    let name = cdb.name_any();
+    let namespace = cdb.namespace().ok_or_else(|| {
+        error!("Namespace is not set for CoreDB instance {}", name);
+        Action::requeue(Duration::from_secs(300))
+    })?;
 
-//     // Check if the cluster exists; if not, exit early.
-//     if !does_cluster_exist(cdb, ctx.clone()).await? {
-//         debug!("Cluster does not exist for instance: {}", name);
-//         return Ok(false);
-//     }
+    // Check if the cluster exists; if not, exit early.
+    if !does_cluster_exist(cdb, ctx.clone()).await? {
+        debug!("Cluster does not exist for instance: {}", name);
+        return Ok(false);
+    }
 
-//     // if cluster exists, check the status.conditions for the cluster status
-//     let cluster_api: Api<Cluster> = Api::namespaced(ctx.client.clone(), &namespace);
-//     let cluster = cluster_api.get(&name).await.map_err(|e| {
-//         error!("Error getting cluster: {}", e);
-//         Action::requeue(Duration::from_secs(300))
-//     })?;
+    // if cluster exists, check the status.conditions for the cluster status
+    let cluster_api: Api<Cluster> = Api::namespaced(ctx.client.clone(), &namespace);
+    let cluster = cluster_api.get(&name).await.map_err(|e| {
+        error!("Error getting cluster: {}", e);
+        Action::requeue(Duration::from_secs(300))
+    })?;
 
-//     let mut is_cluster_ready = false;
-//     let mut is_hibernated_present = false;
-//     let mut is_hibernated = false;
+    let mut is_cluster_ready = false;
+    let mut is_hibernated_present = false;
+    let mut is_hibernated = false;
 
-//     if let Some(status) = &cluster.status {
-//         if let Some(conditions) = &status.conditions {
-//             for condition in conditions {
-//                 if condition.reason == "ClusterIsReady"
-//                     && condition.status == ClusterStatusConditionsStatus::True
-//                 {
-//                     is_cluster_ready = true;
-//                     debug!("Cluster '{}' is ready.", name);
-//                 }
-//                 if condition.reason == "Hibernated" {
-//                     is_hibernated_present = true;
-//                     is_hibernated = condition.status == ClusterStatusConditionsStatus::True;
-//                     debug!(
-//                         "Hibernated status for '{}' is '{:?}'.",
-//                         name, condition.status
-//                     );
-//                 }
-//             }
-//         }
-//     }
+    if let Some(status) = &cluster.status {
+        if let Some(conditions) = &status.conditions {
+            for condition in conditions {
+                if condition.reason == "ClusterIsReady"
+                    && condition.status == ClusterStatusConditionsStatus::True
+                {
+                    is_cluster_ready = true;
+                    debug!("Cluster '{}' is ready.", name);
+                }
+                if condition.reason == "Hibernated" {
+                    is_hibernated_present = true;
+                    is_hibernated = condition.status == ClusterStatusConditionsStatus::True;
+                    debug!(
+                        "Hibernated status for '{}' is '{:?}'.",
+                        name, condition.status
+                    );
+                }
+            }
+        }
+    }
 
-//     // Return true if ClusterIsReady is true and either Hibernated is false or missing.
-//     Ok(is_cluster_ready && (!is_hibernated_present || !is_hibernated))
-// }
+    // Return true if ClusterIsReady is true and either Hibernated is false or missing.
+    Ok(is_cluster_ready && (!is_hibernated_present || !is_hibernated))
+}

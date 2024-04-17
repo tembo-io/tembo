@@ -43,8 +43,8 @@ use crate::{
             ClusterStorage, ClusterSuperuserSecret,
         },
         cnpg_utils::{
-            check_cluster_hibernation_status, is_image_updated, patch_cluster,
-            restart_and_wait_for_restart,
+            check_cluster_hibernation_status, check_cluster_status, is_image_updated,
+            patch_cluster, restart_and_wait_for_restart, update_coredb_status,
         },
         poolers::{
             Pooler, PoolerCluster, PoolerPgbouncer, PoolerSpec, PoolerTemplate, PoolerTemplateSpec,
@@ -1060,8 +1060,25 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
     // Check if the CoreDB status is running: false, return requeue
     if let Some(status) = current_status {
         if !status.running {
-            info!("CoreDB status.running is false, requeuing 10 seconds");
-            return Err(Action::requeue(Duration::from_secs(10)));
+            // Status is not running, we should check if the cluster is ready, if not requeue
+            match check_cluster_status(cdb, &ctx).await {
+                Ok(true) => {
+                    info!("CoreDB status.running is false, but cluster is ready, update CoreDB status.running to true for instnace: {}", &name);
+                    // Set CoreDB status.running to true
+                    update_coredb_status(cdb, &ctx, true).await?;
+                }
+                Ok(false) => {
+                    info!("CoreDB status.running is false, cluster is not ready, requeuing 10 seconds for instance: {}", &name);
+                    return Err(Action::requeue(Duration::from_secs(10)));
+                }
+                Err(e) => {
+                    error!(
+                        "Error checking cluster status {:?} for instance: {}",
+                        e, &name
+                    );
+                    return Err(e);
+                }
+            }
         }
     }
 
