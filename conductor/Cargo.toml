@@ -27,6 +27,9 @@ actix-web-opentelemetry = { version = "0.13.0", features = ["metrics-prometheus"
 opentelemetry = { version = "0.18", features = ["metrics", "rt-tokio-current-thread"] }
 opentelemetry-prometheus = "0.11"
 sqlx = "0.6.3"
+anyhow =  "1.0.82"
+serde_yaml = "0.9.34"
+reqwest = { version = "0.12.3", features = ["json"] }
 
 [dependencies.kube]
 features = ["runtime", "client", "derive"]
