@@ -47,6 +47,8 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         env::var("POSTGRES_QUEUE_CONNECTION").expect("POSTGRES_QUEUE_CONNECTION must be set");
     let control_plane_events_queue =
         env::var("CONTROL_PLANE_EVENTS_QUEUE").expect("CONTROL_PLANE_EVENTS_QUEUE must be set");
+    let metrics_events_queue =
+        env::var("METRICS_EVENTS_QUEUE").expect("METRICS_EVENTS_QUEUE must be set");
     let data_plane_events_queue =
         env::var("DATA_PLANE_EVENTS_QUEUE").expect("DATA_PLANE_EVENTS_QUEUE must be set");
     let data_plane_basedomain =
@@ -71,6 +73,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
     // Create queues if they do not exist
     queue.create(&control_plane_events_queue).await?;
     queue.create(&data_plane_events_queue).await?;
+    queue.create(&metrics_events_queue).await?;
 
     // Infer the runtime environment and try to create a Kubernetes Client
     let client = Client::try_default().await?;

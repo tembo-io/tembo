@@ -1,9 +1,10 @@
-use std::{env, fs::File, time::Duration};
+use std::{env, time::Duration};
 
 use anyhow::{bail, Context, Result};
+use conductor::metrics::{dataplane_metrics::DataPlaneMetrics, prometheus::Metrics};
 use log::info;
+use pgmq::PGMQueueExt;
 use serde::Deserialize;
-use serde_json::Value;
 use tokio::time::interval;
 
 const METRICS_FILE: &str = include_str!("../metrics.yml");
@@ -11,36 +12,51 @@ const METRICS_FILE: &str = include_str!("../metrics.yml");
 use crate::from_env_default;
 
 #[derive(Debug, Deserialize)]
-pub struct Metric {
+pub struct MetricQuery {
     name: String,
     query: String,
 }
 
 #[derive(Debug, Deserialize)]
-pub struct Metrics {
-    metrics: Vec<Metric>,
+pub struct MetricQueries {
+    metrics: Vec<MetricQuery>,
 }
 
-fn load_metrics() -> Result<Metrics> {
-    serde_yaml::from_str(METRICS_FILE).with_context(|| "Failed to deserialize METRICS_FILE")
+fn load_metric_queries() -> Result<MetricQueries> {
+    serde_yaml::from_str(METRICS_FILE).map_err(Into::into)
 }
 
 pub async fn run_metrics_reporter() -> Result<()> {
     let client = Client::new();
-    let Metrics { metrics } = load_metrics()?;
+
+    let MetricQueries { metrics } = load_metric_queries()?;
     info!("metrics_reporter: loaded {} metrics", metrics.len());
+
+    let pg_conn_url = env::var("POSTGRES_QUEUE_CONNECTION")
+        .with_context(|| "POSTGRES_QUEUE_CONNECTION must be set")?;
+
+    let queue = PGMQueueExt::new(pg_conn_url, 5).await?;
+    let metrics_events_queue =
+        env::var("METRICS_EVENTS_QUEUE").expect("METRICS_EVENTS_QUEUE must be set");
+
+    queue.init().await?;
+    queue.create(&metrics_events_queue).await?;
+
     let mut sync_interval = interval(Duration::from_secs(5));
 
     loop {
         sync_interval.tick().await;
 
         for metric in &metrics {
-            let resp = client.query(&metric.query).await?;
+            let metrics = client.query(&metric.query).await?;
 
-            println!(
-                "Got response: {}",
-                serde_json::to_string_pretty(&resp).unwrap()
-            )
+            let data_plane_metrics =
+                DataPlaneMetrics::from_query_result(&metric.name, metrics.data.result);
+
+            // Send to PGMQ
+            queue
+                .send(&metrics_events_queue, &data_plane_metrics)
+                .await?;
         }
     }
 }
@@ -66,7 +82,7 @@ impl Client {
         }
     }
 
-    pub async fn query(&self, query: &str) -> Result<Value> {
+    pub async fn query(&self, query: &str) -> Result<Metrics> {
         let response = self
             .client
             .get(&self.query_url)
