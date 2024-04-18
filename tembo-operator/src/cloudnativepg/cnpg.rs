@@ -1063,7 +1063,7 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
             // Status is not running, we should check if the cluster is ready, if not requeue
             match check_cluster_status(cdb, &ctx).await {
                 Ok(true) => {
-                    info!("CoreDB status.running is false, but cluster is ready, update CoreDB status.running to true for instnace: {}", &name);
+                    info!("CoreDB status.running is false, but cluster is ready, update CoreDB status.running to true for instance: {}", &name);
                     // Set CoreDB status.running to true
                     update_coredb_status(cdb, &ctx, true).await?;
                 }
