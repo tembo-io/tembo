@@ -65,6 +65,112 @@ mod test {
     const TIMEOUT_SECONDS_POD_DELETED: u64 = 300;
     const TIMEOUT_SECONDS_COREDB_DELETED: u64 = 300;
 
+    /// Struct to contain many commonly used test resources
+    /// 
+    /// Most if not all tests use all of the fields here, or refer to them
+    /// in some manner. This struct helps combine everything together.
+    struct TestClass {
+        name: String,
+        namespace: String,
+        client: Client,
+        state: State,
+        context: Arc<Context>,
+        pods: Api<Pod>,
+        coredbs: Api<CoreDB>,
+    }
+
+    /// Helper class to make writing tests easier / less messy
+    /// 
+    /// This class implements several functions for the TestClass struct that
+    /// remove a lot of the boilerplate code that happens frequently in these
+    /// tests. Use it whenever possible and feel free to add methods that
+    /// should be listed.
+    impl TestClass {
+        /// Instantiate a new TestClass object
+        /// 
+        /// By providing a test name, this function will return a TestClass
+        /// object and set all of the related struct values as such:
+        /// 
+        ///   * name - Test name as passed plus an RNG suffix
+        ///   * namespace - An initialized Kubernetes namespace for the test
+        ///   * client - An active Kubernetes client runtime
+        ///   * state - A controller state, set to the default
+        ///   * context - An active Arc context
+        ///   * pods - A pod to use for cluster-commands in this namespace and client
+        ///   * coredbs - A CoreDB API tied to this namespace and client
+        async fn new(test_name: &str) -> Self {
+            let client = kube_client().await;
+            let state = State::default();
+            let context = state.create_context(client.clone());
+
+            let mut rng = rand::thread_rng();
+            let suffix = rng.gen_range(0..100000);
+            let name = format!("{}-{}", test_name, suffix);
+            let namespace = match create_namespace(client.clone(), &name).await {
+                Ok(namespace) => namespace,
+                Err(e) => {
+                    eprintln!("Error creating namespace: {}", e);
+                    std::process::exit(1);
+                }
+            };
+
+            // Create a pod we can use to run commands in the cluster
+            let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
+
+            // Apply a basic configuration of CoreDB
+            println!("Creating CoreDB resource {}", name);
+            let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
+
+            Self {
+                name,
+                namespace,
+                client,
+                state,
+                context,
+                pods,
+                coredbs
+            }
+        }
+
+        /// Transform a JSON object into a cluster definition
+        /// 
+        /// Given a series of JSON values defining a CoreDB cluster, this
+        /// function will return a CoreDB object in the generated namespace.
+        /// Subsequent calls will patch the existing cluster associated with
+        /// the base object.
+        async fn set_cluster_def(&self, cluster_def: &serde_json::Value) -> CoreDB {
+            let params = PatchParams::apply("tembo-integration-test");
+            let patch = Patch::Apply(&cluster_def);
+            self.coredbs.patch(&self.name, &params, &patch).await.unwrap()
+        }
+
+        // Tear down the test cluster, namespace, and other related allocations
+        //
+        // Once a test is finished, we should remove all structures we created.
+        // Always call this function at the end of a test, and it will remove
+        // the namespace for the test and all contained objects.
+        async fn teardown(&self) {
+            self.coredbs.delete(&self.name, &Default::default()).await.unwrap();
+            println!("Waiting for CoreDB to be deleted: {}", &self.name);
+            let _assert_coredb_deleted = tokio::time::timeout(
+                Duration::from_secs(TIMEOUT_SECONDS_COREDB_DELETED),
+                await_condition(self.coredbs.clone(), &self.name, conditions::is_deleted("")),
+            )
+            .await
+            .unwrap_or_else(|_| {
+                panic!(
+                    "CoreDB {} was not deleted after waiting {} seconds",
+                    &self.name, TIMEOUT_SECONDS_COREDB_DELETED
+                )
+            });
+            println!("CoreDB resource deleted {}", &self.name);
+
+            // Delete namespace
+            let _ = delete_namespace(self.client.clone(), &self.namespace).await;
+        }
+
+    }
+
     async fn kube_client() -> Client {
         // Get the name of the currently selected namespace
         let kube_config = Config::infer()
@@ -5402,5 +5508,61 @@ CREATE EVENT TRIGGER pgrst_watch
 
         // Delete namespace
         let _ = delete_namespace(client.clone(), &namespace).await;
+    }
+
+    #[tokio::test]
+    #[ignore]
+    /// Test the hibernation system
+    /// Ensure that the cluster performs the following:
+    ///   * Starts and is running following init
+    ///   * Stops and has no pods after hibernation (spec.stop: true)
+    ///   * Starts and is running after thaw (spec.stop: false)
+    async fn functional_test_hibernate() {
+        let test_name = "test-basic-cnpg";
+        let test = TestClass::new(test_name).await;
+        let name = test.name.clone();
+
+        // Generate very simple CoreDB JSON definitions. The first will be for
+        // initializing and starting the cluster, and the second for stopping
+        // it. We'll use a single replica to ensure _all_ parts of the cluster
+        // are affected by hibernate.
+
+        let cluster_start = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": "CoreDB",
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "replicas": 1,
+                "stop": false,
+            }
+        });
+
+        let mut cluster_stop = cluster_start.clone();
+        cluster_stop["spec"]["stop"] = serde_json::json!(true);
+
+        // Begin by starting the cluster and validating that it worked.
+        // We need this here as initial iterations of the hibernate code
+        // prevented the cluster from starting.
+
+        let _ = test.set_cluster_def(&cluster_start).await;
+        assert!(status_running(&test.coredbs, &name).await);
+
+        // Stop the cluster and check to make sure it's not running to ensure
+        // hibernate is doing its job.
+
+        let _ = test.set_cluster_def(&cluster_stop).await;
+        let _ = wait_until_status_not_running(&test.coredbs, &name).await;
+        assert!(status_running(&test.coredbs, &name).await.not());
+
+        // Patch the cluster to start it up again, then check to ensure it
+        // actually did so. This proves hibernation can be reversed.
+
+        let _ = test.set_cluster_def(&cluster_start).await;
+        assert!(status_running(&test.coredbs, &name).await);
+
+        test.teardown().await;
+
     }
 }
