@@ -59,7 +59,6 @@ pub struct ConnectionInfo {
     pub pooler_host: Option<String>,
     pub port: u16,
     pub user: String,
-    pub password: String,
     pub app_user: String,
     pub app_password: String,
 }
