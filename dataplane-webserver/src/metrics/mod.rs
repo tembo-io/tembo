@@ -3,7 +3,7 @@ use crate::metrics::types::{InstantQuery, RangeQuery};
 use actix_web::http::StatusCode;
 use actix_web::web::{Data, Query};
 use actix_web::HttpResponse;
-use log::{debug, error, warn};
+use log::error;
 use reqwest::{Client, Response};
 use serde_json::Value;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
