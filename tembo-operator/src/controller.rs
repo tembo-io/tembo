@@ -176,7 +176,7 @@ impl CoreDB {
         let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &ns);
 
         // Setup Node/Pod Placement Configuration for the Pooler and App Service deployments
-        let placement_config = PlacementConfig::new(&self);
+        let placement_config = PlacementConfig::new(self);
 
         reconcile_network_policies(ctx.client.clone(), &ns).await?;
 
@@ -296,7 +296,7 @@ impl CoreDB {
         debug!("Reconciling secret");
         // Superuser connection info
         reconcile_secret(self, ctx.clone()).await?;
-        reconcile_app_services(self, ctx.clone()).await?;
+        reconcile_app_services(self, ctx.clone(), placement_config.clone()).await?;
 
         if self
             .spec
@@ -347,7 +347,7 @@ impl CoreDB {
             })?;
 
         // Reconcile Pooler resource
-        reconcile_pooler(self, ctx.clone(), placement_config).await?;
+        reconcile_pooler(self, ctx.clone(), placement_config.clone()).await?;
 
         // Check if Postgres is already running
         let pg_postmaster_start_time = is_not_restarting(self, ctx.clone(), "postgres").await?;

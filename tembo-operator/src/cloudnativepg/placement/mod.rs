@@ -1,4 +1,6 @@
-pub(crate) mod cnpg_affinity;
+mod cnpg_node_affinity;
 pub(crate) mod cnpg_placement;
-pub(crate) mod cnpg_toleration;
-pub(crate) mod cnpg_topology;
+mod cnpg_pod_affinity;
+mod cnpg_pod_anti_affinity;
+mod cnpg_toleration;
+mod cnpg_topology;

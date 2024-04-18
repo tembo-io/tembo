@@ -1276,6 +1276,7 @@ pub async fn reconcile_pooler(
     let topology_spread_constraints = placement
         .as_ref()
         .and_then(|p| p.convert_pooler_topology_spread_constraints());
+    let affinity = placement.as_ref().and_then(|p| p.convert_pooler_affinity());
 
     // If pooler is enabled, create or update
     if cdb.spec.connectionPooler.enabled {
@@ -1310,6 +1311,7 @@ pub async fn reconcile_pooler(
                             resources: cdb.spec.connectionPooler.pooler.resources.clone(),
                             ..Default::default()
                         }],
+                        affinity,
                         tolerations: pooler_tolerations,
                         topology_spread_constraints,
                         ..Default::default()
