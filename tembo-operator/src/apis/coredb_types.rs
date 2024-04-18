@@ -13,7 +13,7 @@ use k8s_openapi::{
     apimachinery::pkg::{api::resource::Quantity, apis::meta::v1::ObjectMeta},
 };
 
-use crate::cloudnativepg::clusters::ClusterAffinity;
+use crate::cloudnativepg::clusters::{ClusterAffinity, ClusterTopologySpreadConstraints};
 use crate::cloudnativepg::poolers::{
     PoolerPgbouncerPoolMode, PoolerTemplateSpecContainersResources,
 };
@@ -577,6 +577,15 @@ pub struct CoreDBSpec {
         default = "defaults::default_affinity_configuration"
     )]
     pub affinity_configuration: Option<ClusterAffinity>,
+
+    /// The topologySpreadConstraints provides a way to spread matching pods among the given topology
+    ///
+    /// For more information see the Kubernetes documentation on [Topology Spread Constraints](https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/)
+    /// Tembo is compatable with the `v1` version of the TopologySpreadConstraints up to [Kubernetes 1.25](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#topologyspreadconstraint-v1-core)
+    ///
+    /// **Default**: `None`
+    #[serde(rename = "topologySpreadConstraints")]
+    pub topology_spread_constraints: Option<Vec<ClusterTopologySpreadConstraints>>,
 }
 
 impl CoreDBSpec {

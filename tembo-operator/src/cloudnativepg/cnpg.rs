@@ -43,6 +43,7 @@ use crate::{
             ClusterStorage, ClusterSuperuserSecret,
         },
         cnpg_utils::{is_image_updated, patch_cluster, restart_and_wait_for_restart},
+        placement::cnpg_placement::PlacementConfig,
         poolers::{
             Pooler, PoolerCluster, PoolerPgbouncer, PoolerSpec, PoolerTemplate, PoolerTemplateSpec,
             PoolerTemplateSpecContainers, PoolerType,
@@ -648,6 +649,7 @@ pub fn cnpg_cluster_from_cdb(
     let storage = cnpg_cluster_storage(cdb);
     let replication = cnpg_high_availability(cdb);
     let affinity = cdb.spec.affinity_configuration.clone();
+    let topology_spread_constraints = cdb.spec.topology_spread_constraints.clone();
 
     let PostgresConfig {
         postgres_parameters,
@@ -711,6 +713,7 @@ pub fn cnpg_cluster_from_cdb(
         },
         spec: ClusterSpec {
             affinity,
+            topology_spread_constraints,
             backup,
             service_account_template,
             bootstrap,
@@ -1257,13 +1260,22 @@ pub async fn reconcile_metrics_service(cdb: &CoreDB, ctx: Arc<Context>) -> Resul
 }
 // Reconcile a Pooler
 #[instrument(skip(cdb, ctx) fields(trace_id, instance_name = %cdb.name_any()))]
-pub async fn reconcile_pooler(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {
+pub async fn reconcile_pooler(
+    cdb: &CoreDB,
+    ctx: Arc<Context>,
+    placement: Option<PlacementConfig>,
+) -> Result<(), Action> {
     let client = ctx.client.clone();
     let name = cdb.name_any() + "-pooler";
     let namespace = cdb.namespace().unwrap();
-    let pooler_api: Api<Pooler> = Api::namespaced(client.clone(), namespace.as_str());
-
     let owner_reference = cdb.controller_owner_ref(&()).unwrap();
+    let pooler_api: Api<Pooler> = Api::namespaced(client.clone(), namespace.as_str());
+    let pooler_tolerations = placement
+        .as_ref()
+        .and_then(|config| config.convert_pooler_tolerations());
+    let topology_spread_constraints = placement
+        .as_ref()
+        .and_then(|p| p.convert_pooler_topology_spread_constraints());
 
     // If pooler is enabled, create or update
     if cdb.spec.connectionPooler.enabled {
@@ -1298,6 +1310,8 @@ pub async fn reconcile_pooler(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Act
                             resources: cdb.spec.connectionPooler.pooler.resources.clone(),
                             ..Default::default()
                         }],
+                        tolerations: pooler_tolerations,
+                        topology_spread_constraints,
                         ..Default::default()
                     }),
                 }),
