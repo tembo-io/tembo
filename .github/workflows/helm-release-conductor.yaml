@@ -1,10 +1,10 @@
-name: Release Helm Chart
+name: Release conductor Helm Chart
 
 on:
   push:
     branches: [ "main" ]
     paths:
-      - 'charts/**'
+      - 'charts/conductor/**'
   workflow_dispatch:
 
 jobs:
@@ -29,12 +29,12 @@ jobs:
 
       - name: Package Helm Chart
         run: |
-          cd code/charts/tembo-operator
+          cd code/charts/conductor
           helm package .
 
       - name: Update Helm repo index
         run: |
-          mv code/charts/tembo-operator/*.tgz gh-pages/
+          mv code/charts/conductor/*.tgz gh-pages/
           cd gh-pages
           helm repo index . --merge index.yaml --url https://tembo-io.github.io/tembo
 

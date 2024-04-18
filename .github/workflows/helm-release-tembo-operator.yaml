@@ -1,0 +1,50 @@
+name: Release tembo-operator Helm Chart
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'charts/tembo-operator/**'
+  workflow_dispatch:
+
+jobs:
+  release-chart:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          path: 'code'
+
+      - name: Checkout gh-pages branch
+        uses: actions/checkout@v4
+        with:
+          ref: 'gh-pages'
+          path: 'gh-pages'
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v3.5
+        with:
+          version: 3.13.2
+
+      - name: Package Helm Chart
+        run: |
+          cd code/charts/tembo-operator
+          helm package .
+
+      - name: Update Helm repo index
+        run: |
+          mv code/charts/tembo-operator/*.tgz gh-pages/
+          cd gh-pages
+          helm repo index . --merge index.yaml --url https://tembo-io.github.io/tembo
+
+      - name: Commit and Push
+        run: |
+          cd gh-pages
+          git config user.name "tembo-service-user"
+          git config user.email "admin+github@tembo.io"
+          git add .
+          git commit -m "Update Helm chart"
+          git push origin gh-pages
+        env:
+          GITHUB_TOKEN: ${{ secrets.SERVICE_USER_GITHUB_SSH_KEY }}
