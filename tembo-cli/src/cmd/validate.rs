@@ -122,7 +122,7 @@ fn validate_stack_support(
     Ok(())
 }
 
-fn validate_config(
+pub fn validate_config(
     config: HashMap<String, InstanceSettings>,
     verbose: bool,
 ) -> Result<(), anyhow::Error> {

@@ -56,7 +56,6 @@ pub fn execute() -> Result<(), anyhow::Error> {
         let table_display = table
             .display()
             .expect("Error: could not parse `tembo context list` table contents!");
-
         label_with_value("Your current Tembo context:", &current_context_profile);
         println!("{}", indent(1));
         println!("{}", table_display);

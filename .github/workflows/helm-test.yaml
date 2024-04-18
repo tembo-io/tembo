@@ -35,6 +35,10 @@ jobs:
   check_version:
     name: Check Helm chart version
     runs-on: ubuntu-latest
+    needs:
+      - find_directories
+    strategy:
+      matrix: ${{ fromJson(needs.find_directories.outputs.directories) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -49,14 +53,14 @@ jobs:
       - name: Check chart version
         run: |
           cd code
-          CURR_VERSION=$(cat charts/tembo-operator/Chart.yaml | grep version: | cut -d ' ' -f 2)
-          MAIN_VERSION=$(git show main:charts/tembo-operator/Chart.yaml | grep version: | cut -d ' ' -f 2)
+          CURR_VERSION=$(cat ${{ matrix.path }}/Chart.yaml | grep version: | cut -d ' ' -f 2)
+          MAIN_VERSION=$(git show main:${{ matrix.path }}/Chart.yaml | grep version: | cut -d ' ' -f 2)
 
           echo -n "Current version: ${CURR_VERSION}\n"
           echo -n "Previous version: ${MAIN_VERSION}\n"
 
           if [ "$CURR_VERSION" = "$MAIN_VERSION" ]; then
-            echo "Helm chart version is unchanged and needs to be bumped!"
+            echo "Helm chart  ${{ matrix.path }} version is unchanged and needs to be bumped!"
             exit 1
           fi
 
