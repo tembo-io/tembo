@@ -15,6 +15,7 @@ use log::info;
 use spinoff::spinners;
 use spinoff::Spinner;
 use std::fmt::Write;
+use std::path::PathBuf;
 use std::{
     collections::HashMap,
     fs::{self},
@@ -83,11 +84,14 @@ pub fn execute(
 ) -> Result<(), anyhow::Error> {
     info!("Running validation!");
     super::validate::execute(verbose)?;
+
+    if let Some(path) = &merge_path {
+        validate_overlay(path)?;
+    }
     info!("Validation completed!");
 
     let env = get_current_context()?;
-
-    let instance_settings = get_instance_settings(merge_path, set_arg)?;
+    let instance_settings = get_instance_settings(merge_path.clone(), set_arg)?;
 
     if env.target == Target::Docker.to_string() {
         return docker_apply(verbose, instance_settings);
@@ -95,6 +99,30 @@ pub fn execute(
         return tembo_cloud_apply(env, instance_settings);
     }
 
+    Ok(())
+}
+
+fn validate_overlay(merge_path: &str) -> Result<(), anyhow::Error> {
+    let mut file_path = PathBuf::from(FileUtils::get_current_working_dir());
+    file_path.push(format!("{}", merge_path));
+
+    let contents = fs::read_to_string(&file_path)?;
+    let config: Result<HashMap<String, InstanceSettings>, toml::de::Error> =
+        toml::from_str(&contents);
+
+    match config.clone() {
+        Ok(i) => i,
+        Err(error) => {
+            tui::error(&format!("{}", error));
+            return Ok(());
+        }
+    };
+    match super::validate::validate_config(config.clone().unwrap(), true) {
+        std::result::Result::Ok(_) => (),
+        std::result::Result::Err(e) => {
+            return Err(Error::msg(format!("Error validating config: {}", e)));
+        }
+    }
     Ok(())
 }
 
