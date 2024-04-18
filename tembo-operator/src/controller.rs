@@ -353,7 +353,8 @@ impl CoreDB {
         let mut new_status = match self.spec.stop {
             false => {
                 // Check if Postgres is already running
-                let pg_postmaster_start_time = is_not_restarting(self, ctx.clone(), "postgres").await?;
+                let pg_postmaster_start_time =
+                    is_not_restarting(self, ctx.clone(), "postgres").await?;
 
                 let patch_status = json!({
                     "apiVersion": "coredb.io/v1alpha1",

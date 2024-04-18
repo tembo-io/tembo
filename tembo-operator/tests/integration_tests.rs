@@ -66,7 +66,7 @@ mod test {
     const TIMEOUT_SECONDS_COREDB_DELETED: u64 = 300;
 
     /// Struct to contain many commonly used test resources
-    /// 
+    ///
     /// Most if not all tests use all of the fields here, or refer to them
     /// in some manner. This struct helps combine everything together.
     struct TestClass {
@@ -80,17 +80,17 @@ mod test {
     }
 
     /// Helper class to make writing tests easier / less messy
-    /// 
+    ///
     /// This class implements several functions for the TestClass struct that
     /// remove a lot of the boilerplate code that happens frequently in these
     /// tests. Use it whenever possible and feel free to add methods that
     /// should be listed.
     impl TestClass {
         /// Instantiate a new TestClass object
-        /// 
+        ///
         /// By providing a test name, this function will return a TestClass
         /// object and set all of the related struct values as such:
-        /// 
+        ///
         ///   * name - Test name as passed plus an RNG suffix
         ///   * namespace - An initialized Kubernetes namespace for the test
         ///   * client - An active Kubernetes client runtime
@@ -128,12 +128,12 @@ mod test {
                 state,
                 context,
                 pods,
-                coredbs
+                coredbs,
             }
         }
 
         /// Transform a JSON object into a cluster definition
-        /// 
+        ///
         /// Given a series of JSON values defining a CoreDB cluster, this
         /// function will return a CoreDB object in the generated namespace.
         /// Subsequent calls will patch the existing cluster associated with
@@ -141,7 +141,10 @@ mod test {
         async fn set_cluster_def(&self, cluster_def: &serde_json::Value) -> CoreDB {
             let params = PatchParams::apply("tembo-integration-test");
             let patch = Patch::Apply(&cluster_def);
-            self.coredbs.patch(&self.name, &params, &patch).await.unwrap()
+            self.coredbs
+                .patch(&self.name, &params, &patch)
+                .await
+                .unwrap()
         }
 
         // Tear down the test cluster, namespace, and other related allocations
@@ -150,7 +153,10 @@ mod test {
         // Always call this function at the end of a test, and it will remove
         // the namespace for the test and all contained objects.
         async fn teardown(&self) {
-            self.coredbs.delete(&self.name, &Default::default()).await.unwrap();
+            self.coredbs
+                .delete(&self.name, &Default::default())
+                .await
+                .unwrap();
             println!("Waiting for CoreDB to be deleted: {}", &self.name);
             let _assert_coredb_deleted = tokio::time::timeout(
                 Duration::from_secs(TIMEOUT_SECONDS_COREDB_DELETED),
@@ -168,7 +174,6 @@ mod test {
             // Delete namespace
             let _ = delete_namespace(self.client.clone(), &self.namespace).await;
         }
-
     }
 
     async fn kube_client() -> Client {
@@ -5563,6 +5568,5 @@ CREATE EVENT TRIGGER pgrst_watch
         assert!(status_running(&test.coredbs, &name).await);
 
         test.teardown().await;
-
     }
 }
