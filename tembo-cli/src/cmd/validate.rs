@@ -64,6 +64,14 @@ pub fn execute(verbose: bool) -> Result<(), anyhow::Error> {
             }
         };
 
+        match validate_stack_in_toml(&config.clone().unwrap()) {
+            std::result::Result::Ok(_) => (),
+            std::result::Result::Err(e) => {
+                error(&format!("Error validating toml file: {}", e));
+                has_error = true;
+            }
+        }
+
         // Validate the config
         match validate_config(config.clone().unwrap(), verbose) {
             std::result::Result::Ok(_) => (),
@@ -119,6 +127,20 @@ fn validate_stack_support(
             stack_type, pg_version
         )));
     }
+    Ok(())
+}
+
+fn validate_stack_in_toml(config: &HashMap<String, InstanceSettings>) -> Result<(), anyhow::Error> {
+    for settings in config.values() {
+        if (settings.stack_file.is_some() && settings.stack_type.is_some())
+            || (settings.stack_file.is_none() && settings.stack_type.is_none())
+        {
+            return Err(Error::msg(format!(
+                "You can only have either a stack_file or stack_type in tembo.toml file"
+            )));
+        }
+    }
+
     Ok(())
 }
 

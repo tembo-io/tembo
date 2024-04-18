@@ -54,6 +54,7 @@ pub struct OverlayInstanceSettings {
     pub extra_domains_rw: Option<Vec<String>>,
     pub ip_allow_list: Option<Vec<String>>,
     pub pg_version: Option<u8>,
+    pub stack_file: Option<String>,
 }
 
 // If a trunk project name is not specified, then assume
@@ -96,10 +97,6 @@ fn default_storage() -> String {
 
 fn default_replicas() -> i32 {
     1
-}
-
-fn default_stack_type() -> String {
-    "Standard".to_string()
 }
 
 fn default_extensions() -> Option<HashMap<String, Extension>> {

@@ -246,9 +246,6 @@ fn docker_apply_instance(
         instance_setting.instance_name.clone(),
         instance_setting.instance_name.clone(),
     )?;
-
-    let stack_type = ControllerStackType::from_str(&instance_setting.stack_type.clone().unwrap())
-        .unwrap_or(ControllerStackType::Standard);
     let stack: Stack;
 
     if instance_setting.stack_file.is_some() {
@@ -256,11 +253,13 @@ fn docker_apply_instance(
         let cleane_stack_file = instance_setting.stack_file.clone().unwrap();
         let cleaned_stack_file = cleane_stack_file.trim_matches('"');
         file_path.push(format!("{}", cleaned_stack_file));
-        println!("{:?}", file_path);
 
         let config_data = fs::read_to_string(&file_path).expect("File not found in the directory");
-        stack = serde_yaml::from_str(&config_data).expect("Failed to parse YAML");
+        stack = serde_yaml::from_str(&config_data).expect("Invalid YAML File");
     } else {
+        let stack_type =
+            ControllerStackType::from_str(&instance_setting.stack_type.clone().unwrap())
+                .unwrap_or(ControllerStackType::Standard);
         stack = get_stack(stack_type);
     }
 
@@ -963,7 +962,11 @@ fn merge_settings(base: &InstanceSettings, overlay: OverlayInstanceSettings) -> 
             .ip_allow_list
             .or_else(|| base.extra_domains_rw.clone()),
         pg_version: overlay.pg_version.unwrap_or(base.pg_version),
-        stack_file: None,
+        stack_file: Some(
+            overlay
+                .stack_file
+                .unwrap_or_else(|| base.stack_file.as_ref().unwrap().clone()),
+        ),
     }
 }
 
