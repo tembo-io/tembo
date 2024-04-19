@@ -26,43 +26,33 @@ on:
 
 runs:
   using: "composite"
-    steps:
-      - name: Check out the repo
-        uses: actions/checkout@v4
-        with:
-          ssh-key: ${{ secrets.SERVICE_USER_GITHUB_SSH_KEY }}
-          clone-into: ${{ inputs.clone_into }}
-      - name: Checkout Repository
-        uses: actions/checkout@v3
+  steps:
+    - name: Check out the repo
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ inputs.repository }}
+        ssh-key: ${{ inputs.ssh_key }}
+    - name: Set up Rust
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: stable
+        override: true
 
-      - name: Set up Rust
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-          override: true
+    - name: Generate Documentation
+      run: |
+        cd tembo-cli
+        cargo run -- --markdown-help > command-reference.md
 
-      - name: Generate Documentation
-        run: |
-          cd tembo-cli
-          cargo run -- --markdown-help > command-reference.md
-
-      - name: Push Documentation to Website Repository
-        run: |
-          set -xe
-          cd ${{ inputs.clone_into }}
-          git config --global user.name "coredb-service-user"
-          git config --global user.email "admin+github@coredb.io"
-          git fetch origin ${{ inputs.branch }} && git checkout ${{ inputs.branch }} || git checkout -b ${{ inputs.branch }}
-
-          # Ensure the target directory exists in the desired branch
-          git fetch
-          git checkout docs-updates
-          mkdir -p src/content/docs/development/cli
-
-          # Copy the documentation over
-          cp ../command-reference.md src/content/docs/development/cli
-
-          # Add, commit, and push changes
-          git add src/content/docs/development/cli/command-reference.md
-          git commit -m "Update command reference documentation"
-          git push
+    - name: Push Documentation to Website Repository
+      run: |
+        set -xe
+        cd ${{ inputs.repository }}
+        git config --global user.name "coredb-service-user"
+        git config --global user.email "admin+github@coredb.io"
+        git fetch
+        git checkout ${{ inputs.branch }} || git checkout -b ${{ inputs.branch }}
+        mkdir -p src/content/docs/development/cli
+        cp command-reference.md src/content/docs/development/cli
+        git add src/content/docs/development/cli/command-reference.md
+        git commit -m "Update command reference documentation"
+        git push origin ${{ inputs.branch }}
