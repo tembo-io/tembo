@@ -29,6 +29,7 @@ jobs:
 
       - name: Generate Documentation
         run: |
+          cd tembo-cli
           cargo run -- --markdown-help > command-reference.md
 
       - name: Push Documentation to Website Repository
