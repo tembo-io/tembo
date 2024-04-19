@@ -36,11 +36,7 @@ jobs:
         env:
           SSH_KEY: ${{ secrets.DEPLOY_KEY }}
         run: |
-          # Configure SSH for Git
-          mkdir -p ~/.ssh
-          echo "${SSH_KEY}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
-          ssh-keyscan github.com >> ~/.ssh/known_hosts
+          set -xe
           git config --global user.name "coredb-service-user"
           git config --global user.email "admin@tembo.io"
 
