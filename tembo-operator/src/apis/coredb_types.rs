@@ -13,6 +13,7 @@ use k8s_openapi::{
     apimachinery::pkg::{api::resource::Quantity, apis::meta::v1::ObjectMeta},
 };
 
+use crate::cloudnativepg::clusters::{ClusterAffinity, ClusterTopologySpreadConstraints};
 use crate::cloudnativepg::poolers::{
     PoolerPgbouncerPoolMode, PoolerTemplateSpecContainersResources,
 };
@@ -554,6 +555,37 @@ pub struct CoreDBSpec {
     /// **Default**: `None` (uses the `default` StorageClass in your cluster)
     #[serde(rename = "storageClass")]
     pub storage_class: Option<String>,
+
+    /// A AffinityConfiguration provides a way to configure the CoreDB instance to run
+    /// on specific nodes in the cluster based off of nodeSelector, nodeAffinity and tolerations
+    ///
+    /// For more informaton on AffinityConfiguration please see the [Cloudnative-PG documentation](https://cloudnative-pg.io/documentation/1.22/cloudnative-pg.v1/#postgresql-cnpg-io-v1-AffinityConfiguration)
+    ///
+    /// **Default**:
+    /// ```yaml
+    /// apiVersion: coredb.io/v1alpha1
+    /// kind: CoreDB
+    /// metadata:
+    ///   name: test-db-restore
+    /// spec:
+    ///   affinityConfiguration:
+    ///     podAntiAffinityType: preferred
+    ///     topologyKey: topology.kubernetes.io/zone
+    /// ```
+    #[serde(
+        rename = "affinityConfiguration",
+        default = "defaults::default_affinity_configuration"
+    )]
+    pub affinity_configuration: Option<ClusterAffinity>,
+
+    /// The topologySpreadConstraints provides a way to spread matching pods among the given topology
+    ///
+    /// For more information see the Kubernetes documentation on [Topology Spread Constraints](https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/)
+    /// Tembo is compatable with the `v1` version of the TopologySpreadConstraints up to [Kubernetes 1.25](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#topologyspreadconstraint-v1-core)
+    ///
+    /// **Default**: `None`
+    #[serde(rename = "topologySpreadConstraints")]
+    pub topology_spread_constraints: Option<Vec<ClusterTopologySpreadConstraints>>,
 }
 
 impl CoreDBSpec {
