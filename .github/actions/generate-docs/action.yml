@@ -32,6 +32,7 @@ runs:
       with:
         repository: ${{ inputs.repository }}
         ssh-key: ${{ inputs.ssh_key }}
+
     - name: Set up Rust
       uses: actions-rs/toolchain@v1
       with:
@@ -42,13 +43,14 @@ runs:
       run: |
         cd tembo-cli
         cargo run -- --markdown-help > command-reference.md
+      shell: bash
 
     - name: Push Documentation to Website Repository
       run: |
         set -xe
         cd ${{ inputs.repository }}
         git config --global user.name "coredb-service-user"
-        git config --global user.email "admin+github@coredb.io"
+        git config --global user.email "admin@github.com"
         git fetch
         git checkout ${{ inputs.branch }} || git checkout -b ${{ inputs.branch }}
         mkdir -p src/content/docs/development/cli
@@ -56,3 +58,4 @@ runs:
         git add src/content/docs/development/cli/command-reference.md
         git commit -m "Update command reference documentation"
         git push origin ${{ inputs.branch }}
+      shell: bash
