@@ -18,6 +18,11 @@ jobs:
   generate_and_deploy_docs:
     runs-on: ubuntu-latest
     steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.repository }}
+          ssh-key: ${{ secrets.SERVICE_USER_GITHUB_SSH_KEY }}
       - name: Checkout Repository
         uses: actions/checkout@v3
 
@@ -33,8 +38,6 @@ jobs:
           cargo run -- --markdown-help > command-reference.md
 
       - name: Push Documentation to Website Repository
-        env:
-          SSH_KEY: ${{ secrets.DEPLOY_KEY }}
         run: |
           set -xe
           git config --global user.name "coredb-service-user"
