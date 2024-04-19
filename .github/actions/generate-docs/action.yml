@@ -1,5 +1,20 @@
 name: Generate and Deploy Documentation
-
+inputs:
+  repository:
+    description: 'The tembo repository'
+    required: true
+  ssh_key:
+    description: 'The SSH key for the repository'
+    required: true
+  branch:
+    description: 'The branch to update'
+    required: true
+  version:
+    description: 'The version to use for updating'
+    required: true
+  clone_into:
+    description: 'The directory to clone the argocd repo into'
+    required: true
 on:
   push:
     paths:
@@ -23,6 +38,7 @@ jobs:
         with:
           repository: ${{ inputs.repository }}
           ssh-key: ${{ secrets.SERVICE_USER_GITHUB_SSH_KEY }}
+          clone-into: ${{ inputs.clone_into }}
       - name: Checkout Repository
         uses: actions/checkout@v3
 
@@ -34,18 +50,16 @@ jobs:
 
       - name: Generate Documentation
         run: |
-          cd tembo-cli
+          cd ${{ inputs.repository }}
           cargo run -- --markdown-help > command-reference.md
 
       - name: Push Documentation to Website Repository
         run: |
           set -xe
+          cd ${{ inputs.clone_into }}
           git config --global user.name "coredb-service-user"
-          git config --global user.email "admin@tembo.io"
-
-          # Clone the website repo
-          git clone https://github.com:tembo-io/website.git
-          cd website
+          git config --global user.email "admin+github@coredb.io"
+          git fetch origin ${{ inputs.branch }} && git checkout ${{ inputs.branch }} || git checkout -b ${{ inputs.branch }}
 
           # Ensure the target directory exists in the desired branch
           git fetch

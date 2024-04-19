@@ -119,3 +119,27 @@ jobs:
           branch: ${{ matrix.branch }}
           version: ${{ needs.find_directories.outputs.short_sha }}
           subdirectory: ${{ matrix.subdirectory }}
+
+  generate-docs:
+    name: Generate Docs Automation
+    runs-on: ubuntu-latest
+    strategy:
+      # fail-fast means to cancel all jobs if one fails
+      fail-fast: false
+      matrix:
+        include:
+          - repository: tembo-io/website
+            branch: plat-410
+    needs:
+      - find_directories
+      - build_and_push_images
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+      - name: Check out the repo
+        uses: ./.github/actions/argocd-update
+        with:
+          repository: ${{ matrix.repository }}
+          ssh_key: ${{ secrets.SERVICE_USER_GITHUB_SSH_KEY }}
+          branch: ${{ matrix.branch }}
+          version: ${{ needs.find_directories.outputs.short_sha }}
