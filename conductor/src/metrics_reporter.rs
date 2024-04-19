@@ -50,6 +50,8 @@ pub async fn run_metrics_reporter() -> Result<()> {
         for metric in &metrics {
             let metrics = client.query(&metric.query).await?;
 
+            info!("Successfully queried '{}' from Prometheus", metric.name);
+
             let data_plane_metrics =
                 DataPlaneMetrics::from_query_result(&metric.name, metrics.data.result);
 
@@ -57,6 +59,8 @@ pub async fn run_metrics_reporter() -> Result<()> {
             queue
                 .send(&metrics_events_queue, &data_plane_metrics)
                 .await?;
+
+            info!("Saved metric to PGMQ");
         }
     }
 }
