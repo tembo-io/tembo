@@ -10,6 +10,7 @@ use crate::{
             cnpg_cluster_from_cdb, reconcile_cnpg, reconcile_cnpg_scheduled_backup,
             reconcile_pooler,
         },
+        placement::cnpg_placement::PlacementConfig,
         VOLUME_SNAPSHOT_CLASS_NAME,
     },
     config::Config,
@@ -174,6 +175,9 @@ impl CoreDB {
         let name = self.name_any();
         let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &ns);
 
+        // Setup Node/Pod Placement Configuration for the Pooler and App Service deployments
+        let placement_config = PlacementConfig::new(self);
+
         reconcile_network_policies(ctx.client.clone(), &ns).await?;
 
         // Fetch any metadata we need from Trunk
@@ -292,7 +296,7 @@ impl CoreDB {
         debug!("Reconciling secret");
         // Superuser connection info
         reconcile_secret(self, ctx.clone()).await?;
-        reconcile_app_services(self, ctx.clone()).await?;
+        reconcile_app_services(self, ctx.clone(), placement_config.clone()).await?;
 
         if self
             .spec
@@ -343,7 +347,7 @@ impl CoreDB {
             })?;
 
         // Reconcile Pooler resource
-        reconcile_pooler(self, ctx.clone()).await?;
+        reconcile_pooler(self, ctx.clone(), placement_config.clone()).await?;
 
         // This block of code is currently fairly contentious. What status
         // elements we should retain in the event the cluster is in a stop

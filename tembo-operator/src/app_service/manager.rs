@@ -1,5 +1,6 @@
 use crate::{
-    apis::coredb_types::CoreDB, ingress_route_crd::IngressRouteRoutes, Context, Error, Result,
+    apis::coredb_types::CoreDB, cloudnativepg::placement::cnpg_placement::PlacementConfig,
+    ingress_route_crd::IngressRouteRoutes, Context, Error, Result,
 };
 use k8s_openapi::{
     api::{
@@ -57,6 +58,7 @@ fn generate_resource(
     oref: OwnerReference,
     domain: Option<String>,
     annotations: &BTreeMap<String, String>,
+    placement: Option<PlacementConfig>,
 ) -> AppServiceResources {
     let resource_name = format!("{}-{}", coredb_name, appsvc.name.clone());
     let service = appsvc.routing.as_ref().map(|_| {
@@ -76,6 +78,7 @@ fn generate_resource(
         namespace,
         oref,
         annotations,
+        placement,
     );
 
     // If DATA_PLANE_BASEDOMAIN is not set, don't generate IngressRoutes, IngressRouteTCPs, or EntryPoints
@@ -226,6 +229,7 @@ fn generate_deployment(
     namespace: &str,
     oref: OwnerReference,
     annotations: &BTreeMap<String, String>,
+    placement: Option<PlacementConfig>,
 ) -> Deployment {
     let mut labels: BTreeMap<String, String> = BTreeMap::new();
     labels.insert("app".to_owned(), resource_name.to_string());
@@ -451,7 +455,14 @@ fn generate_deployment(
         }
     }
 
+    let affinity = placement.as_ref().and_then(|p| p.combine_affinity_items());
+    let tolerations = placement.as_ref().map(|p| p.tolerations.clone());
+    let topology_spread_constraints = placement
+        .as_ref()
+        .and_then(|p| p.topology_spread_constraints.clone());
+
     let pod_spec = PodSpec {
+        affinity,
         containers: vec![Container {
             args: appsvc.args.clone(),
             command: appsvc.command.clone(),
@@ -466,6 +477,8 @@ fn generate_deployment(
             volume_mounts: Some(volume_mounts),
             ..Container::default()
         }],
+        tolerations,
+        topology_spread_constraints,
         volumes: Some(volumes),
         security_context: pod_security_context,
         ..PodSpec::default()
@@ -625,7 +638,11 @@ fn generate_appsvc_annotations(cdb: &CoreDB) -> BTreeMap<String, String> {
     )
 }
 
-pub async fn reconcile_app_services(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {
+pub async fn reconcile_app_services(
+    cdb: &CoreDB,
+    ctx: Arc<Context>,
+    placement: Option<PlacementConfig>,
+) -> Result<(), Action> {
     let client = ctx.client.clone();
     let ns = cdb.namespace().unwrap();
     let coredb_name = cdb.name_any();
@@ -761,6 +778,7 @@ pub async fn reconcile_app_services(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(
                 oref.clone(),
                 domain.to_owned(),
                 &annotations,
+                placement.clone(),
             )
         })
         .collect();
