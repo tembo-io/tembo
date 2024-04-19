@@ -14,9 +14,8 @@ on:
       - develop
       - feature/*
 
-
 jobs:
-  generate_docs:
+  generate_and_deploy_docs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -30,7 +29,6 @@ jobs:
 
       - name: Generate Documentation
         run: |
-          cd tembo-cli
           cargo run -- --markdown-help > command-reference.md
 
       - name: Push Documentation to Website Repository
@@ -43,13 +41,15 @@ jobs:
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan github.com >> ~/.ssh/known_hosts
           git config --global user.name "coredb-service-user"
-          git config --global user.email "admin+github@coredb.io"
+          git config --global user.email "admin@tembo.io"
 
           # Clone the website repo
           git clone git@github.com:tembo-io/website.git
           cd website
 
-          # Ensure the target directory exists
+          # Ensure the target directory exists in the desired branch
+          git fetch
+          git checkout docs-updates
           mkdir -p src/content/docs/development/cli
 
           # Copy the documentation over
