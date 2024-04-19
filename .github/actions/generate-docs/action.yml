@@ -1,13 +1,14 @@
-name: Generate and Deploy Documentation
+name: 'Generate and Deploy Documentation'
+description: 'Generate and deploy documentation files.'
 inputs:
+  repository:
+    description: 'GitHub repository to work with.'
+    required: true
   ssh_key:
-    description: 'The SSH key for the repository'
+    description: 'SSH key for the repository access.'
     required: true
   branch:
-    description: 'The branch to update'
-    required: true
-  clone_into:
-    description: 'The directory to clone the argocd repo into'
+    description: 'Branch to checkout and update.'
     required: true
 on:
   push:
@@ -23,9 +24,8 @@ on:
       - develop
       - feature/*
 
-jobs:
-  generate_and_deploy_docs:
-    runs-on: ubuntu-latest
+runs:
+  using: "composite"
     steps:
       - name: Check out the repo
         uses: actions/checkout@v4
