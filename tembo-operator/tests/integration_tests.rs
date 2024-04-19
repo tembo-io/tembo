@@ -952,7 +952,6 @@ mod test {
         assert!(body.contains("cnpg_pg_settings_setting"));
 
         test.teardown().await;
-
     }
 
     #[tokio::test]
