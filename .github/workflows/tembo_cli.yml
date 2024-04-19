@@ -31,6 +31,6 @@ jobs:
           - name: Check out the repo
             uses: ./.github/actions/generate-docs
             with:
-              repository: ${{ matrix.repository }}
+              clone_into: ${{ matrix.repository }}
               ssh_key: ${{ secrets.SERVICE_USER_GITHUB_SSH_KEY }}
               branch: ${{ matrix.branch }}

@@ -1,8 +1,5 @@
 name: Generate and Deploy Documentation
 inputs:
-  repository:
-    description: 'The tembo repository'
-    required: true
   ssh_key:
     description: 'The SSH key for the repository'
     required: true
@@ -33,7 +30,6 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v4
         with:
-          repository: ${{ inputs.repository }}
           ssh-key: ${{ secrets.SERVICE_USER_GITHUB_SSH_KEY }}
           clone-into: ${{ inputs.clone_into }}
       - name: Checkout Repository
@@ -47,7 +43,7 @@ jobs:
 
       - name: Generate Documentation
         run: |
-          cd ${{ inputs.repository }}
+          cd tembo-cli
           cargo run -- --markdown-help > command-reference.md
 
       - name: Push Documentation to Website Repository
