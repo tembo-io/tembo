@@ -1,0 +1,36 @@
+name: Generate and Deploy Documentation
+
+on:
+  push:
+    paths:
+      - 'tembo-cli/**'
+    branches:
+      - main
+  pull_request:
+    paths:
+      - 'tembo-cli/**'
+    branches:
+      - main
+      - develop
+      - feature/*
+
+jobs:
+    generate-docs:
+        name: Generate Docs Automation
+        runs-on: ubuntu-latest
+        strategy:
+          # fail-fast means to cancel all jobs if one fails
+          fail-fast: false
+          matrix:
+            include:
+              - repository: tembo-io/website
+                branch: plat-410
+        steps:
+          - name: Check out the repo
+            uses: actions/checkout@v4
+          - name: Check out the repo
+            uses: ./.github/actions/generate-docs
+            with:
+              repository: ${{ matrix.repository }}
+              ssh_key: ${{ secrets.SERVICE_USER_GITHUB_SSH_KEY }}
+              branch: ${{ matrix.branch }}

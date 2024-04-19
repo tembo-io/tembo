@@ -9,9 +9,6 @@ inputs:
   branch:
     description: 'The branch to update'
     required: true
-  version:
-    description: 'The version to use for updating'
-    required: true
   clone_into:
     description: 'The directory to clone the argocd repo into'
     required: true
