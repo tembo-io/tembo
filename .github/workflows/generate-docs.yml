@@ -30,7 +30,8 @@ jobs:
 
       - name: Generate Documentation
         run: |
-          cargo run -- --markdown-help > ../command-reference.md
+          cd tembo-cli
+          cargo run -- --markdown-help > command-reference.md
 
       - name: Push Documentation to Website Repository
         env:
@@ -41,8 +42,8 @@ jobs:
           echo "${SSH_KEY}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
           ssh-keyscan github.com >> ~/.ssh/known_hosts
-          git config --global user.email "admin@tembo.io"
-          git config --global user.name "GitHub Actions Bot"
+          git config --global user.name "coredb-service-user"
+          git config --global user.email "admin+github@coredb.io"
 
           # Clone the website repo
           git clone git@github.com:tembo-io/website.git
