@@ -69,11 +69,10 @@ mod test {
     ///
     /// Most if not all tests use all of the fields here, or refer to them
     /// in some manner. This struct helps combine everything together.
-    struct TestClass {
+    struct TestCore {
         name: String,
         namespace: String,
         client: Client,
-        state: State,
         context: Arc<Context>,
         pods: Api<Pod>,
         coredbs: Api<CoreDB>,
@@ -85,7 +84,7 @@ mod test {
     /// remove a lot of the boilerplate code that happens frequently in these
     /// tests. Use it whenever possible and feel free to add methods that
     /// should be listed.
-    impl TestClass {
+    impl TestCore {
         /// Instantiate a new TestClass object
         ///
         /// By providing a test name, this function will return a TestClass
@@ -94,7 +93,6 @@ mod test {
         ///   * name - Test name as passed plus an RNG suffix
         ///   * namespace - An initialized Kubernetes namespace for the test
         ///   * client - An active Kubernetes client runtime
-        ///   * state - A controller state, set to the default
         ///   * context - An active Arc context
         ///   * pods - A pod to use for cluster-commands in this namespace and client
         ///   * coredbs - A CoreDB API tied to this namespace and client
@@ -125,7 +123,6 @@ mod test {
                 name,
                 namespace,
                 client,
-                state,
                 context,
                 pods,
                 coredbs,
@@ -879,32 +876,13 @@ mod test {
     #[tokio::test]
     #[ignore]
     async fn functional_test_basic_cnpg() {
-        // Initialize the Kubernetes client
-        let client = kube_client().await;
-        let state = State::default();
-        let context = state.create_context(client.clone());
-
-        // Configurations
-        let mut rng = rand::thread_rng();
-        let suffix = rng.gen_range(0..100000);
-        let name = &format!("test-basic-cnpg-{}", suffix);
-        let namespace = match create_namespace(client.clone(), name).await {
-            Ok(namespace) => namespace,
-            Err(e) => {
-                eprintln!("Error creating namespace: {}", e);
-                std::process::exit(1);
-            }
-        };
+        let test_name = "test-basic-cnpg";
+        let test = TestCore::new(test_name).await;
+        let name = test.name.clone();
 
         let kind = "CoreDB";
         let replicas = 1;
 
-        // Create a pod we can use to run commands in the cluster
-        let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
-
-        // Apply a basic configuration of CoreDB
-        println!("Creating CoreDB resource {}", name);
-        let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
         // Generate basic CoreDB resource to start with
         let coredb_json = serde_json::json!({
             "apiVersion": API_VERSION,
@@ -931,17 +909,16 @@ mod test {
                 }]
             }
         });
-        let params = PatchParams::apply("tembo-integration-test");
-        let patch = Patch::Apply(&coredb_json);
-        let coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        let coredb_resource = test.set_cluster_def(&coredb_json).await;
 
         // Wait for CNPG Pod to be created
         let pod_name = format!("{}-1", name);
 
-        pod_ready_and_running(pods.clone(), pod_name.clone()).await;
+        pod_ready_and_running(test.pods.clone(), pod_name.clone()).await;
 
         let _ = wait_until_psql_contains(
-            context.clone(),
+            test.context.clone(),
             coredb_resource.clone(),
             "\\dx".to_string(),
             "pg_jsonschema".to_string(),
@@ -950,12 +927,12 @@ mod test {
         .await;
 
         // Wait for pg_jsonschema to be installed before proceeding.
-        let found_extension = trunk_install_status(&coredbs, name, "pg_jsonschema").await;
+        let found_extension = trunk_install_status(&test.coredbs, &name, "pg_jsonschema").await;
         assert!(found_extension);
 
         // Check for heartbeat table and values
         let sql_result = wait_until_psql_contains(
-            context.clone(),
+            test.context.clone(),
             coredb_resource.clone(),
             "SELECT latest_heartbeat FROM tembo.heartbeat_table LIMIT 1".to_string(),
             "postgres".to_string(),
@@ -974,25 +951,8 @@ mod test {
         let body = response.text().await.unwrap();
         assert!(body.contains("cnpg_pg_settings_setting"));
 
-        // CLEANUP TEST
-        // Cleanup CoreDB
-        coredbs.delete(name, &Default::default()).await.unwrap();
-        println!("Waiting for CoreDB to be deleted: {}", &name);
-        let _assert_coredb_deleted = tokio::time::timeout(
-            Duration::from_secs(TIMEOUT_SECONDS_COREDB_DELETED),
-            await_condition(coredbs.clone(), name, conditions::is_deleted("")),
-        )
-        .await
-        .unwrap_or_else(|_| {
-            panic!(
-                "CoreDB {} was not deleted after waiting {} seconds",
-                name, TIMEOUT_SECONDS_COREDB_DELETED
-            )
-        });
-        println!("CoreDB resource deleted {}", name);
+        test.teardown().await;
 
-        // Delete namespace
-        let _ = delete_namespace(client.clone(), &namespace).await;
     }
 
     #[tokio::test]
@@ -5523,8 +5483,8 @@ CREATE EVENT TRIGGER pgrst_watch
     ///   * Stops and has no pods after hibernation (spec.stop: true)
     ///   * Starts and is running after thaw (spec.stop: false)
     async fn functional_test_hibernate() {
-        let test_name = "test-basic-cnpg";
-        let test = TestClass::new(test_name).await;
+        let test_name = "test-hibernate-cnpg";
+        let test = TestCore::new(test_name).await;
         let name = test.name.clone();
 
         // Generate very simple CoreDB JSON definitions. The first will be for
