@@ -14,7 +14,7 @@ mod cmd;
 mod tui;
 
 #[derive(Parser)]
-#[clap(author = crate_authors!("\n"), version = crate_version!(), about = "Tembo CLI", long_about = None)]
+#[clap(name = "tembo", author = crate_authors!("\n"), version = crate_version!(), long_about = None)]
 struct App {
     #[arg(long, hide = true)]
     markdown_help: bool,

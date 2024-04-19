@@ -1,0 +1,57 @@
+name: Generate and Deploy Documentation
+
+on:
+  push:
+    paths:
+      - 'tembo-cli/**'
+    branches:
+      - main
+  pull_request:
+    paths:
+      - 'tembo-cli/**'
+    branches:
+      - main
+
+jobs:
+  generate_docs:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+
+      - name: Generate Documentation
+        run: |
+          cargo run -- --markdown-help > ../command-reference.md
+
+      - name: Push Documentation to Website Repository
+        env:
+          SSH_KEY: ${{ secrets.DEPLOY_KEY }}
+        run: |
+          # Configure SSH for Git
+          mkdir -p ~/.ssh
+          echo "${SSH_KEY}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan github.com >> ~/.ssh/known_hosts
+          git config --global user.email "admin@tembo.io"
+          git config --global user.name "GitHub Actions Bot"
+
+          # Clone the website repo
+          git clone git@github.com:tembo-io/website.git
+          cd website
+
+          # Ensure the target directory exists
+          mkdir -p src/content/docs/development/cli
+
+          # Copy the documentation over
+          cp ../command-reference.md src/content/docs/development/cli
+
+          # Add, commit, and push changes
+          git add src/content/docs/development/cli/command-reference.md
+          git commit -m "Update command reference documentation"
+          git push
