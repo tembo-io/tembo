@@ -115,3 +115,4 @@ jobs:
           formula-name: tembo-cli
         env:
           COMMITTER_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        if: runner.os == 'macOS'
