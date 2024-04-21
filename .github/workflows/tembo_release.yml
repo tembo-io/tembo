@@ -116,7 +116,6 @@ jobs:
           homebrew-tap: tembo-io/homebrew-tembo
           formula-name: tembo-cli
           download-url: "https://github.com/tembo-io/tembo/releases/download/${{ github.ref_name }}/${{ env.TEMBO_CLI_NAME }}-${{ matrix.asset_name }}.tar.gz"
-          create-pullrequest: true
         env:
           COMMITTER_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         if: runner.os == 'macOS'
