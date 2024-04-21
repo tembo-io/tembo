@@ -27,6 +27,7 @@ jobs:
         - name: Generate and Deploy Docs
           uses: ./.github/actions/generate-docs
           with:
-            repository: 'tembo-io/website'
+            repository: 'tembo-io/tembo'
             ssh_key: ${{ secrets.SERVICE_USER_GITHUB_SSH_KEY }}
             branch: 'plat-410'
+            repo_into: 'tembo-io/website'

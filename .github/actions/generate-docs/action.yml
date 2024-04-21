@@ -10,6 +10,9 @@ inputs:
   branch:
     description: 'Branch to checkout and update.'
     required: true
+  repo_into:
+    description: 'repo to checkout and update.'
+    required: true
 
 on:
   push:
@@ -34,6 +37,7 @@ runs:
         repository: ${{ inputs.repository }}
         ssh-key: ${{ inputs.ssh_key }}
         ref: ${{ inputs.branch }}
+        repo-into: ${{ inputs.repo_into }}
 
     - name: List directory contents
       run: ls -lah
