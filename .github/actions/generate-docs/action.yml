@@ -10,6 +10,7 @@ inputs:
   branch:
     description: 'Branch to checkout and update.'
     required: true
+
 on:
   push:
     paths:
@@ -32,19 +33,25 @@ runs:
       with:
         repository: ${{ inputs.repository }}
         ssh-key: ${{ inputs.ssh_key }}
+        ref: ${{ inputs.branch }}
 
-    - name: Generate Documentation
-      shell: bash
+    - name: List directory contents
+      run: ls -lah
+
+    - name: Change to tembo-cli directory
       run: |
-        cd tembo-cli
-        cargo run -- --markdown-help > command-reference.md
-      
+        if [ -d "tembo-cli" ]; then
+          cd tembo-cli
+          cargo run -- --markdown-help > command-reference.md
+        else
+          echo "Directory tembo-cli not found!"
+          exit 1
+        fi
+      shell: bash
 
     - name: Push Documentation to Website Repository
-      shell: bash
       run: |
         set -xe
-        cd ${{ inputs.repository }}
         git config --global user.name "coredb-service-user"
         git config --global user.email "admin@github.com"
         git fetch
@@ -54,4 +61,4 @@ runs:
         git add src/content/docs/development/cli/command-reference.md
         git commit -m "Update command reference documentation"
         git push origin ${{ inputs.branch }}
-      
+      shell: bash
