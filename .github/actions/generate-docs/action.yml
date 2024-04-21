@@ -37,6 +37,7 @@ runs:
 
     - name: List directory contents
       run: ls -lah
+      shell: bash
 
     - name: Change to tembo-cli directory
       run: |
