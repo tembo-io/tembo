@@ -54,16 +54,27 @@ runs:
         fi
       shell: bash
 
-    - name: Push Documentation to Website Repository
-      run: |
-        set -xe
-        git config --global user.name "coredb-service-user"
-        git config --global user.email "admin@github.com"
-        git fetch
-        git checkout ${{ inputs.branch }} || git checkout -b ${{ inputs.branch }}
-        mkdir -p src/content/docs/development/cli
-        cp command-reference.md src/content/docs/development/cli
-        git add src/content/docs/development/cli/command-reference.md
-        git commit -m "Update command reference documentation"
-        git push origin ${{ inputs.branch }}
-      shell: bash
+      - name: Check out the repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ inputs.repo_into }}
+          ssh-key: ${{ inputs.ssh_key }}
+          ref: ${{ inputs.branch }}
+
+      - name: Copy documentation to website repository
+        run: |
+          cp tembo-cli/command-reference.md website-repo/src/content/docs/development/cli
+        shell: bash
+
+      - name: Push Documentation to Website Repository
+        run: |
+          set -xe
+          git config --global user.name "coredb-service-user"
+          git config --global user.email "admin@github.com"
+          git fetch https://github.com/tembo-io/website.git
+          cd src/content/docs/development/cli
+          git add src/content/docs/development/cli/command-reference.md
+          git checkout ${{ inputs.branch }} || git checkout -b ${{ inputs.branch }}
+          git commit -m "Update command reference documentation"
+          git push origin ${{ inputs.branch }}
+        shell: bash
