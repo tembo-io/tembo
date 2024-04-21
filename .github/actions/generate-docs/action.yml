@@ -33,19 +33,15 @@ runs:
         repository: ${{ inputs.repository }}
         ssh-key: ${{ inputs.ssh_key }}
 
-    - name: Set up Rust
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: stable
-        override: true
-
     - name: Generate Documentation
+      shell: bash
       run: |
         cd tembo-cli
         cargo run -- --markdown-help > command-reference.md
-      shell: bash
+      
 
     - name: Push Documentation to Website Repository
+      shell: bash
       run: |
         set -xe
         cd ${{ inputs.repository }}
@@ -58,4 +54,4 @@ runs:
         git add src/content/docs/development/cli/command-reference.md
         git commit -m "Update command reference documentation"
         git push origin ${{ inputs.branch }}
-      shell: bash
+      
