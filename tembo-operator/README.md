@@ -1,5 +1,6 @@
 # Tembo Operator
 
+
 The Tembo Operator is a Kubernetes Operator used for creating, updating, and deleting PostgreSQL (Postgres) instances.
 
 The key differentiators of the Tembo Operator are:
