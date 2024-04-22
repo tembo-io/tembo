@@ -576,6 +576,7 @@ mod test {
         }
     }
 
+    use controller::extensions::database_queries::LIST_EXTENSIONS_QUERY;
     use controller::{
         apis::postgres_parameters::{ConfigValue, PgConfig},
         cloudnativepg::poolers::Pooler,
@@ -1915,7 +1916,7 @@ mod test {
             if i > 5 || ing_route_tcp.is_err() {
                 break;
             }
-            i+=1;
+            i += 1;
         }
         // Get the ingress route tcp
         let ing_route_tcp = ingress_route_tcp_api.get(&ing_route_tcp_name).await;
@@ -3055,9 +3056,9 @@ mod test {
         wait_until_psql_contains(
             context.clone(),
             coredb_resource.clone(),
-            "select extname from pg_catalog.pg_extension;".to_string(),
+            LIST_EXTENSIONS_QUERY.to_string(),
             "aggs_for_vecs".to_string(),
-            true,
+            false,
         )
         .await;
 
