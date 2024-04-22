@@ -124,10 +124,10 @@ jobs:
     runs-on: macos-latest
     needs: [gh_release]
     steps:
-      - name: Update Homebrew formula
-        uses: dawidd6/action-homebrew-bump-formula@v3
+      - name: Bump homebrew formula
+        uses: mislav/bump-homebrew-formula-action@v3
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          org: tembo-io
-          tap: tembo-io/homebrew-tembo
-          formula: tembo-cli
+          homebrew-tap: tembo-io/homebrew-tembo
+          formula-name: tembo-cli
+        env:
+          COMMITTER_TOKEN: ${{ secrets.GITHUB_TOKEN }}
