@@ -349,11 +349,17 @@ impl CoreDB {
         // Reconcile Pooler resource
         reconcile_pooler(self, ctx.clone(), placement_config.clone()).await?;
 
-        // Check if Postgres is already running
-        let pg_postmaster_start_time = is_not_restarting(self, ctx.clone(), "postgres").await?;
+        // This block of code is currently fairly contentious. What status
+        // elements we should retain in the event the cluster is in a stop
+        // state are currenly unknown and under review. This appears to work
+        // for now, but care should be taken given this status.
 
         let mut new_status = match self.spec.stop {
             false => {
+                // Check if Postgres is already running
+                let pg_postmaster_start_time =
+                    is_not_restarting(self, ctx.clone(), "postgres").await?;
+
                 let patch_status = json!({
                     "apiVersion": "coredb.io/v1alpha1",
                     "kind": "CoreDB",
@@ -382,23 +388,16 @@ impl CoreDB {
                     last_fully_reconciled_at: None,
                 }
             }
+            // If the cluster is stopped, set the status to a very sparse set
+            // of information that will allow other provisioning teps to
+            // complete, but otherwise do nothing else. The CNPG operator will
+            // handle the rest.
             true => {
-                let current_config_values = get_current_config_values(self, ctx.clone()).await?;
-                CoreDBStatus {
-                    running: false,
-                    extensionsUpdating: false,
-                    storage: Some(self.spec.storage.clone()),
-                    extensions: self.status.as_ref().and_then(|f| f.extensions.clone()),
-                    trunk_installs: self.status.as_ref().and_then(|f| f.trunk_installs.clone()),
-                    resources: Some(self.spec.resources.clone()),
-                    runtime_config: Some(current_config_values),
-                    first_recoverability_time: self
-                        .status
-                        .as_ref()
-                        .and_then(|f| f.first_recoverability_time),
-                    pg_postmaster_start_time: None,
-                    last_fully_reconciled_at: None,
-                }
+                let mut status = self.status.clone().unwrap_or_default();
+                status.running = false;
+                status.pg_postmaster_start_time = None;
+                status.last_fully_reconciled_at = None;
+                status
             }
         };
 
@@ -428,7 +427,14 @@ impl CoreDB {
 
         patch_cdb_status_merge(&coredbs, &name, patch_status).await?;
 
-        reconcile_heartbeat(self, ctx.clone()).await?;
+        // There's no reason to set up a heartbeat on a stopped cluster. The
+        // heartbeat routine installs SQL functions, which can't be done when
+        // the cluster is inoperable.
+
+        if !self.spec.stop {
+            reconcile_heartbeat(self, ctx.clone()).await?;
+        }
+
         info!("Fully reconciled {}", self.name_any());
         // Check back every 90-150 seconds
         let jitter = rand::thread_rng().gen_range(0..60);
