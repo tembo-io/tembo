@@ -4,7 +4,6 @@ use futures::stream::StreamExt;
 use crate::{
     apis::coredb_types::{CoreDB, CoreDBStatus, VolumeSnapshot},
     app_service::manager::reconcile_app_services,
-    cloudnativepg::cnpg_utils::reconcile_cluster_hibernation,
     cloudnativepg::{
         backups::Backup,
         cnpg::{
@@ -41,6 +40,7 @@ use kube::{
     Resource,
 };
 
+use crate::cloudnativepg::hibernate::reconcile_cluster_hibernation;
 use crate::{
     apis::postgres_parameters::PgConfig,
     configmap::reconcile_generic_metrics_configmap,
