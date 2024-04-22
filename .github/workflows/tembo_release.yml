@@ -131,7 +131,7 @@ jobs:
 
   post_gh_release:
     runs-on: macos-latest
-    needs: [gh_release]
+    needs: gh_release
     steps:
       - name: Check out the repo
         uses: actions/checkout@v4
@@ -157,9 +157,9 @@ jobs:
         run: |
           set -xe
           sed -E -i '' 's/release_version =.*/release_version = "${{needs.gh_release.outputs.release_version}}"/g' tembo-cli.rb
-       - name: Git commit and push to remote
-         shell: bash
-         run: |
+      - name: Git commit and push to remote
+        shell: bash
+        run: |
           set -xe
           cd homebrew-tembo
           git add --all
