@@ -15,8 +15,6 @@ use std::sync::Arc;
 use tokio::time::Duration;
 use tracing::{debug, error, info, instrument, warn};
 
-use crate::cloudnativepg::cnpg::does_cluster_exist;
-
 // restart_and_wait_for_restart is a synchronous function that takes a CNPG cluster adds the restart annotation
 // and waits for the restart to complete.
 #[instrument(skip(cdb, ctx, prev_cluster), fields(trace_id, instance_name = %cdb.name_any()))]
@@ -127,7 +125,7 @@ pub(crate) async fn update_coredb_status(
 
 // patch_cluster_merge takes a CoreDB, Cluster and serde_json::Value and patch merges the Cluster with the new spec
 #[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any(), patch = %patch))]
-async fn patch_cluster_merge(
+pub async fn patch_cluster_merge(
     cdb: &CoreDB,
     ctx: &Arc<Context>,
     patch: serde_json::Value,
@@ -262,70 +260,5 @@ pub(crate) async fn is_image_updated(
         }
     }
 
-    Ok(())
-}
-
-// Applies hibernation to the Cluster if the CoreDB is stopped, then updates the CoreDB Status.
-// Returns a normal, jittered requeue when the instance is stopped.
-// If the CoreDB is not stopped or does not exist, this takes no operation.
-// Resuming a database from stopped should not be handled in this function, as the existing
-// code will make sure to create all the resources it needs.
-pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> Result<(), Action> {
-    let name = cdb.name_any();
-    let namespace = cdb.namespace().ok_or_else(|| {
-        error!("Namespace is not set for CoreDB instance {}", name);
-        Action::requeue(Duration::from_secs(300))
-    })?;
-
-    if !cdb.spec.stop {
-        debug!("Cluster {} is not stopped, taking no action...", name);
-        return Ok(());
-    }
-    // Check if the cluster exists; if not, exit early.
-    // We should allow the rest of the reconcile loop
-    // to run, so we only apply hibernation after a
-    // cluster already exists.
-    if !does_cluster_exist(cdb, ctx.clone()).await? {
-        warn!(
-            "Cluster does not exist for stopped instance {}, proceeding...",
-            name
-        );
-        return Ok(());
-    }
-
-    // TODO: stop all app services' deployments by setting replicas to 0
-    // - Add new function to app_service module that returns the names of all deployments
-    // - Call that function, loop through each and set replicas to 0
-
-    patch_hibernation_on(cdb, ctx, &name).await?;
-
-    let mut status = cdb.status.clone().unwrap_or_default();
-    status.running = false;
-    status.pg_postmaster_start_time = None;
-
-    let client = ctx.client.clone();
-    let coredbs: Api<CoreDB> = Api::namespaced(client, &namespace);
-    let patch_status = json!({
-        "apiVersion": "coredb.io/v1alpha1",
-        "kind": "CoreDB",
-        "status": status
-    });
-    patch_cdb_status_merge(&coredbs, &name, patch_status).await?;
-
-    info!("Fully reconciled stopped instance {}", name);
-    Err(requeue_normal_with_jitter())
-}
-
-// Function to patch the hibernation status of a cluster.
-async fn patch_hibernation_on(cdb: &CoreDB, ctx: &Arc<Context>, name: &str) -> Result<(), Action> {
-    let patch = json!({
-        "metadata": {
-            "annotations": {
-                "cnpg.io/hibernation": "on"
-            }
-        }
-    });
-    patch_cluster_merge(cdb, ctx, patch).await?;
-    info!("Ensured hibernation enabled for {}", name);
     Ok(())
 }
