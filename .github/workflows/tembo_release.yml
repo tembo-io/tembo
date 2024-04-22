@@ -5,8 +5,10 @@ permissions:
 
 on:
   push:
-    tags:
-      - 'test-[0-9]+.[0-9]+.[0-9]+'
+     branches:
+      - bump-homebrew-formula
+    paths:
+      - 'tembo-cli/Cargo.toml'
 
 jobs:
 
@@ -100,6 +102,9 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: set env
+        run: echo "NOW=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
+
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
         with:
@@ -107,7 +112,7 @@ jobs:
           file: tembo-cli/target/${{ matrix.target }}/release/tembo.tar.gz
           asset_name: ${{ env.TEMBO_CLI_NAME }}-${{ matrix.asset_name }}.tar.gz
           prerelease: true
-          tag: ${{ github.ref }}
+          tag: ${{ env.NOW }}
           body: ${{ steps.changelog.outputs.changelog }}
 
       - name: Bump homebrew formula
@@ -115,7 +120,7 @@ jobs:
         with:
           homebrew-tap: tembo-io/homebrew-tembo
           formula-name: tembo-cli
-          download-url: "https://github.com/tembo-io/tembo/releases/download/${{ github.ref_name }}/${{ env.TEMBO_CLI_NAME }}-${{ matrix.asset_name }}.tar.gz"
+          download-url: "https://github.com/tembo-io/tembo/releases/download/${{ env.NOW }}/${{ env.TEMBO_CLI_NAME }}-${{ matrix.asset_name }}.tar.gz"
         env:
           COMMITTER_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         if: runner.os == 'macOS'
