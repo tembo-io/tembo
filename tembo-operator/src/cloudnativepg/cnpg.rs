@@ -648,18 +648,6 @@ pub fn cnpg_cluster_from_cdb(
     let owner_reference = cdb.controller_owner_ref(&()).unwrap();
     let mut annotations = default_cluster_annotations(cdb);
 
-    // If the cluster is stopped, set the CNPG hibernate flag, described in the
-    // docs under Declarative Hibernation. Once this is patched in, the cluster
-    // should immediately spin down all allocated Postgres pods.
-    //
-    // https://cloudnative-pg.io/documentation/current/declarative_hibernation/
-
-    if cdb.spec.stop {
-        annotations.insert("cnpg.io/hibernation".to_string(), "on".to_string());
-    } else {
-        annotations.remove("cnpg.io/hibernation");
-    }
-
     let (bootstrap, external_clusters, superuser_secret) = cnpg_cluster_bootstrap_from_cdb(cdb);
     let (backup, service_account_template) = cnpg_backup_configuration(cdb, &cfg);
     let storage = cnpg_cluster_storage(cdb);
@@ -993,26 +981,7 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
         Action::requeue(tokio::time::Duration::from_secs(300))
     })?;
 
-    match check_cluster_hibernation_status(cdb, &ctx).await {
-        Ok(true) => {
-            info!(
-                "Cluster is hiberneted, skip reconciliation for instance: {}",
-                name
-            );
-            return Ok(());
-        }
-        Ok(false) => {
-            info!(
-                "Cluster is not hibernated, continue reconciliation for instance: {}",
-                name
-            );
-        }
-        Err(e) => {
-            error!("Error checking hibernation status: {:?}", e);
-            return Err(e);
-        }
-    }
-    let fenced_pods = pods_to_fence(cdb, ctx.clone()).await?;
+    let pods_to_fence = pods_to_fence(cdb, ctx.clone()).await?;
     let requires_load = extensions_that_require_load(ctx.client.clone(), namespace).await?;
 
     // TODO: reenable this once we have a work around for snapshots
@@ -1027,7 +996,7 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
     // }
 
     debug!("Generating CNPG spec");
-    let mut cluster = cnpg_cluster_from_cdb(cdb, Some(fenced_pods), requires_load);
+    let mut cluster = cnpg_cluster_from_cdb(cdb, Some(pods_to_fence), requires_load);
 
     let cluster_api: Api<Cluster> = Api::namespaced(ctx.client.clone(), namespace.as_str());
     let maybe_cluster = cluster_api.get(&name).await;
@@ -1060,25 +1029,8 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
     // Check if the CoreDB status is running: false, return requeue
     if let Some(status) = current_status {
         if !status.running {
-            // Status is not running, we should check if the cluster is ready, if not requeue
-            match check_cluster_status(cdb, &ctx).await {
-                Ok(true) => {
-                    info!("CoreDB status.running is false, but cluster is ready, update CoreDB status.running to true for instance: {}", &name);
-                    // Set CoreDB status.running to true
-                    update_coredb_status(cdb, &ctx, true).await?;
-                }
-                Ok(false) => {
-                    info!("CoreDB status.running is false, cluster is not ready, requeuing 10 seconds for instance: {}", &name);
-                    return Err(Action::requeue(Duration::from_secs(10)));
-                }
-                Err(e) => {
-                    error!(
-                        "Error checking cluster status {:?} for instance: {}",
-                        e, &name
-                    );
-                    return Err(e);
-                }
-            }
+            info!("CoreDB status.running is false, requeuing 10 seconds");
+            return Err(Action::requeue(Duration::from_secs(10)));
         }
     }
 
