@@ -121,6 +121,7 @@ jobs:
           body: ${{ steps.changelog.outputs.changelog }}
 
   post_gh_release:
+    runs-on: macos-latest
     needs: [gh_release]
     steps:
       - name: Update Homebrew formula
