@@ -48,6 +48,10 @@ struct TokenRequest {
 
 pub fn execute(login_cmd: LoginCommand) -> Result<(), anyhow::Error> {
     let _ = list_context();
+    let context_file_path = tembo_context_file_path();
+    let contents = fs::read_to_string(&context_file_path)?;
+    let data: Context = toml::from_str(&contents)?;
+
     match (&login_cmd.organization_id, &login_cmd.profile) {
         (Some(_), None) | (None, Some(_)) => {
             return Err(anyhow!(
@@ -63,26 +67,21 @@ pub fn execute(login_cmd: LoginCommand) -> Result<(), anyhow::Error> {
                 ));
             }
         }
-        (Some(_), Some(_)) => {}
+        (Some(_), Some(_)) => {
+            if data
+                .environment
+                .iter()
+                .any(|p| &p.name == login_cmd.profile.as_ref().unwrap())
+            {
+                return Err(anyhow!("An environment with the name {} already exists. Please choose a different name in the --profile flag.", login_cmd.profile.as_ref().unwrap()));
+            }
+        }
     }
 
-    let context_file_path = tembo_context_file_path();
-    let contents = fs::read_to_string(&context_file_path)?;
-    let data: Context = toml::from_str(&contents)?;
-    match data
-        .environment
-        .iter()
-        .any(|p| &p.name == login_cmd.profile.as_ref().unwrap())
-    {
-        true => {
-            error(&format!("An environment with the name {} already exists. Please choose a different name in the --profile flag.", login_cmd.profile.as_ref().unwrap()));
-        }
-        false => {
-            let login_url = url(login_cmd.tembo_host.as_deref())?;
-            let rt = tokio::runtime::Runtime::new()?;
-            rt.block_on(handle_tokio(login_url, &login_cmd))?;
-        }
-    }
+    let login_url = url(login_cmd.tembo_host.as_deref())?;
+    let rt = tokio::runtime::Runtime::new()?;
+    rt.block_on(handle_tokio(login_url, &login_cmd))?;
+
     Ok(())
 }
 
