@@ -148,7 +148,7 @@ annotate STORAGE_CLASS_NAME:
 
 # run tests
 test:
-	cargo test -- --ignored --nocapture --test-threads=5
+	cargo test -- --ignored --nocapture
 
 # run cargo watch
 watch:

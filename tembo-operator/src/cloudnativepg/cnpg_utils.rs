@@ -1,11 +1,9 @@
-use crate::{
+pub use crate::{
     apis::coredb_types::CoreDB,
-    cloudnativepg::{
-        clusters::{Cluster, ClusterStatusConditionsStatus},
-        cnpg::does_cluster_exist,
-    },
+    cloudnativepg::clusters::{Cluster, ClusterStatusConditionsStatus},
+    controller,
     extensions::database_queries::is_not_restarting,
-    patch_cdb_status_merge, Context, RESTARTED_AT,
+    patch_cdb_status_merge, requeue_normal_with_jitter, Context, RESTARTED_AT,
 };
 use kube::{
     api::{Patch, PatchParams},
@@ -127,7 +125,7 @@ pub(crate) async fn update_coredb_status(
 
 // patch_cluster_merge takes a CoreDB, Cluster and serde_json::Value and patch merges the Cluster with the new spec
 #[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any(), patch = %patch))]
-async fn patch_cluster_merge(
+pub async fn patch_cluster_merge(
     cdb: &CoreDB,
     ctx: &Arc<Context>,
     patch: serde_json::Value,
@@ -147,8 +145,6 @@ async fn patch_cluster_merge(
             error!("Error patching cluster: {}", e);
             Action::requeue(Duration::from_secs(300))
         });
-
-    info!("Patched Cluster for instance: {}", &name);
 
     Ok(())
 }
@@ -263,144 +259,4 @@ pub(crate) async fn is_image_updated(
     }
 
     Ok(())
-}
-
-// check_cluster_hibernation_status is a async function that takes a CoreDB and Context and checks if the Cluster
-// API exists and hibernating is set or not set.  It will return a boolean value (false by default).
-pub(crate) async fn check_cluster_hibernation_status(
-    cdb: &CoreDB,
-    ctx: &Arc<Context>,
-) -> Result<bool, Action> {
-    let name = cdb.name_any();
-    // Check if the cluster exists; if not, exit early.
-    if !does_cluster_exist(cdb, ctx.clone()).await? {
-        debug!("Cluster does not exist for instance: {}", name);
-        return Ok(false);
-    }
-
-    // Cluster exists; let's check the status of hibernating.
-    let hibernating = get_hibernate_status(cdb, ctx).await?;
-
-    // Decide on the hibernation status and possibly patch the cluster.
-    match (hibernating, cdb.spec.stop) {
-        (true, false) => {
-            // If incorrectly hibernating, patch to deactivate.
-            patch_hibernation_status(cdb, ctx, false, &name).await?;
-            Ok(true)
-        }
-        (false, true) => {
-            // If should be hibernating but isn't, patch to activate.
-            patch_hibernation_status(cdb, ctx, true, &name).await?;
-            Ok(false)
-        }
-        _ => Ok(hibernating),
-    }
-}
-
-// Function to patch the hibernation status of a cluster.
-async fn patch_hibernation_status(
-    cdb: &CoreDB,
-    ctx: &Arc<Context>,
-    hibernation_status: bool,
-    name: &str,
-) -> Result<bool, Action> {
-    let hibernation_value = if hibernation_status { "on" } else { "off" };
-    let patch = json!({
-        "metadata": {
-            "annotations": {
-                "cnpg.io/hibernation": hibernation_value
-            }
-        }
-    });
-
-    info!(
-        "Changing hibernation status for {} to '{}'",
-        name, hibernation_value
-    );
-    patch_cluster_merge(cdb, ctx, patch).await?;
-
-    Ok(hibernation_status)
-}
-
-/// Determine the hibernate state of the CNPG cluster resources
-///
-/// This function will only return true if the cnpg.io/hibernation annotation
-/// is set to "on". Otherwise the assumption is that the annotation is not set
-/// at all or is set to some other value, in which case CNPG will not hibernate.
-#[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any()))]
-pub async fn get_hibernate_status(cdb: &CoreDB, ctx: &Arc<Context>) -> Result<bool, Action> {
-    let instance_name = cdb.metadata.name.as_deref().unwrap_or_default();
-    let namespace = cdb.namespace().ok_or_else(|| {
-        error!("Namespace is not set for CoreDB instance {}", instance_name);
-        Action::requeue(Duration::from_secs(300))
-    })?;
-
-    let cluster: Api<Cluster> = Api::namespaced(ctx.client.clone(), &namespace);
-    let co = cluster.get(instance_name).await.map_err(|e| {
-        error!("Error getting cluster: {}", e);
-        Action::requeue(Duration::from_secs(300))
-    })?;
-
-    let hibernate = match co.metadata.annotations {
-        Some(ann) => ann
-            .get("cnpg.io/hibernation")
-            .map_or(false, |state| state == "on"),
-        None => {
-            info!("Cluster Status for {} is not set", instance_name);
-            return Ok(false);
-        }
-    };
-
-    Ok(hibernate)
-}
-
-// check_cluster_status will check if the Cluster is running or not and verify the actual status to patch the
-// CoreDB status.running field.
-pub(crate) async fn check_cluster_status(cdb: &CoreDB, ctx: &Arc<Context>) -> Result<bool, Action> {
-    let name = cdb.name_any();
-    let namespace = cdb.namespace().ok_or_else(|| {
-        error!("Namespace is not set for CoreDB instance {}", name);
-        Action::requeue(Duration::from_secs(300))
-    })?;
-
-    // Check if the cluster exists; if not, exit early.
-    if !does_cluster_exist(cdb, ctx.clone()).await? {
-        debug!("Cluster does not exist for instance: {}", name);
-        return Ok(false);
-    }
-
-    // if cluster exists, check the status.conditions for the cluster status
-    let cluster_api: Api<Cluster> = Api::namespaced(ctx.client.clone(), &namespace);
-    let cluster = cluster_api.get(&name).await.map_err(|e| {
-        error!("Error getting cluster: {}", e);
-        Action::requeue(Duration::from_secs(300))
-    })?;
-
-    let mut is_cluster_ready = false;
-    let mut is_hibernated_present = false;
-    let mut is_hibernated = false;
-
-    if let Some(status) = &cluster.status {
-        if let Some(conditions) = &status.conditions {
-            for condition in conditions {
-                if condition.reason == "ClusterIsReady"
-                    && condition.status == ClusterStatusConditionsStatus::True
-                {
-                    is_cluster_ready = true;
-                    debug!("Cluster '{}' is ready.", name);
-                }
-                if condition.reason == "Hibernated" {
-                    is_hibernated_present = true;
-                    is_hibernated = condition.status == ClusterStatusConditionsStatus::True;
-                    debug!(
-                        "Hibernated status for '{}' is '{:?}'.",
-                        name, condition.status
-                    );
-                }
-            }
-        }
-    }
-
-    // Return true if ClusterIsReady is true and either Hibernated is false or missing.
-    Ok(is_cluster_ready && (!is_hibernated_present || !is_hibernated))
 }
