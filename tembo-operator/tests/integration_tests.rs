@@ -269,14 +269,15 @@ mod test {
         coredb_resource: CoreDB,
         query: String,
     ) -> PsqlOutput {
-        // Wait up to 100 seconds
-        for _ in 1..20 {
+        for _ in 1..40 {
             // Assert extension no longer created
             if let Ok(result) = coredb_resource
                 .psql(query.clone(), "postgres".to_string(), context.clone())
                 .await
             {
-                return result;
+                if result.stdout.is_some() {
+                    return result;
+                }
             }
             println!(
                 "Waiting for psql result on DB {}...",
