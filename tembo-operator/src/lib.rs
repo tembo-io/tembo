@@ -28,7 +28,6 @@ pub mod ingress;
 pub mod traefik;
 pub use traefik::ingress_route_crd;
 mod certmanager;
-mod hibernate;
 mod network_policies;
 pub mod postgres_certificates;
 pub mod psql;

@@ -146,8 +146,6 @@ pub async fn patch_cluster_merge(
             Action::requeue(Duration::from_secs(300))
         });
 
-    info!("Patched Cluster for instance: {}", &name);
-
     Ok(())
 }
 
