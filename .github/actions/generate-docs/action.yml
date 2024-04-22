@@ -2,16 +2,19 @@ name: 'Generate and Deploy Documentation'
 description: 'Generate and deploy documentation files.'
 inputs:
   repository:
-    description: 'GitHub repository to work with.'
+    description: 'GitHub repository to work with for documentation generation.'
     required: true
-  repo_into:
+  website_repo:
     description: 'Website repository to update with documentation.'
     required: true
   ssh_key:
-    description: 'SSH key for the repository access.'
+    description: 'SSH key for repository access.'
     required: true
-  branch:
+  generation_branch:
     description: 'Branch to checkout for documentation generation.'
+    required: true
+  update_branch:
+    description: 'Branch to update with generated documentation.'
     required: true
 
 on:
@@ -36,7 +39,7 @@ runs:
       with:
         repository: ${{ inputs.repository }}
         ssh-key: ${{ inputs.ssh_key }}
-        ref: ${{ inputs.branch }}
+        ref: ${{ inputs.generation_branch }}
         path: 'generation-repo'
 
     - name: Generate Documentation
@@ -50,7 +53,7 @@ runs:
       with:
         repository: ${{ inputs.website_repo }}
         ssh-key: ${{ inputs.ssh_key }}
-        ref: ${{ inputs.branch }}
+        ref: ${{ inputs.update_branch }}
         path: 'website-repo'
 
     - name: Copy documentation to website repository
@@ -66,5 +69,5 @@ runs:
         git config user.email "admin@github.com"
         git add src/content/docs/development/cli/command-reference.md
         git commit -m "Update command reference documentation"
-        git push origin ${{ inputs.branch }}
+        git push origin ${{ inputs.update_branch }}
       shell: bash

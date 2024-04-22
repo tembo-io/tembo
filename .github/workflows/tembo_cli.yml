@@ -29,5 +29,6 @@ jobs:
           with:
             repository: 'tembo-io/tembo'
             ssh_key: ${{ secrets.SERVICE_USER_GITHUB_SSH_KEY }}
-            branch: 'plat-410'
+            generation_branch: 'plat-410'
+            update_branch: 'plat-410'
             repo_into: 'tembo-io/website'
