@@ -45,7 +45,7 @@ runs:
     - name: Generate Documentation
       run: |
         cd generation-repo/tembo-cli
-        cargo run -- --markdown-help > ../docs/command-reference.md
+        cargo run -- --markdown-help > docs/command-reference.md
       shell: bash
 
     - name: Check if documentation has changed
