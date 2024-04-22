@@ -109,7 +109,8 @@ jobs:
 
       - name: set env non-windows
         id: set_release_version
-        run: release_version=$(date +'%Y.%m.%d')
+        run: |
+        release_version=$(date +'%Y.%m.%d')
         echo "NOW=$release_version" >> $GITHUB_ENV
         echo "release_version=$release_version" >> $GITHUB_OUTPUT
         if: runner.os != 'Windows'
