@@ -5,7 +5,7 @@ permissions:
 
 on:
   push:
-     branches:
+    branches:
       - bump-homebrew-formula
     paths:
       - 'tembo-cli/Cargo.toml'
