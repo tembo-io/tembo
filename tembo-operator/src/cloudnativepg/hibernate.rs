@@ -7,13 +7,12 @@ use kube::{Api, ResourceExt};
 use serde_json::json;
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{debug, error, info, warn};
+use tracing::{error, info, warn};
 
 // Applies hibernation to the Cluster if the CoreDB is stopped, then updates the CoreDB Status.
 // Returns a normal, jittered requeue when the instance is stopped.
-// If the CoreDB is not stopped or does not exist, this takes no operation.
-// Resuming a database from stopped should not be handled in this function, as the existing
-// code will make sure to create all the resources it needs.
+// When the instance is not stopped and the cluster already exists,
+// ensure the hibernation annotation is "off"
 pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> Result<(), Action> {
     let name = cdb.name_any();
     let namespace = cdb.namespace().ok_or_else(|| {
@@ -21,14 +20,7 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
         Action::requeue(Duration::from_secs(300))
     })?;
 
-    if !cdb.spec.stop {
-        debug!("Cluster {} is not stopped, taking no action...", name);
-        return Ok(());
-    }
     // Check if the cluster exists; if not, exit early.
-    // We should allow the rest of the reconcile loop
-    // to run, so we only apply hibernation after a
-    // cluster already exists.
     if !does_cluster_exist(cdb, ctx.clone()).await? {
         warn!(
             "Cluster does not exist for stopped instance {}, proceeding...",
@@ -37,12 +29,15 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
         return Ok(());
     }
 
-    // TODO: stop all app services' deployments by setting replicas to 0
+    // TODO: conditionally stop all app services' deployments by setting replicas to 0
     // - Add new function to app_service module that returns the names of all deployments
     // - Call that function, loop through each and set replicas to 0
 
-    patch_hibernation_on(cdb, ctx, &name).await?;
+    patch_hibernation(cdb, cdb.spec.stop, ctx, &name).await?;
 
+    if !cdb.spec.stop {
+        return Ok(());
+    }
     let mut status = cdb.status.clone().unwrap_or_default();
     status.running = false;
     status.pg_postmaster_start_time = None;
@@ -61,11 +56,17 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
 }
 
 // Function to patch the hibernation status of a cluster.
-async fn patch_hibernation_on(cdb: &CoreDB, ctx: &Arc<Context>, name: &str) -> Result<(), Action> {
+async fn patch_hibernation(
+    cdb: &CoreDB,
+    on: bool,
+    ctx: &Arc<Context>,
+    name: &str,
+) -> Result<(), Action> {
+    let hibernation_value = if on { "on" } else { "off" };
     let patch = json!({
         "metadata": {
             "annotations": {
-                "cnpg.io/hibernation": "on"
+                "cnpg.io/hibernation": hibernation_value
             }
         }
     });
