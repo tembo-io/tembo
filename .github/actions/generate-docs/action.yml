@@ -68,6 +68,7 @@ runs:
         git config user.name "coredb-service-user"
         git config user.email "admin@github.com"
         git add src/content/docs/development/cli/command-reference.md
+        git checkout -b ${{ inputs.update_branch }}
         git commit -m "Update command reference documentation"
         git push origin ${{ inputs.update_branch }}
       shell: bash
