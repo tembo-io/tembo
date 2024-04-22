@@ -130,4 +130,4 @@ jobs:
           homebrew-tap: tembo-io/homebrew-tembo
           formula-name: tembo-cli
         env:
-          COMMITTER_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          COMMITTER_TOKEN: ${{ secrets.SERVICE_USER_GITHUB_SSH_KEY }}
