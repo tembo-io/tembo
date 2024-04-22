@@ -42,7 +42,7 @@ pub async fn run_metrics_reporter() -> Result<()> {
     queue.init().await?;
     queue.create(&metrics_events_queue).await?;
 
-    let mut sync_interval = interval(Duration::from_secs(5));
+    let mut sync_interval = interval(Duration::from_secs(60));
 
     loop {
         sync_interval.tick().await;
