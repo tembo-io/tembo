@@ -1,14 +1,15 @@
 use crate::apis::coredb_types::CoreDB;
 use crate::cloudnativepg::cnpg::get_cluster;
-use crate::cloudnativepg::cnpg_utils;
+
 use crate::{patch_cdb_status_merge, requeue_normal_with_jitter, Context};
 use kube::runtime::controller::Action;
 use kube::{Api, ResourceExt};
 use serde_json::json;
-use std::collections::BTreeMap;
+
+use crate::cloudnativepg::cnpg_utils::patch_cluster_merge;
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{error, info};
+use tracing::{debug, error, info, warn};
 
 // Applies hibernation to the Cluster if the CoreDB is stopped, then updates the CoreDB Status.
 // Returns a normal, jittered requeue when the instance is stopped.
@@ -26,7 +27,7 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
     let cluster = match cluster {
         Some(cluster) => cluster,
         None => {
-            error!("Cluster {} does not exist yet. Proceeding...", name);
+            warn!("Cluster {} does not exist yet. Proceeding...", name);
             return Ok(());
         }
     };
@@ -36,13 +37,36 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
     // - Call that function, loop through each and set replicas to 0
 
     let cluster_annotations = cluster.metadata.annotations.unwrap_or_default();
-    patch_hibernation(cdb, cluster_annotations, cdb.spec.stop, ctx, &name).await?;
-
-    if !cdb.spec.stop {
-        return Ok(());
+    let hibernation_value = if cdb.spec.stop { "on" } else { "off" };
+    let patch_hibernation_annotation = json!({
+        "metadata": {
+            "annotations": {
+                "cnpg.io/hibernation": hibernation_value
+            }
+        }
+    });
+    // Check the annotation we are about to match was already there
+    if let Some(current_hibernation_setting) = cluster_annotations.get("cnpg.io/hibernation") {
+        if current_hibernation_setting == hibernation_value {
+            debug!(
+                "Hibernation annotation of {} already set to '{}', proceeding...",
+                name, hibernation_value
+            );
+            if cdb.spec.stop {
+                info!("Fully reconciled stopped instance {}", name);
+                return Err(requeue_normal_with_jitter());
+            }
+            return Ok(());
+        }
     }
+    patch_cluster_merge(cdb, ctx, patch_hibernation_annotation).await?;
+    info!(
+        "Toggled hibernation annotation of {} to '{}'",
+        name, hibernation_value
+    );
+
     let mut status = cdb.status.clone().unwrap_or_default();
-    status.running = false;
+    status.running = !cdb.spec.stop;
     status.pg_postmaster_start_time = None;
 
     let client = ctx.client.clone();
@@ -54,36 +78,9 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
     });
     patch_cdb_status_merge(&coredbs, &name, patch_status).await?;
 
-    info!("Fully reconciled stopped instance {}", name);
-    Err(requeue_normal_with_jitter())
-}
-
-// Function to patch the hibernation status of a cluster.
-async fn patch_hibernation(
-    cdb: &CoreDB,
-    current_annotations: BTreeMap<String, String>,
-    on: bool,
-    ctx: &Arc<Context>,
-    name: &str,
-) -> Result<(), Action> {
-    let hibernation_value = if on { "on" } else { "off" };
-    let patch = json!({
-        "metadata": {
-            "annotations": {
-                "cnpg.io/hibernation": hibernation_value
-            }
-        }
-    });
-    // Check the annotation we are about to match was already there
-    if let Some(annot) = current_annotations.get("cnpg.io/hibernation") {
-        if annot == hibernation_value {
-            return Ok(());
-        }
+    if cdb.spec.stop {
+        info!("Fully reconciled stopped instance {}", name);
+        return Err(requeue_normal_with_jitter());
     }
-    cnpg_utils::patch_cluster_merge(cdb, ctx, patch).await?;
-    info!(
-        "Toggled hibernation annotation of {} to '{}'",
-        name, hibernation_value
-    );
     Ok(())
 }
