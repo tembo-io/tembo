@@ -44,7 +44,9 @@ runs:
 
     - name: Generate Documentation
       run: |
-        cd generation-repo/tembo-cli/docs
+        cd generation-repo/tembo-cli
+        pwd
+        ls -lah
         cargo run -- --markdown-help > ../command-reference.md
       shell: bash
 
