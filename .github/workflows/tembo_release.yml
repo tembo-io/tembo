@@ -120,10 +120,6 @@ jobs:
           tag: ${{ env.NOW }}
           body: ${{ steps.changelog.outputs.changelog }}
 
-  post_gh_release:
-    runs-on: macos-latest
-    needs: [gh_release]
-    steps:
       - name: Bump homebrew formula
         uses: mislav/bump-homebrew-formula-action@v3
         with:
@@ -131,3 +127,4 @@ jobs:
           formula-name: tembo-cli
         env:
           COMMITTER_TOKEN: ${{ secrets.SERVICE_USER_GITHUB_SSH_KEY }}
+        if: runner.os == 'macOS'
