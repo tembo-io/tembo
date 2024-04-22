@@ -151,11 +151,13 @@ jobs:
         shell: bash
         run: |
           set -xe
+          cd homebrew-tembo
           sed -E -i '' 's/version ".*/version "${{needs.gh_release.outputs.version}}"/g' tembo-cli.rb
       - name: Replace release_version
         shell: bash
         run: |
           set -xe
+          cd homebrew-tembo
           sed -E -i '' 's/release_version =.*/release_version = "${{needs.gh_release.outputs.release_version}}"/g' tembo-cli.rb
       - name: Git commit and push to remote
         shell: bash
