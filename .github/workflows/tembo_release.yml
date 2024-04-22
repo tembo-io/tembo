@@ -12,8 +12,8 @@ on:
 
 jobs:
 
-  cargo_build:
-    name: Cargo build
+  gh_release:
+    name: Github Release
     strategy:
       fail-fast: false
       matrix:
@@ -102,8 +102,13 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: set env
+      - name: set env non-windows
         run: echo "NOW=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
+        if: runner.os != 'Windows'
+
+      - name: set env windows
+        run: echo "NOW=$(date +'%Y.%m.%d')" >> $env:GITHUB_ENV
+        if: runner.os == 'Windows'
 
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
@@ -115,12 +120,12 @@ jobs:
           tag: ${{ env.NOW }}
           body: ${{ steps.changelog.outputs.changelog }}
 
-      - name: Bump homebrew formula
-        uses: mislav/bump-homebrew-formula-action@v3
+  post_gh_release:
+    needs: [gh_release]
+    steps:
+      - name: Update Homebrew formula
+        uses: dawidd6/action-homebrew-bump-formula@v3
         with:
-          homebrew-tap: tembo-io/homebrew-tembo
-          formula-name: tembo-cli
-          download-url: "https://github.com/tembo-io/tembo/releases/download/${{ env.NOW }}/${{ env.TEMBO_CLI_NAME }}-${{ matrix.asset_name }}.tar.gz"
-        env:
-          COMMITTER_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        if: runner.os == 'macOS'
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tap: tembo-io/tembo
+          formula: tembo-cli
