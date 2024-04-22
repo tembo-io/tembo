@@ -53,7 +53,7 @@ runs:
       with:
         repository: ${{ inputs.website_repo }}
         ssh-key: ${{ inputs.ssh_key }}
-        ref: ${{ inputs.update_branch }}
+        ref: main
         path: 'website-repo'
 
     - name: Copy documentation to website repository
