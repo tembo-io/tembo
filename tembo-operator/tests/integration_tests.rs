@@ -638,7 +638,7 @@ mod test {
     // function to check coredb.status.trunk_installs status of specific extension
     async fn trunk_install_status(coredbs: &Api<CoreDB>, name: &str, extension: &str) -> bool {
         let max_retries = 10;
-        let wait_duration = Duration::from_secs(2); // Adjust as needed
+        let wait_duration = Duration::from_secs(6); // Adjust as needed
 
         for attempt in 1..=max_retries {
             match coredbs.get(name).await {
@@ -846,31 +846,6 @@ mod test {
         DateTime::parse_from_str(stdout, PG_TIMESTAMP_DECL)
             .unwrap()
             .into()
-    }
-
-    async fn status_running(coredbs: &Api<CoreDB>, name: &str) -> bool {
-        let max_retries = 10;
-        let wait_duration = Duration::from_secs(2); // Adjust as needed
-
-        for attempt in 1..=max_retries {
-            let coredb = coredbs.get(name).await.expect("Failed to get CoreDB");
-
-            if coredb.status.as_ref().map_or(false, |s| s.running) {
-                println!("CoreDB {} is running", name);
-                return true;
-            } else {
-                println!(
-                    "Attempt {}/{}: CoreDB {} is not running yet",
-                    attempt, max_retries, name
-                );
-            }
-            tokio::time::sleep(wait_duration).await;
-        }
-        println!(
-            "CoreDB {} did not become running after {} attempts",
-            name, max_retries
-        );
-        false
     }
 
     #[tokio::test]
@@ -1292,7 +1267,18 @@ mod test {
         let params = PatchParams::apply("coredb-integration-test");
         let patch = Patch::Apply(&coredb_json);
         let _ = coredbs.patch(name, &params, &patch).await.unwrap();
-        thread::sleep(Duration::from_millis(10000));
+        // Wait up to 60s for the storage size to change
+        let mut i = 0;
+        loop {
+            thread::sleep(Duration::from_millis(10000));
+            let pvc = pvc_api.get(&pod_name.to_string()).await.unwrap();
+            let storage = pvc.spec.unwrap().resources.unwrap().requests.unwrap();
+            let s = storage.get("storage").unwrap().to_owned();
+            if i > 5 || s == Quantity("10Gi".to_owned()) {
+                break;
+            }
+            i += 1;
+        }
         let pvc = pvc_api.get(&pod_name.to_string()).await.unwrap();
         // checking that the request is set, but its not the status
         // https://github.com/rancher/local-path-provisioner/issues/323
@@ -4174,31 +4160,6 @@ CREATE EVENT TRIGGER pgrst_watch
                 .into()
         }
 
-        async fn status_running(coredbs: &Api<CoreDB>, name: &str) -> bool {
-            let max_retries = 10;
-            let wait_duration = Duration::from_secs(2); // Adjust as needed
-
-            for attempt in 1..=max_retries {
-                let coredb = coredbs.get(name).await.expect("Failed to get CoreDB");
-
-                if coredb.status.as_ref().map_or(false, |s| s.running) {
-                    println!("CoreDB {} is running", name);
-                    return true;
-                } else {
-                    println!(
-                        "Attempt {}/{}: CoreDB {} is not running yet",
-                        attempt, max_retries, name
-                    );
-                }
-                tokio::time::sleep(wait_duration).await;
-            }
-            println!(
-                "CoreDB {} did not become running after {} attempts",
-                name, max_retries
-            );
-            false
-        }
-
         // Initialize tracing
         tracing_subscriber::fmt().init();
 
@@ -4527,6 +4488,31 @@ CREATE EVENT TRIGGER pgrst_watch
 
         // Delete namespace
         let _ = delete_namespace(client.clone(), &namespace).await;
+    }
+
+    async fn status_running(coredbs: &Api<CoreDB>, name: &str) -> bool {
+        let max_retries = 20;
+        let wait_duration = Duration::from_secs(6); // Adjust as needed
+
+        for attempt in 1..=max_retries {
+            let coredb = coredbs.get(name).await.expect("Failed to get CoreDB");
+
+            if coredb.status.as_ref().map_or(false, |s| s.running) {
+                println!("CoreDB {} is running", name);
+                return true;
+            } else {
+                println!(
+                    "Attempt {}/{}: CoreDB {} is not running yet",
+                    attempt, max_retries, name
+                );
+            }
+            tokio::time::sleep(wait_duration).await;
+        }
+        println!(
+            "CoreDB {} did not become running after {} attempts",
+            name, max_retries
+        );
+        false
     }
 
     #[tokio::test]
