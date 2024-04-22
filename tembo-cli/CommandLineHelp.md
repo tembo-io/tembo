@@ -1,28 +1,27 @@
-# Command-Line Help for `tembo-cli`
-
-This document contains the help content for the `tembo-cli` command-line program.
+This document contains the help content for the `tembo` command-line program.
 
 **Command Overview:**
 
-* [`tembo-cli`↴](#tembo-cli)
-* [`tembo-cli context`↴](#tembo-cli-context)
-* [`tembo-cli context list`↴](#tembo-cli-context-list)
-* [`tembo-cli context set`↴](#tembo-cli-context-set)
-* [`tembo-cli init`↴](#tembo-cli-init)
-* [`tembo-cli apply`↴](#tembo-cli-apply)
-* [`tembo-cli validate`↴](#tembo-cli-validate)
-* [`tembo-cli delete`↴](#tembo-cli-delete)
-* [`tembo-cli logs`↴](#tembo-cli-logs)
-* [`tembo-cli login`↴](#tembo-cli-login)
-* [`tembo-cli top`↴](#tembo-cli-top)
+* [tembo](#tembo)
+* [tembo context](#tembo-context)
+* [tembo context list](#tembo-context-list)
+* [tembo context set](#tembo-context-set)
+* [tembo init](#tembo-init)
+* [tembo apply](#tembo-apply)
+* [tembo validate](#tembo-validate)
+* [tembo delete](#tembo-delete)
+* [tembo logs](#tembo-logs)
+* [tembo login](#tembo-login)
+* [tembo top](#tembo-top)
 
-## `tembo-cli`
+## tembo
 
-Tembo CLI
+**Usage:** 
+ ```bash
+tembo [OPTIONS] <COMMAND>
+```
 
-**Usage:** `tembo-cli [OPTIONS] <COMMAND>`
-
-###### **Subcommands:**
+**Subcommands:**
 
 * `context` — Manage Tembo contexts
 * `init` — Initializes a local environment. Creates a sample context and configuration files
@@ -33,122 +32,146 @@ Tembo CLI
 * `login` — Initiates login sequence to authenticate with Tembo
 * `top` — [EXPERIMENTAL] View Metric values of your instances
 
-###### **Options:**
+**Options:**
 
 * `--markdown-help`
 * `-v`, `--verbose` — Show more information in command output
 
+<br />
 
-
-## `tembo-cli context`
+## tembo context
 
 Manage Tembo contexts
 
-**Usage:** `tembo-cli context <COMMAND>`
+**Usage:** 
+ ```bash
+tembo context <COMMAND>
+```
 
-###### **Subcommands:**
+**Subcommands:**
 
 * `list` — List all available contexts
 * `set` — Set the current context
 
+<br />
 
-
-## `tembo-cli context list`
+## tembo context list
 
 List all available contexts
 
-**Usage:** `tembo-cli context list`
+**Usage:** 
+ ```bash
+tembo context list
+```
 
+<br />
 
-
-## `tembo-cli context set`
+## tembo context set
 
 Set the current context
 
-**Usage:** `tembo-cli context set --name <NAME>`
+**Usage:** 
+ ```bash
+tembo context set --name <NAME>
+```
 
-###### **Options:**
+**Options:**
 
 * `-n`, `--name <NAME>`
 
+<br />
 
-
-## `tembo-cli init`
+## tembo init
 
 Initializes a local environment. Creates a sample context and configuration files
 
-**Usage:** `tembo-cli init`
+**Usage:** 
+ ```bash
+tembo init
+```
 
+<br />
 
-
-## `tembo-cli apply`
+## tembo apply
 
 Deploys a tembo.toml file
 
-**Usage:** `tembo-cli apply [OPTIONS]`
+**Usage:** 
+ ```bash
+tembo apply [OPTIONS]
+```
 
-###### **Options:**
+**Options:**
 
 * `-m`, `--merge <MERGE>` — Merge the values of another tembo.toml file to this file before applying
 * `-s`, `--set <SET>` — Replace a specific configuration in your tembo.toml file. For example, tembo apply --set standard.cpu = 0.25
 
+<br />
 
-
-## `tembo-cli validate`
+## tembo validate
 
 Validates the tembo.toml file, context file, etc
 
-**Usage:** `tembo-cli validate`
+**Usage:** 
+ ```bash
+tembo validate
+```
 
+<br />
 
-
-## `tembo-cli delete`
+## tembo delete
 
 Deletes database instance locally or on Tembo Cloud
 
-**Usage:** `tembo-cli delete`
+**Usage:** 
+ ```bash
+tembo delete
+```
 
+<br />
 
-
-## `tembo-cli logs`
+## tembo logs
 
 View logs for your instance
 
-**Usage:** `tembo-cli logs`
+**Usage:** 
+ ```bash
+tembo logs
+```
 
+<br />
 
-
-## `tembo-cli login`
+## tembo login
 
 Initiates login sequence to authenticate with Tembo
 
-**Usage:** `tembo-cli login [OPTIONS]`
+**Usage:** 
+ ```bash
+tembo login [OPTIONS]
+```
 
-###### **Options:**
+**Options:**
 
 * `--organization-id <ORGANIZATION_ID>` — Set your Org ID for your new environment, which starts with "org_"
 * `--profile <PROFILE>` — Set a name for your new environment, for example "prod". This name will be used for the name of the environment and the credentials profile
 * `--tembo-host <TEMBO_HOST>` — Set your tembo_host for your profile, for example api.tembo.io
 * `--tembo-data-host <TEMBO_DATA_HOST>` — Set your tembo_data_host for your profile, for example api.data-1.use1.tembo.io
 
+<br />
 
-
-## `tembo-cli top`
+## tembo top
 
 [EXPERIMENTAL] View Metric values of your instances
 
-**Usage:** `tembo-cli top [OPTIONS]`
+**Usage:** 
+ ```bash
+tembo top [OPTIONS]
+```
 
-###### **Options:**
+**Options:**
 
 * `--tail`
 
+<br />
 
-
-<hr/>
-
-<small><i>
-    This document was generated automatically by
-    <a href="https://crates.io/crates/clap-markdown"><code>clap-markdown</code></a>.
-</i></small>
 
