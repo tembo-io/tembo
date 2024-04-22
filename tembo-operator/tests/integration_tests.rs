@@ -1907,8 +1907,16 @@ mod test {
         let patch = Patch::Apply(&coredb_json);
         let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
 
-        tokio::time::sleep(Duration::from_secs(5)).await;
-
+        // wait for ingress route tcp to be deleted
+        let mut i = 0;
+        loop {
+            tokio::time::sleep(Duration::from_secs(5)).await;
+            let ing_route_tcp = ingress_route_tcp_api.get(&ing_route_tcp_name).await;
+            if i > 5 || ing_route_tcp.is_err() {
+                break;
+            }
+            i+=1;
+        }
         // Get the ingress route tcp
         let ing_route_tcp = ingress_route_tcp_api.get(&ing_route_tcp_name).await;
         // Should be deleted
