@@ -42,10 +42,7 @@ use crate::{
             ClusterServiceAccountTemplate, ClusterServiceAccountTemplateMetadata, ClusterSpec,
             ClusterStorage, ClusterSuperuserSecret,
         },
-        cnpg_utils::{
-            check_cluster_hibernation_status, check_cluster_status, is_image_updated,
-            patch_cluster, restart_and_wait_for_restart, update_coredb_status,
-        },
+        cnpg_utils::{is_image_updated, patch_cluster, restart_and_wait_for_restart},
         placement::cnpg_placement::PlacementConfig,
         poolers::{
             Pooler, PoolerCluster, PoolerPgbouncer, PoolerSpec, PoolerTemplate, PoolerTemplateSpec,
