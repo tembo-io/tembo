@@ -46,7 +46,6 @@ jobs:
       release_version: ${{ steps.set_release_version.outputs.release_version }}
       sha_x86_64: ${{ steps.cargo_build.outputs.sha_x86_64 }}
       sha_aarch64: ${{ steps.cli_version_mac.outputs.sha_aarch64 }}
-      version: ${{ steps.cargo_build.outputs.version }}
     container:
       image: ${{ matrix.container }}
     steps:
