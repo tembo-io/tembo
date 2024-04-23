@@ -50,21 +50,7 @@ runs:
         cargo run -- --markdown-help > ../command-reference.md
       shell: bash
 
-    - name: Check if documentation has changed
-      id: doc_check
-      run: |
-        if diff -q generation-repo/docs/old-command-reference.md generation-repo/docs/command-reference.md > /dev/null; then
-          echo "Documentation has not changed."
-          echo "skip_commit=1" >> $GITHUB_ENV
-        else
-          echo "Documentation has changed."
-          cp generation-repo/docs/command-reference.md generation-repo/docs/old-command-reference.md
-          echo "skip_commit=0" >> $GITHUB_ENV
-        fi
-      shell: bash
-
     - name: Check out the website repo
-      if: env.skip_commit == '0'
       uses: actions/checkout@v4
       with:
         repository: ${{ inputs.website_repo }}
@@ -73,20 +59,17 @@ runs:
         path: 'website-repo'
 
     - name: Copy documentation to website repository
-      if: env.skip_commit == '0'
       run: |
         mkdir -p website-repo/src/content/docs/development/cli/
         cp generation-repo/docs/command-reference.md website-repo/src/content/docs/development/cli/
       shell: bash
 
     - name: Commit and push documentation to website repository
-      if: env.skip_commit == '0'
       run: |
         cd website-repo
         git config user.name "coredb-service-user"
         git config user.email "admin@github.com"
         git add src/content/docs/development/cli/command-reference.md
         git checkout -b ${{ inputs.update_branch }}
-        git commit -m "Update command reference documentation"
-        git push origin ${{ inputs.update_branch }}
+        git commit -m "Update command reference documentation" && git push origin ${{ inputs.update_branch }} || echo "No change in docs!"
       shell: bash
