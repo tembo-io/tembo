@@ -12,8 +12,31 @@ on:
 
 jobs:
 
+  pre_gh_release:
+    runs-on: macos-latest
+    outputs:
+      release_version: ${{ steps.set_release_version.outputs.release_version }}
+    steps:
+      - name: set release version
+        id: set_release_version
+        run: |
+          RELEASE_VERSION=$(date +'%Y.%m.%d')
+          echo "release_version=$RELEASE_VERSION" >> $GITHUB_OUTPUT
+          echo "TEMBO_RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_ENV
+
+      - name: Create Github release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$TEMBO_RELEASE_VERSION" \
+              --repo="https://github.com/tembo-io/tembo" \
+              --title="$TEMBO_RELEASE_VERSION" \
+              --generate-notes
+
   gh_release:
     name: Github Release
+    needs: pre_gh_release
     strategy:
       fail-fast: false
       matrix:
@@ -43,7 +66,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     outputs:
       version: ${{ steps.cli_version_mac.outputs.version }}
-      release_version: ${{ steps.set_release_version.outputs.release_version }}
       sha_x86_64: ${{ steps.fetch_sha256.outputs.sha_x86_64 }}
       sha_aarch64: ${{ steps.fetch_sha256.outputs.sha_aarch64 }}
     container:
@@ -117,24 +139,6 @@ jobs:
           echo "TEMBO_CLI_NAME=$TEMBO_CLI_NAME" >> $env:GITHUB_ENV
         if: runner.os == 'Windows'
 
-      - name: "Generate release changelog"
-        id: changelog
-        uses: mikepenz/release-changelog-builder-action@v4.1.0
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: set env non-windows
-        id: set_release_version
-        run: |
-          RELEASE_VERSION=$(date +'%Y.%m.%d')
-          echo "RELEASE_TAG=$RELEASE_VERSION" >> $GITHUB_ENV
-          echo "release_version=$RELEASE_VERSION" >> $GITHUB_OUTPUT
-        if: runner.os != 'Windows'
-
-      - name: set env windows
-        run: echo "RELEASE_TAG=$(date +'%Y.%m.%d')" >> $env:GITHUB_ENV
-        if: runner.os == 'Windows'
-
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
         with:
@@ -173,7 +177,7 @@ jobs:
         run: |
           set -xe
           cd homebrew-tembo
-          sed -E -i '' 's/release_version =.*/release_version = "${{needs.gh_release.outputs.release_version}}"/g' tembo-cli.rb
+          sed -E -i '' 's/release_version =.*/release_version = "${{needs.pre_gh_release.outputs.release_version}}"/g' tembo-cli.rb
       - name: Replace sha_x86_64
         shell: bash
         run: |
