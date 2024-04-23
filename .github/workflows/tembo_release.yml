@@ -27,10 +27,10 @@ jobs:
       - name: Create Github release
         shell: bash
         env:
-          GH_TOKEN: ${{ secrets.SERVICE_USER_GITHUB_SSH_KEY }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           gh release create "$TEMBO_RELEASE_VERSION" \
-              --repo="git@github.com:tembo-io/tembo.git" \
+              --repo="https://github.com/tembo-io/tembo" \
               --title="$TEMBO_RELEASE_VERSION" \
               --generate-notes --prerelease
 
