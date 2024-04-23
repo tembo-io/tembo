@@ -524,6 +524,26 @@ async fn get_appservice_deployments(
         .collect())
 }
 
+/// Retrieves all AppService component Deployments in the namespace
+///
+/// This function should return all available deployments with an AppService label
+/// and return the actual Deployment struct for each as a vector. This allows us
+/// to use the full current state of the deployment rather than simply the name.
+pub async fn get_appservice_deployment_objects(
+    client: &Client,
+    namespace: &str,
+    coredb_name: &str,
+) -> Result<Vec<Deployment>, Error> {
+    let label_selector = format!(
+        "component={},coredb.io/name={}",
+        COMPONENT_NAME, coredb_name
+    );
+    let deployent_api: Api<Deployment> = Api::namespaced(client.clone(), namespace);
+    let lp = ListParams::default().labels(&label_selector).timeout(10);
+    let deployments = deployent_api.list(&lp).await.map_err(Error::KubeError)?;
+    Ok(deployments.items)
+}
+
 // gets all names of AppService Services in the namespace
 // that have the label "component=AppService" and belong to the coredb
 async fn get_appservice_services(
