@@ -6,7 +6,7 @@ permissions:
 on:
   push:
     branches:
-      - release-notes-2
+      - main
     paths:
       - 'tembo-cli/Cargo.toml'
 
@@ -32,7 +32,7 @@ jobs:
           gh release create "$TEMBO_RELEASE_VERSION" \
               --repo="https://github.com/tembo-io/tembo" \
               --title="$TEMBO_RELEASE_VERSION" \
-              --generate-notes --prerelease
+              --generate-notes
 
   gh_release:
     name: Github Release
