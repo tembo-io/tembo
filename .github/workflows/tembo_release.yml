@@ -75,10 +75,10 @@ jobs:
         id: fetch_sha256
         run: |
           sha_256=$(shasum -a 256 tembo-cli/target/${{ matrix.target }}/release/tembo.tar.gz  | cut -d" " -f 1)
-          if [ ${{ matrix.target }} == "x86_64-apple-darwin" ]
+          if [[ ${{ matrix.target }} == "x86_64-apple-darwin" ]]
           then
             echo "sha_x86_64=$sha_256" >> $GITHUB_OUTPUT
-          elif [ ${{ matrix.target }} == "aarch64-apple-darwin" ]
+          elif [[ ${{ matrix.target }} == "aarch64-apple-darwin" ]]
             echo "sha_aarch64=$sha_256" >> $GITHUB_OUTPUT
           fi
         if: runner.os == 'macOS'
