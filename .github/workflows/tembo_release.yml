@@ -186,7 +186,7 @@ jobs:
         run: |
           set -xe
           cd homebrew-tembo
-          sed -E -i '' '1,/sha256.*/ s/sha256.*/sha256 "${{needs.gh_release.outputs.sha_aarch_64}}"/g' tembo-cli.rb
+          sed -E -i '' '1,/sha256.*/ s/sha256.*/sha256 "${{needs.gh_release.outputs.sha_aarch64}}"/g' tembo-cli.rb
       - name: Git commit and push to remote
         shell: bash
         run: |
