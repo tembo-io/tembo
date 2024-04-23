@@ -79,6 +79,7 @@ jobs:
           then
             echo "sha_x86_64=$sha_256" >> $GITHUB_OUTPUT
           elif [[ ${{ matrix.target }} == "aarch64-apple-darwin" ]]
+          then
             echo "sha_aarch64=$sha_256" >> $GITHUB_OUTPUT
           fi
         if: runner.os == 'macOS'
