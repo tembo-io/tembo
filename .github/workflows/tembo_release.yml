@@ -74,7 +74,7 @@ jobs:
         working-directory: ./tembo-cli
         id: fetch_sha256
         run: |
-          sha_256=$(shasum -a 256 tembo-cli/target/${{ matrix.target }}/release/tembo.tar.gz  | cut -d" " -f 1)
+          sha_256=$(shasum -a 256 target/${{ matrix.target }}/release/tembo.tar.gz  | cut -d" " -f 1)
           if [[ ${{ matrix.target }} == "x86_64-apple-darwin" ]]
           then
             echo "sha_x86_64=$sha_256" >> $GITHUB_OUTPUT
