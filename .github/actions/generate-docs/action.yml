@@ -61,7 +61,7 @@ runs:
     - name: Copy documentation to website repository
       run: |
         mkdir -p website-repo/src/content/docs/development/cli/
-        cp generation-repo/docs/command-reference.md website-repo/src/content/docs/development/cli/
+        cp generation-repo/command-reference.md website-repo/src/content/docs/development/cli/
       shell: bash
 
     - name: Commit and push documentation to website repository
