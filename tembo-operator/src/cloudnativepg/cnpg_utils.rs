@@ -1,6 +1,9 @@
-use crate::{
-    apis::coredb_types::CoreDB, cloudnativepg::clusters::Cluster,
-    extensions::database_queries::is_not_restarting, patch_cdb_status_merge, Context, RESTARTED_AT,
+pub use crate::{
+    apis::coredb_types::CoreDB,
+    cloudnativepg::clusters::{Cluster, ClusterStatusConditionsStatus},
+    controller,
+    extensions::database_queries::is_not_restarting,
+    patch_cdb_status_merge, requeue_normal_with_jitter, Context, RESTARTED_AT,
 };
 use kube::{
     api::{Patch, PatchParams},
@@ -96,7 +99,7 @@ pub(crate) async fn restart_and_wait_for_restart(
 }
 
 #[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any(), running = %running))]
-async fn update_coredb_status(
+pub(crate) async fn update_coredb_status(
     cdb: &CoreDB,
     ctx: &Arc<Context>,
     running: bool,
@@ -122,7 +125,7 @@ async fn update_coredb_status(
 
 // patch_cluster_merge takes a CoreDB, Cluster and serde_json::Value and patch merges the Cluster with the new spec
 #[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any(), patch = %patch))]
-async fn patch_cluster_merge(
+pub async fn patch_cluster_merge(
     cdb: &CoreDB,
     ctx: &Arc<Context>,
     patch: serde_json::Value,
@@ -134,7 +137,7 @@ async fn patch_cluster_merge(
     })?;
 
     let cluster_api: Api<Cluster> = Api::namespaced(ctx.client.clone(), namespace);
-    let pp = PatchParams::apply("restart_annotation_patch");
+    let pp = PatchParams::apply("patch_merge");
     let _ = cluster_api
         .patch(&name, &pp, &Patch::Merge(&patch))
         .await

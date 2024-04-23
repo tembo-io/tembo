@@ -1596,7 +1596,8 @@ pub async fn reconcile_cnpg_scheduled_backup(
     ctx: Arc<Context>,
 ) -> Result<(), Action> {
     // check if the Cluster object exists on the cluster, if not then requeue
-    if !does_cluster_exist(cdb, ctx.clone()).await? {
+    let cluster = get_cluster(cdb, ctx.clone()).await;
+    if cluster.is_none() {
         warn!("Cluster does not exist, requeuing ScheduledBackup");
         return Err(Action::requeue(Duration::from_secs(30)));
     }
@@ -2161,30 +2162,33 @@ async fn is_restore_backup_running_pending_completed(
     }
 }
 
-// does_cluster_exist checks if a cluster exists and returns a bool or action to
-// requeue in a result
 #[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any()))]
-async fn does_cluster_exist(cdb: &CoreDB, ctx: Arc<Context>) -> Result<bool, Action> {
+pub(crate) async fn get_cluster(cdb: &CoreDB, ctx: Arc<Context>) -> Option<Cluster> {
     let instance_name = cdb.name_any();
-    let namespace = cdb.namespace().ok_or_else(|| {
-        error!(
-            "Namespace is not set for CoreDB for instance {}",
-            instance_name
-        );
-        Action::requeue(Duration::from_secs(300))
-    })?;
+    let namespace = match cdb.namespace() {
+        Some(ns) => ns,
+        _ => {
+            error!("Namespace is not set for CoreDB {}", instance_name);
+            return None;
+        }
+    };
 
     let cluster: Api<Cluster> = Api::namespaced(ctx.client.clone(), &namespace);
     let co = cluster.get(&instance_name).await;
 
     match co {
-        Ok(_) => {
+        Ok(cluster) => {
             debug!("Cluster {} exists", instance_name);
-            Ok(true)
+            Some(cluster)
         }
-        Err(e) => {
-            error!("Error getting cluster: {}", e);
-            Err(Action::requeue(Duration::from_secs(10)))
+        // return Ok(false) if the cluster does not exist (404)
+        Err(kube::Error::Api(ae)) if ae.code == 404 => {
+            debug!("Cluster {} does not exist", instance_name);
+            None
+        }
+        Err(_e) => {
+            error!("Error getting cluster: {}", instance_name);
+            None
         }
     }
 }
