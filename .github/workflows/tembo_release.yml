@@ -6,7 +6,7 @@ permissions:
 on:
   push:
     branches:
-      - main
+      - release-notes
     paths:
       - 'tembo-cli/Cargo.toml'
 
