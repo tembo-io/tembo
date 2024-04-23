@@ -30,7 +30,7 @@ jobs:
           GH_TOKEN: ${{ secrets.SERVICE_USER_GITHUB_SSH_KEY }}
         run: |
           gh release create "$TEMBO_RELEASE_VERSION" \
-              --repo="https://github.com/tembo-io/tembo" \
+              --repo="git@github.com:tembo-io/tembo.git" \
               --title="$TEMBO_RELEASE_VERSION" \
               --generate-notes --prerelease
 
