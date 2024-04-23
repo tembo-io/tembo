@@ -44,6 +44,9 @@ jobs:
     outputs:
       version: ${{ steps.cli_version_mac.outputs.version }}
       release_version: ${{ steps.set_release_version.outputs.release_version }}
+      sha_x86_64: ${{ steps.cargo_build.outputs.sha_x86_64 }}
+      sha_aarch64: ${{ steps.cli_version_mac.outputs.sha_aarch64 }}
+      version: ${{ steps.cargo_build.outputs.version }}
     container:
       image: ${{ matrix.container }}
     steps:
@@ -67,6 +70,15 @@ jobs:
           cd target/${{ matrix.target }}/release
           tar -czvf tembo.tar.gz ${{ matrix.executable }}
           git config --global --add safe.directory '*'
+
+          if [ ${{ matrix.target }} == "x86_64-apple-darwin" ]
+          then
+            sha_x86_64=$(shasum -a 256 tembo.tar.gz | cut -d" " -f 1)
+            echo "sha_x86_64=$sha_x86_64" >> $GITHUB_OUTPUT
+          elif [ ${{ matrix.target }} == "aarch64-apple-darwin" ]
+            sha_aarch64=$(shasum -a 256 tembo.tar.gz | cut -d" " -f 1)
+            echo "sha_aarch64=$sha_aarch64" >> $GITHUB_OUTPUT
+          fi
 
       # TODO: Figure out a better way to fetch version for mac & linux
       - name: CLI version Mac
@@ -159,6 +171,18 @@ jobs:
           set -xe
           cd homebrew-tembo
           sed -E -i '' 's/release_version =.*/release_version = "${{needs.gh_release.outputs.release_version}}"/g' tembo-cli.rb
+      - name: Replace sha_x86_64
+        shell: bash
+        run: |
+          set -xe
+          cd homebrew-tembo
+          sed -E -i '' 's/sha256.*/sha256 "${{needs.gh_release.outputs.sha_x86_64}}"/g' tembo-cli.rb
+      - name: Replace sha_aarch_64
+        shell: bash
+        run: |
+          set -xe
+          cd homebrew-tembo
+          sed -E -i '' '1,/sha256.*/ s/sha256.*/sha256 "${{needs.gh_release.outputs.sha_aarch_64}}"/g' tembo-cli.rb
       - name: Git commit and push to remote
         shell: bash
         run: |
