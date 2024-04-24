@@ -48,12 +48,6 @@ runs:
         pwd
         ls -lah
         cargo run -- --markdown-help > command-reference.md
-        ls -lah
-        cd ..
-        ls -lah
-        cd ..
-        ls -lah
-        cd tembo-repo/tembo-cli
       shell: bash
 
     - name: Check out the website repo
