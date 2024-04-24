@@ -68,17 +68,28 @@ runs:
         cd website-repo
         git config user.name "coredb-service-user"
         git config user.email "admin@github.com"
-        # Stash all local changes
-        git stash  
-        # Ensure the branch is up to date
-        git pull origin cli-updates --rebase  
-        if git diff --staged --quiet; then
-          echo "No changes to commit."
-        else
-          git add src/content/docs/development/cli/command-reference.md
-          git commit -m "Update command reference documentation"
-          git push --force origin cli-updates  # Force push to overwrite remote changes
-        fi
+        
+        # Fetch the latest changes from the remote branch
+        git fetch origin cli-updates
+        
+        # Reset local copy to match the remote, discarding local changes
+        git reset --hard origin/cli-updates
+        
+        # Setup a custom merge strategy to always choose local changes for specific files
+        git config merge.ours.driver true
+        
+        # Attempt to merge remote changes, favoring our local changes during a conflict
+        git merge -X ours origin/cli-updates
+        
+        # Add changes to command-reference.md
+        git add src/content/docs/development/cli/command-reference.md
+        
+        # Commit the changes, handle the case where no changes exist
+        git commit -m "Update command reference documentation" || echo "No changes to commit."
+        
+        # Force push to ensure local changes are applied on the remote branch
+        git push --force origin cli-updates
       shell: bash
+
 
 
