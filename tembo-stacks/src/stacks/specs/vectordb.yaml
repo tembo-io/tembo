@@ -169,3 +169,17 @@ postgres_config:
     value: vectorize,pg_stat_statements,pg_cron
   - name: vectorize.embedding_service_url
     value: http://${NAMESPACE}-embeddings.${NAMESPACE}.svc.cluster.local:3000/v1/embeddings
+postgres_metrics:
+  vectorize_jobs:
+      query: select count(*) as total_jobs, current_database() as datname
+      master: true
+      metrics:
+        - total_jobs:
+            usage: GAUGE
+            description: Number of vectorize jobs
+        - datname:
+            usage: "LABEL"
+            description: "Name of current database"
+      target_databases:
+        - "*"
+        - "postgres"
