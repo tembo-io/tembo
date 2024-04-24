@@ -45,7 +45,7 @@ runs:
     - name: Generate Documentation
       run: |
         cd tembo-repo/tembo-cli
-        pwd
+        cargo run -- --command-reference.md
       shell: bash
 
     - name: Check out the website repo
@@ -58,6 +58,13 @@ runs:
 
     - name: Copy documentation to website repository
       run: |
+        ls -lah
+        cd tembo-cli
+        ls -lah
+        cd ..
+        cd tembo-repo
+        ls -lah
+        cd tembo-cli
         ls -lah
         cd website-repo/src/content/docs/development/cli/
         cp tembo-repo/command-reference.md website-repo/src/content/docs/development/cli/
