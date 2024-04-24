@@ -3,11 +3,10 @@ use crate::metrics::types::{InstantQuery, RangeQuery};
 use actix_web::http::StatusCode;
 use actix_web::web::{Data, Query};
 use actix_web::HttpResponse;
-use log::{debug, error, warn};
+use log::error;
 use reqwest::{Client, Response};
 use serde_json::Value;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-
 pub mod expression_validator;
 pub mod types;
 
@@ -132,10 +131,16 @@ pub async fn query_prometheus(
     // Check if the time range is within the allowed limits (e.g., 1 day)
     let start_sec = start.parse::<u64>().unwrap();
     let end_sec = end.parse::<u64>().unwrap();
-    if end_sec - start_sec > 86_400 {
+    if end_sec - start_sec > 86_400 && !query.starts_with("ALERTS{") {
         // 1 day in seconds
         return HttpResponse::BadRequest()
             .json("Time range too large, must be less than or equal to 1 day");
+    }
+
+    if query.starts_with("ALERTS{") && end_sec - start_sec > 2_678_400 {
+        // 31 days in seconds
+        return HttpResponse::BadRequest()
+            .json("Time range too large, must be less than or equal to 31 days for ALERT metrics");
     }
 
     // Construct query URL

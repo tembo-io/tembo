@@ -22,6 +22,7 @@ watch-conductor:
     RUST_LOG={{RUST_LOG}} \
     CONTROL_PLANE_EVENTS_QUEUE=saas_queue \
     DATA_PLANE_EVENTS_QUEUE=data_plane_events \
+    METRICS_EVENTS_QUEUE=metrics_events \
     DATA_PLANE_BASEDOMAIN=local.tembo-development.com \
     CF_TEMPLATE_BUCKET=cdb-plat-use1-dev-eks-data-1-conductor-cf-templates \
     BACKUP_ARCHIVE_BUCKET=cdb-plat-use1-dev-instance-backups \

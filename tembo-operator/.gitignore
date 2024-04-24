@@ -1,6 +1,4 @@
 .DS_Store
-
-
 traefik-helm-chart
 traefik-helm-chart/**
 temp.yaml
