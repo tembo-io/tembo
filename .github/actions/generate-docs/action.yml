@@ -68,13 +68,19 @@ runs:
         cd website-repo
         git config user.name "coredb-service-user"
         git config user.email "admin@github.com"
-        git pull origin ${{ inputs.website_branch }} --rebase  # Ensure the branch is up to date
         git add src/content/docs/development/cli/command-reference.md
+        # Stash all local changes
+        git stash  
+        # Ensure the branch is up to date
+        git pull origin cli-updates --rebase  
+        # Apply the stashed changes
+        git stash pop  
         if git diff --staged --quiet; then
           echo "No changes to commit."
         else
           git commit -m "Update command reference documentation"
-          git push origin ${{ inputs.website_branch }}
+          git push origin cli-updates
         fi
       shell: bash
+
 
