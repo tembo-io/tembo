@@ -47,7 +47,13 @@ runs:
         cd tembo-repo/tembo-cli
         pwd
         ls -lah
-        cargo run -- --markdown-help > ../command-reference.md
+        cargo run -- --markdown-help > command-reference.md
+        ls -lah
+        cd ..
+        ls -lah
+        cd ..
+        ls -lah
+        cd tembo-repo/tembo-cli
       shell: bash
 
     - name: Check out the website repo
@@ -61,7 +67,7 @@ runs:
     - name: Copy documentation to website repository
       run: |
         cd website-repo/src/content/docs/development/cli/
-        cp tembo-repo/command-reference.md website-repo/src/content/docs/development/cli/
+        cp tembo-repo/tembo-cli/command-reference.md website-repo/src/content/docs/development/cli/
       shell: bash
 
     - name: Commit and push documentation to website repository
