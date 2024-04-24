@@ -1305,10 +1305,10 @@ fn construct_connection_string(info: ConnectionInfo, password: String) -> String
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
     use assert_cmd::prelude::*;
-    use std::env;
     use core::result::Result::Ok;
+    use std::env;
+    use std::path::PathBuf;
     use std::process::Command;
 
     const ROOT_DIR: &str = env!("CARGO_MANIFEST_DIR");
@@ -1392,13 +1392,18 @@ mod tests {
             let cleaned_stack_file = stack_file.trim_matches('"');
             test_dir.push(format!("{}", cleaned_stack_file));
 
-            let config_data = fs::read_to_string(&test_dir).expect("File not found in the directory");
+            let config_data =
+                fs::read_to_string(&test_dir).expect("File not found in the directory");
             let stack: Stack = serde_yaml::from_str(&config_data).expect("Invalid YAML File");
 
-            if stack.extensions.iter().flatten().any(|ext| ext.name == "earthdistance" && ext.locations.iter().any(|loc| loc.enabled)) {
+            if stack.extensions.iter().flatten().any(|ext| {
+                ext.name == "earthdistance" && ext.locations.iter().any(|loc| loc.enabled)
+            }) {
                 continue;
             } else {
-                return Err(anyhow::Error::msg("Not connecting to the enabled extension"));
+                return Err(anyhow::Error::msg(
+                    "Not connecting to the enabled extension",
+                ));
             }
         }
 
@@ -1409,5 +1414,4 @@ mod tests {
 
         Ok(())
     }
-
 }
