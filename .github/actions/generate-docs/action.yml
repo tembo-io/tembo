@@ -59,6 +59,7 @@ runs:
     - name: Copy documentation to website repository
       run: |
         mkdir -p website-repo/src/content/docs/development/cli/
+        ls -lah
         cp tembo-repo/command-reference.md website-repo/src/content/docs/development/cli/
       shell: bash
 
