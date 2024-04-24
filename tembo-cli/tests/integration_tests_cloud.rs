@@ -32,7 +32,7 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
     cmd.assert().success();
 
     let charset = "abcdefghijklmnopqrstuvwxyz";
-    let instance_name = generate(10, charset);
+    let instance_name = format!("e2e-{}", generate(10, charset));
 
     setup_env(&instance_name)?;
 

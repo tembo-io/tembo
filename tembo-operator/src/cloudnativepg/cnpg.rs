@@ -10,7 +10,7 @@ use crate::{
     cloudnativepg::{
         backups::Backup,
         clusters::{
-            Cluster, ClusterAffinity, ClusterBackup, ClusterBackupBarmanObjectStore,
+            Cluster, ClusterBackup, ClusterBackupBarmanObjectStore,
             ClusterBackupBarmanObjectStoreData, ClusterBackupBarmanObjectStoreDataCompression,
             ClusterBackupBarmanObjectStoreDataEncryption,
             ClusterBackupBarmanObjectStoreS3Credentials,
@@ -43,6 +43,7 @@ use crate::{
             ClusterStorage, ClusterSuperuserSecret,
         },
         cnpg_utils::{is_image_updated, patch_cluster, restart_and_wait_for_restart},
+        placement::cnpg_placement::PlacementConfig,
         poolers::{
             Pooler, PoolerCluster, PoolerPgbouncer, PoolerSpec, PoolerTemplate, PoolerTemplateSpec,
             PoolerTemplateSpecContainers, PoolerType,
@@ -647,6 +648,8 @@ pub fn cnpg_cluster_from_cdb(
     let (backup, service_account_template) = cnpg_backup_configuration(cdb, &cfg);
     let storage = cnpg_cluster_storage(cdb);
     let replication = cnpg_high_availability(cdb);
+    let affinity = cdb.spec.affinity_configuration.clone();
+    let topology_spread_constraints = cdb.spec.topology_spread_constraints.clone();
 
     let PostgresConfig {
         postgres_parameters,
@@ -709,11 +712,8 @@ pub fn cnpg_cluster_from_cdb(
             ..ObjectMeta::default()
         },
         spec: ClusterSpec {
-            affinity: Some(ClusterAffinity {
-                pod_anti_affinity_type: Some("preferred".to_string()),
-                topology_key: Some("topology.kubernetes.io/zone".to_string()),
-                ..ClusterAffinity::default()
-            }),
+            affinity,
+            topology_spread_constraints,
             backup,
             service_account_template,
             bootstrap,
@@ -1260,13 +1260,23 @@ pub async fn reconcile_metrics_service(cdb: &CoreDB, ctx: Arc<Context>) -> Resul
 }
 // Reconcile a Pooler
 #[instrument(skip(cdb, ctx) fields(trace_id, instance_name = %cdb.name_any()))]
-pub async fn reconcile_pooler(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {
+pub async fn reconcile_pooler(
+    cdb: &CoreDB,
+    ctx: Arc<Context>,
+    placement: Option<PlacementConfig>,
+) -> Result<(), Action> {
     let client = ctx.client.clone();
     let name = cdb.name_any() + "-pooler";
     let namespace = cdb.namespace().unwrap();
-    let pooler_api: Api<Pooler> = Api::namespaced(client.clone(), namespace.as_str());
-
     let owner_reference = cdb.controller_owner_ref(&()).unwrap();
+    let pooler_api: Api<Pooler> = Api::namespaced(client.clone(), namespace.as_str());
+    let pooler_tolerations = placement
+        .as_ref()
+        .and_then(|config| config.convert_pooler_tolerations());
+    let topology_spread_constraints = placement
+        .as_ref()
+        .and_then(|p| p.convert_pooler_topology_spread_constraints());
+    let affinity = placement.as_ref().and_then(|p| p.convert_pooler_affinity());
 
     // If pooler is enabled, create or update
     if cdb.spec.connectionPooler.enabled {
@@ -1301,6 +1311,9 @@ pub async fn reconcile_pooler(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Act
                             resources: cdb.spec.connectionPooler.pooler.resources.clone(),
                             ..Default::default()
                         }],
+                        affinity,
+                        tolerations: pooler_tolerations,
+                        topology_spread_constraints,
                         ..Default::default()
                     }),
                 }),
@@ -1583,7 +1596,8 @@ pub async fn reconcile_cnpg_scheduled_backup(
     ctx: Arc<Context>,
 ) -> Result<(), Action> {
     // check if the Cluster object exists on the cluster, if not then requeue
-    if !does_cluster_exist(cdb, ctx.clone()).await? {
+    let cluster = get_cluster(cdb, ctx.clone()).await;
+    if cluster.is_none() {
         warn!("Cluster does not exist, requeuing ScheduledBackup");
         return Err(Action::requeue(Duration::from_secs(30)));
     }
@@ -2148,30 +2162,33 @@ async fn is_restore_backup_running_pending_completed(
     }
 }
 
-// does_cluster_exist checks if a cluster exists and returns a bool or action to
-// requeue in a result
 #[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any()))]
-async fn does_cluster_exist(cdb: &CoreDB, ctx: Arc<Context>) -> Result<bool, Action> {
+pub(crate) async fn get_cluster(cdb: &CoreDB, ctx: Arc<Context>) -> Option<Cluster> {
     let instance_name = cdb.name_any();
-    let namespace = cdb.namespace().ok_or_else(|| {
-        error!(
-            "Namespace is not set for CoreDB for instance {}",
-            instance_name
-        );
-        Action::requeue(Duration::from_secs(300))
-    })?;
+    let namespace = match cdb.namespace() {
+        Some(ns) => ns,
+        _ => {
+            error!("Namespace is not set for CoreDB {}", instance_name);
+            return None;
+        }
+    };
 
     let cluster: Api<Cluster> = Api::namespaced(ctx.client.clone(), &namespace);
     let co = cluster.get(&instance_name).await;
 
     match co {
-        Ok(_) => {
+        Ok(cluster) => {
             debug!("Cluster {} exists", instance_name);
-            Ok(true)
+            Some(cluster)
         }
-        Err(e) => {
-            error!("Error getting cluster: {}", e);
-            Err(Action::requeue(Duration::from_secs(10)))
+        // return Ok(false) if the cluster does not exist (404)
+        Err(kube::Error::Api(ae)) if ae.code == 404 => {
+            debug!("Cluster {} does not exist", instance_name);
+            None
+        }
+        Err(_e) => {
+            error!("Error getting cluster: {}", instance_name);
+            None
         }
     }
 }

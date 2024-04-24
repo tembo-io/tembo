@@ -1209,11 +1209,6 @@ async fn get_loadable_libraries(
         for ext in extensions.iter() {
             let trunk_projects = get_trunk_projects(&ext.name).await?;
 
-            // If more than 1 trunk_project is returned then skip adding "shared_preload_libraries"
-            if trunk_projects.len() > 1 {
-                return Ok(shared_preload_libraries);
-            }
-
             for trunk_project in trunk_projects.iter() {
                 if let Some(extensions) = trunk_project.extensions.as_ref() {
                     for trunk_extension in extensions.iter() {

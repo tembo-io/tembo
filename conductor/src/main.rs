@@ -585,7 +585,7 @@ async fn main() -> std::io::Result<()> {
 
     let conductor_enabled = from_env_default("CONDUCTOR_ENABLED", "true");
     let status_reporter_enabled = from_env_default("WATCHER_ENABLED", "true");
-    let metrics_reported_enabled = from_env_default("METRICS_REPORTER_ENABLED", "true");
+    let metrics_reported_enabled = from_env_default("METRICS_REPORTER_ENABLED", "false");
 
     if conductor_enabled != "false" {
         info!("Starting conductor");
