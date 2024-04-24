@@ -1,19 +1,19 @@
 name: 'Generate and Deploy Documentation'
 description: 'Generate and deploy documentation files.'
 inputs:
-  repository:
+  tembo_repository:
     description: 'GitHub repository to work with for documentation generation.'
     required: true
-  website_repo:
+  website_repository:
     description: 'Website repository to update with documentation.'
     required: true
   ssh_key:
     description: 'SSH key for repository access.'
     required: true
-  generation_branch:
+  tembo_branch:
     description: 'Branch to checkout for documentation generation.'
     required: true
-  update_branch:
+  website_branch:
     description: 'Branch to update with generated documentation.'
     required: true
 
@@ -34,17 +34,17 @@ on:
 runs:
   using: "composite"
   steps:
-    - name: Check out the generation repo
+    - name: Check out the tembo repo
       uses: actions/checkout@v4
       with:
-        repository: ${{ inputs.repository }}
+        repository: ${{ inputs.tembo_repository }}
         ssh-key: ${{ inputs.ssh_key }}
-        ref: ${{ inputs.generation_branch }}
-        path: 'generation-repo'
+        ref: ${{ inputs.tembo_branch }}
+        path: 'tembo-repo'
 
     - name: Generate Documentation
       run: |
-        cd generation-repo/tembo-cli
+        cd tembo-repo/tembo-cli
         pwd
         ls -lah
         cargo run -- --markdown-help > ../command-reference.md
@@ -53,23 +53,24 @@ runs:
     - name: Check out the website repo
       uses: actions/checkout@v4
       with:
-        repository: ${{ inputs.website_repo }}
+        repository: ${{ inputs.website_repository }}
         ssh-key: ${{ inputs.ssh_key }}
         ref: main
         path: 'website-repo'
 
     - name: Copy documentation to website repository
       run: |
-        mkdir -p website-repo/src/content/docs/development/cli/
-        cp generation-repo/command-reference.md website-repo/src/content/docs/development/cli/
+        cd website-repo/src/content/docs/development/cli/
+        cp tembo-repo/command-reference.md website-repo/src/content/docs/development/cli/
       shell: bash
 
     - name: Commit and push documentation to website repository
       run: |
         cd website-repo
+        git pull
         git config user.name "coredb-service-user"
         git config user.email "admin@github.com"
         git add src/content/docs/development/cli/command-reference.md
-        git checkout -b ${{ inputs.update_branch }}
-        git commit -m "Update command reference documentation" && git push origin ${{ inputs.update_branch }} || echo "No change in docs!"
+        git checkout -b ${{ inputs.website_branch }}
+        git commit -m "Update command reference documentation" && git push origin ${{ inputs.website_branch }} || echo "No change in docs!"
       shell: bash
