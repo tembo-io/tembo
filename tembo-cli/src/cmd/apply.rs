@@ -250,8 +250,8 @@ fn docker_apply_instance(
 
     if instance_setting.stack_file.is_some() {
         let mut file_path = PathBuf::from(FileUtils::get_current_working_dir());
-        let cleane_stack_file = instance_setting.stack_file.clone().unwrap();
-        let cleaned_stack_file = cleane_stack_file.trim_matches('"');
+        let stack_file = instance_setting.stack_file.clone().unwrap();
+        let cleaned_stack_file = stack_file.trim_matches('"');
         file_path.push(format!("{}", cleaned_stack_file));
 
         let config_data = fs::read_to_string(&file_path).expect("File not found in the directory");
@@ -1306,8 +1306,13 @@ fn construct_connection_string(info: ConnectionInfo, password: String) -> String
 mod tests {
     use super::*;
     use std::path::PathBuf;
+    use assert_cmd::prelude::*;
+    use std::env;
+    use core::result::Result::Ok;
+    use std::process::Command;
 
     const ROOT_DIR: &str = env!("CARGO_MANIFEST_DIR");
+    const CARGO_BIN: &str = "tembo";
 
     #[tokio::test]
     async fn merge_settings() -> Result<(), Box<dyn std::error::Error>> {
@@ -1353,4 +1358,56 @@ mod tests {
 
         Ok(())
     }
+
+    #[tokio::test]
+    async fn stack_file() -> Result<(), anyhow::Error> {
+        let root_dir = env!("CARGO_MANIFEST_DIR");
+        let mut test_dir = PathBuf::from(root_dir).join("examples").join("stack-file");
+
+        env::set_current_dir(&test_dir)?;
+
+        // tembo init
+        let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+        cmd.arg("init");
+        cmd.assert().success();
+
+        // tembo context set --name local
+        let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+        cmd.arg("context");
+        cmd.arg("set");
+        cmd.arg("--name");
+        cmd.arg("local");
+        cmd.assert().success();
+
+        // tembo apply
+        let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+        cmd.arg("--verbose");
+        cmd.arg("apply");
+        cmd.assert().success();
+
+        // Check if extension is enabled
+        let instance_settings = get_instance_settings(None, None)?;
+        for (_key, instance_setting) in instance_settings.iter() {
+            let stack_file = instance_setting.stack_file.clone().unwrap();
+            let cleaned_stack_file = stack_file.trim_matches('"');
+            test_dir.push(format!("{}", cleaned_stack_file));
+
+            let config_data = fs::read_to_string(&test_dir).expect("File not found in the directory");
+            let stack: Stack = serde_yaml::from_str(&config_data).expect("Invalid YAML File");
+
+            if stack.extensions.iter().flatten().any(|ext| ext.name == "earthdistance" && ext.locations.iter().any(|loc| loc.enabled)) {
+                continue;
+            } else {
+                return Err(anyhow::Error::msg("Not connecting to the enabled extension"));
+            }
+        }
+
+        // tembo delete
+        let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+        cmd.arg("delete");
+        let _ = cmd.ok();
+
+        Ok(())
+    }
+
 }
