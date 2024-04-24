@@ -18,7 +18,7 @@ mod tui;
 struct App {
     #[arg(long, hide = true)]
     markdown_help: bool,
-    
+
     #[clap(flatten)]
     global_opts: GlobalOpts,
 
