@@ -60,13 +60,14 @@ runs:
 
     - name: Copy documentation to website repository
       run: |
-        mkdir -p website-repo/src/content/docs/development/cli/
+        cd website-repo/src/content/docs/development/cli/
         cp tembo-repo/command-reference.md website-repo/src/content/docs/development/cli/
       shell: bash
 
     - name: Commit and push documentation to website repository
       run: |
         cd website-repo
+        git pull
         git config user.name "coredb-service-user"
         git config user.email "admin@github.com"
         git add src/content/docs/development/cli/command-reference.md
