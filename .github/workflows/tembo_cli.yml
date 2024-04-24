@@ -18,12 +18,17 @@ jobs:
   generate_docs:
     runs-on: ubuntu-latest
     steps:
-      - name: Check out the main repo
-        uses: actions/checkout@v4
+        - uses: actions/checkout@v4
+        - name: Install system dependencies
+          run: |
+            set -xe
+            sudo apt-get update
 
-      - name: Generate and Deploy Docs
-        uses: ./.github/actions/generate-docs
-        with:
-          repository: 'tembo-io/website'
-          ssh_key: ${{ secrets.SERVICE_USER_GITHUB_SSH_KEY }}
-          branch: 'plat-410'
+        - name: Generate and Deploy Docs
+          uses: ./.github/actions/generate-docs
+          with:
+            tembo_repository: 'tembo-io/tembo'
+            ssh_key: ${{ secrets.SERVICE_USER_GITHUB_SSH_KEY }}
+            tembo_branch: 'plat-410'
+            website_branch: 'cli-updates'
+            website_repository: 'tembo-io/website'
