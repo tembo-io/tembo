@@ -66,10 +66,15 @@ runs:
     - name: Commit and push documentation to website repository
       run: |
         cd website-repo
-        git pull
         git config user.name "coredb-service-user"
         git config user.email "admin@github.com"
+        git pull origin ${{ inputs.website_branch }} --rebase  # Ensure the branch is up to date
         git add src/content/docs/development/cli/command-reference.md
-        git checkout -b ${{ inputs.website_branch }}
-        git commit -m "Update command reference documentation" && git push origin ${{ inputs.website_branch }} || echo "No change in docs!"
+        if git diff --staged --quiet; then
+          echo "No changes to commit."
+        else
+          git commit -m "Update command reference documentation"
+          git push origin ${{ inputs.website_branch }}
+        fi
       shell: bash
+
