@@ -1,18 +1,19 @@
 use crate::cli::context::{get_current_context, Target};
 use crate::cmd::apply::{get_instance_id, get_instance_settings};
+use anyhow::anyhow;
 use anyhow::{Context, Result};
+use chrono::{LocalResult, TimeZone, Utc};
 use clap::Args;
 use reqwest::blocking::Client;
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
 use serde::{Deserialize, Serialize};
-use anyhow::anyhow;
 use std::process::Command;
 use temboclient::apis::configuration::Configuration;
 
 /// View logs for your instance
 #[derive(Args)]
 pub struct LogsCommand {
-    /// Application name to fetch logs for
+    /// Fetch logs for specific apps
     #[clap(long)]
     app: Option<String>,
 }
@@ -25,6 +26,22 @@ struct LogStream {
     stream: String,
     tembo_instance_id: String,
     tembo_organization_id: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Value2 {
+    level: String,
+    ts: String,
+    logger: String,
+    msg: String,
+    logging_pod: String,
+    record: Record,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Record {
+    log_time: String,
+    message: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -48,11 +65,11 @@ struct LogData {
 
 #[derive(Serialize, Deserialize, Debug)]
 struct IndividualLogEntry {
-    ts: String,
-    msg: String,
+    info: String,
 }
 
 pub fn execute(args: LogsCommand) -> Result<(), anyhow::Error> {
+    //let current_system_time = SystemTime::now();
     let env = match get_current_context() {
         Ok(env) => env,
         Err(e) => return Err(anyhow!(e)),
@@ -73,39 +90,47 @@ fn beautify_logs(json_data: &str, app_name: Option<String>) -> Result<(), anyhow
     let log_data: LogData = serde_json::from_str(json_data)?;
     let mut found = false;
 
-    for entry in log_data.data.result {
-        if let Some(app) = &app_name {
-            if entry.stream.container == *app {
-                println!("Stream Info: {:?}", entry.stream);
-                for value in entry.values {
-                    println!("Log: {}", value[1]);
-                }
-                found = true;
-            }
-        } else {
-            for value in entry.values {
-                let log = &value[1];
-    
-                match serde_json::from_str::<IndividualLogEntry>(log) {
-                    Ok(log_entry) => println!("{}", format_log_entry(&log_entry)),
-                    Err(_) => println!("{}", log),
+    for entry in &log_data.data.result {
+        if app_name
+            .as_ref()
+            .map_or(true, |app| entry.stream.container == *app)
+        {
+            for value in &entry.values {
+                match value[0].parse::<i64>() {
+                    Ok(unix_timestamp_ns) => {
+                        let unix_timestamp = unix_timestamp_ns / 1_000_000_000;
+                        match Utc.timestamp_opt(unix_timestamp, 0) {
+                            LocalResult::Single(date_time) => {
+                                let timestamp = date_time.format("%Y-%m-%d %H:%M:%S").to_string();
+                                process_log_entry(&timestamp, &value[1]);
+                                found = true;
+                            }
+                            _ => eprintln!("Invalid or ambiguous timestamp: {}", unix_timestamp),
+                        }
+                    }
+                    Err(e) => eprintln!("Error parsing string to i64: {}", e),
                 }
             }
         }
     }
 
-    if !found && app_name.is_some() {
-        return Err(anyhow!(
-            "Couldn't find logs with the specified app"
-        ));
+    if app_name.is_some() && !found {
+        return Err(anyhow!("Couldn't find logs with the specified app"));
     }
 
     Ok(())
 }
 
-
-fn format_log_entry(log_entry: &IndividualLogEntry) -> String {
-    format!("{} {}", log_entry.ts, log_entry.msg)
+fn process_log_entry(timestamp: &str, log_json_str: &str) {
+    match serde_json::from_str::<Value2>(log_json_str) {
+        Ok(log_details) => {
+            println!(
+                "{} {}: ({}) {}",
+                timestamp, log_details.level, log_details.msg, log_details.record.message
+            );
+        }
+        Err(_) => eprintln!("{} {}", timestamp, log_json_str),
+    }
 }
 
 pub fn cloud_logs(app: Option<String>) -> Result<(), anyhow::Error> {
@@ -290,6 +315,6 @@ mod tests {
     #[tokio::test]
     async fn cloud_logs() {
         let valid_json_log = mock_query("valid_json").unwrap();
-        beautify_logs(&valid_json_log,None).unwrap();
+        beautify_logs(&valid_json_log, None).unwrap();
     }
 }
