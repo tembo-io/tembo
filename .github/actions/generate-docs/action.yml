@@ -67,17 +67,14 @@ runs:
         cd website-repo
         git config user.name "coredb-service-user"
         git config user.email "admin@github.com"
-        git fetch origin cli-updates
-        git checkout cli-updates
-        # do the copy here
+        git fetch origin ${{ inputs.website_branch }}
+        git checkout ${{ inputs.website_branch }}
         cd ..
         cp tembo-repo/command-reference.md website-repo/src/content/docs/development/cli/
         cd website-repo
         git add src/content/docs/development/cli/command-reference.md
         git status
-        ls src/content/docs/development/cli/
-        git commit -m "Update command reference documentation" || echo "No changes to commit."
-        git push origin cli-updates
+        git commit -m "Update command reference documentation: ${SHORT_SHA}" && git push origin ${{ inputs.website_branch }} || echo "No change in docs!" 
       shell: bash
 
 
