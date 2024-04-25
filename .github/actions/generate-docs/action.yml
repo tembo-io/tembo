@@ -64,13 +64,13 @@ runs:
 
     - name: Commit and push documentation to website repository
       run: |
+        cp tembo-repo/command-reference.md website-repo/src/content/docs/development/cli/
         cd website-repo
         git config user.name "coredb-service-user"
         git config user.email "admin@github.com"
         git fetch origin cli-updates
         git checkout cli-updates
         # do the copy here
-        cp tembo-repo/command-reference.md website-repo/src/content/docs/development/cli/
         git add src/content/docs/development/cli/command-reference.md
         git status
         ls src/content/docs/development/cli/
