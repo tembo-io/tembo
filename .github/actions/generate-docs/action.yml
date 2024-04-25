@@ -17,13 +17,6 @@ inputs:
     description: 'Branch to update with generated documentation.'
     required: true
 
-on:
-  push:
-    paths:
-      - 'tembo-cli/**'
-    branches:
-      - main
-
 runs:
   using: "composite"
   steps:
