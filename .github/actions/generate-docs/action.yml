@@ -23,13 +23,6 @@ on:
       - 'tembo-cli/**'
     branches:
       - main
-  pull_request:
-    paths:
-      - 'tembo-cli/**'
-    branches:
-      - main
-      - develop
-      - feature/*
 
 runs:
   using: "composite"
@@ -45,8 +38,6 @@ runs:
     - name: Generate Documentation
       run: |
         cd tembo-repo/tembo-cli
-        pwd
-        ls -lah
         cargo run -- --markdown-help > ../command-reference.md
       shell: bash
 
@@ -60,17 +51,21 @@ runs:
 
     - name: Copy documentation to website repository
       run: |
-        cd website-repo/src/content/docs/development/cli/
-        cp tembo-repo/command-reference.md website-repo/src/content/docs/development/cli/
+        mkdir -p website-repo/src/content/docs/development/cli/
+        ls -lah
       shell: bash
 
     - name: Commit and push documentation to website repository
       run: |
         cd website-repo
-        git pull
         git config user.name "coredb-service-user"
         git config user.email "admin@github.com"
+        git fetch origin ${{ inputs.website_branch }}
+        git checkout ${{ inputs.website_branch }}
+        cd ..
+        cp tembo-repo/command-reference.md website-repo/src/content/docs/development/cli/
+        cd website-repo
         git add src/content/docs/development/cli/command-reference.md
-        git checkout -b ${{ inputs.website_branch }}
-        git commit -m "Update command reference documentation" && git push origin ${{ inputs.website_branch }} || echo "No change in docs!"
+        git status
+        git commit -m "Update command reference documentation: ${SHORT_SHA}" && git push origin ${{ inputs.website_branch }} || echo "No change in docs!" 
       shell: bash
