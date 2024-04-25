@@ -47,6 +47,7 @@ struct GlobalOpts {
 }
 
 fn main() -> Result<(), anyhow::Error> {
+
     if std::env::args().any(|arg| arg == "--markdown-help") {
         clap_markdown::print_help_markdown::<App>();
         return Ok(());
