@@ -55,6 +55,7 @@ use crate::cli::tembo_config::Library;
 use crate::cli::tembo_config::OverlayInstanceSettings;
 use crate::cli::tembo_config::TrunkProject;
 use crate::tui;
+use crate::tui::error;
 use crate::{
     cli::context::{get_current_context, Environment, Profile, Target},
     tui::{clean_console, colors, instance_started, white_confirmation},
@@ -151,6 +152,9 @@ fn tembo_cloud_apply(
     instance_settings: HashMap<String, InstanceSettings>,
 ) -> Result<(), anyhow::Error> {
     for (_key, instance_setting) in instance_settings.iter() {
+        if instance_setting.stack_file.is_some() {
+            error("Stack File is only available for local testing.");
+        }
         let result = tembo_cloud_apply_instance(&env, instance_setting);
 
         match result {
@@ -228,7 +232,6 @@ fn docker_apply(
                 "postgres://postgres:postgres@{}.local.tembo.io:{}",
                 instance_setting.instance_name, port
             ),
-            &instance_setting.stack_type,
             "local",
         );
     }
@@ -243,10 +246,22 @@ fn docker_apply_instance(
         instance_setting.instance_name.clone(),
         instance_setting.instance_name.clone(),
     )?;
+    let stack: Stack;
 
-    let stack_type = ControllerStackType::from_str(instance_setting.stack_type.as_str())
-        .unwrap_or(ControllerStackType::Standard);
-    let stack = get_stack(stack_type);
+    if instance_setting.stack_file.is_some() {
+        let mut file_path = PathBuf::from(FileUtils::get_current_working_dir());
+        let stack_file = instance_setting.stack_file.clone().unwrap();
+        let cleaned_stack_file = stack_file.trim_matches('"');
+        file_path.push(format!("{}", cleaned_stack_file));
+
+        let config_data = fs::read_to_string(&file_path).expect("File not found in the directory");
+        stack = serde_yaml::from_str(&config_data).expect("Invalid YAML File");
+    } else {
+        let stack_type =
+            ControllerStackType::from_str(&instance_setting.stack_type.clone().unwrap())
+                .unwrap_or(ControllerStackType::Standard);
+        stack = get_stack(stack_type);
+    }
 
     let extensions = merge_options(
         stack.extensions.clone(),
@@ -397,7 +412,10 @@ pub fn tembo_cloud_apply_instance(
             ));
             clean_console();
             let connection_string = construct_connection_string(conn_info, password);
-            instance_started(&connection_string, &instance_settings.stack_type, "cloud");
+            instance_started(
+                &connection_string,
+                &instance_settings.stack_type.clone().unwrap(),
+            );
 
             break;
         }
@@ -585,7 +603,7 @@ fn get_create_instance(
         )
         .unwrap(),
         instance_name: instance_settings.instance_name.clone(),
-        stack_type: StackType::from_str(instance_settings.stack_type.as_str()).unwrap(),
+        stack_type: StackType::from_str(&instance_settings.stack_type.as_ref().unwrap()).unwrap(),
         storage: Storage::from_str(instance_settings.storage.as_str()).unwrap(),
         replicas: Some(instance_settings.replicas),
         app_services: get_app_services(instance_settings.app_services.clone())?,
@@ -925,9 +943,11 @@ fn merge_settings(base: &InstanceSettings, overlay: OverlayInstanceSettings) -> 
         memory: overlay.memory.unwrap_or_else(|| base.memory.clone()),
         storage: overlay.storage.unwrap_or_else(|| base.storage.clone()),
         replicas: overlay.replicas.unwrap_or(base.replicas),
-        stack_type: overlay
-            .stack_type
-            .unwrap_or_else(|| base.stack_type.clone()),
+        stack_type: Some(
+            overlay
+                .stack_type
+                .unwrap_or_else(|| base.stack_type.as_ref().unwrap().clone()),
+        ),
         postgres_configurations: overlay
             .postgres_configurations
             .or_else(|| base.postgres_configurations.clone()),
@@ -942,6 +962,7 @@ fn merge_settings(base: &InstanceSettings, overlay: OverlayInstanceSettings) -> 
             .ip_allow_list
             .or_else(|| base.extra_domains_rw.clone()),
         pg_version: overlay.pg_version.unwrap_or(base.pg_version),
+        stack_file: base.stack_file.clone(),
     }
 }
 
@@ -982,7 +1003,7 @@ pub fn set_instance_settings(
                     .parse()
                     .map_err(|_| Error::msg("Invalid value for replicas"))?;
             }
-            "stack_type" => settings.stack_type = setting_value,
+            "stack_type" => settings.stack_type = Some(setting_value),
             _ => {
                 return Err(Error::msg(format!("Unknown setting: {}", setting_name)));
             }
@@ -1279,9 +1300,14 @@ fn construct_connection_string(info: ConnectionInfo, password: String) -> String
 #[cfg(test)]
 mod tests {
     use super::*;
+    use assert_cmd::prelude::*;
+    use core::result::Result::Ok;
+    use std::env;
     use std::path::PathBuf;
+    use std::process::Command;
 
     const ROOT_DIR: &str = env!("CARGO_MANIFEST_DIR");
+    const CARGO_BIN: &str = "tembo";
 
     #[tokio::test]
     async fn merge_settings() -> Result<(), Box<dyn std::error::Error>> {
@@ -1324,6 +1350,62 @@ mod tests {
         } else {
             return Err("Setting key 'defaults' not found".into());
         }
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn stack_file() -> Result<(), anyhow::Error> {
+        let root_dir = env!("CARGO_MANIFEST_DIR");
+        let mut test_dir = PathBuf::from(root_dir).join("examples").join("stack-file");
+
+        env::set_current_dir(&test_dir)?;
+
+        // tembo init
+        let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+        cmd.arg("init");
+        cmd.assert().success();
+
+        // tembo context set --name local
+        let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+        cmd.arg("context");
+        cmd.arg("set");
+        cmd.arg("--name");
+        cmd.arg("local");
+        cmd.assert().success();
+
+        // tembo apply
+        let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+        cmd.arg("--verbose");
+        cmd.arg("apply");
+        cmd.assert().success();
+
+        // Check if extension is enabled
+        let instance_settings = get_instance_settings(None, None)?;
+        for (_key, instance_setting) in instance_settings.iter() {
+            let stack_file = instance_setting.stack_file.clone().unwrap();
+            let cleaned_stack_file = stack_file.trim_matches('"');
+            test_dir.push(format!("{}", cleaned_stack_file));
+
+            let config_data =
+                fs::read_to_string(&test_dir).expect("File not found in the directory");
+            let stack: Stack = serde_yaml::from_str(&config_data).expect("Invalid YAML File");
+
+            if stack.extensions.iter().flatten().any(|ext| {
+                ext.name == "earthdistance" && ext.locations.iter().any(|loc| loc.enabled)
+            }) {
+                continue;
+            } else {
+                return Err(anyhow::Error::msg(
+                    "Not connecting to the enabled extension",
+                ));
+            }
+        }
+
+        // tembo delete
+        let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+        cmd.arg("delete");
+        let _ = cmd.ok();
 
         Ok(())
     }

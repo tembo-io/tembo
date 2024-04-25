@@ -1,0 +1,5 @@
+[stack-file-testing]
+environment = "prod"
+instance_name = "stack-file-testing"
+pg_version = 15
+stack_file = "sample-stack-file.yaml"
