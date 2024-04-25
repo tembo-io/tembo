@@ -5,12 +5,16 @@ use clap::Args;
 use reqwest::blocking::Client;
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
 use serde::{Deserialize, Serialize};
-use std::process::Command;
+use std::process::{Output, Command};
 use temboclient::apis::configuration::Configuration;
 
 /// View logs for your instance
 #[derive(Args)]
-pub struct LogsCommand {}
+pub struct LogsCommand {
+    /// Tail your logs
+    #[clap(long, action = clap::ArgAction::SetTrue)]
+    tail: bool,
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 struct LogStream {
@@ -68,24 +72,24 @@ fn format_log_entry(log_entry: &IndividualLogEntry) -> String {
     format!("{} {}", log_entry.ts, log_entry.msg)
 }
 
-pub fn execute() -> Result<()> {
+pub fn execute(arg: LogsCommand) -> Result<()> {
     let env = match get_current_context() {
         Ok(env) => env,
-        Err(e) => return Err(e), // early return in case of error
+        Err(e) => return Err(e),
     };
 
     if env.target == Target::Docker.to_string() {
         let instance_settings = get_instance_settings(None, None)?;
         for (_instance_name, _settings) in instance_settings {
-            docker_logs(&_settings.instance_name)?;
+            docker_logs(&_settings.instance_name, Some(arg.tail))?;
         }
     } else if env.target == Target::TemboCloud.to_string() {
-        let _ = cloud_logs();
+        let _ = cloud_logs(Some(arg.tail));
     }
     Ok(())
 }
 
-pub fn cloud_logs() -> Result<()> {
+pub fn cloud_logs(tail: Option<bool>) -> Result<()> {
     let env = get_current_context()?;
     let org_id = env.org_id.clone().unwrap_or_default();
     let profile = env.selected_profile.clone().unwrap();
@@ -115,19 +119,40 @@ pub fn cloud_logs() -> Result<()> {
         };
 
         let query = format!("{{tembo_instance_id=\"{}\"}}", instance_id);
-        let url = format!("{}/loki/api/v1/query_range", tembo_data_host);
 
-        let response = client
+        if tail.is_some() {
+            let url = format!("{}/loki/api/v1/query", tembo_data_host);
+
+            loop {
+                let response = client
+                .get(url.clone())
+                .headers(headers.clone())
+                .query(&[("query", &query)])
+                .send()?;
+
+                if response.status().is_success() {
+                    let response_body = response.text()?;
+                    beautify_logs(&response_body)?;
+                } else {
+                    eprintln!("Error: {:?}", response.status());
+                }
+            }
+
+        } else {
+            let url = format!("{}/loki/api/v1/query_range", tembo_data_host);
+
+            let response = client
             .get(url)
             .headers(headers.clone())
             .query(&[("query", &query)])
             .send()?;
 
-        if response.status().is_success() {
-            let response_body = response.text()?;
-            beautify_logs(&response_body)?;
-        } else {
-            eprintln!("Error: {:?}", response.status());
+            if response.status().is_success() {
+                let response_body = response.text()?;
+                beautify_logs(&response_body)?;
+            } else {
+                eprintln!("Error: {:?}", response.status());
+            }
         }
     }
 
@@ -144,10 +169,11 @@ fn format_log_line(line: &str) -> Option<String> {
     }
 }
 
-pub fn docker_logs(instance_name: &str) -> Result<()> {
-    println!("\nFetching logs for instance: {}\n", instance_name);
+pub fn docker_logs(instance_name: &str, tail: Option<bool>) -> Result<()> {
+    if tail.is_some() {
+        println!("\nFetching logs for instance: {}\n", instance_name);
     let output = Command::new("docker")
-        .args(["logs", instance_name])
+        .args(["logs", "--follow", instance_name])
         .output()
         .with_context(|| {
             format!(
@@ -161,6 +187,30 @@ pub fn docker_logs(instance_name: &str) -> Result<()> {
         return Ok(());
     }
 
+    print_docker_logs(output)?;
+    } else {
+        println!("\nFetching logs for instance: {}\n", instance_name);
+        let output = Command::new("docker")
+            .args(["logs", instance_name])
+            .output()
+            .with_context(|| {
+                format!(
+                    "Failed to fetch logs for Docker container '{}'",
+                    instance_name
+                )
+            })?;
+
+        if !output.status.success() {
+            eprintln!("Error fetching logs for instance '{}'", instance_name);
+            return Ok(());
+        }
+        print_docker_logs(output)?;
+        }
+
+        Ok(())
+}
+
+fn print_docker_logs(output: Output) -> Result<(),anyhow::Error> {
     let logs_stdout = String::from_utf8_lossy(&output.stdout);
     let logs_stderr = String::from_utf8_lossy(&output.stderr);
 
