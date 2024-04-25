@@ -2,11 +2,13 @@ use crate::cli::context::{get_current_context, Target};
 use crate::cmd::apply::{get_instance_id, get_instance_settings};
 use anyhow::anyhow;
 use anyhow::{Context, Result};
+use chrono::DateTime;
 use chrono::{LocalResult, TimeZone, Utc};
 use clap::Args;
 use reqwest::blocking::Client;
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::process::Command;
 use temboclient::apis::configuration::Configuration;
 
@@ -69,7 +71,6 @@ struct IndividualLogEntry {
 }
 
 pub fn execute(args: LogsCommand) -> Result<(), anyhow::Error> {
-    //let current_system_time = SystemTime::now();
     let env = match get_current_context() {
         Ok(env) => env,
         Err(e) => return Err(anyhow!(e)),
@@ -86,9 +87,9 @@ pub fn execute(args: LogsCommand) -> Result<(), anyhow::Error> {
     Ok(())
 }
 
-fn beautify_logs(json_data: &str, app_name: Option<String>) -> Result<(), anyhow::Error> {
+fn beautify_logs(json_data: &str, app_name: Option<String>) -> Result<()> {
     let log_data: LogData = serde_json::from_str(json_data)?;
-    let mut found = false;
+    let mut entries: BTreeMap<DateTime<Utc>, Vec<String>> = BTreeMap::new();
 
     for entry in &log_data.data.result {
         if app_name
@@ -101,9 +102,24 @@ fn beautify_logs(json_data: &str, app_name: Option<String>) -> Result<(), anyhow
                         let unix_timestamp = unix_timestamp_ns / 1_000_000_000;
                         match Utc.timestamp_opt(unix_timestamp, 0) {
                             LocalResult::Single(date_time) => {
-                                let timestamp = date_time.format("%Y-%m-%d %H:%M:%S").to_string();
-                                process_log_entry(&timestamp, &value[1]);
-                                found = true;
+                                let log_detail = match serde_json::from_str::<Value2>(&value[1]) {
+                                    Ok(log_details) => format!(
+                                        "{} {}: ({}) {}",
+                                        date_time.format("%Y-%m-%d %H:%M:%S"),
+                                        log_details.level,
+                                        log_details.msg,
+                                        log_details.record.message
+                                    ),
+                                    Err(_) => format!(
+                                        "{} {}",
+                                        date_time.format("%Y-%m-%d %H:%M:%S"),
+                                        &value[1]
+                                    ),
+                                };
+                                entries
+                                    .entry(date_time)
+                                    .or_insert_with(Vec::new)
+                                    .push(log_detail);
                             }
                             _ => eprintln!("Invalid or ambiguous timestamp: {}", unix_timestamp),
                         }
@@ -114,23 +130,17 @@ fn beautify_logs(json_data: &str, app_name: Option<String>) -> Result<(), anyhow
         }
     }
 
-    if app_name.is_some() && !found {
+    for (_date_time, logs) in &entries {
+        for log in logs {
+            println!("{}", log);
+        }
+    }
+
+    if app_name.is_some() && entries.is_empty() {
         return Err(anyhow!("Couldn't find logs with the specified app"));
     }
 
     Ok(())
-}
-
-fn process_log_entry(timestamp: &str, log_json_str: &str) {
-    match serde_json::from_str::<Value2>(log_json_str) {
-        Ok(log_details) => {
-            println!(
-                "{} {}: ({}) {}",
-                timestamp, log_details.level, log_details.msg, log_details.record.message
-            );
-        }
-        Err(_) => eprintln!("{} {}", timestamp, log_json_str),
-    }
 }
 
 pub fn cloud_logs(app: Option<String>) -> Result<(), anyhow::Error> {
