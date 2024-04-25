@@ -106,6 +106,12 @@ extensions:
       - database: postgres
         enabled: true
         version: 1.1.1
+      - database: app
+        enabled: true
+        version: 1.1.1
+      - database: template1
+        enabled: true
+        version: 1.1.1
   - name: pg_partman
     locations:
       - database: postgres
