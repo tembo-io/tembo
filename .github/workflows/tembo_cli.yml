@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'tembo-cli/**'
+      - '.github/workflows/tembo_cli.yml'
     branches:
       - main
 
