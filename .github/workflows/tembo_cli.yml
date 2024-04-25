@@ -6,6 +6,13 @@ on:
       - 'tembo-cli/**'
     branches:
       - main
+  pull_request:
+    paths:
+      - 'tembo-cli/**'
+    branches:
+      - main
+      - develop
+      - feature/*
 
 jobs:
   generate_docs:
