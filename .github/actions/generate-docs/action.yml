@@ -51,8 +51,8 @@ runs:
     - name: Commit and push documentation to website repository
       run: |
         cd website-repo
-        git config user.name "coredb-service-user"
-        git config user.email "admin@github.com"
+        git config --global user.name "coredb-service-user"
+        git config --global user.email "admin+github@coredb.io"
         git fetch origin ${{ inputs.website_branch }} && git checkout ${{ inputs.website_branch }} || git checkout -b ${{ inputs.website_branch }}
         cd ..
         cp tembo-repo/command-reference.md website-repo/src/content/docs/development/cli/
