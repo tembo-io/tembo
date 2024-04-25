@@ -76,7 +76,7 @@ fn main() -> Result<(), anyhow::Error> {
             validate::execute(app.global_opts.verbose)?;
         }
         SubCommands::Logs(_logs_cmd) => {
-            logs::execute()?;
+            logs::execute(_logs_cmd)?;
         }
         SubCommands::Delete(_delete_cmd) => {
             delete::execute()?;
