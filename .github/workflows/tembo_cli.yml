@@ -11,8 +11,7 @@ on:
       - 'tembo-cli/**'
     branches:
       - main
-      - develop
-      - feature/*
+      - '.github/workflows/tembo_cli.yml'
 
 jobs:
   generate_docs:
