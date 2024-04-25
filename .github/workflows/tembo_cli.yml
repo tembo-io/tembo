@@ -5,6 +5,7 @@ on:
     paths:
       - 'tembo-cli/**'
       - '.github/workflows/tembo_cli.yml'
+      - '.github/actions/generate-docs/**'
     branches:
       - main
 
