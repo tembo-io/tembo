@@ -60,7 +60,6 @@ runs:
       run: |
         mkdir -p website-repo/src/content/docs/development/cli/
         ls -lah
-        cp tembo-repo/command-reference.md website-repo/src/content/docs/development/cli/
       shell: bash
 
     - name: Commit and push documentation to website repository
@@ -68,27 +67,15 @@ runs:
         cd website-repo
         git config user.name "coredb-service-user"
         git config user.email "admin@github.com"
-        
-        # Fetch the latest changes from the remote branch
         git fetch origin cli-updates
-        
-        # Reset local copy to match the remote, discarding local changes
-        git reset --hard origin/cli-updates
-        
-        # Setup a custom merge strategy to always choose local changes for specific files
-        git config merge.ours.driver true
-        
-        # Attempt to merge remote changes, favoring our local changes during a conflict
-        git merge -X ours origin/cli-updates
-        
-        # Add changes to command-reference.md
+        git checkout cli-updates
+        # do the copy here
+        cp tembo-repo/command-reference.md website-repo/src/content/docs/development/cli/
         git add src/content/docs/development/cli/command-reference.md
-        
-        # Commit the changes, handle the case where no changes exist
+        git status
+        ls src/content/docs/development/cli/
         git commit -m "Update command reference documentation" || echo "No changes to commit."
-        
-        # Force push to ensure local changes are applied on the remote branch
-        git push --force origin cli-updates
+        git push origin cli-updates
       shell: bash
 
 
