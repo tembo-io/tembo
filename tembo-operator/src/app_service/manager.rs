@@ -456,6 +456,7 @@ fn generate_deployment(
     }
 
     let affinity = placement.as_ref().and_then(|p| p.combine_affinity_items());
+    let node_selector = placement.as_ref().and_then(|p| p.node_selector.clone());
     let tolerations = placement.as_ref().map(|p| p.tolerations.clone());
     let topology_spread_constraints = placement
         .as_ref()
@@ -477,6 +478,7 @@ fn generate_deployment(
             volume_mounts: Some(volume_mounts),
             ..Container::default()
         }],
+        node_selector,
         tolerations,
         topology_spread_constraints,
         volumes: Some(volumes),
@@ -974,7 +976,7 @@ mod tests {
                 volumeSnapshot:
                   enabled: true
                   snapshotClass: "csi-vsc"
-              image: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e 
+              image: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e
               port: 5432
               replicas: 1
               resources:
