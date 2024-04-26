@@ -1270,13 +1270,14 @@ pub async fn reconcile_pooler(
     let namespace = cdb.namespace().unwrap();
     let owner_reference = cdb.controller_owner_ref(&()).unwrap();
     let pooler_api: Api<Pooler> = Api::namespaced(client.clone(), namespace.as_str());
-    let pooler_tolerations = placement
+    let tolerations = placement
         .as_ref()
         .and_then(|config| config.convert_pooler_tolerations());
     let topology_spread_constraints = placement
         .as_ref()
         .and_then(|p| p.convert_pooler_topology_spread_constraints());
     let affinity = placement.as_ref().and_then(|p| p.convert_pooler_affinity());
+    let node_selector = placement.as_ref().and_then(|p| p.node_selector.clone());
 
     // If pooler is enabled, create or update
     if cdb.spec.connectionPooler.enabled {
@@ -1312,7 +1313,8 @@ pub async fn reconcile_pooler(
                             ..Default::default()
                         }],
                         affinity,
-                        tolerations: pooler_tolerations,
+                        node_selector,
+                        tolerations,
                         topology_spread_constraints,
                         ..Default::default()
                     }),
@@ -1539,7 +1541,7 @@ fn cnpg_scheduled_backup(
     };
 
     // TODO: reenable this once we have a work around for snapshots
-    // Becasue the snapshot name can easily be over the character limit for k8s
+    // Because the snapshot name can easily be over the character limit for k8s
     // we will need to trim the name to 43 characters and append "-snap"
     // let snap_name = generate_scheduled_backup_snapshot_name(name);
 
@@ -1699,7 +1701,7 @@ pub async fn get_latest_generated_node(
     }
 }
 
-/// fenced_pods_initialized checks if fenced pods are initialized and retuns a bool or action in a
+/// fenced_pods_initialized checks if fenced pods are initialized and returns a bool or action in a
 /// result
 #[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any()))]
 async fn fenced_pods_initialized(
