@@ -842,10 +842,13 @@ fn get_extensions(
                             name);
                         let ext_locations = extension_mismatch.unwrap().locations.clone();
                         if !ext_locations.is_empty() {
+                            if ext_locations[0].clone().error.unwrap() == Some(false) { 
                             if let Some(existing_version) = ext_locations[0].clone().version {
                                 version = existing_version
                             } else {
                                 return Err(Error::msg(version_error));
+                            } } else {
+                                return Err(Error::msg("Error adding Extension to your instance."));
                             }
                         } else {
                             return Err(Error::msg(version_error));
