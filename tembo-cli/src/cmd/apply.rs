@@ -382,8 +382,8 @@ pub fn tembo_cloud_apply_instance(
                 tui::error(&format!("Error creating instance: {}", error));
                 return Ok(());
             }
-        }
     }
+}
     println!();
     let mut sp = spinoff::Spinner::new(
         spinoff::spinners::Aesthetic,
@@ -561,6 +561,7 @@ fn create_new_instance(
     env: Environment,
 ) -> Result<String, String> {
     let maybe_instance = get_create_instance(value);
+    println!("{:?}",maybe_instance);
 
     match maybe_instance {
         Ok(instance) => {
@@ -824,6 +825,7 @@ fn get_extensions(
                 extension.clone().version,
             ))?;
 
+
             // Handle extension version change during an update
             if let Some(Some(existing_extensions)) = maybe_existing_extensions {
                 let extension_mismatch = existing_extensions
@@ -861,7 +863,7 @@ fn get_extensions(
                 vec![ExtensionInstallLocation {
                     database: Some("postgres".to_string()),
                     schema: None,
-                    version: Some(version),
+                    version: version,
                     enabled: extension.enabled,
                 }];
 
@@ -908,11 +910,15 @@ fn get_trunk_installs(
     let mut vec_trunk_installs: Vec<TrunkInstall> = vec![];
 
     if let Some(extensions) = maybe_extensions {
-        for (_, extension) in extensions.into_iter() {
+        for (name, extension) in extensions.into_iter() {
+            let version = Runtime::new().unwrap().block_on(get_extension_version(
+                name.clone(),
+                extension.clone().version,
+            )).expect("msg");
             if extension.trunk_project.is_some() {
                 vec_trunk_installs.push(TrunkInstall {
                     name: extension.trunk_project.unwrap(),
-                    version: Some(extension.trunk_project_version),
+                    version: version,
                 });
             }
         }
@@ -1241,7 +1247,6 @@ async fn get_extension_version(
     if let Some(version) = maybe_version {
         return Ok(Some(version));
     }
-
     let trunk_projects = get_trunk_projects(&name).await?;
 
     // If trunk projects returned is not exactly 1 then skip getting version

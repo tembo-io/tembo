@@ -19,10 +19,9 @@ pub struct TrunkInstall {
     #[serde(
         rename = "version",
         default,
-        with = "::serde_with::rust::double_option",
         skip_serializing_if = "Option::is_none"
     )]
-    pub version: Option<Option<String>>,
+    pub version: Option<String>,
 }
 
 impl TrunkInstall {
