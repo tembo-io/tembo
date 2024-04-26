@@ -84,10 +84,10 @@ pub fn execute(args: LogsCommand) -> Result<(), anyhow::Error> {
     if env.target == Target::Docker.to_string() {
         let instance_settings = get_instance_settings(None, None)?;
         for (_instance_name, _settings) in instance_settings {
-            docker_logs(&_settings.instance_name, Some(arg.tail))?;
+            docker_logs(&_settings.instance_name, args.tail)?;
         }
     } else if env.target == Target::TemboCloud.to_string() {
-        let _ = cloud_logs(Some(arg.tail), args.app)?;
+        let _ = cloud_logs(args.tail, args.app)?;
     }
     Ok(())
 }
@@ -148,7 +148,7 @@ fn beautify_logs(json_data: &str, app_name: Option<String>) -> Result<()> {
     Ok(())
 }
 
-pub fn cloud_logs(tail: Option<bool>, app: Option<String>) -> Result<()> {
+pub fn cloud_logs(tail: bool, app: Option<String>) -> Result<()> {
     let env = get_current_context()?;
     let org_id = env.org_id.clone().unwrap_or_default();
     let profile = env.selected_profile.clone().unwrap();
@@ -179,7 +179,7 @@ pub fn cloud_logs(tail: Option<bool>, app: Option<String>) -> Result<()> {
 
         let query = format!("{{tembo_instance_id=\"{}\"}}", instance_id);
 
-        if tail.is_some() {
+        if tail {
             let url = format!("{}/loki/api/v1/query", tembo_data_host);
 
             loop {
@@ -191,7 +191,7 @@ pub fn cloud_logs(tail: Option<bool>, app: Option<String>) -> Result<()> {
 
                 if response.status().is_success() {
                     let response_body = response.text()?;
-                    beautify_logs(&response_body)?;
+                    beautify_logs(&response_body, app.clone())?;
                 } else {
                     eprintln!("Error: {:?}", response.status());
                 }
@@ -208,18 +208,11 @@ pub fn cloud_logs(tail: Option<bool>, app: Option<String>) -> Result<()> {
 
             if response.status().is_success() {
                 let response_body = response.text()?;
-                beautify_logs(&response_body)?;
+                beautify_logs(&response_body, app.clone())?;
             } else {
                 eprintln!("Error: {:?}", response.status());
             }
-
-        if response.status().is_success() {
-            let response_body = response.text()?;
-            beautify_logs(&response_body, app.clone())?;
-        } else {
-            eprintln!("Error: {:?}", response.status());
-        }
-    }
+    }}
 
     Ok(())
 }
@@ -234,8 +227,8 @@ fn format_log_line(line: &str) -> Option<String> {
     }
 }
 
-pub fn docker_logs(instance_name: &str, tail: Option<bool>) -> Result<()> {
-    if tail.is_some() {
+pub fn docker_logs(instance_name: &str, tail: bool) -> Result<()> {
+    if tail {
         println!("\nFetching logs for instance: {}\n", instance_name);
     let output = Command::new("docker")
         .args(["logs", "--follow", instance_name])
@@ -254,7 +247,8 @@ pub fn docker_logs(instance_name: &str, tail: Option<bool>) -> Result<()> {
 
     print_docker_logs(output)?;
     } else {
-        println!("\nFetching logs for instance: {}\n", instance_name);
+
+        println!("\nBAD: Fetching logs for instance: {}\n", instance_name);
         let output = Command::new("docker")
             .args(["logs", instance_name])
             .output()
