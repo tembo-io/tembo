@@ -83,13 +83,7 @@ mod test {
 
         // Configurations
         let mut rng = rand::thread_rng();
-        let org_name = "coredb-test-org-1234".to_owned();
-        // Use the max allowed org name length
-        assert_eq!(org_name.len(), 20);
-        let dbname = format!("test-coredb-{}", rng.gen_range(10000000..99999999));
-        // Use the max allowed instance name length
-        assert_eq!(dbname.len(), 20);
-        let namespace = format!("org-{}-inst-{}", org_name, dbname);
+        let namespace = format!("sample-{}", rng.gen_range(1000000..9999999));
 
         let limits: BTreeMap<String, String> = BTreeMap::from([
             ("cpu".to_owned(), "1".to_string()),
@@ -154,12 +148,11 @@ mod test {
         let mut spec: CoreDBSpec = serde_json::from_value(spec_js).unwrap();
 
         let msg = types::CRUDevent {
-            organization_name: org_name.clone(),
             data_plane_id: "org_02s3owPQskuGXHE8vYsGSY".to_owned(),
             org_id: "org_02s3owPQskuGXHE8vYsGSY".to_owned(),
             inst_id: "inst_02s4UKVbRy34SAYVSwZq2H".to_owned(),
             event_type: types::Event::Create,
-            dbname: dbname.clone(),
+            namespace: namespace.clone(),
             spec: Some(spec.clone()),
         };
 
@@ -252,12 +245,11 @@ mod test {
         let current_coredb = coredb_resource.clone();
         // println!("Updated spec: {:?}", spec.clone());
         let msg = types::CRUDevent {
-            organization_name: org_name.clone(),
             data_plane_id: "org_02s3owPQskuGXHE8vYsGSY".to_owned(),
             org_id: "org_02s3owPQskuGXHE8vYsGSY".to_owned(),
             inst_id: "inst_02s4UKVbRy34SAYVSwZq2H".to_owned(),
             event_type: types::Event::Update,
-            dbname: dbname.clone(),
+            namespace: namespace.clone(),
             spec: Some(spec.clone()),
         };
         let msg_id = queue.send(&myqueue, &msg).await;
@@ -323,12 +315,11 @@ mod test {
         // pod restarts correctly.
 
         let msg = types::CRUDevent {
-            organization_name: org_name.clone(),
             data_plane_id: "org_02s3owPQskuGXHE8vYsGSY".to_owned(),
             org_id: "org_02s3owPQskuGXHE8vYsGSY".to_owned(),
             inst_id: "inst_02s4UKVbRy34SAYVSwZq2H".to_owned(),
             event_type: types::Event::Restart,
-            dbname: dbname.clone(),
+            namespace: namespace.clone(),
             spec: Some(spec.clone()),
         };
         let msg_id = queue.send(&myqueue, &msg).await;
@@ -373,12 +364,11 @@ mod test {
 
         // delete the instance
         let msg = types::CRUDevent {
-            organization_name: org_name.clone(),
             data_plane_id: "org_02s3owPQskuGXHE8vYsGSY".to_owned(),
             org_id: "org_02s3owPQskuGXHE8vYsGSY".to_owned(),
             inst_id: "inst_02s4UKVbRy34SAYVSwZq2H".to_owned(),
             event_type: types::Event::Delete,
-            dbname: dbname.clone(),
+            namespace: namespace.clone(),
             spec: None,
         };
         // println!("DELETE msg: {:?}", msg);
@@ -411,7 +401,7 @@ mod test {
         let aws_region = "us-east-1".to_owned();
         let region = Region::new(aws_region);
         let aws_config_state = AWSConfigState::new(region.clone()).await;
-        let stack_name = format!("org-{}-inst-{}-cf", org_name, dbname);
+        let stack_name = format!("{}-cf", namespace);
 
         // Check to see if the cloudformation stack exists
         let cf_stack_deleted = check_cf_stack_deletion(&aws_config_state, &stack_name).await;
