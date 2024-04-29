@@ -10,7 +10,7 @@ metrics:
     )
 - name: primary_available
   query: |
-    sum by (instance_id) (
+    sum by (instance_id, pod) (
       label_replace(
         kube_pod_container_status_ready{container="postgres"} * on(namespace) group_left(label_tembo_io_instance_id)
         kube_namespace_labels{label_tembo_io_instance_id!=""} unless on(namespace, pod)
