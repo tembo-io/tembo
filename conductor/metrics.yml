@@ -8,3 +8,13 @@ metrics:
         "instance_id", "$1", "label_tembo_io_instance_id", "(.*)"
       )
     )
+- name: primary_available
+  query: |
+    sum by (instance_id) (
+      label_replace(
+        kube_pod_container_status_ready{container="postgres"} * on(namespace) group_left(label_tembo_io_instance_id)
+        kube_namespace_labels{label_tembo_io_instance_id!=""} unless on(namespace, pod)
+        (cnpg_pg_replication_in_recovery{} == 1),
+        "instance_id", "$1", "label_tembo_io_instance_id", "(.*)"
+      )
+    )
