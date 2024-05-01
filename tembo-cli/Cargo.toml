@@ -76,6 +76,7 @@ tembo-stacks = "0.4.1"
 itertools = "0.12.1"
 random-string = "1.1.0"
 test-case = "=2.0.0-rc2"
+clap-markdown = { git = "https://github.com/tembo-io/clap-markdown.git", branch = "main" }
 
 [target.aarch64-unknown-linux-musl.dependencies]
 openssl = { version = "0.10", features = ["vendored"] }

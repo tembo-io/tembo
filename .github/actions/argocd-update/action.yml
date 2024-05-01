@@ -45,7 +45,7 @@ runs:
   - name: Update conductor image
     uses: mikefarah/yq@v4.33.3
     with:
-      cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/data-plane.yaml
+      cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/data-plane.yaml 
   - name: Update dataplane webserver image
     uses: mikefarah/yq@v4.33.3
     with:

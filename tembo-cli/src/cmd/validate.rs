@@ -64,6 +64,14 @@ pub fn execute(verbose: bool) -> Result<(), anyhow::Error> {
             }
         };
 
+        match validate_stack_in_toml(&config.clone().unwrap()) {
+            std::result::Result::Ok(_) => (),
+            std::result::Result::Err(e) => {
+                error(&format!("Error validating toml file: {}", e));
+                has_error = true;
+            }
+        }
+
         // Validate the config
         match validate_config(config.clone().unwrap(), verbose) {
             std::result::Result::Ok(_) => (),
@@ -113,7 +121,7 @@ fn validate_stack_support(
     pg_version: u8,
     stack_type: &str,
 ) -> Result<(), anyhow::Error> {
-    if settings.pg_version == pg_version && settings.stack_type == stack_type {
+    if settings.pg_version == pg_version && settings.stack_type.as_deref() == Some(stack_type) {
         return Err(Error::msg(format!(
             "Support for the {} stack on Postgres version {} is coming soon!",
             stack_type, pg_version
@@ -122,7 +130,21 @@ fn validate_stack_support(
     Ok(())
 }
 
-fn validate_config(
+fn validate_stack_in_toml(config: &HashMap<String, InstanceSettings>) -> Result<(), anyhow::Error> {
+    for settings in config.values() {
+        if (settings.stack_file.is_some() && settings.stack_type.is_some())
+            || (settings.stack_file.is_none() && settings.stack_type.is_none())
+        {
+            return Err(Error::msg(format!(
+                "You can only have either a stack_file or stack_type in tembo.toml file"
+            )));
+        }
+    }
+
+    Ok(())
+}
+
+pub fn validate_config(
     config: HashMap<String, InstanceSettings>,
     verbose: bool,
 ) -> Result<(), anyhow::Error> {
@@ -148,8 +170,10 @@ fn validate_config(
         validate_replicas(&replicas_str, &section, verbose)?;
 
         // Validate the stack types
-        let stack_types_str = settings.stack_type.as_str();
-        validate_stack_type(stack_types_str, &section, verbose)?;
+        if settings.stack_type.is_some() {
+            let ha = settings.stack_type;
+            validate_stack_type(&ha.unwrap(), &section, verbose)?;
+        }
     }
     Ok(())
 }

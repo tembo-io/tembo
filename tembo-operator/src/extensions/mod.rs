@@ -11,7 +11,7 @@ use crate::{
 };
 use kube::{
     runtime::{controller::Action, wait::Condition},
-    Api,
+    Api, ResourceExt,
 };
 use std::{sync::Arc, time::Duration};
 use tracing::debug;
@@ -24,11 +24,7 @@ pub async fn reconcile_extensions(
     _name: &str,
 ) -> Result<(Vec<TrunkInstallStatus>, Vec<ExtensionStatus>), Action> {
     // Trunk installs do not require postgres is ready
-    let coredb_name = coredb
-        .metadata
-        .name
-        .clone()
-        .expect("CoreDB should have a name");
+    let coredb_name = coredb.name_any();
     debug!("Reconciling trunk installs: {}", coredb_name);
     let trunk_installs = install::reconcile_trunk_installs(coredb, ctx.clone()).await?;
 

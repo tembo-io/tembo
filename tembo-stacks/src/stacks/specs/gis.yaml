@@ -78,6 +78,8 @@ postgres_config:
   - name: shared_preload_libraries
     value: pg_stat_statements
 trunk_installs:
+  - name: fuzzystrmatch
+    version: 1.2.0
   - name: pg_stat_statements
     version: 1.10.0
 extensions:

@@ -1,4 +1,4 @@
 [vector]
 environment = "prod"
 instance_name = "vector"
-stack = "VectorDB"
+stack_type = "VectorDB"

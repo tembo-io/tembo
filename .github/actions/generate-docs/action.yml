@@ -1,0 +1,63 @@
+name: 'Generate and Deploy Documentation'
+description: 'Generate and deploy documentation files.'
+inputs:
+  tembo_repository:
+    description: 'GitHub repository to work with for documentation generation.'
+    required: true
+  website_repository:
+    description: 'Website repository to update with documentation.'
+    required: true
+  ssh_key:
+    description: 'SSH key for repository access.'
+    required: true
+  tembo_branch:
+    description: 'Branch to checkout for documentation generation.'
+    required: true
+  website_branch:
+    description: 'Branch to update with generated documentation.'
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Check out the tembo repo
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ inputs.tembo_repository }}
+        ssh-key: ${{ inputs.ssh_key }}
+        ref: ${{ inputs.tembo_branch }}
+        path: 'tembo-repo'
+
+    - name: Generate Documentation
+      run: |
+        cd tembo-repo/tembo-cli
+        cargo run -- --markdown-help > ../command-reference.md
+      shell: bash
+
+    - name: Check out the website repo
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ inputs.website_repository }}
+        ssh-key: ${{ inputs.ssh_key }}
+        ref: main
+        path: 'website-repo'
+
+    - name: Copy documentation to website repository
+      run: |
+        mkdir -p website-repo/src/content/docs/development/cli/
+        ls -lah
+      shell: bash
+
+    - name: Commit and push documentation to website repository
+      run: |
+        cd website-repo
+        git config --global user.name "coredb-service-user"
+        git config --global user.email "admin+github@coredb.io"
+        git fetch origin ${{ inputs.website_branch }} && git checkout ${{ inputs.website_branch }} || git checkout -b ${{ inputs.website_branch }}
+        cd ..
+        cp tembo-repo/command-reference.md website-repo/src/content/docs/development/cli/
+        cd website-repo
+        git add src/content/docs/development/cli/command-reference.md
+        git status
+        git commit -m "Update command reference documentation: ${SHORT_SHA}" && git push origin ${{ inputs.website_branch }} || echo "No change in docs!" 
+      shell: bash

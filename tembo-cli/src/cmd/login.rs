@@ -22,17 +22,21 @@ struct SharedState {
 }
 
 #[derive(Args)]
-#[clap(author, version, about, long_about = None)]
+#[clap(author, version, about = "Initiates login sequence to authenticate with Tembo", long_about = None)]
 pub struct LoginCommand {
+    /// Set your Org ID for your new environment, which starts with "org_"
     #[clap(long)]
     pub organization_id: Option<String>,
 
+    /// Set a name for your new environment, for example "prod". This name will be used for the name of the environment and the credentials profile.
     #[clap(long)]
     pub profile: Option<String>,
 
+    /// Set your tembo_host for your profile, for example api.tembo.io
     #[clap(long)]
     pub tembo_host: Option<String>,
 
+    /// Set your tembo_data_host for your profile, for example api.data-1.use1.tembo.io
     #[clap(long)]
     pub tembo_data_host: Option<String>,
 }
@@ -44,6 +48,10 @@ struct TokenRequest {
 
 pub fn execute(login_cmd: LoginCommand) -> Result<(), anyhow::Error> {
     let _ = list_context();
+    let context_file_path = tembo_context_file_path();
+    let contents = fs::read_to_string(&context_file_path)?;
+    let data: Context = toml::from_str(&contents)?;
+
     match (&login_cmd.organization_id, &login_cmd.profile) {
         (Some(_), None) | (None, Some(_)) => {
             return Err(anyhow!(
@@ -59,7 +67,15 @@ pub fn execute(login_cmd: LoginCommand) -> Result<(), anyhow::Error> {
                 ));
             }
         }
-        (Some(_), Some(_)) => {}
+        (Some(_), Some(_)) => {
+            if data
+                .environment
+                .iter()
+                .any(|p| &p.name == login_cmd.profile.as_ref().unwrap())
+            {
+                return Err(anyhow!("An environment with the name {} already exists. Please choose a different name in the --profile flag.", login_cmd.profile.as_ref().unwrap()));
+            }
+        }
     }
 
     let login_url = url(login_cmd.tembo_host.as_deref())?;
@@ -100,7 +116,7 @@ async fn handle_tokio(login_url: String, cmd: &LoginCommand) -> Result<(), anyho
     }
 
     match result {
-        Ok(_) => println!("File saved and Server Closed!"),
+        Ok(_) => {}
         Err(_) => {
             println!("Operation timed out. Server is being stopped.");
         }
@@ -222,24 +238,17 @@ fn update_context(org_id: &str, profile_name: &str) -> Result<()> {
         env.set = Some(false);
     }
 
-    match data.environment.iter().any(|p| p.name == profile_name) {
-        true => {
-            error(&format!("Context Environment already exists. Either try creating a new name or set it to that."));
-        }
-        false => {
-            data.environment.push(Environment {
-                name: profile_name.to_string(),
-                target: "tembo-cloud".to_string(),
-                org_id: Some(org_id.to_string()),
-                profile: Some(profile_name.to_string()),
-                set: Some(true),
-                selected_profile: None,
-            });
+    data.environment.push(Environment {
+        name: profile_name.to_string(),
+        target: "tembo-cloud".to_string(),
+        org_id: Some(org_id.to_string()),
+        profile: Some(profile_name.to_string()),
+        set: Some(true),
+        selected_profile: None,
+    });
 
-            contents = toml::to_string(&data)?;
-            fs::write(&context_file_path, contents)?;
-        }
-    }
+    contents = toml::to_string(&data)?;
+    fs::write(&context_file_path, contents)?;
 
     Ok(())
 }

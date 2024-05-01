@@ -1,5 +1,22 @@
 use colorful::{Color, Colorful, RGB as ColorfulRgb};
+use std::fmt;
 use tiny_gradient::{GradientDisplay, GradientStr, RGB};
+
+pub enum TemboCliLog<'a> {
+    Gradient(GradientDisplay<'a, [RGB; 3]>),
+    GradientLarge(GradientDisplay<'a, [RGB; 4]>),
+    Default(String),
+}
+
+impl<'a> fmt::Display for TemboCliLog<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            TemboCliLog::Gradient(gradient) => write!(f, "{}", gradient),
+            TemboCliLog::Default(message) => write!(f, "{}", message),
+            TemboCliLog::GradientLarge(gradient) => write!(f, "{}", gradient),
+        }
+    }
+}
 
 /// Utility for completely clearing the console when called
 pub fn clean_console() {
@@ -95,14 +112,14 @@ pub fn chevrons<'a>() -> GradientDisplay<'a, [RGB; 4]> {
     )
 }
 
-pub fn logo<'a>() -> GradientDisplay<'a, [RGB; 3]> {
+pub fn logo<'a>() -> TemboCliLog<'a> {
     colors::gradient_rainbow(">>> T E M B O")
 }
 
-pub fn instance_started(server_url: &str, stack: &str, instance_type: &str) {
+pub fn instance_started(server_url: &str, stack: &str) {
     let bar = "┃".color(colors::sql_u()).bold();
     println!(
-        "\n{bar} {} {instance_type} instance {}: \n\n ➜ {}\n ➜ {}",
+        "\n{bar} {} instance {}: \n\n ➜ {}\n ➜ {}",
         logo(),
         "started".bg_rgb(255, 125, 127).color(Color::White).bold(),
         format_args!(
@@ -126,9 +143,10 @@ pub fn indent(amount: u32) -> String {
 }
 
 pub mod colors {
+    use super::TemboCliLog;
     use colorful::RGB as ColorfulRgb;
     use spinoff::Color as SpinnerColor;
-    use tiny_gradient::{GradientDisplay, GradientStr, RGB};
+    use tiny_gradient::{GradientStr, RGB};
 
     pub fn sql_u() -> ColorfulRgb {
         ColorfulRgb::new(255, 125, 127)
@@ -145,8 +163,13 @@ pub mod colors {
 
     #[allow(dead_code)]
     #[allow(clippy::needless_lifetimes)]
-    pub fn gradient_p<'a>(log: &'a str) -> GradientDisplay<'a, [RGB; 4]> {
-        GradientStr::gradient(
+    pub fn gradient_p<'a>(log: &'a str) -> TemboCliLog {
+        let term_program = std::env::var("TERM_PROGRAM").unwrap_or_default();
+        // aTerminal only supports 8 bit colors so gradients won't work
+        if term_program == "Apple_Terminal" {
+            return TemboCliLog::Default(log.to_string());
+        }
+        TemboCliLog::GradientLarge(GradientStr::gradient(
             log,
             [
                 RGB::new(255, 198, 217),
@@ -154,18 +177,23 @@ pub mod colors {
                 RGB::new(137, 203, 166),
                 RGB::new(165, 213, 113),
             ],
-        )
+        ))
     }
 
-    pub fn gradient_rainbow(log: &str) -> GradientDisplay<'_, [RGB; 3]> {
-        GradientStr::gradient(
+    pub fn gradient_rainbow(log: &str) -> TemboCliLog {
+        let term_program = std::env::var("TERM_PROGRAM").unwrap_or_default();
+        // aTerminal only supports 8 bit colors so gradients won't work
+        if term_program == "Apple_Terminal" {
+            return TemboCliLog::Default(log.to_string());
+        }
+        TemboCliLog::Gradient(GradientStr::gradient(
             log,
             [
                 RGB::new(247, 117, 119),
                 RGB::new(219, 57, 203),
                 RGB::new(202, 111, 229),
             ],
-        )
+        ))
     }
 
     pub fn indicator_good() -> ColorfulRgb {

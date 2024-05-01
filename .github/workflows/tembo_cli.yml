@@ -1,0 +1,35 @@
+name: Generate and Deploy Documentation
+
+on:
+  push:
+    paths:
+      - 'tembo-cli/**'
+      - '.github/workflows/tembo_cli.yml'
+      - '.github/actions/generate-docs/**'
+    branches:
+      - main
+
+jobs:
+  generate_docs:
+    runs-on: ubuntu-latest
+    steps:
+        - uses: actions/checkout@v4
+        - name: Install system dependencies
+          run: |
+            set -xe
+            sudo apt-get update
+        
+        - name: Set version strings
+          id: versions
+          run: |
+            echo "SHORT_SHA=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+            echo "BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)" >> $GITHUB_ENV
+
+        - name: Generate and Deploy Docs
+          uses: ./.github/actions/generate-docs
+          with:
+            tembo_repository: 'tembo-io/tembo'
+            ssh_key: ${{ secrets.SERVICE_USER_GITHUB_SSH_KEY }}
+            tembo_branch: 'main'
+            website_branch: 'cli-updates'
+            website_repository: 'tembo-io/website'

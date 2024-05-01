@@ -5,13 +5,38 @@ permissions:
 
 on:
   push:
-    tags:
-      - '[0-9]+.[0-9]+.[0-9]+'
+    branches:
+      - main
+    paths:
+      - 'tembo-cli/Cargo.toml'
 
 jobs:
 
-  cargo_build:
-    name: Cargo build
+  pre_gh_release:
+    runs-on: macos-latest
+    outputs:
+      release_version: ${{ steps.set_release_version.outputs.release_version }}
+    steps:
+      - name: set release version
+        id: set_release_version
+        run: |
+          RELEASE_VERSION=$(date +'%Y.%m.%d')
+          echo "release_version=$RELEASE_VERSION" >> $GITHUB_OUTPUT
+          echo "TEMBO_RELEASE_VERSION=$RELEASE_VERSION" >> $GITHUB_ENV
+
+      - name: Create Github release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "$TEMBO_RELEASE_VERSION" \
+              --repo="https://github.com/tembo-io/tembo" \
+              --title="$TEMBO_RELEASE_VERSION" \
+              --generate-notes
+
+  gh_release:
+    name: Github Release
+    needs: pre_gh_release
     strategy:
       fail-fast: false
       matrix:
@@ -39,6 +64,10 @@ jobs:
             os: windows-latest
             executable: tembo.exe
     runs-on: ${{ matrix.os }}
+    outputs:
+      version: ${{ steps.cli_version_mac.outputs.version }}
+      sha_x86_64: ${{ steps.fetch_sha256.outputs.sha_x86_64 }}
+      sha_aarch64: ${{ steps.fetch_sha256.outputs.sha_aarch64 }}
     container:
       image: ${{ matrix.container }}
     steps:
@@ -63,14 +92,30 @@ jobs:
           tar -czvf tembo.tar.gz ${{ matrix.executable }}
           git config --global --add safe.directory '*'
 
+      - name: Fetch sha256
+        working-directory: ./tembo-cli
+        id: fetch_sha256
+        run: |
+          sha_256=$(shasum -a 256 target/${{ matrix.target }}/release/tembo.tar.gz  | cut -d" " -f 1)
+          if [[ ${{ matrix.target }} == "x86_64-apple-darwin" ]]
+          then
+            echo "sha_x86_64=$sha_256" >> $GITHUB_OUTPUT
+          elif [[ ${{ matrix.target }} == "aarch64-apple-darwin" ]]
+          then
+            echo "sha_aarch64=$sha_256" >> $GITHUB_OUTPUT
+          fi
+        if: runner.os == 'macOS'
+
       # TODO: Figure out a better way to fetch version for mac & linux
       - name: CLI version Mac
         working-directory: ./tembo-cli
         id: cli_version_mac
         run: |
           cargo install cargo-get
-          TEMBO_CLI_NAME=$(cargo-get package.name)-$(cargo-get package.version)
+          VERSION=$(cargo-get package.version)
+          TEMBO_CLI_NAME=$(cargo-get package.name)-$VERSION
           echo "TEMBO_CLI_NAME=$TEMBO_CLI_NAME" >> $GITHUB_ENV
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
         if: runner.os == 'macOS'
 
       - name: CLI version Linux
@@ -94,17 +139,63 @@ jobs:
           echo "TEMBO_CLI_NAME=$TEMBO_CLI_NAME" >> $env:GITHUB_ENV
         if: runner.os == 'Windows'
 
-      - name: "Generate release changelog"
-        id: changelog
-        uses: mikepenz/release-changelog-builder-action@v4.1.0
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Upload binaries to release
         uses: svenstaro/upload-release-action@v2
         with:
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           file: tembo-cli/target/${{ matrix.target }}/release/tembo.tar.gz
           asset_name: ${{ env.TEMBO_CLI_NAME }}-${{ matrix.asset_name }}.tar.gz
-          tag: ${{ github.ref }}
-          body: ${{ steps.changelog.outputs.changelog }}
+          tag: ${{needs.pre_gh_release.outputs.release_version}}
+
+  post_gh_release:
+    runs-on: macos-latest
+    needs: [pre_gh_release, gh_release]
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+        with:
+          repository: tembo-io/homebrew-tembo
+          ssh-key: ${{ secrets.SERVICE_USER_GITHUB_SSH_KEY }}
+          path: homebrew-tembo
+      - name: Git commit and push to remote
+        shell: bash
+        run: |
+          set -xe
+          cd homebrew-tembo
+          git config --global user.name "coredb-service-user"
+          git config --global user.email "admin+github@coredb.io"
+          git fetch origin main && git checkout main
+      - name: Replace version
+        shell: bash
+        run: |
+          set -xe
+          cd homebrew-tembo
+          sed -E -i '' 's/version ".*/version "${{needs.gh_release.outputs.version}}"/g' tembo-cli.rb
+      - name: Replace release_version
+        shell: bash
+        run: |
+          set -xe
+          cd homebrew-tembo
+          sed -E -i '' 's/release_version =.*/release_version = "${{needs.pre_gh_release.outputs.release_version}}"/g' tembo-cli.rb
+      - name: Replace sha_x86_64
+        shell: bash
+        run: |
+          set -xe
+          cd homebrew-tembo
+          sed -E -i '' 's/sha256.*/sha256 "${{needs.gh_release.outputs.sha_x86_64}}"/g' tembo-cli.rb
+      - name: Replace sha_aarch_64
+        shell: bash
+        run: |
+          set -xe
+          cd homebrew-tembo
+          sed -E -i '' '1,/sha256.*/ s/sha256.*/sha256 "${{needs.gh_release.outputs.sha_aarch64}}"/g' tembo-cli.rb
+      - name: Git commit and push to remote
+        shell: bash
+        run: |
+          set -xe
+          cd homebrew-tembo
+          git add --all
+          # debugging
+          git diff HEAD
+          git commit -m "Update from tembo-io/tembo: ${{needs.gh_release.outputs.version}}"
+          git push origin main

@@ -1,7 +1,7 @@
 [package]
 name = "tembo-stacks"
 description = "Tembo Stacks for Postgres"
-version = "0.5.0"
+version = "0.5.8"
 authors = ["tembo.io"]
 edition = "2021"
 license = "Apache-2.0"
@@ -16,7 +16,7 @@ schemars = {version = "0.8.12", features = ["chrono"]}
 k8s-openapi = { version = "0.18.0", features = ["v1_25", "schemars"], default-features = false } # This version has to be in line with the same version we use in the controller
 serde = "1.0.152"
 serde_yaml = "0.9.21"
-tembo-controller = { package = "controller", version = "0.43.1" }
+tembo-controller = { package = "controller", version = "0.45.0" }
 tracing = "0.1"
 utoipa = { version = "3", features = ["actix_extras", "chrono"] }
 

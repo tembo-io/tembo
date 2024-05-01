@@ -14,3 +14,5 @@ target/
 **/.idea
 temp.sh
 **/*.DS_Store
+tags
+**/tags

@@ -359,19 +359,20 @@ async fn apply_network_policy(
             return Err(Action::requeue(Duration::from_secs(300)));
         }
     };
-    let name = network_policy
-        .metadata
-        .name
-        .clone()
-        .expect("There is always a name for a network policy")
-        .clone();
+    let name = network_policy.metadata.name.as_ref().ok_or_else(|| {
+        error!(
+            "Network policy name is empty in namespace: {}.",
+            namespace.to_string()
+        );
+        Action::requeue(tokio::time::Duration::from_secs(300))
+    })?;
     let params: PatchParams = PatchParams::apply("conductor").force();
     debug!(
         "\nApplying Network Policy {} in namespace {}",
         name, namespace
     );
     let _o: NetworkPolicy = match np_api
-        .patch(&name, &params, &Patch::Apply(&network_policy))
+        .patch(name, &params, &Patch::Apply(&network_policy))
         .await
     {
         Ok(np) => np,

@@ -162,7 +162,7 @@ export PGPASSWORD=$(kubectl get secrets/sample-standard-connection --template={{
 
 Add the following line to /etc/hosts
 ```
-127.0.0.1 sample-coredb.localhost
+127.0.0.1 sample-standard.localhost
 ```
 
 ```bash
