@@ -1,15 +1,24 @@
 use crate::cli::context::{get_current_context, Target};
 use crate::cmd::apply::{get_instance_id, get_instance_settings};
+use anyhow::anyhow;
 use anyhow::{Context, Result};
+use chrono::DateTime;
+use chrono::{LocalResult, TimeZone, Utc};
 use clap::Args;
 use reqwest::blocking::Client;
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
 use std::process::Command;
 use temboclient::apis::configuration::Configuration;
 
+/// View logs for your instance
 #[derive(Args)]
-pub struct LogsCommand {}
+pub struct LogsCommand {
+    /// Fetch logs for specific apps
+    #[clap(long)]
+    app: Option<String>,
+}
 
 #[derive(Serialize, Deserialize, Debug)]
 struct LogStream {
@@ -19,6 +28,22 @@ struct LogStream {
     stream: String,
     tembo_instance_id: String,
     tembo_organization_id: String,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Value2 {
+    level: String,
+    ts: String,
+    logger: String,
+    msg: String,
+    logging_pod: String,
+    record: Record,
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Record {
+    log_time: String,
+    message: String,
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -42,35 +67,13 @@ struct LogData {
 
 #[derive(Serialize, Deserialize, Debug)]
 struct IndividualLogEntry {
-    ts: String,
-    msg: String,
+    info: String,
 }
 
-fn beautify_logs(json_data: &str) -> Result<()> {
-    let log_data: LogData = serde_json::from_str(json_data)?;
-
-    for entry in log_data.data.result {
-        for value in entry.values {
-            let log = &value[1];
-
-            match serde_json::from_str::<IndividualLogEntry>(log) {
-                Ok(log_entry) => println!("{}", format_log_entry(&log_entry)),
-                Err(_) => println!("{}", log),
-            }
-        }
-    }
-
-    Ok(())
-}
-
-fn format_log_entry(log_entry: &IndividualLogEntry) -> String {
-    format!("{} {}", log_entry.ts, log_entry.msg)
-}
-
-pub fn execute() -> Result<()> {
+pub fn execute(args: LogsCommand) -> Result<(), anyhow::Error> {
     let env = match get_current_context() {
         Ok(env) => env,
-        Err(e) => return Err(e), // early return in case of error
+        Err(e) => return Err(anyhow!(e)),
     };
 
     if env.target == Target::Docker.to_string() {
@@ -79,12 +82,68 @@ pub fn execute() -> Result<()> {
             docker_logs(&_settings.instance_name)?;
         }
     } else if env.target == Target::TemboCloud.to_string() {
-        let _ = cloud_logs();
+        let _ = cloud_logs(args.app)?;
     }
     Ok(())
 }
 
-pub fn cloud_logs() -> Result<()> {
+fn beautify_logs(json_data: &str, app_name: Option<String>) -> Result<()> {
+    let log_data: LogData = serde_json::from_str(json_data)?;
+    let mut entries: BTreeMap<DateTime<Utc>, Vec<String>> = BTreeMap::new();
+
+    for entry in &log_data.data.result {
+        if app_name
+            .as_ref()
+            .map_or(true, |app| entry.stream.container == *app)
+        {
+            for value in &entry.values {
+                match value[0].parse::<i64>() {
+                    Ok(unix_timestamp_ns) => {
+                        let unix_timestamp = unix_timestamp_ns / 1_000_000_000;
+                        match Utc.timestamp_opt(unix_timestamp, 0) {
+                            LocalResult::Single(date_time) => {
+                                let log_detail = match serde_json::from_str::<Value2>(&value[1]) {
+                                    Ok(log_details) => format!(
+                                        "{} {}: ({}) {}",
+                                        date_time.format("%Y-%m-%d %H:%M:%S"),
+                                        log_details.level,
+                                        log_details.msg,
+                                        log_details.record.message
+                                    ),
+                                    Err(_) => format!(
+                                        "{} {}",
+                                        date_time.format("%Y-%m-%d %H:%M:%S"),
+                                        &value[1]
+                                    ),
+                                };
+                                entries
+                                    .entry(date_time)
+                                    .or_insert_with(Vec::new)
+                                    .push(log_detail);
+                            }
+                            _ => eprintln!("Invalid or ambiguous timestamp: {}", unix_timestamp),
+                        }
+                    }
+                    Err(e) => eprintln!("Error parsing string to i64: {}", e),
+                }
+            }
+        }
+    }
+
+    for (_date_time, logs) in &entries {
+        for log in logs {
+            println!("{}", log);
+        }
+    }
+
+    if app_name.is_some() && entries.is_empty() {
+        return Err(anyhow!("Couldn't find logs with the specified app"));
+    }
+
+    Ok(())
+}
+
+pub fn cloud_logs(app: Option<String>) -> Result<(), anyhow::Error> {
     let env = get_current_context()?;
     let org_id = env.org_id.clone().unwrap_or_default();
     let profile = env.selected_profile.clone().unwrap();
@@ -124,7 +183,7 @@ pub fn cloud_logs() -> Result<()> {
 
         if response.status().is_success() {
             let response_body = response.text()?;
-            beautify_logs(&response_body)?;
+            beautify_logs(&response_body, app.clone())?;
         } else {
             eprintln!("Error: {:?}", response.status());
         }
@@ -266,6 +325,6 @@ mod tests {
     #[tokio::test]
     async fn cloud_logs() {
         let valid_json_log = mock_query("valid_json").unwrap();
-        beautify_logs(&valid_json_log).unwrap();
+        beautify_logs(&valid_json_log, None).unwrap();
     }
 }

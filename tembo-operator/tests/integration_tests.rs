@@ -65,6 +65,114 @@ mod test {
     const TIMEOUT_SECONDS_POD_DELETED: u64 = 300;
     const TIMEOUT_SECONDS_COREDB_DELETED: u64 = 300;
 
+    /// Struct to contain many commonly used test resources
+    ///
+    /// Most if not all tests use all of the fields here, or refer to them
+    /// in some manner. This struct helps combine everything together.
+    struct TestCore {
+        name: String,
+        namespace: String,
+        client: Client,
+        context: Arc<Context>,
+        pods: Api<Pod>,
+        coredbs: Api<CoreDB>,
+    }
+
+    /// Helper class to make writing tests easier / less messy
+    ///
+    /// This class implements several functions for the TestClass struct that
+    /// remove a lot of the boilerplate code that happens frequently in these
+    /// tests. Use it whenever possible and feel free to add methods that
+    /// should be listed.
+    impl TestCore {
+        /// Instantiate a new TestClass object
+        ///
+        /// By providing a test name, this function will return a TestClass
+        /// object and set all of the related struct values as such:
+        ///
+        ///   * name - Test name as passed plus an RNG suffix
+        ///   * namespace - An initialized Kubernetes namespace for the test
+        ///   * client - An active Kubernetes client runtime
+        ///   * context - An active Arc context
+        ///   * pods - A pod to use for cluster-commands in this namespace and client
+        ///   * coredbs - A CoreDB API tied to this namespace and client
+        async fn new(test_name: &str) -> Self {
+            let client = kube_client().await;
+            let state = State::default();
+            let context = state.create_context(client.clone());
+
+            let mut rng = rand::thread_rng();
+            let suffix = rng.gen_range(0..100000);
+            let name = format!("{}-{}", test_name, suffix);
+            let namespace = match create_namespace(client.clone(), &name).await {
+                Ok(namespace) => namespace,
+                Err(e) => {
+                    eprintln!("Error creating namespace: {}", e);
+                    std::process::exit(1);
+                }
+            };
+
+            // Create a pod we can use to run commands in the cluster
+            let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
+
+            // Apply a basic configuration of CoreDB
+            println!("Creating CoreDB resource {}", name);
+            let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
+
+            Self {
+                name,
+                namespace,
+                client,
+                context,
+                pods,
+                coredbs,
+            }
+        }
+
+        /// Transform a JSON object into a cluster definition
+        ///
+        /// Given a series of JSON values defining a CoreDB cluster, this
+        /// function will return a CoreDB object in the generated namespace.
+        /// Subsequent calls will patch the existing cluster associated with
+        /// the base object.
+        async fn set_cluster_def(&self, cluster_def: &serde_json::Value) -> CoreDB {
+            let params = PatchParams::apply("tembo-integration-test");
+            let patch = Patch::Apply(&cluster_def);
+            self.coredbs
+                .patch(&self.name, &params, &patch)
+                .await
+                .unwrap()
+        }
+
+        // Tear down the test cluster, namespace, and other related allocations
+        //
+        // Once a test is finished, we should remove all structures we created.
+        // Always call this function at the end of a test, and it will remove
+        // the namespace for the test and all contained objects.
+        async fn teardown(&self) {
+            self.coredbs
+                .delete(&self.name, &Default::default())
+                .await
+                .unwrap();
+            println!("Waiting for CoreDB to be deleted: {}", &self.name);
+            let _assert_coredb_deleted = tokio::time::timeout(
+                Duration::from_secs(TIMEOUT_SECONDS_COREDB_DELETED),
+                await_condition(self.coredbs.clone(), &self.name, conditions::is_deleted("")),
+            )
+            .await
+            .unwrap_or_else(|_| {
+                panic!(
+                    "CoreDB {} was not deleted after waiting {} seconds",
+                    &self.name, TIMEOUT_SECONDS_COREDB_DELETED
+                )
+            });
+            println!("CoreDB resource deleted {}", &self.name);
+
+            // Delete namespace
+            let _ = delete_namespace(self.client.clone(), &self.namespace).await;
+        }
+    }
+
     async fn kube_client() -> Client {
         // Get the name of the currently selected namespace
         let kube_config = Config::infer()
@@ -161,14 +269,15 @@ mod test {
         coredb_resource: CoreDB,
         query: String,
     ) -> PsqlOutput {
-        // Wait up to 100 seconds
-        for _ in 1..20 {
+        for _ in 1..40 {
             // Assert extension no longer created
             if let Ok(result) = coredb_resource
                 .psql(query.clone(), "postgres".to_string(), context.clone())
                 .await
             {
-                return result;
+                if result.stdout.is_some() {
+                    return result;
+                }
             }
             println!(
                 "Waiting for psql result on DB {}...",
@@ -467,6 +576,7 @@ mod test {
         }
     }
 
+    use controller::extensions::database_queries::LIST_EXTENSIONS_QUERY;
     use controller::{
         apis::postgres_parameters::{ConfigValue, PgConfig},
         cloudnativepg::poolers::Pooler,
@@ -530,7 +640,7 @@ mod test {
     // function to check coredb.status.trunk_installs status of specific extension
     async fn trunk_install_status(coredbs: &Api<CoreDB>, name: &str, extension: &str) -> bool {
         let max_retries = 10;
-        let wait_duration = Duration::from_secs(2); // Adjust as needed
+        let wait_duration = Duration::from_secs(6); // Adjust as needed
 
         for attempt in 1..=max_retries {
             match coredbs.get(name).await {
@@ -693,36 +803,63 @@ mod test {
             metric_name, max_retries
         ))
     }
+    async fn wait_til_status_is_filled(coredbs: &Api<CoreDB>, name: &str) {
+        let max_retries = 10; // adjust as needed
+        for attempt in 1..=max_retries {
+            let coredb = coredbs
+                .get(name)
+                .await
+                .unwrap_or_else(|_| panic!("Failed to get CoreDB: {}", name));
+
+            if coredb.status.is_some() {
+                println!("Status is filled for CoreDB: {}", name);
+                return;
+            } else {
+                println!(
+                    "Attempt {}/{}: Status not yet filled for CoreDB: {}",
+                    attempt, max_retries, name
+                );
+            }
+            tokio::time::sleep(Duration::from_secs(10)).await;
+        }
+        panic!(
+            "Failed to fetch filled status for CoreDB: {} after {} attempts",
+            name, max_retries
+        );
+    }
+
+    async fn get_pg_start_time(
+        coredbs: &Api<CoreDB>,
+        name: &str,
+        ctx: Arc<Context>,
+    ) -> DateTime<Utc> {
+        const PG_TIMESTAMP_DECL: &str = "%Y-%m-%d %H:%M:%S.%f%#z";
+
+        let coredb = coredbs.get(name).await.expect("spec not found");
+
+        let query = "SELECT pg_postmaster_start_time()".to_string();
+        let psql_output = psql_with_retry(ctx.clone(), coredb, query).await;
+        let stdout = psql_output
+            .stdout
+            .as_ref()
+            .and_then(|stdout| stdout.lines().nth(2).map(str::trim))
+            .expect("expected stdout");
+
+        DateTime::parse_from_str(stdout, PG_TIMESTAMP_DECL)
+            .unwrap()
+            .into()
+    }
 
     #[tokio::test]
     #[ignore]
     async fn functional_test_basic_cnpg() {
-        // Initialize the Kubernetes client
-        let client = kube_client().await;
-        let state = State::default();
-        let context = state.create_context(client.clone());
-
-        // Configurations
-        let mut rng = rand::thread_rng();
-        let suffix = rng.gen_range(0..100000);
-        let name = &format!("test-basic-cnpg-{}", suffix);
-        let namespace = match create_namespace(client.clone(), name).await {
-            Ok(namespace) => namespace,
-            Err(e) => {
-                eprintln!("Error creating namespace: {}", e);
-                std::process::exit(1);
-            }
-        };
+        let test_name = "test-basic-cnpg";
+        let test = TestCore::new(test_name).await;
+        let name = test.name.clone();
 
         let kind = "CoreDB";
         let replicas = 1;
 
-        // Create a pod we can use to run commands in the cluster
-        let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
-
-        // Apply a basic configuration of CoreDB
-        println!("Creating CoreDB resource {}", name);
-        let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
         // Generate basic CoreDB resource to start with
         let coredb_json = serde_json::json!({
             "apiVersion": API_VERSION,
@@ -749,17 +886,16 @@ mod test {
                 }]
             }
         });
-        let params = PatchParams::apply("tembo-integration-test");
-        let patch = Patch::Apply(&coredb_json);
-        let coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        let coredb_resource = test.set_cluster_def(&coredb_json).await;
 
         // Wait for CNPG Pod to be created
         let pod_name = format!("{}-1", name);
 
-        pod_ready_and_running(pods.clone(), pod_name.clone()).await;
+        pod_ready_and_running(test.pods.clone(), pod_name.clone()).await;
 
         let _ = wait_until_psql_contains(
-            context.clone(),
+            test.context.clone(),
             coredb_resource.clone(),
             "\\dx".to_string(),
             "pg_jsonschema".to_string(),
@@ -768,12 +904,12 @@ mod test {
         .await;
 
         // Wait for pg_jsonschema to be installed before proceeding.
-        let found_extension = trunk_install_status(&coredbs, name, "pg_jsonschema").await;
+        let found_extension = trunk_install_status(&test.coredbs, &name, "pg_jsonschema").await;
         assert!(found_extension);
 
         // Check for heartbeat table and values
         let sql_result = wait_until_psql_contains(
-            context.clone(),
+            test.context.clone(),
             coredb_resource.clone(),
             "SELECT latest_heartbeat FROM tembo.heartbeat_table LIMIT 1".to_string(),
             "postgres".to_string(),
@@ -792,25 +928,7 @@ mod test {
         let body = response.text().await.unwrap();
         assert!(body.contains("cnpg_pg_settings_setting"));
 
-        // CLEANUP TEST
-        // Cleanup CoreDB
-        coredbs.delete(name, &Default::default()).await.unwrap();
-        println!("Waiting for CoreDB to be deleted: {}", &name);
-        let _assert_coredb_deleted = tokio::time::timeout(
-            Duration::from_secs(TIMEOUT_SECONDS_COREDB_DELETED),
-            await_condition(coredbs.clone(), name, conditions::is_deleted("")),
-        )
-        .await
-        .unwrap_or_else(|_| {
-            panic!(
-                "CoreDB {} was not deleted after waiting {} seconds",
-                name, TIMEOUT_SECONDS_COREDB_DELETED
-            )
-        });
-        println!("CoreDB resource deleted {}", name);
-
-        // Delete namespace
-        let _ = delete_namespace(client.clone(), &namespace).await;
+        test.teardown().await;
     }
 
     #[tokio::test]
@@ -1151,7 +1269,18 @@ mod test {
         let params = PatchParams::apply("coredb-integration-test");
         let patch = Patch::Apply(&coredb_json);
         let _ = coredbs.patch(name, &params, &patch).await.unwrap();
-        thread::sleep(Duration::from_millis(10000));
+        // Wait up to 60s for the storage size to change
+        let mut i = 0;
+        loop {
+            thread::sleep(Duration::from_millis(10000));
+            let pvc = pvc_api.get(&pod_name.to_string()).await.unwrap();
+            let storage = pvc.spec.unwrap().resources.unwrap().requests.unwrap();
+            let s = storage.get("storage").unwrap().to_owned();
+            if i > 5 || s == Quantity("10Gi".to_owned()) {
+                break;
+            }
+            i += 1;
+        }
         let pvc = pvc_api.get(&pod_name.to_string()).await.unwrap();
         // checking that the request is set, but its not the status
         // https://github.com/rancher/local-path-provisioner/issues/323
@@ -1779,8 +1908,16 @@ mod test {
         let patch = Patch::Apply(&coredb_json);
         let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
 
-        tokio::time::sleep(Duration::from_secs(5)).await;
-
+        // wait for ingress route tcp to be deleted
+        let mut i = 0;
+        loop {
+            tokio::time::sleep(Duration::from_secs(5)).await;
+            let ing_route_tcp = ingress_route_tcp_api.get(&ing_route_tcp_name).await;
+            if i > 5 || ing_route_tcp.is_err() {
+                break;
+            }
+            i += 1;
+        }
         // Get the ingress route tcp
         let ing_route_tcp = ingress_route_tcp_api.get(&ing_route_tcp_name).await;
         // Should be deleted
@@ -2919,9 +3056,9 @@ mod test {
         wait_until_psql_contains(
             context.clone(),
             coredb_resource.clone(),
-            "select extname from pg_catalog.pg_extension;".to_string(),
+            LIST_EXTENSIONS_QUERY.to_string(),
             "aggs_for_vecs".to_string(),
-            true,
+            false,
         )
         .await;
 
@@ -4033,31 +4170,6 @@ CREATE EVENT TRIGGER pgrst_watch
                 .into()
         }
 
-        async fn status_running(coredbs: &Api<CoreDB>, name: &str) -> bool {
-            let max_retries = 10;
-            let wait_duration = Duration::from_secs(2); // Adjust as needed
-
-            for attempt in 1..=max_retries {
-                let coredb = coredbs.get(name).await.expect("Failed to get CoreDB");
-
-                if coredb.status.as_ref().map_or(false, |s| s.running) {
-                    println!("CoreDB {} is running", name);
-                    return true;
-                } else {
-                    println!(
-                        "Attempt {}/{}: CoreDB {} is not running yet",
-                        attempt, max_retries, name
-                    );
-                }
-                tokio::time::sleep(wait_duration).await;
-            }
-            println!(
-                "CoreDB {} did not become running after {} attempts",
-                name, max_retries
-            );
-            false
-        }
-
         // Initialize tracing
         tracing_subscriber::fmt().init();
 
@@ -4386,6 +4498,31 @@ CREATE EVENT TRIGGER pgrst_watch
 
         // Delete namespace
         let _ = delete_namespace(client.clone(), &namespace).await;
+    }
+
+    async fn status_running(coredbs: &Api<CoreDB>, name: &str) -> bool {
+        let max_retries = 20;
+        let wait_duration = Duration::from_secs(6); // Adjust as needed
+
+        for attempt in 1..=max_retries {
+            let coredb = coredbs.get(name).await.expect("Failed to get CoreDB");
+
+            if coredb.status.as_ref().map_or(false, |s| s.running) {
+                println!("CoreDB {} is running", name);
+                return true;
+            } else {
+                println!(
+                    "Attempt {}/{}: CoreDB {} is not running yet",
+                    attempt, max_retries, name
+                );
+            }
+            tokio::time::sleep(wait_duration).await;
+        }
+        println!(
+            "CoreDB {} did not become running after {} attempts",
+            name, max_retries
+        );
+        false
     }
 
     #[tokio::test]
@@ -4976,5 +5113,415 @@ CREATE EVENT TRIGGER pgrst_watch
 
         // Delete namespace
         let _ = delete_namespace(client.clone(), &namespace).await;
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn functional_test_restart_and_update_replicas() {
+        // Initialize the Kubernetes client
+        let client = kube_client().await;
+        let state = State::default();
+        let context = state.create_context(client.clone());
+
+        // Configurations
+        let mut rng = rand::thread_rng();
+        let suffix = rng.gen_range(0..100000);
+        let name = &format!("test-restart-{}", suffix);
+        let namespace = match create_namespace(client.clone(), name).await {
+            Ok(namespace) => namespace,
+            Err(e) => {
+                eprintln!("Error creating namespace: {}", e);
+                std::process::exit(1);
+            }
+        };
+
+        let kind = "CoreDB";
+        let replicas = 1;
+
+        // Create a pod we can use to run commands in the cluster
+        let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
+
+        // Apply a basic configuration of CoreDB
+        println!("Creating CoreDB resource {}", name);
+        let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
+        // Generate basic CoreDB resource to start with
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "replicas": replicas,
+            }
+        });
+        let params = PatchParams::apply("tembo-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        // Wait for CNPG Pod to be created
+        {
+            let pod_name = format!("{}-1", name);
+
+            pod_ready_and_running(pods.clone(), pod_name.clone()).await;
+            wait_til_status_is_filled(&coredbs, name).await;
+        }
+
+        // Ensure status.running is true
+        assert!(status_running(&coredbs, name).await);
+        let initial_start_time = get_pg_start_time(&coredbs, name, context.clone()).await;
+
+        println!("Initial start time: {}", initial_start_time);
+
+        {
+            let pod_name = format!("{}-1", name);
+
+            pod_ready_and_running(pods.clone(), pod_name.clone()).await;
+            wait_til_status_is_filled(&coredbs, name).await;
+        }
+
+        // Update CoreDB with restart annotation and replica = 2
+        let replicas = 2;
+        // Set restart annotation
+        let restart = Utc::now()
+            .to_rfc3339_opts(SecondsFormat::Secs, true)
+            .to_string();
+        // Update coredb to disable pooler
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name,
+                "annotations": {
+                    "kubectl.kubernetes.io/restartedAt": restart
+                }
+            },
+            "spec": {
+                "replicas": replicas,
+            }
+        });
+
+        let params = PatchParams::apply("tembo-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        // Wait for Postgres to restart
+        {
+            let started = Utc::now();
+            let max_wait_time =
+                chrono::TimeDelta::try_seconds(TIMEOUT_SECONDS_POD_READY as _).unwrap();
+            let mut running_became_true = false;
+            while Utc::now().signed_duration_since(started) < max_wait_time {
+                if status_running(&coredbs, name).await.not() {
+                    println!("status.running is still false. Retrying in 3 secs.");
+                    tokio::time::sleep(Duration::from_secs(3)).await;
+                } else {
+                    println!("status.running is now true once again!");
+
+                    running_became_true = true;
+                    break;
+                }
+            }
+
+            assert!(
+                running_became_true,
+                "status.running should've become true once restarted"
+            );
+        }
+
+        // Wait for new CNPG secondary Pod to be created and running
+        // loop over replicas until they are both in a running state
+        for i in 1..=replicas {
+            let pod_name = format!("{}-{}", name, i);
+            pod_ready_and_running(pods.clone(), pod_name).await;
+        }
+
+        let reboot_start_time = get_pg_start_time(&coredbs, name, context).await;
+        println!("Initial start time: {}", initial_start_time);
+        println!("Reboot start time: {}", reboot_start_time);
+
+        assert!(
+            reboot_start_time > initial_start_time,
+            "start time should've changed"
+        );
+
+        // Cleanup CoreDB
+        coredbs.delete(name, &Default::default()).await.unwrap();
+        println!("Waiting for CoreDB to be deleted: {}", &name);
+        let _assert_coredb_deleted = tokio::time::timeout(
+            Duration::from_secs(TIMEOUT_SECONDS_COREDB_DELETED),
+            await_condition(coredbs.clone(), name, conditions::is_deleted("")),
+        )
+        .await
+        .unwrap_or_else(|_| {
+            panic!(
+                "CoreDB {} was not deleted after waiting {} seconds",
+                name, TIMEOUT_SECONDS_COREDB_DELETED
+            )
+        });
+        println!("CoreDB resource deleted {}", name);
+
+        // Delete namespace
+        let _ = delete_namespace(client.clone(), &namespace).await;
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn functional_test_cnpg_update_image_and_params() {
+        // Initialize the Kubernetes client
+        let client = kube_client().await;
+        let state = State::default();
+        let context = state.create_context(client.clone());
+
+        // Configurations
+        let mut rng = rand::thread_rng();
+        let suffix = rng.gen_range(0..100000);
+        let name = &format!("test-cnpg-upimage-{}", suffix);
+        let namespace = match create_namespace(client.clone(), name).await {
+            Ok(namespace) => namespace,
+            Err(e) => {
+                eprintln!("Error creating namespace: {}", e);
+                std::process::exit(1);
+            }
+        };
+
+        let kind = "CoreDB";
+        let replicas = 1;
+
+        // Create a pod we can use to run commands in the cluster
+        let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
+
+        // Apply a basic configuration of CoreDB
+        println!("Creating CoreDB resource {}", name);
+        let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
+        // Generate CoreDB resource with params
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "replicas": replicas,
+            }
+        });
+        let params = PatchParams::apply("tembo-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        // Wait for CNPG Pod to be created
+        {
+            let pod_name = format!("{}-1", name);
+
+            pod_ready_and_running(pods.clone(), pod_name.clone()).await;
+            wait_til_status_is_filled(&coredbs, name).await;
+        }
+
+        // Ensure status.running is true
+        assert!(status_running(&coredbs, name).await);
+
+        // Update CNPG image and params
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "image": "quay.io/tembo/standard-cnpg:15-120cc24",
+                "replicas": replicas,
+                "trunk_installs": [
+                    {
+                        "name": "pg_partman",
+                        "version": "4.7.3",
+                    },
+                    {
+                        "name": "pgmq",
+                        "version": "1.1.1",
+                    },
+                    {
+                        "name": "pg_stat_statements",
+                        "version": "1.10.0",
+                    },
+                    {
+                        "name": "postgis",
+                        "version": "3.4.0",
+                    },
+                ],
+                "extensions": [
+                    {
+                        "name": "pg_partman",
+                        "locations": [
+                        {
+                          "enabled": true,
+                          "version": "4.7.3",
+                          "database": "postgres",
+                          "schema": "public"
+                        }]
+                    },
+                    {
+                        "name": "pgmq",
+                        "locations": [
+                        {
+                          "enabled": true,
+                          "version": "1.1.1",
+                          "database": "postgres",
+                          "schema": "public"
+                        }]
+                    },
+                    {
+                        "name": "pg_stat_statements",
+                        "locations": [
+                        {
+                          "enabled": true,
+                          "version": "1.10.0",
+                          "database": "postgres",
+                          "schema": "public"
+                        }]
+                    },
+                    {
+                        "name": "postgis",
+                        "locations": [
+                        {
+                          "enabled": true,
+                          "version": "3.4.0",
+                          "database": "postgres",
+                          "schema": "public"
+                        }]
+                    }
+                ],
+                "runtime_config": [
+                    {
+                        "name": "shared_preload_libraries",
+                        "value": "pg_stat_statements"
+                    },
+                    {
+                        "name": "pg_partman_bgw.interval",
+                        "value": "30"
+                    },
+                    {
+                        "name": "pg_partman_bgw.role",
+                        "value": "postgres"
+                    },
+                    {
+                        "name": "pg_partman_bgw.dbname",
+                        "value": "postgres"
+                    }
+                ]
+            }
+        });
+
+        // Use the patch method to update the Cluster resource
+        let params = PatchParams::apply("tembo-integration-test");
+        let patch = Patch::Apply(&coredb_json);
+        let coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        let _result = wait_until_psql_contains(
+            context.clone(),
+            coredb_resource.clone(),
+            "show shared_preload_libraries;".to_string(),
+            "pg_partman_bgw".to_string(),
+            false,
+        )
+        .await;
+
+        // Assert that shared_preload_libraries contains pg_stat_statements
+        // and pg_partman_bgw
+
+        let result = psql_with_retry(
+            context.clone(),
+            coredb_resource.clone(),
+            "show shared_preload_libraries;".to_string(),
+        )
+        .await;
+
+        let stdout = match result.stdout {
+            Some(output) => output,
+            None => panic!("stdout is None"),
+        };
+
+        assert!(stdout.contains("pg_partman_bgw"));
+        assert!(stdout.contains("pg_stat_statements"));
+
+        //assert to make sure the correct image has been updated
+        let cluster_api: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
+        let cluster = cluster_api.get(name).await.unwrap();
+        let image = cluster.spec.image.clone();
+        assert_eq!(image, "quay.io/tembo/standard-cnpg:15-120cc24");
+
+        // CLEANUP TEST
+        // Cleanup CoreDB
+        coredbs.delete(name, &Default::default()).await.unwrap();
+        println!("Waiting for CoreDB to be deleted: {}", &name);
+        let _assert_coredb_deleted = tokio::time::timeout(
+            Duration::from_secs(TIMEOUT_SECONDS_COREDB_DELETED),
+            await_condition(coredbs.clone(), name, conditions::is_deleted("")),
+        )
+        .await
+        .unwrap_or_else(|_| {
+            panic!(
+                "CoreDB {} was not deleted after waiting {} seconds",
+                name, TIMEOUT_SECONDS_COREDB_DELETED
+            )
+        });
+        println!("CoreDB resource deleted {}", name);
+
+        // Delete namespace
+        let _ = delete_namespace(client.clone(), &namespace).await;
+    }
+
+    #[tokio::test]
+    #[ignore]
+    /// Test the hibernation system
+    /// Ensure that the cluster performs the following:
+    ///   * Starts and is running following init
+    ///   * Stops and has no pods after hibernation (spec.stop: true)
+    ///   * Starts and is running after thaw (spec.stop: false)
+    async fn functional_test_hibernate() {
+        let test_name = "test-hibernate-cnpg";
+        let test = TestCore::new(test_name).await;
+        let name = test.name.clone();
+
+        // Generate very simple CoreDB JSON definitions. The first will be for
+        // initializing and starting the cluster, and the second for stopping
+        // it. We'll use a single replica to ensure _all_ parts of the cluster
+        // are affected by hibernate.
+
+        let cluster_start = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": "CoreDB",
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "replicas": 1,
+                "stop": false,
+            }
+        });
+
+        let mut cluster_stop = cluster_start.clone();
+        cluster_stop["spec"]["stop"] = serde_json::json!(true);
+
+        // Begin by starting the cluster and validating that it worked.
+        // We need this here as initial iterations of the hibernate code
+        // prevented the cluster from starting.
+
+        let _ = test.set_cluster_def(&cluster_start).await;
+        assert!(status_running(&test.coredbs, &name).await);
+
+        // Stop the cluster and check to make sure it's not running to ensure
+        // hibernate is doing its job.
+
+        let _ = test.set_cluster_def(&cluster_stop).await;
+        let _ = wait_until_status_not_running(&test.coredbs, &name).await;
+        assert!(status_running(&test.coredbs, &name).await.not());
+
+        // Patch the cluster to start it up again, then check to ensure it
+        // actually did so. This proves hibernation can be reversed.
+
+        let _ = test.set_cluster_def(&cluster_start).await;
+        assert!(status_running(&test.coredbs, &name).await);
+
+        test.teardown().await;
     }
 }

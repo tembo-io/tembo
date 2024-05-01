@@ -25,9 +25,7 @@ pub struct InstanceSettings {
     pub storage: String,
     #[serde(default = "default_replicas")]
     pub replicas: i32,
-    #[serde(default = "default_stack_type")]
-    #[serde(alias = "stack")]
-    pub stack_type: String,
+    pub stack_type: Option<String>,
     pub postgres_configurations: Option<HashMap<String, Value>>,
     #[serde(default = "default_pg_version")]
     pub pg_version: u8,
@@ -41,6 +39,7 @@ pub struct InstanceSettings {
     pub final_extensions: Option<Vec<ControllerExtension>>,
     pub extra_domains_rw: Option<Vec<String>>,
     pub ip_allow_list: Option<Vec<String>>,
+    pub stack_file: Option<String>,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
@@ -55,6 +54,7 @@ pub struct OverlayInstanceSettings {
     pub extra_domains_rw: Option<Vec<String>>,
     pub ip_allow_list: Option<Vec<String>>,
     pub pg_version: Option<u8>,
+    pub stack_file: Option<String>,
 }
 
 // If a trunk project name is not specified, then assume
@@ -97,10 +97,6 @@ fn default_storage() -> String {
 
 fn default_replicas() -> i32 {
     1
-}
-
-fn default_stack_type() -> String {
-    "Standard".to_string()
 }
 
 fn default_extensions() -> Option<HashMap<String, Extension>> {

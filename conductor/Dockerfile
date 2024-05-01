@@ -14,6 +14,7 @@ COPY Cargo.toml .
 COPY Cargo.lock .
 COPY ./src ./src
 COPY ./migrations ./migrations
+COPY metrics.yml .
 
 RUN cargo install --path .
 

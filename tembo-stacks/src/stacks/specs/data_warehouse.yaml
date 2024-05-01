@@ -79,6 +79,8 @@ trunk_installs:
     version: 0.2.0
   - name: multicorn
     version: 2.5.0
+  - name: pg_tier 
+    version: 0.0.3
 extensions:
   - name: pg_stat_statements
     locations:
@@ -130,3 +132,9 @@ extensions:
       - database: postgres
         enabled: true
         version: 2.5.0
+  - name: pg_tier 
+    description: pg_tier 
+    locations:
+      - database: postgres
+        enabled: true
+        version: 0.0.3

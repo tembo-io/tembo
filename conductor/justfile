@@ -10,7 +10,9 @@ default:
 
 install-traefik:
 	kubectl create namespace traefik || true
-	helm upgrade --install --namespace=traefik --values=./testdata/traefik-values.yaml traefik traefik/traefik
+	helm upgrade --install --namespace=traefik --version=20.8.0 --values=./testdata/traefik-values.yaml traefik traefik/traefik
+	# https://github.com/traefik/traefik-helm-chart/issues/757#issuecomment-1753995542
+	kubectl apply -f https://raw.githubusercontent.com/traefik/traefik/v3.0.0-beta2/docs/content/reference/dynamic-configuration/kubernetes-crd-definition-v1.yml
 
 install-operator:
   just install-cert-manager
@@ -74,6 +76,7 @@ watch:
 	RUST_LOG={{RUST_LOG}} \
 	CONTROL_PLANE_EVENTS_QUEUE=myqueue_control_plane \
 	DATA_PLANE_EVENTS_QUEUE=myqueue_data_plane \
+	METRICS_EVENTS_QUEUE=metrics_events \
 	DATA_PLANE_BASEDOMAIN=coredb-development.com \
 	CF_TEMPLATE_BUCKET=cdb-plat-use1-dev-eks-data-1-conductor-cf-templates \
 	BACKUP_ARCHIVE_BUCKET=cdb-plat-use1-dev-instance-backups \

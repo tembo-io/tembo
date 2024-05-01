@@ -1,6 +1,7 @@
 pub mod aws;
 pub mod errors;
 pub mod extensions;
+pub mod metrics;
 pub mod monitoring;
 pub mod routes;
 pub mod types;

@@ -8,7 +8,7 @@ use crate::{
     Context,
 };
 use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
-use kube::{runtime::controller::Action, Api};
+use kube::{runtime::controller::Action, Api, ResourceExt};
 use std::{collections::HashSet, sync::Arc, time::Duration};
 use tracing::{debug, error, info, instrument, warn};
 
@@ -58,11 +58,7 @@ pub async fn all_fenced_and_non_fenced_pods(
     cdb: &CoreDB,
     ctx: Arc<Context>,
 ) -> Result<Vec<Pod>, Action> {
-    let name = cdb
-        .metadata
-        .name
-        .clone()
-        .expect("CoreDB should have a name");
+    let name = cdb.name_any();
 
     // Get fenced pods
     let pods_fenced = get_fenced_pods(cdb, ctx.clone()).await?;
@@ -75,7 +71,7 @@ pub async fn all_fenced_and_non_fenced_pods(
 
     debug!(
         "After appending fenced instances for {}, pod count: {}",
-        name,
+        &name,
         all_pods.len()
     );
 
@@ -85,12 +81,10 @@ pub async fn all_fenced_and_non_fenced_pods(
 /// Find all trunk installs to remove and return a list of strings
 #[instrument(skip(cdb) fields(trace_id))]
 fn find_trunk_installs_to_remove_from_status(cdb: &CoreDB) -> Vec<String> {
+    let name = cdb.name_any();
     debug!(
         "Checking for trunk installs to remove from status for {}",
-        cdb.metadata
-            .name
-            .clone()
-            .expect("CoreDB should have a name")
+        &name
     );
 
     let mut trunk_installs_to_remove_from_status = Vec::new();
@@ -132,10 +126,7 @@ fn find_trunk_installs_to_pod<'a>(cdb: &'a CoreDB, pod_name: &str) -> Vec<&'a Tr
     debug!(
         "Checking for trunk installs to install on pod {} for {}",
         pod_name,
-        cdb.metadata
-            .name
-            .clone()
-            .expect("CoreDB should have a name")
+        cdb.name_any()
     );
 
     let mut trunk_installs_to_install = Vec::new();
@@ -193,21 +184,18 @@ pub async fn reconcile_trunk_installs(
     cdb: &CoreDB,
     ctx: Arc<Context>,
 ) -> Result<Vec<TrunkInstallStatus>, Action> {
-    let instance_name = cdb
-        .metadata
-        .name
-        .clone()
-        .expect("CoreDB should have a name");
+    let instance_name = cdb.name_any();
+    let namespace = cdb.metadata.namespace.as_ref().ok_or_else(|| {
+        error!(
+            "CoreDB namespace is empty for instance: {}.",
+            &instance_name
+        );
+        Action::requeue(tokio::time::Duration::from_secs(300))
+    })?;
 
     debug!("Starting to reconcile trunk installs for {}", instance_name);
 
-    let coredb_api: Api<CoreDB> = Api::namespaced(
-        ctx.client.clone(),
-        &cdb.metadata
-            .namespace
-            .clone()
-            .expect("CoreDB should have a namespace"),
-    );
+    let coredb_api: Api<CoreDB> = Api::namespaced(ctx.client.clone(), namespace);
 
     // Get extensions in status.trunk_install that are not in spec
     // Deleting them from status allows for retrying installation
@@ -218,10 +206,7 @@ pub async fn reconcile_trunk_installs(
     // Remove extensions from status
     remove_trunk_installs_from_status(
         &coredb_api,
-        &cdb.metadata
-            .name
-            .clone()
-            .expect("CoreDB should have a name"),
+        &instance_name,
         trunk_installs_to_remove_from_status,
     )
     .await?;
@@ -491,18 +476,13 @@ pub async fn install_extensions_to_pod(
     ctx: &Arc<Context>,
     pod_name: String,
 ) -> Result<Vec<TrunkInstallStatus>, Action> {
-    let coredb_name = cdb
-        .metadata
-        .name
-        .clone()
-        .expect("CoreDB should have a name");
-    let coredb_api: Api<CoreDB> = Api::namespaced(
-        ctx.client.clone(),
-        &cdb.metadata
-            .namespace
-            .clone()
-            .expect("CoreDB should have a namespace"),
-    );
+    let coredb_name = cdb.name_any();
+    let namespace = cdb.metadata.namespace.as_ref().ok_or_else(|| {
+        error!("CoreDB namespace is empty for instance: {}.", &coredb_name);
+        Action::requeue(tokio::time::Duration::from_secs(300))
+    })?;
+
+    let coredb_api: Api<CoreDB> = Api::namespaced(ctx.client.clone(), namespace);
 
     // Lookup current status for trunk installs
     let mut current_trunk_install_statuses = initialize_trunk_install_statuses(cdb, &coredb_name);

@@ -64,6 +64,20 @@ app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end }}
 
+{{- define "conductor.metricsSelectorLabels" -}}
+app.kubernetes.io/name: {{ include "conductor.name" . }}-metrics
+app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}
+
+{{- define "conductor.metricsLabels" -}}
+helm.sh/chart: {{ include "conductor.chart" . }}
+{{ include "conductor.metricsSelectorLabels" . }}
+{{- if .Chart.AppVersion }}
+app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+{{- end }}
+app.kubernetes.io/managed-by: {{ .Release.Service }}
+{{- end }}
+
 
 {{/*
 Create the name of the service account to use

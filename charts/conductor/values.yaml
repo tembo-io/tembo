@@ -50,4 +50,9 @@ securityContext: {}
 nodeSelector: {}
 tolerations: []
 affinity: {}
-env: {}
+env:
+  - name: PG_CONN_URL
+    valueFrom:
+      secretKeyRef:
+        name: data-plane
+        key: _data-plane_postgres_connection_string

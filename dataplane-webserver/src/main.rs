@@ -2,7 +2,7 @@ use actix_web::{middleware, web, App, HttpServer};
 
 use actix_cors::Cors;
 
-use dataplane_webserver::secrets::types::AvailableSecret;
+use dataplane_webserver::secrets::types::{AvailableSecret, PasswordString};
 use dataplane_webserver::{
     config,
     routes::health::{lively, ready},
@@ -38,11 +38,13 @@ async fn main() -> std::io::Result<()> {
               secrets::get_secret_names,
               secrets::get_secret_v1,
               secrets::get_secret_names_v1,
+              secrets::update_postgres_password,
               metrics::query_range,
               metrics::query,
         ),
         components(schemas(
-            AvailableSecret
+            AvailableSecret,
+            PasswordString
         )),
         modifiers(&SecurityAddon),
         security(("jwt_token" = [])),
@@ -98,6 +100,7 @@ async fn main() -> std::io::Result<()> {
                 web::scope("/api/v1/orgs/{org_id}/instances/{instance_id}")
                     .service(secrets::get_secret_names_v1)
                     .service(secrets::get_secret_v1)
+                    .service(secrets::update_postgres_password)
             )
             .service(
                 web::scope("/{namespace}/metrics")

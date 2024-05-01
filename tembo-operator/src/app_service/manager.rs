@@ -1,5 +1,6 @@
 use crate::{
-    apis::coredb_types::CoreDB, ingress_route_crd::IngressRouteRoutes, Context, Error, Result,
+    apis::coredb_types::CoreDB, cloudnativepg::placement::cnpg_placement::PlacementConfig,
+    ingress_route_crd::IngressRouteRoutes, Context, Error, Result,
 };
 use k8s_openapi::{
     api::{
@@ -57,6 +58,7 @@ fn generate_resource(
     oref: OwnerReference,
     domain: Option<String>,
     annotations: &BTreeMap<String, String>,
+    placement: Option<PlacementConfig>,
 ) -> AppServiceResources {
     let resource_name = format!("{}-{}", coredb_name, appsvc.name.clone());
     let service = appsvc.routing.as_ref().map(|_| {
@@ -76,6 +78,7 @@ fn generate_resource(
         namespace,
         oref,
         annotations,
+        placement,
     );
 
     // If DATA_PLANE_BASEDOMAIN is not set, don't generate IngressRoutes, IngressRouteTCPs, or EntryPoints
@@ -226,6 +229,7 @@ fn generate_deployment(
     namespace: &str,
     oref: OwnerReference,
     annotations: &BTreeMap<String, String>,
+    placement: Option<PlacementConfig>,
 ) -> Deployment {
     let mut labels: BTreeMap<String, String> = BTreeMap::new();
     labels.insert("app".to_owned(), resource_name.to_string());
@@ -451,7 +455,15 @@ fn generate_deployment(
         }
     }
 
+    let affinity = placement.as_ref().and_then(|p| p.combine_affinity_items());
+    let node_selector = placement.as_ref().and_then(|p| p.node_selector.clone());
+    let tolerations = placement.as_ref().map(|p| p.tolerations.clone());
+    let topology_spread_constraints = placement
+        .as_ref()
+        .and_then(|p| p.topology_spread_constraints.clone());
+
     let pod_spec = PodSpec {
+        affinity,
         containers: vec![Container {
             args: appsvc.args.clone(),
             command: appsvc.command.clone(),
@@ -466,6 +478,9 @@ fn generate_deployment(
             volume_mounts: Some(volume_mounts),
             ..Container::default()
         }],
+        node_selector,
+        tolerations,
+        topology_spread_constraints,
         volumes: Some(volumes),
         security_context: pod_security_context,
         ..PodSpec::default()
@@ -507,8 +522,28 @@ async fn get_appservice_deployments(
     Ok(deployments
         .items
         .iter()
-        .map(|d| d.metadata.name.to_owned().expect("no name on resource"))
+        .filter_map(|d| d.metadata.name.clone())
         .collect())
+}
+
+/// Retrieves all AppService component Deployments in the namespace
+///
+/// This function should return all available deployments with an AppService label
+/// and return the actual Deployment struct for each as a vector. This allows us
+/// to use the full current state of the deployment rather than simply the name.
+pub async fn get_appservice_deployment_objects(
+    client: &Client,
+    namespace: &str,
+    coredb_name: &str,
+) -> Result<Vec<Deployment>, Error> {
+    let label_selector = format!(
+        "component={},coredb.io/name={}",
+        COMPONENT_NAME, coredb_name
+    );
+    let deployent_api: Api<Deployment> = Api::namespaced(client.clone(), namespace);
+    let lp = ListParams::default().labels(&label_selector).timeout(10);
+    let deployments = deployent_api.list(&lp).await.map_err(Error::KubeError)?;
+    Ok(deployments.items)
 }
 
 // gets all names of AppService Services in the namespace
@@ -528,7 +563,7 @@ async fn get_appservice_services(
     Ok(services
         .items
         .iter()
-        .map(|d| d.metadata.name.to_owned().expect("no name on resource"))
+        .filter_map(|d| d.metadata.name.clone())
         .collect())
 }
 
@@ -625,7 +660,11 @@ fn generate_appsvc_annotations(cdb: &CoreDB) -> BTreeMap<String, String> {
     )
 }
 
-pub async fn reconcile_app_services(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {
+pub async fn reconcile_app_services(
+    cdb: &CoreDB,
+    ctx: Arc<Context>,
+    placement: Option<PlacementConfig>,
+) -> Result<(), Action> {
     let client = ctx.client.clone();
     let ns = cdb.namespace().unwrap();
     let coredb_name = cdb.name_any();
@@ -761,6 +800,7 @@ pub async fn reconcile_app_services(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(
                 oref.clone(),
                 domain.to_owned(),
                 &annotations,
+                placement.clone(),
             )
         })
         .collect();
@@ -936,7 +976,7 @@ mod tests {
                 volumeSnapshot:
                   enabled: true
                   snapshotClass: "csi-vsc"
-              image: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e 
+              image: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e
               port: 5432
               replicas: 1
               resources:

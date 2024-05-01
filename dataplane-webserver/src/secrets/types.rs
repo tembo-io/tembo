@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 type SecretNameFormatter = Box<dyn Fn(&str) -> String + Send + Sync>;
@@ -12,6 +12,12 @@ pub struct AvailableSecret {
     // All secrets need a string formatting function
     #[serde(skip)]
     pub formatter: SecretNameFormatter,
+}
+
+#[derive(Deserialize, ToSchema)]
+pub struct PasswordString {
+    /// The New Password
+    pub password: String,
 }
 
 impl AvailableSecret {
