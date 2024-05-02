@@ -53,7 +53,7 @@ pub async fn get_secret_data_from_kubernetes(
     }
 }
 
-pub fn validate_requested_secret(secret_name: &String) -> Result<&AvailableSecret, String> {
+pub fn validate_requested_secret(secret_name: &str) -> Result<&AvailableSecret, String> {
     let requested_secret = SECRETS_ALLOW_LIST
         .iter()
         .find(|&secret| &secret.name == secret_name);

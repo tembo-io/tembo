@@ -177,6 +177,14 @@ pub async fn get_secret_v1(
 
     let (org_id, instance_id, secret_name) = path.into_inner();
 
+    get_secret_data_for_instance(&org_id, &instance_id, &secret_name).await
+}
+
+pub async fn get_secret_data_for_instance(
+    org_id: &str,
+    instance_id: &str,
+    secret_name: &str,
+) -> Result<HttpResponse, Error> {
     if !is_valid_id(&org_id) || !is_valid_id(&instance_id) {
         return Ok(HttpResponse::BadRequest()
             .json("org_id and instance_id must be alphanumeric or underscore only"));
