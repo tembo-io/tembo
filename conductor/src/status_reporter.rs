@@ -35,7 +35,7 @@ pub async fn run_status_reporter(
                     coredb
                         .metadata
                         .name
-                        .clone()
+                        .as_ref()
                         .expect("CoreDB should always have a name")
                 );
                 match send_status_update(client, &queue, coredb).await {
@@ -58,15 +58,15 @@ async fn send_status_update(
     response_queue: &PGMQueueExt,
     coredb: CoreDB,
 ) -> Result<(), ConductorError> {
-    let coredb_name = coredb
+    let coredb_name = &coredb
         .metadata
         .name
-        .clone()
+        .as_ref()
         .expect("CoreDB should always have a name");
     let namespace = coredb
         .metadata
         .namespace
-        .clone()
+        .as_ref()
         .expect("CoreDB should always have a namespace");
     // Could be nice to move these env reads into a config struct
     let data_plane_basedomain = match env::var("DATA_PLANE_BASEDOMAIN") {
@@ -99,8 +99,7 @@ async fn send_status_update(
         }
     };
 
-    let conn_info = match get_pg_conn(client, &namespace, &data_plane_basedomain, &coredb.spec)
-        .await
+    let conn_info = match get_pg_conn(client, namespace, &data_plane_basedomain, &coredb.spec).await
     {
         Ok(conn_info) => conn_info,
         Err(_) => {
