@@ -99,13 +99,11 @@ pub struct ComputeConstraint {
     pub max: Option<ComputeResource>,
 }
 
-
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, JsonSchema, PartialEq)]
 pub struct ComputeResource {
     pub cpu: Option<String>,
     pub memory: Option<String>,
 }
-
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema, PartialEq, ToSchema)]
 pub struct ImagePerPgVersion {
