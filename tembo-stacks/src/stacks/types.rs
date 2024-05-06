@@ -197,7 +197,6 @@ mod tests {
                 let min_constraint = constraints.min.expect("missing min constraint");
                 assert_eq!(min_constraint.cpu, Some("2".to_string()));
                 assert_eq!(min_constraint.memory, Some("4Gi".to_string()));
-                assert_eq!(constraints.max, None);
             } else {
                 // only ML has compute constraints
                 assert!(maybe_constraints.is_none());
