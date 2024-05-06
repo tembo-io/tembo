@@ -21,62 +21,6 @@ Using cargo
 cargo install tembo-cli
 ```
 
-### Commands
-
-#### `tembo init`
-
-The `tembo init` command initializes your environment with following files. Run init in the directory you want to create the `tembo.toml` file.
-
-* `tembo.toml` example configuration file
-* `~/.tembo/context` file with various contexts user can connect to
-* `~/.tembo/credentials` file with credentials & api urls
-
-For more information: `tembo init --help`
-
-#### Add Tembo Cloud info
-
-To provision instances on Tembo Cloud using CLI you will need to configure `org_id` & `tembo_access_token`
-
-* fetch the `org_id` from Tembo Cloud and add it as `org_id` in context file generated above
-* generate a JWT token using steps [here](https://tembo.io/docs/tembo-cloud/security-and-authentication/api-authentication/) & add it as `tembo_access_token` to the credentials file generated above.
-
-#### `tembo context list/set`
-
-tembo context works like [kubectl context](https://www.notion.so/abee0b15119343e4947692feb740e892?pvs=21). User can set context for local docker environment or tembo cloud (dev/qa/prod) with org_id. When they run any of the other commands it will run in the context selected. Default context will be local.
-
-#### `tembo validate`
-
-Validates `tembo.toml` and other configurations files.
-
-#### `tembo apply`
-
-Validates tembo.toml (same as `tembo validate`) and applies the changes to the context selected.
-
-##### Environment:
-
-  * ###### Local Docker:
-    * runs `docker-compose down` to bring down all existing containers
-    * generates `Dockerfile` for each instance & builds a docker image
-    * generates `docker-compose` to provision all instances
-    * runs `docker-compose up -d` to spin up all instances
-
-  * ###### Tembo-Cloud: 
-    * Creates/updates instance on tembo-cloud by calling the api against the appropriate environment
-
-##### Flags: 
-  * `--merge`: Overlays Tembo.toml by another toml file for a specific context
-  *  `--set` : Specifies a single instance setting by assigning a new value
-
-#### `tembo logs`
-
-Retrieves log data from the specified Tembo instances. Depending on your current context, it will fetch logs from either local Docker containers or Tembo Cloud instances.
-
-
-#### `tembo delete`
-
-- **local docker:** runs `docker-compose down` command to bring down all containers
-- **tembo-cloud:** deletes the instance on tembo-cloud by calling the api
-
 ## Developing Tembo CLI
 
 ### Local Testing
