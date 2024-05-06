@@ -2,8 +2,18 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-#[cfg_attr(test, derive(strum_macros::EnumIter, strum_macros::Display))]
-#[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema, PartialEq, ToSchema)]
+#[derive(
+    Clone,
+    Debug,
+    Default,
+    Serialize,
+    Deserialize,
+    JsonSchema,
+    PartialEq,
+    ToSchema,
+    strum_macros::EnumIter,
+    strum_macros::Display,
+)]
 pub enum StackType {
     API,
     DataWarehouse,
@@ -173,6 +183,25 @@ mod tests {
                 "stack type missing from_str {:?}",
                 stack_str
             )
+        }
+    }
+
+    #[test]
+    fn test_compute_constraints() {
+        for variant in StackType::iter() {
+            let stack = get_stack(variant.clone());
+            let maybe_constraints = stack.compute_constraints;
+            if variant == StackType::MachineLearning {
+                // ML stack is only stack currently with constraints
+                let constraints = maybe_constraints.expect("missing ML constraints");
+                let min_constraint = constraints.min.expect("missing min constraint");
+                assert_eq!(min_constraint.cpu, Some("2".to_string()));
+                assert_eq!(min_constraint.memory, Some("4Gi".to_string()));
+                assert_eq!(constraints.max, None);
+            } else {
+                // only ML has compute constraints
+                assert!(maybe_constraints.is_none());
+            }
         }
     }
 }
