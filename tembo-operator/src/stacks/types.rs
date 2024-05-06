@@ -15,7 +15,7 @@ use utoipa::ToSchema;
 #[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema, PartialEq, ToSchema)]
 pub struct Stack {
     pub name: String,
-    pub compute_templates: Option<Vec<ComputeTemplate>>,
+    pub compute_constraints: Option<ComputeConstraint>,
     pub description: Option<String>,
     /// Organization hosting the Docker images used in this stack
     /// Default: "tembo"
@@ -94,19 +94,18 @@ fn default_storage() -> String {
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, JsonSchema, PartialEq)]
-pub struct ComputeTemplate {
-    pub cpu: String,
-    pub memory: String,
-    pub instance_class: InstanceClass,
+pub struct ComputeConstraint {
+    pub min: Option<ComputeResource>,
+    pub max: Option<ComputeResource>,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema, PartialEq, ToSchema)]
-pub enum InstanceClass {
-    #[default]
-    GeneralPurpose,
-    MemoryOptimized,
-    ComputeOptimized,
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, JsonSchema, PartialEq)]
+pub struct ComputeResource {
+    pub cpu: Option<String>,
+    pub memory: Option<String>,
 }
+
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema, PartialEq, ToSchema)]
 pub struct ImagePerPgVersion {
