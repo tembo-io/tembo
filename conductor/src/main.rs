@@ -116,8 +116,8 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
             }
         };
 
-        let org_id = read_msg.message.org_id.clone();
-        let instance_id = read_msg.message.inst_id.clone();
+        let org_id = &read_msg.message.org_id;
+        let instance_id = &read_msg.message.inst_id;
         let namespace = format!(
             "org-{}-inst-{}",
             read_msg.message.organization_name, read_msg.message.dbname
