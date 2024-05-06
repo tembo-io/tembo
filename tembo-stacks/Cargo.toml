@@ -16,11 +16,11 @@ schemars = {version = "0.8.12", features = ["chrono"]}
 k8s-openapi = { version = "0.18.0", features = ["v1_25", "schemars"], default-features = false } # This version has to be in line with the same version we use in the controller
 serde = "1.0.152"
 serde_yaml = "0.9.21"
-tembo-controller = { package = "controller", version = "0.45.0" }
+strum = "0.26.2"
+strum_macros = "0.26.2"
+tembo-controller = { package = "controller", version = "0.46.0" }
 tracing = "0.1"
 utoipa = { version = "3", features = ["actix_extras", "chrono"] }
 
 [dev-dependencies]
-strum = "0.26.2"
-strum_macros = "0.26.2"
 serde_json = "1.0.114"

@@ -417,9 +417,7 @@ dependencies = [
 
 [[package]]
 name = "controller"
-version = "0.45.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "93af300aca5d5bfc54b1c43a28984d5f21ff8d2b61bc6388ec3a2773a5250afc"
+version = "0.46.0"
 dependencies = [
  "actix-web",
  "anyhow",
@@ -441,6 +439,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "strum",
  "thiserror",
  "tokio",
  "tracing",
@@ -2229,6 +2228,9 @@ name = "strum"
 version = "0.26.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d8cec3501a5194c432b2b7976db6b7d10ec95c253208b45f83f7136aa985e29"
+dependencies = [
+ "strum_macros",
+]
 
 [[package]]
 name = "strum_macros"
