@@ -21,6 +21,9 @@ Using cargo
 cargo install tembo-cli
 ```
 
+### Commands
+Discover a wide range of commands and subcommands, along with their respective options, by exploring our comprehensive [Command Reference](https://tembo.io/docs/development/cli/command-reference).
+
 ## Developing Tembo CLI
 
 ### Local Testing
