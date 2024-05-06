@@ -15,6 +15,10 @@ use utoipa::ToSchema;
 #[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema, PartialEq, ToSchema)]
 pub struct Stack {
     pub name: String,
+<<<<<<< HEAD
+=======
+    /// specifies any resource constraints that should be applied to an instance of the Stack
+>>>>>>> main
     pub compute_constraints: Option<ComputeConstraint>,
     pub description: Option<String>,
     /// Organization hosting the Docker images used in this stack
@@ -96,7 +100,6 @@ fn default_storage() -> String {
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, JsonSchema, PartialEq)]
 pub struct ComputeConstraint {
     pub min: Option<ComputeResource>,
-    pub max: Option<ComputeResource>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, JsonSchema, PartialEq)]
