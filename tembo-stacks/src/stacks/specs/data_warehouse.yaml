@@ -11,6 +11,9 @@ compute_templates:
   - cpu: 0.25
     memory: 1Gi
     instance_class: GeneralPurpose
+  - cpu: 0.5
+    memory: 2Gi
+    instance_class: GeneralPurpose
   - cpu: 2
     memory: 8Gi
     instance_class: GeneralPurpose
