@@ -88,6 +88,12 @@ extensions:
     - database: postgres
       enabled: true
       version: 0.15.0
+    - database: app
+      enabled: true
+      version: 0.15.0
+    - database: template1
+      enabled: true
+      version: 0.15.0
   - name: pg_stat_statements
     locations:
       - database: postgres
@@ -123,3 +129,17 @@ postgres_config:
     value: vectorize,pg_stat_statements,pg_cron
   - name: vectorize.embedding_service_url
     value: http://${NAMESPACE}-embeddings.${NAMESPACE}.svc.cluster.local:3000/v1/embeddings
+postgres_metrics:
+  vectorize_jobs:
+      query: select count(*) as total_jobs, current_database() as datname from vectorize.job
+      master: true
+      metrics:
+        - total_jobs:
+            usage: GAUGE
+            description: Number of vectorize jobs
+        - datname:
+            usage: "LABEL"
+            description: "Name of current database"
+      target_databases:
+        - "*"
+        - "postgres"
