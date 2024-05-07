@@ -2790,6 +2790,10 @@ spec:
                 format: date-time
                 nullable: true
                 type: string
+              last_archiver_status:
+                format: date-time
+                nullable: true
+                type: string
               last_fully_reconciled_at:
                 format: date-time
                 nullable: true

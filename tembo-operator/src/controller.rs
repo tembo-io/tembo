@@ -5,6 +5,7 @@ use crate::{
     apis::coredb_types::{CoreDB, CoreDBStatus, VolumeSnapshot},
     app_service::manager::reconcile_app_services,
     cloudnativepg::{
+        archive::wal::reconcile_last_archive_status,
         backups::Backup,
         cnpg::{
             cnpg_cluster_from_cdb, reconcile_cnpg, reconcile_cnpg_scheduled_backup,
@@ -376,6 +377,7 @@ impl CoreDB {
             reconcile_extensions(self, ctx.clone(), &coredbs, &name).await?;
 
         let recovery_time = self.get_recovery_time(ctx.clone()).await?;
+        let last_archiver_status = reconcile_last_archive_status(self, ctx.clone()).await?;
 
         let current_config_values = get_current_config_values(self, ctx.clone()).await?;
         let mut new_status = CoreDBStatus {
@@ -389,6 +391,7 @@ impl CoreDB {
             first_recoverability_time: recovery_time,
             pg_postmaster_start_time,
             last_fully_reconciled_at: None,
+            last_archiver_status,
         };
 
         let current_time = Utc::now();
