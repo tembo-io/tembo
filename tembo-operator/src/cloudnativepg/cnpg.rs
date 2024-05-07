@@ -1476,17 +1476,18 @@ fn schedule_expression_from_cdb(cdb: &CoreDB) -> String {
     match &cdb.spec.backup.schedule {
         None => default,
         Some(expression) => {
-            let mut terms = expression.split(' ').collect::<Vec<&str>>();
-            if terms.len() == 5 {
+            let terms: Vec<&str> = expression.split(' ').collect();
+            let terms = if terms.len() == 5 {
                 // pre-pend "0" to the vector
                 let mut new_terms = vec!["0"];
                 new_terms.extend(terms);
-                terms = new_terms.clone();
-            }
-            if terms.len() != 6 {
+                new_terms
+            } else if terms.len() == 6 {
+                terms
+            } else {
                 warn!("Invalid schedule expression, expected five or six terms. Setting as default. Found expression: '{}'", expression);
                 return default;
-            }
+            };
             // check that all terms are either parsable as int32 or "*"
             for term in &terms {
                 if *term != "*" {
@@ -2918,6 +2919,35 @@ mod tests {
         "#;
         let cdb_no_storage_class: CoreDB = from_str(cdb_no_storage_class_yaml).unwrap();
         assert_eq!(cnpg_cluster_storage_class(&cdb_no_storage_class), None);
+    }
+
+    #[test]
+    fn test_schedule_expression_from_cdb() {
+        let mut coredb = CoreDB::test();
+
+        // Test case 1: No schedule specified, should return default
+        coredb.spec.backup.schedule = None;
+        assert_eq!(schedule_expression_from_cdb(&coredb), "0 0 0 * * *");
+
+        // Test case 2: Valid 6-term schedule expression
+        coredb.spec.backup.schedule = Some("30 12 * * * *".to_string());
+        assert_eq!(schedule_expression_from_cdb(&coredb), "30 12 * * * *");
+
+        // Test case 3: Valid 5-term schedule expression
+        coredb.spec.backup.schedule = Some("30 12 * * *".to_string());
+        assert_eq!(schedule_expression_from_cdb(&coredb), "0 30 12 * * *");
+
+        // Test case 4: Invalid schedule expression with less than 5 terms
+        coredb.spec.backup.schedule = Some("30 12 * *".to_string());
+        assert_eq!(schedule_expression_from_cdb(&coredb), "0 0 0 * * *");
+
+        // Test case 5: Invalid schedule expression with more than 6 terms
+        coredb.spec.backup.schedule = Some("30 12 * * * * *".to_string());
+        assert_eq!(schedule_expression_from_cdb(&coredb), "0 0 0 * * *");
+
+        // Test case 6: Invalid schedule expression with non-integer term
+        coredb.spec.backup.schedule = Some("30 12 * * * abc".to_string());
+        assert_eq!(schedule_expression_from_cdb(&coredb), "0 0 0 * * *");
     }
 
     // #[test]
