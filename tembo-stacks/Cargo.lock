@@ -417,9 +417,7 @@ dependencies = [
 
 [[package]]
 name = "controller"
-version = "0.46.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "89857fc33b01e46073edf982d450a71396a5d9eb167c8878185cbca037ecbe5d"
+version = "0.47.0"
 dependencies = [
  "actix-web",
  "anyhow",
