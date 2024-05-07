@@ -1,9 +1,3 @@
-use k8s_openapi::{
-    api::core::v1::ResourceRequirements,
-    apimachinery::pkg::{api::resource::Quantity, util::intstr::IntOrString},
-};
-use std::collections::BTreeMap;
-
 use crate::apis::coredb_types::CoreDB;
 use crate::{
     apis::coredb_types::{
@@ -12,8 +6,25 @@ use crate::{
     cloudnativepg::clusters::ClusterAffinity,
     cloudnativepg::poolers::{PoolerPgbouncerPoolMode, PoolerTemplateSpecContainersResources},
     extensions::types::{Extension, TrunkInstall},
-    stacks::types::ImagePerPgVersion,
 };
+use k8s_openapi::{
+    api::core::v1::ResourceRequirements,
+    apimachinery::pkg::{api::resource::Quantity, util::intstr::IntOrString},
+};
+use schemars::JsonSchema;
+use serde::{Deserialize, Serialize};
+use std::collections::BTreeMap;
+use utoipa::ToSchema;
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema, PartialEq, ToSchema)]
+pub struct ImagePerPgVersion {
+    #[serde(rename = "14")]
+    pub pg14: String,
+    #[serde(rename = "15")]
+    pub pg15: String,
+    #[serde(rename = "16")]
+    pub pg16: String,
+}
 
 pub fn default_replicas() -> i32 {
     1
