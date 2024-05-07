@@ -5,6 +5,8 @@ appServices:
     env:
       - name: DB_URL
         valueFromPlatform: ReadWriteConnection
+      - name: DB_NAME
+        value: "postgres, *"
       - name: PGA_API_SYSTEM_TYPE
         value: tembo
     storage:

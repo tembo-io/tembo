@@ -505,7 +505,7 @@ async fn get_trunk_project_version(
         .is_ok();
         // If trunk project exists for this version, use it
         if trunk_project_version_exists {
-            trunk_project_version = location_to_toggle.version.clone();
+            trunk_project_version.clone_from(&location_to_toggle.version);
         }
         // Otherwise, fall back to latest version
         else {

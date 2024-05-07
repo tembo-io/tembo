@@ -189,10 +189,7 @@ pub fn generate_extension_enable_cmd(
     }
     let mut command_suffix: String = "".to_string();
     if EXTRA_COMMANDS_TO_ENABLE_EXTENSION.contains_key(ext_name) {
-        command_suffix = EXTRA_COMMANDS_TO_ENABLE_EXTENSION
-            .get(ext_name)
-            .unwrap()
-            .clone();
+        command_suffix.clone_from(EXTRA_COMMANDS_TO_ENABLE_EXTENSION.get(ext_name).unwrap());
     }
     // only specify the schema if it provided
     let command = match ext_loc.enabled {

@@ -417,9 +417,9 @@ dependencies = [
 
 [[package]]
 name = "controller"
-version = "0.46.0"
+version = "0.47.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "89857fc33b01e46073edf982d450a71396a5d9eb167c8878185cbca037ecbe5d"
+checksum = "c2a3e5feec969cab81365dc99caf804454dfcdb58fdc58be4a610117e3cce70c"
 dependencies = [
  "actix-web",
  "anyhow",
@@ -1866,9 +1866,9 @@ dependencies = [
 
 [[package]]
 name = "regex"
-version = "1.10.3"
+version = "1.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b62dbe01f0b06f9d8dc7d49e05a0785f153b00b2c227856282f671e0318c9b15"
+checksum = "c117dbdfde9c8308975b6a18d71f3f385c89461f7b3fb054288ecf2a2058ba4c"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -2298,13 +2298,14 @@ dependencies = [
 
 [[package]]
 name = "tembo-stacks"
-version = "0.6.0"
+version = "0.7.0"
 dependencies = [
  "anyhow",
  "controller",
  "futures",
  "k8s-openapi",
  "lazy_static",
+ "regex",
  "schemars",
  "serde",
  "serde_json",
