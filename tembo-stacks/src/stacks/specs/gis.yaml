@@ -7,52 +7,6 @@ images:
   15: "geo-cnpg:15-8f5366e"
   16: "geo-cnpg:16-8f5366e"
 stack_version: 0.1.0
-compute_templates:
-  - cpu: 0.25
-    memory: 1Gi
-    instance_class: GeneralPurpose
-  - cpu: 0.5
-    memory: 2Gi
-    instance_class: GeneralPurpose
-  - cpu: 1
-    memory: 4Gi
-    instance_class: GeneralPurpose
-  - cpu: 2
-    memory: 8Gi
-    instance_class: GeneralPurpose
-  - cpu: 4
-    memory: 16Gi
-    instance_class: GeneralPurpose
-  - cpu: 8
-    memory: 32Gi
-    instance_class: GeneralPurpose
-  - cpu: 0.5
-    memory: 1Gi
-    instance_class: ComputeOptimized
-  - cpu: 1
-    memory: 2Gi
-    instance_class: ComputeOptimized
-  - cpu: 2
-    memory: 4Gi
-    instance_class: ComputeOptimized
-  - cpu: 4
-    memory: 8Gi
-    instance_class: ComputeOptimized
-  - cpu: 8
-    memory: 16Gi
-    instance_class: ComputeOptimized
-  - cpu: 0.5
-    memory: 4Gi
-    instance_class: MemoryOptimized
-  - cpu: 1
-    memory: 8Gi
-    instance_class: MemoryOptimized
-  - cpu: 2
-    memory: 16Gi
-    instance_class: MemoryOptimized
-  - cpu: 4
-    memory: 32Gi
-    instance_class: MemoryOptimized
 postgres_config_engine: standard
 postgres_config:
   - name: autovacuum_vacuum_cost_limit

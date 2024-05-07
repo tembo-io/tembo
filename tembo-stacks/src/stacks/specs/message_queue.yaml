@@ -49,52 +49,6 @@ appServices:
       limits:
         cpu: 400m
         memory: 256Mi
-compute_templates:
-  - cpu: 0.25
-    memory: 1Gi
-    instance_class: GeneralPurpose
-  - cpu: 0.5
-    memory: 2Gi
-    instance_class: GeneralPurpose
-  - cpu: 1
-    memory: 4Gi
-    instance_class: GeneralPurpose
-  - cpu: 2
-    memory: 8Gi
-    instance_class: GeneralPurpose
-  - cpu: 4
-    memory: 16Gi
-    instance_class: GeneralPurpose
-  - cpu: 8
-    memory: 32Gi
-    instance_class: GeneralPurpose
-  - cpu: 0.5
-    memory: 1Gi
-    instance_class: ComputeOptimized
-  - cpu: 1
-    memory: 2Gi
-    instance_class: ComputeOptimized
-  - cpu: 2
-    memory: 4Gi
-    instance_class: ComputeOptimized
-  - cpu: 4
-    memory: 8Gi
-    instance_class: ComputeOptimized
-  - cpu: 8
-    memory: 16Gi
-    instance_class: ComputeOptimized
-  - cpu: 0.5
-    memory: 4Gi
-    instance_class: MemoryOptimized
-  - cpu: 1
-    memory: 8Gi
-    instance_class: MemoryOptimized
-  - cpu: 2
-    memory: 16Gi
-    instance_class: MemoryOptimized
-  - cpu: 4
-    memory: 32Gi
-    instance_class: MemoryOptimized
 trunk_installs:
   - name: pgmq
     version: 1.1.1

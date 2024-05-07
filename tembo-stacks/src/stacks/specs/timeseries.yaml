@@ -7,55 +7,6 @@ images:
   15: "standard-cnpg:15-ed6e9e9"
   16: "standard-cnpg:16-ed6e9e9"
 stack_version: 0.1.0
-compute_templates:
-  - cpu: 0.25
-    memory: 1Gi
-    instance_class: GeneralPurpose
-  - cpu: 0.5
-    memory: 2Gi
-    instance_class: GeneralPurpose
-  - cpu: 1
-    memory: 4Gi
-    instance_class: GeneralPurpose
-  - cpu: 2
-    memory: 8Gi
-    instance_class: GeneralPurpose
-  - cpu: 4
-    memory: 16Gi
-    instance_class: GeneralPurpose
-  - cpu: 8
-    memory: 32Gi
-    instance_class: GeneralPurpose
-  - cpu: 0.5
-    memory: 1Gi
-    instance_class: ComputeOptimized
-  - cpu: 1
-    memory: 2Gi
-    instance_class: ComputeOptimized
-  - cpu: 2
-    memory: 4Gi
-    instance_class: ComputeOptimized
-  - cpu: 4
-    memory: 8Gi
-    instance_class: ComputeOptimized
-  - cpu: 8
-    memory: 16Gi
-    instance_class: ComputeOptimized
-  - cpu: 16
-    memory: 32Gi
-    instance_class: ComputeOptimized
-  - cpu: 0.5
-    memory: 4Gi
-    instance_class: MemoryOptimized
-  - cpu: 1
-    memory: 8Gi
-    instance_class: MemoryOptimized
-  - cpu: 2
-    memory: 16Gi
-    instance_class: MemoryOptimized
-  - cpu: 4
-    memory: 32Gi
-    instance_class: MemoryOptimized
 postgres_config_engine: olap
 postgres_config:
   - name: autovacuum_vacuum_scale_factor
