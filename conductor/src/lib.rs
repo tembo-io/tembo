@@ -286,21 +286,16 @@ pub async fn get_pg_conn(
     let host = format!("{name}.{basedomain}");
 
     // If connectionPooler is enabled, set the pooler_host
-    let pooler_host = match spec.connectionPooler.enabled {
-        true => {
-            if spec.connectionPooler.enabled {
-                Some(format!("{name}-pooler.{basedomain}"))
-            } else {
-                None
-            }
-        }
-        _ => None,
+    let pooler_host = if spec.connectionPooler.enabled {
+        Some(format!("{name}-pooler.{basedomain}"))
+    } else {
+        None
     };
 
     // Create ConnectionInfo for the postgres user
     // The user and password are base64 encoded when passed back to the control-plane
     let postgres_conn = types::ConnectionInfo {
-        host: host.clone(),
+        host,
         pooler_host,
         port: 5432,
         user: postgres_user,

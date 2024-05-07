@@ -3,10 +3,12 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
-use crate::{
+use crate::stacks::types::Stack;
+use lazy_static::lazy_static;
+use regex::Regex;
+use tembo_controller::{
     apis::postgres_parameters::{ConfigValue, PgConfig},
     errors::ValueError,
-    stacks::types::Stack,
 };
 
 const DEFAULT_MAINTENANCE_WORK_MEM_MB: i32 = 64;
@@ -288,13 +290,9 @@ fn dynamic_effective_cache_size_mb(sys_mem_mb: i32) -> i32 {
     (sys_mem_mb as f64 * EFFECTIVE_CACHE_SIZE).floor() as i32
 }
 
-use lazy_static::lazy_static;
-
 lazy_static! {
     static ref RE: Regex = Regex::new(r"^([0-9]*\.?[0-9]+)([a-zA-Z]+)$").unwrap();
 }
-
-use regex::Regex;
 
 fn split_string(input: &str) -> Result<(f64, String), ValueError> {
     if let Some(cap) = RE.captures(input) {

@@ -88,57 +88,17 @@ extensions:
     - database: postgres
       enabled: true
       version: 0.15.0
+    - database: app
+      enabled: true
+      version: 0.15.0
+    - database: template1
+      enabled: true
+      version: 0.15.0
   - name: pg_stat_statements
     locations:
       - database: postgres
         enabled: true
         version: 1.10.0
-compute_templates:
-  - cpu: 0.25
-    memory: 1Gi
-    instance_class: GeneralPurpose
-  - cpu: 0.5
-    memory: 2Gi
-    instance_class: GeneralPurpose
-  - cpu: 1
-    memory: 4Gi
-    instance_class: GeneralPurpose
-  - cpu: 2
-    memory: 8Gi
-    instance_class: GeneralPurpose
-  - cpu: 4
-    memory: 16Gi
-    instance_class: GeneralPurpose
-  - cpu: 8
-    memory: 32Gi
-    instance_class: GeneralPurpose
-  - cpu: 0.5
-    memory: 1Gi
-    instance_class: ComputeOptimized
-  - cpu: 1
-    memory: 2Gi
-    instance_class: ComputeOptimized
-  - cpu: 2
-    memory: 4Gi
-    instance_class: ComputeOptimized
-  - cpu: 4
-    memory: 8Gi
-    instance_class: ComputeOptimized
-  - cpu: 8
-    memory: 16Gi
-    instance_class: ComputeOptimized
-  - cpu: 0.5
-    memory: 4Gi
-    instance_class: MemoryOptimized
-  - cpu: 1
-    memory: 8Gi
-    instance_class: MemoryOptimized
-  - cpu: 2
-    memory: 16Gi
-    instance_class: MemoryOptimized
-  - cpu: 4
-    memory: 32Gi
-    instance_class: MemoryOptimized
 postgres_config_engine: standard
 postgres_config:
   - name: cron.host
@@ -169,3 +129,17 @@ postgres_config:
     value: vectorize,pg_stat_statements,pg_cron
   - name: vectorize.embedding_service_url
     value: http://${NAMESPACE}-embeddings.${NAMESPACE}.svc.cluster.local:3000/v1/embeddings
+postgres_metrics:
+  vectorize_jobs:
+      query: select count(*) as total_jobs, current_database() as datname from vectorize.job
+      master: true
+      metrics:
+        - total_jobs:
+            usage: GAUGE
+            description: Number of vectorize jobs
+        - datname:
+            usage: "LABEL"
+            description: "Name of current database"
+      target_databases:
+        - "*"
+        - "postgres"
