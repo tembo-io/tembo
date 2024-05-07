@@ -60,12 +60,6 @@ extensions:
       - database: postgres
         enabled: true
         version: 1.1.1
-      - database: app
-        enabled: true
-        version: 1.1.1
-      - database: template1
-        enabled: true
-        version: 1.1.1
   - name: pg_partman
     locations:
       - database: postgres
@@ -73,7 +67,7 @@ extensions:
         version: 4.7.4
 postgres_metrics:
   pgmq:
-      query: select queue_name, queue_length, oldest_msg_age_sec, newest_msg_age_sec, total_messages, current_database() as datname from pgmq.metrics_all()
+      query: select queue_name, queue_length, oldest_msg_age_sec, newest_msg_age_sec, total_messages from pgmq.metrics_all()
       master: true
       metrics:
         - queue_name:
@@ -91,11 +85,7 @@ postgres_metrics:
         - total_messages:
             usage: GAUGE
             description: Total number of messages that have passed into the queue.
-        - datname:
-            usage: "LABEL"
-            description: "Name of current database"
       target_databases:
-        - "*"
         - "postgres"
 postgres_config_engine: mq
 postgres_config:
