@@ -9,7 +9,7 @@ use controller::app_service::types::EnvVar;
 use controller::extensions::types::Extension as ControllerExtension;
 use controller::extensions::types::ExtensionInstallLocation as ControllerExtensionInstallLocation;
 use controller::extensions::types::TrunkInstall as ControllerTrunkInstall;
-use controller::stacks::types::Stack;
+use tembo_stacks::stacks::types::Stack;
 use itertools::Itertools;
 use log::info;
 use spinoff::spinners;
