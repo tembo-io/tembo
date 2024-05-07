@@ -7,7 +7,6 @@ pub mod app_service;
 pub mod configmap;
 pub mod extensions;
 pub mod postgres_exporter;
-pub mod stacks;
 /// Log and trace integrations
 pub mod telemetry;
 
