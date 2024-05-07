@@ -33,7 +33,7 @@ pub fn check_input(input: &str) -> bool {
 pub const LIST_SHARED_PRELOAD_LIBRARIES_QUERY: &str = r#"SHOW shared_preload_libraries;"#;
 
 pub const LIST_DATABASES_QUERY: &str =
-    r#"SELECT datname FROM pg_database WHERE datname != 'template0';"#;
+    r#"SELECT datname FROM pg_database WHERE datistemplate = false;"#;
 
 pub const LIST_EXTENSIONS_QUERY: &str = r#"select
 distinct on
