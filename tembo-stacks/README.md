@@ -40,6 +40,8 @@ A stack consists of a number of components that are optimized for a particular u
 
 ## Generating a CoreDB Spec from a Stack Spec
 
+For local development purposes, you can generate a CoreDB spec for any Stack spec.
+
 ```bash
 cargo run -- --stack VectorDB --name my-resource --pg-version 16
 ```
