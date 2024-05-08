@@ -10,16 +10,22 @@ struct Args {
 
     #[arg(long)]
     stack: StackType,
+
+    #[arg(long)]
+    name: Option<String>,
 }
 
 fn main() {
     let args = Args::parse();
-    println!("PostgreSQL version: {}", args.pg_version);
+    let resource_name = match args.name {
+        Some(name) => name,
+        None => args.stack.to_string(),
+    };
     let stack_name = args.stack.to_string();
     let stack = tembo_stacks::stacks::get_stack(args.stack);
     let coredb = stack.to_coredb();
-    let yaml = generate_spec(&coredb);
-    let filename = format!("{}-coredb.yaml", stack_name);
+    let yaml = generate_spec(&coredb, &resource_name);
+    let filename = format!("{resource_name}-{stack_name}-coredb.json");
     std::fs::write(&filename, yaml).expect("Unable to write to file");
     println!("Wrote to spec: {}", filename);
 }
@@ -34,12 +40,12 @@ struct Spec {
     spec: CoreDBSpec,
 }
 
-fn generate_spec(spec: &CoreDBSpec) -> String {
+fn generate_spec(spec: &CoreDBSpec, resource_name: &str) -> String {
     let kspec = Spec {
         api_version: "coredb.io/v1alpha1".to_string(),
         kind: "CoreDB".to_string(),
         metadata: serde_json::json!({
-            "name": spec.stack.as_ref().unwrap().name.to_lowercase(),
+            "name": resource_name,
         }),
         spec: spec.clone(),
     };

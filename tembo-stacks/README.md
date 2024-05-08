@@ -37,3 +37,19 @@ A stack consists of a number of components that are optimized for a particular u
 * Postgres configs optimized according to hardware and use cases.
 * Use case specific metrics, alerts and recommendations.
 * On-instance application deployments to add additional tools required for the use case.
+
+## Generating a CoreDB Spec from a Stack Spec
+
+```bash
+cargo run -- --stack VectorDB --name MyResource --pg-version 16
+```
+
+```text
+Wrote to spec: MyResource-VectorDB-coredb.json
+```
+
+Then apply the generated spec to a Kubernetes cluster:
+
+```bash
+kubectl apply -f  MyResource-VectorDB-coredb.json
+```
