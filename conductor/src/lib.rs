@@ -378,9 +378,10 @@ pub async fn restart_coredb(
 pub async fn create_cloudformation(
     aws_region: String,
     backup_archive_bucket: String,
-    org_name: &str,
-    db_name: &str,
-    cf_template_bucket: &str,
+    namespace: String,
+    read_path: Option<String>,
+    write_path: Option<String>,
+    cf_template_bucket: String,
 ) -> Result<(), ConductorError> {
     // (todo: nhudson) - Create Cloudformation Stack only for Create event
     // Create new function that returns 3 enums of SUCCESS, ERROR, WAITING
@@ -390,28 +391,21 @@ pub async fn create_cloudformation(
     // If we are still waiting for the stack to be created we will need to requeue the message
     let region = Region::new(aws_region);
     let aws_config_state = AWSConfigState::new(region).await;
-    let namespace = format!("org-{}-inst-{}", org_name, db_name);
-    let stack_name = format!("org-{}-inst-{}-cf", org_name, db_name);
-    let iam_role_name = format!("org-{}-inst-{}-iam", org_name, db_name);
-    let service_account_name = format!("org-{}-inst-{}-sa", org_name, db_name);
-    let cf_template_params = CloudFormationParams::new(
-        // Database Backup Bucket Name
-        String::from(&backup_archive_bucket),
-        // Customer Org Name
-        String::from(org_name),
-        // Customer Database Name
-        String::from(db_name),
-        // AWS IAM Role Name to create
-        String::from(&iam_role_name),
-        // The AWS S3 Bucket where the CF Template is placed
-        String::from(cf_template_bucket),
-        // The Kubernetes Namespace where the database is deployed
+    let stack_name = format!("{}-cf", namespace);
+    let iam_role_name = format!("{}-iam", namespace);
+    let service_account_name = format!("{}-sa", namespace);
+    let read_path = read_path.unwrap_or_else(|| format!("v2/{}", namespace));
+    let write_path = write_path.unwrap_or_else(|| format!("v2/{}", namespace));
+    let cf_template_params = CloudFormationParams {
+        bucket_name: backup_archive_bucket,
+        read_path_prefix: read_path,
+        write_path_prefix: write_path,
+        role_name: iam_role_name,
         namespace,
-        // The Kubernetes Service Account to use for the database
-        String::from(&service_account_name),
-    );
+        service_account_name,
+    };
     aws_config_state
-        .create_cloudformation_stack(&stack_name, &cf_template_params)
+        .create_cloudformation_stack(&stack_name, &cf_template_params, cf_template_bucket)
         .await
         .map_err(ConductorError::from)?;
     Ok(())
@@ -425,12 +419,11 @@ pub async fn create_cloudformation(
 // Delete a cloudformation stack.
 pub async fn delete_cloudformation(
     aws_region: String,
-    org_name: &str,
-    db_name: &str,
+    namespace: &str,
 ) -> Result<(), ConductorError> {
     let region = Region::new(aws_region);
     let aws_config_state = AWSConfigState::new(region).await;
-    let stack_name = format!("org-{}-inst-{}-cf", org_name, db_name);
+    let stack_name = format!("{}-cf", namespace);
     aws_config_state
         .delete_cloudformation_stack(&stack_name)
         .await
@@ -445,10 +438,9 @@ pub struct StackOutputs {
 
 pub async fn lookup_role_arn(
     aws_region: String,
-    organization_name: &str,
-    dbname: &str,
+    namespace: &str,
 ) -> Result<String, ConductorError> {
-    let stack_outputs = get_stack_outputs(aws_region, organization_name, dbname).await?;
+    let stack_outputs = get_stack_outputs(aws_region, namespace).await?;
     let role_arn = stack_outputs
         .role_arn
         .ok_or_else(|| ConductorError::NoOutputsFound)?;
@@ -458,12 +450,11 @@ pub async fn lookup_role_arn(
 // Get Cloudformation Stack Outputs RoleName and RoleArn
 async fn get_stack_outputs(
     aws_region: String,
-    org_name: &str,
-    db_name: &str,
+    namespace: &str,
 ) -> Result<StackOutputs, ConductorError> {
     let region = Region::new(aws_region);
     let aws_config_state = AWSConfigState::new(region).await;
-    let stack_name = format!("org-{}-inst-{}-cf", org_name, db_name);
+    let stack_name = format!("{}-cf", namespace);
     // When moving this into operator, handle the specific errors that mean
     // "cloudformation is not done yet" and return a more specific error
     let (role_name, role_arn) = aws_config_state
