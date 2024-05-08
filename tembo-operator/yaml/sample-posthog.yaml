@@ -1,0 +1,45 @@
+apiVersion: coredb.io/v1alpha1
+kind: CoreDB
+metadata:
+  name: posthog
+spec:
+  image: "quay.io/tembo/standard-cnpg:15-a0a5ab5"
+  stop: false
+  stack:
+    name: Document
+  appServices:
+    - name: fdb-api
+      image: ghcr.io/ferretdb/ferretdb
+      routing:
+        - port: 27018
+          ingressPath: /ferretdb/v1
+          entryPoints:
+            - ferretdb
+          ingressType: tcp
+      env:
+        - name: FERRETDB_POSTGRESQL_URL
+          valueFromPlatform: ReadWriteConnection
+        - name: FERRETDB_LOG_LEVEL
+          value: debug
+        - name: FERRETDB_STATE_DIR
+          value: '-'
+        - name: FERRETDB_LISTEN_TLS_CERT_FILE
+          value: /tembo/certs/tls.crt
+        - name: FERRETDB_LISTEN_TLS_KEY_FILE
+          value: /tembo/certs/tls.key
+        - name: FERRETDB_LISTEN_TLS
+          value: :27018
+      storage:
+        volumes:
+          - name: ferretdb-data
+            ephemeral:
+              volumeClaimTemplate:
+                spec:
+                  accessModes:
+                    - ReadWriteOnce
+                  resources:
+                    requests:
+                      storage: 1Gi
+        volumeMounts:
+            - name: ferretdb-data
+              mountPath: /state

@@ -1,15 +1,17 @@
 use crate::stacks::config_engines::{
     mq_config_engine, olap_config_engine, standard_config_engine, ConfigEngine,
 };
+use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use tembo_controller::{
-    apis::postgres_parameters::PgConfig,
+    apis::{coredb_types::CoreDBSpec, postgres_parameters::PgConfig},
     app_service::types::AppService,
-    defaults::ImagePerPgVersion,
-    defaults::{default_images, default_repository},
+    defaults::{
+        default_images, default_postgres_exporter_image, default_repository, ImagePerPgVersion,
+    },
     extensions::types::{Extension, TrunkInstall},
-    postgres_exporter::QueryConfig,
+    postgres_exporter::{PostgresMetrics, QueryConfig},
 };
 use utoipa::ToSchema;
 
@@ -117,6 +119,43 @@ pub struct Stack {
     pub app_services: Option<Vec<AppService>>,
 }
 
+impl Stack {
+    // warning: for development purposes only
+    pub fn to_coredb(self) -> CoreDBSpec {
+        let metrics = PostgresMetrics {
+            image: default_postgres_exporter_image(),
+            enabled: true,
+            queries: self.postgres_metrics.clone(),
+        };
+        let mut mut_self = self.clone();
+        mut_self.infrastructure = Some(Infrastructure {
+            cpu: "1".to_string(),
+            memory: "1Gi".to_string(),
+            storage: "10Gi".to_string(),
+        });
+        let runtime_config = mut_self.runtime_config();
+        CoreDBSpec {
+            image: format!(
+                "{repo}/{image}",
+                repo = self.repository,
+                image = self.images.pg16.clone()
+            ),
+            extensions: self.extensions.unwrap_or_default(),
+            trunk_installs: self.trunk_installs.unwrap_or_default(),
+            app_services: self.app_services,
+            stack: Some(tembo_controller::apis::coredb_types::Stack {
+                name: self.name,
+                postgres_config: self.postgres_config,
+            }),
+            metrics: Some(metrics),
+            runtime_config,
+            replicas: 1,
+            storage: Quantity("10Gi".to_string()),
+            ..CoreDBSpec::default()
+        }
+    }
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, JsonSchema, PartialEq)]
 pub struct ComputeConstraint {
     pub min: Option<ComputeResource>,
@@ -173,6 +212,20 @@ fn default_memory() -> String {
 
 fn default_storage() -> String {
     "10Gi".to_owned()
+}
+
+pub fn merge_options<T>(opt1: Option<Vec<T>>, opt2: Option<Vec<T>>) -> Option<Vec<T>>
+where
+    T: Clone,
+{
+    match (opt1, opt2) {
+        (Some(mut vec1), Some(vec2)) => {
+            vec1.extend(vec2);
+            Some(vec1)
+        }
+        (Some(vec), None) | (None, Some(vec)) => Some(vec),
+        (None, None) => None,
+    }
 }
 
 #[cfg(test)]

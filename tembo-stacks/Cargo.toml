@@ -8,18 +8,26 @@ license = "Apache-2.0"
 readme = "README.md"
 repository = "https://github.com/tembo-io/tembo"
 
+
+[[bin]]
+name = "coredb-spec"
+path = "src/main.rs"
+
+
 [dependencies]
 anyhow = "1.0.71"
+clap = { version = "4.5.4", features = ["derive"] }
 futures = "0.3.28"
 k8s-openapi = { version = "0.18.0", features = ["v1_25", "schemars"], default-features = false } # This version has to be in line with the same version we use in the controller
 lazy_static = "1.4.0"
 regex = "1.10.4"
 schemars = {version = "0.8.12", features = ["chrono"]}
 serde = "1.0.152"
+serde_json = "1.0.114"
 serde_yaml = "0.9.21"
 strum = "0.26.2"
 strum_macros = "0.26.2"
-tembo-controller = { package = "controller", version = "0.47.0" }
+tembo-controller = { package = "controller", path = "../tembo-operator" } #version = "0.47.0" }
 tracing = "0.1"
 utoipa = { version = "3", features = ["actix_extras", "chrono"] }
 

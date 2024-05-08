@@ -373,8 +373,7 @@ pub struct PgBouncer {
 ///   name: test-db
 /// spec: {}
 /// ````
-#[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
-#[cfg_attr(test, derive(Default))]
+#[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema, Default)]
 #[kube(kind = "CoreDB", group = "coredb.io", version = "v1alpha1", namespaced)]
 #[kube(status = "CoreDBStatus", shortname = "cdb")]
 #[allow(non_snake_case)]
@@ -446,7 +445,7 @@ pub struct CoreDBSpec {
     pub uid: i32,
 
     /// A list of extensions to enable on the CoreDB instance.
-    /// This list should be a lits of extension names that are already available
+    /// This list should be a list of extension names that are already available
     /// on the Postgres instance you are running.  To install extensions at runtime
     /// please see the `trunk_installs` field.
     ///

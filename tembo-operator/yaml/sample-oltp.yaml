@@ -44,8 +44,6 @@ spec:
           enabled: true
           version: 1.10.0
   runtime_config:
-    - name: shared_buffers
-      value: 1024MB
     - name: max_connections
       value: "431"
     - name: work_mem
