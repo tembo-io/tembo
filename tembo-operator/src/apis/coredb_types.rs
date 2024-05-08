@@ -373,7 +373,7 @@ pub struct PgBouncer {
 ///   name: test-db
 /// spec: {}
 /// ````
-#[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema, Default)]
+#[derive(CustomResource, Default, Deserialize, Serialize, Clone, Debug, JsonSchema)]
 #[kube(kind = "CoreDB", group = "coredb.io", version = "v1alpha1", namespaced)]
 #[kube(status = "CoreDBStatus", shortname = "cdb")]
 #[allow(non_snake_case)]
