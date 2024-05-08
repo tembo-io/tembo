@@ -445,7 +445,7 @@ pub struct CoreDBSpec {
     pub uid: i32,
 
     /// A list of extensions to enable on the CoreDB instance.
-    /// This list should be a list of extension names that are already available
+    /// This list should be a lits of extension names that are already available
     /// on the Postgres instance you are running.  To install extensions at runtime
     /// please see the `trunk_installs` field.
     ///
