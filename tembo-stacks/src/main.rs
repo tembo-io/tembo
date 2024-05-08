@@ -18,12 +18,12 @@ struct Args {
 fn main() {
     let args = Args::parse();
     let resource_name = match args.name {
-        Some(name) => name,
-        None => args.stack.to_string(),
+        Some(name) => name.to_lowercase(),
+        None => args.stack.to_string().to_lowercase(),
     };
     let stack_name = args.stack.to_string();
     let stack = tembo_stacks::stacks::get_stack(args.stack);
-    let coredb = stack.to_coredb();
+    let coredb = stack.to_coredb("1".to_string(), "1Gi".to_string(), "10Gi".to_string());
     let yaml = generate_spec(&coredb, &resource_name);
     let filename = format!("{resource_name}-{stack_name}-coredb.json");
     std::fs::write(&filename, yaml).expect("Unable to write to file");

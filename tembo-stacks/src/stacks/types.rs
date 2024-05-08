@@ -121,7 +121,7 @@ pub struct Stack {
 
 impl Stack {
     // warning: for development purposes only
-    pub fn to_coredb(self) -> CoreDBSpec {
+    pub fn to_coredb(self, cpu: String, memory: String, storage: String) -> CoreDBSpec {
         let metrics = PostgresMetrics {
             image: default_postgres_exporter_image(),
             enabled: true,
@@ -129,9 +129,9 @@ impl Stack {
         };
         let mut mut_self = self.clone();
         mut_self.infrastructure = Some(Infrastructure {
-            cpu: "1".to_string(),
-            memory: "1Gi".to_string(),
-            storage: "10Gi".to_string(),
+            cpu,
+            memory,
+            storage,
         });
         let runtime_config = mut_self.runtime_config();
         CoreDBSpec {
