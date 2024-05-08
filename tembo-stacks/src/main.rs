@@ -24,9 +24,11 @@ fn main() {
     let stack_name = args.stack.to_string();
     let stack = tembo_stacks::stacks::get_stack(args.stack);
     let coredb = stack.to_coredb("1".to_string(), "1Gi".to_string(), "10Gi".to_string());
-    let yaml = generate_spec(&coredb, &resource_name);
+    let json = generate_spec(&coredb, &resource_name);
+    // writing to json because not an easy way to string quote nested postgres config values in yaml
+    // but serializing as json handles this
     let filename = format!("{resource_name}-{stack_name}-coredb.json");
-    std::fs::write(&filename, yaml).expect("Unable to write to file");
+    std::fs::write(&filename, json).expect("Unable to write to file");
     println!("Wrote to spec: {}", filename);
 }
 
