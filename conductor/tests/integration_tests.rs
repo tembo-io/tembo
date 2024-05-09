@@ -154,12 +154,13 @@ mod test {
         let mut spec: CoreDBSpec = serde_json::from_value(spec_js).unwrap();
 
         let msg = types::CRUDevent {
-            organization_name: org_name.clone(),
+            namespace,
+            backups_read_path: None,
+            backups_write_path: None,
             data_plane_id: "org_02s3owPQskuGXHE8vYsGSY".to_owned(),
             org_id: "org_02s3owPQskuGXHE8vYsGSY".to_owned(),
             inst_id: "inst_02s4UKVbRy34SAYVSwZq2H".to_owned(),
             event_type: types::Event::Create,
-            dbname: dbname.clone(),
             spec: Some(spec.clone()),
         };
 
@@ -223,11 +224,11 @@ mod test {
             extensions
         );
 
-        let coredb_api: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
-        let coredb_resource = coredb_api.get(&namespace).await.unwrap();
+        let coredb_api: Api<CoreDB> = Api::namespaced(client.clone(), &namespace.clone());
+        let coredb_resource = coredb_api.get(&namespace.clone()).await.unwrap();
 
         // Wait for CNPG pod to be running and ready
-        let pod_name = format!("{}-1", &namespace);
+        let pod_name = format!("{}-1", &namespace.clone());
         pod_ready_and_running(pods.clone(), pod_name.clone()).await;
 
         // ADD AN EXTENSION - ASSERT IT MAKES IT TO STATUS.EXTENSIONS
@@ -252,12 +253,13 @@ mod test {
         let current_coredb = coredb_resource.clone();
         // println!("Updated spec: {:?}", spec.clone());
         let msg = types::CRUDevent {
-            organization_name: org_name.clone(),
+            namespace,
+            backups_read_path: None,
+            backups_write_path: None,
             data_plane_id: "org_02s3owPQskuGXHE8vYsGSY".to_owned(),
             org_id: "org_02s3owPQskuGXHE8vYsGSY".to_owned(),
             inst_id: "inst_02s4UKVbRy34SAYVSwZq2H".to_owned(),
             event_type: types::Event::Update,
-            dbname: dbname.clone(),
             spec: Some(spec.clone()),
         };
         let msg_id = queue.send(&myqueue, &msg).await;
@@ -306,7 +308,7 @@ mod test {
         println!("start_time: {:?}", stdout);
 
         // Since we have updated lets check the status of the CoreDB from current_coredb
-        let update_coredb = coredb_api.get(&namespace).await.unwrap();
+        let update_coredb = coredb_api.get(&namespace.clone()).await.unwrap();
         let old_backup_spec = current_coredb.spec.backup.clone();
         let new_backup_spec = update_coredb.spec.backup.clone();
 
@@ -323,12 +325,13 @@ mod test {
         // pod restarts correctly.
 
         let msg = types::CRUDevent {
-            organization_name: org_name.clone(),
+            namespace,
+            backups_read_path: None,
+            backups_write_path: None,
             data_plane_id: "org_02s3owPQskuGXHE8vYsGSY".to_owned(),
             org_id: "org_02s3owPQskuGXHE8vYsGSY".to_owned(),
             inst_id: "inst_02s4UKVbRy34SAYVSwZq2H".to_owned(),
             event_type: types::Event::Restart,
-            dbname: dbname.clone(),
             spec: Some(spec.clone()),
         };
         let msg_id = queue.send(&myqueue, &msg).await;
@@ -341,7 +344,7 @@ mod test {
                 panic!("CNPG pod did not restart after about 300 seconds");
             }
             thread::sleep(time::Duration::from_secs(10));
-            let current_coredb = get_coredb_error_without_status(client.clone(), &namespace)
+            let current_coredb = get_coredb_error_without_status(client.clone(), &namespace.clone())
                 .await
                 .unwrap();
             if let Some(status) = current_coredb.status {
@@ -373,12 +376,13 @@ mod test {
 
         // delete the instance
         let msg = types::CRUDevent {
-            organization_name: org_name.clone(),
+            namespace,
+            backups_write_path: None,
+            backups_read_path: None,
             data_plane_id: "org_02s3owPQskuGXHE8vYsGSY".to_owned(),
             org_id: "org_02s3owPQskuGXHE8vYsGSY".to_owned(),
             inst_id: "inst_02s4UKVbRy34SAYVSwZq2H".to_owned(),
             event_type: types::Event::Delete,
-            dbname: dbname.clone(),
             spec: None,
         };
         // println!("DELETE msg: {:?}", msg);
