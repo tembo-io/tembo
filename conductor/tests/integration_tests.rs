@@ -154,7 +154,7 @@ mod test {
         let mut spec: CoreDBSpec = serde_json::from_value(spec_js).unwrap();
 
         let msg = types::CRUDevent {
-            namespace,
+            namespace: namespace.clone(),
             backups_read_path: None,
             backups_write_path: None,
             data_plane_id: "org_02s3owPQskuGXHE8vYsGSY".to_owned(),
@@ -253,7 +253,7 @@ mod test {
         let current_coredb = coredb_resource.clone();
         // println!("Updated spec: {:?}", spec.clone());
         let msg = types::CRUDevent {
-            namespace,
+            namespace: namespace.clone(),
             backups_read_path: None,
             backups_write_path: None,
             data_plane_id: "org_02s3owPQskuGXHE8vYsGSY".to_owned(),
@@ -325,7 +325,7 @@ mod test {
         // pod restarts correctly.
 
         let msg = types::CRUDevent {
-            namespace,
+            namespace: namespace.clone(),
             backups_read_path: None,
             backups_write_path: None,
             data_plane_id: "org_02s3owPQskuGXHE8vYsGSY".to_owned(),
@@ -344,9 +344,10 @@ mod test {
                 panic!("CNPG pod did not restart after about 300 seconds");
             }
             thread::sleep(time::Duration::from_secs(10));
-            let current_coredb = get_coredb_error_without_status(client.clone(), &namespace.clone())
-                .await
-                .unwrap();
+            let current_coredb =
+                get_coredb_error_without_status(client.clone(), &namespace.clone())
+                    .await
+                    .unwrap();
             if let Some(status) = current_coredb.status {
                 if status.running {
                     is_ready = true;
@@ -376,7 +377,7 @@ mod test {
 
         // delete the instance
         let msg = types::CRUDevent {
-            namespace,
+            namespace: namespace.clone(),
             backups_write_path: None,
             backups_read_path: None,
             data_plane_id: "org_02s3owPQskuGXHE8vYsGSY".to_owned(),
