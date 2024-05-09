@@ -343,6 +343,60 @@ fn merge_env_defaults(defaults: Vec<EnvVar>, overrides: Vec<EnvVar>) -> Vec<EnvV
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::apps::types::AppConfig;
+    use tembo_controller::app_service::types::EnvVar;
+    #[test]
+    fn test_merge_app_reqs() {
+        //
+        let app_config = AppConfig {
+            env: Some(vec![
+                EnvVar {
+                    name: "APP_ENV".to_string(),
+                    value: Some("user".to_string()),
+                    value_from_platform: None,
+                },
+                EnvVar {
+                    name: "TMPDIR".to_string(),
+                    value: Some("/custom_dir".to_string()),
+                    value_from_platform: None,
+                },
+            ]),
+            resources: None,
+        };
+        let user_embedding_app = AppType::Embeddings(Some(app_config));
+        let user_apps = vec![user_embedding_app];
+        let stack_apps = vec![AppService {
+            name: "embeddings".to_string(),
+            env: Some(vec![EnvVar {
+                name: "APP_ENV".to_string(),
+                value: Some("stack".to_string()),
+                value_from_platform: None,
+            }]),
+            ..AppService::default()
+        }];
+        let merged_configs: MergedConfigs =
+            merge_app_reqs(Some(user_apps), Some(stack_apps), None, None, None).unwrap();
+        let app = merged_configs.app_services.unwrap()[0].clone();
+        let mut to_find = 2;
+        // two embedding defaults + 1 custom
+        assert_eq!(app.env.as_ref().unwrap().len(), 3);
+        for e in app.env.unwrap() {
+            match e.name.as_str() {
+                // custom env var is found
+                "APP_ENV" => {
+                    assert_eq!(e.value.unwrap(), "user".to_string());
+                    to_find -= 1;
+                }
+                // overridden TMPDIR value is found
+                "TMPDIR" => {
+                    assert_eq!(e.value.unwrap(), "/custom_dir".to_string());
+                    to_find -= 1;
+                }
+                _ => {}
+            }
+        }
+        assert_eq!(to_find, 0);
+    }
 
     #[test]
     fn test_app_specs() {
