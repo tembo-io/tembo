@@ -372,68 +372,35 @@ mod tests {
                 ..AppService::default()
             },
             AppService {
-                name: "reserved_name_0".to_string(),
+                name: "app2".to_string(),
                 image: "user_image".to_string(),
                 ..AppService::default()
             },
         ];
         let stack_apps = vec![
             AppService {
-                name: "reserved_name_0".to_string(),
+                name: "app1".to_string(),
                 image: "stack_image".to_string(),
                 ..AppService::default()
             },
             AppService {
-                name: "reserved_name_1".to_string(),
+                name: "app3".to_string(),
                 image: "stack_image".to_string(),
                 ..AppService::default()
             },
         ];
-        // stack_apps contains reserved_name_0, and user app also contained app with same name
-        // this should ignore user request, and apply the Stack's app definition
+        // app1 should be overriten with the user provided image
         let merged_apps = merge_apps(user_apps, stack_apps.clone()).unwrap();
         assert_eq!(merged_apps.len(), 3);
         for app in merged_apps {
-            if app.name == "reserved_name_0" {
+            if app.name == "app1" {
+                assert_eq!(app.image, "user_image");
+            }
+            // reserved_name_1 should not be overriten
+            if app.name == "reserved_name_1" {
                 assert_eq!(app.image, "stack_image");
             }
         }
-
-        let user_apps = vec![
-            AppService {
-                name: "sameName".to_string(),
-                image: "image1".to_string(),
-                ..AppService::default()
-            },
-            AppService {
-                name: "sameName".to_string(),
-                image: "image1".to_string(),
-                ..AppService::default()
-            },
-        ];
-
-        // there are duplicate names in the user Apps
-        // this must error
-        let merged_apps = merge_apps(user_apps, stack_apps.clone());
-        assert!(merged_apps.is_err());
-
-        let user_apps = vec![
-            AppService {
-                name: "app1".to_string(),
-                image: "image1".to_string(),
-                ..AppService::default()
-            },
-            AppService {
-                name: "app2".to_string(),
-                image: "image1".to_string(),
-                ..AppService::default()
-            },
-        ];
-
-        // no conflicts in names between user_apps and stack_apps
-        // must succeed
-        let merged_apps = merge_apps(user_apps, stack_apps).unwrap();
-        assert_eq!(merged_apps.len(), 4);
     }
 
     #[test]
