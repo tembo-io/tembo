@@ -137,6 +137,7 @@ pub fn merge_app_reqs(
                 };
 
                 stack_app.resources = user_defined_configs.resources.clone();
+                stack_app.env = user_defined_configs.env.clone();
                 info!("Overwrote resources for stack app {}", stack_app.name);
             }
 
