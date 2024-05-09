@@ -6,7 +6,7 @@ use tembo_controller::{
     app_service::types::{AppService, EnvVar},
     extensions::types::{Extension, ExtensionInstallLocation, TrunkInstall},
 };
-use tracing::{instrument, warn};
+use tracing::{info, instrument, warn};
 
 use crate::apps::types::{App, AppConfig, AppType, MergedConfigs};
 
@@ -127,8 +127,20 @@ pub fn merge_app_reqs(
     // merge stack apps into final app services
     // if there are any conflicts in naming, then we should return an error and notify user (4xx)
     let final_apps = match stack_apps {
-        Some(s_apps) => {
-            let merged_apps = merge_apps(user_app_services, s_apps)?;
+        Some(mut stack_apps) => {
+            for stack_app in stack_apps.iter_mut() {
+                let Some(user_defined_configs) = user_app_services
+                    .iter()
+                    .find(|app| app.name == stack_app.name)
+                else {
+                    continue;
+                };
+
+                stack_app.resources = user_defined_configs.resources.clone();
+                info!("Overwrote resources for stack app {}", stack_app.name);
+            }
+
+            let merged_apps = merge_apps(user_app_services, stack_apps)?;
             Some(merged_apps)
         }
         None => {
