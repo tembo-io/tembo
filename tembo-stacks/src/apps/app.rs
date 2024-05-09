@@ -125,7 +125,6 @@ pub fn merge_app_reqs(
     }
 
     // merge stack apps into final app services
-    // if there are any conflicts in naming, then we should return an error and notify user (4xx)
     let final_apps = match stack_apps {
         Some(s_apps) => {
             let merged_apps = merge_apps(user_app_services, s_apps)?;
@@ -245,47 +244,21 @@ pub fn merge_location_into_extensions(
 }
 
 // merge user Apps and Stack Apps
-// returns Err when there are any conflicts in naming
 #[instrument]
 fn merge_apps(
     user_apps: Vec<AppService>,
     stack_apps: Vec<AppService>,
 ) -> Result<Vec<AppService>, Error> {
-    // users cannot override the names of any Apps originating from the Stack definition
-    // create a set of the App names from Stack definitions
-    // start w/ the Stack's Apps, and append any user apps assuming no conflicts
-    let mut merged_apps: Vec<AppService> = stack_apps.clone();
-    let mut stack_app_names = std::collections::HashSet::new();
-    for app in &stack_apps {
-        stack_app_names.insert(&app.name);
+    // when user provides configuration for app with same name as another app,
+    // the user provided configuration overrides the existing configuration
+    let mut final_apps: HashMap<String, AppService> = HashMap::new();
+    for app in stack_apps {
+        final_apps.insert(app.name.clone(), app);
     }
-
-    // users app names must also be unique across their defined Apps
-    let mut user_app_names = std::collections::HashSet::new();
-    for app in &user_apps {
-        user_app_names.insert(&app.name);
+    for app in user_apps {
+        final_apps.insert(app.name.clone(), app);
     }
-    if user_app_names.len() != user_apps.len() {
-        return Err(Error::msg("Cannot have duplicate App names".to_string()));
-    }
-    // if we've reached this point, then user has no naming conflicts in their own Apps
-
-    // check whether their names conflict with Stack App names
-    for user_app in user_apps {
-        // can expand this to validate any App attributes conflicts in the future
-        if stack_app_names.contains(&user_app.name) {
-            // TODO: do not allow user to override the appService that is defined in a Stack
-            // need to find a way to report error
-            warn!(
-                "User App name: {} conflicts with Stack App name",
-                user_app.name
-            );
-        } else {
-            // no conflicts with Stack name, so we are good-to-go
-            merged_apps.push(user_app);
-        }
-    }
-    Ok(merged_apps)
+    Ok(final_apps.into_values().collect())
 }
 
 // merges 2 vecs of PgConfigs
