@@ -393,7 +393,7 @@ pub async fn create_cloudformation(
     let aws_config_state = AWSConfigState::new(region).await;
     let stack_name = format!("{}-cf", namespace);
     let iam_role_name = format!("{}-iam", namespace);
-    let service_account_name = format!("{}-sa", namespace);
+    let service_account_name = namespace.clone();
     let read_path = read_path.unwrap_or_else(|| format!("v2/{}", namespace));
     let write_path = write_path.unwrap_or_else(|| format!("v2/{}", namespace));
     let cf_template_params = CloudFormationParams {
