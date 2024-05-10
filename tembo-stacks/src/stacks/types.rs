@@ -266,7 +266,7 @@ mod tests {
         assert_eq!(mq_metrics.queries.len(), 1);
         assert!(mq_metrics.queries.contains_key("pgmq"));
         assert!(mq_metrics.queries["pgmq"].master);
-        assert_eq!(mq_metrics.queries["pgmq"].metrics.len(), 5);
+        assert_eq!(mq_metrics.queries["pgmq"].metrics.len(), 6);
 
         let mut std = get_stack(StackType::Standard);
         let infra = Infrastructure {
