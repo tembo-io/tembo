@@ -10,66 +10,50 @@ use std::sync::Arc;
 
 use crate::errors::ConductorError;
 
+#[derive(Clone)]
 pub struct CloudFormationParams {
-    pub backup_archive_bucket: String,
-    pub org_name: String,
-    pub db_name: String,
-    pub iam_role_name: String,
-    pub cf_template_bucket: String,
+    pub bucket_name: String,
+    pub read_path_prefix: String,
+    pub write_path_prefix: String,
+    pub role_name: String,
     pub namespace: String,
     pub service_account_name: String,
+}
+
+impl CloudFormationParams {
+    fn parameters(self) -> Vec<Parameter> {
+        vec![
+            Parameter::builder()
+                .parameter_key("BucketName")
+                .parameter_value(self.bucket_name)
+                .build(),
+            Parameter::builder()
+                .parameter_key("ReadPathPrefix")
+                .parameter_value(self.read_path_prefix)
+                .build(),
+            Parameter::builder()
+                .parameter_key("WritePathPrefix")
+                .parameter_value(self.write_path_prefix)
+                .build(),
+            Parameter::builder()
+                .parameter_key("RoleName")
+                .parameter_value(self.role_name)
+                .build(),
+            Parameter::builder()
+                .parameter_key("Namespace")
+                .parameter_value(self.namespace)
+                .build(),
+            Parameter::builder()
+                .parameter_key("ServiceAccountName")
+                .parameter_value(self.service_account_name)
+                .build(),
+        ]
+    }
 }
 
 pub struct AWSConfigState {
     pub cf_client: Arc<Client>,
     pub cf_config: Arc<SdkConfig>,
-}
-
-impl CloudFormationParams {
-    pub fn new(
-        backup_archive_bucket: String,
-        org_name: String,
-        db_name: String,
-        iam_role_name: String,
-        cf_template_bucket: String,
-        namespace: String,
-        service_account_name: String,
-    ) -> Self {
-        Self {
-            backup_archive_bucket,
-            org_name,
-            db_name,
-            iam_role_name,
-            cf_template_bucket,
-            namespace,
-            service_account_name,
-        }
-    }
-
-    pub fn validate(&self) -> Result<(), String> {
-        if self.iam_role_name.is_empty() {
-            return Err("IAM role name cannot be empty".to_string());
-        }
-        if self.backup_archive_bucket.is_empty() {
-            return Err("Cloudformation Bucket Name cannot be empty".to_string());
-        }
-        if self.org_name.is_empty() {
-            return Err("Cloudformation Bucket Name cannot be empty".to_string());
-        }
-        if self.db_name.is_empty() {
-            return Err("Cloudformation Bucket Name cannot be empty".to_string());
-        }
-        if self.cf_template_bucket.is_empty() {
-            return Err("Cloudformation Bucket Name cannot be empty".to_string());
-        }
-        if self.namespace.is_empty() {
-            return Err("Namespace cannot be empty".to_string());
-        }
-        if self.service_account_name.is_empty() {
-            return Err("Kubernetes Service Account Name cannot be empty".to_string());
-        }
-        Ok(())
-    }
 }
 
 impl AWSConfigState {
@@ -103,33 +87,13 @@ impl AWSConfigState {
         &self,
         stack_name: &str,
         params: &CloudFormationParams,
+        cloudformation_template_bucket: String,
     ) -> Result<(), ConductorError> {
         let template_url = format!(
             "https://{}.s3.amazonaws.com/{}",
-            params.cf_template_bucket, "conductor-cf-template.yaml"
+            cloudformation_template_bucket, "conductor-cf-template-v2.yaml"
         );
-        let parameters = vec![
-            Parameter::builder()
-                .parameter_key("BucketName")
-                .parameter_value(params.backup_archive_bucket.clone())
-                .build(),
-            Parameter::builder()
-                .parameter_key("BucketOrg")
-                .parameter_value(params.org_name.clone())
-                .build(),
-            Parameter::builder()
-                .parameter_key("RoleName")
-                .parameter_value(params.iam_role_name.clone())
-                .build(),
-            Parameter::builder()
-                .parameter_key("Namespace")
-                .parameter_value(params.namespace.clone())
-                .build(),
-            Parameter::builder()
-                .parameter_key("ServiceAccountName")
-                .parameter_value(params.service_account_name.clone())
-                .build(),
-        ];
+        let parameters = params.clone().parameters();
         if !self.does_stack_exist(stack_name).await {
             // todo(nhudson): We need to add tags to the stack
             // get with @sjmiller609 to figure out how we want
