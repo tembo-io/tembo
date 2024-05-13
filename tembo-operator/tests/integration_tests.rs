@@ -59,7 +59,7 @@ mod test {
 
     const API_VERSION: &str = "coredb.io/v1alpha1";
     // Timeout settings while waiting for an event
-    const TIMEOUT_SECONDS_START_POD: u64 = 1200;
+    const TIMEOUT_SECONDS_START_POD: u64 = 600;
     const TIMEOUT_SECONDS_POD_READY: u64 = 600;
     const TIMEOUT_SECONDS_NS_DELETED: u64 = 300;
     const TIMEOUT_SECONDS_POD_DELETED: u64 = 300;
@@ -691,7 +691,7 @@ mod test {
         extension: &str,
         inverse: bool,
     ) -> Result<(), kube::Error> {
-        let max_retries = 60;
+        let max_retries = 10;
         let wait_duration = Duration::from_secs(2); // Adjust as needed
 
         for attempt in 1..=max_retries {
