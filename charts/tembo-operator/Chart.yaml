@@ -1,9 +1,9 @@
 apiVersion: v2
 name: tembo-operator
-description: 'Helm chart to deploy the tembo-operator'
+description: "Helm chart to deploy the tembo-operator"
 type: application
 icon: https://cloud.tembo.io/images/TemboElephant.png
-version: 0.5.2
+version: 0.5.3
 home: https://tembo.io
 sources:
   - https://github.com/tembo-io/tembo
