@@ -1,7 +1,7 @@
 workspace = { members = ["temboclient", "tembodataclient"] }
 [package]
 name = "tembo-cli"
-version = "0.20.4"
+version = "0.20.5"
 edition = "2021"
 authors = ["Tembo.io"]
 description = "The CLI for Tembo"
@@ -54,7 +54,7 @@ dateparser = "0.2.0"
 log = "0.4.20"
 tera = "1.18.1"
 curl = "0.4.44"
-temboclient = { version = "1.0.1", path = "temboclient" }
+temboclient = { version = "1.0.2", path = "temboclient" }
 tembodataclient = { version = "0.0.2", path = "tembodataclient" }
 tokio = { version = "1.26.0", features = [
     "rt",
@@ -76,7 +76,7 @@ tembo-stacks = "0.7.0"
 itertools = "0.12.1"
 random-string = "1.1.0"
 test-case = "=2.0.0-rc2"
-clap-markdown = { git = "https://github.com/tembo-io/clap-markdown.git", branch = "main" }
+clap-markdown = { git = "https://github.com/tembo-io/clap-markdown.git", branch = "main", version = "0.1.3" }
 
 [target.aarch64-unknown-linux-musl.dependencies]
 openssl = { version = "0.10", features = ["vendored"] }
