@@ -100,8 +100,7 @@ async fn fetch_metrics_loop(
     }
 
     for value in instance_settings.values() {
-        let org_name = get_instance_org_name(config, &env, &value.instance_name).await?;
-        let namespace = format!("org-{}-inst-{}", org_name, &value.instance_name);
+        let namespace = get_instance_namespace(config, &env, &value.instance_name).await?;
         let namespace_encoded = urlencoding::encode(&namespace);
 
         let mut cpu_value = String::new();
@@ -227,7 +226,7 @@ async fn fetch_metric(
     Ok(response)
 }
 
-async fn get_instance_org_name(
+async fn get_instance_namespace(
     config: &Configuration,
     env: &Environment,
     instance_name: &String,
@@ -250,7 +249,7 @@ async fn get_instance_org_name(
 
     let instance_result = get_instance(config, org_id, &instance_id).await;
     match instance_result {
-        Ok(instance) => Ok(instance.organization_name),
+        Ok(instance) => Ok(instance.namespace),
         Err(e) => Err(e.into()),
     }
 }
