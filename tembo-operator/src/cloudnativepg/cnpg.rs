@@ -1,3 +1,5 @@
+use crate::apis::coredb_types;
+use crate::apis::coredb_types::Restore;
 use crate::ingress_route_crd::{
     IngressRoute, IngressRouteRoutes, IngressRouteRoutesKind, IngressRouteRoutesServices,
     IngressRouteRoutesServicesKind, IngressRouteSpec, IngressRouteTls,
@@ -59,7 +61,6 @@ use crate::{
     is_postgres_ready,
     postgres_exporter::EXPORTER_CONFIGMAP_PREFIX,
     psql::PsqlOutput,
-    // snapshots::volumesnapshots::reconcile_volume_snapshot_restore,
     trunk::extensions_that_require_load,
     Context,
 };
@@ -413,14 +414,11 @@ pub fn cnpg_cluster_bootstrap_from_cdb(
     let coredb_cluster = if let Some(restore) = &cdb.spec.restore {
         let s3_credentials = generate_s3_restore_credentials(restore.s3_credentials.as_ref());
         // Find destination_path from Backup to generate the restore destination path
-        let restore_destination_path = match &cdb.spec.backup.destinationPath {
-            Some(path) => generate_restore_destination_path(path),
-            None => "".to_string(),
-        };
+        let restore_destination_path = generate_restore_destination_path(restore, &cdb.spec.backup);
         ClusterExternalClusters {
             name: "tembo-recovery".to_string(),
             barman_object_store: Some(ClusterExternalClustersBarmanObjectStore {
-                destination_path: format!("{}/{}", restore_destination_path, restore.server_name),
+                destination_path: restore_destination_path,
                 endpoint_url: restore.endpoint_url.clone(),
                 s3_credentials: Some(s3_credentials),
                 wal: Some(ClusterExternalClustersBarmanObjectStoreWal {
@@ -2011,10 +2009,22 @@ pub async fn unfence_pod(cdb: &CoreDB, ctx: Arc<Context>, pod_name: &str) -> Res
 // generate_restore_destination_path function will generate the restore destination path from the backup
 // object and return a string
 #[instrument(fields(trace_id, path))]
-fn generate_restore_destination_path(path: &str) -> String {
-    let mut parts: Vec<&str> = path.split('/').collect();
-    parts.pop();
-    parts.join("/")
+fn generate_restore_destination_path(restore: &Restore, backup: &coredb_types::Backup) -> String {
+    match restore.backups_path.clone() {
+        Some(path) => return path.clone(),
+        None => {
+            let this_instance_destination_path = match backup.destinationPath.clone() {
+                Some(path) => path.clone(),
+                None => "".to_string(),
+            };
+            let mut path_prefix_from_this_instance: Vec<&str> =
+                this_instance_destination_path.split('/').collect();
+            path_prefix_from_this_instance.pop();
+            let prefix = path_prefix_from_this_instance.join("/");
+            let destination_path = format!("{}/{}", prefix, restore.server_name.clone());
+            destination_path
+        }
+    }
 }
 
 // generate_s3_backup_credentials function will generate the s3 backup credentials from
@@ -2803,23 +2813,85 @@ mod tests {
         let _result: Cluster =
             serde_json::from_str(json_str).expect("Should be able to deserialize");
     }
+    #[test]
+    fn test_generate_restore_destination_path_null() {
+        let backup = coredb_types::Backup {
+            destinationPath: Some(
+                "s3://cdb-plat-use1-dev-instance-backups/v2/homely-musical-bullsnake".to_string(),
+            ),
+            ..Default::default()
+        };
+        let restore = Restore {
+            server_name: "org-foobar-inst-test".to_string(),
+            backups_path: None,
+            ..Default::default()
+        };
+        assert_eq!(
+            generate_restore_destination_path(&restore, &backup),
+            "s3://cdb-plat-use1-dev-instance-backups/v2/org-foobar-inst-test".to_string()
+        );
+    }
 
     #[test]
-    fn test_generate_restore_destination_path() {
-        // Define test cases
-        let test_cases = [
-            (
-                "s3://cdb-plat-use1-dev-instance-backups/coredb/coredb/org-coredb-inst-test-testing-test-1",
-                "s3://cdb-plat-use1-dev-instance-backups/coredb/coredb",
+    fn test_generate_restore_destination_path_null_old_format() {
+        let backup = coredb_types::Backup {
+            destinationPath: Some(
+                "s3://cdb-plat-use1-dev-instance-backups/coredb/coredb/org-foobar-inst-test"
+                    .to_string(),
             ),
-            ("s3://path/with/multiple/segments", "s3://path/with/multiple"),
-            ("s3://short/path", "s3://short"),
-            ("single_segment", ""),
-        ];
+            ..Default::default()
+        };
+        let restore = Restore {
+            server_name: "org-coredb-inst-pgtrunkio-dev".to_string(),
+            backups_path: None,
+            ..Default::default()
+        };
+        assert_eq!(
+            generate_restore_destination_path(&restore, &backup),
+            "s3://cdb-plat-use1-dev-instance-backups/coredb/coredb/org-coredb-inst-pgtrunkio-dev"
+                .to_string()
+        );
+    }
 
-        for (input, expected) in test_cases.iter() {
-            assert_eq!(generate_restore_destination_path(input), *expected);
-        }
+    #[test]
+    fn test_generate_restore_destination_path_from_old_to_new() {
+        let backup = coredb_types::Backup {
+            destinationPath: Some(
+                "s3://cdb-plat-use1-dev-instance-backups/v2/org-foobar-inst-test".to_string(),
+            ),
+            ..Default::default()
+        };
+        let restore = Restore {
+            server_name: "org-coredb-inst-pgtrunkio-dev".to_string(),
+            backups_path: Some("s3://cdb-plat-use1-dev-instance-backups/coredb/coredb/org-coredb-inst-pgtrunkio-dev".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(
+            generate_restore_destination_path(&restore, &backup),
+            "s3://cdb-plat-use1-dev-instance-backups/coredb/coredb/org-coredb-inst-pgtrunkio-dev"
+                .to_string()
+        );
+    }
+    #[test]
+    fn test_generate_restore_destination_path_from_new_to_new() {
+        let backup = coredb_types::Backup {
+            destinationPath: Some(
+                "s3://cdb-plat-use1-dev-instance-backups/v2/org-foobar-inst-test".to_string(),
+            ),
+            ..Default::default()
+        };
+        let restore = Restore {
+            server_name: "org-coredb-inst-pgtrunkio-dev".to_string(),
+            backups_path: Some(
+                "s3://cdb-plat-use1-dev-instance-backups/v2/org-coredb-inst-pgtrunkio-dev"
+                    .to_string(),
+            ),
+            ..Default::default()
+        };
+        assert_eq!(
+            generate_restore_destination_path(&restore, &backup),
+            "s3://cdb-plat-use1-dev-instance-backups/v2/org-coredb-inst-pgtrunkio-dev".to_string()
+        );
     }
 
     #[test]
