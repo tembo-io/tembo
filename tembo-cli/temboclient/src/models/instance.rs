@@ -70,8 +70,8 @@ pub struct Instance {
     pub memory: crate::models::Memory,
     #[serde(rename = "organization_id")]
     pub organization_id: String,
-    #[serde(rename = "organization_name")]
-    pub organization_name: String,
+    #[serde(rename = "namespace")]
+    pub namespace: String,
     #[serde(
         rename = "postgres_configs",
         default,
@@ -114,7 +114,7 @@ impl Instance {
         instance_name: String,
         memory: crate::models::Memory,
         organization_id: String,
-        organization_name: String,
+        namespace: String,
         postgres_version: i32,
         replicas: i32,
         stack_type: crate::models::StackType,
@@ -137,7 +137,7 @@ impl Instance {
             last_updated_at: None,
             memory,
             organization_id,
-            organization_name,
+            namespace,
             postgres_configs: None,
             postgres_version,
             replicas,

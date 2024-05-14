@@ -64,7 +64,7 @@ trunk_installs:
   - name: vectorize
     version: 0.15.0
   - name: pgvector
-    version: 0.6.0
+    version: 0.7.0
   - name: pg_stat_statements
     version: 1.10.0
 extensions:
@@ -72,7 +72,7 @@ extensions:
     locations:
       - database: postgres
         enabled: true
-        version: 0.6.0
+        version: 0.7.0
   - name: pg_cron
     locations:
     - database: postgres

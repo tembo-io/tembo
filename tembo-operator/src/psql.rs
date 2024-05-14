@@ -22,6 +22,21 @@ impl PsqlOutput {
             success,
         }
     }
+
+    // Get a field from the stdout by index
+    pub fn get_field(&self, index: usize) -> Option<String> {
+        self.stdout.as_ref().and_then(|output| {
+            let lines: Vec<&str> = output.lines().collect();
+
+            lines.get(2).map(|line| {
+                line.split('|')
+                    .map(str::trim)
+                    .nth(index)
+                    .unwrap_or("")
+                    .to_string()
+            })
+        })
+    }
 }
 
 pub struct PsqlCommand {

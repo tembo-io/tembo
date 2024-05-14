@@ -4705,6 +4705,14 @@ CREATE EVENT TRIGGER pgrst_watch
         // Wait for backup to complete
         has_backup_completed(context.clone(), &namespace, &backup_name).await;
 
+        // Check to make sure CoreDBStatus has last_archiver_status set to a DateTime<Utc>
+        let cdbstatus = coredbs.get(name).await.unwrap();
+        let last_archiver_state = cdbstatus
+            .status
+            .as_ref()
+            .and_then(|stats| stats.last_archiver_status);
+        assert!(last_archiver_state.is_some());
+
         // If the backup is complete, we can now restore to a new instance in a new namespace
         let suffix = rng.gen_range(0..100000);
         let restore_name = &format!("test-coredb-restore-{}", suffix);
@@ -4882,6 +4890,14 @@ CREATE EVENT TRIGGER pgrst_watch
         )
         .await;
         assert!(result.stdout.clone().unwrap().contains("test"));
+
+        // Check to make sure CoreDBStatus has last_archiver_status set to a DateTime<Utc>
+        let cdbstatus = coredbs.get(name).await.unwrap();
+        let last_archiver_state = cdbstatus
+            .status
+            .as_ref()
+            .and_then(|stats| stats.last_archiver_status);
+        assert!(last_archiver_state.is_some());
 
         // CLEANUP TEST
         // Cleanup CoreDB
