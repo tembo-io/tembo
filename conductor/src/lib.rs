@@ -447,7 +447,10 @@ pub struct StackOutputs {
     pub role_arn: Option<String>,
 }
 
-pub async fn lookup_role_arn(aws_region: String, namespace: &str) -> Result<String, ConductorError> {
+pub async fn lookup_role_arn(
+    aws_region: String,
+    namespace: &str,
+) -> Result<String, ConductorError> {
     let stack_outputs = get_stack_outputs(aws_region, namespace).await?;
     let role_arn = stack_outputs
         .role_arn
