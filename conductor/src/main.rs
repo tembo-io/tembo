@@ -293,6 +293,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     instance_id,
                     &read_msg.message.data_plane_id,
                     &namespace,
+                    &backup_archive_bucket,
                     &coredb_spec,
                 )
                 .await;
