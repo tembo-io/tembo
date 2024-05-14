@@ -65,6 +65,10 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         .unwrap_or_else(|_| "true".to_owned())
         .parse()
         .expect("error parsing IS_CLOUD_FORMATION");
+    let aws_region: String = env::var("AWS_REGION")
+        .unwrap_or_else(|_| "us-east-1".to_owned())
+        .parse()
+        .expect("error parsing AWS_REGION");
 
     // Connect to pgmq
     let queue = PGMQueueExt::new(pg_conn_url.clone(), 5).await?;
@@ -221,6 +225,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                 let mut coredb_spec = msg_spec;
 
                 match init_cloud_perms(
+                    aws_region.clone(),
                     backup_archive_bucket.clone(),
                     cf_template_bucket.clone(),
                     &read_msg,
@@ -418,7 +423,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                 delete_namespace(client.clone(), &namespace).await?;
 
                 info!("{}: Deleting cloudformation stack", read_msg.msg_id);
-                delete_cloudformation(String::from("us-east-1"), &namespace).await?;
+                delete_cloudformation(aws_region.clone(), &namespace).await?;
 
                 let insert_query = sqlx::query!(
                     "INSERT INTO deleted_instances (namespace) VALUES ($1) ON CONFLICT (namespace) DO NOTHING",
@@ -682,6 +687,7 @@ async fn main() -> std::io::Result<()> {
 }
 
 async fn init_cloud_perms(
+    aws_region: String,
     backup_archive_bucket: String,
     cf_template_bucket: String,
     read_msg: &Message<CRUDevent>,
@@ -694,7 +700,7 @@ async fn init_cloud_perms(
     }
 
     create_cloudformation(
-        String::from("us-east-1"),
+        aws_region.clone(),
         backup_archive_bucket.clone(),
         read_msg.message.namespace.clone(),
         read_msg.message.backups_read_path.clone(),
@@ -704,7 +710,7 @@ async fn init_cloud_perms(
     .await?;
 
     // Lookup the CloudFormation stack's role ARN
-    let role_arn = lookup_role_arn(String::from("us-east-1"), &read_msg.message.namespace).await?;
+    let role_arn = lookup_role_arn(aws_region, &read_msg.message.namespace).await?;
 
     info!("{}: Adding backup configuration to spec", read_msg.msg_id);
     // Format ServiceAccountTemplate spec in CoreDBSpec
