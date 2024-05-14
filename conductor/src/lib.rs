@@ -32,8 +32,19 @@ pub async fn generate_spec(
     instance_id: &str,
     data_plane_id: &str,
     namespace: &str,
+    backups_bucket: &str,
     spec: &CoreDBSpec,
 ) -> Value {
+    let mut spec = spec.clone();
+    // Add the bucket name into the backups_path if it's not already there
+    if let Some(restore) = &mut spec.restore {
+        if let Some(backups_path) = &mut restore.backups_path {
+            if !backups_path.starts_with(&format!("s3://{}", backups_bucket)) {
+                let path_suffix = backups_path.trim_start_matches("s3://");
+                *backups_path = format!("s3://{}/{}", backups_bucket, path_suffix);
+            }
+        }
+    }
     serde_json::json!({
         "apiVersion": "coredb.io/v1alpha1",
         "kind": "CoreDB",
@@ -493,6 +504,7 @@ mod tests {
 
     use super::*;
     use base64::Engine;
+    use controller::apis::coredb_types::Restore;
 
     #[test]
     fn test_get_field_value_from_secret() {
@@ -558,5 +570,100 @@ mod tests {
             output_one, output_two,
             "Different inputs should produce different cron expressions"
         );
+    }
+
+    #[tokio::test]
+    async fn test_generate_spec_with_non_matching_bucket() {
+        let spec = CoreDBSpec {
+            restore: Some(Restore {
+                backups_path: Some("s3://coredb/coredb/org-coredb-inst-pgtrunkio-dev".to_string()),
+                ..Restore::default()
+            }),
+            ..CoreDBSpec::default()
+        };
+        let result = generate_spec(
+            "org-id",
+            "entity-name",
+            "instance-id",
+            "data-plane-id",
+            "namespace",
+            "my-bucket",
+            &spec,
+        )
+        .await;
+        let expected_backups_path = "s3://my-bucket/coredb/coredb/org-coredb-inst-pgtrunkio-dev";
+        assert_eq!(
+            result["spec"]["restore"]["backupsPath"].as_str().unwrap(),
+            expected_backups_path
+        );
+    }
+
+    #[tokio::test]
+    async fn test_generate_spec_with_matching_bucket() {
+        let spec = CoreDBSpec {
+            restore: Some(Restore {
+                backups_path: Some(
+                    "s3://my-bucket/coredb/coredb/org-coredb-inst-pgtrunkio-dev".to_string(),
+                ),
+                ..Restore::default()
+            }),
+            ..CoreDBSpec::default()
+        };
+        let result = generate_spec(
+            "org-id",
+            "entity-name",
+            "instance-id",
+            "data-plane-id",
+            "namespace",
+            "my-bucket",
+            &spec,
+        )
+        .await;
+        let expected_backups_path = "s3://my-bucket/coredb/coredb/org-coredb-inst-pgtrunkio-dev";
+        assert_eq!(
+            result["spec"]["restore"]["backupsPath"].as_str().unwrap(),
+            expected_backups_path
+        );
+    }
+
+    #[tokio::test]
+    async fn test_generate_spec_without_backups_path() {
+        let spec = CoreDBSpec {
+            restore: Some(Restore {
+                backups_path: None,
+                ..Restore::default()
+            }),
+            ..CoreDBSpec::default()
+        };
+        let result = generate_spec(
+            "org-id",
+            "entity-name",
+            "instance-id",
+            "data-plane-id",
+            "namespace",
+            "my-bucket",
+            &spec,
+        )
+        .await;
+        assert!(result["spec"]["restore"]["backupsPath"].is_null());
+    }
+
+    #[tokio::test]
+    async fn test_generate_spec_without_restore() {
+        let spec = CoreDBSpec {
+            restore: None,
+            ..CoreDBSpec::default()
+        };
+        let result = generate_spec(
+            "org-id",
+            "entity-name",
+            "instance-id",
+            "data-plane-id",
+            "namespace",
+            "my-bucket",
+            &spec,
+        )
+        .await;
+        assert!(result["spec"]["restore"].is_null());
     }
 }
