@@ -2,7 +2,7 @@ use actix_cors::Cors;
 use actix_web::{middleware, web, App, HttpServer};
 use std::time::Duration;
 
-use tembo_inference::{config, db, routes};
+use gateway::{config, db, routes};
 
 use sqlx::{Pool, Postgres};
 

@@ -13,6 +13,7 @@ pub async fn connect(url: &str, max_connections: u32) -> Result<Pool<Postgres>, 
         .await?;
     Ok(pgp)
 }
+
 // Configure connection options
 pub fn conn_options(url: &str) -> Result<PgConnectOptions, PlatformError> {
     // Parse url

@@ -831,6 +831,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "gateway"
+version = "0.1.0"
+dependencies = [
+ "actix-cors",
+ "actix-web",
+ "env_logger",
+ "log",
+ "reqwest",
+ "serde",
+ "serde_json",
+ "sqlx",
+ "thiserror",
+ "url",
+]
+
+[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2203,22 +2219,6 @@ checksum = "a75fb188eb626b924683e3b95e3a48e63551fcfb51949de2f06a9d91dbee93c9"
 dependencies = [
  "core-foundation-sys",
  "libc",
-]
-
-[[package]]
-name = "tembo-inference"
-version = "0.1.0"
-dependencies = [
- "actix-cors",
- "actix-web",
- "env_logger",
- "log",
- "reqwest",
- "serde",
- "serde_json",
- "sqlx",
- "thiserror",
- "url",
 ]
 
 [[package]]
