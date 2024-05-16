@@ -1,0 +1,18 @@
+[package]
+name = "tembo-inference"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+actix-cors = "0.7.0"
+actix-web = "4.5.1"
+env_logger = "0.11.3"
+log = "0.4.21"
+reqwest = { version = "0.12.4", features = ["json"] }
+serde = { version = "1.0.202", features = ["derive"] }
+serde_json = "1.0.117"
+sqlx = { version = "0.7.4",  features = [ "runtime-tokio-native-tls", "postgres", "chrono", "json"] }
+thiserror = "1.0.60"
+url = "2.5.0"
