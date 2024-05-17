@@ -9,7 +9,7 @@ services:
   gateway:
     build:
       context: .
-      dockerfile: docker/gateway/Dockerfile
+      dockerfile: Dockerfile
     environment:
       - RUST_LOG=info
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/postgres
