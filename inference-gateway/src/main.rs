@@ -2,7 +2,7 @@ use actix_cors::Cors;
 use actix_web::{middleware, web, App, HttpServer};
 use std::time::Duration;
 
-use gateway::{config, db, routes};
+use gateway::{config, db};
 
 use sqlx::{Pool, Postgres};
 
@@ -20,6 +20,8 @@ async fn main() {
         .await
         .expect("Failed to run migrations");
 
+    println!("Starting server on port {}", server_port);
+
     let reqwest_client: reqwest::Client = reqwest::Client::new();
     let _ = HttpServer::new(move || {
         let cors = Cors::permissive();
@@ -30,7 +32,7 @@ async fn main() {
             .app_data(web::Data::new(cfg.clone()))
             .app_data(web::Data::new(reqwest_client.clone()))
             .app_data(web::Data::new(dbclient.clone()))
-            .default_service(web::to(routes::forward::forward_request))
+            .configure(gateway::server::webserver_routes)
     })
     .workers(8)
     .keep_alive(Duration::from_secs(75))
