@@ -20,8 +20,6 @@ async fn main() {
         .await
         .expect("Failed to run migrations");
 
-    println!("Starting server on port {}", server_port);
-
     let reqwest_client: reqwest::Client = reqwest::Client::new();
     let _ = HttpServer::new(move || {
         let cors = Cors::permissive();
