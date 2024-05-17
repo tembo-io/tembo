@@ -9,14 +9,16 @@ services:
   gateway:
     build:
       context: .
-      dockerfile: docker/Dockerfile.gateway
+      dockerfile: Dockerfile
     environment:
       - RUST_LOG=info
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/postgres
     ports:
       - 8080:8080
   vllm:
-    image: vllm/vllm-openai:latest
+    build:
+      context: .
+      dockerfile: docker/inference/Dockerfile
     command: --model meta-llama/Meta-Llama-3-8B-Instruct --max-model-len 8192
     runtime: nvidia
     environment:
