@@ -9,6 +9,8 @@ images:
 stack_version: 0.1.0
 postgres_config_engine: olap
 postgres_config:
+  - name: cron.database_name
+    value: postgres
   - name: cron.host
     value: /controller/run
   - name: autovacuum_vacuum_scale_factor
