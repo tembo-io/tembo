@@ -6,3 +6,6 @@ run:
 
 run-migrations:
 	sqlx migrate run
+
+test:
+	cargo test -- --ignored

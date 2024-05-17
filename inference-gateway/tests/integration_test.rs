@@ -3,6 +3,7 @@ mod util;
 use actix_web::test;
 use util::common;
 
+#[ignore]
 #[actix_web::test]
 async fn test_probes() {
     let app = common::get_test_app().await;
