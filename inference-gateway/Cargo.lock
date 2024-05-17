@@ -835,6 +835,8 @@ name = "gateway"
 version = "0.1.0"
 dependencies = [
  "actix-cors",
+ "actix-http",
+ "actix-service",
  "actix-web",
  "env_logger",
  "log",
