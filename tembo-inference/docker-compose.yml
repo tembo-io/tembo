@@ -16,7 +16,9 @@ services:
     ports:
       - 8080:8080
   vllm:
-    image: vllm/vllm-openai:latest
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.inference
     command: --model meta-llama/Meta-Llama-3-8B-Instruct --max-model-len 8192
     runtime: nvidia
     environment:
