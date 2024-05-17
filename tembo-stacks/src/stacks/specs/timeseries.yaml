@@ -9,6 +9,8 @@ images:
 stack_version: 0.1.0
 postgres_config_engine: olap
 postgres_config:
+  - name: cron.host
+    value: /controller/run
   - name: autovacuum_vacuum_scale_factor
     value: 0.05
   - name: autovacuum_vacuum_insert_scale_factor
@@ -27,7 +29,7 @@ postgres_config:
     value: logical
 trunk_installs:
   - name: pg_timeseries
-    version: 0.1.4
+    version: 0.1.5
   - name: hydra_columnar
     version: 1.1.1
   - name: pg_cron
@@ -41,7 +43,7 @@ extensions:
     locations:
       - database: postgres
         enabled: true
-        version: 0.1.4
+        version: 0.1.5
   - name: pg_stat_statements
     locations:
       - database: postgres
