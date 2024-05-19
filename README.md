@@ -23,6 +23,9 @@ Postgres is the best OSS database in the world, with millions of active deployme
 
 ## Our other open-source projects 
 
+* [Tembo Terraform Provider](https://github.com/tembo-io/terraform-provider-tembo) - The Terraform provider for Tembo
+* [Tembo Telemetry](https://github.com/tembo-io/tembo-telemetry) - Logging and Telemetry exporters for Tembo applications
+
 ### Trunk
 
 * [Trunk CLI](https://github.com/tembo-io/trunk/tree/main/cli) that users can use to publish and install Postgres extensions
@@ -31,10 +34,16 @@ Postgres is the best OSS database in the world, with millions of active deployme
 ### Postgres Extensions
 
 * [pgmq](https://github.com/tembo-io/pgmq) - a message queue built with Rust and available as a Postgres extension and Rust crate (used in our managed service)
-* [pg_later](https://github.com/tembo-io/pg_later) - a Postgres extension for completely asynchronous query execution
 * [pg_vectorize](https://github.com/tembo-io/pg_vectorize) - automate vector search workflow, and SQL access to 100+ OSS sentence transformer models
-* [clerk_fdw](https://github.com/tembo-io/clerk_fdw) - connect to [Clerk](https://clerk.com/) User and Organization data from Postgres
+* [pg_later](https://github.com/tembo-io/pg_later) - a Postgres extension for completely asynchronous query execution
+* [pg_tier](https://github.com/tembo-io/pg_tier) - a Postgres Extension to enable data tiering to AWS S3
+* [pg_timeseries](https://github.com/tembo-io/pg_timeseries) - a Postgres Extension to provide simple and focused time-series tables
+* [pg_auto_dw](https://github.com/tembo-io/pg_auto_dw) - An auto data warehouse extension for Postgres
+
+#### Foreign Data Wrapper Extensions
+
 * [prometheus_fdw](https://github.com/tembo-io/prometheus_fdw) - query and move metrics from [Prometheus](https://prometheus.io/) to Postgres
+* [clerk_fdw](https://github.com/tembo-io/clerk_fdw) - connect to [Clerk](https://clerk.com/) User and Organization data from Postgres
 * [orb_fdw](https://github.com/tembo-io/orb_fdw) - connect your billing data from [Orb](https://www.withorb.com/) to Postgres 
 
 ## Tembo Cloud (GA)
