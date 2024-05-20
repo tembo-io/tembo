@@ -7,28 +7,30 @@ services:
     environment:
       - POSTGRES_PASSWORD=postgres
   gateway:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: quay.io/tembo/inference-gateway:d20d71c
+    # build:
+    #   context: .
+    #   dockerfile: Dockerfile
     environment:
       - RUST_LOG=info
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/postgres
     ports:
       - 8080:8080
-  vllm:
-    build:
-      context: .
-      dockerfile: docker/inference/Dockerfile
-    command: --model meta-llama/Meta-Llama-3-8B-Instruct --max-model-len 8192
-    runtime: nvidia
-    environment:
-      - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN}
-    volumes:
-      - ~/.cache/huggingface:/root/.cache/huggingface
-    ports:
-      - 8000:8000
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - capabilities: ["gpu"]
+    command: /usr/local/bin/gateway
+  # vllm:
+  #   build:
+  #     context: .
+  #     dockerfile: docker/inference/Dockerfile
+  #   command: --model meta-llama/Meta-Llama-3-8B-Instruct --max-model-len 8192
+  #   runtime: nvidia
+  #   environment:
+  #     - HUGGING_FACE_HUB_TOKEN=${HUGGING_FACE_HUB_TOKEN}
+  #   volumes:
+  #     - ~/.cache/huggingface:/root/.cache/huggingface
+  #   ports:
+  #     - 8000:8000
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - capabilities: ["gpu"]
