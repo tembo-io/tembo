@@ -3,7 +3,7 @@ kind: CoreDB
 metadata:
   name: sample-message-queue
 spec:
-  image: "quay.io/tembo/standard-cnpg:15.3.0-1-1096aeb"
+  image: "quay.io/tembo/standard-cnpg:15-389a437"
   stop: false
   stack:
     name: MessageQueue
@@ -39,6 +39,10 @@ spec:
       version: 1.1.0
     - name: pg_partman
       version: 4.7.3
+    - name: parquet_s3_fdw
+      version: 1.1.0
+    - name: pg_tier
+      version: 0.0.3
   extensions:
     - name: pgmq
       locations:
@@ -50,6 +54,16 @@ spec:
         - database: postgres
           enabled: true
           version: 4.7.3
+    - name: parquet_s3_fdw
+      locations:
+        - database: postgres
+          enabled: true
+          version: 1.1.0
+    - name: pg_tier
+      locations:
+        - database: postgres
+          enabled: true
+          version: 0.0.3
   metrics:
     enabled: true
     image: quay.io/prometheuscommunity/postgres-exporter:v0.12.0
@@ -77,7 +91,7 @@ spec:
           - "postgres"
   runtime_config:
     - name: shared_buffers
-      value: "512MB"
+      value: "256MB"
     - name: max_connections
       value: "431"
     - name: work_mem
@@ -85,7 +99,7 @@ spec:
     - name: bgwriter_delay
       value: "200ms"
     - name: effective_cache_size
-      value: "2867MB"
+      value: "267MB"
     - name: maintenance_work_mem
       value: "204MB"
     - name: max_wal_size
