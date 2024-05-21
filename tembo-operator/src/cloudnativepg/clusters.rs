@@ -265,7 +265,7 @@ pub struct ClusterSpec {
 }
 
 /// Affinity/Anti-affinity rules for Pods
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct ClusterAffinity {
     /// AdditionalPodAffinity allows to specify pod affinity terms to be passed to all the cluster's pods.
     #[serde(
@@ -322,7 +322,7 @@ pub struct ClusterAffinity {
 }
 
 /// AdditionalPodAffinity allows to specify pod affinity terms to be passed to all the cluster's pods.
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct ClusterAffinityAdditionalPodAffinity {
     /// The scheduler will prefer to schedule pods to nodes that satisfy the affinity expressions specified by this field, but it may choose a node that violates one or more of the expressions. The node that is most preferred is the one with the greatest sum of weights, i.e. for each node that meets all of the scheduling requirements (resource request, requiredDuringScheduling affinity expressions, etc.), compute a sum by iterating through the elements of this field and adding "weight" to the sum if the node has pods which matches the corresponding podAffinityTerm; the node(s) with the highest sum are the most preferred.
     #[serde(
@@ -345,7 +345,7 @@ pub struct ClusterAffinityAdditionalPodAffinity {
 }
 
 /// The weights of all of the matched WeightedPodAffinityTerm fields are added per-node to find the most preferred node(s)
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct ClusterAffinityAdditionalPodAffinityPreferredDuringSchedulingIgnoredDuringExecution {
     /// Required. A pod affinity term, associated with the corresponding weight.
     #[serde(rename = "podAffinityTerm")]
@@ -355,7 +355,7 @@ pub struct ClusterAffinityAdditionalPodAffinityPreferredDuringSchedulingIgnoredD
 }
 
 /// Required. A pod affinity term, associated with the corresponding weight.
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct ClusterAffinityAdditionalPodAffinityPreferredDuringSchedulingIgnoredDuringExecutionPodAffinityTerm {
     /// A label query over a set of resources, in this case pods.
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "labelSelector")]
@@ -372,7 +372,7 @@ pub struct ClusterAffinityAdditionalPodAffinityPreferredDuringSchedulingIgnoredD
 }
 
 /// A label query over a set of resources, in this case pods.
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct ClusterAffinityAdditionalPodAffinityPreferredDuringSchedulingIgnoredDuringExecutionPodAffinityTermLabelSelector {
     /// matchExpressions is a list of label selector requirements. The requirements are ANDed.
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "matchExpressions")]
@@ -383,7 +383,7 @@ pub struct ClusterAffinityAdditionalPodAffinityPreferredDuringSchedulingIgnoredD
 }
 
 /// A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct ClusterAffinityAdditionalPodAffinityPreferredDuringSchedulingIgnoredDuringExecutionPodAffinityTermLabelSelectorMatchExpressions
 {
     /// key is the label key that the selector applies to.
@@ -396,7 +396,7 @@ pub struct ClusterAffinityAdditionalPodAffinityPreferredDuringSchedulingIgnoredD
 }
 
 /// A label query over the set of namespaces that the term applies to. The term is applied to the union of the namespaces selected by this field and the ones listed in the namespaces field. null selector and null or empty namespaces list means "this pod's namespace". An empty selector ({}) matches all namespaces.
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct ClusterAffinityAdditionalPodAffinityPreferredDuringSchedulingIgnoredDuringExecutionPodAffinityTermNamespaceSelector {
     /// matchExpressions is a list of label selector requirements. The requirements are ANDed.
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "matchExpressions")]
@@ -407,7 +407,7 @@ pub struct ClusterAffinityAdditionalPodAffinityPreferredDuringSchedulingIgnoredD
 }
 
 /// A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct ClusterAffinityAdditionalPodAffinityPreferredDuringSchedulingIgnoredDuringExecutionPodAffinityTermNamespaceSelectorMatchExpressions
 {
     /// key is the label key that the selector applies to.
@@ -420,7 +420,7 @@ pub struct ClusterAffinityAdditionalPodAffinityPreferredDuringSchedulingIgnoredD
 }
 
 /// Defines a set of pods (namely those matching the labelSelector relative to the given namespace(s)) that this pod should be co-located (affinity) or not co-located (anti-affinity) with, where co-located is defined as running on a node whose value of the label with key <topologyKey> matches that of any node on which a pod of the set of pods is running
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct ClusterAffinityAdditionalPodAffinityRequiredDuringSchedulingIgnoredDuringExecution {
     /// A label query over a set of resources, in this case pods.
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "labelSelector")]
@@ -437,7 +437,7 @@ pub struct ClusterAffinityAdditionalPodAffinityRequiredDuringSchedulingIgnoredDu
 }
 
 /// A label query over a set of resources, in this case pods.
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct ClusterAffinityAdditionalPodAffinityRequiredDuringSchedulingIgnoredDuringExecutionLabelSelector {
     /// matchExpressions is a list of label selector requirements. The requirements are ANDed.
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "matchExpressions")]
@@ -448,7 +448,7 @@ pub struct ClusterAffinityAdditionalPodAffinityRequiredDuringSchedulingIgnoredDu
 }
 
 /// A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct ClusterAffinityAdditionalPodAffinityRequiredDuringSchedulingIgnoredDuringExecutionLabelSelectorMatchExpressions
 {
     /// key is the label key that the selector applies to.
@@ -461,7 +461,7 @@ pub struct ClusterAffinityAdditionalPodAffinityRequiredDuringSchedulingIgnoredDu
 }
 
 /// A label query over the set of namespaces that the term applies to. The term is applied to the union of the namespaces selected by this field and the ones listed in the namespaces field. null selector and null or empty namespaces list means "this pod's namespace". An empty selector ({}) matches all namespaces.
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct ClusterAffinityAdditionalPodAffinityRequiredDuringSchedulingIgnoredDuringExecutionNamespaceSelector {
     /// matchExpressions is a list of label selector requirements. The requirements are ANDed.
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "matchExpressions")]
@@ -472,7 +472,7 @@ pub struct ClusterAffinityAdditionalPodAffinityRequiredDuringSchedulingIgnoredDu
 }
 
 /// A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct ClusterAffinityAdditionalPodAffinityRequiredDuringSchedulingIgnoredDuringExecutionNamespaceSelectorMatchExpressions
 {
     /// key is the label key that the selector applies to.
@@ -485,7 +485,7 @@ pub struct ClusterAffinityAdditionalPodAffinityRequiredDuringSchedulingIgnoredDu
 }
 
 /// AdditionalPodAntiAffinity allows to specify pod anti-affinity terms to be added to the ones generated by the operator if EnablePodAntiAffinity is set to true (default) or to be used exclusively if set to false.
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct ClusterAffinityAdditionalPodAntiAffinity {
     /// The scheduler will prefer to schedule pods to nodes that satisfy the anti-affinity expressions specified by this field, but it may choose a node that violates one or more of the expressions. The node that is most preferred is the one with the greatest sum of weights, i.e. for each node that meets all of the scheduling requirements (resource request, requiredDuringScheduling anti-affinity expressions, etc.), compute a sum by iterating through the elements of this field and adding "weight" to the sum if the node has pods which matches the corresponding podAffinityTerm; the node(s) with the highest sum are the most preferred.
     #[serde(
@@ -510,7 +510,7 @@ pub struct ClusterAffinityAdditionalPodAntiAffinity {
 }
 
 /// The weights of all of the matched WeightedPodAffinityTerm fields are added per-node to find the most preferred node(s)
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct ClusterAffinityAdditionalPodAntiAffinityPreferredDuringSchedulingIgnoredDuringExecution {
     /// Required. A pod affinity term, associated with the corresponding weight.
     #[serde(rename = "podAffinityTerm")]
@@ -520,7 +520,7 @@ pub struct ClusterAffinityAdditionalPodAntiAffinityPreferredDuringSchedulingIgno
 }
 
 /// Required. A pod affinity term, associated with the corresponding weight.
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct ClusterAffinityAdditionalPodAntiAffinityPreferredDuringSchedulingIgnoredDuringExecutionPodAffinityTerm {
     /// A label query over a set of resources, in this case pods.
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "labelSelector")]
@@ -537,7 +537,7 @@ pub struct ClusterAffinityAdditionalPodAntiAffinityPreferredDuringSchedulingIgno
 }
 
 /// A label query over a set of resources, in this case pods.
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct ClusterAffinityAdditionalPodAntiAffinityPreferredDuringSchedulingIgnoredDuringExecutionPodAffinityTermLabelSelector {
     /// matchExpressions is a list of label selector requirements. The requirements are ANDed.
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "matchExpressions")]
@@ -548,7 +548,7 @@ pub struct ClusterAffinityAdditionalPodAntiAffinityPreferredDuringSchedulingIgno
 }
 
 /// A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct ClusterAffinityAdditionalPodAntiAffinityPreferredDuringSchedulingIgnoredDuringExecutionPodAffinityTermLabelSelectorMatchExpressions
 {
     /// key is the label key that the selector applies to.
@@ -561,7 +561,7 @@ pub struct ClusterAffinityAdditionalPodAntiAffinityPreferredDuringSchedulingIgno
 }
 
 /// A label query over the set of namespaces that the term applies to. The term is applied to the union of the namespaces selected by this field and the ones listed in the namespaces field. null selector and null or empty namespaces list means "this pod's namespace". An empty selector ({}) matches all namespaces.
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct ClusterAffinityAdditionalPodAntiAffinityPreferredDuringSchedulingIgnoredDuringExecutionPodAffinityTermNamespaceSelector {
     /// matchExpressions is a list of label selector requirements. The requirements are ANDed.
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "matchExpressions")]
@@ -572,7 +572,7 @@ pub struct ClusterAffinityAdditionalPodAntiAffinityPreferredDuringSchedulingIgno
 }
 
 /// A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct ClusterAffinityAdditionalPodAntiAffinityPreferredDuringSchedulingIgnoredDuringExecutionPodAffinityTermNamespaceSelectorMatchExpressions
 {
     /// key is the label key that the selector applies to.
@@ -585,7 +585,7 @@ pub struct ClusterAffinityAdditionalPodAntiAffinityPreferredDuringSchedulingIgno
 }
 
 /// Defines a set of pods (namely those matching the labelSelector relative to the given namespace(s)) that this pod should be co-located (affinity) or not co-located (anti-affinity) with, where co-located is defined as running on a node whose value of the label with key <topologyKey> matches that of any node on which a pod of the set of pods is running
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct ClusterAffinityAdditionalPodAntiAffinityRequiredDuringSchedulingIgnoredDuringExecution {
     /// A label query over a set of resources, in this case pods.
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "labelSelector")]
@@ -602,7 +602,7 @@ pub struct ClusterAffinityAdditionalPodAntiAffinityRequiredDuringSchedulingIgnor
 }
 
 /// A label query over a set of resources, in this case pods.
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct ClusterAffinityAdditionalPodAntiAffinityRequiredDuringSchedulingIgnoredDuringExecutionLabelSelector {
     /// matchExpressions is a list of label selector requirements. The requirements are ANDed.
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "matchExpressions")]
@@ -613,7 +613,7 @@ pub struct ClusterAffinityAdditionalPodAntiAffinityRequiredDuringSchedulingIgnor
 }
 
 /// A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct ClusterAffinityAdditionalPodAntiAffinityRequiredDuringSchedulingIgnoredDuringExecutionLabelSelectorMatchExpressions
 {
     /// key is the label key that the selector applies to.
@@ -626,7 +626,7 @@ pub struct ClusterAffinityAdditionalPodAntiAffinityRequiredDuringSchedulingIgnor
 }
 
 /// A label query over the set of namespaces that the term applies to. The term is applied to the union of the namespaces selected by this field and the ones listed in the namespaces field. null selector and null or empty namespaces list means "this pod's namespace". An empty selector ({}) matches all namespaces.
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct ClusterAffinityAdditionalPodAntiAffinityRequiredDuringSchedulingIgnoredDuringExecutionNamespaceSelector {
     /// matchExpressions is a list of label selector requirements. The requirements are ANDed.
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "matchExpressions")]
@@ -637,7 +637,7 @@ pub struct ClusterAffinityAdditionalPodAntiAffinityRequiredDuringSchedulingIgnor
 }
 
 /// A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct ClusterAffinityAdditionalPodAntiAffinityRequiredDuringSchedulingIgnoredDuringExecutionNamespaceSelectorMatchExpressions
 {
     /// key is the label key that the selector applies to.
@@ -650,7 +650,7 @@ pub struct ClusterAffinityAdditionalPodAntiAffinityRequiredDuringSchedulingIgnor
 }
 
 /// NodeAffinity describes node affinity scheduling rules for the pod. More info: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#node-affinity
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct ClusterAffinityNodeAffinity {
     /// The scheduler will prefer to schedule pods to nodes that satisfy the affinity expressions specified by this field, but it may choose a node that violates one or more of the expressions. The node that is most preferred is the one with the greatest sum of weights, i.e. for each node that meets all of the scheduling requirements (resource request, requiredDuringScheduling affinity expressions, etc.), compute a sum by iterating through the elements of this field and adding "weight" to the sum if the node matches the corresponding matchExpressions; the node(s) with the highest sum are the most preferred.
     #[serde(
@@ -671,7 +671,7 @@ pub struct ClusterAffinityNodeAffinity {
 }
 
 /// An empty preferred scheduling term matches all objects with implicit weight 0 (i.e. it's a no-op). A null preferred scheduling term matches no objects (i.e. is also a no-op).
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct ClusterAffinityNodeAffinityPreferredDuringSchedulingIgnoredDuringExecution {
     /// A node selector term, associated with the corresponding weight.
     pub preference:
@@ -681,7 +681,7 @@ pub struct ClusterAffinityNodeAffinityPreferredDuringSchedulingIgnoredDuringExec
 }
 
 /// A node selector term, associated with the corresponding weight.
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct ClusterAffinityNodeAffinityPreferredDuringSchedulingIgnoredDuringExecutionPreference {
     /// A list of node selector requirements by node's labels.
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "matchExpressions")]
@@ -692,7 +692,7 @@ pub struct ClusterAffinityNodeAffinityPreferredDuringSchedulingIgnoredDuringExec
 }
 
 /// A node selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct ClusterAffinityNodeAffinityPreferredDuringSchedulingIgnoredDuringExecutionPreferenceMatchExpressions
 {
     /// The label key that the selector applies to.
@@ -705,7 +705,7 @@ pub struct ClusterAffinityNodeAffinityPreferredDuringSchedulingIgnoredDuringExec
 }
 
 /// A node selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct ClusterAffinityNodeAffinityPreferredDuringSchedulingIgnoredDuringExecutionPreferenceMatchFields
 {
     /// The label key that the selector applies to.
@@ -718,7 +718,7 @@ pub struct ClusterAffinityNodeAffinityPreferredDuringSchedulingIgnoredDuringExec
 }
 
 /// If the affinity requirements specified by this field are not met at scheduling time, the pod will not be scheduled onto the node. If the affinity requirements specified by this field cease to be met at some point during pod execution (e.g. due to an update), the system may or may not try to eventually evict the pod from its node.
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct ClusterAffinityNodeAffinityRequiredDuringSchedulingIgnoredDuringExecution {
     /// Required. A list of node selector terms. The terms are ORed.
     #[serde(rename = "nodeSelectorTerms")]
@@ -728,7 +728,7 @@ pub struct ClusterAffinityNodeAffinityRequiredDuringSchedulingIgnoredDuringExecu
 }
 
 /// A null or empty node selector term matches no objects. The requirements of them are ANDed. The TopologySelectorTerm type implements a subset of the NodeSelectorTerm.
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct ClusterAffinityNodeAffinityRequiredDuringSchedulingIgnoredDuringExecutionNodeSelectorTerms {
     /// A list of node selector requirements by node's labels.
     #[serde(default, skip_serializing_if = "Option::is_none", rename = "matchExpressions")]
@@ -739,7 +739,7 @@ pub struct ClusterAffinityNodeAffinityRequiredDuringSchedulingIgnoredDuringExecu
 }
 
 /// A node selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct ClusterAffinityNodeAffinityRequiredDuringSchedulingIgnoredDuringExecutionNodeSelectorTermsMatchExpressions
 {
     /// The label key that the selector applies to.
@@ -752,7 +752,7 @@ pub struct ClusterAffinityNodeAffinityRequiredDuringSchedulingIgnoredDuringExecu
 }
 
 /// A node selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct ClusterAffinityNodeAffinityRequiredDuringSchedulingIgnoredDuringExecutionNodeSelectorTermsMatchFields
 {
     /// The label key that the selector applies to.
@@ -765,7 +765,7 @@ pub struct ClusterAffinityNodeAffinityRequiredDuringSchedulingIgnoredDuringExecu
 }
 
 /// The pod this Toleration is attached to tolerates any taint that matches the triple <key,value,effect> using the matching operator <operator>.
-#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
 pub struct ClusterAffinityTolerations {
     /// Effect indicates the taint effect to match. Empty means match all taint effects. When specified, allowed values are NoSchedule, PreferNoSchedule and NoExecute.
     #[serde(default, skip_serializing_if = "Option::is_none")]
