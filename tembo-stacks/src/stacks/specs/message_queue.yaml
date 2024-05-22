@@ -57,7 +57,7 @@ trunk_installs:
   - name: parquet_s3_fdw
     version: 1.1.0
   - name: pg_tier
-    version: 0.0.3
+    version: 0.0.4
 extensions:
   - name: pgmq
     locations:
@@ -84,7 +84,7 @@ extensions:
     locations:
       - database: postgres
         enabled: true
-        version: 0.0.3
+        version: 0.0.4
 postgres_metrics:
   pgmq:
       query: select queue_name, queue_length, oldest_msg_age_sec, newest_msg_age_sec, total_messages, current_database() as datname from pgmq.metrics_all()
