@@ -38,6 +38,10 @@ trunk_installs:
     version: 5.0.1
   - name: pg_stat_statements
     version: 1.10.0
+  - name: parquet_s3_fdw
+    version: 1.1.0
+  - name: pg_tier
+    version: 0.0.4
 extensions:
   - name: columnar
     locations:
@@ -65,3 +69,13 @@ extensions:
       - database: postgres
         enabled: true
         version: 1.10.0
+  - name: parquet_s3_fdw
+    locations:
+      - database: postgres
+        enabled: true
+        version: 1.1.0
+  - name: pg_tier
+    locations:
+      - database: postgres
+        enabled: true
+        version: 0.0.4
