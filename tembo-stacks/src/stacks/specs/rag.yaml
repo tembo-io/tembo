@@ -8,13 +8,13 @@ images:
   16: "standard-cnpg:16-389a437"
 stack_version: 0.1.0
 appServices:
-  - image: quay.io/tembo/vector-serve:7343bf4
+  - image: quay.io/tembo/vector-serve:2a7cdb3
     name: embeddings
     env:
       - name: TMPDIR
         value: /models
       - name: BATCH_SIZE
-        value: "1000"
+        value: "750"
       - name: XDG_CACHE_HOME
         value: /models/.cache
     routing:
