@@ -90,10 +90,19 @@ impl AWSConfigState {
         cloudformation_template_bucket: String,
         aws_region: String,
     ) -> Result<(), ConductorError> {
-        let template_url = format!(
-            "https://{}.s3.{}.amazonaws.com/{}",
-            cloudformation_template_bucket, aws_region, "conductor-cf-template-v2.yaml"
-        );
+        // If region is us-east-1, we don't need to specify the region in the template url
+        let template_url = if aws_region == "us-east-1" {
+            format!(
+                "https://{}.s3.amazonaws.com/{}",
+                cloudformation_template_bucket, "conductor-cf-template-v2.yaml"
+            )
+        } else {
+            format!(
+                "https://{}.s3.{}.amazonaws.com/{}",
+                cloudformation_template_bucket, aws_region, "conductor-cf-template-v2.yaml"
+            )
+        };
+
         let parameters = params.clone().parameters();
         if !self.does_stack_exist(stack_name).await {
             // todo(nhudson): We need to add tags to the stack
