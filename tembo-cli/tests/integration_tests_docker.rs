@@ -184,7 +184,9 @@ async fn vector() -> Result<(), anyhow::Error> {
 #[tokio::test]
 async fn migrations() -> Result<(), anyhow::Error> {
     let root_dir = env!("CARGO_MANIFEST_DIR");
-    let test_dir = PathBuf::from(root_dir).join("examples").join("migrations-1");
+    let test_dir = PathBuf::from(root_dir)
+        .join("examples")
+        .join("migrations-1");
 
     env::set_current_dir(&test_dir)?;
 
