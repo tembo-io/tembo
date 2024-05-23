@@ -28,8 +28,23 @@ pub async fn forward_request(
     let resp = client.post(new_url).json(&body).send().await?;
     if resp.status().is_success() {
         let llm_resp = resp.json::<serde_json::Value>().await?;
-        let model = llm_resp.get("model").unwrap().as_str().unwrap();
-        let usage: Usage = serde_json::from_value(llm_resp.get("usage").unwrap().clone())?;
+        let model = llm_resp
+            .get("model")
+            .ok_or_else(|| {
+                PlatformError::InvalidQuery("invalid response from model server".to_string())
+            })?
+            .as_str()
+            .ok_or_else(|| {
+                PlatformError::InvalidQuery("invalid response from model server".to_string())
+            })?;
+        let usage: Usage = serde_json::from_value(
+            llm_resp
+                .get("usage")
+                .ok_or_else(|| {
+                    PlatformError::InvalidQuery("invalid response from model server".to_string())
+                })?
+                .clone(),
+        )?;
         if let Err(e) = insert_data(x_tembo, model, usage, &dbclient).await {
             log::error!("{}", e);
         }
