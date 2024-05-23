@@ -82,6 +82,7 @@ test-case = "=2.0.0-rc2"
 clap-markdown = { git = "https://github.com/tembo-io/clap-markdown.git", branch = "main", version = "0.1.3" }
 url = "2.5.0"
 rand = "0.8.5"
+sqlx-cli = "0.7.3"
 
 [target.aarch64-unknown-linux-musl.dependencies]
 openssl = { version = "0.10", features = ["vendored"] }
