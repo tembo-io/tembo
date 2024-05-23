@@ -88,10 +88,11 @@ impl AWSConfigState {
         stack_name: &str,
         params: &CloudFormationParams,
         cloudformation_template_bucket: String,
+        aws_region: String,
     ) -> Result<(), ConductorError> {
         let template_url = format!(
-            "https://{}.s3.amazonaws.com/{}",
-            cloudformation_template_bucket, "conductor-cf-template-v2.yaml"
+            "https://{}.s3.{}.amazonaws.com/{}",
+            cloudformation_template_bucket, aws_region, "conductor-cf-template-v2.yaml"
         );
         let parameters = params.clone().parameters();
         if !self.does_stack_exist(stack_name).await {

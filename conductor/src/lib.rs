@@ -400,7 +400,7 @@ pub async fn create_cloudformation(
     // back to the queue.
     // If there is an error we will need to alert on it
     // If we are still waiting for the stack to be created we will need to requeue the message
-    let region = Region::new(aws_region);
+    let region = Region::new(aws_region.clone());
     let aws_config_state = AWSConfigState::new(region).await;
     let stack_name = format!("{}-cf", namespace);
     let iam_role_name = format!("{}-iam", namespace);
@@ -416,7 +416,12 @@ pub async fn create_cloudformation(
         service_account_name,
     };
     aws_config_state
-        .create_cloudformation_stack(&stack_name, &cf_template_params, cf_template_bucket)
+        .create_cloudformation_stack(
+            &stack_name,
+            &cf_template_params,
+            cf_template_bucket,
+            aws_region,
+        )
         .await
         .map_err(ConductorError::from)?;
     Ok(())
