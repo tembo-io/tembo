@@ -1,4 +1,3 @@
-use sqlx::{PgPool, migrate::Migrator};
 use anyhow::Context as AnyhowContext;
 use anyhow::Error;
 use clap::Args;
@@ -14,6 +13,7 @@ use itertools::Itertools;
 use log::info;
 use spinoff::spinners;
 use spinoff::Spinner;
+use sqlx::{migrate::Migrator, PgPool};
 use std::fmt::Write;
 use std::path::PathBuf;
 use std::{
@@ -182,10 +182,7 @@ fn docker_apply(
 
     for (_key, instance_setting) in instance_settings.iter_mut() {
         let final_instance_setting = docker_apply_instance(verbose, instance_setting.to_owned())?;
-        final_instance_settings.insert(
-            _key.to_string(),
-            final_instance_setting,
-        );
+        final_instance_settings.insert(_key.to_string(), final_instance_setting);
     }
 
     let rendered_dockercompose: String =
@@ -237,7 +234,8 @@ fn docker_apply(
         // Apply SQLx migrations if the tembo-migrations directory exists
         if migrations_dir.exists() && migrations_dir.is_dir() {
             let mut sp = Spinner::new(spinners::Dots, "Applying migrations", spinoff::Color::White);
-            tokio::runtime::Runtime::new()?.block_on(apply_migrations(database_url.to_string(), migrations_dir))?;
+            tokio::runtime::Runtime::new()?
+                .block_on(apply_migrations(database_url.to_string(), migrations_dir))?;
             sp.stop_with_message(&format!(
                 "{} {}",
                 "✓".color(colors::indicator_good()).bold(),
@@ -245,18 +243,18 @@ fn docker_apply(
                     .color(colorful::Color::White)
                     .bold()
             ));
-        } 
+        }
 
         // If all of the above was successful, we can print the url to user
-        instance_started(
-            database_url,
-            "local",
-        );
+        instance_started(database_url, "local");
     }
     Ok(())
 }
 
-async fn apply_migrations(database_url: String, migrations_dir: PathBuf) -> Result<(), anyhow::Error> {
+async fn apply_migrations(
+    database_url: String,
+    migrations_dir: PathBuf,
+) -> Result<(), anyhow::Error> {
     let pool = PgPool::connect(&database_url).await?;
 
     for entry in fs::read_dir(&migrations_dir)? {
@@ -270,7 +268,6 @@ async fn apply_migrations(database_url: String, migrations_dir: PathBuf) -> Resu
 
     Ok(())
 }
-
 
 fn docker_apply_instance(
     verbose: bool,
@@ -450,8 +447,11 @@ pub fn tembo_cloud_apply_instance(
 
             let migrations_dir = PathBuf::from("tembo-migrations").join(key);
             if migrations_dir.exists() && migrations_dir.is_dir() {
-                tokio::runtime::Runtime::new()?.block_on(apply_migrations(connection_string.to_string(), migrations_dir))?;
-            } 
+                tokio::runtime::Runtime::new()?.block_on(apply_migrations(
+                    connection_string.to_string(),
+                    migrations_dir,
+                ))?;
+            }
 
             instance_started(
                 &connection_string,
