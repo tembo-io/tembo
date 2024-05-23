@@ -251,24 +251,6 @@ fn docker_apply(
     Ok(())
 }
 
-async fn apply_migrations(
-    database_url: String,
-    migrations_dir: PathBuf,
-) -> Result<(), anyhow::Error> {
-    let pool = PgPool::connect(&database_url).await?;
-
-    for entry in fs::read_dir(&migrations_dir)? {
-        let entry = entry?;
-        let path = entry.path();
-        if path.is_file() {
-            let migrator = Migrator::new(migrations_dir.clone()).await?;
-            migrator.run(&pool).await?;
-        }
-    }
-
-    Ok(())
-}
-
 fn docker_apply_instance(
     verbose: bool,
     mut instance_setting: InstanceSettings,
@@ -459,6 +441,24 @@ pub fn tembo_cloud_apply_instance(
             );
 
             break;
+        }
+    }
+
+    Ok(())
+}
+
+async fn apply_migrations(
+    database_url: String,
+    migrations_dir: PathBuf,
+) -> Result<(), anyhow::Error> {
+    let pool = PgPool::connect(&database_url).await?;
+
+    for entry in fs::read_dir(&migrations_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_file() {
+            let migrator = Migrator::new(migrations_dir.clone()).await?;
+            migrator.run(&pool).await?;
         }
     }
 
