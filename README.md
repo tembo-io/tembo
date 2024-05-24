@@ -4,11 +4,11 @@
 [![OSSRank](https://shields.io/endpoint?url=https://ossrank.com/shield/3811)](https://ossrank.com/p/3811)
 [![Static Badge](https://img.shields.io/badge/%40tembo-community?logo=slack&label=slack)](https://join.slack.com/t/tembocommunity/shared_invite/zt-293gc1k0k-3K8z~eKW1SEIfrqEI~5_yw)
 
-Tembo aims to improve the experience developers have with deploying, managing, and scaling Postgres. Tembo is under active development that you are free to use anything that we have open-sourced.
+Tembo improves the developer experience of deploying, managing, and scaling Postgres. Tembo is under active development and you are free to use anything we have open-sourced.
 
 ## Why Postgres?
 
-Postgres is the best OSS database in the world, with millions of active deployments, and is growing faster than MySQL. It is battle-tested with a large community that can handle SQL (relational) and JSON (non-relational) queries and a widerange of workloads (i.e, analytical, time-series, geospatial, etc), on account of its’ rich ecosystem of add-ons and extensions.
+Postgres is the best OSS database in the world, with millions of active deployments, growing faster than MySQL. It is battle-tested with a large community that can handle SQL (relational) and JSON (non-relational) queries and a wide range of workloads (analytical, time-series, geospatial, etc.), through its rich ecosystem of add-ons and extensions.
 
 ## Inside this repo
 
@@ -48,8 +48,7 @@ Postgres is the best OSS database in the world, with millions of active deployme
 
 ## Tembo Cloud (GA)
 
-Tembo Cloud is a dev-first, fully-extensible, fully-managed, secure, and scalable Postgres service. The managed service will provide a growing ecosystem of easily-installed
-extensions, allowing you to expand the use cases of Postgres.
+Tembo Cloud is a dev-first, fully-extensible, fully-managed, secure, and scalable Postgres service. The managed service will provide a growing ecosystem of easily-installable extensions, allowing you to expand the use cases of Postgres.
 
 Deploy a free-forever hobby Postgres database and install any of more than 200 extensions at [https://cloud.tembo.io](https://cloud.tembo.io).
 
