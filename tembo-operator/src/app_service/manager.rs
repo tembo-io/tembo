@@ -1015,6 +1015,7 @@ fn generate_podmonitor(
 
     let mut labels = selector_labels.clone();
     labels.insert("component".to_owned(), COMPONENT_NAME.to_owned());
+    labels.insert("coredb.io/name".to_owned(), namespace.to_owned());
 
     let podmon_metadata = ObjectMeta {
         name: Some(resource_name.to_string()),
