@@ -4,8 +4,8 @@ repository: "quay.io/tembo"
 organization: tembo
 images:
   14: "ml-cnpg:14-a0a5ab5"
-  15: "ml-cnpg:15-ed6e9e9"
-  16: "ml-cnpg:16-ed6e9e9"
+  15: "ml-cnpg:15-389a437"
+  16: "ml-cnpg:16-389a437"
 stack_version: 0.3.0
 compute_constraints:
   min:
