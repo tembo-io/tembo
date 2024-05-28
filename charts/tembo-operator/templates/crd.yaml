@@ -658,8 +658,10 @@ spec:
                       nullable: true
                       properties:
                         path:
+                          description: path to scrape metrics
                           type: string
                         port:
+                          description: port must be also exposed in one of AppService.routing[]
                           format: uint16
                           minimum: 0.0
                           type: integer

@@ -38,7 +38,7 @@ use super::{
 
 use crate::{app_service::types::IngressType, secret::fetch_all_decoded_data_from_secret};
 
-const container_port_prefix: &str = "http-";
+const APP_CONTAINER_PORT_PREFIX: &str = "app-";
 
 // private wrapper to hold the AppService Resources
 #[derive(Clone, Debug)]
@@ -202,7 +202,7 @@ fn generate_service(
                     port: p as i32,
                     // there can be more than one ServicePort per Service
                     // these must be unique, so we'll use the port number
-                    name: Some(format!("{container_port_prefix}{p}")),
+                    name: Some(format!("{APP_CONTAINER_PORT_PREFIX}{p}")),
                     target_port: None,
                     ..ServicePort::default()
                 })
@@ -287,7 +287,7 @@ fn generate_deployment(
         let container_ports: Vec<ContainerPort> = distinct_ports
             .into_iter()
             .map(|p| ContainerPort {
-                name: Some(format!("{container_port_prefix}{p}")),
+                name: Some(format!("{APP_CONTAINER_PORT_PREFIX}{p}")),
                 container_port: p as i32,
                 protocol: Some("TCP".to_string()),
                 ..ContainerPort::default()
@@ -1004,7 +1004,7 @@ fn generate_podmonitor(
 
     let metrics_endpoint = podmon::PodMonitorPodMetricsEndpoints {
         path: Some(metrics.path),
-        port: Some(format!("http-{}", metrics.port)),
+        port: Some(format!("{APP_CONTAINER_PORT_PREFIX}{}", metrics.port)),
         ..podmon::PodMonitorPodMetricsEndpoints::default()
     };
 
