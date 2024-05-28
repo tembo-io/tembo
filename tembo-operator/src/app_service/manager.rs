@@ -82,14 +82,8 @@ fn generate_resource(
         placement.clone(),
     );
 
-    let maybe_podmonitor = generate_podmonitor(
-        appsvc,
-        coredb_name,
-        &resource_name,
-        namespace,
-        oref.clone(),
-        annotations,
-    );
+    let maybe_podmonitor =
+        generate_podmonitor(appsvc, &resource_name, namespace, oref.clone(), annotations);
 
     // If DATA_PLANE_BASEDOMAIN is not set, don't generate IngressRoutes, IngressRouteTCPs, or EntryPoints
     if domain.is_none() {
@@ -981,7 +975,6 @@ use crate::prometheus::podmonitor_crd as podmon;
 
 fn generate_podmonitor(
     appsvc: &AppService,
-    coredb_name: &str,
     resource_name: &str,
     namespace: &str,
     oref: OwnerReference,
@@ -990,7 +983,7 @@ fn generate_podmonitor(
     let metrics = appsvc.metrics.clone()?;
 
     let mut selector_labels: BTreeMap<String, String> = BTreeMap::new();
-    selector_labels.insert("cnpg.io/cluster".to_owned(), resource_name.to_string());
+    selector_labels.insert("app".to_owned(), resource_name.to_string());
 
     let mut labels = selector_labels.clone();
     labels.insert("component".to_owned(), COMPONENT_NAME.to_owned());
