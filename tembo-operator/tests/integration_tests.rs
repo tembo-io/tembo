@@ -42,7 +42,7 @@ mod test {
             AttachParams, DeleteParams, ListParams, Patch, PatchParams, WatchEvent, WatchParams,
         },
         runtime::wait::{await_condition, conditions, Condition},
-        Api, Client, Config, Error, ResourceExt,
+        Api, Client, Config, Error,
     };
     use rand::Rng;
     use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
@@ -587,6 +587,44 @@ mod test {
     use k8s_openapi::NamespaceResourceScope;
     use serde::{de::DeserializeOwned, Deserialize};
 
+    async fn get_resource<R>(
+        client: Client,
+        namespace: &str,
+        name: &str,
+        retries: usize,
+        // is resource expected to exist?
+        expected: bool,
+    ) -> Result<R, kube::Error>
+    where
+        R: kube::api::Resource<Scope = NamespaceResourceScope>
+            + std::fmt::Debug
+            + 'static
+            + Clone
+            + DeserializeOwned
+            + for<'de> serde::Deserialize<'de>,
+        R::DynamicType: Default,
+    {
+        let api: Api<R> = Api::namespaced(client, namespace);
+        for _ in 0..retries {
+            let resource = api.get(name).await;
+            if expected {
+                if resource.is_ok() {
+                    return resource;
+                } else {
+                    println!("Failed to get resource: {}. Retrying...", name);
+                    thread::sleep(Duration::from_millis(2000));
+                }
+            } else {
+                if resource.is_err() {
+                    return resource;
+                } else {
+                    println!("Resource {} should not exist. Retrying...", name);
+                    thread::sleep(Duration::from_millis(2000));
+                }
+            }
+        }
+        panic!("Failed to get resource");
+    }
     // helper function retrieve all instances of a resource in namespace
     // used repeatedly in appService tests
     // handles retries
@@ -5601,11 +5639,14 @@ CREATE EVENT TRIGGER pgrst_watch
         tokio::time::sleep(Duration::from_secs(2)).await;
         use controller::prometheus::podmonitor_crd::PodMonitor;
         let pmon_name = format!("{}-dummy-exporter", cdb_name);
-        let pdomon_api: Api<PodMonitor> = Api::namespaced(client.clone(), &namespace);
-        let podmon = pdomon_api
-            .get(&pmon_name)
+        // let pdomon_api: Api<PodMonitor> = Api::namespaced(client.clone(), &namespace);
+        // let podmon = pdomon_api
+        //     .get(&pmon_name)
+        //     .await
+        //     .expect("failed to find podmonitor");
+        let podmon = get_resource::<PodMonitor>(client.clone(), &namespace, &pmon_name, 5, true)
             .await
-            .expect("failed to find podmonitor");
+            .unwrap();
         let pmon_spec = podmon.spec.pod_metrics_endpoints.unwrap();
         assert_eq!(pmon_spec.len(), 1);
 
@@ -5635,18 +5676,24 @@ CREATE EVENT TRIGGER pgrst_watch
         let params = PatchParams::apply("tembo-integration-test");
         let patch = Patch::Apply(&no_metrics_app);
         let _coredb_resource = coredbs.patch(cdb_name, &params, &patch).await.unwrap();
-        tokio::time::sleep(Duration::from_secs(2)).await;
-        let podmon = pdomon_api.get(&pmon_name).await;
+        // tokio::time::sleep(Duration::from_secs(2)).await;
+        // let podmon = pdomon_api.get(&pmon_name).await;
+        let podmon =
+            get_resource::<PodMonitor>(client.clone(), &namespace, &pmon_name, 5, false).await;
         assert!(podmon.is_err());
 
         // renable it, assert it exists, then delete the app and assert PodMonitor is gone
         let patch = Patch::Apply(&full_app);
         let _coredb_resource = coredbs.patch(cdb_name, &params, &patch).await.unwrap();
-        tokio::time::sleep(Duration::from_secs(2)).await;
-        let podmon = pdomon_api
-            .get(&pmon_name)
+        // tokio::time::sleep(Duration::from_secs(2)).await;
+        // let podmon = pdomon_api
+        //     .get(&pmon_name)
+        //     .await
+        //     .expect("failed to find podmonitor");
+        let podmon = get_resource::<PodMonitor>(client.clone(), &namespace, &pmon_name, 5, true)
             .await
-            .expect("failed to find podmonitor");
+            .unwrap();
+
         let pmon_spec = podmon.spec.pod_metrics_endpoints.unwrap();
         assert_eq!(pmon_spec.len(), 1);
         // delete the app
@@ -5662,8 +5709,10 @@ CREATE EVENT TRIGGER pgrst_watch
         });
         let patch = Patch::Apply(&no_app);
         let _coredb_resource = coredbs.patch(cdb_name, &params, &patch).await.unwrap();
-        tokio::time::sleep(Duration::from_secs(2)).await;
-        let podmon = pdomon_api.get(&pmon_name).await;
+        // tokio::time::sleep(Duration::from_secs(2)).await;
+        // let podmon = pdomon_api.get(&pmon_name).await;
+        let podmon =
+            get_resource::<PodMonitor>(client.clone(), &namespace, &pmon_name, 5, false).await;
         assert!(podmon.is_err());
 
         // CLEANUP TEST
