@@ -5,8 +5,11 @@ metadata:
 spec:
   image: "quay.io/tembo/standard-cnpg:15-a0a5ab5"
   appServices:
-    - image: quay.io/tembo/vector-serve:7343bf4
+    - image: quay.io/tembo/vector-serve:5caa95d
       name: embeddings
+      metrics:
+        path: /metrics
+        port: 3000
       env:
         - name: TMPDIR
           value: /models
@@ -57,11 +60,11 @@ spec:
           name: hf-data-vol
   trunk_installs:
     - name: pgmq
-      version: 1.1.1
+      version: 1.2.1
     - name: vectorize
-      version: 0.4.0
+      version: 0.15.0
     - name: pgvector
-      version: 0.5.1
+      version: 0.7.0
     - name: pg_stat_statements
       version: 1.10.0
   extensions:
