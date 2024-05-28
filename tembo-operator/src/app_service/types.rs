@@ -152,7 +152,9 @@ pub fn default_resources() -> ResourceRequirements {
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, JsonSchema, PartialEq)]
 pub struct AppMetrics {
+    /// port must be also exposed in one of AppService.routing[]
     pub port: u16,
+    /// path to scrape metrics
     pub path: String,
 }
 

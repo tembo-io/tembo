@@ -38,6 +38,8 @@ use super::{
 
 use crate::{app_service::types::IngressType, secret::fetch_all_decoded_data_from_secret};
 
+const container_port_prefix: &str = "http-";
+
 // private wrapper to hold the AppService Resources
 #[derive(Clone, Debug)]
 struct AppServiceResources {
@@ -200,7 +202,7 @@ fn generate_service(
                     port: p as i32,
                     // there can be more than one ServicePort per Service
                     // these must be unique, so we'll use the port number
-                    name: Some(format!("http-{}", p)),
+                    name: Some(format!("{container_port_prefix}{p}")),
                     target_port: None,
                     ..ServicePort::default()
                 })
@@ -285,6 +287,7 @@ fn generate_deployment(
         let container_ports: Vec<ContainerPort> = distinct_ports
             .into_iter()
             .map(|p| ContainerPort {
+                name: Some(format!("{container_port_prefix}{p}")),
                 container_port: p as i32,
                 protocol: Some("TCP".to_string()),
                 ..ContainerPort::default()
@@ -637,20 +640,22 @@ async fn apply_resources(resources: Vec<AppServiceResources>, client: &Client, n
             }
         }
 
-        match podmon_api
-            .patch(&res.name, &ps, &Patch::Apply(&res.podmonitor.unwrap()))
-            .await
-            .map_err(Error::KubeError)
-        {
-            Ok(_) => {
-                debug!("ns: {}, applied PodMonitor: {}", ns, res.name);
-            }
-            Err(e) => {
-                has_errors = true;
-                error!(
-                    "ns: {}, failed to apply PodMonitor for AppService: {}, error: {}",
-                    ns, res.name, e
-                );
+        if let Some(pmon) = res.podmonitor {
+            match podmon_api
+                .patch(&res.name, &ps, &Patch::Apply(&pmon))
+                .await
+                .map_err(Error::KubeError)
+            {
+                Ok(_) => {
+                    debug!("ns: {}, applied PodMonitor: {}", ns, res.name);
+                }
+                Err(e) => {
+                    has_errors = true;
+                    error!(
+                        "ns: {}, failed to apply PodMonitor for AppService: {}, error: {}",
+                        ns, res.name, e
+                    );
+                }
             }
         }
     }
@@ -999,7 +1004,7 @@ fn generate_podmonitor(
 
     let metrics_endpoint = podmon::PodMonitorPodMetricsEndpoints {
         path: Some(metrics.path),
-        port: Some(metrics.port.to_string()),
+        port: Some(format!("http-{}", metrics.port)),
         ..podmon::PodMonitorPodMetricsEndpoints::default()
     };
 
