@@ -84,8 +84,7 @@ fn generate_resource(
         placement.clone(),
     );
 
-    let maybe_podmonitor =
-        generate_podmonitor(appsvc, &resource_name, namespace, oref.clone(), annotations);
+    let maybe_podmonitor = generate_podmonitor(appsvc, &resource_name, namespace, annotations);
 
     // If DATA_PLANE_BASEDOMAIN is not set, don't generate IngressRoutes, IngressRouteTCPs, or EntryPoints
     if domain.is_none() {
@@ -594,8 +593,6 @@ pub fn to_delete(desired: Vec<String>, actual: Vec<String>) -> Option<Vec<String
 
 async fn apply_resources(resources: Vec<AppServiceResources>, client: &Client, ns: &str) -> bool {
     let deployment_api: Api<Deployment> = Api::namespaced(client.clone(), ns);
-    let service_api: Api<Service> = Api::namespaced(client.clone(), ns);
-    let podmon_api: Api<podmon::PodMonitor> = Api::namespaced(client.clone(), ns);
     let ps = PatchParams::apply("cntrlr").force();
 
     let mut has_errors: bool = false;
@@ -622,6 +619,8 @@ async fn apply_resources(resources: Vec<AppServiceResources>, client: &Client, n
         if res.service.is_none() {
             continue;
         }
+
+        let service_api: Api<Service> = Api::namespaced(client.clone(), ns);
         match service_api
             .patch(&res.name, &ps, &Patch::Apply(&res.service))
             .await
@@ -640,7 +639,23 @@ async fn apply_resources(resources: Vec<AppServiceResources>, client: &Client, n
             }
         }
 
-        if let Some(pmon) = res.podmonitor {
+        if let Some(mut pmon) = res.podmonitor {
+            let podmon_api: Api<podmon::PodMonitor> = Api::namespaced(client.clone(), ns);
+            // assign ownership of the PodMonitor to the Service
+            // if Service is deleted, so is the PodMonitor
+            let meta = service_api.get(&res.name).await;
+            if let Ok(svc) = meta {
+                let uid = svc.metadata.uid.unwrap_or_default();
+                let oref = OwnerReference {
+                    api_version: "v1".to_string(),
+                    kind: "Service".to_string(),
+                    name: res.name.clone(),
+                    uid,
+                    controller: Some(true),
+                    block_owner_deletion: Some(true),
+                };
+                pmon.metadata.owner_references = Some(vec![oref]);
+            }
             match podmon_api
                 .patch(&res.name, &ps, &Patch::Apply(&pmon))
                 .await
@@ -982,7 +997,6 @@ fn generate_podmonitor(
     appsvc: &AppService,
     resource_name: &str,
     namespace: &str,
-    oref: OwnerReference,
     annotations: &BTreeMap<String, String>,
 ) -> Option<podmon::PodMonitor> {
     let metrics = appsvc.metrics.clone()?;
@@ -997,7 +1011,6 @@ fn generate_podmonitor(
         name: Some(resource_name.to_string()),
         namespace: Some(namespace.to_owned()),
         labels: Some(labels.clone()),
-        owner_references: Some(vec![oref]),
         annotations: Some(annotations.clone()),
         ..ObjectMeta::default()
     };
