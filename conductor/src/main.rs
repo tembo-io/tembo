@@ -1,7 +1,6 @@
 use actix_web::{web, App, HttpServer};
 use actix_web_opentelemetry::{PrometheusMetricsHandler, RequestTracing};
 use conductor::errors::ConductorError;
-// use conductor::extensions::extensions_still_processing;
 use conductor::monitoring::CustomMetrics;
 use conductor::{
     create_cloudformation, create_namespace, create_or_update, delete, delete_cloudformation,
@@ -367,30 +366,6 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                 info!("{}: Getting status", read_msg.msg_id);
 
                 let result = get_one(client.clone(), &namespace).await;
-
-                // let extension_still_processing = match &result {
-                //     Ok(coredb) => extensions_still_processing(coredb),
-                //     Err(_) => true,
-                // };
-
-                // if extension_still_processing
-                //     && (read_msg.message.event_type == Event::Create
-                //         || read_msg.message.event_type == Event::Restore)
-                // {
-                //     let _ = queue
-                //         .set_vt::<CRUDevent>(
-                //             &control_plane_events_queue,
-                //             read_msg.msg_id,
-                //             REQUEUE_VT_SEC_SHORT,
-                //         )
-                //         .await?;
-                //     metrics.conductor_requeues.add(
-                //         &opentelemetry::Context::current(),
-                //         1,
-                //         &[KeyValue::new("queue_duration", "short")],
-                //     );
-                //     continue;
-                // }
 
                 let current_spec = result?;
 
