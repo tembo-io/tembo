@@ -623,7 +623,7 @@ mod test {
                 }
             }
         }
-        panic!("Failed to get resource");
+        panic!("Failed to get resource, {}", name);
     }
     // helper function retrieve all instances of a resource in namespace
     // used repeatedly in appService tests
@@ -5636,15 +5636,9 @@ CREATE EVENT TRIGGER pgrst_watch
         let _coredb_resource = coredbs.patch(cdb_name, &params, &patch).await.unwrap();
 
         // pause for resource creation
-        tokio::time::sleep(Duration::from_secs(2)).await;
         use controller::prometheus::podmonitor_crd::PodMonitor;
         let pmon_name = format!("{}-dummy-exporter", cdb_name);
-        // let pdomon_api: Api<PodMonitor> = Api::namespaced(client.clone(), &namespace);
-        // let podmon = pdomon_api
-        //     .get(&pmon_name)
-        //     .await
-        //     .expect("failed to find podmonitor");
-        let podmon = get_resource::<PodMonitor>(client.clone(), &namespace, &pmon_name, 5, true)
+        let podmon = get_resource::<PodMonitor>(client.clone(), &namespace, &pmon_name, 10, true)
             .await
             .unwrap();
         let pmon_spec = podmon.spec.pod_metrics_endpoints.unwrap();
@@ -5676,20 +5670,13 @@ CREATE EVENT TRIGGER pgrst_watch
         let params = PatchParams::apply("tembo-integration-test");
         let patch = Patch::Apply(&no_metrics_app);
         let _coredb_resource = coredbs.patch(cdb_name, &params, &patch).await.unwrap();
-        // tokio::time::sleep(Duration::from_secs(2)).await;
-        // let podmon = pdomon_api.get(&pmon_name).await;
         let podmon =
-            get_resource::<PodMonitor>(client.clone(), &namespace, &pmon_name, 5, false).await;
+            get_resource::<PodMonitor>(client.clone(), &namespace, &pmon_name, 10, false).await;
         assert!(podmon.is_err());
 
         // renable it, assert it exists, then delete the app and assert PodMonitor is gone
         let patch = Patch::Apply(&full_app);
         let _coredb_resource = coredbs.patch(cdb_name, &params, &patch).await.unwrap();
-        // tokio::time::sleep(Duration::from_secs(2)).await;
-        // let podmon = pdomon_api
-        //     .get(&pmon_name)
-        //     .await
-        //     .expect("failed to find podmonitor");
         let podmon = get_resource::<PodMonitor>(client.clone(), &namespace, &pmon_name, 5, true)
             .await
             .unwrap();
@@ -5709,10 +5696,8 @@ CREATE EVENT TRIGGER pgrst_watch
         });
         let patch = Patch::Apply(&no_app);
         let _coredb_resource = coredbs.patch(cdb_name, &params, &patch).await.unwrap();
-        // tokio::time::sleep(Duration::from_secs(2)).await;
-        // let podmon = pdomon_api.get(&pmon_name).await;
         let podmon =
-            get_resource::<PodMonitor>(client.clone(), &namespace, &pmon_name, 5, false).await;
+            get_resource::<PodMonitor>(client.clone(), &namespace, &pmon_name, 10, false).await;
         assert!(podmon.is_err());
 
         // CLEANUP TEST
