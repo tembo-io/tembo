@@ -639,8 +639,8 @@ async fn apply_resources(resources: Vec<AppServiceResources>, client: &Client, n
             }
         }
 
+        let podmon_api: Api<podmon::PodMonitor> = Api::namespaced(client.clone(), ns);
         if let Some(mut pmon) = res.podmonitor {
-            let podmon_api: Api<podmon::PodMonitor> = Api::namespaced(client.clone(), ns);
             // assign ownership of the PodMonitor to the Service
             // if Service is deleted, so is the PodMonitor
             let meta = service_api.get(&res.name).await;
@@ -670,6 +670,15 @@ async fn apply_resources(resources: Vec<AppServiceResources>, client: &Client, n
                         "ns: {}, failed to apply PodMonitor for AppService: {}, error: {}",
                         ns, res.name, e
                     );
+                }
+            }
+        } else {
+            match podmon_api.delete(&res.name, &Default::default()).await.ok() {
+                Some(_) => {
+                    debug!("ns: {}, deleted PodMonitor: {}", ns, res.name);
+                }
+                None => {
+                    debug!("ns: {}, PodMonitor does not exist: {}", ns, res.name);
                 }
             }
         }
