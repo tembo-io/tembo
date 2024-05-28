@@ -653,6 +653,20 @@ spec:
                     image:
                       description: Defines the container image to use for the appService.
                       type: string
+                    metrics:
+                      description: Defines the metrics endpoints to be scraped by Prometheus. This implements a subset of features available by PodMonitorPodMetricsEndpoints.
+                      nullable: true
+                      properties:
+                        path:
+                          type: string
+                        port:
+                          format: uint16
+                          minimum: 0.0
+                          type: integer
+                      required:
+                      - path
+                      - port
+                      type: object
                     middlewares:
                       description: Defines the ingress middeware configuration for the appService. This is specifically configured for the ingress controller Traefik.
                       items:
