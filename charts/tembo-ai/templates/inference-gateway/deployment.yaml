@@ -39,16 +39,32 @@ spec:
               containerPort: {{ .Values.inferenceGateway.podMonitor.containerPort }}
               protocol: TCP
           {{- end }}
+          {{- if .Values.inferenceGateway.livenessProbe.enabled }}
           livenessProbe:
             httpGet:
-              path: /
-              port: http
+              path: {{ .Values.inferenceGateway.livenessProbe.path }}
+              port: {{ .Values.inferenceGateway.livenessProbe.port }}
+          {{- end }}
+          {{- if .Values.inferenceGateway.readinessProbe.enabled }}
           readinessProbe:
             httpGet:
-              path: /
-              port: http
+              path: {{ .Values.inferenceGateway.readinessProbe.path }}
+              port: {{ .Values.inferenceGateway.readinessProbe.port }}
+          {{- end }}
           resources:
             {{- toYaml .Values.inferenceGateway.resources | nindent 12 }}
+          {{- with .Values.inferenceGateway.args }}
+          args:
+            {{- toYaml . | nindent 10 }}
+          {{- end }}
+          {{- with .Values.inferenceGateway.command }}
+          command:
+            {{- toYaml . | nindent 10 }}
+          {{- end }}
+          {{- with .Values.inferenceGateway.env }}
+          env:
+            {{- toYaml . | nindent 10 }}
+          {{- end }}
       {{- with .Values.inferenceGateway.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

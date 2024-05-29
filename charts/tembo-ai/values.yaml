@@ -1,15 +1,8 @@
-# Values file for the tembo-ai chart with inference gateway component.
-
 inferenceGateway:
   image:
     repository: quay.io/tembo/inference-gateway
     pullPolicy: IfNotPresent
     tag: latest
-  serviceAccount:
-    create: true
-    annotations: {}
-  service:
-    port: 8080
   resources:
     requests:
       cpu: 100m
@@ -17,11 +10,19 @@ inferenceGateway:
     limits:
       cpu: 1000m
       memory: 512Mi
+  livenessProbe:
+    enabled: true
+    path: /lively
+    port: http
+  readinessProbe:
+    enabled: true
+    path: /ready
+    port: http
   autoscaling:
     enabled: true
     minReplicas: 1
-    maxReplicas: 5
-    # target CPU is a percentage of requests, i.e. the measurement can
+    maxReplicas: 10
+    # Target CPU is a percentage of requests, i.e. the measurement can
     # exceed 100% when limits is greater than requests.
     targetCPUUtilizationPercentage: 99
   externalSecrets:
@@ -43,6 +44,15 @@ inferenceGateway:
     enabled: false
     # match: "Host(`example.com`)"
     match: ~
+  serviceAccount:
+    create: true
+    annotations: {}
+  service:
+    port: 8080
+  args: []
+  command:
+    - "/usr/local/bin/gateway"
+  env: []
   securityContext:
     # The most practical security settings are
     # dropping all linux capabilities and
