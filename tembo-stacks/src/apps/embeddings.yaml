@@ -2,6 +2,9 @@ name: !embeddings
 appServices:
   - image: quay.io/tembo/vector-serve:d5e7b63
     name: embeddings
+    metrics:
+      path: /metrics
+      port: 3000
     routing:
       - port: 3000
         ingressPath: /embeddings
