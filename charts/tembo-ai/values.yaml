@@ -24,6 +24,13 @@ inferenceGateway:
     # target CPU is a percentage of requests, i.e. the measurement can
     # exceed 100% when limits is greater than requests.
     targetCPUUtilizationPercentage: 99
+  externalSecrets:
+    refreshInterval: "5m"
+    parameterStore:
+      name: "secret-store-parameter-store"
+      kind: ClusterSecretStore
+    secretName: ~
+    secretRegex: ~
   podMonitor:
     enabled: false
     path: /metrics
