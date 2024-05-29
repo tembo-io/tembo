@@ -69,3 +69,64 @@ inferenceGateway:
   affinity: {}
   podAnnotations: {}
   podSecurityContext: {}
+
+inferenceService:
+  image:
+    repository: vllm/vllm-openai
+    pullPolicy: IfNotPresent
+    tag: latest
+  resources:
+    requests:
+      cpu: 4
+      memory: 16Gi
+    limits:
+      cpu: 8
+      memory: 16Gi
+  livenessProbe:
+    enabled: true
+    path: /lively
+    port: http
+  readinessProbe:
+    enabled: true
+    path: /ready
+    port: http
+  replicaCount: 1
+  externalSecrets:
+    refreshInterval: "5m"
+    parameterStore:
+      name: "secret-store-parameter-store"
+      kind: ClusterSecretStore
+    secretName: ~
+    secretRegex: ~
+  podMonitor:
+    enabled: false
+    path: /metrics
+    # Sometimes applications serve metrics on a different port,
+    # which makes it easier to prevent metrics from accidentally
+    # being publicly available.
+    portName: metrics
+    containerPort: 8081
+  serviceAccount:
+    create: true
+    annotations: {}
+  service:
+    port: 8080
+  args: []
+  command: []
+  env: []
+  securityContext: {}
+  #   # The most practical security settings are
+  #   # dropping all linux capabilities and
+  #   # running as non-root.
+  #   capabilities:
+  #     drop:
+  #     - ALL
+  #   runAsNonRoot: true
+  #   # Read only file system is better if the application
+  #   # can tolerate it.
+  #   # readOnlyRootFilesystem: true
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  podAnnotations: {}
+  podSecurityContext: {}
