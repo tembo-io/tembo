@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "tembo-ai.fullname" . }}-inference-gateway
+  labels:
+    {{- include "tembo-ai.inferenceGateway.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.inferenceGateway.service.type }}
+  ports:
+    - port: {{ .Values.inferenceGateway.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "tembo-ai.inferenceGateway.selectorLabels" . | nindent 4 }}

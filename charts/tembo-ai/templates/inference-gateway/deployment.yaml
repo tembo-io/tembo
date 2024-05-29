@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "tembo-ai.fullname" . }}-inference-gateway
+  labels:
+    {{- include "tembo-ai.inferenceGateway.labels" . | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "tembo-ai.inferenceGateway.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.inferenceGateway.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "tembo-ai.inferenceGateway.selectorLabels" . | nindent 8 }}
+    spec:
+      {{- with .Values.inferenceGateway.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "tembo-ai.inferenceGateway.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.inferenceGateway.podSecurityContext | nindent 8 }}
+      containers:
+        - name: inference-gateway
+          securityContext:
+            {{- toYaml .Values.inferenceGateway.securityContext | nindent 12 }}
+          image: "{{ .Values.inferenceGateway.image.repository }}:{{ .Values.inferenceGateway.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.inferenceGateway.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.inferenceGateway.service.port }}
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+          resources:
+            {{- toYaml .Values.inferenceGateway.resources | nindent 12 }}
+      {{- with .Values.inferenceGateway.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.inferenceGateway.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.inferenceGateway.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
