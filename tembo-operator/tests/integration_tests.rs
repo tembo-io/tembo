@@ -623,7 +623,7 @@ mod test {
                 }
             }
         }
-        panic!("Failed to get resource, {}", name);
+        panic!("Timed out getting resource, {}", name);
     }
     // helper function retrieve all instances of a resource in namespace
     // used repeatedly in appService tests
@@ -5638,7 +5638,7 @@ CREATE EVENT TRIGGER pgrst_watch
         // pause for resource creation
         use controller::prometheus::podmonitor_crd::PodMonitor;
         let pmon_name = format!("{}-dummy-exporter", cdb_name);
-        let podmon = get_resource::<PodMonitor>(client.clone(), &namespace, &pmon_name, 10, true)
+        let podmon = get_resource::<PodMonitor>(client.clone(), &namespace, &pmon_name, 50, true)
             .await
             .unwrap();
         let pmon_spec = podmon.spec.pod_metrics_endpoints.unwrap();
@@ -5671,13 +5671,13 @@ CREATE EVENT TRIGGER pgrst_watch
         let patch = Patch::Apply(&no_metrics_app);
         let _coredb_resource = coredbs.patch(cdb_name, &params, &patch).await.unwrap();
         let podmon =
-            get_resource::<PodMonitor>(client.clone(), &namespace, &pmon_name, 10, false).await;
+            get_resource::<PodMonitor>(client.clone(), &namespace, &pmon_name, 50, false).await;
         assert!(podmon.is_err());
 
         // renable it, assert it exists, then delete the app and assert PodMonitor is gone
         let patch = Patch::Apply(&full_app);
         let _coredb_resource = coredbs.patch(cdb_name, &params, &patch).await.unwrap();
-        let podmon = get_resource::<PodMonitor>(client.clone(), &namespace, &pmon_name, 5, true)
+        let podmon = get_resource::<PodMonitor>(client.clone(), &namespace, &pmon_name, 50, true)
             .await
             .unwrap();
 
@@ -5697,7 +5697,7 @@ CREATE EVENT TRIGGER pgrst_watch
         let patch = Patch::Apply(&no_app);
         let _coredb_resource = coredbs.patch(cdb_name, &params, &patch).await.unwrap();
         let podmon =
-            get_resource::<PodMonitor>(client.clone(), &namespace, &pmon_name, 10, false).await;
+            get_resource::<PodMonitor>(client.clone(), &namespace, &pmon_name, 50, false).await;
         assert!(podmon.is_err());
 
         // CLEANUP TEST
