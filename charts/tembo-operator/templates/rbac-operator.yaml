@@ -29,7 +29,7 @@ rules:
     verbs: ["get", "list", "watch", "patch", "update"]
   - apiGroups: ["monitoring.coreos.com"]
     resources: ["podmonitors"]
-    verbs: ["get", "patch", "update", "delete"]
+    verbs: ["get", "patch", "update", "delete", "list", "watch"]
   - apiGroups: ["events.k8s.io"]
     resources: ["events"]
     verbs: ["create"]
