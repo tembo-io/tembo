@@ -512,9 +512,9 @@ checksum = "0b6a852b24ab71dffc585bcb46eaf7959d175cb865a7152e35b348d1b2960422"
 
 [[package]]
 name = "controller"
-version = "0.47.1"
+version = "0.48.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2bb5e5bce112ef05f35c1dcfaf7fe34339d9392dc8aec3eda89495db1fe9078c"
+checksum = "ff3f80f9863877bef10bf8d6eb13ecad4bd01ccb0a15350ee3d2ab5604d7cc4d"
 dependencies = [
  "actix-web",
  "anyhow",
