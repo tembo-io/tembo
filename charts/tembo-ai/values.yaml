@@ -77,6 +77,7 @@ inferenceService:
     tag: latest
   resources:
     requests:
+      nvidia.com/gpu: 1
       cpu: 4
       memory: 16Gi
     limits:
@@ -126,7 +127,11 @@ inferenceService:
   #   # can tolerate it.
   #   # readOnlyRootFilesystem: true
   nodeSelector: {}
-  tolerations: []
+  tolerations:
+  - key: "tembo.io/gpu"
+    operator: "Equal"
+    value: "true"
+    effect: "NoSchedule"
   affinity: {}
   podAnnotations: {}
   podSecurityContext: {}

@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "tembo-ai.fullname" . }}-service
+  name: {{ include "tembo-ai.fullname" . }}-inference-service
   labels:
     {{- include "tembo-ai.inferenceService.labels" . | nindent 4 }}
 spec:
@@ -9,7 +9,7 @@ spec:
   selector:
     matchLabels:
       {{- include "tembo-ai.inferenceService.selectorLabels" . | nindent 6 }}
-  serviceName: {{ include "tembo-ai.fullname" . }}-service
+  serviceName: {{ include "tembo-ai.fullname" . }}-inference-service
   template:
     metadata:
       {{- with .Values.inferenceService.podAnnotations }}
