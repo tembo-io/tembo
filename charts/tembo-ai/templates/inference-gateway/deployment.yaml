@@ -34,6 +34,11 @@ spec:
             - name: http
               containerPort: {{ .Values.inferenceGateway.service.port }}
               protocol: TCP
+          {{- if and .Values.inferenceGateway.podMonitor.enabled (ne .Values.inferenceGateway.podMonitor.port "http") }}
+            - name: {{ .Values.inferenceGateway.podMonitor.portName }}
+              containerPort: {{ .Values.inferenceGateway.podMonitor.containerPort }}
+              protocol: TCP
+          {{- end }}
           livenessProbe:
             httpGet:
               path: /
