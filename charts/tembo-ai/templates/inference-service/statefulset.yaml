@@ -1,5 +1,5 @@
 apiVersion: apps/v1
-kind: Deployment
+kind: StatefulSet
 metadata:
   name: {{ include "tembo-ai.fullname" . }}-service
   labels:
@@ -9,6 +9,7 @@ spec:
   selector:
     matchLabels:
       {{- include "tembo-ai.inferenceService.selectorLabels" . | nindent 6 }}
+  serviceName: {{ include "tembo-ai.fullname" . }}-service
   template:
     metadata:
       {{- with .Values.inferenceService.podAnnotations }}
@@ -66,6 +67,11 @@ spec:
           env:
             {{- toYaml . | nindent 10 }}
           {{- end }}
+          {{- if .Values.inferenceService.persistence.enabled }}
+          volumeMounts:
+            - name: models
+              mountPath: {{ .Values.inferenceService.persistence.mountPath }}
+          {{- end }}
       {{- with .Values.inferenceService.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
@@ -78,3 +84,19 @@ spec:
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+  volumeClaimTemplates:
+    {{- if .Values.inferenceService.persistence.enabled }}
+    - metadata:
+        name: models
+        labels:
+          {{- include "tembo-ai.inferenceService.labels" . | nindent 8 }}
+      spec:
+        accessModes:
+          - {{ .Values.inferenceService.persistence.accessMode }}
+        resources:
+          requests:
+            storage: {{ .Values.inferenceService.persistence.size }}
+        {{- if .Values.inferenceService.persistence.storageClass }}
+        storageClassName: {{ .Values.inferenceService.persistence.storageClass }}
+        {{- end }}
+    {{- end }}

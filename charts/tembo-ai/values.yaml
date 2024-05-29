@@ -130,3 +130,9 @@ inferenceService:
   affinity: {}
   podAnnotations: {}
   podSecurityContext: {}
+  persistence:
+    enabled: true
+    size: 100Gi
+    storageClass: ""
+    accessMode: ReadWriteOnce
+    mountPath: /root/.cache/

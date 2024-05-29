@@ -5,6 +5,7 @@ metadata:
   labels:
     {{- include "tembo-ai.inferenceService.labels" . | nindent 4 }}
 spec:
+  clusterIP: None
   type: {{ .Values.inferenceService.service.type }}
   ports:
     - port: {{ .Values.inferenceService.service.port }}
