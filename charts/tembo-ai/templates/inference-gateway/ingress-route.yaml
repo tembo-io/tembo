@@ -1,0 +1,21 @@
+{{- if .Values.inferenceGateway.ingressRoute.enabled -}}
+{{- $fullName := include "tembo-ai.fullname" . -}}
+{{- $svcPort := .Values.inferenceGateway.service.port -}}
+---
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ $fullName }}-inference-gateway
+  labels:
+    {{- include "tembo-ai.inferenceGateway.labels" . | nindent 4 }}
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: {{ .Values.inferenceGateway.ingressRoute.match }}
+      kind: Rule
+      services:
+        - name: {{ $fullName }}-inference-gateway
+          port: {{ $svcPort }}
+  tls: {}
+{{- end }}

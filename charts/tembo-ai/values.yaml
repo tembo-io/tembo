@@ -39,6 +39,10 @@ inferenceGateway:
     # being publicly available.
     portName: metrics
     containerPort: 8081
+  ingressRoute:
+    enabled: false
+    # match: "Host(`example.com`)"
+    match: ~
   securityContext:
     # The most practical security settings are
     # dropping all linux capabilities and
