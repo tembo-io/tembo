@@ -10,7 +10,7 @@ app.kubernetes.io/component: inference-service
 Inference service specific selector labels
 */}}
 {{- define "tembo-ai.inferenceService.selectorLabels" -}}
-app.kubernetes.io/name: {{ include "tembo-ai.name" . }}-inference-service
+app.kubernetes.io/name: {{ include "tembo-ai.name" . }}-service
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
@@ -18,5 +18,5 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 Create the name of the inference-service service account to use
 */}}
 {{- define "tembo-ai.inferenceService.serviceAccountName" -}}
-{{- include "tembo-ai.fullname" . }}-inference-service
+{{- include "tembo-ai.fullname" . }}-service
 {{- end }}

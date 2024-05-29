@@ -2,7 +2,7 @@
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
-  name: {{ include "tembo-ai.fullname" . }}-inference-service
+  name: {{ include "tembo-ai.fullname" . }}-service
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "tembo-ai.inferenceService.labels" . | nindent 4 }}

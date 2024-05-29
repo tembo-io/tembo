@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "tembo-ai.fullname" . }}-inference-gateway
+  name: {{ include "tembo-ai.fullname" . }}-gateway
   labels:
     {{- include "tembo-ai.inferenceGateway.labels" . | nindent 4 }}
 spec:
