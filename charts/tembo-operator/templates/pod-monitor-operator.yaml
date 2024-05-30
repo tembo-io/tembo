@@ -9,8 +9,8 @@ metadata:
   namespace: {{ $namespace }}
 spec:
   podMetricsEndpoints:
-  - path: {{ (index .Values "controller").podMonitor.path }}
-    port: {{ (index .Values "controller").podMonitor.port }}
+  - path: {{ (index .Values "controller").monitoring.podMonitor.path }}
+    port: {{ (index .Values "controller").monitoring.podMonitor.port }}
   namespaceSelector:
     matchNames:
       - {{ $namespace }}
