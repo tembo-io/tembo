@@ -120,6 +120,10 @@ pub struct AppService {
     /// See the [Kubernetes docs](https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/).
     pub probes: Option<Probes>,
 
+    /// Defines the metrics endpoints to be scraped by Prometheus.
+    /// This implements a subset of features available by PodMonitorPodMetricsEndpoints.
+    pub metrics: Option<AppMetrics>,
+
     /// Defines the ingress middeware configuration for the appService.
     /// This is specifically configured for the ingress controller Traefik.
     pub middlewares: Option<Vec<Middleware>>,
@@ -144,6 +148,14 @@ pub fn default_resources() -> ResourceRequirements {
         limits: Some(limits),
         requests: Some(requests),
     }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, ToSchema, JsonSchema, PartialEq)]
+pub struct AppMetrics {
+    /// port must be also exposed in one of AppService.routing[]
+    pub port: u16,
+    /// path to scrape metrics
+    pub path: String,
 }
 
 // Secrets are injected into the container as environment variables

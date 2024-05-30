@@ -347,7 +347,6 @@ mod tests {
     use tembo_controller::app_service::types::EnvVar;
     #[test]
     fn test_merge_app_reqs() {
-        //
         let app_config = AppConfig {
             env: Some(vec![
                 EnvVar {
@@ -396,6 +395,11 @@ mod tests {
             }
         }
         assert_eq!(to_find, 0);
+
+        // validate metrics end up in final_app
+        let metrics = app.metrics.expect("metrics not found");
+        assert_eq!(metrics.path, "/metrics".to_string());
+        assert_eq!(metrics.port, 3000);
     }
 
     #[test]
