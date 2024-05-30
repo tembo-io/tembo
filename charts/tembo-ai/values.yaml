@@ -53,17 +53,17 @@ inferenceGateway:
   command:
     - "/usr/local/bin/gateway"
   env: []
-  securityContext:
-    # The most practical security settings are
-    # dropping all linux capabilities and
-    # running as non-root.
-    capabilities:
-      drop:
-      - ALL
-    runAsNonRoot: true
-    # Read only file system is better if the application
-    # can tolerate it.
-    # readOnlyRootFilesystem: true
+  securityContext: {}
+  #  # The most practical security settings are
+  #  # dropping all linux capabilities and
+  #  # running as non-root.
+  #  capabilities:
+  #    drop:
+  #    - ALL
+  #  runAsNonRoot: true
+  #  # Read only file system is better if the application
+  #  # can tolerate it.
+  #  # readOnlyRootFilesystem: true
   nodeSelector: {}
   tolerations: []
   affinity: {}
