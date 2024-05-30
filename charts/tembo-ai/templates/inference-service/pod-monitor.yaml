@@ -1,0 +1,19 @@
+{{- if .Values.inferenceService.podMonitor.enabled -}}
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: {{ include "tembo-ai.fullname" . }}-service
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "tembo-ai.inferenceService.labels" . | nindent 4 }}
+spec:
+  podMetricsEndpoints:
+    - path: {{ .Values.inferenceService.podMonitor.path }}
+      port: {{ .Values.inferenceService.podMonitor.portName }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+  selector:
+    matchLabels:
+      {{- include "tembo-ai.inferenceService.selectorLabels" . | nindent 6 }}
+{{- end }}
