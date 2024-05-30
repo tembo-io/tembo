@@ -65,7 +65,7 @@ runs:
   - name: Update Inference Gateway image
     uses: mikefarah/yq@v4.33.3
     with:
-      cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-inference-gateway.yaml
+      cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-ai.yaml
   - name: Git commit and push to remote
     shell: bash
     run: |
