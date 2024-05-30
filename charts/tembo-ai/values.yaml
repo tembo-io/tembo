@@ -42,8 +42,13 @@ inferenceGateway:
     containerPort: 8081
   ingressRoute:
     enabled: false
-    # match: "Host(`example.com`)"
-    match: ~
+    match: ~ # Configure for your environment
+    # By default, rewrite path from
+    # /ai/inference-gateway-path to /inference-gatway-path
+    rewrite:
+      enabled: true
+      regex: "^/ai/(.*)"
+      replacement: "/$1"
   serviceAccount:
     create: true
     annotations: {}
