@@ -86,11 +86,11 @@ inferenceService:
       nvidia.com/gpu: 1
   livenessProbe:
     enabled: true
-    path: /lively
+    path: /health
     port: http
   readinessProbe:
     enabled: true
-    path: /ready
+    path: /health
     port: http
   replicaCount: 1
   externalSecrets:
@@ -112,7 +112,7 @@ inferenceService:
     create: true
     annotations: {}
   service:
-    port: 8080
+    port: 8000
   args: []
   command: []
   env: []
