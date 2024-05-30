@@ -52,8 +52,6 @@ jobs:
 
       - name: Check chart version
         run: |
-      - name: Check chart version
-        run: |
           cd code
           CURR_VERSION=$(cat ${{ matrix.path }}/Chart.yaml | grep version: | cut -d ' ' -f 2)
           MAIN_VERSION=$(git show main:${{ matrix.path }}/Chart.yaml 2>/dev/null | grep version: | cut -d ' ' -f 2 || echo "")
