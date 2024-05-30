@@ -77,13 +77,13 @@ inferenceService:
     tag: latest
   resources:
     requests:
-      cpu: 4
-      memory: 16Gi
-      nvidia.com/gpu: 1
+      cpu: '4'
+      memory: '16Gi'
+      nvidia.com/gpu: '1'
     limits:
-      cpu: 8
-      memory: 16Gi
-      nvidia.com/gpu: 1
+      cpu: '8'
+      memory: '16Gi'
+      nvidia.com/gpu: '1'
   livenessProbe:
     enabled: true
     path: /health

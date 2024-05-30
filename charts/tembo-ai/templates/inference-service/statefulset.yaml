@@ -86,7 +86,9 @@ spec:
       {{- end }}
   volumeClaimTemplates:
     {{- if .Values.inferenceService.persistence.enabled }}
-    - metadata:
+    - apiVersion: v1
+      kind: PersistentVolumeClaim
+      metadata:
         name: models
         labels:
           {{- include "tembo-ai.inferenceService.labels" . | nindent 8 }}
