@@ -77,7 +77,7 @@ inferenceGateway:
 
 inferenceService:
   image:
-    repository: vllm/vllm-openai
+    repository: quay.io/tembo/inference
     pullPolicy: IfNotPresent
     tag: latest
   resources:
@@ -97,6 +97,12 @@ inferenceService:
     enabled: true
     path: /health
     port: http
+  startupProbe:
+    enabled: true
+    path: /startup
+    port: http
+    failureThreshold: 30
+    periodSeconds: 10
   replicaCount: 1
   externalSecrets:
     refreshInterval: "5m"
