@@ -53,6 +53,7 @@ spec:
               path: {{ .Values.inferenceService.readinessProbe.path }}
               port: {{ .Values.inferenceService.readinessProbe.port }}
           {{- end }}
+          {{- if .Values.inferenceService.startupProbe.enabled }}
           startupProbe:
             failureThreshold: {{ .Values.inferenceService.startupProbe.failureThreshold }}
             httpGet:
