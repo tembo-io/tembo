@@ -54,9 +54,10 @@ spec:
               port: {{ .Values.inferenceService.readinessProbe.port }}
           {{- end }}
           startupProbe:
+            failureThreshold: {{ .Values.inferenceService.startupProbe.failureThreshold }}
             httpGet:
-              path: {{ .Values.inferenceService.readinessProbe.path }}
-              port: {{ .Values.inferenceService.readinessProbe.port }}
+              path: {{ .Values.inferenceService.startupProbe.path }}
+              port: {{ .Values.inferenceService.startupProbe.port }}
           {{- end }}
           resources:
             {{- toYaml .Values.inferenceService.resources | nindent 12 }}
