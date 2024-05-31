@@ -97,6 +97,10 @@ inferenceService:
     enabled: true
     path: /health
     port: http
+  startupProbe:
+    enabled: true
+    path: /health
+    port: http
   replicaCount: 1
   externalSecrets:
     refreshInterval: "5m"
