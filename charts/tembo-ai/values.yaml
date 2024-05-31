@@ -77,7 +77,7 @@ inferenceGateway:
 
 inferenceService:
   image:
-    repository: vllm/vllm-openai
+    repository: quay.io/tembo/inference
     pullPolicy: IfNotPresent
     tag: latest
   resources:
