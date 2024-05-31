@@ -1,7 +1,7 @@
 services:
   postgres:
     restart: always
-    image: postgres:16
+    image: quay.io/tembo/timeseries-pg:latest
     ports:
       - 5432:5432
     environment:
