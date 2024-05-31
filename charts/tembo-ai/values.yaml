@@ -99,7 +99,7 @@ inferenceService:
     port: http
   startupProbe:
     enabled: true
-    path: /startup
+    path: /health
     port: http
     failureThreshold: 30
     periodSeconds: 10
