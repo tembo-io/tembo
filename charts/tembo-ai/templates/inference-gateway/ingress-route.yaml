@@ -1,0 +1,40 @@
+{{- if .Values.inferenceGateway.ingressRoute.enabled -}}
+{{- if not .Values.inferenceGateway.ingressRoute.match }}
+{{- fail "ingressRoute is enabled, but no match rule is configured" }}
+{{- end }}
+{{- $fullName := include "tembo-ai.fullname" . -}}
+{{- $svcPort := .Values.inferenceGateway.service.port -}}
+---
+{{- if .Values.inferenceGateway.ingressRoute.rewrite.enabled -}}
+apiVersion: traefik.containo.us/v1alpha1
+kind: Middleware
+metadata:
+  name: {{ $fullName }}-gateway-replace-path
+  namespace: {{ .Release.Namespace }}
+spec:
+  replacePathRegex:
+    regex: "{{ .Values.inferenceGateway.ingressRoute.rewrite.regex }}"
+    replacement: "{{ .Values.inferenceGateway.ingressRoute.rewrite.replacement }}"
+---
+{{- end }}
+apiVersion: traefik.containo.us/v1alpha1
+kind: IngressRoute
+metadata:
+  name: {{ $fullName }}-gateway
+  labels:
+    {{- include "tembo-ai.inferenceGateway.labels" . | nindent 4 }}
+spec:
+  entryPoints:
+    - websecure
+  routes:
+    - match: {{ .Values.inferenceGateway.ingressRoute.match | quote }}
+      kind: Rule
+      {{- if .Values.inferenceGateway.ingressRoute.rewrite.enabled }}
+      middlewares:
+        - name: {{ $fullName }}-gateway-replace-path
+      {{- end }}
+      services:
+        - name: {{ $fullName }}-gateway
+          port: {{ $svcPort }}
+  tls: {}
+{{- end }}
