@@ -53,6 +53,11 @@ spec:
               path: {{ .Values.inferenceService.readinessProbe.path }}
               port: {{ .Values.inferenceService.readinessProbe.port }}
           {{- end }}
+          startupProbe:
+            httpGet:
+              path: {{ .Values.inferenceService.readinessProbe.path }}
+              port: {{ .Values.inferenceService.readinessProbe.port }}
+          {{- end }}
           resources:
             {{- toYaml .Values.inferenceService.resources | nindent 12 }}
           {{- with .Values.inferenceService.args }}
