@@ -39,35 +39,35 @@ runs:
       git config --global user.email "admin+github@coredb.io"
       git fetch origin ${{ inputs.branch }} && git checkout ${{ inputs.branch }} || git checkout -b ${{ inputs.branch }}
   - name: Update conductor helm chart
-    uses: mikefarah/yq@v4.33.3
+    uses: mikefarah/yq@v4.44.1
     with:
       cmd: yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/data-plane.yaml
   - name: Update conductor image
-    uses: mikefarah/yq@v4.33.3
+    uses: mikefarah/yq@v4.44.1
     with:
       cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/data-plane.yaml
   - name: Update dataplane webserver image
-    uses: mikefarah/yq@v4.33.3
+    uses: mikefarah/yq@v4.44.1
     with:
       cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/dataplane-webserver.yaml
   - name: Update operator helm chart
-    uses: mikefarah/yq@v4.33.3
+    uses: mikefarah/yq@v4.44.1
     with:
       cmd: yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator.yaml
   - name: Update operator image
-    uses: mikefarah/yq@v4.33.3
+    uses: mikefarah/yq@v4.44.1
     with:
       cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "controller.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator.yaml
   - name: Update pod-init image
-    uses: mikefarah/yq@v4.33.3
+    uses: mikefarah/yq@v4.44.1
     with:
       cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "pod-init.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator.yaml
   - name: Update Tembo AI images
-    uses: mikefarah/yq@v4.33.3
+    uses: mikefarah/yq@v4.44.1
     with:
       cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "inferenceGateway.image.tag" or .name == "inferenceService.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-ai.yaml
   - name: Update Tembo AI chart
-    uses: mikefarah/yq@v4.33.3
+    uses: mikefarah/yq@v4.44.1
     with:
       cmd: yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-ai.yaml
   - name: Git commit and push to remote
