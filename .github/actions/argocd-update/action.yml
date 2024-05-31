@@ -65,7 +65,7 @@ runs:
   - name: Update Tembo AI images
     uses: mikefarah/yq@v4.44.1
     with:
-      cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "inferenceGateway.image.tag" or .name == "inferenceService.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-ai.yaml
+      cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "inferenceGateway.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-ai.yaml
   - name: Update Tembo AI chart
     uses: mikefarah/yq@v4.44.1
     with:
