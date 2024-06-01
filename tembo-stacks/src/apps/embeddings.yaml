@@ -1,6 +1,6 @@
 name: !embeddings
 appServices:
-  - image: quay.io/tembo/vector-serve:d5e7b63
+  - image: quay.io/tembo/vector-serve:d246961
     name: embeddings
     metrics:
       path: /metrics
