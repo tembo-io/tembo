@@ -309,6 +309,67 @@ async fn multiple_instances() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+#[tokio::test]
+async fn local_persistence() -> Result<(), anyhow::Error> {
+    let root_dir = env!("CARGO_MANIFEST_DIR");
+    let test_dir = PathBuf::from(root_dir).join("examples").join("set");
+
+    env::set_current_dir(&test_dir)?;
+
+    // tembo init
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("init");
+    cmd.assert().success();
+
+    // tembo context set --name local
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("context");
+    cmd.arg("set");
+    cmd.arg("--name");
+    cmd.arg("local");
+    cmd.assert().success();
+
+    // tembo apply
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("--verbose");
+    cmd.arg("apply");
+    cmd.assert().success();
+
+    // Create a table and insert data
+    SqlxUtils::execute_sql(
+        "set".to_string(),
+        "CREATE TABLE test_table (id serial PRIMARY KEY, data TEXT NOT NULL);".to_string(),
+    )
+    .await?;
+
+    SqlxUtils::execute_sql(
+        "set".to_string(),
+        "INSERT INTO test_table (data) VALUES ('test data');".to_string(),
+    )
+    .await?;
+
+    // Stop the container
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("delete");
+    let _ = cmd.ok();
+
+    // Start the container again
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("--verbose");
+    cmd.arg("apply");
+    cmd.assert().success();
+
+    // Verify the data persists
+    let result: String = get_output_from_sql(
+        "set".to_string(),
+        "SELECT data FROM test_table WHERE id = 1;".to_string(),
+    )
+    .await?;
+    assert!(result.contains("test data"), "Data did not persist");
+
+    Ok(())
+}
+
 async fn get_output_from_sql(instance_name: String, sql: String) -> Result<String, anyhow::Error> {
     // Configure SQLx connection options
     let connect_options = PgConnectOptions::new()
@@ -321,7 +382,7 @@ async fn get_output_from_sql(instance_name: String, sql: String) -> Result<Strin
     let pool = sqlx::PgPool::connect_with(connect_options).await?;
 
     // Simple query
-    let result: (i32,) = sqlx::query_as(&sql).fetch_one(&pool).await?;
+    let result: (String,) = sqlx::query_as(&sql).fetch_one(&pool).await?;
 
     println!(
         "Successfully connected to the database: {}",
