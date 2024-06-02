@@ -24,13 +24,30 @@ pub async fn forward_request(
     new_url.set_path(path);
     new_url.set_query(req.uri().query());
 
-    // For now, only POST is supported
+    // log request duration
+    let start = std::time::Instant::now();
     let resp = client.post(new_url).json(&body).send().await?;
+    let duration = start.elapsed().as_millis() as i32;
     if resp.status().is_success() {
         let llm_resp = resp.json::<serde_json::Value>().await?;
-        let model = llm_resp.get("model").unwrap().as_str().unwrap();
-        let usage: Usage = serde_json::from_value(llm_resp.get("usage").unwrap().clone())?;
-        if let Err(e) = insert_data(x_tembo, model, usage, &dbclient).await {
+        let model = llm_resp
+            .get("model")
+            .ok_or_else(|| {
+                PlatformError::InvalidQuery("invalid response from model server".to_string())
+            })?
+            .as_str()
+            .ok_or_else(|| {
+                PlatformError::InvalidQuery("invalid response from model server".to_string())
+            })?;
+        let usage: Usage = serde_json::from_value(
+            llm_resp
+                .get("usage")
+                .ok_or_else(|| {
+                    PlatformError::InvalidQuery("invalid response from model server".to_string())
+                })?
+                .clone(),
+        )?;
+        if let Err(e) = insert_data(x_tembo, model, usage, duration, &dbclient).await {
             log::error!("{}", e);
         }
         Ok(HttpResponse::Ok().json(llm_resp))
@@ -45,15 +62,17 @@ async fn insert_data(
     org: &str,
     model: &str,
     usage: Usage,
+    duration_ms: i32,
     con: &Pool<Postgres>,
 ) -> Result<(), PlatformError> {
     let _r = sqlx::query!(
-        "INSERT INTO inference.requests ( organization_id, model, prompt_tokens, completion_tokens )
-        VALUES ($1, $2, $3, $4)",
+        "INSERT INTO inference.requests ( organization_id, model, prompt_tokens, completion_tokens, duration_ms )
+        VALUES ($1, $2, $3, $4, $5)",
         org,
         model,
         usage.prompt_tokens,
-        usage.completion_tokens
+        usage.completion_tokens,
+        duration_ms
     )
     .execute(con)
     .await?;

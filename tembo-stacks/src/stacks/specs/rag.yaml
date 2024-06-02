@@ -8,8 +8,11 @@ images:
   16: "standard-cnpg:16-389a437"
 stack_version: 0.1.0
 appServices:
-  - image: quay.io/tembo/vector-serve:7343bf4
+  - image: 387894460527.dkr.ecr.us-east-1.amazonaws.com/tembo-io/vector-serve:89dbbab
     name: embeddings
+    metrics:
+      path: /metrics
+      port: 3000
     env:
       - name: TMPDIR
         value: /models

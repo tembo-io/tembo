@@ -182,6 +182,45 @@ async fn vector() -> Result<(), anyhow::Error> {
 }
 
 #[tokio::test]
+async fn migrations() -> Result<(), anyhow::Error> {
+    let root_dir = env!("CARGO_MANIFEST_DIR");
+    let test_dir = PathBuf::from(root_dir)
+        .join("examples")
+        .join("migrations-1");
+
+    env::set_current_dir(&test_dir)?;
+
+    // tembo init
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("init");
+    cmd.assert().success();
+
+    // tembo context set --name local
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("context");
+    cmd.arg("set");
+    cmd.arg("--name");
+    cmd.arg("local");
+    cmd.assert().success();
+
+    // tembo apply
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("--verbose");
+    cmd.arg("apply");
+    cmd.assert().success();
+
+    // tembo delete
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("delete");
+    let _ = cmd.ok();
+
+    // check can't connect
+    assert!(assert_can_connect("migration-test".to_str()).await.is_err());
+
+    Ok(())
+}
+
+#[tokio::test]
 async fn data_warehouse() -> Result<(), anyhow::Error> {
     let instance_name = "data-warehouse";
 

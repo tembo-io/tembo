@@ -1,7 +1,10 @@
 name: !embeddings
 appServices:
-  - image: quay.io/tembo/vector-serve:7343bf4
+  - image: 387894460527.dkr.ecr.us-east-1.amazonaws.com/tembo-io/vector-serve:89dbbab
     name: embeddings
+    metrics:
+      path: /metrics
+      port: 3000
     routing:
       - port: 3000
         ingressPath: /embeddings

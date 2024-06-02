@@ -362,4 +362,20 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn test_app_metrics() {
+        let vdb = get_stack(StackType::VectorDB);
+
+        let embedding_app = vdb
+            .app_services
+            .unwrap()
+            .into_iter()
+            .find(|app| app.name == "embeddings".to_string())
+            .expect("missing embedding app");
+
+        let metrics = embedding_app.metrics.expect("missing metrics");
+        assert_eq!(metrics.path, "/metrics");
+        assert_eq!(metrics.port, 3000);
+    }
 }
