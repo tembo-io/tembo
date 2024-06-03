@@ -274,6 +274,43 @@ pub async fn reconcile_network_policies(client: Client, namespace: &str) -> Resu
     });
     apply_network_policy(namespace, &np_api, allow_kube_api).await?;
 
+    let allow_proxy_to_access_tembo_ai_gateway = serde_json::json!({
+        "apiVersion": "networking.k8s.io/v1",
+        "kind": "NetworkPolicy",
+        "metadata": {
+            "name": "allow-proxy-to-access-tembo-ai-gateway",
+            "namespace": namespace,
+        },
+        "spec": {
+            "podSelector": {
+                "matchLabels": {
+                    "app": format!("{}-ai-proxy", namespace)
+                }
+            },
+            "policyTypes": ["Egress"],
+            "egress": [
+                {
+                    "to": [
+                        {
+                            "namespaceSelector": {
+                                "matchLabels": {
+                                    "kubernetes.io/metadata.name": "tembo-ai"
+                                }
+                            },
+                            "podSelector": {
+                                "matchLabels": {
+                                    "app.kubernetes.io/name": "tembo-ai-gateway"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        }
+    });
+
+    apply_network_policy(namespace, &np_api, allow_proxy_to_access_tembo_ai_gateway).await?;
+
     Ok(())
 }
 
