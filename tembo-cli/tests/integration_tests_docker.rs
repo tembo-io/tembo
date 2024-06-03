@@ -420,6 +420,53 @@ async fn local_persistence() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+#[tokio::test]
+async fn allow_migration_secret() -> Result<(), anyhow::Error> {
+    let instance_name = "migrations-2";
+    let root_dir = env!("CARGO_MANIFEST_DIR");
+    let test_dir = PathBuf::from(root_dir).join("examples").join(instance_name);
+
+    env::set_current_dir(&test_dir)?;
+
+    // Set the environment variable
+    env::set_var("TEMBO_CUSTOM_SECRET", "my_custom_secret_value");
+
+    // tembo init
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("init");
+    cmd.assert().success();
+
+    // tembo context set --name local
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("context");
+    cmd.arg("set");
+    cmd.arg("--name");
+    cmd.arg("local");
+    cmd.assert().success();
+
+    // tembo apply
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("--verbose");
+    cmd.arg("apply");
+    cmd.assert().success();
+
+    assert!(assert_can_connect(instance_name.to_str()).await.is_err());
+
+    let result: String = get_output_from_sql(
+        instance_name.to_string(),
+        "SELECT secret_value FROM custom_secret_table WHERE secret_value = current_setting('tembo.custom_secret');".to_string(),
+    )
+    .await?;
+    assert!(result.contains('1'), "Query did not return 1");
+
+    // Stop the container
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("delete");
+    let _ = cmd.ok();
+
+    Ok(())
+}
+
 async fn get_output_from_sql(instance_name: String, sql: String) -> Result<String, anyhow::Error> {
     // Configure SQLx connection options
     let connect_options = PgConnectOptions::new()

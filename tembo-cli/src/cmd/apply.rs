@@ -13,9 +13,11 @@ use itertools::Itertools;
 use log::info;
 use spinoff::spinners;
 use spinoff::Spinner;
-use sqlx::{migrate::Migrator, PgPool};
+use sqlx::migrate::Migrator;
 use std::fmt::Write;
 use std::path::PathBuf;
+use std::env;
+use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use std::{
     collections::HashMap,
     fs::{self},
@@ -461,8 +463,23 @@ async fn apply_migrations(
     database_url: String,
     migrations_dir: PathBuf,
 ) -> Result<(), anyhow::Error> {
-    let pool = PgPool::connect(&database_url).await?;
+    // Create connection options
+    let mut options: PgConnectOptions = database_url.parse()?;
 
+    // Extract environment variables with the "TEMBO_" prefix
+    for (key, value) in env::vars() {
+        if key.starts_with("TEMBO_") {
+            let parameter = key.replace("TEMBO_", "tembo.").to_lowercase();
+            options = options.options([(parameter.as_str(), value.as_str())]);
+        }
+    }
+
+    // Create a connection pool with the custom options
+    let pool = PgPoolOptions::new()
+        .connect_with(options)
+        .await?;
+
+    // Apply migrations
     for entry in fs::read_dir(&migrations_dir)? {
         let entry = entry?;
         let path = entry.path();
