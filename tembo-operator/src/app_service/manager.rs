@@ -431,6 +431,18 @@ fn generate_deployment(
         });
     }
 
+    // Forward TEMBO_APPS_DEFAULT_ENV_* environment variables
+    for (key, value) in std::env::vars() {
+        if key.starts_with("TEMBO_APPS_DEFAULT_ENV_") {
+            let new_key = key.replace("TEMBO_APPS_DEFAULT_ENV_", "TEMBO_");
+            env_vars.push(EnvVar {
+                name: new_key,
+                value: Some(value),
+                ..EnvVar::default()
+            });
+        }
+    }
+
     // combine the secret env vars and those provided in spec by user
     env_vars.extend(default_app_envs);
 
