@@ -348,6 +348,78 @@ async fn multiple_instances() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+#[tokio::test]
+async fn local_persistence() -> Result<(), anyhow::Error> {
+    let instance_name = "set";
+    let root_dir = env!("CARGO_MANIFEST_DIR");
+    let test_dir = PathBuf::from(root_dir).join("examples").join(instance_name);
+
+    env::set_current_dir(&test_dir)?;
+
+    // tembo init
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("init");
+    cmd.assert().success();
+
+    // tembo context set --name local
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("context");
+    cmd.arg("set");
+    cmd.arg("--name");
+    cmd.arg("local");
+    cmd.assert().success();
+
+    // tembo apply
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("--verbose");
+    cmd.arg("apply");
+    cmd.assert().success();
+
+    // Create a table and insert data
+    SqlxUtils::execute_sql(
+        instance_name.to_string(),
+        "CREATE TABLE test_table (id serial PRIMARY KEY, data TEXT NOT NULL);".to_string(),
+    )
+    .await?;
+
+    SqlxUtils::execute_sql(
+        instance_name.to_string(),
+        "INSERT INTO test_table (data) VALUES ('test data');".to_string(),
+    )
+    .await?;
+
+    // Stop the container
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("delete");
+    let _ = cmd.ok();
+
+    // Start the container again
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("--verbose");
+    cmd.arg("apply");
+    cmd.assert().success();
+
+    SqlxUtils::execute_sql(
+        instance_name.to_string(),
+        "SELECT * FROM test_table;".to_string(),
+    )
+    .await?;
+
+    // Stop the container
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("delete");
+    let _ = cmd.ok();
+
+    // Remove the Docker volume
+    let mut cmd = Command::new("docker");
+    cmd.arg("volume");
+    cmd.arg("rm");
+    cmd.arg("set_set-data");
+    cmd.assert().success();
+
+    Ok(())
+}
+
 async fn get_output_from_sql(instance_name: String, sql: String) -> Result<String, anyhow::Error> {
     // Configure SQLx connection options
     let connect_options = PgConnectOptions::new()
