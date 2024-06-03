@@ -24,6 +24,7 @@ use kube::{
     Client, Resource,
 };
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
+use lazy_static::lazy_static;
 
 use crate::{
     app_service::ingress::{generate_ingress_tcp_routes, reconcile_ingress_tcp},
@@ -39,6 +40,23 @@ use super::{
 use crate::{app_service::types::IngressType, secret::fetch_all_decoded_data_from_secret};
 
 const APP_CONTAINER_PORT_PREFIX: &str = "app-";
+
+lazy_static! {
+    static ref FORWARDED_ENV_VARS: Vec<EnvVar> = {
+        let mut env_vars = Vec::new();
+        for (key, value) in std::env::vars() {
+            if key.starts_with("TEMBO_APPS_DEFAULT_ENV_") {
+                let new_key = key.replace("TEMBO_APPS_DEFAULT_ENV_", "TEMBO_");
+                env_vars.push(EnvVar {
+                    name: new_key,
+                    value: Some(value),
+                    ..EnvVar::default()
+                });
+            }
+        }
+        env_vars
+    };
+}
 
 // private wrapper to hold the AppService Resources
 #[derive(Clone, Debug)]
@@ -431,17 +449,8 @@ fn generate_deployment(
         });
     }
 
-    // Forward TEMBO_APPS_DEFAULT_ENV_* environment variables
-    for (key, value) in std::env::vars() {
-        if key.starts_with("TEMBO_APPS_DEFAULT_ENV_") {
-            let new_key = key.replace("TEMBO_APPS_DEFAULT_ENV_", "TEMBO_");
-            env_vars.push(EnvVar {
-                name: new_key,
-                value: Some(value),
-                ..EnvVar::default()
-            });
-        }
-    }
+    // Add the pre-loaded forwarded environment variables
+    env_vars.extend(FORWARDED_ENV_VARS.iter().cloned());
 
     // combine the secret env vars and those provided in spec by user
     env_vars.extend(default_app_envs);
