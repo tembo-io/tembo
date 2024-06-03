@@ -8,6 +8,28 @@ images:
   16: "standard-cnpg:16-389a437"
 stack_version: 0.1.0
 appServices:
+  - image: quay.io/tembo/ai-proxy:2024.06.03
+    name: ai-proxy
+    resources:
+      limits:
+        cpu: 100m
+        memory: 150Mi
+      requests:
+        cpu: 10m
+        memory: 150Mi
+    routing:
+    - port: 8080
+    storage:
+      volumeMounts:
+      - mountPath: /etc/nginx/conf.d
+        name: empty-dir
+      - mountPath: /var/cache/nginx
+        name: empty-dir
+      - mountPath: /var/run
+        name: empty-dir
+      volumes:
+      - emptyDir: {}
+        name: empty-dir
   - image: 387894460527.dkr.ecr.us-east-1.amazonaws.com/tembo-io/vector-serve:89dbbab
     name: embeddings
     metrics:
@@ -126,3 +148,5 @@ postgres_config:
     value: vectorize,pg_stat_statements,pg_cron
   - name: vectorize.embedding_service_url
     value: http://${NAMESPACE}-embeddings.${NAMESPACE}.svc.cluster.local:3000/v1/embeddings
+  - name: vectorize.ai_proxy_host
+    value: ${NAMESPACE}-ai-proxy:8080
