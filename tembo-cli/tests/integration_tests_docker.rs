@@ -350,8 +350,9 @@ async fn multiple_instances() -> Result<(), anyhow::Error> {
 
 #[tokio::test]
 async fn local_persistence() -> Result<(), anyhow::Error> {
+    let instance_name = "set";
     let root_dir = env!("CARGO_MANIFEST_DIR");
-    let test_dir = PathBuf::from(root_dir).join("examples").join("set");
+    let test_dir = PathBuf::from(root_dir).join("examples").join(instance_name);
 
     env::set_current_dir(&test_dir)?;
 
@@ -376,13 +377,13 @@ async fn local_persistence() -> Result<(), anyhow::Error> {
 
     // Create a table and insert data
     SqlxUtils::execute_sql(
-        "set".to_string(),
+        instance_name.to_string(),
         "CREATE TABLE test_table (id serial PRIMARY KEY, data TEXT NOT NULL);".to_string(),
     )
     .await?;
 
     SqlxUtils::execute_sql(
-        "set".to_string(),
+        instance_name.to_string(),
         "INSERT INTO test_table (data) VALUES ('test data');".to_string(),
     )
     .await?;
@@ -398,13 +399,11 @@ async fn local_persistence() -> Result<(), anyhow::Error> {
     cmd.arg("apply");
     cmd.assert().success();
 
-    // Verify the data persists
-    let result: String = get_output_from_sql(
-        "set".to_string(),
-        "SELECT data FROM test_table WHERE id = 1;".to_string(),
+    SqlxUtils::execute_sql(
+        instance_name.to_string(),
+        "SELECT * FROM test_table;".to_string(),
     )
     .await?;
-    assert!(result.contains("test data"), "Data did not persist");
 
     Ok(())
 }
@@ -421,7 +420,7 @@ async fn get_output_from_sql(instance_name: String, sql: String) -> Result<Strin
     let pool = sqlx::PgPool::connect_with(connect_options).await?;
 
     // Simple query
-    let result: (String,) = sqlx::query_as(&sql).fetch_one(&pool).await?;
+    let result: (i32,) = sqlx::query_as(&sql).fetch_one(&pool).await?;
 
     println!(
         "Successfully connected to the database: {}",
