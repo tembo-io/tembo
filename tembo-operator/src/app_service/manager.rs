@@ -23,8 +23,8 @@ use kube::{
     runtime::controller::Action,
     Client, Resource,
 };
-use std::{collections::BTreeMap, sync::Arc, time::Duration};
 use lazy_static::lazy_static;
+use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 use crate::{
     app_service::ingress::{generate_ingress_tcp_routes, reconcile_ingress_tcp},

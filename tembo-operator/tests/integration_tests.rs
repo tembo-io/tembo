@@ -614,13 +614,11 @@ mod test {
                     println!("Failed to get resource: {}. Retrying...", name);
                     thread::sleep(Duration::from_millis(2000));
                 }
+            } else if resource.is_err() {
+                return resource;
             } else {
-                if resource.is_err() {
-                    return resource;
-                } else {
-                    println!("Resource {} should not exist. Retrying...", name);
-                    thread::sleep(Duration::from_millis(2000));
-                }
+                println!("Resource {} should not exist. Retrying...", name);
+                thread::sleep(Duration::from_millis(2000));
             }
         }
         panic!("Timed out getting resource, {}", name);
