@@ -67,6 +67,7 @@ const DOCKERFILE_NAME: &str = "Dockerfile";
 const DOCKERCOMPOSE_NAME: &str = "docker-compose.yml";
 const POSTGRESCONF_NAME: &str = "postgres.conf";
 const MAX_INT32: i32 = 2147483647;
+const PGDATA_NAME: &str = "init_pgdata.sh";
 
 /// Deploys a tembo.toml file
 #[derive(Args)]
@@ -309,6 +310,15 @@ fn docker_apply_instance(
         DOCKERFILE_NAME.to_string(),
         instance_setting.instance_name.clone() + "/" + DOCKERFILE_NAME,
         rendered_dockerfile,
+        true,
+    )?;
+
+    let rendered_pgdata_script: String = get_rendered_init_pgdata()?;
+
+    FileUtils::create_file(
+        PGDATA_NAME.to_string(),
+        instance_setting.instance_name.clone() + "/" + PGDATA_NAME,
+        rendered_pgdata_script,
         true,
     )?;
 
@@ -1078,6 +1088,17 @@ pub fn get_instance_settings(
     }
 
     Ok(base_settings)
+}
+
+pub fn get_rendered_init_pgdata() -> Result<String, anyhow::Error> {
+    let contents = include_str!("../../tembo/init_pgdata.sh.template");
+
+    let mut tera = Tera::new("templates/**/*").unwrap();
+    let _ = tera.add_raw_template("init_pgdata", contents);
+    let context = Context::new();
+
+    let rendered_init_pgdata = tera.render("init_pgdata", &context)?;
+    Ok(rendered_init_pgdata)
 }
 
 pub fn get_rendered_dockerfile(
