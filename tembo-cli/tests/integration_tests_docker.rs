@@ -405,6 +405,18 @@ async fn local_persistence() -> Result<(), anyhow::Error> {
     )
     .await?;
 
+    // Stop the container
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("delete");
+    let _ = cmd.ok();
+
+    // Remove the Docker volume
+    let mut cmd = Command::new("docker");
+    cmd.arg("volume");
+    cmd.arg("rm");
+    cmd.arg("set_set-data");
+    cmd.assert().success();
+
     Ok(())
 }
 
