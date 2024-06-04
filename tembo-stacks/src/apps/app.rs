@@ -377,8 +377,9 @@ mod tests {
             merge_app_reqs(Some(user_apps), Some(stack_apps), None, None, None).unwrap();
         let app = merged_configs.app_services.unwrap()[0].clone();
         let mut to_find = 2;
-        // two embedding defaults + 1 custom
-        assert_eq!(app.env.as_ref().unwrap().len(), 3);
+        // 3 embedding app defaults + 1 custom
+        println!("{:?}", app.env.as_ref().unwrap());
+        assert_eq!(app.env.as_ref().unwrap().len(), 4);
         for e in app.env.unwrap() {
             match e.name.as_str() {
                 // custom env var is found
