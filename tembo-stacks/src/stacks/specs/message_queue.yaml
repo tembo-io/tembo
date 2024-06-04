@@ -44,10 +44,10 @@ appServices:
         value: info
     resources:
       requests:
-        cpu: 100m
+        cpu: 10m
         memory: 256Mi
       limits:
-        cpu: 400m
+        cpu: 200m
         memory: 256Mi
 trunk_installs:
   - name: pgmq
