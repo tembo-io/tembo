@@ -30,7 +30,7 @@ appServices:
       volumes:
       - emptyDir: {}
         name: empty-dir
-  - image: 387894460527.dkr.ecr.us-east-1.amazonaws.com/tembo-io/vector-serve:89dbbab
+  - image: 387894460527.dkr.ecr.us-east-1.amazonaws.com/tembo-io/vector-serve:6397964
     name: embeddings
     metrics:
       path: /metrics
@@ -39,7 +39,7 @@ appServices:
       - name: TMPDIR
         value: /models
       - name: BATCH_SIZE
-        value: "750"
+        value: "500"
       - name: XDG_CACHE_HOME
         value: /models/.cache
     routing:
@@ -55,11 +55,11 @@ appServices:
             replacement: /v1/embeddings
     resources:
       requests:
-        cpu: 500m
-        memory: 1500Mi
+        cpu: 100m
+        memory: 500Mi
       limits:
-        cpu: 4000m
-        memory: 1500Mi
+        cpu: 400m
+        memory: 500Mi
     storage:
       volumeMounts:
       - mountPath: /models
@@ -72,7 +72,7 @@ appServices:
               - ReadWriteOnce
               resources:
                 requests:
-                  storage: 2Gi
+                  storage: 1Gi
         name: hf-data-vol
     probes:
       readiness:
