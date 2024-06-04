@@ -16,7 +16,7 @@ appServices:
           config:
             regex: ^\/embeddings\/?
             replacement: /v1/embeddings
-    env: 
+    env:
       - name: TMPDIR
         value: /models
       - name: XDG_CACHE_HOME
