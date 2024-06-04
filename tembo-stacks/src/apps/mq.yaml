@@ -37,7 +37,7 @@ appServices:
     resources:
       requests:
         cpu: 10m
-        memory: 256Mi
+        memory: 100Mi
       limits:
         cpu: 200m
-        memory: 256Mi
+        memory: 100Mi
