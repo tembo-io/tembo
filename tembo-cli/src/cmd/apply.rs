@@ -14,10 +14,10 @@ use log::info;
 use spinoff::spinners;
 use spinoff::Spinner;
 use sqlx::migrate::Migrator;
+use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
+use std::env;
 use std::fmt::Write;
 use std::path::PathBuf;
-use std::env;
-use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
 use std::{
     collections::HashMap,
     fs::{self},
@@ -475,9 +475,7 @@ async fn apply_migrations(
     }
 
     // Create a connection pool with the custom options
-    let pool = PgPoolOptions::new()
-        .connect_with(options)
-        .await?;
+    let pool = PgPoolOptions::new().connect_with(options).await?;
 
     // Apply migrations
     for entry in fs::read_dir(&migrations_dir)? {
