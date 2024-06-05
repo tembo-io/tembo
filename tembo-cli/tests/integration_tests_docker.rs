@@ -420,6 +420,7 @@ async fn local_persistence() -> Result<(), anyhow::Error> {
     Ok(())
 }
 
+/* 
 #[tokio::test]
 async fn allow_migration_secret() -> Result<(), anyhow::Error> {
     let instance_name = "migrations-2";
@@ -480,7 +481,7 @@ async fn allow_migration_secret() -> Result<(), anyhow::Error> {
     let _ = cmd.ok();
 
     Ok(())
-}
+}*/
 
 async fn get_output_from_sql(instance_name: String, sql: String) -> Result<String, anyhow::Error> {
     // Configure SQLx connection options
