@@ -687,6 +687,9 @@ pub fn cnpg_cluster_from_cdb(
         })
     }
 
+    let instances = cdb.spec.replicas as i64;
+    let primary_update_method = determine_primary_update_method(instances);
+
     if cdb
         .spec
         .metrics
@@ -721,7 +724,7 @@ pub fn cnpg_cluster_from_cdb(
             enable_superuser_access: Some(true),
             failover_delay: Some(0),
             image_name: Some(image),
-            instances: cdb.spec.replicas as i64,
+            instances,
             log_level: Some(ClusterLogLevel::Info),
             managed: cluster_managed(&name),
             max_sync_replicas: Some(0),
@@ -748,7 +751,7 @@ pub fn cnpg_cluster_from_cdb(
                 enable_alter_system: Some(true),
                 ..ClusterPostgresql::default()
             }),
-            primary_update_method: Some(ClusterPrimaryUpdateMethod::Restart),
+            primary_update_method,
             primary_update_strategy: Some(ClusterPrimaryUpdateStrategy::Unsupervised),
             replication_slots: replication,
             resources: Some(ClusterResources {
@@ -777,6 +780,18 @@ pub fn cnpg_cluster_from_cdb(
             ..ClusterSpec::default()
         },
         status: None,
+    }
+}
+
+// This function is used to determine the primary update method based on the number of instances
+// for restart, this will only be applied to a single instance cluster
+// for switchover, it will be applied to HA clusters, so that failover to secondary is done before
+// the restart of the primary instance.
+fn determine_primary_update_method(instances: i64) -> Option<ClusterPrimaryUpdateMethod> {
+    if instances == 1 {
+        Some(ClusterPrimaryUpdateMethod::Restart)
+    } else {
+        Some(ClusterPrimaryUpdateMethod::Switchover)
     }
 }
 
@@ -1590,7 +1605,7 @@ fn cnpg_scheduled_backup(
 //     format!("{}-snap", trimmed_name)
 // }
 
-// Reconcile a SheduledBackup
+// Reconcile a ScheduledBackup
 #[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any()))]
 pub async fn reconcile_cnpg_scheduled_backup(
     cdb: &CoreDB,
@@ -3020,6 +3035,26 @@ mod tests {
         // Test case 6: Invalid schedule expression with non-integer term
         coredb.spec.backup.schedule = Some("30 12 * * * abc".to_string());
         assert_eq!(schedule_expression_from_cdb(&coredb), "0 0 0 * * *");
+    }
+
+    #[test]
+    fn test_determine_primary_update_method() {
+        // Test case for instances == 1
+        assert_eq!(
+            determine_primary_update_method(1),
+            Some(ClusterPrimaryUpdateMethod::Restart)
+        );
+
+        // Test case for instances > 1
+        assert_eq!(
+            determine_primary_update_method(2),
+            Some(ClusterPrimaryUpdateMethod::Switchover)
+        );
+
+        assert_eq!(
+            determine_primary_update_method(3),
+            Some(ClusterPrimaryUpdateMethod::Switchover)
+        );
     }
 
     // #[test]
