@@ -746,6 +746,7 @@ pub struct CoreDBStatus {
     pub runtime_config: Option<Vec<PgConfig>>,
     pub first_recoverability_time: Option<DateTime<Utc>>,
     pub pg_postmaster_start_time: Option<DateTime<Utc>>,
+    #[deprecated(note = "This field is deprecated and it is no longer used")]
     pub last_fully_reconciled_at: Option<DateTime<Utc>>,
     pub last_archiver_status: Option<DateTime<Utc>>,
 }

@@ -1,5 +1,6 @@
 use crate::apis::coredb_types;
 use crate::apis::coredb_types::Restore;
+use crate::extensions::install::find_trunk_installs_to_pod;
 use crate::ingress_route_crd::{
     IngressRoute, IngressRouteRoutes, IngressRouteRoutesKind, IngressRouteRoutesServices,
     IngressRouteRoutesServicesKind, IngressRouteSpec, IngressRouteTls,
@@ -880,14 +881,17 @@ async fn pods_to_fence(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<String>, A
         && cdb
             .status
             .as_ref()
-            .and_then(|s| s.last_fully_reconciled_at.as_ref())
+            .and_then(|s| s.pg_postmaster_start_time.as_ref())
             .is_none()
     {
         // If restore is requested, fence all the pods based on the cdb.spec.replicas value
         let mut pod_names_to_fence = Vec::new();
         for i in 1..=cdb.spec.replicas {
             let pod_name = format!("{}-{}", &cdb.name_any(), i);
-            pod_names_to_fence.push(pod_name);
+            let trunk_installs = find_trunk_installs_to_pod(cdb, &pod_name);
+            if !trunk_installs.is_empty() {
+                pod_names_to_fence.push(pod_name);
+            }
         }
 
         debug!(
