@@ -380,7 +380,9 @@ impl CoreDB {
         let last_archiver_status = reconcile_last_archive_status(self, ctx.clone()).await?;
 
         let current_config_values = get_current_config_values(self, ctx.clone()).await?;
-        let mut new_status = CoreDBStatus {
+
+        #[allow(deprecated)]
+        let new_status = CoreDBStatus {
             running: true,
             extensionsUpdating: false,
             storage: Some(self.spec.storage.clone()),
@@ -389,25 +391,9 @@ impl CoreDB {
             resources: Some(self.spec.resources.clone()),
             runtime_config: Some(current_config_values),
             first_recoverability_time: recovery_time,
-            pg_postmaster_start_time,
             last_fully_reconciled_at: None,
+            pg_postmaster_start_time,
             last_archiver_status,
-        };
-
-        let current_time = Utc::now();
-        new_status.last_fully_reconciled_at = {
-            let current_fully_reconciled_at = match self.status.as_ref() {
-                None => None,
-                Some(status) => status.last_fully_reconciled_at,
-            };
-            // Update the timestamp if it's been more than 30 seconds since the last update
-            if current_fully_reconciled_at.map_or(true, |last_reconciled| {
-                current_time > last_reconciled + Duration::from_secs(cfg.reconcile_timestamp_ttl)
-            }) {
-                Some(current_time)
-            } else {
-                current_fully_reconciled_at
-            }
         };
 
         debug!("Updating CoreDB status to {:?} for {name}", new_status);
