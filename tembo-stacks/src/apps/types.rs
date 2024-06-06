@@ -27,8 +27,8 @@ pub struct MergedConfigs {
 
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, JsonSchema)]
 pub enum AppType {
-    #[serde(rename = "ai")]
-    AI(Option<AppConfig>),
+    #[serde(rename = "ai-proxy")]
+    AIProxy(Option<AppConfig>),
     #[serde(rename = "restapi")]
     RestAPI(Option<AppConfig>),
     #[serde(rename = "http")]
@@ -67,7 +67,7 @@ impl TryFrom<AppService> for AppType {
         });
 
         match app_service.name.as_str() {
-            "ai" => Ok(AppType::RestAPI(app_config)),
+            "ai-proxy" => Ok(AppType::RestAPI(app_config)),
             "restapi" => Ok(AppType::RestAPI(app_config)),
             "http" => Ok(AppType::HTTP(app_config)),
             "mq-api" => Ok(AppType::MQ(app_config)),

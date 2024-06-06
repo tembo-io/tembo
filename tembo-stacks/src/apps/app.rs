@@ -43,7 +43,7 @@ pub fn merge_app_reqs(
     if let Some(apps) = user_apps {
         for app in apps {
             match app {
-                AppType::AI(_config) => {
+                AppType::AIProxy(_config) => {
                     let ai = AI.clone();
                     let ai_app_svc = ai.app_services.unwrap()[0].clone();
                     // the AI appService is a proxy container to Tembo AI
