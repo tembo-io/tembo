@@ -877,6 +877,11 @@ async fn pods_to_fence(cdb: &CoreDB, ctx: Arc<Context>) -> Result<Vec<String>, A
             .as_ref()
             .and_then(|s| s.first_recoverability_time.as_ref())
             .is_none()
+        && cdb
+            .status
+            .as_ref()
+            .and_then(|s| s.pg_postmaster_start_time.as_ref())
+            .is_none()
     {
         // If restore is requested, fence all the pods based on the cdb.spec.replicas value
         let mut pod_names_to_fence = Vec::new();
