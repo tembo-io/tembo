@@ -380,6 +380,8 @@ impl CoreDB {
         let last_archiver_status = reconcile_last_archive_status(self, ctx.clone()).await?;
 
         let current_config_values = get_current_config_values(self, ctx.clone()).await?;
+
+        #[allow(deprecated)]
         let new_status = CoreDBStatus {
             running: true,
             extensionsUpdating: false,
@@ -389,6 +391,7 @@ impl CoreDB {
             resources: Some(self.spec.resources.clone()),
             runtime_config: Some(current_config_values),
             first_recoverability_time: recovery_time,
+            last_fully_reconciled_at: None,
             pg_postmaster_start_time,
             last_archiver_status,
         };

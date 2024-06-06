@@ -2817,6 +2817,10 @@ spec:
                 format: date-time
                 nullable: true
                 type: string
+              last_fully_reconciled_at:
+                format: date-time
+                nullable: true
+                type: string
               pg_postmaster_start_time:
                 format: date-time
                 nullable: true
