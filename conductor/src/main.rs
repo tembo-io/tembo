@@ -154,7 +154,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
             }
         }
 
-        metrics.conductor_total.add(1, &[]);
+        metrics.conductor.add(1, &[]);
 
         // note: messages are recycled on purpose
         // but absurdly high read_ct means its probably never going to get processed

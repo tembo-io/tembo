@@ -2,7 +2,7 @@ use opentelemetry::metrics::{Counter, Meter};
 
 #[derive(Clone)]
 pub struct CustomMetrics {
-    pub conductor_total: Counter<u64>,
+    pub conductor: Counter<u64>,
     pub conductor_requeues: Counter<u64>,
     pub conductor_errors: Counter<u64>,
     pub conductor_completed: Counter<u64>,
@@ -10,7 +10,7 @@ pub struct CustomMetrics {
 
 impl CustomMetrics {
     pub fn new(meter: &Meter) -> Self {
-        let conductor_total = meter
+        let conductor = meter
             .u64_counter("conductor_total")
             .with_description("Total number of dequeues in conductor")
             .init();
@@ -27,7 +27,7 @@ impl CustomMetrics {
             .with_description("Number of messages successfully processed in conductor")
             .init();
         Self {
-            conductor_total,
+            conductor,
             conductor_requeues,
             conductor_errors,
             conductor_completed,
