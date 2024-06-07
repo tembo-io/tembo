@@ -148,5 +148,7 @@ postgres_config:
     value: vectorize,pg_stat_statements,pg_cron
   - name: vectorize.embedding_service_url
     value: http://${NAMESPACE}-embeddings.${NAMESPACE}.svc.cluster.local:3000/v1/embeddings
-  - name: vectorize.ai_proxy_host
-    value: ${NAMESPACE}-ai-proxy:8080
+  - name: vectorize.tembo_service_url
+    value: http://${NAMESPACE}-ai-proxy:8080/v1
+  - name: vectorize.tembo_jwt
+    value: placeholder
