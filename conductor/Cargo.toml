@@ -9,31 +9,38 @@ publish = false
 [dependencies]
 aws-config = "0.55.1"
 aws-sdk-cloudformation = "0.26.0"
-base64 = "0.21.0"
-chrono = { version = "0.4.24", features = [ "serde" ] }
-controller = {path = "../tembo-operator", package = "controller"}
-env_logger = "0.10.0"
-futures = "0.3.28"
-k8s-openapi = { version = "0.18.0", features = ["v1_25", "schemars"] }
-log = "0.4.17"
+base64 = "0.21"
+chrono = { version = "0.4", features = ["serde"] }
+controller = { path = "../tembo-operator", package = "controller" }
+env_logger = "0.11"
+futures = "0.3"
+k8s-openapi = { version = "0.22.0", features = ["v1_28", "schemars"] }
+log = "0.4"
 pgmq = "0.16.1"
-schemars = "0.8.12"
-serde = { version = "1.0.160", features = ["derive"] }
-serde_json = "1.0.96"
-thiserror = "1.0.40"
-tokio = {version = "1.28.0", features = ["full"]}
+schemars = "0.8"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+tokio = { version = "1.28.0", features = ["full"] }
 actix-web = "4.3.0"
-actix-web-opentelemetry = { version = "0.13.0", features = ["metrics-prometheus"] }
-opentelemetry = { version = "0.18", features = ["metrics", "rt-tokio-current-thread"] }
-opentelemetry-prometheus = "0.11"
+actix-web-opentelemetry = { version = "0.18.0", features = [
+  "metrics-prometheus",
+] }
+opentelemetry = { version = "0.20", features = ["metrics"] }
+opentelemetry_sdk = { version = "0.20", features = [
+  "metrics",
+  "rt-tokio-current-thread",
+] }
+opentelemetry-prometheus = "0.13" #otel-prometheus needs to support the same version as otel and otel_sdk
+prometheus = "0.13"
 sqlx = "0.6.3"
-anyhow =  "1.0.82"
+anyhow = "1.0"
 serde_yaml = "0.9.34"
-reqwest = { version = "0.12.3", features = ["json"] }
+reqwest = { version = "0.12", features = ["json"] }
 
 [dependencies.kube]
 features = ["runtime", "client", "derive"]
-version = "0.84.0"
+version = "0.91.0"
 
 
 [dev-dependencies]

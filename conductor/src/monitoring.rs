@@ -24,7 +24,7 @@ impl CustomMetrics {
             .init();
         let conductor_completed = meter
             .u64_counter("conductor_completed")
-            .with_description("Number of messages sucessfully processed in conductor")
+            .with_description("Number of messages successfully processed in conductor")
             .init();
         Self {
             conductor_total,
