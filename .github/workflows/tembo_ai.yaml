@@ -26,35 +26,6 @@ on:
     - 'inference-gateway/**'
 
 jobs:
-  lint:
-    name: Run linters
-    runs-on:
-      - self-hosted
-      - dind
-      - xlarge-16x16
-    env:
-      DATABASE_URL: "postgresql://postgres:postgres@0.0.0.0:5432/postgres"
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install system dependencies
-        run: |
-          set -xe
-          sudo apt-get update
-          sudo apt-get install -y pkg-config libssl-dev
-      - name: Install minimal nightly with clippy and rustfmt
-        uses: actions-rs/toolchain@v1
-        with:
-          profile: minimal
-          toolchain: nightly
-          components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: "tembo-ai"
-      - name: install dependencies
-        run: cargo install sqlx-cli --version 0.7.4
-      - name: Check
-        run: make check
-
   tests:
     name: Run tests
     runs-on: ubuntu-latest
@@ -69,6 +40,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           prefix-key: "cp-test"
+      - name: Check Formatter, Migrations
+        run: make check
       - name: install dependencies
         run: cargo install sqlx-cli --version 0.7.4
       - name: unit-test
