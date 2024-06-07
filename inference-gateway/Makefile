@@ -28,7 +28,7 @@ run-mock-server:
 unit-test:
 	cargo test
 
-integration-test: run-postgres run-migrations run-mock-server
+integration-test: run-mock-server
 	RUST_LOG=${RUST_LOG} LLM_SERVICE_HOST_PORT=${LLM_SERVICE_HOST_PORT} cargo test -- --ignored
 
 test-all: unit-test integration-test
