@@ -1,0 +1,74 @@
+name: Tembo AI Gateway Workflow
+
+permissions:
+  pull-requests: write
+  deployments: write
+  id-token: write
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+    working-directory: ./inference-gateway/
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+    - '.github/workflows/tembo_ai.yaml'
+    - 'inference-gateway/**'
+  push:
+    branches:
+      - main
+    paths:
+    - '.github/workflows/tembo_ai.yaml'
+    - 'inference-gateway/**'
+
+jobs:
+  lint:
+    name: Run linters
+    runs-on:
+      - self-hosted
+      - dind
+      - xlarge-16x16
+    env:
+      DATABASE_URL: "postgresql://postgres:postgres@0.0.0.0:5432/postgres"
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install minimal nightly with clippy and rustfmt
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: nightly
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: "tembo-ai"
+      - name: install dependencies
+        run: cargo install sqlx-cli --version 0.7.4
+      - name: Check
+        run: make check
+
+  tests:
+    name: Run tests
+    runs-on: ubuntu-latest
+    env:
+      DATABASE_URL: "postgresql://postgres:postgres@0.0.0.0:5432/postgres"
+    steps:
+      - name: Delete huge unnecessary tools folder
+        run: rm -rf /opt/hostedtoolcache && df -h
+      - uses: actions/checkout@v4
+      - name: Install Rust stable toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: "cp-test"
+      - name: install dependencies
+        run: cargo install sqlx-cli --version 0.7.4
+      - name: unit-test
+        run: make unit-test
+      - name: integration-test
+        run: make integration-test
