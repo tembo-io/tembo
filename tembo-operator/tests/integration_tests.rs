@@ -5384,7 +5384,7 @@ CREATE EVENT TRIGGER pgrst_watch
                 "name": name
             },
             "spec": {
-                "image": "quay.io/tembo/standard-cnpg:15-120cc24",
+                "image": "quay.io/tembo/standard-cnpg:15-a0a5ab5",
                 "replicas": replicas,
                 "trunk_installs": [
                     {

@@ -9,7 +9,6 @@ images=(
 	"postgrest/postgrest:v10.0.0"
 	"crccheck/hello-world:latest"
 	"ghcr.io/ferretdb/ferretdb"
-	"quay.io/tembo/standard-cnpg:15-120cc24"
 	"prom/blackbox-exporter"
 )
 
