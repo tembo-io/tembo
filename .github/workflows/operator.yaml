@@ -16,14 +16,14 @@ on:
     branches:
       - main
     paths:
-    - '.github/workflows/operator.yaml'
-    - 'tembo-operator/**'
+      - ".github/workflows/operator.yaml"
+      - "tembo-operator/**"
   push:
     branches:
       - main
     paths:
-    - '.github/workflows/operator.yaml'
-    - 'tembo-operator/**'
+      - ".github/workflows/operator.yaml"
+      - "tembo-operator/**"
 
 jobs:
   functional_test:
@@ -39,7 +39,7 @@ jobs:
         # Go here for a list of versions:
         # https://github.com/kubernetes-sigs/kind/releases
         kube_version:
-          - '1.25.8'
+          - "1.28.9"
     steps:
       - uses: actions/checkout@v4
       - name: Install system dependencies
