@@ -147,6 +147,7 @@ pub fn default_resources() -> ResourceRequirements {
     ResourceRequirements {
         limits: Some(limits),
         requests: Some(requests),
+        ..ResourceRequirements::default()
     }
 }
 
@@ -159,7 +160,7 @@ pub struct AppMetrics {
 }
 
 // Secrets are injected into the container as environment variables
-// ths allows users to map these secrets to environment variable of their choice
+// this allows users to map these secrets to environment variable of their choice
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, JsonSchema, PartialEq)]
 pub struct EnvVar {
     pub name: String,

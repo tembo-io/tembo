@@ -3,7 +3,7 @@ ORG := "localhost:5001"
 VERSION := `git rev-parse HEAD`
 SEMVER_VERSION := `grep version Cargo.toml | awk -F"\"" '{print $2}' | head -n 1`
 NAMESPACE := "default"
-KUBE_VERSION := env_var_or_default('KUBE_VERSION', '1.25.8')
+KUBE_VERSION := env_var_or_default('KUBE_VERSION', '1.28.9')
 STORAGE_CLASS_NAME := "standard"
 
 default:
@@ -14,7 +14,7 @@ generate-crd:
   cargo run --bin crdgen > ../charts/tembo-operator/templates/crd.yaml
 
 install-calico:
-	helm upgrade --install --create-namespace --namespace=tigera-operator --version=3.26.1 --values=./testdata/calico.yaml calico projectcalico/tigera-operator
+	helm upgrade --install --create-namespace --namespace=tigera-operator --version=3.28.0 --values=./testdata/calico.yaml calico projectcalico/tigera-operator
 
 install-traefik:
 	kubectl create namespace traefik || true

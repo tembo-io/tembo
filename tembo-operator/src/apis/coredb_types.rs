@@ -222,7 +222,7 @@ pub struct Backup {
     #[serde(default = "defaults::default_backup_schedule")]
     pub schedule: Option<String>,
 
-    /// The S3 compatable endpoint URL
+    /// The S3 compatible endpoint URL
     #[serde(default, rename = "endpointURL")]
     pub endpoint_url: Option<String>,
 
@@ -255,7 +255,7 @@ pub struct Backup {
 ///       inheritFromIAMRole: true
 /// ```
 ///
-/// For more information plese read through the [cloudnative-pg documentation](https://cloudnative-pg.io/documentation/1.20/recovery/#pitr-from-an-object-store)
+/// For more information please read through the [cloudnative-pg documentation](https://cloudnative-pg.io/documentation/1.20/recovery/#pitr-from-an-object-store)
 #[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
 pub struct Restore {
     /// The name of the instance you wish to restore.  This maps to the `Backup`
@@ -282,7 +282,7 @@ pub struct Restore {
     #[serde(rename = "recoveryTargetTime")]
     pub recovery_target_time: Option<String>,
 
-    /// endpointURL is the S3 compatable endpoint URL
+    /// endpointURL is the S3 compatible endpoint URL
     #[serde(default, rename = "endpointURL")]
     pub endpoint_url: Option<String>,
 
@@ -454,7 +454,7 @@ pub struct CoreDBSpec {
     pub uid: i32,
 
     /// A list of extensions to enable on the CoreDB instance.
-    /// This list should be a lits of extension names that are already available
+    /// This list should be a list of extension names that are already available
     /// on the Postgres instance you are running.  To install extensions at runtime
     /// please see the `trunk_installs` field.
     ///
@@ -567,7 +567,7 @@ pub struct CoreDBSpec {
     /// A AffinityConfiguration provides a way to configure the CoreDB instance to run
     /// on specific nodes in the cluster based off of nodeSelector, nodeAffinity and tolerations
     ///
-    /// For more informaton on AffinityConfiguration please see the [Cloudnative-PG documentation](https://cloudnative-pg.io/documentation/1.22/cloudnative-pg.v1/#postgresql-cnpg-io-v1-AffinityConfiguration)
+    /// For more information on AffinityConfiguration please see the [Cloudnative-PG documentation](https://cloudnative-pg.io/documentation/1.22/cloudnative-pg.v1/#postgresql-cnpg-io-v1-AffinityConfiguration)
     ///
     /// **Default**:
     /// ```yaml
@@ -589,7 +589,7 @@ pub struct CoreDBSpec {
     /// The topologySpreadConstraints provides a way to spread matching pods among the given topology
     ///
     /// For more information see the Kubernetes documentation on [Topology Spread Constraints](https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/)
-    /// Tembo is compatable with the `v1` version of the TopologySpreadConstraints up to [Kubernetes 1.25](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#topologyspreadconstraint-v1-core)
+    /// Tembo is compatible with the `v1` version of the TopologySpreadConstraints up to [Kubernetes 1.28](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#topologyspreadconstraint-v1-core)
     ///
     /// **Default**: `None`
     #[serde(rename = "topologySpreadConstraints")]
