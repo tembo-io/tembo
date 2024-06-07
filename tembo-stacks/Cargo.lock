@@ -2411,7 +2411,7 @@ dependencies = [
 
 [[package]]
 name = "tembo-stacks"
-version = "0.9.3"
+version = "0.10.1"
 dependencies = [
  "anyhow",
  "clap",
@@ -2419,7 +2419,6 @@ dependencies = [
  "futures",
  "k8s-openapi",
  "lazy_static",
- "regex",
  "schemars",
  "serde",
  "serde_json",

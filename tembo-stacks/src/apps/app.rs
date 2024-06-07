@@ -11,6 +11,8 @@ use tracing::{instrument, warn};
 use crate::apps::types::{App, AppConfig, AppType, MergedConfigs};
 
 lazy_static! {
+    pub static ref AI: App =
+        serde_yaml::from_str(include_str!("ai.yaml")).expect("ai.yaml not found");
     pub static ref HTTP: App =
         serde_yaml::from_str(include_str!("http.yaml")).expect("http.yaml not found");
     pub static ref RESTAPI: App =
@@ -41,6 +43,19 @@ pub fn merge_app_reqs(
     if let Some(apps) = user_apps {
         for app in apps {
             match app {
+                AppType::AIProxy(_config) => {
+                    let ai = AI.clone();
+                    let ai_app_svc = ai.app_services.unwrap()[0].clone();
+                    // the AI appService is a proxy container to Tembo AI
+                    // and its configuration should not be modified
+                    user_app_services.push(ai_app_svc);
+                    if let Some(extensions) = ai.extensions {
+                        fin_app_extensions.extend(extensions);
+                    }
+                    if let Some(trunks) = ai.trunk_installs {
+                        fin_app_trunk_installs.extend(trunks);
+                    }
+                }
                 AppType::RestAPI(config) => {
                     // there is only 1 app_service in the restAPI
                     let mut restapi = RESTAPI.clone().app_services.unwrap().clone()[0].clone();
@@ -377,8 +392,9 @@ mod tests {
             merge_app_reqs(Some(user_apps), Some(stack_apps), None, None, None).unwrap();
         let app = merged_configs.app_services.unwrap()[0].clone();
         let mut to_find = 2;
-        // two embedding defaults + 1 custom
-        assert_eq!(app.env.as_ref().unwrap().len(), 3);
+        // 3 embedding app defaults + 1 custom
+        println!("{:?}", app.env.as_ref().unwrap());
+        assert_eq!(app.env.as_ref().unwrap().len(), 4);
         for e in app.env.unwrap() {
             match e.name.as_str() {
                 // custom env var is found
@@ -409,6 +425,7 @@ mod tests {
         assert!(MQ.app_services.is_some());
         assert!(PGANALYZE.app_services.is_some());
         assert!(RESTAPI.app_services.is_some());
+        assert!(AI.app_services.is_some());
     }
 
     #[test]

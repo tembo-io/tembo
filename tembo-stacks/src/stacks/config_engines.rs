@@ -1,11 +1,11 @@
+use std::ops::Not;
+
 use anyhow::Result;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 use crate::stacks::types::Stack;
-use lazy_static::lazy_static;
-use regex::Regex;
 use tembo_controller::{
     apis::postgres_parameters::{ConfigValue, PgConfig},
     errors::ValueError,
@@ -233,7 +233,7 @@ fn parse_memory(stack: &Stack) -> Result<f64, ValueError> {
         .memory
         .clone();
     let (mem, unit) = split_string(&mem_str)?;
-    match unit.as_str() {
+    match unit {
         "Gi" => Ok(mem * 1024.0),
         "Mi" => Ok(mem),
         _ => Err(ValueError::Invalid(format!(
@@ -250,10 +250,12 @@ fn parse_storage(stack: &Stack) -> Result<f64, ValueError> {
         .as_ref()
         .expect("infra required for a configuration engine")
         .storage
-        .clone();
-    let (storage, unit) = split_string(&storage_str)?;
-    match unit.as_str() {
+        .as_ref();
+    let (storage, unit) = split_string(storage_str)?;
+
+    match unit {
         "Gi" => Ok(storage),
+        "Ti" => Ok(storage * 1024.0),
         _ => Err(ValueError::Invalid(format!(
             "Invalid storage value: {}",
             storage_str
@@ -290,14 +292,13 @@ fn dynamic_effective_cache_size_mb(sys_mem_mb: i32) -> i32 {
     (sys_mem_mb as f64 * EFFECTIVE_CACHE_SIZE).floor() as i32
 }
 
-lazy_static! {
-    static ref RE: Regex = Regex::new(r"^([0-9]*\.?[0-9]+)([a-zA-Z]+)$").unwrap();
-}
+fn split_string(input: &str) -> Result<(f64, &str), ValueError> {
+    let is_not_numeric = |ch: char| (ch.is_ascii_digit() || ch == '.').not();
 
-fn split_string(input: &str) -> Result<(f64, String), ValueError> {
-    if let Some(cap) = RE.captures(input) {
-        let num = cap[1].parse::<f64>()?;
-        let alpha = cap[2].to_string();
+    if let Some(pos) = input.find(is_not_numeric) {
+        let (num, alpha) = input.split_at(pos);
+        let num = num.parse()?;
+
         Ok((num, alpha))
     } else {
         Err(ValueError::Invalid(format!(
@@ -321,6 +322,8 @@ fn parse_cpu(stack: &Stack) -> f32 {
 
 #[cfg(test)]
 mod tests {
+    use tembo_controller::defaults::default_repository;
+
     use super::*;
     use crate::stacks::types::*;
 
@@ -438,10 +441,71 @@ mod tests {
         assert_eq!(mem, 10.0);
         assert_eq!(unit, "Gi");
 
+        let (mem, unit) = split_string("1024Gi").expect("failed parsing val");
+        assert_eq!(mem, 1024.0);
+        assert_eq!(unit, "Gi");
+
+        let (mem, unit) = split_string("2Ti").expect("failed parsing val");
+        assert_eq!(mem, 2.0);
+        assert_eq!(unit, "Ti");
+
+        let (mem, unit) = split_string("1.5Ti").expect("failed parsing val");
+        assert_eq!(mem, 1.5);
+        assert_eq!(unit, "Ti");
+
+        let (mem, unit) = split_string("600MB").expect("failed parsing val");
+        assert_eq!(mem, 600.0);
+        assert_eq!(unit, "MB");
+
         let error_val = split_string("BadData");
         assert!(error_val.is_err());
-        let error_val: Result<(f64, String), ValueError> = split_string("Gi10");
+        let error_val = split_string("Gi10");
         assert!(error_val.is_err());
+        let error_val = split_string("1024");
+        assert!(error_val.is_err());
+    }
+
+    #[test]
+    fn test_parse_storage() {
+        let mut stack = Stack {
+            name: "parse-storage-inst".into(),
+            compute_constraints: None,
+            description: None,
+            organization: "tembo".into(),
+            repository: default_repository(),
+            images: Default::default(),
+            stack_version: None,
+            trunk_installs: None,
+            extensions: None,
+            postgres_metrics: None,
+            postgres_config: None,
+            postgres_config_engine: None,
+            infrastructure: Some(Infrastructure {
+                cpu: "1".into(),
+                memory: "1Gi".into(),
+                storage: "10Gi".into(),
+            }),
+            app_services: None,
+        };
+
+        // Default value: should be 10Gi
+        assert_eq!(parse_storage(&stack).unwrap(), 10.0);
+
+        stack.infrastructure.as_mut().unwrap().storage = "500Gi".into();
+        assert_eq!(parse_storage(&stack).unwrap(), 500.0);
+
+        stack.infrastructure.as_mut().unwrap().storage = "1Ti".into();
+        assert_eq!(parse_storage(&stack).unwrap(), 1024.0);
+
+        stack.infrastructure.as_mut().unwrap().storage = "1.5Ti".into();
+        assert_eq!(parse_storage(&stack).unwrap(), 1.5 * 1024.0);
+
+        stack.infrastructure.as_mut().unwrap().storage = "2Ti".into();
+        assert_eq!(parse_storage(&stack).unwrap(), 2.0 * 1024.0);
+
+        // Finally, try some invalid storage
+        stack.infrastructure.as_mut().unwrap().storage = "1024".into();
+        assert!(parse_storage(&stack).is_err());
     }
 
     #[test]

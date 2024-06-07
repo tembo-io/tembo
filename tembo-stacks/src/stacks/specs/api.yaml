@@ -12,11 +12,11 @@ appServices:
     name: http
     resources:
       requests:
-        cpu: 100m
-        memory: 256Mi
+        cpu: 10m
+        memory: 100Mi
       limits:
-        cpu: 400m
-        memory: 256Mi
+        cpu: 200m
+        memory: 100Mi
     routing:
       - port: 3000
         ingressPath: /rest/v1

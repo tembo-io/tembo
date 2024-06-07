@@ -2881,7 +2881,7 @@ pub struct ClusterPostgresqlSyncReplicaElectionConstraint {
 }
 
 /// Specification of the desired behavior of the cluster. More info: https://git.k8s.io/community/contributors/devel/sig-architecture/api-conventions.md#spec-and-status
-#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema, PartialEq)]
 pub enum ClusterPrimaryUpdateMethod {
     #[serde(rename = "switchover")]
     Switchover,
