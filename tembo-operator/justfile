@@ -203,6 +203,10 @@ forward-tempo:
 forward-grafana:
   kubectl port-forward -n monitoring svc/promstack-grafana 8000:80
 
+# pre-load container images into Kind
+run-load-images:
+	./scripts/load_docker_images.sh
+
 # mode: makefile
 # End:
 # vim: set ft=make :

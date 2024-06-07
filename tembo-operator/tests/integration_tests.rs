@@ -1,4 +1,5 @@
 // Include the #[gnore] macro on slow tests
+//
 // That way, 'cargo test' does not run them by default.
 // To run just these tests, use 'cargo test -- --ignored'
 // To run all tests, use 'cargo test -- --include-ignored'
@@ -2148,6 +2149,9 @@ mod test {
         let result =
             psql_with_retry(context.clone(), coredb_resource.clone(), "\\dx".to_string()).await;
         assert!(result.stdout.clone().unwrap().contains("plpgsql"));
+
+        pod_ready_and_running(pods.clone(), pod_name_primary.clone()).await;
+        pod_ready_and_running(pods.clone(), pod_name_secondary.clone()).await;
 
         // Assert that both pods are replicating successfully
         let result = psql_with_retry(
