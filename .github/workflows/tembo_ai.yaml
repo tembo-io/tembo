@@ -41,21 +41,21 @@ jobs:
           set -xe
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev
+      - uses: Swatinem/rust-cache@v2
+        with:
+          prefix-key: "cp-test"
       - name: Install Rust stable toolchain
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: "cp-test"
+      - name: install dependencies
+        run: cargo install sqlx-cli --version 0.7.4
       - name: Start Postgres
         run: |
           make run-postgres
           make run-migrations
       - name: Check Format and Migrations
         run: make check
-      - name: install dependencies
-        run: cargo install sqlx-cli --version 0.7.4
       - name: unit-test
         run: make unit-test
       - name: integration-test
