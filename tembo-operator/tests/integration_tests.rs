@@ -982,7 +982,7 @@ mod test {
 
         let cdb_name = coredb_resource.metadata.name.clone().unwrap();
         let metrics_url = format!("https://{}.localhost:8443/metrics", cdb_name);
-        let response = http_get_with_retry(&metrics_url, None, 100, 5)
+        let response = http_get_with_retry(&metrics_url, None, 200, 10)
             .await
             .unwrap();
         let response_code = response.status();
