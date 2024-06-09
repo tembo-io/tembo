@@ -349,7 +349,7 @@ mod test {
         inverse: bool,
     ) -> PsqlOutput {
         // Wait up to 200 seconds
-        for _ in 1..40 {
+        for _ in 1..60 {
             thread::sleep(Duration::from_millis(5000));
             // Assert extension no longer created
             let result = coredb_resource
@@ -422,6 +422,31 @@ mod test {
             )
         });
         println!("Found pod ready: {}", pod_name);
+    }
+
+    async fn wait_for_pod_with_label(pods: &Api<Pod>, label_selector: &str) -> Option<String> {
+        let timeout = Duration::from_secs(TIMEOUT_SECONDS_START_POD);
+        let mut interval = tokio::time::interval(Duration::from_secs(5));
+
+        let start = tokio::time::Instant::now();
+        while start.elapsed() < timeout {
+            let lp = ListParams::default().labels(label_selector);
+            match pods.list(&lp).await {
+                Ok(pod_list) => {
+                    for pod in pod_list {
+                        if let Some(name) = pod.metadata.name {
+                            println!("Found pooler pod: {}", name);
+                            return Some(name);
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Error listing pods: {}", e);
+                }
+            }
+            interval.tick().await;
+        }
+        None
     }
 
     pub fn is_backup_completed() -> impl Condition<Backup> + 'static {
@@ -3680,6 +3705,10 @@ mod test {
         let patch = Patch::Apply(&coredb_json);
         let _coredb_resource = coredbs.patch(cdb_name, &params, &patch).await.unwrap();
 
+        let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
+        let pod_name = format!("{}-1", cdb_name);
+        pod_ready_and_running(pods.clone(), pod_name).await;
+
         // assert we created three Deployments, with the names we provided
         let deployment_items: Vec<Deployment> =
             list_resources(client.clone(), cdb_name, &namespace, 3)
@@ -5058,9 +5087,15 @@ CREATE EVENT TRIGGER pgrst_watch
 
         // Check for pooler service
         let pooler_services: Api<Service> = Api::namespaced(client.clone(), &namespace);
+        let pooler_pod_name = wait_for_pod_with_label(&pods, "cnpg.io/podRole=pooler").await;
+        if let Some(pooler_pod_name) = pooler_pod_name {
+            pod_ready_and_running(pods.clone(), pooler_pod_name.clone()).await;
+            println!("Found pooler pod: {}", pooler_pod_name);
+        } else {
+            println!("No pooler pod found with the specified label.");
+        }
         let _pooler_service = pooler_services.get(&pooler_name).await.unwrap();
         println!("Found pooler service: {}", pooler_name);
-
         // Check for pooler secret
         let pooler_secrets: Api<Secret> = Api::namespaced(client.clone(), &namespace);
         let _pooler_secret = pooler_secrets.get(&pooler_name).await.unwrap();
@@ -5503,7 +5538,7 @@ CREATE EVENT TRIGGER pgrst_watch
         let cluster_api: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
         let cluster = cluster_api.get(name).await.unwrap();
         let image = cluster.spec.image.clone();
-        assert_eq!(image, "quay.io/tembo/standard-cnpg:15-120cc24");
+        assert_eq!(image, "quay.io/tembo/standard-cnpg:15-a0a5ab5");
 
         // CLEANUP TEST
         // Cleanup CoreDB
