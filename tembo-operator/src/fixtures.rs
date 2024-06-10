@@ -6,9 +6,10 @@ use crate::{
 use assert_json_diff::assert_json_include;
 use futures::pin_mut;
 use http::{Request, Response};
-use hyper::{body::to_bytes, Body};
 use k8s_openapi::api::core::v1::{Pod, Secret};
-use kube::{api::ObjectMeta, core::ObjectList, Client, Resource, ResourceExt};
+use kube::{
+    api::ObjectList, api::ObjectMeta, client::Body, core::TypeMeta, Client, Resource, ResourceExt,
+};
 use prometheus::Registry;
 use std::sync::Arc;
 use tokio::task::JoinHandle;
@@ -63,7 +64,7 @@ impl ApiServerVerifier {
                 { "op": "test", "path": "/metadata/finalizers", "value": null },
                 { "op": "add", "path": "/metadata/finalizers", "value": vec![COREDB_FINALIZER] }
             ]);
-            let req_body = to_bytes(request.into_body()).await.unwrap();
+            let req_body = request.into_body().collect_bytes().await.unwrap();
             let runtime_patch: serde_json::Value =
                 serde_json::from_slice(&req_body).expect("valid coredb from runtime");
             assert_json_include!(actual: runtime_patch, expected: expected_patch);
@@ -93,6 +94,10 @@ impl ApiServerVerifier {
             let obj: ObjectList<Secret> = ObjectList {
                 metadata: Default::default(),
                 items: vec![],
+                types: TypeMeta {
+                    kind: "Secret".to_string(),
+                    api_version: "v1".to_string(),
+                },
             };
             let response = serde_json::to_vec(&obj).unwrap();
             send.send_response(Response::builder().body(Body::from(response)).unwrap());
@@ -162,6 +167,10 @@ impl ApiServerVerifier {
             let obj: ObjectList<Pod> = ObjectList {
                 metadata: Default::default(),
                 items: vec![pod],
+                types: TypeMeta {
+                    kind: "Pod".to_string(),
+                    api_version: "v1".to_string(),
+                },
             };
             let response = serde_json::to_vec(&obj).unwrap();
             send.send_response(Response::builder().body(Body::from(response)).unwrap());
@@ -179,7 +188,7 @@ impl ApiServerVerifier {
                     coredb.name_any()
                 )
             );
-            let req_body = to_bytes(request.into_body()).await.unwrap();
+            let req_body = request.into_body().collect_bytes().await.unwrap();
             let json: serde_json::Value =
                 serde_json::from_slice(&req_body).expect("patch_status object is json");
             let status_json = json.get("status").expect("status object").clone();

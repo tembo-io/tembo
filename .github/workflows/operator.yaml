@@ -16,14 +16,14 @@ on:
     branches:
       - main
     paths:
-    - '.github/workflows/operator.yaml'
-    - 'tembo-operator/**'
+      - ".github/workflows/operator.yaml"
+      - "tembo-operator/**"
   push:
     branches:
       - main
     paths:
-    - '.github/workflows/operator.yaml'
-    - 'tembo-operator/**'
+      - ".github/workflows/operator.yaml"
+      - "tembo-operator/**"
 
 jobs:
   functional_test:
@@ -39,7 +39,7 @@ jobs:
         # Go here for a list of versions:
         # https://github.com/kubernetes-sigs/kind/releases
         kube_version:
-          - '1.25.8'
+          - "1.28.9"
     steps:
       - uses: actions/checkout@v4
       - name: Install system dependencies
@@ -50,7 +50,7 @@ jobs:
       - uses: azure/setup-helm@v3
       - uses: extractions/setup-just@v1
       - name: Install kind
-        uses: helm/kind-action@v1.7.0
+        uses: helm/kind-action@v1.10.0
         with:
           install_only: true
       - uses: dtolnay/rust-toolchain@stable
@@ -71,6 +71,10 @@ jobs:
           set -xe
           export KUBE_VERSION=${{ matrix.kube_version }}
           just start-kind
+      - name: Pre-load docker images into cluster
+        run: |
+          set -xe
+          just run-load-images
       - name: Run functional / integration tests
         run: |
           set -xe
@@ -79,7 +83,7 @@ jobs:
           # Start the operator in the background
           cargo run > operator-output.txt 2>&1 &
           # Run the tests
-          cargo test --jobs 1 -- --ignored --nocapture
+          cargo test --jobs 1 -- --test-threads=1 --ignored --nocapture
       - name: Debugging information
         if: always()
         run: |

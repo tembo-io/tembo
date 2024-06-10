@@ -1199,11 +1199,11 @@ mod test {
 
     // Test the error_policy function, we need to mock the ctx and cdb to mimic a 429 error code
     use crate::{error_policy, Error};
+    use bytes::Bytes;
     use futures::pin_mut;
     use http::{Request, Response, StatusCode};
-    use hyper::Body;
     use k8s_openapi::api::core::v1::Pod;
-    use kube::{api::Api, Client};
+    use kube::{api::Api, client::Body, Client};
     use serde_json::json;
     use tower_test::mock;
 
@@ -1226,21 +1226,21 @@ mod test {
             pin_mut!(handle);
             if let Some((_request, send)) = handle.next_request().await {
                 // We don't check the specifics of the request here, focusing on the response
+                let response_body = json!({
+                    "kind": "Status",
+                    "apiVersion": "v1",
+                    "metadata": {},
+                    "status": "Failure",
+                    "message": "Too Many Requests",
+                    "reason": "TooManyRequests",
+                    "code": 429
+                })
+                .to_string();
+
                 send.send_response(
                     Response::builder()
                         .status(StatusCode::TOO_MANY_REQUESTS)
-                        .body(Body::from(
-                            json!({
-                                "kind": "Status",
-                                "apiVersion": "v1",
-                                "metadata": {},
-                                "status": "Failure",
-                                "message": "Too Many Requests",
-                                "reason": "TooManyRequests",
-                                "code": 429
-                            })
-                            .to_string(),
-                        ))
+                        .body(Body::from(Bytes::from(response_body)))
                         .unwrap(),
                 );
             }
@@ -1289,21 +1289,21 @@ mod test {
         let spawned = tokio::spawn(async move {
             pin_mut!(handle);
             if let Some((_request, send)) = handle.next_request().await {
+                let response_body = json!({
+                    "kind": "Status",
+                    "apiVersion": "v1",
+                    "metadata": {},
+                    "status": "Failure",
+                    "message": "Not Found",
+                    "reason": "NotFound",
+                    "code": 404
+                })
+                .to_string();
+
                 send.send_response(
                     Response::builder()
                         .status(StatusCode::NOT_FOUND)
-                        .body(Body::from(
-                            json!({
-                                "kind": "Status",
-                                "apiVersion": "v1",
-                                "metadata": {},
-                                "status": "Failure",
-                                "message": "Not Found",
-                                "reason": "NotFound",
-                                "code": 404
-                            })
-                            .to_string(),
-                        ))
+                        .body(Body::from(Bytes::from(response_body)))
                         .unwrap(),
                 );
             }
