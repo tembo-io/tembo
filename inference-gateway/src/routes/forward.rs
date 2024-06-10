@@ -12,7 +12,12 @@ pub async fn forward_request(
     dbclient: web::Data<Pool<Postgres>>,
 ) -> Result<HttpResponse, PlatformError> {
     let headers = req.headers();
-    let x_tembo = if let Some(header) = headers.get("X-TEMBO-ORG") {
+    let x_tembo_org = if let Some(header) = headers.get("X-TEMBO-ORG") {
+        header.to_str().unwrap()
+    } else {
+        return Err(AuthError::Forbidden("Missing request headers".to_string()).into());
+    };
+    let x_tembo_inst = if let Some(header) = headers.get("X-TEMBO-INSTANCE") {
         header.to_str().unwrap()
     } else {
         return Err(AuthError::Forbidden("Missing request headers".to_string()).into());
@@ -47,7 +52,9 @@ pub async fn forward_request(
                 })?
                 .clone(),
         )?;
-        if let Err(e) = insert_data(x_tembo, model, usage, duration, &dbclient).await {
+        if let Err(e) =
+            insert_data(x_tembo_org, x_tembo_inst, model, usage, duration, &dbclient).await
+        {
             log::error!("{}", e);
         }
         Ok(HttpResponse::Ok().json(llm_resp))
@@ -60,15 +67,17 @@ pub async fn forward_request(
 // Function to insert data into Postgres
 async fn insert_data(
     org: &str,
+    isnt: &str,
     model: &str,
     usage: Usage,
     duration_ms: i32,
     con: &Pool<Postgres>,
 ) -> Result<(), PlatformError> {
     let _r = sqlx::query!(
-        "INSERT INTO inference.requests ( organization_id, model, prompt_tokens, completion_tokens, duration_ms )
-        VALUES ($1, $2, $3, $4, $5)",
+        "INSERT INTO inference.requests ( organization_id, instance_id, model, prompt_tokens, completion_tokens, duration_ms )
+        VALUES ($1, $2, $3, $4, $5, $6)",
         org,
+        isnt,
         model,
         usage.prompt_tokens,
         usage.completion_tokens,
