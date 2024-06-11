@@ -840,6 +840,7 @@ dependencies = [
  "actix-web",
  "env_logger",
  "log",
+ "rand",
  "reqwest",
  "serde",
  "serde_json",
