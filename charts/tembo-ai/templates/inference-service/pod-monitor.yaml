@@ -9,7 +9,7 @@ metadata:
 spec:
   podMetricsEndpoints:
     - path: {{ .Values.inferenceService.podMonitor.path }}
-      port: {{ .Values.inferenceService.podMonitor.portName }}
+      containerPort: {{ .Values.inferenceService.podMonitor.portName }}
   namespaceSelector:
     matchNames:
       - {{ .Release.Namespace }}
