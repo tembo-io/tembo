@@ -67,7 +67,7 @@ impl TryFrom<AppService> for AppType {
         });
 
         match app_service.name.as_str() {
-            "ai-proxy" => Ok(AppType::RestAPI(app_config)),
+            "ai-proxy" => Ok(AppType::AIProxy(app_config)),
             "restapi" => Ok(AppType::RestAPI(app_config)),
             "http" => Ok(AppType::HTTP(app_config)),
             "mq-api" => Ok(AppType::MQ(app_config)),
