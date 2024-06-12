@@ -175,6 +175,11 @@ async fn vector() -> Result<(), anyhow::Error> {
     cmd.arg("delete");
     let _ = cmd.ok();
 
+    let mut cmd = Command::new("sh");
+    cmd.arg("-c");
+    cmd.arg("docker volume rm $(docker volume ls -q)");
+    cmd.assert().success();
+
     // check can't connect
     assert!(assert_can_connect("vector".to_str()).await.is_err());
 
@@ -213,6 +218,11 @@ async fn migrations() -> Result<(), anyhow::Error> {
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
     cmd.arg("delete");
     let _ = cmd.ok();
+
+    let mut cmd = Command::new("sh");
+    cmd.arg("-c");
+    cmd.arg("docker volume rm $(docker volume ls -q)");
+    cmd.assert().success();
 
     // check can't connect
     assert!(assert_can_connect("migration-test".to_str()).await.is_err());
@@ -264,6 +274,11 @@ async fn data_warehouse() -> Result<(), anyhow::Error> {
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
     cmd.arg("delete");
     let _ = cmd.ok();
+
+    let mut cmd = Command::new("sh");
+    cmd.arg("-c");
+    cmd.arg("docker volume rm $(docker volume ls -q)");
+    cmd.assert().success();
 
     // check can't connect
     assert!(assert_can_connect(instance_name.to_string()).await.is_err());
@@ -341,6 +356,11 @@ async fn multiple_instances() -> Result<(), anyhow::Error> {
     cmd.arg("delete");
     let _ = cmd.ok();
 
+    let mut cmd = Command::new("sh");
+    cmd.arg("-c");
+    cmd.arg("docker volume rm $(docker volume ls -q)");
+    cmd.assert().success();
+
     // check can't connect
     assert!(assert_can_connect(instance1_name.to_str()).await.is_err());
     assert!(assert_can_connect(instance2_name.to_str()).await.is_err());
@@ -410,11 +430,9 @@ async fn local_persistence() -> Result<(), anyhow::Error> {
     cmd.arg("delete");
     let _ = cmd.ok();
 
-    // Remove the Docker volume
-    let mut cmd = Command::new("docker");
-    cmd.arg("volume");
-    cmd.arg("rm");
-    cmd.arg("set_set-data");
+    let mut cmd = Command::new("sh");
+    cmd.arg("-c");
+    cmd.arg("docker volume rm $(docker volume ls -q)");
     cmd.assert().success();
 
     Ok(())
@@ -478,6 +496,11 @@ async fn allow_migration_secret() -> Result<(), anyhow::Error> {
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
     cmd.arg("delete");
     let _ = cmd.ok();
+
+    let mut cmd = Command::new("sh");
+    cmd.arg("-c");
+    cmd.arg("docker volume rm $(docker volume ls -q)");
+    cmd.assert().success();
 
     Ok(())
 }
