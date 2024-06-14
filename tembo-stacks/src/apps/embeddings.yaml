@@ -62,6 +62,8 @@ trunk_installs:
     version: 0.7.1
   - name: vectorize
     version: 0.16.0
+  - name: vectorscale
+    version: 0.2.0
 extensions:
   - name: pg_cron
     locations:
@@ -83,6 +85,11 @@ extensions:
       - database: postgres
         enabled: true
         version: 0.16.0
+  - name: vectorscale
+    locations:
+      - database: postgres
+        enabled: true
+        version: 0.2.0
 postgres_config:
   - name: cron.host
     value: /controller/run
