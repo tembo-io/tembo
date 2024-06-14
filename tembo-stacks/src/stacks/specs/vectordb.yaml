@@ -70,6 +70,8 @@ trunk_installs:
     version: 0.7.1
   - name: pg_stat_statements
     version: 1.10.0
+  - name: vectorscale
+    version: 0.2.0
 extensions:
   - name: vector
     locations:
@@ -96,6 +98,11 @@ extensions:
       - database: postgres
         enabled: true
         version: 1.10.0
+  - name: vectorscale
+    locations:
+      - database: postgres
+        enabled: true
+        version: 0.2.0
 postgres_config_engine: standard
 postgres_config:
   - name: cron.host
