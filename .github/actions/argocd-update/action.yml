@@ -50,6 +50,10 @@ runs:
     uses: mikefarah/yq@v4.44.1
     with:
       cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/dataplane-webserver.yaml
+ - name: Update dataplane webserver image EUC1
+    uses: mikefarah/yq@v4.44.1
+    with:
+      cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/dataplane-webserver-euc1.yaml
   - name: Update operator helm chart
     uses: mikefarah/yq@v4.44.1
     with:
@@ -62,6 +66,18 @@ runs:
     uses: mikefarah/yq@v4.44.1
     with:
       cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "pod-init.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator.yaml
+  - name: Update operator helm chart EUC1
+    uses: mikefarah/yq@v4.44.1
+    with:
+      cmd: yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator-euc1.yaml
+  - name: Update operator image EUC1
+    uses: mikefarah/yq@v4.44.1
+    with:
+      cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "controller.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator-euc1.yaml
+  - name: Update pod-init image EUC1
+    uses: mikefarah/yq@v4.44.1
+    with:
+      cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "pod-init.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator-euc1.yaml
   - name: Update Tembo AI images
     uses: mikefarah/yq@v4.44.1
     with:
