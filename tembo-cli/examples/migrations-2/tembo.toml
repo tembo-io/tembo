@@ -1,0 +1,4 @@
+[migration-test-2]
+environment = "dev"
+instance_name = "migration-test-2"
+stack_type = "Standard"
