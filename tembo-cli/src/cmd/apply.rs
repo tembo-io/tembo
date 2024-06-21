@@ -13,7 +13,9 @@ use itertools::Itertools;
 use log::info;
 use spinoff::spinners;
 use spinoff::Spinner;
-use sqlx::{migrate::Migrator, PgPool};
+use sqlx::migrate::Migrator;
+use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
+use std::env;
 use std::fmt::Write;
 use std::path::PathBuf;
 use std::{
@@ -461,7 +463,17 @@ async fn apply_migrations(
     database_url: String,
     migrations_dir: PathBuf,
 ) -> Result<(), anyhow::Error> {
-    let pool = PgPool::connect(&database_url).await?;
+    // Create connection options
+    let mut options: PgConnectOptions = database_url.parse()?;
+
+    for (key, value) in env::vars() {
+        if key.starts_with("TEMBO_") {
+            let parameter = key.replace("TEMBO_", "tembo.").to_lowercase();
+            options = options.options([(parameter.as_str(), value.as_str())]);
+        }
+    }
+
+    let pool = PgPoolOptions::new().connect_with(options).await?;
 
     for entry in fs::read_dir(&migrations_dir)? {
         let entry = entry?;
@@ -1479,6 +1491,11 @@ mod tests {
         let mut cmd = Command::cargo_bin(CARGO_BIN)?;
         cmd.arg("delete");
         let _ = cmd.ok();
+
+        let mut cmd = Command::new("sh");
+        cmd.arg("-c");
+        cmd.arg("docker volume rm $(docker volume ls -q)");
+        cmd.assert().success();
 
         Ok(())
     }
