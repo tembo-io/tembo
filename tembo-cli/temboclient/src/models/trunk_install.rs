@@ -16,11 +16,7 @@ pub struct TrunkInstall {
     #[serde(rename = "name")]
     pub name: String,
     /// The version of the extension to install. If not specified, the latest version will be used. (Optional)
-    #[serde(
-        rename = "version",
-        default,
-        skip_serializing_if = "Option::is_none"
-    )]
+    #[serde(rename = "version", default, skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
 }
 

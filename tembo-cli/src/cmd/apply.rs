@@ -382,8 +382,8 @@ pub fn tembo_cloud_apply_instance(
                 tui::error(&format!("Error creating instance: {}", error));
                 return Ok(());
             }
+        }
     }
-}
     println!();
     let mut sp = spinoff::Spinner::new(
         spinoff::spinners::Aesthetic,
@@ -561,7 +561,7 @@ fn create_new_instance(
     env: Environment,
 ) -> Result<String, String> {
     let maybe_instance = get_create_instance(value);
-    println!("{:?}",maybe_instance);
+    println!("{:?}", maybe_instance);
 
     match maybe_instance {
         Ok(instance) => {
@@ -825,7 +825,6 @@ fn get_extensions(
                 extension.clone().version,
             ))?;
 
-
             // Handle extension version change during an update
             if let Some(Some(existing_extensions)) = maybe_existing_extensions {
                 let extension_mismatch = existing_extensions
@@ -844,12 +843,13 @@ fn get_extensions(
                             name);
                         let ext_locations = extension_mismatch.unwrap().locations.clone();
                         if !ext_locations.is_empty() {
-                            if ext_locations[0].clone().error.unwrap() == Some(false) { 
-                            if let Some(existing_version) = ext_locations[0].clone().version {
-                                version = existing_version
+                            if ext_locations[0].clone().error.unwrap() == Some(false) {
+                                if let Some(existing_version) = ext_locations[0].clone().version {
+                                    version = existing_version
+                                } else {
+                                    return Err(Error::msg(version_error));
+                                }
                             } else {
-                                return Err(Error::msg(version_error));
-                            } } else {
                                 return Err(Error::msg("Error adding Extension to your instance."));
                             }
                         } else {
@@ -911,10 +911,13 @@ fn get_trunk_installs(
 
     if let Some(extensions) = maybe_extensions {
         for (name, extension) in extensions.into_iter() {
-            let version = Runtime::new().unwrap().block_on(get_extension_version(
-                name.clone(),
-                extension.clone().version,
-            )).expect("msg");
+            let version = Runtime::new()
+                .unwrap()
+                .block_on(get_extension_version(
+                    name.clone(),
+                    extension.clone().version,
+                ))
+                .expect("msg");
             if extension.trunk_project.is_some() {
                 vec_trunk_installs.push(TrunkInstall {
                     name: extension.trunk_project.unwrap(),
