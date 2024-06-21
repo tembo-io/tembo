@@ -1,8 +1,0 @@
-[test-instance]
-environment = "prod"
-instance_name = "test-instance"
-cpu = "0.25"
-memory = "1Gi"
-storage = "10Gi"
-replicas = 1
-stack_type = "Standard"

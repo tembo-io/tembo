@@ -440,7 +440,7 @@ async fn local_persistence() -> Result<(), anyhow::Error> {
 
 #[tokio::test]
 async fn run_migration_secret() -> Result<(), anyhow::Error> {
-    let instance_name = "set";
+    let instance_name = "migrations-1";
     let root_dir = env!("CARGO_MANIFEST_DIR");
     let test_dir = PathBuf::from(root_dir).join("examples").join(instance_name);
 
