@@ -194,7 +194,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         // Based on message_type in message, create, update, delete CoreDB
         let event_msg: types::StateToControlPlane = match read_msg.message.event_type {
             // every event is for a single namespace
-            Event::Create | Event::Update | Event::Restore => {
+            Event::Create | Event::Update | Event::Restore | Event::Start | Event::Stop => {
                 info!("{}: Got create, restore or update event", read_msg.msg_id);
 
                 // (todo: nhudson) in the future move this to be more specific
@@ -376,6 +376,8 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     Event::Create => Event::Created,
                     Event::Update => Event::Updated,
                     Event::Restore => Event::Restored,
+                    Event::Start => Event::Started,
+                    Event::Stop => Event::StopComplete,
                     _ => unreachable!(),
                 };
                 types::StateToControlPlane {
