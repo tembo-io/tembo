@@ -45,7 +45,7 @@ appServices:
           mountPath: /state
     resources:
       requests:
-        cpu: 100m
+        cpu: 10m
         memory: 256Mi
       limits:
         cpu: 400m
@@ -79,3 +79,5 @@ postgres_config:
     value: 'on'
   - name: log_min_duration_statement # https://www.postgresql.org/docs/15/runtime-config-logging.html
     value: 1000
+  - name: random_page_cost
+    value: 1.1

@@ -35,6 +35,8 @@ postgres_config:
     value: top
   - name: shared_preload_libraries
     value: pg_stat_statements,auto_explain
+  - name: random_page_cost
+    value: 1.1
 trunk_installs:
   - name: pg_stat_statements
     version: 1.10.0

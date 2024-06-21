@@ -8,7 +8,29 @@ images:
   16: "standard-cnpg:16-389a437"
 stack_version: 0.1.0
 appServices:
-  - image: 387894460527.dkr.ecr.us-east-1.amazonaws.com/tembo-io/vector-serve:89dbbab
+  - image: quay.io/tembo/ai-proxy:2024.06.03
+    name: ai-proxy
+    resources:
+      limits:
+        cpu: 100m
+        memory: 150Mi
+      requests:
+        cpu: 10m
+        memory: 150Mi
+    routing:
+    - port: 8080
+    storage:
+      volumeMounts:
+      - mountPath: /etc/nginx/conf.d
+        name: empty-dir
+      - mountPath: /var/cache/nginx
+        name: empty-dir
+      - mountPath: /var/run
+        name: empty-dir
+      volumes:
+      - emptyDir: {}
+        name: empty-dir
+  - image: 387894460527.dkr.ecr.us-east-1.amazonaws.com/tembo-io/vector-serve:6397964
     name: embeddings
     metrics:
       path: /metrics
@@ -17,7 +39,7 @@ appServices:
       - name: TMPDIR
         value: /models
       - name: BATCH_SIZE
-        value: "750"
+        value: "500"
       - name: XDG_CACHE_HOME
         value: /models/.cache
     routing:
@@ -33,11 +55,11 @@ appServices:
             replacement: /v1/embeddings
     resources:
       requests:
-        cpu: 500m
-        memory: 1500Mi
+        cpu: 100m
+        memory: 500Mi
       limits:
-        cpu: 4000m
-        memory: 1500Mi
+        cpu: 400m
+        memory: 500Mi
     storage:
       volumeMounts:
       - mountPath: /models
@@ -50,7 +72,7 @@ appServices:
               - ReadWriteOnce
               resources:
                 requests:
-                  storage: 2Gi
+                  storage: 1Gi
         name: hf-data-vol
     probes:
       readiness:
@@ -63,11 +85,11 @@ appServices:
         initialDelaySeconds: 10
 trunk_installs:
   - name: pgmq
-    version: 1.1.1
+    version: 1.3.3
   - name: vectorize
-    version: 0.15.0
+    version: 0.16.0
   - name: pgvector
-    version: 0.7.0
+    version: 0.7.1
   - name: pg_stat_statements
     version: 1.10.0
 extensions:
@@ -75,7 +97,7 @@ extensions:
     locations:
       - database: postgres
         enabled: true
-        version: 0.7.0
+        version: 0.7.1
   - name: pg_cron
     locations:
     - database: postgres
@@ -85,12 +107,12 @@ extensions:
     locations:
     - database: postgres
       enabled: true
-      version: 1.1.1
+      version: 1.3.3
   - name: vectorize
     locations:
     - database: postgres
       enabled: true
-      version: 0.15.0
+      version: 0.16.0
   - name: pg_stat_statements
     locations:
       - database: postgres
@@ -126,3 +148,7 @@ postgres_config:
     value: vectorize,pg_stat_statements,pg_cron
   - name: vectorize.embedding_service_url
     value: http://${NAMESPACE}-embeddings.${NAMESPACE}.svc.cluster.local:3000/v1/embeddings
+  - name: vectorize.tembo_service_url
+    value: http://${NAMESPACE}-ai-proxy:8080/v1
+  - name: vectorize.tembo_jwt
+    value: placeholder

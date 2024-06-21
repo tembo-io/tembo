@@ -122,7 +122,7 @@ fn find_trunk_installs_to_remove_from_status(cdb: &CoreDB) -> Vec<String> {
 /// This function also needs to define a lifetime, since we are only returning a reference to
 /// TrunkInstall, which is owned by CoreDB we only need to define a lifetime for CoreDB
 #[instrument(skip(cdb, pod_name) fields(trace_id))]
-fn find_trunk_installs_to_pod<'a>(cdb: &'a CoreDB, pod_name: &str) -> Vec<&'a TrunkInstall> {
+pub fn find_trunk_installs_to_pod<'a>(cdb: &'a CoreDB, pod_name: &str) -> Vec<&'a TrunkInstall> {
     debug!(
         "Checking for trunk installs to install on pod {} for {}",
         pod_name,

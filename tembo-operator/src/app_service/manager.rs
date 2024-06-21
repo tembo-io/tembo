@@ -23,6 +23,7 @@ use kube::{
     runtime::controller::Action,
     Client, Resource,
 };
+use lazy_static::lazy_static;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 use crate::{
@@ -39,6 +40,23 @@ use super::{
 use crate::{app_service::types::IngressType, secret::fetch_all_decoded_data_from_secret};
 
 const APP_CONTAINER_PORT_PREFIX: &str = "app-";
+
+lazy_static! {
+    static ref FORWARDED_ENV_VARS: Vec<EnvVar> = {
+        let mut env_vars = Vec::new();
+        for (key, value) in std::env::vars() {
+            if key.starts_with("TEMBO_APPS_DEFAULT_ENV_") {
+                let new_key = key.replace("TEMBO_APPS_DEFAULT_ENV_", "TEMBO_");
+                env_vars.push(EnvVar {
+                    name: new_key,
+                    value: Some(value),
+                    ..EnvVar::default()
+                });
+            }
+        }
+        env_vars
+    };
+}
 
 // private wrapper to hold the AppService Resources
 #[derive(Clone, Debug)]
@@ -315,7 +333,7 @@ fn generate_deployment(
         ..SecurityContext::default()
     };
 
-    // ensure hyphen in in env var name (cdb name allows hyphen)
+    // ensure hyphen in env var name (cdb name allows hyphen)
     let cdb_name_env = coredb_name.to_uppercase().replace('-', "_");
 
     // map postgres connection secrets to env vars
@@ -329,7 +347,7 @@ fn generate_deployment(
     let apps_connection_secret_name = format!("{}-apps", coredb_name);
 
     // map the secrets we inject to appService containers
-    let secret_envs = vec![
+    let default_app_envs = vec![
         EnvVar {
             name: r_conn,
             value_from: Some(EnvVarSource {
@@ -413,8 +431,29 @@ fn generate_deployment(
             }
         }
     }
+
+    // Check for tembo.io/instance_id and tembo.io/organization_id annotations
+    if let Some(instance_id) = annotations.get("tembo.io/instance_id") {
+        env_vars.push(EnvVar {
+            name: "TEMBO_INSTANCE_ID".to_string(),
+            value: Some(instance_id.clone()),
+            ..EnvVar::default()
+        });
+    }
+
+    if let Some(organization_id) = annotations.get("tembo.io/organization_id") {
+        env_vars.push(EnvVar {
+            name: "TEMBO_ORG_ID".to_string(),
+            value: Some(organization_id.clone()),
+            ..EnvVar::default()
+        });
+    }
+
+    // Add the pre-loaded forwarded environment variables
+    env_vars.extend(FORWARDED_ENV_VARS.iter().cloned());
+
     // combine the secret env vars and those provided in spec by user
-    env_vars.extend(secret_envs);
+    env_vars.extend(default_app_envs);
 
     // Create volume vec and add certs volume from secret
     let mut volumes: Vec<Volume> = Vec::new();
@@ -447,6 +486,7 @@ fn generate_deployment(
             warn!("USE_SHARED_CA not set, skipping certs volume mount");
         }
     }
+
     let mut pod_security_context: Option<PodSecurityContext> = None;
     // Add any user provided volumes / volume mounts
     if let Some(storage) = appsvc.storage.clone() {

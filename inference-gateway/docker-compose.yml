@@ -13,6 +13,7 @@ services:
     environment:
       - RUST_LOG=info
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/postgres
+      - LLM_SERVICE_HOST_PORT=${LLM_SERVICE_HOST_PORT}
     ports:
       - 8080:8080
   vllm:
@@ -32,3 +33,15 @@ services:
         reservations:
           devices:
             - capabilities: ["gpu"]
+  vllm-cpu:
+    build:
+      context: .
+      dockerfile: docker/inference/Dockerfile.cpu
+    ports:
+      - 8000:8000
+  mock-server:
+    build:
+      context: .
+      dockerfile: docker/inference/Dockerfile.mock
+    ports:
+      - 8000:8000

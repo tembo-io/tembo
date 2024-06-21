@@ -19,3 +19,4 @@ url = "2.5.0"
 [dev-dependencies]
 actix-http = "3.6.0"
 actix-service = "2.0.2"
+rand = "0.8.5"
