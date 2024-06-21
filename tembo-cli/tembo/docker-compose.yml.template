@@ -3,9 +3,12 @@ version: '3.8'
 services:
 {% for key, instance in instance_settings %}
   {{instance.instance_name}}:
+    platform: linux/amd64
     build:
       context: ./{{instance.instance_name}}
     container_name: {{instance.instance_name}}
+    volumes:
+      - {{instance.instance_name}}-data:/var/lib/postgresql/data2
     networks:
       - tembo
     labels:
@@ -107,3 +110,8 @@ services:
 
 networks:
   tembo: {}
+
+volumes:
+{% for key, instance in instance_settings %}
+  {{instance.instance_name}}-data:
+{% endfor %}

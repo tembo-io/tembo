@@ -11,6 +11,8 @@ use tracing::{instrument, warn};
 use crate::apps::types::{App, AppConfig, AppType, MergedConfigs};
 
 lazy_static! {
+    pub static ref AI: App =
+        serde_yaml::from_str(include_str!("ai.yaml")).expect("ai.yaml not found");
     pub static ref HTTP: App =
         serde_yaml::from_str(include_str!("http.yaml")).expect("http.yaml not found");
     pub static ref RESTAPI: App =
@@ -41,6 +43,19 @@ pub fn merge_app_reqs(
     if let Some(apps) = user_apps {
         for app in apps {
             match app {
+                AppType::AIProxy(_config) => {
+                    let ai = AI.clone();
+                    let ai_app_svc = ai.app_services.unwrap()[0].clone();
+                    // the AI appService is a proxy container to Tembo AI
+                    // and its configuration should not be modified
+                    user_app_services.push(ai_app_svc);
+                    if let Some(extensions) = ai.extensions {
+                        fin_app_extensions.extend(extensions);
+                    }
+                    if let Some(trunks) = ai.trunk_installs {
+                        fin_app_trunk_installs.extend(trunks);
+                    }
+                }
                 AppType::RestAPI(config) => {
                     // there is only 1 app_service in the restAPI
                     let mut restapi = RESTAPI.clone().app_services.unwrap().clone()[0].clone();
@@ -125,7 +140,6 @@ pub fn merge_app_reqs(
     }
 
     // merge stack apps into final app services
-    // if there are any conflicts in naming, then we should return an error and notify user (4xx)
     let final_apps = match stack_apps {
         Some(s_apps) => {
             let merged_apps = merge_apps(user_app_services, s_apps)?;
@@ -245,47 +259,21 @@ pub fn merge_location_into_extensions(
 }
 
 // merge user Apps and Stack Apps
-// returns Err when there are any conflicts in naming
 #[instrument]
 fn merge_apps(
     user_apps: Vec<AppService>,
     stack_apps: Vec<AppService>,
 ) -> Result<Vec<AppService>, Error> {
-    // users cannot override the names of any Apps originating from the Stack definition
-    // create a set of the App names from Stack definitions
-    // start w/ the Stack's Apps, and append any user apps assuming no conflicts
-    let mut merged_apps: Vec<AppService> = stack_apps.clone();
-    let mut stack_app_names = std::collections::HashSet::new();
-    for app in &stack_apps {
-        stack_app_names.insert(&app.name);
+    // when user provides configuration for app with same name as another app,
+    // the user provided configuration overrides the existing configuration
+    let mut final_apps: HashMap<String, AppService> = HashMap::new();
+    for app in stack_apps {
+        final_apps.insert(app.name.clone(), app);
     }
-
-    // users app names must also be unique across their defined Apps
-    let mut user_app_names = std::collections::HashSet::new();
-    for app in &user_apps {
-        user_app_names.insert(&app.name);
+    for app in user_apps {
+        final_apps.insert(app.name.clone(), app);
     }
-    if user_app_names.len() != user_apps.len() {
-        return Err(Error::msg("Cannot have duplicate App names".to_string()));
-    }
-    // if we've reached this point, then user has no naming conflicts in their own Apps
-
-    // check whether their names conflict with Stack App names
-    for user_app in user_apps {
-        // can expand this to validate any App attributes conflicts in the future
-        if stack_app_names.contains(&user_app.name) {
-            // TODO: do not allow user to override the appService that is defined in a Stack
-            // need to find a way to report error
-            warn!(
-                "User App name: {} conflicts with Stack App name",
-                user_app.name
-            );
-        } else {
-            // no conflicts with Stack name, so we are good-to-go
-            merged_apps.push(user_app);
-        }
-    }
-    Ok(merged_apps)
+    Ok(final_apps.into_values().collect())
 }
 
 // merges 2 vecs of PgConfigs
@@ -370,6 +358,65 @@ fn merge_env_defaults(defaults: Vec<EnvVar>, overrides: Vec<EnvVar>) -> Vec<EnvV
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::apps::types::AppConfig;
+    use tembo_controller::app_service::types::EnvVar;
+    #[test]
+    fn test_merge_app_reqs() {
+        let app_config = AppConfig {
+            env: Some(vec![
+                EnvVar {
+                    name: "APP_ENV".to_string(),
+                    value: Some("user".to_string()),
+                    value_from_platform: None,
+                },
+                EnvVar {
+                    name: "TMPDIR".to_string(),
+                    value: Some("/custom_dir".to_string()),
+                    value_from_platform: None,
+                },
+            ]),
+            resources: None,
+        };
+        let user_embedding_app = AppType::Embeddings(Some(app_config));
+        let user_apps = vec![user_embedding_app];
+        let stack_apps = vec![AppService {
+            name: "embeddings".to_string(),
+            env: Some(vec![EnvVar {
+                name: "APP_ENV".to_string(),
+                value: Some("stack".to_string()),
+                value_from_platform: None,
+            }]),
+            ..AppService::default()
+        }];
+        let merged_configs: MergedConfigs =
+            merge_app_reqs(Some(user_apps), Some(stack_apps), None, None, None).unwrap();
+        let app = merged_configs.app_services.unwrap()[0].clone();
+        let mut to_find = 2;
+        // 3 embedding app defaults + 1 custom
+        println!("{:?}", app.env.as_ref().unwrap());
+        assert_eq!(app.env.as_ref().unwrap().len(), 4);
+        for e in app.env.unwrap() {
+            match e.name.as_str() {
+                // custom env var is found
+                "APP_ENV" => {
+                    assert_eq!(e.value.unwrap(), "user".to_string());
+                    to_find -= 1;
+                }
+                // overridden TMPDIR value is found
+                "TMPDIR" => {
+                    assert_eq!(e.value.unwrap(), "/custom_dir".to_string());
+                    to_find -= 1;
+                }
+                _ => {}
+            }
+        }
+        assert_eq!(to_find, 0);
+
+        // validate metrics end up in final_app
+        let metrics = app.metrics.expect("metrics not found");
+        assert_eq!(metrics.path, "/metrics".to_string());
+        assert_eq!(metrics.port, 3000);
+    }
 
     #[test]
     fn test_app_specs() {
@@ -378,6 +425,7 @@ mod tests {
         assert!(MQ.app_services.is_some());
         assert!(PGANALYZE.app_services.is_some());
         assert!(RESTAPI.app_services.is_some());
+        assert!(AI.app_services.is_some());
     }
 
     #[test]
@@ -399,68 +447,35 @@ mod tests {
                 ..AppService::default()
             },
             AppService {
-                name: "reserved_name_0".to_string(),
+                name: "app2".to_string(),
                 image: "user_image".to_string(),
                 ..AppService::default()
             },
         ];
         let stack_apps = vec![
             AppService {
-                name: "reserved_name_0".to_string(),
+                name: "app1".to_string(),
                 image: "stack_image".to_string(),
                 ..AppService::default()
             },
             AppService {
-                name: "reserved_name_1".to_string(),
+                name: "app3".to_string(),
                 image: "stack_image".to_string(),
                 ..AppService::default()
             },
         ];
-        // stack_apps contains reserved_name_0, and user app also contained app with same name
-        // this should ignore user request, and apply the Stack's app definition
+        // app1 should be overriten with the user provided image
         let merged_apps = merge_apps(user_apps, stack_apps.clone()).unwrap();
         assert_eq!(merged_apps.len(), 3);
         for app in merged_apps {
-            if app.name == "reserved_name_0" {
+            if app.name == "app1" {
+                assert_eq!(app.image, "user_image");
+            }
+            // reserved_name_1 should not be overriten
+            if app.name == "reserved_name_1" {
                 assert_eq!(app.image, "stack_image");
             }
         }
-
-        let user_apps = vec![
-            AppService {
-                name: "sameName".to_string(),
-                image: "image1".to_string(),
-                ..AppService::default()
-            },
-            AppService {
-                name: "sameName".to_string(),
-                image: "image1".to_string(),
-                ..AppService::default()
-            },
-        ];
-
-        // there are duplicate names in the user Apps
-        // this must error
-        let merged_apps = merge_apps(user_apps, stack_apps.clone());
-        assert!(merged_apps.is_err());
-
-        let user_apps = vec![
-            AppService {
-                name: "app1".to_string(),
-                image: "image1".to_string(),
-                ..AppService::default()
-            },
-            AppService {
-                name: "app2".to_string(),
-                image: "image1".to_string(),
-                ..AppService::default()
-            },
-        ];
-
-        // no conflicts in names between user_apps and stack_apps
-        // must succeed
-        let merged_apps = merge_apps(user_apps, stack_apps).unwrap();
-        assert_eq!(merged_apps.len(), 4);
     }
 
     #[test]

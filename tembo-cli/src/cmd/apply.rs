@@ -13,6 +13,7 @@ use itertools::Itertools;
 use log::info;
 use spinoff::spinners;
 use spinoff::Spinner;
+use sqlx::{migrate::Migrator, PgPool};
 use std::fmt::Write;
 use std::path::PathBuf;
 use std::{
@@ -66,6 +67,7 @@ const DOCKERFILE_NAME: &str = "Dockerfile";
 const DOCKERCOMPOSE_NAME: &str = "docker-compose.yml";
 const POSTGRESCONF_NAME: &str = "postgres.conf";
 const MAX_INT32: i32 = 2147483647;
+const PGDATA_NAME: &str = "init_pgdata.sh";
 
 /// Deploys a tembo.toml file
 #[derive(Args)]
@@ -155,7 +157,7 @@ fn tembo_cloud_apply(
         if instance_setting.stack_file.is_some() {
             error("Stack File is only available for local testing.");
         }
-        let result = tembo_cloud_apply_instance(&env, instance_setting);
+        let result = tembo_cloud_apply_instance(&env, instance_setting, _key.to_string());
 
         match result {
             Ok(i) => i,
@@ -181,10 +183,7 @@ fn docker_apply(
 
     for (_key, instance_setting) in instance_settings.iter_mut() {
         let final_instance_setting = docker_apply_instance(verbose, instance_setting.to_owned())?;
-        final_instance_settings.insert(
-            final_instance_setting.instance_name.clone(),
-            final_instance_setting,
-        );
+        final_instance_settings.insert(_key.to_string(), final_instance_setting);
     }
 
     let rendered_dockercompose: String =
@@ -226,14 +225,29 @@ fn docker_apply(
                 .bold()
         ));
 
-        // If all of the above was successful, we can print the url to user
-        instance_started(
-            &format!(
-                "postgres://postgres:postgres@{}.local.tembo.io:{}",
-                instance_setting.instance_name, port
-            ),
-            "local",
+        let database_url = &format!(
+            "postgres://postgres:postgres@{}.local.tembo.io:{}",
+            instance_setting.instance_name, port
         );
+
+        let migrations_dir = PathBuf::from("tembo-migrations").join(_key);
+
+        // Apply SQLx migrations if the tembo-migrations directory exists
+        if migrations_dir.exists() && migrations_dir.is_dir() {
+            let mut sp = Spinner::new(spinners::Dots, "Applying migrations", spinoff::Color::White);
+            tokio::runtime::Runtime::new()?
+                .block_on(apply_migrations(database_url.to_string(), migrations_dir))?;
+            sp.stop_with_message(&format!(
+                "{} {}",
+                "✓".color(colors::indicator_good()).bold(),
+                format!("Migrations applied for Key {}", _key)
+                    .color(colorful::Color::White)
+                    .bold()
+            ));
+        }
+
+        // If all of the above was successful, we can print the url to user
+        instance_started(database_url, "local");
     }
     Ok(())
 }
@@ -299,6 +313,15 @@ fn docker_apply_instance(
         true,
     )?;
 
+    let rendered_pgdata_script: String = get_rendered_init_pgdata()?;
+
+    FileUtils::create_file(
+        PGDATA_NAME.to_string(),
+        instance_setting.instance_name.clone() + "/" + PGDATA_NAME,
+        rendered_pgdata_script,
+        true,
+    )?;
+
     instance_setting.final_extensions = extensions;
 
     FileUtils::create_file(
@@ -356,6 +379,7 @@ fn process_app_services(
 pub fn tembo_cloud_apply_instance(
     env: &Environment,
     instance_settings: &InstanceSettings,
+    key: String,
 ) -> Result<(), anyhow::Error> {
     let profile = env
         .selected_profile
@@ -412,12 +436,39 @@ pub fn tembo_cloud_apply_instance(
             ));
             clean_console();
             let connection_string = construct_connection_string(conn_info, password);
+
+            let migrations_dir = PathBuf::from("tembo-migrations").join(key);
+            if migrations_dir.exists() && migrations_dir.is_dir() {
+                tokio::runtime::Runtime::new()?.block_on(apply_migrations(
+                    connection_string.to_string(),
+                    migrations_dir,
+                ))?;
+            }
+
             instance_started(
                 &connection_string,
                 &instance_settings.stack_type.clone().unwrap(),
             );
 
             break;
+        }
+    }
+
+    Ok(())
+}
+
+async fn apply_migrations(
+    database_url: String,
+    migrations_dir: PathBuf,
+) -> Result<(), anyhow::Error> {
+    let pool = PgPool::connect(&database_url).await?;
+
+    for entry in fs::read_dir(&migrations_dir)? {
+        let entry = entry?;
+        let path = entry.path();
+        if path.is_file() {
+            let migrator = Migrator::new(migrations_dir.clone()).await?;
+            migrator.run(&pool).await?;
         }
     }
 
@@ -1049,6 +1100,17 @@ pub fn get_instance_settings(
     }
 
     Ok(base_settings)
+}
+
+pub fn get_rendered_init_pgdata() -> Result<String, anyhow::Error> {
+    let contents = include_str!("../../tembo/init_pgdata.sh.template");
+
+    let mut tera = Tera::new("templates/**/*").unwrap();
+    let _ = tera.add_raw_template("init_pgdata", contents);
+    let context = Context::new();
+
+    let rendered_init_pgdata = tera.render("init_pgdata", &context)?;
+    Ok(rendered_init_pgdata)
 }
 
 pub fn get_rendered_dockerfile(

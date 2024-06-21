@@ -1,7 +1,10 @@
 name: !embeddings
 appServices:
-  - image: quay.io/tembo/vector-serve:7343bf4
+  - image: 387894460527.dkr.ecr.us-east-1.amazonaws.com/tembo-io/vector-serve:6397964
     name: embeddings
+    metrics:
+      path: /metrics
+      port: 3000
     routing:
       - port: 3000
         ingressPath: /embeddings
@@ -18,13 +21,15 @@ appServices:
         value: /models
       - name: XDG_CACHE_HOME
         value: /models/.cache
+      - name: BATCH_SIZE
+        value: "500"
     resources:
       requests:
-        cpu: 500m
-        memory: 1500Mi
+        cpu: 100m
+        memory: 500Mi
       limits:
-        cpu: 4000m
-        memory: 1500Mi
+        cpu: 400m
+        memory: 500Mi
     storage:
       volumeMounts:
       - mountPath: /models
@@ -37,7 +42,7 @@ appServices:
               - ReadWriteOnce
               resources:
                 requests:
-                  storage: 2Gi
+                  storage: 1Gi
         name: hf-model-vol
     probes:
       readiness:
@@ -52,11 +57,13 @@ trunk_installs:
   - name: pg_cron
     version: 1.6.2
   - name: pgmq
-    version: 1.1.1
+    version: 1.3.3
   - name: pgvector
-    version: 0.6.0
+    version: 0.7.1
   - name: vectorize
-    version: 0.13.0
+    version: 0.16.0
+  - name: vectorscale
+    version: 0.2.0
 extensions:
   - name: pg_cron
     locations:
@@ -67,17 +74,22 @@ extensions:
     locations:
       - database: postgres
         enabled: true
-        version: 1.1.1
+        version: 1.3.3
   - name: vector
     locations:
       - database: postgres
         enabled: true
-        version: 0.6.0
+        version: 0.7.1
   - name: vectorize
     locations:
       - database: postgres
         enabled: true
-        version: 0.13.0
+        version: 0.16.0
+  - name: vectorscale
+    locations:
+      - database: postgres
+        enabled: true
+        version: 0.2.0
 postgres_config:
   - name: cron.host
     value: /controller/run

@@ -587,6 +587,42 @@ mod test {
     use k8s_openapi::NamespaceResourceScope;
     use serde::{de::DeserializeOwned, Deserialize};
 
+    async fn get_resource<R>(
+        client: Client,
+        namespace: &str,
+        name: &str,
+        retries: usize,
+        // is resource expected to exist?
+        expected: bool,
+    ) -> Result<R, kube::Error>
+    where
+        R: kube::api::Resource<Scope = NamespaceResourceScope>
+            + std::fmt::Debug
+            + 'static
+            + Clone
+            + DeserializeOwned
+            + for<'de> serde::Deserialize<'de>,
+        R::DynamicType: Default,
+    {
+        let api: Api<R> = Api::namespaced(client, namespace);
+        for _ in 0..retries {
+            let resource = api.get(name).await;
+            if expected {
+                if resource.is_ok() {
+                    return resource;
+                } else {
+                    println!("Failed to get resource: {}. Retrying...", name);
+                    thread::sleep(Duration::from_millis(2000));
+                }
+            } else if resource.is_err() {
+                return resource;
+            } else {
+                println!("Resource {} should not exist. Retrying...", name);
+                thread::sleep(Duration::from_millis(2000));
+            }
+        }
+        panic!("Timed out getting resource, {}", name);
+    }
     // helper function retrieve all instances of a resource in namespace
     // used repeatedly in appService tests
     // handles retries
@@ -4705,6 +4741,14 @@ CREATE EVENT TRIGGER pgrst_watch
         // Wait for backup to complete
         has_backup_completed(context.clone(), &namespace, &backup_name).await;
 
+        // Check to make sure CoreDBStatus has last_archiver_status set to a DateTime<Utc>
+        let cdbstatus = coredbs.get(name).await.unwrap();
+        let last_archiver_state = cdbstatus
+            .status
+            .as_ref()
+            .and_then(|stats| stats.last_archiver_status);
+        assert!(last_archiver_state.is_some());
+
         // If the backup is complete, we can now restore to a new instance in a new namespace
         let suffix = rng.gen_range(0..100000);
         let restore_name = &format!("test-coredb-restore-{}", suffix);
@@ -4882,6 +4926,14 @@ CREATE EVENT TRIGGER pgrst_watch
         )
         .await;
         assert!(result.stdout.clone().unwrap().contains("test"));
+
+        // Check to make sure CoreDBStatus has last_archiver_status set to a DateTime<Utc>
+        let cdbstatus = coredbs.get(name).await.unwrap();
+        let last_archiver_state = cdbstatus
+            .status
+            .as_ref()
+            .and_then(|stats| stats.last_archiver_status);
+        assert!(last_archiver_state.is_some());
 
         // CLEANUP TEST
         // Cleanup CoreDB
@@ -5523,5 +5575,147 @@ CREATE EVENT TRIGGER pgrst_watch
         assert!(status_running(&test.coredbs, &name).await);
 
         test.teardown().await;
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn functional_test_app_service_podmonitor() {
+        // Validates PodMonitor resource created and destroyed properly
+        // PodMonitor created/destroyed when adding/removing `metrics` from CoredBSpec
+        // PodMonitor destroyed when the corresponding AppService is deleted
+
+        // Initialize the Kubernetes client
+        let client = kube_client().await;
+        let mut rng = rand::thread_rng();
+        let suffix = rng.gen_range(0..100000);
+        let cdb_name = &format!("test-app-service-podmon-{}", suffix);
+        let namespace = match create_namespace(client.clone(), cdb_name).await {
+            Ok(namespace) => namespace,
+            Err(e) => {
+                eprintln!("Error creating namespace: {}", e);
+                std::process::exit(1);
+            }
+        };
+
+        let kind = "CoreDB";
+
+        // Apply a basic configuration of CoreDB
+        println!("Creating CoreDB resource {}", cdb_name);
+        let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
+        // generate an instance w/ 2 appServices
+        let full_app = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": cdb_name
+            },
+            "spec": {
+                "appServices": [
+                    {
+                        "name": "dummy-exporter",
+                        "image": "prom/blackbox-exporter",
+                        "routing": [
+                            {
+                                "port": 9115,
+                                "ingressPath": "/metrics",
+                                "ingressType": "http"
+                            }
+                        ],
+                        "metrics": {
+                            "path": "/metrics",
+                            "port": 9115
+                        }
+                    },
+                ]
+            }
+        });
+        let params = PatchParams::apply("tembo-integration-test");
+        let patch = Patch::Apply(&full_app);
+        let _coredb_resource = coredbs.patch(cdb_name, &params, &patch).await.unwrap();
+
+        // pause for resource creation
+        use controller::prometheus::podmonitor_crd::PodMonitor;
+        let pmon_name = format!("{}-dummy-exporter", cdb_name);
+        let podmon = get_resource::<PodMonitor>(client.clone(), &namespace, &pmon_name, 50, true)
+            .await
+            .unwrap();
+        let pmon_spec = podmon.spec.pod_metrics_endpoints.unwrap();
+        assert_eq!(pmon_spec.len(), 1);
+
+        // disable metrics
+        let no_metrics_app = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": cdb_name
+            },
+            "spec": {
+                "appServices": [
+                    {
+                        "name": "dummy-exporter",
+                        "image": "prom/blackbox-exporter",
+                        "routing": [
+                            {
+                                "port": 9115,
+                                "ingressPath": "/metrics",
+                                "ingressType": "http"
+                            }
+                        ],
+                    },
+                ]
+            }
+        });
+        let params = PatchParams::apply("tembo-integration-test");
+        let patch = Patch::Apply(&no_metrics_app);
+        let _coredb_resource = coredbs.patch(cdb_name, &params, &patch).await.unwrap();
+        let podmon =
+            get_resource::<PodMonitor>(client.clone(), &namespace, &pmon_name, 50, false).await;
+        assert!(podmon.is_err());
+
+        // renable it, assert it exists, then delete the app and assert PodMonitor is gone
+        let patch = Patch::Apply(&full_app);
+        let _coredb_resource = coredbs.patch(cdb_name, &params, &patch).await.unwrap();
+        let podmon = get_resource::<PodMonitor>(client.clone(), &namespace, &pmon_name, 50, true)
+            .await
+            .unwrap();
+
+        let pmon_spec = podmon.spec.pod_metrics_endpoints.unwrap();
+        assert_eq!(pmon_spec.len(), 1);
+        // delete the app
+        let no_app = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": cdb_name
+            },
+            "spec": {
+                "appServices": []
+            }
+        });
+        let patch = Patch::Apply(&no_app);
+        let _coredb_resource = coredbs.patch(cdb_name, &params, &patch).await.unwrap();
+        let podmon =
+            get_resource::<PodMonitor>(client.clone(), &namespace, &pmon_name, 50, false).await;
+        assert!(podmon.is_err());
+
+        // CLEANUP TEST
+        // Cleanup CoreDB
+        coredbs.delete(cdb_name, &Default::default()).await.unwrap();
+        println!("Waiting for CoreDB to be deleted: {}", &cdb_name);
+        let _assert_coredb_deleted = tokio::time::timeout(
+            Duration::from_secs(TIMEOUT_SECONDS_COREDB_DELETED),
+            await_condition(coredbs.clone(), cdb_name, conditions::is_deleted("")),
+        )
+        .await
+        .unwrap_or_else(|_| {
+            panic!(
+                "CoreDB {} was not deleted after waiting {} seconds",
+                cdb_name, TIMEOUT_SECONDS_COREDB_DELETED
+            )
+        });
+        println!("CoreDB resource deleted {}", cdb_name);
+
+        // Delete namespace
+        let _ = delete_namespace(client.clone(), &namespace).await;
     }
 }

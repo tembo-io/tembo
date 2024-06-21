@@ -103,6 +103,13 @@ impl ExecCommand {
                     "Error executing command on pod: {:?}. response: {:?}",
                     self.pod_name, output
                 );
+
+                if let Some(reason) = &status.reason {
+                    warn!(
+                        "Reason for failed kube exec: {reason}, code {:?}",
+                        status.code
+                    );
+                }
                 debug!("Failed command: {:?}", command);
                 false
             }

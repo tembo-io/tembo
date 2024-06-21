@@ -269,6 +269,15 @@ pub struct Restore {
     #[serde(rename = "serverName")]
     pub server_name: String,
 
+    /// The object storage path and bucket name of the instance you wish to restore from.  This maps to the `Backup`
+    /// `destinationPath` field for the original instance.
+    ///
+    /// **Example**: If you have an instance with `spec.backup.destinationPath`
+    /// set to `s3://my-bucket/v2/test-db` then you would set `backupsPath` to `s3://my-bucket/v2/test-db`.
+    /// And backups are saved in that bucket under `s3://my-bucket/v2/test-db/server_name`
+    #[serde(rename = "backupsPath")]
+    pub backups_path: Option<String>,
+
     /// recovery_target_time is the time base target for point-in-time recovery.
     #[serde(rename = "recoveryTargetTime")]
     pub recovery_target_time: Option<String>,
@@ -373,8 +382,7 @@ pub struct PgBouncer {
 ///   name: test-db
 /// spec: {}
 /// ````
-#[derive(CustomResource, Deserialize, Serialize, Clone, Debug, JsonSchema)]
-#[cfg_attr(test, derive(Default))]
+#[derive(CustomResource, Default, Deserialize, Serialize, Clone, Debug, JsonSchema)]
 #[kube(kind = "CoreDB", group = "coredb.io", version = "v1alpha1", namespaced)]
 #[kube(status = "CoreDBStatus", shortname = "cdb")]
 #[allow(non_snake_case)]
@@ -738,6 +746,7 @@ pub struct CoreDBStatus {
     pub runtime_config: Option<Vec<PgConfig>>,
     pub first_recoverability_time: Option<DateTime<Utc>>,
     pub pg_postmaster_start_time: Option<DateTime<Utc>>,
+    #[deprecated(note = "This field is deprecated and it is no longer used")]
     pub last_fully_reconciled_at: Option<DateTime<Utc>>,
     pub last_archiver_status: Option<DateTime<Utc>>,
 }

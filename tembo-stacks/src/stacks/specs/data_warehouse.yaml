@@ -3,9 +3,9 @@ description: A Postgres instance equipped with configuration and extensions for 
 repository: "quay.io/tembo"
 organization: tembo
 images:
-  14: "dw-cnpg:14-ed6e9e9"
-  15: "dw-cnpg:15-ed6e9e9"
-  16: "dw-cnpg:16-ed6e9e9"
+  14: "dw-cnpg:14-389a437"
+  15: "dw-cnpg:15-389a437"
+  16: "dw-cnpg:16-389a437"
 stack_version: 0.1.0
 postgres_config_engine: olap
 postgres_config:
@@ -35,7 +35,7 @@ trunk_installs:
   - name: hydra_columnar
     version: 1.1.1
   - name: pg_later
-    version: 0.1.0
+    version: 0.1.1
   - name: pg_partman
     version: 4.7.4
   - name: pg_cron
@@ -45,11 +45,11 @@ trunk_installs:
   - name: redis_fdw
     version: 1.0.0
   - name: wrappers
-    version: 0.2.0
+    version: 0.3.1
   - name: multicorn
     version: 2.5.0
   - name: pg_tier 
-    version: 0.0.3
+    version: 0.0.4
 extensions:
   - name: pg_stat_statements
     locations:
@@ -65,7 +65,7 @@ extensions:
     locations:
       - database: postgres
         enabled: true
-        version: 0.1.0
+        version: 0.1.1
   - name: pg_partman
     locations:
       - database: postgres
@@ -94,7 +94,7 @@ extensions:
     locations:
       - database: postgres
         enabled: true
-        version: 0.2.0
+        version: 0.3.1
   - name: multicorn
     description: multicorn
     locations:
@@ -106,4 +106,4 @@ extensions:
     locations:
       - database: postgres
         enabled: true
-        version: 0.0.3
+        version: 0.0.4

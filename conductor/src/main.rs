@@ -1,7 +1,6 @@
 use actix_web::{web, App, HttpServer};
 use actix_web_opentelemetry::{PrometheusMetricsHandler, RequestTracing};
 use conductor::errors::ConductorError;
-use conductor::extensions::extensions_still_processing;
 use conductor::monitoring::CustomMetrics;
 use conductor::{
     create_cloudformation, create_namespace, create_or_update, delete, delete_cloudformation,
@@ -65,6 +64,10 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         .unwrap_or_else(|_| "true".to_owned())
         .parse()
         .expect("error parsing IS_CLOUD_FORMATION");
+    let aws_region: String = env::var("AWS_REGION")
+        .unwrap_or_else(|_| "us-east-1".to_owned())
+        .parse()
+        .expect("error parsing AWS_REGION");
 
     // Connect to pgmq
     let queue = PGMQueueExt::new(pg_conn_url.clone(), 5).await?;
@@ -118,10 +121,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
 
         let org_id = &read_msg.message.org_id;
         let instance_id = &read_msg.message.inst_id;
-        let namespace = format!(
-            "org-{}-inst-{}",
-            read_msg.message.organization_name, read_msg.message.dbname
-        );
+        let namespace = read_msg.message.namespace.clone();
         info!("{}: Using namespace {}", read_msg.msg_id, &namespace);
 
         if read_msg.message.event_type != Event::Delete {
@@ -224,6 +224,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                 let mut coredb_spec = msg_spec;
 
                 match init_cloud_perms(
+                    aws_region.clone(),
                     backup_archive_bucket.clone(),
                     cf_template_bucket.clone(),
                     &read_msg,
@@ -282,7 +283,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
 
                 info!("{}: Creating namespace", read_msg.msg_id);
                 // create Namespace
-                create_namespace(client.clone(), &namespace, &org_id, &instance_id).await?;
+                create_namespace(client.clone(), &namespace, org_id, instance_id).await?;
 
                 info!("{}: Generating spec", read_msg.msg_id);
                 let stack_type = match coredb_spec.stack.as_ref() {
@@ -291,11 +292,12 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                 };
 
                 let spec = generate_spec(
-                    &org_id,
+                    org_id,
                     &stack_type,
-                    &instance_id,
+                    instance_id,
                     &read_msg.message.data_plane_id,
                     &namespace,
+                    &backup_archive_bucket,
                     &coredb_spec,
                 )
                 .await;
@@ -365,30 +367,6 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
 
                 let result = get_one(client.clone(), &namespace).await;
 
-                let extension_still_processing = match &result {
-                    Ok(coredb) => extensions_still_processing(coredb),
-                    Err(_) => true,
-                };
-
-                if extension_still_processing
-                    && (read_msg.message.event_type == Event::Create
-                        || read_msg.message.event_type == Event::Restore)
-                {
-                    let _ = queue
-                        .set_vt::<CRUDevent>(
-                            &control_plane_events_queue,
-                            read_msg.msg_id,
-                            REQUEUE_VT_SEC_SHORT,
-                        )
-                        .await?;
-                    metrics.conductor_requeues.add(
-                        &opentelemetry::Context::current(),
-                        1,
-                        &[KeyValue::new("queue_duration", "short")],
-                    );
-                    continue;
-                }
-
                 let current_spec = result?;
 
                 let spec_js = serde_json::to_string(&current_spec.spec).unwrap();
@@ -420,12 +398,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                 delete_namespace(client.clone(), &namespace).await?;
 
                 info!("{}: Deleting cloudformation stack", read_msg.msg_id);
-                delete_cloudformation(
-                    String::from("us-east-1"),
-                    &read_msg.message.organization_name,
-                    &read_msg.message.dbname,
-                )
-                .await?;
+                delete_cloudformation(aws_region.clone(), &namespace).await?;
 
                 let insert_query = sqlx::query!(
                     "INSERT INTO deleted_instances (namespace) VALUES ($1) ON CONFLICT (namespace) DO NOTHING",
@@ -689,6 +662,7 @@ async fn main() -> std::io::Result<()> {
 }
 
 async fn init_cloud_perms(
+    aws_region: String,
     backup_archive_bucket: String,
     cf_template_bucket: String,
     read_msg: &Message<CRUDevent>,
@@ -701,21 +675,17 @@ async fn init_cloud_perms(
     }
 
     create_cloudformation(
-        String::from("us-east-1"),
+        aws_region.clone(),
         backup_archive_bucket.clone(),
-        &read_msg.message.organization_name,
-        &read_msg.message.dbname,
-        &cf_template_bucket,
+        read_msg.message.namespace.clone(),
+        read_msg.message.backups_read_path.clone(),
+        read_msg.message.backups_write_path.clone(),
+        cf_template_bucket,
     )
     .await?;
 
     // Lookup the CloudFormation stack's role ARN
-    let role_arn = lookup_role_arn(
-        String::from("us-east-1"),
-        &read_msg.message.organization_name,
-        &read_msg.message.dbname,
-    )
-    .await?;
+    let role_arn = lookup_role_arn(aws_region, &read_msg.message.namespace).await?;
 
     info!("{}: Adding backup configuration to spec", read_msg.msg_id);
     // Format ServiceAccountTemplate spec in CoreDBSpec
@@ -729,25 +699,23 @@ async fn init_cloud_perms(
         }),
     };
 
-    // TODO: disbale volumesnapshots for now until we can make them work with CNPG
+    // TODO: disable volumesnapshots for now until we can make them work with CNPG
     // Enable VolumeSnapshots for all instances being created
     let volume_snapshot = Some(VolumeSnapshot {
         enabled: false,
         snapshot_class: None,
     });
 
-    let instance_name_slug = format!(
-        "org-{}-inst-{}",
-        &read_msg.message.organization_name, &read_msg.message.dbname
-    );
+    let write_path = read_msg
+        .message
+        .backups_write_path
+        .clone()
+        .unwrap_or(format!("v2/{}", read_msg.message.namespace));
     let backup = Backup {
-        destinationPath: Some(format!(
-            "s3://{}/coredb/{}/{}",
-            backup_archive_bucket, &read_msg.message.organization_name, &instance_name_slug
-        )),
+        destinationPath: Some(format!("s3://{}/{}", backup_archive_bucket, write_path)),
         encryption: Some(String::from("AES256")),
         retentionPolicy: Some(String::from("30")),
-        schedule: Some(generate_cron_expression(&instance_name_slug)),
+        schedule: Some(generate_cron_expression(&read_msg.message.namespace)),
         s3_credentials: Some(S3Credentials {
             inherit_from_iam_role: Some(true),
             ..Default::default()

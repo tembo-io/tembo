@@ -24,10 +24,16 @@ RUN openssl req -new -newkey rsa:4096 -days 365 -nodes -x509 \
     chown postgres:postgres /var/lib/postgresql/server.* && \
     chmod 600 /var/lib/postgresql/server.key
 
+# Copy the init_pgdata.sh script to the correct location
+COPY init_pgdata.sh /docker-entrypoint-initdb.d/init_pgdata.sh
+
+# Set permissions for the init_pgdata.sh script
+RUN chmod +x /docker-entrypoint-initdb.d/init_pgdata.sh
+
 USER postgres
 
-# Initialize the database
-RUN pg_ctl -c init
+# Initialize the database if not already initialized
+RUN if [ ! -s "$PGDATA/PG_VERSION" ]; then pg_ctl -c init; fi
 
 # Set permissive authentication (for local testing)
 RUN echo "hostssl all all 0.0.0.0/0 trust" >> ${PGDATA}/pg_hba.conf

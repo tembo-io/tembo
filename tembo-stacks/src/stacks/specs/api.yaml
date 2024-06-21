@@ -3,20 +3,20 @@ description: Tembo Stack with REST and graphQL interfaces.
 repository: "quay.io/tembo"
 organization: tembo
 images:
-  14: "standard-cnpg:14-ed6e9e9"
-  15: "standard-cnpg:15-ed6e9e9"
-  16: "standard-cnpg:16-ed6e9e9"
+  14: "standard-cnpg:14-389a437"
+  15: "standard-cnpg:15-389a437"
+  16: "standard-cnpg:16-389a437"
 stack_version: 0.1.0
 appServices:
   - image: postgrest/postgrest:v12.0.0
     name: http
     resources:
       requests:
-        cpu: 100m
-        memory: 256Mi
+        cpu: 10m
+        memory: 100Mi
       limits:
-        cpu: 400m
-        memory: 256Mi
+        cpu: 200m
+        memory: 100Mi
     routing:
       - port: 3000
         ingressPath: /rest/v1

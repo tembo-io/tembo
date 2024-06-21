@@ -3,9 +3,9 @@ description: A Tembo Postgres Stack optimized for Message Queue workloads.
 repository: "quay.io/tembo"
 organization: tembo
 images:
-  14: "standard-cnpg:14-ed6e9e9"
-  15: "standard-cnpg:15-ed6e9e9"
-  16: "standard-cnpg:16-ed6e9e9"
+  14: "standard-cnpg:14-389a437"
+  15: "standard-cnpg:15-389a437"
+  16: "standard-cnpg:16-389a437"
 stack_version: 0.3.0
 appServices:
   - name: mq-api
@@ -44,33 +44,47 @@ appServices:
         value: info
     resources:
       requests:
-        cpu: 100m
-        memory: 256Mi
+        cpu: 10m
+        memory: 100Mi
       limits:
-        cpu: 400m
-        memory: 256Mi
+        cpu: 200m
+        memory: 100Mi
 trunk_installs:
   - name: pgmq
-    version: 1.1.1
+    version: 1.3.3
   - name: pg_partman
     version: 4.7.4
+  - name: parquet_s3_fdw
+    version: 1.1.0
+  - name: pg_tier
+    version: 0.0.4
 extensions:
   - name: pgmq
     locations:
       - database: postgres
         enabled: true
-        version: 1.1.1
+        version: 1.3.3
       - database: app
         enabled: true
-        version: 1.1.1
+        version: 1.3.3
       - database: template1
         enabled: true
-        version: 1.1.1
+        version: 1.3.3
   - name: pg_partman
     locations:
       - database: postgres
         enabled: true
         version: 4.7.4
+  - name: parquet_s3_fdw
+    locations:
+      - database: postgres
+        enabled: true
+        version: 1.1.0
+  - name: pg_tier
+    locations:
+      - database: postgres
+        enabled: true
+        version: 0.0.4
 postgres_metrics:
   pgmq:
       query: select queue_name, queue_length, oldest_msg_age_sec, newest_msg_age_sec, total_messages, current_database() as datname from pgmq.metrics_all()

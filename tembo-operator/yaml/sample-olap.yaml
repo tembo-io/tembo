@@ -3,7 +3,7 @@ kind: CoreDB
 metadata:
   name: sample-olap
 spec:
-  image: "quay.io/tembo/standard-cnpg:15-a0a5ab5"
+  image: "quay.io/tembo/standard-cnpg:15-389a437"
   stop: false
   stack:
     name: OLAP
@@ -33,6 +33,10 @@ spec:
       version: 0.2.4
     - name: redis_fdw
       version: 1.0.0
+    - name: parquet_s3_fdw
+      version: 1.1.0
+    - name: pg_tier
+      version: 0.0.3
   extensions:
     - name: pg_stat_statements
       locations:
@@ -73,12 +77,24 @@ spec:
         - database: postgres
           enabled: true
           version: 1.0.0
+    - name: parquet_s3_fdw
+      description: parquet_s3_fdw
+      locations:
+        - database: postgres
+          enabled: true
+          version: 1.1.0
+    - name: pg_tier
+      description: pg_tier
+      locations:
+        - database: postgres
+          enabled: true
+          version: 0.0.3
   runtime_config:
     - name: shared_buffers
-      value: "1024MB"
+      value: "256MB"
     - name: max_connections
       value: "100"
     - name: work_mem
       value: "22MB"
     - name: effective_cache_size
-      value: "2867MB"
+      value: "100MB"

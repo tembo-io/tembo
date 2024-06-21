@@ -7,3 +7,4 @@ tembo-pod-init/** @nhudson
 tembo-cli/** @shahadarsh @vrmiguel @DarrenBaldwin07 @sjmiller609
 tembo-py/** @chuckhend @EvanHStanton
 tembo-stacks/** @chuckhend @jasonmp85
+inference-gateway/** @chuckhend @jasonmp85 @shhnwz

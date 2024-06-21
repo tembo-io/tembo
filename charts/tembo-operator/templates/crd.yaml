@@ -653,6 +653,22 @@ spec:
                     image:
                       description: Defines the container image to use for the appService.
                       type: string
+                    metrics:
+                      description: Defines the metrics endpoints to be scraped by Prometheus. This implements a subset of features available by PodMonitorPodMetricsEndpoints.
+                      nullable: true
+                      properties:
+                        path:
+                          description: path to scrape metrics
+                          type: string
+                        port:
+                          description: port must be also exposed in one of AppService.routing[]
+                          format: uint16
+                          minimum: 0.0
+                          type: integer
+                      required:
+                      - path
+                      - port
+                      type: object
                     middlewares:
                       description: Defines the ingress middeware configuration for the appService. This is specifically configured for the ingress controller Traefik.
                       items:
@@ -2320,6 +2336,13 @@ spec:
                   **Default**: disabled
                 nullable: true
                 properties:
+                  backupsPath:
+                    description: |-
+                      The object storage path and bucket name of the instance you wish to restore from.  This maps to the `Backup` `destinationPath` field for the original instance.
+
+                      **Example**: If you have an instance with `spec.backup.destinationPath` set to `s3://my-bucket/v2/test-db` then you would set `backupsPath` to `s3://my-bucket/v2/test-db`. And backups are saved in that bucket under `s3://my-bucket/v2/test-db/server_name`
+                    nullable: true
+                    type: string
                   endpointURL:
                     description: endpointURL is the S3 compatable endpoint URL
                     nullable: true

@@ -23,6 +23,7 @@ use kube::{
     runtime::controller::Action,
     Client, Resource,
 };
+use lazy_static::lazy_static;
 use std::{collections::BTreeMap, sync::Arc, time::Duration};
 
 use crate::{
@@ -38,6 +39,25 @@ use super::{
 
 use crate::{app_service::types::IngressType, secret::fetch_all_decoded_data_from_secret};
 
+const APP_CONTAINER_PORT_PREFIX: &str = "app-";
+
+lazy_static! {
+    static ref FORWARDED_ENV_VARS: Vec<EnvVar> = {
+        let mut env_vars = Vec::new();
+        for (key, value) in std::env::vars() {
+            if key.starts_with("TEMBO_APPS_DEFAULT_ENV_") {
+                let new_key = key.replace("TEMBO_APPS_DEFAULT_ENV_", "TEMBO_");
+                env_vars.push(EnvVar {
+                    name: new_key,
+                    value: Some(value),
+                    ..EnvVar::default()
+                });
+            }
+        }
+        env_vars
+    };
+}
+
 // private wrapper to hold the AppService Resources
 #[derive(Clone, Debug)]
 struct AppServiceResources {
@@ -48,6 +68,7 @@ struct AppServiceResources {
     ingress_tcp_routes: Option<Vec<IngressRouteTCPRoutes>>,
     entry_points: Option<Vec<String>>,
     entry_points_tcp: Option<Vec<String>>,
+    podmonitor: Option<podmon::PodMonitor>,
 }
 
 // generates Kubernetes Deployment and Service templates for a AppService
@@ -76,10 +97,12 @@ fn generate_resource(
         coredb_name,
         &resource_name,
         namespace,
-        oref,
+        oref.clone(),
         annotations,
-        placement,
+        placement.clone(),
     );
+
+    let maybe_podmonitor = generate_podmonitor(appsvc, &resource_name, namespace, annotations);
 
     // If DATA_PLANE_BASEDOMAIN is not set, don't generate IngressRoutes, IngressRouteTCPs, or EntryPoints
     if domain.is_none() {
@@ -91,6 +114,7 @@ fn generate_resource(
             ingress_tcp_routes: None,
             entry_points: None,
             entry_points_tcp: None,
+            podmonitor: maybe_podmonitor,
         };
     }
     // It's safe to unwrap domain here because we've already checked if it's None
@@ -158,6 +182,7 @@ fn generate_resource(
         ingress_tcp_routes,
         entry_points,
         entry_points_tcp,
+        podmonitor: maybe_podmonitor,
     }
 }
 
@@ -194,7 +219,7 @@ fn generate_service(
                     port: p as i32,
                     // there can be more than one ServicePort per Service
                     // these must be unique, so we'll use the port number
-                    name: Some(format!("http-{}", p)),
+                    name: Some(format!("{APP_CONTAINER_PORT_PREFIX}{p}")),
                     target_port: None,
                     ..ServicePort::default()
                 })
@@ -279,6 +304,7 @@ fn generate_deployment(
         let container_ports: Vec<ContainerPort> = distinct_ports
             .into_iter()
             .map(|p| ContainerPort {
+                name: Some(format!("{APP_CONTAINER_PORT_PREFIX}{p}")),
                 container_port: p as i32,
                 protocol: Some("TCP".to_string()),
                 ..ContainerPort::default()
@@ -307,7 +333,7 @@ fn generate_deployment(
         ..SecurityContext::default()
     };
 
-    // ensure hyphen in in env var name (cdb name allows hyphen)
+    // ensure hyphen in env var name (cdb name allows hyphen)
     let cdb_name_env = coredb_name.to_uppercase().replace('-', "_");
 
     // map postgres connection secrets to env vars
@@ -321,7 +347,7 @@ fn generate_deployment(
     let apps_connection_secret_name = format!("{}-apps", coredb_name);
 
     // map the secrets we inject to appService containers
-    let secret_envs = vec![
+    let default_app_envs = vec![
         EnvVar {
             name: r_conn,
             value_from: Some(EnvVarSource {
@@ -405,8 +431,29 @@ fn generate_deployment(
             }
         }
     }
+
+    // Check for tembo.io/instance_id and tembo.io/organization_id annotations
+    if let Some(instance_id) = annotations.get("tembo.io/instance_id") {
+        env_vars.push(EnvVar {
+            name: "TEMBO_INSTANCE_ID".to_string(),
+            value: Some(instance_id.clone()),
+            ..EnvVar::default()
+        });
+    }
+
+    if let Some(organization_id) = annotations.get("tembo.io/organization_id") {
+        env_vars.push(EnvVar {
+            name: "TEMBO_ORG_ID".to_string(),
+            value: Some(organization_id.clone()),
+            ..EnvVar::default()
+        });
+    }
+
+    // Add the pre-loaded forwarded environment variables
+    env_vars.extend(FORWARDED_ENV_VARS.iter().cloned());
+
     // combine the secret env vars and those provided in spec by user
-    env_vars.extend(secret_envs);
+    env_vars.extend(default_app_envs);
 
     // Create volume vec and add certs volume from secret
     let mut volumes: Vec<Volume> = Vec::new();
@@ -439,6 +486,7 @@ fn generate_deployment(
             warn!("USE_SHARED_CA not set, skipping certs volume mount");
         }
     }
+
     let mut pod_security_context: Option<PodSecurityContext> = None;
     // Add any user provided volumes / volume mounts
     if let Some(storage) = appsvc.storage.clone() {
@@ -585,7 +633,6 @@ pub fn to_delete(desired: Vec<String>, actual: Vec<String>) -> Option<Vec<String
 
 async fn apply_resources(resources: Vec<AppServiceResources>, client: &Client, ns: &str) -> bool {
     let deployment_api: Api<Deployment> = Api::namespaced(client.clone(), ns);
-    let service_api: Api<Service> = Api::namespaced(client.clone(), ns);
     let ps = PatchParams::apply("cntrlr").force();
 
     let mut has_errors: bool = false;
@@ -612,6 +659,8 @@ async fn apply_resources(resources: Vec<AppServiceResources>, client: &Client, n
         if res.service.is_none() {
             continue;
         }
+
+        let service_api: Api<Service> = Api::namespaced(client.clone(), ns);
         match service_api
             .patch(&res.name, &ps, &Patch::Apply(&res.service))
             .await
@@ -627,6 +676,50 @@ async fn apply_resources(resources: Vec<AppServiceResources>, client: &Client, n
                     "ns: {}, failed to apply AppService Service: {}, error: {}",
                     ns, res.name, e
                 );
+            }
+        }
+
+        let podmon_api: Api<podmon::PodMonitor> = Api::namespaced(client.clone(), ns);
+        if let Some(mut pmon) = res.podmonitor {
+            // assign ownership of the PodMonitor to the Service
+            // if Service is deleted, so is the PodMonitor
+            let meta = service_api.get(&res.name).await;
+            if let Ok(svc) = meta {
+                let uid = svc.metadata.uid.unwrap_or_default();
+                let oref = OwnerReference {
+                    api_version: "v1".to_string(),
+                    kind: "Service".to_string(),
+                    name: res.name.clone(),
+                    uid,
+                    controller: Some(true),
+                    block_owner_deletion: Some(true),
+                };
+                pmon.metadata.owner_references = Some(vec![oref]);
+            }
+            match podmon_api
+                .patch(&res.name, &ps, &Patch::Apply(&pmon))
+                .await
+                .map_err(Error::KubeError)
+            {
+                Ok(_) => {
+                    debug!("ns: {}, applied PodMonitor: {}", ns, res.name);
+                }
+                Err(e) => {
+                    has_errors = true;
+                    error!(
+                        "ns: {}, failed to apply PodMonitor for AppService: {}, error: {}",
+                        ns, res.name, e
+                    );
+                }
+            }
+        } else {
+            match podmon_api.delete(&res.name, &Default::default()).await.ok() {
+                Some(_) => {
+                    debug!("ns: {}, deleted PodMonitor: {}", ns, res.name);
+                }
+                None => {
+                    debug!("ns: {}, PodMonitor does not exist: {}", ns, res.name);
+                }
             }
         }
     }
@@ -945,6 +1038,51 @@ pub async fn prepare_apps_connection_secret(client: Client, cdb: &CoreDB) -> Res
         .await?;
 
     Ok(())
+}
+
+use crate::prometheus::podmonitor_crd as podmon;
+
+fn generate_podmonitor(
+    appsvc: &AppService,
+    resource_name: &str,
+    namespace: &str,
+    annotations: &BTreeMap<String, String>,
+) -> Option<podmon::PodMonitor> {
+    let metrics = appsvc.metrics.clone()?;
+
+    let mut selector_labels: BTreeMap<String, String> = BTreeMap::new();
+    selector_labels.insert("app".to_owned(), resource_name.to_string());
+
+    let mut labels = selector_labels.clone();
+    labels.insert("component".to_owned(), COMPONENT_NAME.to_owned());
+    labels.insert("coredb.io/name".to_owned(), namespace.to_owned());
+
+    let podmon_metadata = ObjectMeta {
+        name: Some(resource_name.to_string()),
+        namespace: Some(namespace.to_owned()),
+        labels: Some(labels.clone()),
+        annotations: Some(annotations.clone()),
+        ..ObjectMeta::default()
+    };
+
+    let metrics_endpoint = podmon::PodMonitorPodMetricsEndpoints {
+        path: Some(metrics.path),
+        port: Some(format!("{APP_CONTAINER_PORT_PREFIX}{}", metrics.port)),
+        ..podmon::PodMonitorPodMetricsEndpoints::default()
+    };
+
+    let pmonspec = podmon::PodMonitorSpec {
+        pod_metrics_endpoints: Some(vec![metrics_endpoint]),
+        selector: podmon::PodMonitorSelector {
+            match_labels: Some(selector_labels.clone()),
+            ..podmon::PodMonitorSelector::default()
+        },
+        ..podmon::PodMonitorSpec::default()
+    };
+    Some(podmon::PodMonitor {
+        metadata: podmon_metadata,
+        spec: pmonspec,
+    })
 }
 
 #[cfg(test)]

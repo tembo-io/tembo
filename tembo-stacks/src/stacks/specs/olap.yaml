@@ -3,9 +3,9 @@ description: A Postgres instance equipped with configuration and extensions for 
 repository: "quay.io/tembo"
 organization: tembo
 images:
-  14: "standard-cnpg:14-ed6e9e9"
-  15: "standard-cnpg:15-ed6e9e9"
-  16: "standard-cnpg:16-ed6e9e9"
+  14: "standard-cnpg:14-389a437"
+  15: "standard-cnpg:15-389a437"
+  16: "standard-cnpg:16-389a437"
 stack_version: 0.1.0
 postgres_config_engine: olap
 postgres_config:
@@ -42,6 +42,10 @@ trunk_installs:
     version: 0.2.4
   - name: redis_fdw
     version: 1.0.0
+  - name: parquet_s3_fdw
+    version: 1.1.0
+  - name: pg_tier 
+    version: 0.0.4
 extensions:
   - name: pg_stat_statements
     locations:
@@ -82,3 +86,15 @@ extensions:
     - database: postgres
       enabled: true
       version:  1.0.0
+  - name: parquet_s3_fdw
+    description: parquet_s3_fdw
+    locations:
+    - database: postgres
+      enabled: true
+      version:  1.1.0
+  - name: pg_tier
+    description: pg_tier
+    locations:
+    - database: postgres
+      enabled: true
+      version:  0.0.4
