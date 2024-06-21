@@ -466,7 +466,6 @@ async fn apply_migrations(
     // Create connection options
     let mut options: PgConnectOptions = database_url.parse()?;
 
-    // Extract environment variables with the "TEMBO_" prefix
     for (key, value) in env::vars() {
         if key.starts_with("TEMBO_") {
             let parameter = key.replace("TEMBO_", "tembo.").to_lowercase();
@@ -474,10 +473,8 @@ async fn apply_migrations(
         }
     }
 
-    // Create a connection pool with the custom options
     let pool = PgPoolOptions::new().connect_with(options).await?;
 
-    // Apply migrations
     for entry in fs::read_dir(&migrations_dir)? {
         let entry = entry?;
         let path = entry.path();

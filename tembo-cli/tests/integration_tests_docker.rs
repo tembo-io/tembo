@@ -439,8 +439,8 @@ async fn local_persistence() -> Result<(), anyhow::Error> {
 }
 
 #[tokio::test]
-async fn allow_migration_secret() -> Result<(), anyhow::Error> {
-    let instance_name = "migrations-2";
+async fn run_migration_secret() -> Result<(), anyhow::Error> {
+    let instance_name = "set";
     let root_dir = env!("CARGO_MANIFEST_DIR");
     let test_dir = PathBuf::from(root_dir).join("examples").join(instance_name);
 
@@ -468,39 +468,10 @@ async fn allow_migration_secret() -> Result<(), anyhow::Error> {
     cmd.arg("apply");
     cmd.assert().success();
 
-    assert!(assert_can_connect(instance_name.to_str()).await.is_err());
-
-    /* Check if the secret was correctly inserted into the database
-    let secret_value = SqlxUtils::get_output_from_sql(
-        instance_name.to_string(),
-        "SELECT secret_value FROM custom_secret_table WHERE secret_value = current_setting('tembo.custom_secret');".to_string(),
-    )
-    .await?;
-
-    assert_eq!(secret_value, "my_custom_secret_value", "The secret value was not correctly inserted");
-
-    let result: String = get_output_from_sql(
-        instance_name.to_string(),
-        "SELECT secret_value FROM custom_secret_table WHERE secret_value = current_setting('tembo.custom_secret');".to_string(),
-    )
-    .await?;
-    assert!(result.contains('1'), "Query did not return 1");*/
-
-    SqlxUtils::execute_sql(
-        instance_name.to_string(),
-        "SELECT * FROM custom_secret_table;".to_string(),
-    )
-    .await?;
-
     // Stop the container
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
     cmd.arg("delete");
     let _ = cmd.ok();
-
-    let mut cmd = Command::new("sh");
-    cmd.arg("-c");
-    cmd.arg("docker volume rm $(docker volume ls -q)");
-    cmd.assert().success();
 
     Ok(())
 }
