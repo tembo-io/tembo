@@ -91,15 +91,6 @@ pub mod dataplane_metrics {
         pub result: Vec<MetricsResult>,
     }
 
-    impl DataPlaneMetrics {
-        pub fn from_query_result(name: &str, query_result: Vec<MetricsResult>) -> Self {
-            Self {
-                name: name.into(),
-                result: query_result,
-            }
-        }
-    }
-
     pub fn split_data_plane_metrics(
         metrics: DataPlaneMetrics,
         max_size: usize,
