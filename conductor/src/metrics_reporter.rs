@@ -1,6 +1,7 @@
 use std::{env, time::Duration};
 
 use anyhow::{bail, Context, Result};
+use conductor::metrics::dataplane_metrics::split_data_plane_metrics;
 use conductor::metrics::{dataplane_metrics::DataPlaneMetrics, prometheus::Metrics};
 use log::info;
 use pgmq::PGMQueueExt;
@@ -48,6 +49,7 @@ pub async fn run_metrics_reporter() -> Result<()> {
         sync_interval.tick().await;
 
         for metric in &metrics {
+            info!("Querying '{}' from Prometheus", metric.name);
             let metrics = client.query(&metric.query).await?;
 
             info!("Successfully queried '{}' from Prometheus", metric.name);
@@ -55,12 +57,23 @@ pub async fn run_metrics_reporter() -> Result<()> {
             let data_plane_metrics =
                 DataPlaneMetrics::from_query_result(&metric.name, metrics.data.result);
 
-            // Send to PGMQ
-            queue
-                .send(&metrics_events_queue, &data_plane_metrics)
-                .await?;
+            let batch_size = 1000;
+            let metrics_to_send = split_data_plane_metrics(data_plane_metrics, batch_size);
+            let batches = metrics_to_send.len();
 
-            info!("Saved metric to PGMQ");
+            info!(
+                "Split metrics into {} chunks, each with {} results",
+                batches, batch_size
+            );
+
+            let mut i = 1;
+            for data_plane_metrics in &metrics_to_send {
+                queue
+                    .send(&metrics_events_queue, data_plane_metrics)
+                    .await?;
+                info!("Enqueued batch {}/{} to PGMQ", i, batches);
+                i += 1;
+            }
         }
     }
 }
