@@ -90,10 +90,39 @@ pub mod dataplane_metrics {
         /// Results of this metric for all instances
         pub result: Vec<MetricsResult>,
     }
+
+    pub fn split_data_plane_metrics(
+        metrics: DataPlaneMetrics,
+        max_size: usize,
+    ) -> Vec<DataPlaneMetrics> {
+        let mut result = Vec::new();
+        let mut chunk = Vec::new();
+
+        for item in metrics.result.into_iter() {
+            if chunk.len() == max_size {
+                result.push(DataPlaneMetrics {
+                    name: metrics.name.clone(),
+                    result: chunk,
+                });
+                chunk = Vec::new();
+            }
+            chunk.push(item);
+        }
+
+        if !chunk.is_empty() {
+            result.push(DataPlaneMetrics {
+                name: metrics.name.clone(),
+                result: chunk,
+            });
+        }
+
+        result
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use crate::metrics::dataplane_metrics::{split_data_plane_metrics, DataPlaneMetrics};
     use crate::metrics::prometheus::{MetricLabels, Metrics, MetricsData, MetricsResult};
 
     const QUERY_RESPONSE: &str = r#"
@@ -155,5 +184,82 @@ mod tests {
         };
 
         assert_eq!(response, expected);
+    }
+
+    #[test]
+    fn test_split_data_plane_metrics() {
+        let mut results = Vec::new();
+
+        for i in 0..2008 {
+            results.push(MetricsResult {
+                metric: MetricLabels {
+                    instance_id: format!("inst_{}", i),
+                    pod: format!("pod_{}", i),
+                },
+                value: (i as i64, i as i64),
+            });
+        }
+
+        let data_plane_metrics = DataPlaneMetrics {
+            name: "test_metric".into(),
+            result: results,
+        };
+
+        let split_metrics = split_data_plane_metrics(data_plane_metrics, 1000);
+
+        assert_eq!(
+            split_metrics.len(),
+            3,
+            "Expected 3 chunks, got {}",
+            split_metrics.len()
+        );
+        assert_eq!(
+            split_metrics[0].result.len(),
+            1000,
+            "First chunk size incorrect"
+        );
+        assert_eq!(
+            split_metrics[1].result.len(),
+            1000,
+            "Second chunk size incorrect"
+        );
+        assert_eq!(
+            split_metrics[2].result.len(),
+            8,
+            "Third chunk size incorrect"
+        );
+    }
+    #[test]
+    fn test_split_data_plane_metrics_exact() {
+        let mut results = Vec::new();
+
+        for i in 0..1000 {
+            results.push(MetricsResult {
+                metric: MetricLabels {
+                    instance_id: format!("inst_{}", i),
+                    pod: format!("pod_{}", i),
+                },
+                value: (i as i64, i as i64),
+            });
+        }
+
+        let data_plane_metrics = DataPlaneMetrics {
+            name: "test_metric".into(),
+            result: results,
+        };
+
+        let split_metrics = split_data_plane_metrics(data_plane_metrics, 1000);
+
+        assert_eq!(
+            split_metrics.len(),
+            1,
+            "Expected 1 chunks, got {}",
+            split_metrics.len()
+        );
+        assert_eq!(
+            split_metrics[0].result.len(),
+            1000,
+            "First chunk size incorrect"
+        );
     }
 }
