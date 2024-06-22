@@ -90,15 +90,6 @@ pub mod dataplane_metrics {
         /// Results of this metric for all instances
         pub result: Vec<MetricsResult>,
     }
-
-    impl DataPlaneMetrics {
-        pub fn from_query_result(name: &str, query_result: Vec<MetricsResult>) -> Self {
-            Self {
-                name: name.into(),
-                result: query_result,
-            }
-        }
-    }
 }
 
 #[cfg(test)]
