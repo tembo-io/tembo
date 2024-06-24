@@ -64,6 +64,7 @@ fn postgres_ingress_route_tcp(
                 }]),
                 middlewares,
                 priority: None,
+                syntax: None,
             }],
             tls: Some(IngressRouteTCPTls {
                 passthrough: Some(true),

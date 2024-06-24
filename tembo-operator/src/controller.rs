@@ -4,8 +4,6 @@ use futures::stream::StreamExt;
 use crate::{
     apis::coredb_types::{CoreDB, CoreDBStatus, VolumeSnapshot},
     app_service::manager::reconcile_app_services,
-    // TODO: Delete after API migration
-    app_service::manager_v3::reconcile_app_services as reconcile_app_services_v3,
     cloudnativepg::{
         archive::wal::reconcile_last_archive_status,
         backups::Backup,
@@ -21,7 +19,6 @@ use crate::{
     extensions::database_queries::is_not_restarting,
     heartbeat::reconcile_heartbeat,
     ingress::reconcile_postgres_ing_route_tcp,
-    ingress_v3::reconcile_postgres_ing_route_tcp as reconcile_postgres_ing_route_tcp_v3,
     postgres_certificates::reconcile_certificates,
     psql::{PsqlCommand, PsqlOutput},
     secret::{reconcile_postgres_role_secret, reconcile_secret},
@@ -53,10 +50,6 @@ use crate::{
     configmap::reconcile_generic_metrics_configmap,
     extensions::{database_queries::list_config_params, reconcile_extensions},
     ingress::{reconcile_extra_postgres_ing_route_tcp, reconcile_ip_allowlist_middleware},
-    ingress_v3::{
-        reconcile_extra_postgres_ing_route_tcp as reconcile_extra_postgres_ing_route_tcp_v3,
-        reconcile_ip_allowlist_middleware as reconcile_ip_allowlist_middleware_v3,
-    },
     network_policies::reconcile_network_policies,
     postgres_exporter::reconcile_metrics_configmap,
     trunk::{extensions_that_require_load, reconcile_trunk_configmap},
@@ -221,13 +214,6 @@ impl CoreDB {
                         error!("Error reconciling MiddlewareTCP for {}: {:?}", name, e);
                         Action::requeue(Duration::from_secs(300))
                     })?;
-                // TODO: Delete after API migration
-                let middleware_name_v3 = reconcile_ip_allowlist_middleware_v3(self, ctx.clone())
-                    .await
-                    .map_err(|e| {
-                        error!("Error reconciling MiddlewareTCP for {}: {:?}", name, e);
-                        Action::requeue(Duration::from_secs(300))
-                    })?;
 
                 let service_name_read_only = format!("{}-ro", self.name_any().as_str());
                 let prefix_read_only = format!("{}-ro-", self.name_any().as_str());
@@ -242,26 +228,6 @@ impl CoreDB {
                     service_name_read_only.as_str(),
                     IntOrString::Int(5432),
                     vec![middleware_name.clone()],
-                )
-                .await
-                .map_err(|e| {
-                    error!("Error reconciling postgres ingress route: {:?}", e);
-                    // For unexpected errors, we should requeue for several minutes at least,
-                    // for expected, "waiting" type of requeuing, those should be shorter, just a few seconds.
-                    // IngressRouteTCP does not have expected errors during reconciliation.
-                    Action::requeue(Duration::from_secs(300))
-                })?;
-                // TODO: Delete after API migration
-                reconcile_postgres_ing_route_tcp_v3(
-                    self,
-                    ctx.clone(),
-                    &read_only_subdomain,
-                    basedomain.as_str(),
-                    ns.as_str(),
-                    prefix_read_only.as_str(),
-                    service_name_read_only.as_str(),
-                    IntOrString::Int(5432),
-                    vec![middleware_name_v3.clone()],
                 )
                 .await
                 .map_err(|e| {
@@ -293,26 +259,6 @@ impl CoreDB {
                     // IngressRouteTCP does not have expected errors during reconciliation.
                     Action::requeue(Duration::from_secs(300))
                 })?;
-                // TODO: Delete after API migration
-                reconcile_postgres_ing_route_tcp_v3(
-                    self,
-                    ctx.clone(),
-                    self.name_any().as_str(),
-                    basedomain.as_str(),
-                    ns.as_str(),
-                    prefix_read_write.as_str(),
-                    service_name_read_write.as_str(),
-                    IntOrString::Int(5432),
-                    vec![middleware_name_v3.clone()],
-                )
-                .await
-                .map_err(|e| {
-                    error!("Error reconciling postgres ingress route: {:?}", e);
-                    // For unexpected errors, we should requeue for several minutes at least,
-                    // for expected, "waiting" type of requeuing, those should be shorter, just a few seconds.
-                    // IngressRouteTCP does not have expected errors during reconciliation.
-                    Action::requeue(Duration::from_secs(300))
-                })?;
 
                 reconcile_extra_postgres_ing_route_tcp(
                     self,
@@ -330,48 +276,12 @@ impl CoreDB {
                     // IngressRouteTCP does not have expected errors during reconciliation.
                     Action::requeue(Duration::from_secs(300))
                 })?;
-                // TODO: Delete after API migration
-                reconcile_extra_postgres_ing_route_tcp_v3(
-                    self,
-                    ctx.clone(),
-                    ns.as_str(),
-                    service_name_read_write.as_str(),
-                    IntOrString::Int(5432),
-                    vec![middleware_name_v3.clone()],
-                )
-                .await
-                .map_err(|e| {
-                    error!("Error reconciling extra postgres ingress route: {:?}", e);
-                    // For unexpected errors, we should requeue for several minutes at least,
-                    // for expected, "waiting" type of requeuing, those should be shorter, just a few seconds.
-                    // IngressRouteTCP does not have expected errors during reconciliation.
-                    Action::requeue(Duration::from_secs(300))
-                })?;
+
                 // If pooler is enabled, reconcile ingress route tcp for pooler
                 if self.spec.connectionPooler.enabled {
                     let name_pooler = format!("{}-pooler", self.name_any().as_str());
                     let prefix_pooler = format!("{}-pooler-", self.name_any().as_str());
                     reconcile_postgres_ing_route_tcp(
-                        self,
-                        ctx.clone(),
-                        name_pooler.as_str(),
-                        basedomain.as_str(),
-                        ns.as_str(),
-                        prefix_pooler.as_str(),
-                        name_pooler.as_str(),
-                        IntOrString::Int(5432),
-                        vec![middleware_name.clone()],
-                    )
-                    .await
-                    .map_err(|e| {
-                        error!("Error reconciling pooler ingress route: {:?}", e);
-                        // For unexpected errors, we should requeue for several minutes at least,
-                        // for expected, "waiting" type of requeuing, those should be shorter, just a few seconds.
-                        // IngressRouteTCP does not have expected errors during reconciliation.
-                        Action::requeue(Duration::from_secs(300))
-                    })?;
-                    // TODO: Delete after API migration
-                    reconcile_postgres_ing_route_tcp_v3(
                         self,
                         ctx.clone(),
                         name_pooler.as_str(),
@@ -403,7 +313,6 @@ impl CoreDB {
         // Superuser connection info
         reconcile_secret(self, ctx.clone()).await?;
         reconcile_app_services(self, ctx.clone(), placement_config.clone()).await?;
-        reconcile_app_services_v3(self, ctx.clone(), placement_config.clone()).await?;
 
         if self
             .spec
