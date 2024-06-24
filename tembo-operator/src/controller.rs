@@ -4,6 +4,8 @@ use futures::stream::StreamExt;
 use crate::{
     apis::coredb_types::{CoreDB, CoreDBStatus, VolumeSnapshot},
     app_service::manager::reconcile_app_services,
+    // TODO: Delete after API migration
+    app_service::manager_v3::reconcile_app_services as reconcile_app_services_v3,
     cloudnativepg::{
         archive::wal::reconcile_last_archive_status,
         backups::Backup,
@@ -22,7 +24,10 @@ use crate::{
     postgres_certificates::reconcile_certificates,
     psql::{PsqlCommand, PsqlOutput},
     secret::{reconcile_postgres_role_secret, reconcile_secret},
-    telemetry, Error, Metrics, Result,
+    telemetry,
+    Error,
+    Metrics,
+    Result,
 };
 use k8s_openapi::{
     api::core::v1::{Namespace, Pod},
@@ -309,6 +314,7 @@ impl CoreDB {
         // Superuser connection info
         reconcile_secret(self, ctx.clone()).await?;
         reconcile_app_services(self, ctx.clone(), placement_config.clone()).await?;
+        reconcile_app_services_v3(self, ctx.clone(), placement_config.clone()).await?;
 
         if self
             .spec
