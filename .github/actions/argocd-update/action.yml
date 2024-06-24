@@ -40,8 +40,8 @@ runs:
         git config --global user.email "admin+github@coredb.io"
         git fetch origin ${{ inputs.branch }} && git checkout ${{ inputs.branch }} || git checkout -b ${{ inputs.branch }}
 
-    - name: Update for staging deployments
-      if: inputs.branch == 'staging-updates'
+    - name: Update for dev or staging deployments
+      if: inputs.branch == 'staging-updates' || (inputs.branch == 'main' && inputs.subdirectory == 'dev')
       uses: mikefarah/yq@v4.44.2
       with:
         cmd: |
