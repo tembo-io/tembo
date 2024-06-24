@@ -25,6 +25,7 @@ mod deployment_postgres_exporter;
 pub mod fixtures;
 pub mod heartbeat;
 pub mod ingress;
+pub mod ingress_v3;
 pub mod traefik;
 pub use traefik::ingress_route_crd;
 mod certmanager;
