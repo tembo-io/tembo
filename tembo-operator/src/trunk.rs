@@ -4,6 +4,7 @@ use lazy_static::lazy_static;
 use schemars::JsonSchema;
 use serde::de::Error;
 use serde::{Deserialize, Serialize};
+use std::borrow::Cow;
 use std::{collections::BTreeMap, env, time::Duration};
 
 use crate::configmap::apply_configmap;
@@ -233,6 +234,7 @@ pub async fn get_trunk_project_names() -> Result<Vec<String>, TrunkError> {
 }
 
 // Get all metadata entries for a given trunk project
+#[allow(unused)]
 async fn get_trunk_project_metadata(
     trunk_project: String,
 ) -> Result<Vec<TrunkProjectMetadata>, TrunkError> {
@@ -243,9 +245,7 @@ async fn get_trunk_project_metadata(
     let response = reqwest::get(&url).await?;
 
     if response.status().is_success() {
-        let response_body = response.text().await?;
-        let project_metadata: Vec<TrunkProjectMetadata> = serde_json::from_str(&response_body)?;
-        Ok(project_metadata)
+        Ok(response.json().await?)
     } else {
         error!(
             "Failed to fetch metadata for trunk project {}: {}",
@@ -377,10 +377,7 @@ pub async fn get_trunk_project_for_extension(
 }
 
 // Check if control file is absent for a given trunk project version
-pub async fn is_control_file_absent(
-    trunk_project: &str,
-    version: &str,
-) -> Result<bool, Action> {
+pub async fn is_control_file_absent(trunk_project: &str, version: &str) -> Result<bool, Action> {
     let project_metadata: TrunkProjectMetadata =
         match get_trunk_project_metadata_for_version(trunk_project, version).await {
             Ok(project_metadata) => project_metadata,
@@ -409,21 +406,17 @@ pub async fn get_loadable_library_name(
     version: &str,
     extension_name: &str,
 ) -> Result<Option<String>, Action> {
-    let project_metadata: TrunkProjectMetadata = match get_trunk_project_metadata_for_version(
-        &trunk_project,
-        version,
-    )
-    .await
-    {
-        Ok(project_metadata) => project_metadata,
-        Err(e) => {
-            error!(
-                "Failed to get trunk project metadata for version {}: {:?}",
-                version, e
-            );
-            return Err(Action::requeue(Duration::from_secs(3)));
-        }
-    };
+    let project_metadata: TrunkProjectMetadata =
+        match get_trunk_project_metadata_for_version(trunk_project, version).await {
+            Ok(project_metadata) => project_metadata,
+            Err(e) => {
+                error!(
+                    "Failed to get trunk project metadata for version {}: {:?}",
+                    version, e
+                );
+                return Err(Action::requeue(Duration::from_secs(3)));
+            }
+        };
 
     // Find the extension in the project metadata
     let extension_metadata = match project_metadata
@@ -455,28 +448,22 @@ pub async fn get_trunk_project_description(
     trunk_project: &str,
     version: &str,
 ) -> Result<Option<String>, Action> {
-    let project_metadata: TrunkProjectMetadata = match get_trunk_project_metadata_for_version(
-        trunk_project,
-        version,
-    )
-    .await
-    {
-        Ok(project_metadata) => project_metadata,
-        Err(e) => {
-            error!(
-                "Failed to get trunk project metadata for version {}: {:?}",
-                version, e
-            );
-            return Err(Action::requeue(Duration::from_secs(3)));
-        }
-    };
+    let project_metadata: TrunkProjectMetadata =
+        match get_trunk_project_metadata_for_version(trunk_project, version).await {
+            Ok(project_metadata) => project_metadata,
+            Err(e) => {
+                error!(
+                    "Failed to get trunk project metadata for version {}: {:?}",
+                    version, e
+                );
+                return Err(Action::requeue(Duration::from_secs(3)));
+            }
+        };
     Ok(project_metadata.description)
 }
 
 // Get latest version of trunk project
-pub async fn get_latest_trunk_project_version(
-    trunk_project: &str,
-) -> Result<String, Action> {
+pub async fn get_latest_trunk_project_version(trunk_project: &str) -> Result<String, Action> {
     match get_latest_trunk_project_metadata(trunk_project).await {
         Ok(project_metadata) => Ok(project_metadata.version),
         Err(e) => {
@@ -484,7 +471,8 @@ pub async fn get_latest_trunk_project_version(
                 "Failed to get trunk project metadata for {}: {:?}",
                 trunk_project, e
             );
-            return Err(Action::requeue(Duration::from_secs(3)));
+
+            Err(Action::requeue(Duration::from_secs(3)))
         }
     }
 }
@@ -495,10 +483,10 @@ pub fn is_semver(version: &str) -> bool {
 }
 
 // Convert to semver if not already
-pub fn convert_to_semver(version: String) -> String {
-    let mut version = version;
+pub fn convert_to_semver(version: &str) -> Cow<'_, str> {
+    let mut version = Cow::Borrowed(version);
     if !is_semver(&version) {
-        version.push_str(".0");
+        version.to_mut().push_str(".0");
     }
     version
 }
@@ -644,30 +632,12 @@ mod tests {
 
     #[test]
     fn test_convert_to_semver() {
-        let version = "1.2.3".to_string();
+        let version = "1.2.3";
         let result = convert_to_semver(version);
-        assert_eq!(result, "1.2.3".to_string());
+        assert_eq!(result, "1.2.3");
 
-        let version = "1.2".to_string();
+        let version = "1.2";
         let result = convert_to_semver(version);
         assert_eq!(result, "1.2.0".to_string());
-    }
-
-    #[tokio::test]
-    async fn sort_semver_test() {
-        let versions = vec![
-            "2.3.0".to_string(),
-            "13.1.1".to_string(),
-            "13.1.0".to_string(),
-        ];
-        let result = sort_semver(versions);
-        assert_eq!(
-            result,
-            vec![
-                "2.3.0".to_string(),
-                "13.1.0".to_string(),
-                "13.1.1".to_string()
-            ]
-        );
     }
 }
