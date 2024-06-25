@@ -1,4 +1,4 @@
-use actix_web::{web, App};
+use actix_web::web;
 
 #[cfg(test)]
 mod tests {
@@ -6,11 +6,101 @@ mod tests {
 
     use super::*;
 
-    use actix_web::test;
     use dataplane_webserver::config;
     use dataplane_webserver::routes::health::{lively, ready};
     use dataplane_webserver::routes::{metrics, root};
     use reqwest::Url;
+    use actix_web::{test, App, http::StatusCode};
+    use dataplane_webserver::routes::secrets::{
+        get_secret, get_secret_names, get_secret_names_v1, get_secret_v1, update_postgres_password,
+    };
+    use serde_json::json;
+
+    #[actix_web::test]
+    async fn test_get_secret_names() {
+        let app = test::init_service(
+            App::new().service(
+                web::scope("/{namespace}/secrets")
+                    .service(get_secret_names),
+            ),
+        )
+        .await;
+
+        let req = test::TestRequest::get()
+            .uri("/test_namespace/secrets")
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+    }
+
+    #[actix_web::test]
+    async fn test_get_secret() {
+        let app = test::init_service(
+            App::new().service(
+                web::scope("/{namespace}/secrets")
+                    .service(get_secret),
+            ),
+        )
+        .await;
+
+        let req = test::TestRequest::get()
+            .uri("/test_namespace/secrets/app-role")
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[actix_web::test]
+    async fn test_get_secret_names_v1() {
+        let app = test::init_service(
+            App::new().service(
+                web::scope("/api/v1/orgs/{org_id}/instances/{instance_id}")
+                    .service(get_secret_names_v1),
+            ),
+        )
+        .await;
+
+        let req = test::TestRequest::get()
+            .uri("/api/v1/orgs/test_org/instances/test_instance/secrets")
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+    }
+
+    #[actix_web::test]
+    async fn test_get_secret_v1() {
+        let app = test::init_service(
+            App::new().service(
+                web::scope("/api/v1/orgs/{org_id}/instances/{instance_id}")
+                    .service(get_secret_v1),
+            ),
+        )
+        .await;
+
+        let req = test::TestRequest::get()
+            .uri("/api/v1/orgs/test_org/instances/test_instance/secrets/app-role")
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    }
+
+    #[actix_web::test]
+    async fn test_update_postgres_password() {
+        let app = test::init_service(
+            App::new().service(
+                web::scope("/api/v1/orgs/{org_id}/instances/{instance_id}")
+                    .service(update_postgres_password),
+            ),
+        )
+        .await;
+
+        let req = test::TestRequest::patch()
+            .uri("/api/v1/orgs/test_org/instances/test_instance/secrets/app-role")
+            .set_json(&json!({ "password": "newpassword" }))
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert_eq!(resp.status(), StatusCode::FORBIDDEN);
+    }
 
     #[actix_web::test]
     async fn test_probes() {
