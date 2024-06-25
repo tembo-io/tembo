@@ -71,7 +71,7 @@ async fn toggle_extensions(
             .await?;
     let mut ext_status_updates = ext_status_updates.clone();
     for extension_to_toggle in toggle_these_extensions {
-        for location_to_toggle in extension_to_toggle.locations {
+        for location_to_toggle in &extension_to_toggle.locations {
             let expected_library_name = match requires_load.get(&extension_to_toggle.name) {
                 None => &extension_to_toggle.name,
                 Some(expected_library_name) => expected_library_name,
@@ -79,15 +79,12 @@ async fn toggle_extensions(
             // Get extensions trunk project name
             let trunk_project_name =
                 get_trunk_project_for_extension(extension_to_toggle.name.clone()).await?;
+
             // Get appropriate version for trunk project
             let loadable_library_name = match trunk_project_name {
                 Some(proj_name) => {
-                    let trunk_project_version = get_trunk_project_version(
-                        cdb,
-                        proj_name.clone(),
-                        location_to_toggle.clone(),
-                    )
-                    .await?;
+                    let trunk_project_version =
+                        get_trunk_project_version(cdb, &proj_name, location_to_toggle).await?;
 
                     // If version is None, error
                     if trunk_project_version.is_none() {
@@ -95,14 +92,16 @@ async fn toggle_extensions(
                         continue;
                     }
                     let loadable_library_name = get_loadable_library_name(
-                        proj_name.clone(),
-                        trunk_project_version.clone().unwrap(),
-                        extension_to_toggle.name.clone(),
+                        &proj_name,
+                        trunk_project_version.as_ref().unwrap(),
+                        &extension_to_toggle.name,
                     )
                     .await?;
-                    let control_file_absent =
-                        is_control_file_absent(proj_name.clone(), trunk_project_version.unwrap())
-                            .await?;
+                    let control_file_absent = is_control_file_absent(
+                        &proj_name,
+                        trunk_project_version.as_deref().unwrap(),
+                    )
+                    .await?;
                     if control_file_absent && loadable_library_name.is_some() {
                         info!(
                             "Extension {} must be enabled with LOAD. Skipping toggle.",
@@ -425,8 +424,8 @@ async fn check_for_extensions_enabled_with_load(
                 let trunk_project_name =
                     get_trunk_project_for_extension(extension.name.clone()).await?;
                 let description = get_trunk_project_description(
-                    trunk_project_name.clone().unwrap(),
-                    extension.version.clone().unwrap(),
+                    trunk_project_name.as_deref().unwrap(),
+                    extension.version.as_deref().unwrap(),
                 )
                 .await?;
 
@@ -477,61 +476,46 @@ async fn check_for_extensions_enabled_with_load(
 // Get trunk project version
 async fn get_trunk_project_version(
     cdb: &CoreDB,
-    trunk_project_name: String,
-    location_to_toggle: types::ExtensionInstallLocation,
+    trunk_project_name: &str,
+    location_to_toggle: &types::ExtensionInstallLocation,
 ) -> Result<Option<String>, Action> {
     let mut trunk_project_version = None;
 
     // Check if version is provided in cdb.spec.trunk_installs
-    for trunk_install in cdb.spec.trunk_installs.clone() {
-        if trunk_install.name == trunk_project_name.clone() {
-            trunk_project_version = trunk_install.version;
+    for trunk_install in &cdb.spec.trunk_installs {
+        if trunk_install.name == trunk_project_name {
+            trunk_project_version = trunk_install.version.clone();
         }
     }
 
-    let location_version = location_to_toggle
-        .version
-        .clone()
-        .ok_or(Action::requeue(Duration::from_secs(300)))?;
+    if let Some(location_version) = location_to_toggle.version.as_deref() {
+        let location_version = if is_semver(location_version) {
+            location_version.into()
+        } else {
+            convert_to_semver(location_version)
+        };
 
-    // If trunk_project_version is None && extension version is semver
-    if trunk_project_version.is_none() && is_semver(location_version.clone()) {
-        // Check if trunk project with extension version exists
-        let trunk_project_version_exists = get_trunk_project_metadata_for_version(
-            trunk_project_name.clone(),
-            location_version.clone(),
-        )
-        .await
-        .is_ok();
-        // If trunk project exists for this version, use it
-        if trunk_project_version_exists {
-            trunk_project_version.clone_from(&location_to_toggle.version);
-        }
-        // Otherwise, fall back to latest version
-        else {
-            trunk_project_version =
-                get_latest_trunk_project_version(trunk_project_name.clone()).await?;
-        }
-        // If trunk_project_version is None && extension version is NOT semver
-    } else if trunk_project_version.is_none() {
-        // Convert to semver and check if trunk project with semver version exists
-        let semver_version = convert_to_semver(location_version.clone());
-        let trunk_project_version_exists = get_trunk_project_metadata_for_version(
-            trunk_project_name.clone(),
-            semver_version.clone(),
-        )
-        .await
-        .is_ok();
-        // If trunk project exists for this version, use it
-        if trunk_project_version_exists {
-            trunk_project_version = Some(semver_version);
-        }
-        // Otherwise, fall back to latest version
-        else {
-            trunk_project_version =
-                get_latest_trunk_project_version(trunk_project_name.clone()).await?;
+        // If the version is not specified in Trunk installs:  and the version specified
+        if trunk_project_version.is_none() && is_semver(&location_version) {
+            // Check if trunk project with extension version exists
+            let trunk_project_version_exists =
+                get_trunk_project_metadata_for_version(trunk_project_name, &location_version)
+                    .await
+                    .is_ok();
+            // If trunk project exists for this version, use it
+            if trunk_project_version_exists {
+                trunk_project_version.clone_from(&location_to_toggle.version);
+            }
         }
     }
+
+    if trunk_project_version.is_none() {
+        // If we still haven't managed to identify the latest Trunk project version,
+        // assume the latest version
+        let latest_version = get_latest_trunk_project_version(trunk_project_name).await?;
+        trunk_project_version = Some(latest_version);
+    }
+
     Ok(trunk_project_version)
 }
 
