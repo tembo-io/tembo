@@ -225,6 +225,7 @@ impl CoreDB {
                     service_name_read_only.as_str(),
                     IntOrString::Int(5432),
                     vec![middleware_name.clone()],
+                    self.spec.replicas < 2 || self.spec.stop,
                 )
                 .await
                 .map_err(|e| {
@@ -247,6 +248,7 @@ impl CoreDB {
                     service_name_read_write.as_str(),
                     IntOrString::Int(5432),
                     vec![middleware_name.clone()],
+                    self.spec.replicas < 1 || self.spec.stop,
                 )
                 .await
                 .map_err(|e| {
@@ -273,30 +275,29 @@ impl CoreDB {
                     // IngressRouteTCP does not have expected errors during reconciliation.
                     Action::requeue(Duration::from_secs(300))
                 })?;
-                // If pooler is enabled, reconcile ingress route tcp for pooler
-                if self.spec.connectionPooler.enabled {
-                    let name_pooler = format!("{}-pooler", self.name_any().as_str());
-                    let prefix_pooler = format!("{}-pooler-", self.name_any().as_str());
-                    reconcile_postgres_ing_route_tcp(
-                        self,
-                        ctx.clone(),
-                        name_pooler.as_str(),
-                        basedomain.as_str(),
-                        ns.as_str(),
-                        prefix_pooler.as_str(),
-                        name_pooler.as_str(),
-                        IntOrString::Int(5432),
-                        vec![middleware_name.clone()],
-                    )
-                    .await
-                    .map_err(|e| {
-                        error!("Error reconciling pooler ingress route: {:?}", e);
-                        // For unexpected errors, we should requeue for several minutes at least,
-                        // for expected, "waiting" type of requeuing, those should be shorter, just a few seconds.
-                        // IngressRouteTCP does not have expected errors during reconciliation.
-                        Action::requeue(Duration::from_secs(300))
-                    })?;
-                }
+
+                let name_pooler = format!("{}-pooler", self.name_any().as_str());
+                let prefix_pooler = format!("{}-pooler-", self.name_any().as_str());
+                reconcile_postgres_ing_route_tcp(
+                    self,
+                    ctx.clone(),
+                    name_pooler.as_str(),
+                    basedomain.as_str(),
+                    ns.as_str(),
+                    prefix_pooler.as_str(),
+                    name_pooler.as_str(),
+                    IntOrString::Int(5432),
+                    vec![middleware_name.clone()],
+                    self.spec.replicas < 1 || self.spec.stop || !self.spec.connectionPooler.enabled,
+                )
+                .await
+                .map_err(|e| {
+                    error!("Error reconciling pooler ingress route: {:?}", e);
+                    // For unexpected errors, we should requeue for several minutes at least,
+                    // for expected, "waiting" type of requeuing, those should be shorter, just a few seconds.
+                    // IngressRouteTCP does not have expected errors during reconciliation.
+                    Action::requeue(Duration::from_secs(300))
+                })?;
             }
             Err(_e) => {
                 warn!(
