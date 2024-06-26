@@ -139,6 +139,7 @@ fn generate_middlewares(
             Middleware::StripPrefix(mw) => {
                 let mw_name = format!("{}-{}", coredb_name, mw.name);
                 let mwsp = MiddlewareStripPrefix {
+                    force_slash: None,
                     prefixes: Some(mw.config),
                 };
                 let tmw = TraefikMiddleware {
@@ -236,6 +237,7 @@ pub fn generate_ingress_routes(
                             }]),
                             middlewares,
                             priority: None,
+                            syntax: None,
                         };
                         routes.push(route);
                     }
@@ -290,6 +292,7 @@ pub fn generate_ingress_tcp_routes(
                             }]),
                             middlewares,
                             priority: None,
+                            syntax: None,
                         };
                         routes.push(route);
                     }
