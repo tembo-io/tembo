@@ -89,6 +89,84 @@ pub struct ServiceAccountTemplate {
     pub metadata: Option<ObjectMeta>,
 }
 
+/// AzureCredentials is the type for the credentials to be used to upload files to Azure Blob Storage.
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+pub struct AzureCredentials {
+    /// The connection string to be used
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "connectionString"
+    )]
+    pub connection_string: Option<AzureCredentialsConnectionString>,
+    /// Use the Azure AD based authentication without providing explicitly the keys.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "inheritFromAzureAD"
+    )]
+    pub inherit_from_azure_ad: Option<bool>,
+    /// The storage account where to upload data
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "storageAccount"
+    )]
+    pub storage_account: Option<AzureCredentialsStorageAccount>,
+    /// The storage account key to be used in conjunction with the storage account name
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "storageKey"
+    )]
+    pub storage_key: Option<AzureCredentialsStorageKey>,
+    /// A shared-access-signature to be used in conjunction with the storage account name
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "storageSasToken"
+    )]
+    pub storage_sas_token: Option<AzureCredentialsStorageSasToken>,
+}
+
+/// The connection string to be used for Azure Blob Storage backups
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+pub struct AzureCredentialsConnectionString {
+    /// The key to select
+    pub key: String,
+    /// Name of the referent.
+    pub name: String,
+}
+
+/// The storage account for Azure Blob Storage backups
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+pub struct AzureCredentialsStorageAccount {
+    /// The key to select
+    pub key: String,
+    /// Name of the referent.
+    pub name: String,
+}
+
+/// The storage account key to be used in conjunction with the storage account name for Azure Blob
+/// Storage backups
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+pub struct AzureCredentialsStorageKey {
+    /// The key to select
+    pub key: String,
+    /// Name of the referent.
+    pub name: String,
+}
+
+/// A shared-access-signature to be used in conjunction with the storage account name for Azure Blob
+/// Storage backups
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+pub struct AzureCredentialsStorageSasToken {
+    /// The key to select
+    pub key: String,
+    /// Name of the referent.
+    pub name: String,
+}
+
 /// S3Credentials is the type for the credentials to be used to upload files to S3.
 /// It can be provided in two alternative ways:
 /// * explicitly passing accessKeyId and secretAccessKey
@@ -226,6 +304,10 @@ pub struct Backup {
     #[serde(default, rename = "endpointURL")]
     pub endpoint_url: Option<String>,
 
+    /// The Azure Blob Storage credentials to use for backups
+    #[serde(default, rename = "azureCredentials")]
+    pub azure_credentials: Option<AzureCredentials>,
+
     /// The S3 credentials to use for backups (if not using IAM Role)
     #[serde(default = "defaults::default_s3_credentials", rename = "s3Credentials")]
     pub s3_credentials: Option<S3Credentials>,
@@ -285,6 +367,10 @@ pub struct Restore {
     /// endpointURL is the S3 compatable endpoint URL
     #[serde(default, rename = "endpointURL")]
     pub endpoint_url: Option<String>,
+
+    /// The Azure Blob Storage credentials to use for restores
+    #[serde(default, rename = "azureCredentials")]
+    pub azure_credentials: Option<AzureCredentials>,
 
     /// s3Credentials is the S3 credentials to use for backups.
     #[serde(rename = "s3Credentials")]
