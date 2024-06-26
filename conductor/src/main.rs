@@ -9,7 +9,8 @@ use conductor::{
 };
 
 use controller::apis::coredb_types::{
-    Backup, CoreDBSpec, S3Credentials, ServiceAccountTemplate, VolumeSnapshot,
+    AzureCredentials, AzureCredentialsStorageAccount, Backup, CoreDBSpec, S3Credentials,
+    ServiceAccountTemplate, VolumeSnapshot,
 };
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use kube::Client;
@@ -76,6 +77,10 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         .unwrap_or_else(|_| "".to_owned())
         .parse()
         .expect("error parsing AZURE_STORAGE_ACCOUNT");
+    let azure_storage_access_key: String = env::var("AZURE_STORAGE_ACCESS_KEY")
+        .unwrap_or_else(|_| "".to_owned())
+        .parse()
+        .expect("error parsing AZURE_STORAGE_ACCESS_KEY");
 
     // Connect to pgmq
     let queue = PGMQueueExt::new(pg_conn_url.clone(), 5).await?;
@@ -240,6 +245,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     is_cloud_formation,
                     cloud_provider.clone(),
                     azure_storage_account.clone(),
+                    azure_storage_access_key.clone(),
                     &client,
                 )
                 .await
@@ -682,6 +688,7 @@ async fn init_cloud_perms(
     is_cloud_formation: bool,
     cloud_provider: String,
     azure_storage_account: String,
+    azure_storage_account_key: String,
     _client: &Client,
 ) -> Result<(), ConductorError> {
     if !is_cloud_formation && cloud_provider != "azure" {
@@ -750,10 +757,28 @@ async fn init_cloud_perms(
         encryption: Some(String::from("AES256")),
         retentionPolicy: Some(String::from("30")),
         schedule: Some(generate_cron_expression(&read_msg.message.namespace)),
-        s3_credentials: Some(S3Credentials {
-            inherit_from_iam_role: Some(true),
-            ..Default::default()
-        }),
+        azure_credentials: if cloud_provider == "azure" {
+            Some(AzureCredentials {
+                connection_string: None,
+                inherit_from_azure_ad: None,
+                storage_account: Some(AzureCredentialsStorageAccount {
+                    key: azure_storage_account_key.clone(),
+                    name: azure_storage_account.clone(),
+                }),
+                storage_key: None,
+                storage_sas_token: None,
+            })
+        } else {
+            None
+        },
+        s3_credentials: if cloud_provider == "aws" {
+            Some(S3Credentials {
+                inherit_from_iam_role: Some(true),
+                ..Default::default()
+            })
+        } else {
+            None
+        },
         volume_snapshot,
         ..Default::default()
     };
