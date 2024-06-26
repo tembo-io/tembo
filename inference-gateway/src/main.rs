@@ -2,34 +2,22 @@ use actix_cors::Cors;
 use actix_web::{middleware, web, App, HttpServer};
 use std::time::Duration;
 
-use gateway::{config, db};
-
-use sqlx::{Pool, Postgres};
-
 #[actix_web::main]
 async fn main() {
     env_logger::init();
 
-    let cfg = config::Config::new().await;
-    let server_port = cfg.server_port;
-    let dbclient: Pool<Postgres> = db::connect(&cfg.pg_conn_str, 4)
-        .await
-        .expect("Failed to connect to database");
-    sqlx::migrate!("./migrations")
-        .run(&dbclient)
-        .await
-        .expect("Failed to run migrations");
-
-    let reqwest_client: reqwest::Client = reqwest::Client::new();
+    let startup_configs = gateway::server::webserver_startup_config().await;
+    let server_port = startup_configs.cfg.server_port;
     let _ = HttpServer::new(move || {
         let cors = Cors::permissive();
 
         App::new()
             .wrap(cors)
             .wrap(middleware::Logger::default())
-            .app_data(web::Data::new(cfg.clone()))
-            .app_data(web::Data::new(reqwest_client.clone()))
-            .app_data(web::Data::new(dbclient.clone()))
+            .app_data(web::Data::new(startup_configs.cfg.clone()))
+            .app_data(web::Data::new(startup_configs.http_client.clone()))
+            .app_data(web::Data::new(startup_configs.pool.clone()))
+            .app_data(web::Data::new(startup_configs.validation_cache.clone()))
             .configure(gateway::server::webserver_routes)
     })
     .workers(8)
