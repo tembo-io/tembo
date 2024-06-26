@@ -5,10 +5,11 @@ pub mod common {
     use actix_web::{dev::ServiceResponse, web, App, Error};
 
     #[cfg(test)]
-    pub async fn get_test_app() -> impl Service<Request, Response = ServiceResponse, Error = Error>
-    {
-        let startup_config = gateway::server::webserver_startup_config().await;
-
+    pub async fn get_test_app(
+        validation: bool,
+    ) -> impl Service<Request, Response = ServiceResponse, Error = Error> {
+        let mut startup_config = gateway::server::webserver_startup_config().await;
+        startup_config.cfg.org_validation_enabled = validation;
         test::init_service(
             App::new()
                 .app_data(web::Data::new(startup_config.cfg.clone()))

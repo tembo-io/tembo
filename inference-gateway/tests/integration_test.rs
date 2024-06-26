@@ -11,7 +11,7 @@ use gateway::db::{self, connect};
 #[ignore]
 #[actix_web::test]
 async fn test_probes() {
-    let app = common::get_test_app().await;
+    let app = common::get_test_app(false).await;
 
     let req = test::TestRequest::get().uri("/ready").to_request();
     let resp = test::call_service(&app, req).await;
@@ -33,8 +33,7 @@ async fn test_logging() {
     env_logger::init();
     let config = Config::new().await;
 
-    std::env::set_var("ORG_VALIDATION_ENABLED", "false");
-    let app = common::get_test_app().await;
+    let app = common::get_test_app(false).await;
 
     let mut rng = rand::thread_rng();
     let rnd = rng.gen_range(0..100000);
@@ -86,9 +85,8 @@ async fn test_validation() {
     let rnd = rng.gen_range(0..100000);
     let org_id = format!("org_{rnd}");
 
-    std::env::set_var("ORG_VALIDATION_ENABLED", "true");
     std::env::set_var("ORG_VALIDATION_CACHE_REFRESH_INTERVAL_SEC", "1");
-    let app = common::get_test_app().await;
+    let app = common::get_test_app(true).await;
 
     let model = "facebook/opt-125m";
     let payload = serde_json::json!({
