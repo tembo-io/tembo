@@ -29,6 +29,6 @@ unit-test:
 	cargo test
 
 integration-test: run-mock-server
-	RUST_LOG=${RUST_LOG} LLM_SERVICE_HOST_PORT=${LLM_SERVICE_HOST_PORT} cargo test -- --ignored
+	RUST_LOG=${RUST_LOG} LLM_SERVICE_HOST_PORT=${LLM_SERVICE_HOST_PORT} cargo test ${TEST_NAME} -- --ignored --nocapture
 
 test-all: unit-test integration-test
