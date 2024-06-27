@@ -1,7 +1,7 @@
 use actix_web::web;
 
 use crate::routes;
-use crate::{config, db, validation};
+use crate::{authorization, config, db};
 
 use sqlx::{Pool, Postgres};
 use std::collections::HashMap;
@@ -20,7 +20,7 @@ pub fn webserver_routes(configuration: &mut web::ServiceConfig) {
 pub struct ServerStartUpConfig {
     pub cfg: config::Config,
     pub pool: Arc<Pool<Postgres>>,
-    pub validation_cache: Arc<RwLock<HashMap<String, bool>>>,
+    pub auth_cache: Arc<RwLock<HashMap<String, bool>>>,
     pub http_client: reqwest::Client,
 }
 
@@ -34,34 +34,32 @@ pub async fn webserver_startup_config(cfg: config::Config) -> ServerStartUpConfi
         .expect("Failed to run migrations");
     let pool = Arc::new(dbclient);
     let http_client: reqwest::Client = reqwest::Client::new();
-    let validation_cache = Arc::new(RwLock::new(HashMap::<String, bool>::new()));
+    let auth_cache = Arc::new(RwLock::new(HashMap::<String, bool>::new()));
 
-    if cfg.org_validation_enabled {
-        log::info!("Starting background task to refresh org validation cache");
-        let cache_refresher = validation_cache.clone();
+    if cfg.org_auth_enabled {
+        log::info!("Starting background task to refresh org auth cache");
+        let cache_refresher = auth_cache.clone();
         let pool_for_bg_task = pool.clone();
         actix_rt::spawn(async move {
             loop {
-                match validation::refresh_cache(&pool_for_bg_task, &cache_refresher).await {
+                match authorization::refresh_cache(&pool_for_bg_task, &cache_refresher).await {
                     Ok(_) => {}
                     Err(e) => {
                         log::error!("Failed to refresh cache: {:?}", e);
                     }
                 }
-                tokio::time::sleep(Duration::from_secs(
-                    cfg.org_validation_cache_refresh_interval_sec,
-                ))
-                .await;
+                tokio::time::sleep(Duration::from_secs(cfg.org_auth_cache_refresh_interval_sec))
+                    .await;
             }
         });
     } else {
-        log::info!("Org validation is disabled");
+        log::info!("Org auth is disabled");
     }
 
     ServerStartUpConfig {
         cfg,
         pool,
-        validation_cache,
+        auth_cache,
         http_client,
     }
 }

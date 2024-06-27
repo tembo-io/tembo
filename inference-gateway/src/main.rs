@@ -18,7 +18,7 @@ async fn main() {
             .app_data(web::Data::new(startup_configs.cfg.clone()))
             .app_data(web::Data::new(startup_configs.http_client.clone()))
             .app_data(web::Data::new(startup_configs.pool.clone()))
-            .app_data(web::Data::new(startup_configs.validation_cache.clone()))
+            .app_data(web::Data::new(startup_configs.auth_cache.clone()))
             .configure(gateway::server::webserver_routes)
     })
     .workers(server_workers as usize)

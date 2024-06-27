@@ -79,14 +79,14 @@ async fn test_logging() {
 
 #[ignore]
 #[actix_web::test]
-async fn test_validation() {
+async fn test_authorization() {
     env_logger::init();
 
     let mut rng = rand::thread_rng();
     let rnd = rng.gen_range(0..100000);
     let org_id = format!("org_{rnd}");
 
-    std::env::set_var("ORG_VALIDATION_CACHE_REFRESH_INTERVAL_SEC", "1");
+    std::env::set_var("ORG_AUTHORIZATION_CACHE_REFRESH_INTERVAL_SEC", "1");
     let app = common::get_test_app(true).await;
 
     let model = "facebook/opt-125m";
@@ -128,6 +128,8 @@ async fn test_validation() {
         .insert_header((header::CONTENT_TYPE, "application/json"))
         .set_payload(payload.to_string())
         .to_request();
+
+    println!("org_id: {}", org_id);
 
     let resp = test::call_service(&app, req).await;
     // validated org must succeed

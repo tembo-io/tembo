@@ -25,7 +25,7 @@ pub async fn refresh_cache(
 }
 
 /// checks if org's is flagged as validated
-pub async fn validate_org(org_id: &str, cache: &Arc<RwLock<HashMap<String, bool>>>) -> bool {
+pub async fn auth_org(org_id: &str, cache: &Arc<RwLock<HashMap<String, bool>>>) -> bool {
     let cache_read = cache.read().await;
     match cache_read.get(org_id) {
         Some(valid) => *valid,

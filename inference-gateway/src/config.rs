@@ -8,8 +8,8 @@ pub struct Config {
     pub pg_conn_str: String,
     pub server_port: u16,
     pub server_workers: u16,
-    pub org_validation_enabled: bool,
-    pub org_validation_cache_refresh_interval_sec: u64,
+    pub org_auth_enabled: bool,
+    pub org_auth_cache_refresh_interval_sec: u64,
 }
 
 impl Config {
@@ -26,15 +26,15 @@ impl Config {
             server_workers: from_env_default("WEBSERVER_WORKERS", "8")
                 .parse::<u16>()
                 .unwrap_or(8),
-            org_validation_enabled: from_env_default("ORG_VALIDATION_ENABLED", "false")
+            org_auth_enabled: from_env_default("ORG_AUTH_ENABLED", "false")
                 .parse()
-                .expect("ORG_VALIDATION_ENABLED must be a boolean"),
-            org_validation_cache_refresh_interval_sec: from_env_default(
-                "ORG_VALIDATION_CACHE_REFRESH_INTERVAL_SEC",
+                .expect("ORG_AUTH_ENABLED must be a boolean"),
+            org_auth_cache_refresh_interval_sec: from_env_default(
+                "ORG_AUTH_CACHE_REFRESH_INTERVAL_SEC",
                 "10",
             )
             .parse()
-            .expect("ORG_VALIDATION_CACHE_REFRESH_INTERVAL_SEC must be an integer"),
+            .expect("ORG_AUTH_CACHE_REFRESH_INTERVAL_SEC must be an integer"),
         }
     }
 }
