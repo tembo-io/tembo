@@ -5,7 +5,6 @@ use crate::{
         kubernetes_queries::{add_trunk_install_to_status, remove_trunk_installs_from_status},
         types::{TrunkInstall, TrunkInstallStatus},
     },
-    trunk::get_latest_trunk_project_version,
     Context,
 };
 use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
@@ -301,29 +300,18 @@ async fn execute_extension_install_command(
     // Handle the case where version is None
     let version = match &ext.version {
         None => {
-            warn!(
-                "Version for extension {} not specified in {}, will fetch latest version",
+            error!(
+                "Installing extension {} into {}: missing version",
                 ext.name, coredb_name
             );
-
-            match get_latest_trunk_project_version(&ext.name).await {
-                Ok(latest_version) => latest_version,
-                Err(_) => {
-                    error!(
-                        "Failed to get latest version for extension {} in {}",
-                        ext.name, coredb_name
-                    );
-
-                    return Ok(TrunkInstallStatus {
-                        name: ext.name.clone(),
-                        version: None,
-                        error: true,
-                        loading: false,
-                        error_message: Some("Missing version".to_string()),
-                        installed_to_pods: Some(vec![pod_name.to_string()]),
-                    });
-                }
-            }
+            return Ok(TrunkInstallStatus {
+                name: ext.name.clone(),
+                version: None,
+                error: true,
+                loading: false,
+                error_message: Some("Missing version".to_string()),
+                installed_to_pods: Some(vec![pod_name.to_string()]),
+            });
         }
         Some(version) => version.clone(),
     };
