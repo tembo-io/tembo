@@ -912,13 +912,11 @@ mod test {
                         "description": "fake description",
                         "locations": [{
                             "enabled": true,
-                            "version": "0.1.4",
-                            "database": "postgres",
+                            "database": "postgres"
                         }],
                     }],
                 "trunk_installs": [{
-                        "name": "pg_jsonschema",
-                        "version": "0.1.4",
+                        "name": "pg_jsonschema"
                 }]
             }
         });
