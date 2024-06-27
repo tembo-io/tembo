@@ -2475,7 +2475,7 @@ spec:
                     nullable: true
                     type: string
                   endpointURL:
-                    description: endpointURL is the S3 compatable endpoint URL
+                    description: endpointURL is the S3 compatible endpoint URL
                     nullable: true
                     type: string
                   recoveryTargetTime:

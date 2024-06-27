@@ -447,8 +447,10 @@ pub fn cnpg_cluster_bootstrap_from_cdb(
 
     let superuser_secret_name = format!("{}-connection", cluster_name);
 
+    println!("****CHECKING RESTORE: {:?}", cdb.spec.restore);
     let coredb_cluster = if let Some(restore) = &cdb.spec.restore {
         if cfg.cloud_provider == "azure" {
+            println!("****AZURE RESTORE");
             let azure_credentials =
                 generate_azure_blob_storage_restore_credentials(restore.azure_credentials.as_ref());
             let restore_destination_path =
@@ -474,6 +476,7 @@ pub fn cnpg_cluster_bootstrap_from_cdb(
                 ..ClusterExternalClusters::default()
             }
         } else {
+            println!("****S3 RESTORE");
             let s3_credentials = generate_s3_restore_credentials(restore.s3_credentials.as_ref());
             // Find destination_path from Backup to generate the restore destination path
             let restore_destination_path =
