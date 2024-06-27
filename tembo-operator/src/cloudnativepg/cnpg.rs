@@ -4,6 +4,9 @@ use crate::cloudnativepg::clusters::{
     ClusterBackupBarmanObjectStoreAzureCredentials,
     ClusterBackupBarmanObjectStoreAzureCredentialsStorageAccount,
     ClusterBackupBarmanObjectStoreAzureCredentialsStorageKey,
+    ClusterExternalClustersBarmanObjectStoreAzureCredentials,
+    ClusterExternalClustersBarmanObjectStoreAzureCredentialsStorageAccount,
+    ClusterExternalClustersBarmanObjectStoreAzureCredentialsStorageKey,
 };
 use crate::extensions::install::find_trunk_installs_to_pod;
 use crate::ingress_route_crd::{
@@ -424,6 +427,7 @@ fn parse_target_time(target_time: Option<&str>) -> Result<Option<String>, ValueE
 #[instrument(skip(cdb))]
 pub fn cnpg_cluster_bootstrap_from_cdb(
     cdb: &CoreDB,
+    cfg: &Config,
 ) -> (
     Option<ClusterBootstrap>,
     Option<Vec<ClusterExternalClusters>>,
@@ -444,26 +448,56 @@ pub fn cnpg_cluster_bootstrap_from_cdb(
     let superuser_secret_name = format!("{}-connection", cluster_name);
 
     let coredb_cluster = if let Some(restore) = &cdb.spec.restore {
-        let s3_credentials = generate_s3_restore_credentials(restore.s3_credentials.as_ref());
-        // Find destination_path from Backup to generate the restore destination path
-        let restore_destination_path = generate_restore_destination_path(restore, &cdb.spec.backup);
-        ClusterExternalClusters {
-            name: "tembo-recovery".to_string(),
-            barman_object_store: Some(ClusterExternalClustersBarmanObjectStore {
-                destination_path: restore_destination_path,
-                endpoint_url: restore.endpoint_url.clone(),
-                s3_credentials: Some(s3_credentials),
-                wal: Some(ClusterExternalClustersBarmanObjectStoreWal {
-                    max_parallel: Some(8),
-                    encryption: Some(ClusterExternalClustersBarmanObjectStoreWalEncryption::Aes256),
-                    compression: Some(
-                        ClusterExternalClustersBarmanObjectStoreWalCompression::Snappy,
-                    ),
+        if cfg.cloud_provider == "azure" {
+            let azure_credentials =
+                generate_azure_blob_storage_restore_credentials(restore.azure_credentials.as_ref());
+            let restore_destination_path =
+                generate_restore_destination_path(restore, &cdb.spec.backup);
+            ClusterExternalClusters {
+                name: "tembo-recovery".to_string(),
+                barman_object_store: Some(ClusterExternalClustersBarmanObjectStore {
+                    destination_path: restore_destination_path,
+                    endpoint_url: restore.endpoint_url.clone(),
+                    azure_credentials: Some(azure_credentials),
+                    wal: Some(ClusterExternalClustersBarmanObjectStoreWal {
+                        max_parallel: Some(8),
+                        encryption: Some(
+                            ClusterExternalClustersBarmanObjectStoreWalEncryption::Aes256,
+                        ),
+                        compression: Some(
+                            ClusterExternalClustersBarmanObjectStoreWalCompression::Snappy,
+                        ),
+                    }),
+                    server_name: Some(restore.server_name.clone()),
+                    ..ClusterExternalClustersBarmanObjectStore::default()
                 }),
-                server_name: Some(restore.server_name.clone()),
-                ..ClusterExternalClustersBarmanObjectStore::default()
-            }),
-            ..ClusterExternalClusters::default()
+                ..ClusterExternalClusters::default()
+            }
+        } else {
+            let s3_credentials = generate_s3_restore_credentials(restore.s3_credentials.as_ref());
+            // Find destination_path from Backup to generate the restore destination path
+            let restore_destination_path =
+                generate_restore_destination_path(restore, &cdb.spec.backup);
+            ClusterExternalClusters {
+                name: "tembo-recovery".to_string(),
+                barman_object_store: Some(ClusterExternalClustersBarmanObjectStore {
+                    destination_path: restore_destination_path,
+                    endpoint_url: restore.endpoint_url.clone(),
+                    s3_credentials: Some(s3_credentials),
+                    wal: Some(ClusterExternalClustersBarmanObjectStoreWal {
+                        max_parallel: Some(8),
+                        encryption: Some(
+                            ClusterExternalClustersBarmanObjectStoreWalEncryption::Aes256,
+                        ),
+                        compression: Some(
+                            ClusterExternalClustersBarmanObjectStoreWalCompression::Snappy,
+                        ),
+                    }),
+                    server_name: Some(restore.server_name.clone()),
+                    ..ClusterExternalClustersBarmanObjectStore::default()
+                }),
+                ..ClusterExternalClusters::default()
+            }
         }
     } else {
         ClusterExternalClusters {
@@ -674,7 +708,8 @@ pub fn cnpg_cluster_from_cdb(
     let namespace = cdb.namespace().unwrap();
     let owner_reference = cdb.controller_owner_ref(&()).unwrap();
     let mut annotations = default_cluster_annotations(cdb);
-    let (bootstrap, external_clusters, superuser_secret) = cnpg_cluster_bootstrap_from_cdb(cdb);
+    let (bootstrap, external_clusters, superuser_secret) =
+        cnpg_cluster_bootstrap_from_cdb(cdb, &cfg);
     let (backup, service_account_template) = cnpg_backup_configuration(cdb, &cfg);
     let storage = cnpg_cluster_storage(cdb);
     let replication = cnpg_high_availability(cdb);
@@ -2126,35 +2161,6 @@ fn generate_s3_backup_credentials(
     }
 }
 
-// Generate credentials for Azure Blob Storage
-fn generate_azure_blob_storage_backup_credentials(
-    creds: Option<&AzureCredentials>,
-) -> ClusterBackupBarmanObjectStoreAzureCredentials {
-    if let Some(creds) = creds {
-        ClusterBackupBarmanObjectStoreAzureCredentials {
-            connection_string: None,
-            inherit_from_azure_ad: None,
-            storage_account: creds.storage_account.as_ref().map(|sa| {
-                ClusterBackupBarmanObjectStoreAzureCredentialsStorageAccount {
-                    key: sa.key.clone(),
-                    name: sa.name.clone(),
-                }
-            }),
-            storage_key: creds.storage_key.as_ref().map(|key| {
-                ClusterBackupBarmanObjectStoreAzureCredentialsStorageKey {
-                    key: key.key.clone(),
-                    name: key.name.clone(),
-                }
-            }),
-            storage_sas_token: None,
-        }
-    } else {
-        ClusterBackupBarmanObjectStoreAzureCredentials {
-            ..Default::default()
-        }
-    }
-}
-
 // generate_s3_restore_credentials function will generate the s3 restore credentials from
 // S3Credentials object and return a ClusterExternalClustersBarmanObjectStoreS3Credentials object
 #[instrument(fields(trace_id, creds))]
@@ -2199,6 +2205,64 @@ fn generate_s3_restore_credentials(
     } else {
         ClusterExternalClustersBarmanObjectStoreS3Credentials {
             inherit_from_iam_role: Some(true),
+            ..Default::default()
+        }
+    }
+}
+
+// Generate backup credentials for Azure Blob Storage
+fn generate_azure_blob_storage_backup_credentials(
+    creds: Option<&AzureCredentials>,
+) -> ClusterBackupBarmanObjectStoreAzureCredentials {
+    if let Some(creds) = creds {
+        ClusterBackupBarmanObjectStoreAzureCredentials {
+            connection_string: None,
+            inherit_from_azure_ad: None,
+            storage_account: creds.storage_account.as_ref().map(|sa| {
+                ClusterBackupBarmanObjectStoreAzureCredentialsStorageAccount {
+                    key: sa.key.clone(),
+                    name: sa.name.clone(),
+                }
+            }),
+            storage_key: creds.storage_key.as_ref().map(|key| {
+                ClusterBackupBarmanObjectStoreAzureCredentialsStorageKey {
+                    key: key.key.clone(),
+                    name: key.name.clone(),
+                }
+            }),
+            storage_sas_token: None,
+        }
+    } else {
+        ClusterBackupBarmanObjectStoreAzureCredentials {
+            ..Default::default()
+        }
+    }
+}
+
+// Generate credentials for Azure Blob Storage
+fn generate_azure_blob_storage_restore_credentials(
+    creds: Option<&AzureCredentials>,
+) -> ClusterExternalClustersBarmanObjectStoreAzureCredentials {
+    if let Some(creds) = creds {
+        ClusterExternalClustersBarmanObjectStoreAzureCredentials {
+            connection_string: None,
+            inherit_from_azure_ad: None,
+            storage_account: creds.storage_account.as_ref().map(|sa| {
+                ClusterExternalClustersBarmanObjectStoreAzureCredentialsStorageAccount {
+                    key: sa.key.clone(),
+                    name: sa.name.clone(),
+                }
+            }),
+            storage_key: creds.storage_key.as_ref().map(|key| {
+                ClusterExternalClustersBarmanObjectStoreAzureCredentialsStorageKey {
+                    key: key.key.clone(),
+                    name: key.name.clone(),
+                }
+            }),
+            storage_sas_token: None,
+        }
+    } else {
+        ClusterExternalClustersBarmanObjectStoreAzureCredentials {
             ..Default::default()
         }
     }

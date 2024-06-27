@@ -364,7 +364,7 @@ pub struct Restore {
     #[serde(rename = "recoveryTargetTime")]
     pub recovery_target_time: Option<String>,
 
-    /// endpointURL is the S3 compatable endpoint URL
+    /// endpointURL is the S3 compatible endpoint URL
     #[serde(default, rename = "endpointURL")]
     pub endpoint_url: Option<String>,
 
