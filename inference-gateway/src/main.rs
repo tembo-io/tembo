@@ -8,6 +8,7 @@ async fn main() {
     let cfg = gateway::config::Config::new().await;
     let startup_configs = gateway::server::webserver_startup_config(cfg).await;
     let server_port = startup_configs.cfg.server_port;
+    let server_workers = startup_configs.cfg.server_workers;
     let _ = HttpServer::new(move || {
         let cors = Cors::permissive();
 
@@ -20,7 +21,7 @@ async fn main() {
             .app_data(web::Data::new(startup_configs.validation_cache.clone()))
             .configure(gateway::server::webserver_routes)
     })
-    .workers(8)
+    .workers(server_workers as usize)
     .keep_alive(Duration::from_secs(75))
     .bind(("0.0.0.0", server_port))
     .unwrap()

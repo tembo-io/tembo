@@ -25,7 +25,7 @@ pub struct ServerStartUpConfig {
 }
 
 pub async fn webserver_startup_config(cfg: config::Config) -> ServerStartUpConfig {
-    let dbclient: Pool<Postgres> = db::connect(&cfg.pg_conn_str, 4)
+    let dbclient: Pool<Postgres> = db::connect(&cfg.pg_conn_str, cfg.server_workers as u32)
         .await
         .expect("Failed to connect to database");
     sqlx::migrate!("./migrations")
