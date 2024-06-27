@@ -86,7 +86,7 @@ async fn test_authorization() {
     let rnd = rng.gen_range(0..100000);
     let org_id = format!("org_{rnd}");
 
-    std::env::set_var("ORG_AUTHORIZATION_CACHE_REFRESH_INTERVAL_SEC", "1");
+    std::env::set_var("ORG_AUTH_CACHE_REFRESH_INTERVAL_SEC", "1");
     let app = common::get_test_app(true).await;
 
     let model = "facebook/opt-125m";
