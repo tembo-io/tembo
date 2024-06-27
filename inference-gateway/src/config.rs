@@ -22,7 +22,7 @@ impl Config {
             server_port: from_env_default("WEBSERVER_PORT", "8080")
                 .parse::<u16>()
                 .unwrap_or(8080),
-            org_validation_enabled: from_env_default("ORG_VALIDATION_ENABLED", "true")
+            org_validation_enabled: from_env_default("ORG_VALIDATION_ENABLED", "false")
                 .parse()
                 .expect("ORG_VALIDATION_ENABLED must be a boolean"),
             org_validation_cache_refresh_interval_sec: from_env_default(

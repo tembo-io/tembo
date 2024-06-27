@@ -24,8 +24,7 @@ pub struct ServerStartUpConfig {
     pub http_client: reqwest::Client,
 }
 
-pub async fn webserver_startup_config() -> ServerStartUpConfig {
-    let cfg = config::Config::new().await;
+pub async fn webserver_startup_config(cfg: config::Config) -> ServerStartUpConfig {
     let dbclient: Pool<Postgres> = db::connect(&cfg.pg_conn_str, 4)
         .await
         .expect("Failed to connect to database");
@@ -38,6 +37,7 @@ pub async fn webserver_startup_config() -> ServerStartUpConfig {
     let validation_cache = Arc::new(RwLock::new(HashMap::<String, bool>::new()));
 
     if cfg.org_validation_enabled {
+        log::info!("Starting background task to refresh org validation cache");
         let cache_refresher = validation_cache.clone();
         let pool_for_bg_task = pool.clone();
         actix_rt::spawn(async move {
@@ -54,6 +54,8 @@ pub async fn webserver_startup_config() -> ServerStartUpConfig {
                 .await;
             }
         });
+    } else {
+        log::info!("Org validation is disabled");
     }
 
     ServerStartUpConfig {

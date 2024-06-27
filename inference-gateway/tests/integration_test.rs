@@ -5,6 +5,7 @@ use rand::prelude::*;
 use sqlx::Row;
 use util::common;
 
+use env_logger;
 use gateway::config::Config;
 use gateway::db::{self, connect};
 
@@ -29,8 +30,6 @@ async fn test_probes() {
 #[ignore]
 #[actix_web::test]
 async fn test_logging() {
-    use env_logger;
-    env_logger::init();
     let config = Config::new().await;
 
     let app = common::get_test_app(false).await;
@@ -81,6 +80,8 @@ async fn test_logging() {
 #[ignore]
 #[actix_web::test]
 async fn test_validation() {
+    env_logger::init();
+
     let mut rng = rand::thread_rng();
     let rnd = rng.gen_range(0..100000);
     let org_id = format!("org_{rnd}");
@@ -112,13 +113,13 @@ async fn test_validation() {
         .expect("Failed to connect to database");
     sqlx::query("INSERT INTO inference.org_validation (org_id, valid) VALUES ($1, $2)")
         .bind(&org_id)
-        .bind(&true)
+        .bind(true)
         .execute(&dbclient)
         .await
         .expect("Failed to insert org status");
 
     // call again after org is validated
-    tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+    tokio::time::sleep(std::time::Duration::from_secs(4)).await;
 
     let req = test::TestRequest::post()
         .uri("/v1/chat/completions")
@@ -130,5 +131,6 @@ async fn test_validation() {
 
     let resp = test::call_service(&app, req).await;
     // validated org must succeed
+    println!("{:?}", resp);
     assert!(resp.status().is_success());
 }

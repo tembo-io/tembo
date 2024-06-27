@@ -61,3 +61,8 @@ jobs:
         run: make unit-test
       - name: integration-test
         run: make integration-test
+      - name: Debugging information
+        if: always()
+        run: |
+          docker compose logs postgres
+          docker compose logs mock-server

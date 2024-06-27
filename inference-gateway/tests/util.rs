@@ -8,8 +8,9 @@ pub mod common {
     pub async fn get_test_app(
         validation: bool,
     ) -> impl Service<Request, Response = ServiceResponse, Error = Error> {
-        let mut startup_config = gateway::server::webserver_startup_config().await;
-        startup_config.cfg.org_validation_enabled = validation;
+        let mut cfg = gateway::config::Config::new().await;
+        cfg.org_validation_enabled = validation;
+        let startup_config = gateway::server::webserver_startup_config(cfg).await;
         test::init_service(
             App::new()
                 .app_data(web::Data::new(startup_config.cfg.clone()))

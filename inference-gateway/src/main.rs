@@ -5,8 +5,8 @@ use std::time::Duration;
 #[actix_web::main]
 async fn main() {
     env_logger::init();
-
-    let startup_configs = gateway::server::webserver_startup_config().await;
+    let cfg = gateway::config::Config::new().await;
+    let startup_configs = gateway::server::webserver_startup_config(cfg).await;
     let server_port = startup_configs.cfg.server_port;
     let _ = HttpServer::new(move || {
         let cors = Cors::permissive();
