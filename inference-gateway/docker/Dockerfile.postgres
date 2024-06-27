@@ -1,9 +1,9 @@
 FROM quay.io/tembo/tembo-local
 
-RUN trunk install pg_timeseries
-RUN trunk install pg_cron
-RUN trunk install pg_partman
-RUN trunk install postgres_fdw
+RUN trunk install pg_timeseries --version 0.1.5
+RUN trunk install pg_cron --version 1.6.2
+RUN trunk install pg_partman --version 5.0.1
+RUN trunk install postgres_fdw --version 1.1.0
 
 USER root
 
