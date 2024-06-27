@@ -2132,6 +2132,8 @@ fn generate_azure_blob_storage_backup_credentials(
 ) -> ClusterBackupBarmanObjectStoreAzureCredentials {
     if let Some(creds) = creds {
         ClusterBackupBarmanObjectStoreAzureCredentials {
+            connection_string: None,
+            inherit_from_azure_ad: None,
             storage_account: creds.storage_account.as_ref().map(|sa| {
                 ClusterBackupBarmanObjectStoreAzureCredentialsStorageAccount {
                     key: sa.key.clone(),
@@ -2144,7 +2146,7 @@ fn generate_azure_blob_storage_backup_credentials(
                     name: key.name.clone(),
                 }
             }),
-            ..Default::default()
+            storage_sas_token: None,
         }
     } else {
         ClusterBackupBarmanObjectStoreAzureCredentials {
