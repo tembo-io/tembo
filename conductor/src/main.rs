@@ -9,7 +9,8 @@ use conductor::{
 };
 
 use controller::apis::coredb_types::{
-    Backup, CoreDBSpec, S3Credentials, ServiceAccountTemplate, VolumeSnapshot,
+    AzureCredentials, AzureCredentialsStorageAccount, AzureCredentialsStorageKey, Backup,
+    CoreDBSpec, S3Credentials, ServiceAccountTemplate, VolumeSnapshot,
 };
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use kube::Client;
@@ -68,6 +69,18 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         .unwrap_or_else(|_| "us-east-1".to_owned())
         .parse()
         .expect("error parsing AWS_REGION");
+    let cloud_provider: String = env::var("CLOUD_PROVIDER")
+        .unwrap_or_else(|_| "aws".to_owned())
+        .parse()
+        .expect("error parsing CLOUD_PROVIDER");
+    let azure_storage_account: String = env::var("AZURE_STORAGE_ACCOUNT")
+        .unwrap_or_else(|_| "".to_owned())
+        .parse()
+        .expect("error parsing AZURE_STORAGE_ACCOUNT");
+    let azure_storage_access_key: String = env::var("AZURE_STORAGE_ACCESS_KEY")
+        .unwrap_or_else(|_| "".to_owned())
+        .parse()
+        .expect("error parsing AZURE_STORAGE_ACCESS_KEY");
 
     // Connect to pgmq
     let queue = PGMQueueExt::new(pg_conn_url.clone(), 5).await?;
@@ -230,6 +243,9 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     &read_msg,
                     &mut coredb_spec,
                     is_cloud_formation,
+                    cloud_provider.clone(),
+                    azure_storage_account.clone(),
+                    azure_storage_access_key.clone(),
                     &client,
                 )
                 .await
@@ -670,36 +686,64 @@ async fn init_cloud_perms(
     read_msg: &Message<CRUDevent>,
     coredb_spec: &mut CoreDBSpec,
     is_cloud_formation: bool,
+    cloud_provider: String,
+    azure_storage_account: String,
+    azure_storage_account_key: String,
     _client: &Client,
 ) -> Result<(), ConductorError> {
-    if !is_cloud_formation {
+    if !is_cloud_formation && cloud_provider != "azure" {
         return Ok(());
     }
 
-    create_cloudformation(
-        aws_region.clone(),
-        backup_archive_bucket.clone(),
-        read_msg.message.namespace.clone(),
-        read_msg.message.backups_read_path.clone(),
-        read_msg.message.backups_write_path.clone(),
-        cf_template_bucket,
-    )
-    .await?;
+    // These vary based on cloud provider
+    let mut service_account_template = ServiceAccountTemplate::default();
+    let mut destination_path = "".to_string();
 
-    // Lookup the CloudFormation stack's role ARN
-    let role_arn = lookup_role_arn(aws_region, &read_msg.message.namespace).await?;
+    if cloud_provider == "aws" {
+        let write_path = read_msg
+            .message
+            .backups_write_path
+            .clone()
+            .unwrap_or(format!("v2/{}", read_msg.message.namespace));
 
-    info!("{}: Adding backup configuration to spec", read_msg.msg_id);
-    // Format ServiceAccountTemplate spec in CoreDBSpec
-    use std::collections::BTreeMap;
-    let mut annotations: BTreeMap<String, String> = BTreeMap::new();
-    annotations.insert("eks.amazonaws.com/role-arn".to_string(), role_arn.clone());
-    let service_account_template = ServiceAccountTemplate {
-        metadata: Some(ObjectMeta {
-            annotations: Some(annotations),
-            ..ObjectMeta::default()
-        }),
-    };
+        create_cloudformation(
+            aws_region.clone(),
+            backup_archive_bucket.clone(),
+            read_msg.message.namespace.clone(),
+            read_msg.message.backups_read_path.clone(),
+            read_msg.message.backups_write_path.clone(),
+            cf_template_bucket,
+        )
+        .await?;
+
+        // Lookup the CloudFormation stack's role ARN
+        let role_arn = lookup_role_arn(aws_region, &read_msg.message.namespace).await?;
+
+        info!("{}: Adding backup configuration to spec", read_msg.msg_id);
+        // Format ServiceAccountTemplate spec in CoreDBSpec
+        use std::collections::BTreeMap;
+        let mut annotations: BTreeMap<String, String> = BTreeMap::new();
+        annotations.insert("eks.amazonaws.com/role-arn".to_string(), role_arn.clone());
+        service_account_template = ServiceAccountTemplate {
+            metadata: Some(ObjectMeta {
+                annotations: Some(annotations),
+                ..ObjectMeta::default()
+            }),
+        };
+        destination_path = format!("s3://{}/{}", backup_archive_bucket, write_path);
+    }
+
+    if cloud_provider == "azure" {
+        let write_path = read_msg
+            .message
+            .backups_write_path
+            .clone()
+            .unwrap_or(format!("{}", read_msg.message.namespace));
+        destination_path = format!(
+            "https://{}.blob.core.windows.net/{}/{}",
+            azure_storage_account, backup_archive_bucket, write_path
+        );
+    }
 
     // TODO: disable volumesnapshots for now until we can make them work with CNPG
     // Enable VolumeSnapshots for all instances being created
@@ -708,20 +752,36 @@ async fn init_cloud_perms(
         snapshot_class: None,
     });
 
-    let write_path = read_msg
-        .message
-        .backups_write_path
-        .clone()
-        .unwrap_or(format!("v2/{}", read_msg.message.namespace));
     let backup = Backup {
-        destinationPath: Some(format!("s3://{}/{}", backup_archive_bucket, write_path)),
+        destinationPath: Some(destination_path),
         encryption: Some(String::from("AES256")),
         retentionPolicy: Some(String::from("30")),
         schedule: Some(generate_cron_expression(&read_msg.message.namespace)),
-        s3_credentials: Some(S3Credentials {
-            inherit_from_iam_role: Some(true),
-            ..Default::default()
-        }),
+        azure_credentials: if cloud_provider == "azure" {
+            Some(AzureCredentials {
+                connection_string: None,
+                inherit_from_azure_ad: None,
+                storage_account: Some(AzureCredentialsStorageAccount {
+                    key: "AZURE_STORAGE_ACCOUNT".to_string(),
+                    name: "azure-creds".to_string(),
+                }),
+                storage_key: Some(AzureCredentialsStorageKey {
+                    key: "AZURE_STORAGE_KEY".to_string(),
+                    name: "azure-creds".to_string(),
+                }),
+                storage_sas_token: None,
+            })
+        } else {
+            None
+        },
+        s3_credentials: if cloud_provider == "aws" {
+            Some(S3Credentials {
+                inherit_from_iam_role: Some(true),
+                ..Default::default()
+            })
+        } else {
+            None
+        },
         volume_snapshot,
         ..Default::default()
     };

@@ -2,6 +2,7 @@ use std::env;
 
 #[derive(Clone, Debug)]
 pub struct Config {
+    pub cloud_provider: String,
     pub enable_backup: bool,
     pub enable_volume_snapshot: bool,
     pub reconcile_timestamp_ttl: u64,
@@ -11,6 +12,7 @@ pub struct Config {
 impl Default for Config {
     fn default() -> Self {
         Self {
+            cloud_provider: from_env_default("CLOUD_PROVIDER", "aws"),
             enable_backup: from_env_default("ENABLE_BACKUP", "true").parse().unwrap(),
             enable_volume_snapshot: from_env_default("ENABLE_VOLUME_SNAPSHOT", "false")
                 .parse()
