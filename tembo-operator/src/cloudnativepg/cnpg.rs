@@ -1,5 +1,10 @@
 use crate::apis::coredb_types;
-use crate::apis::coredb_types::Restore;
+use crate::apis::coredb_types::{AzureCredentials, Restore};
+use crate::cloudnativepg::clusters::{
+    ClusterBackupBarmanObjectStoreAzureCredentials,
+    ClusterBackupBarmanObjectStoreAzureCredentialsStorageAccount,
+    ClusterBackupBarmanObjectStoreAzureCredentialsStorageKey,
+};
 use crate::extensions::install::find_trunk_installs_to_pod;
 use crate::ingress_route_crd::{
     IngressRoute, IngressRouteRoutes, IngressRouteRoutesKind, IngressRouteRoutesServices,
@@ -127,13 +132,15 @@ fn create_cluster_backup_barman_object_store(
     cdb: &CoreDB,
     endpoint_url: &str,
     backup_path: &str,
-    s3_credentials: &ClusterBackupBarmanObjectStoreS3Credentials,
+    azure_credentials: Option<&ClusterBackupBarmanObjectStoreAzureCredentials>,
+    s3_credentials: Option<&ClusterBackupBarmanObjectStoreS3Credentials>,
 ) -> ClusterBackupBarmanObjectStore {
     ClusterBackupBarmanObjectStore {
         data: create_cluster_backup_barman_data(cdb),
         endpoint_url: Some(endpoint_url.to_string()),
         destination_path: backup_path.to_string(),
-        s3_credentials: Some(s3_credentials.clone()),
+        azure_credentials: azure_credentials.cloned(),
+        s3_credentials: s3_credentials.cloned(),
         wal: create_cluster_backup_barman_wal(cdb),
         ..ClusterBackupBarmanObjectStore::default()
     }
@@ -191,7 +198,8 @@ fn create_cluster_backup(
     cdb: &CoreDB,
     endpoint_url: &str,
     backup_path: &str,
-    s3_credentials: &ClusterBackupBarmanObjectStoreS3Credentials,
+    azure_credentials: Option<&ClusterBackupBarmanObjectStoreAzureCredentials>,
+    s3_credentials: Option<&ClusterBackupBarmanObjectStoreS3Credentials>,
 ) -> Option<ClusterBackup> {
     let retention_days = match &cdb.spec.backup.retentionPolicy {
         None => "30d".to_string(),
@@ -219,6 +227,7 @@ fn create_cluster_backup(
             cdb,
             endpoint_url,
             backup_path,
+            azure_credentials,
             s3_credentials,
         )),
         retention_policy: Some(retention_days),
@@ -247,6 +256,7 @@ pub fn cnpg_backup_configuration(
         return (None, None);
     }
 
+    // AWS
     let should_set_service_account_template = (cdb.spec.backup.endpoint_url.is_none()
         && cdb.spec.backup.s3_credentials.is_none())
         || (cdb
@@ -266,6 +276,7 @@ pub fn cnpg_backup_configuration(
                     annots.contains_key("eks.amazonaws.com/role-arn")
                 }));
 
+    // AWS
     let should_reset_service_account_template = cdb
         .spec
         .backup
@@ -285,9 +296,9 @@ pub fn cnpg_backup_configuration(
                     || cred.session_token.is_some()
             }));
 
-    if should_reset_service_account_template {
+    if should_reset_service_account_template || cfg.cloud_provider == "azure" {
         service_account_template = None;
-    } else if should_set_service_account_template {
+    } else if should_set_service_account_template && cfg.cloud_provider == "aws" {
         let service_account_metadata = cdb.spec.serviceAccountTemplate.metadata.clone();
         if service_account_metadata.is_none() {
             warn!("Backups are disabled because we don't have a service account template");
@@ -325,11 +336,31 @@ pub fn cnpg_backup_configuration(
     }
     // Copy the endpoint_url and s3_credentials from cdb to configure backups
     let endpoint_url = cdb.spec.backup.endpoint_url.as_deref().unwrap_or_default();
-    let s3_credentials = generate_s3_backup_credentials(cdb.spec.backup.s3_credentials.as_ref());
-    let cluster_backup =
-        create_cluster_backup(cdb, endpoint_url, &backup_path.unwrap(), &s3_credentials);
 
-    (cluster_backup, service_account_template)
+    if cfg.cloud_provider == "azure" {
+        let azure_credentials = generate_azure_blob_storage_backup_credentials(
+            cdb.spec.backup.azure_credentials.as_ref(),
+        );
+        let cluster_backup = create_cluster_backup(
+            cdb,
+            endpoint_url,
+            &backup_path.unwrap(),
+            Some(&azure_credentials),
+            None,
+        );
+        return (cluster_backup, service_account_template);
+    } else {
+        let s3_credentials =
+            generate_s3_backup_credentials(cdb.spec.backup.s3_credentials.as_ref());
+        let cluster_backup = create_cluster_backup(
+            cdb,
+            endpoint_url,
+            &backup_path.unwrap(),
+            None,
+            Some(&s3_credentials),
+        );
+        return (cluster_backup, service_account_template);
+    }
 }
 
 // parse_target_time returns the parsed target_time which is used for point-in-time-recovery
@@ -2090,6 +2121,33 @@ fn generate_s3_backup_credentials(
     } else {
         ClusterBackupBarmanObjectStoreS3Credentials {
             inherit_from_iam_role: Some(true),
+            ..Default::default()
+        }
+    }
+}
+
+// Generate credentials for Azure Blob Storage
+fn generate_azure_blob_storage_backup_credentials(
+    creds: Option<&AzureCredentials>,
+) -> ClusterBackupBarmanObjectStoreAzureCredentials {
+    if let Some(creds) = creds {
+        ClusterBackupBarmanObjectStoreAzureCredentials {
+            storage_account: creds.storage_account.as_ref().map(|sa| {
+                ClusterBackupBarmanObjectStoreAzureCredentialsStorageAccount {
+                    key: sa.key.clone(),
+                    name: sa.name.clone(),
+                }
+            }),
+            storage_key: creds.storage_key.as_ref().map(|key| {
+                ClusterBackupBarmanObjectStoreAzureCredentialsStorageKey {
+                    key: key.key.clone(),
+                    name: key.name.clone(),
+                }
+            }),
+            ..Default::default()
+        }
+    } else {
+        ClusterBackupBarmanObjectStoreAzureCredentials {
             ..Default::default()
         }
     }
