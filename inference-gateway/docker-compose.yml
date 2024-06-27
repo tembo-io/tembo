@@ -1,7 +1,9 @@
 services:
   postgres:
     restart: always
-    image: quay.io/tembo/timeseries-pg:latest
+    build:
+      dockerfile: docker/Dockerfile.postgres
+      context: .
     ports:
       - 5432:5432
     environment:

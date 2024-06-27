@@ -2,6 +2,7 @@ DATABASE_URL:=postgresql://postgres:postgres@localhost:5432/postgres
 LLM_SERVICE_HOST_PORT=http://localhost:8000
 RUST_LOG=debug
 SQLX_OFFLINE:=true
+ORG_AUTH_ENABLED:=false
 
 fmt:
 	cargo sqlx prepare --database-url ${DATABASE_URL}
@@ -14,7 +15,7 @@ check:
 	cargo sqlx prepare --check
 
 run:
-	LLM_SERVICE_HOST_PORT=${LLM_SERVICE_HOST_PORT} RUST_LOG=${RUST_LOG} cargo run
+	LLM_SERVICE_HOST_PORT=${LLM_SERVICE_HOST_PORT} RUST_LOG=${RUST_LOG} ORG_AUTH_ENABLED=${ORG_AUTH_ENABLED} cargo run
 
 run-migrations:
 	sqlx migrate run --database-url ${DATABASE_URL}
@@ -29,6 +30,6 @@ unit-test:
 	cargo test
 
 integration-test: run-mock-server
-	RUST_LOG=${RUST_LOG} LLM_SERVICE_HOST_PORT=${LLM_SERVICE_HOST_PORT} cargo test -- --ignored
+	RUST_LOG=${RUST_LOG} LLM_SERVICE_HOST_PORT=${LLM_SERVICE_HOST_PORT} cargo test ${TEST_NAME} -- --ignored --nocapture
 
 test-all: unit-test integration-test
