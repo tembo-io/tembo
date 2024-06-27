@@ -9,8 +9,8 @@ use conductor::{
 };
 
 use controller::apis::coredb_types::{
-    AzureCredentials, AzureCredentialsStorageAccount, Backup, CoreDBSpec, S3Credentials,
-    ServiceAccountTemplate, VolumeSnapshot,
+    AzureCredentials, AzureCredentialsStorageAccount, AzureCredentialsStorageKey, Backup,
+    CoreDBSpec, S3Credentials, ServiceAccountTemplate, VolumeSnapshot,
 };
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use kube::Client;
@@ -762,10 +762,13 @@ async fn init_cloud_perms(
                 connection_string: None,
                 inherit_from_azure_ad: None,
                 storage_account: Some(AzureCredentialsStorageAccount {
-                    key: azure_storage_account_key.clone(),
-                    name: azure_storage_account.clone(),
+                    key: "AZURE_STORAGE_ACCOUNT".to_string(),
+                    name: "azure-creds".to_string(),
                 }),
-                storage_key: None,
+                storage_key: Some(AzureCredentialsStorageKey {
+                    key: "AZURE_STORAGE_KEY".to_string(),
+                    name: "azure-creds".to_string(),
+                }),
                 storage_sas_token: None,
             })
         } else {
