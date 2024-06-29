@@ -1,11 +1,7 @@
 use actix_web::web;
 
 use crate::routes;
-<<<<<<< HEAD
-use crate::{config, db, validation};
-=======
 use crate::{authorization, config, db};
->>>>>>> main
 
 use sqlx::{Pool, Postgres};
 use std::collections::HashMap;

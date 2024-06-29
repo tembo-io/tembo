@@ -8,7 +8,6 @@ use tokio::sync::RwLock;
 
 use crate::authorization;
 use crate::errors::{AuthError, PlatformError};
-use crate::validation;
 
 pub async fn forward_request(
     req: HttpRequest,
@@ -30,10 +29,6 @@ pub async fn forward_request(
         return Err(AuthError::Forbidden("Missing request headers".to_string()).into());
     };
 
-    if config.org_validation_enabled {
-        let is_valid = validation::validate_org(x_tembo_org, &cache).await;
-        if !is_valid {
-            return Err(AuthError::Forbidden("Organization is not validated".to_string()).into());
     if config.org_auth_enabled {
         let is_valid = authorization::auth_org(x_tembo_org, &cache).await;
         if !is_valid {
