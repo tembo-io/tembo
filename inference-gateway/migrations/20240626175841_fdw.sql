@@ -14,7 +14,7 @@ CREATE FOREIGN TABLE IF NOT EXISTS fdw_paid_organizations (
     has_cc boolean not null default false
 )
 SERVER cp_queue_server
-OPTIONS (schema_name 'public', table_name 'paid_organizations');
+OPTIONS (schema_name 'billing', table_name 'paid_organizations');
 
 SELECT cron.schedule('refresh-validations', '1 second', $$
     INSERT INTO inference.org_validation
