@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 
+use crate::authorization;
 use crate::errors::{AuthError, PlatformError};
 use crate::validation;
 
@@ -33,6 +34,10 @@ pub async fn forward_request(
         let is_valid = validation::validate_org(x_tembo_org, &cache).await;
         if !is_valid {
             return Err(AuthError::Forbidden("Organization is not validated".to_string()).into());
+    if config.org_auth_enabled {
+        let is_valid = authorization::auth_org(x_tembo_org, &cache).await;
+        if !is_valid {
+            return Err(AuthError::Forbidden("Organization is not authorized".to_string()).into());
         }
     }
 
