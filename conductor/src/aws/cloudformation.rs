@@ -12,7 +12,8 @@ use crate::errors::ConductorError;
 
 #[derive(Clone)]
 pub struct CloudFormationParams {
-    pub bucket_name: String,
+    pub backups_bucket_name: String,
+    pub storage_bucket_name: String,
     pub read_path_prefix: String,
     pub write_path_prefix: String,
     pub role_name: String,
@@ -25,7 +26,7 @@ impl CloudFormationParams {
         vec![
             Parameter::builder()
                 .parameter_key("BucketName")
-                .parameter_value(self.bucket_name)
+                .parameter_value(self.backups_bucket_name)
                 .build(),
             Parameter::builder()
                 .parameter_key("ReadPathPrefix")
@@ -94,12 +95,12 @@ impl AWSConfigState {
         let template_url = if aws_region == "us-east-1" {
             format!(
                 "https://{}.s3.amazonaws.com/{}",
-                cloudformation_template_bucket, "conductor-cf-template-v2.yaml"
+                cloudformation_template_bucket, "conductor-cf-template-v3.yaml"
             )
         } else {
             format!(
                 "https://{}.s3.{}.amazonaws.com/{}",
-                cloudformation_template_bucket, aws_region, "conductor-cf-template-v2.yaml"
+                cloudformation_template_bucket, aws_region, "conductor-cf-template-v3.yaml"
             )
         };
 

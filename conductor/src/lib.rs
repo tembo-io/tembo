@@ -389,6 +389,7 @@ pub async fn restart_coredb(
 pub async fn create_cloudformation(
     aws_region: String,
     backup_archive_bucket: String,
+    storage_archive_bucket: String,
     namespace: String,
     read_path: Option<String>,
     write_path: Option<String>,
@@ -408,7 +409,8 @@ pub async fn create_cloudformation(
     let read_path = read_path.unwrap_or_else(|| format!("v2/{}", namespace));
     let write_path = write_path.unwrap_or_else(|| format!("v2/{}", namespace));
     let cf_template_params = CloudFormationParams {
-        bucket_name: backup_archive_bucket,
+        backups_bucket_name: backup_archive_bucket,
+        storage_bucket_name: storage_archive_bucket,
         read_path_prefix: read_path,
         write_path_prefix: write_path,
         role_name: iam_role_name,
