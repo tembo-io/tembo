@@ -8,7 +8,6 @@ This is a LLM hosting service for the Tembo Platform. It is built on top of [vLL
 - `Inference Server`: a vLLM model server that hosts various LLMs
 - `Postgres`: a standard Postgres database
 
-
 ```mermaid
 graph LR
 A[Gateway] --> |forward request| B[Inference Server]

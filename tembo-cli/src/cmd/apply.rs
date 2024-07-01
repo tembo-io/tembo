@@ -13,7 +13,9 @@ use itertools::Itertools;
 use log::info;
 use spinoff::spinners;
 use spinoff::Spinner;
-use sqlx::{migrate::Migrator, PgPool};
+use sqlx::migrate::Migrator;
+use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
+use std::env;
 use std::fmt::Write;
 use std::path::PathBuf;
 use std::{
@@ -461,7 +463,17 @@ async fn apply_migrations(
     database_url: String,
     migrations_dir: PathBuf,
 ) -> Result<(), anyhow::Error> {
-    let pool = PgPool::connect(&database_url).await?;
+    // Create connection options
+    let mut options: PgConnectOptions = database_url.parse()?;
+
+    for (key, value) in env::vars() {
+        if key.starts_with("TEMBO_") {
+            let parameter = key.replace("TEMBO_", "tembo.").to_lowercase();
+            options = options.options([(parameter.as_str(), value.as_str())]);
+        }
+    }
+
+    let pool = PgPoolOptions::new().connect_with(options).await?;
 
     for entry in fs::read_dir(&migrations_dir)? {
         let entry = entry?;
@@ -612,6 +624,7 @@ fn create_new_instance(
     env: Environment,
 ) -> Result<String, String> {
     let maybe_instance = get_create_instance(value);
+    println!("{:?}", maybe_instance);
 
     match maybe_instance {
         Ok(instance) => {
@@ -893,10 +906,14 @@ fn get_extensions(
                             name);
                         let ext_locations = extension_mismatch.unwrap().locations.clone();
                         if !ext_locations.is_empty() {
-                            if let Some(existing_version) = ext_locations[0].clone().version {
-                                version = existing_version
+                            if ext_locations[0].clone().error.unwrap() == Some(false) {
+                                if let Some(existing_version) = ext_locations[0].clone().version {
+                                    version = existing_version
+                                } else {
+                                    return Err(Error::msg(version_error));
+                                }
                             } else {
-                                return Err(Error::msg(version_error));
+                                return Err(Error::msg("Error adding Extension to your instance."));
                             }
                         } else {
                             return Err(Error::msg(version_error));
@@ -909,7 +926,7 @@ fn get_extensions(
                 vec![ExtensionInstallLocation {
                     database: Some("postgres".to_string()),
                     schema: None,
-                    version: Some(version),
+                    version: version,
                     enabled: extension.enabled,
                 }];
 
@@ -956,11 +973,18 @@ fn get_trunk_installs(
     let mut vec_trunk_installs: Vec<TrunkInstall> = vec![];
 
     if let Some(extensions) = maybe_extensions {
-        for (_, extension) in extensions.into_iter() {
+        for (name, extension) in extensions.into_iter() {
+            let version = Runtime::new()
+                .unwrap()
+                .block_on(get_extension_version(
+                    name.clone(),
+                    extension.clone().version,
+                ))
+                .expect("msg");
             if extension.trunk_project.is_some() {
                 vec_trunk_installs.push(TrunkInstall {
                     name: extension.trunk_project.unwrap(),
-                    version: Some(extension.trunk_project_version),
+                    version: version,
                 });
             }
         }
@@ -1300,7 +1324,6 @@ async fn get_extension_version(
     if let Some(version) = maybe_version {
         return Ok(Some(version));
     }
-
     let trunk_projects = get_trunk_projects(&name).await?;
 
     // If trunk projects returned is not exactly 1 then skip getting version
@@ -1468,6 +1491,11 @@ mod tests {
         let mut cmd = Command::cargo_bin(CARGO_BIN)?;
         cmd.arg("delete");
         let _ = cmd.ok();
+
+        let mut cmd = Command::new("sh");
+        cmd.arg("-c");
+        cmd.arg("docker volume rm $(docker volume ls -q)");
+        cmd.assert().success();
 
         Ok(())
     }

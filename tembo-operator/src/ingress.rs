@@ -64,6 +64,7 @@ fn postgres_ingress_route_tcp(
                 }]),
                 middlewares,
                 priority: None,
+                syntax: None,
             }],
             tls: Some(IngressRouteTCPTls {
                 passthrough: Some(true),
@@ -236,6 +237,7 @@ async fn delete_ingress_route_tcp(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn reconcile_postgres_ing_route_tcp(
     cdb: &CoreDB,
     ctx: Arc<Context>,
@@ -246,6 +248,7 @@ pub async fn reconcile_postgres_ing_route_tcp(
     service_name: &str,
     port: IntOrString,
     middleware_names: Vec<String>,
+    delete: bool,
 ) -> Result<(), OperatorError> {
     let client = ctx.client.clone();
     // Initialize kube api for ingress route tcp
@@ -253,6 +256,15 @@ pub async fn reconcile_postgres_ing_route_tcp(
     let owner_reference = cdb.controller_owner_ref(&()).unwrap();
     let ingress_route_tcp_name = format!("{}0", ingress_name_prefix);
     let newest_matcher = format!("HostSNI(`{subdomain}.{basedomain}`)");
+    if delete {
+        delete_ingress_route_tcp(
+            ingress_route_tcp_api.clone(),
+            namespace,
+            &ingress_route_tcp_name,
+        )
+        .await?;
+        return Ok(());
+    }
 
     let ingress_route_tcp_to_apply = postgres_ingress_route_tcp(
         ingress_route_tcp_name.clone(),

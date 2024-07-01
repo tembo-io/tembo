@@ -27,13 +27,8 @@ pub struct ExtensionInstallLocation {
     )]
     pub schema: Option<Option<String>>,
     /// The extension version to install. If not specified, the latest version will be used.
-    #[serde(
-        rename = "version",
-        default,
-        with = "::serde_with::rust::double_option",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub version: Option<Option<String>>,
+    #[serde(rename = "version", default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
 }
 
 impl ExtensionInstallLocation {

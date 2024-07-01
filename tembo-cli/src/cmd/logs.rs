@@ -415,6 +415,11 @@ mod tests {
         cmd.arg("delete");
         let _ = cmd.ok();
 
+        let mut cmd = Command::new("sh");
+        cmd.arg("-c");
+        cmd.arg("docker volume rm $(docker volume ls -q)");
+        cmd.assert().success();
+
         Ok(())
     }
 

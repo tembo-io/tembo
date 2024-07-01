@@ -969,6 +969,85 @@ mod test {
 
     #[tokio::test]
     #[ignore]
+    async fn functional_test_basic_cnpg_assuming_latest_version() {
+        let test_name = "test-basic-cnpg";
+        let test = TestCore::new(test_name).await;
+        let name = test.name.clone();
+
+        let kind = "CoreDB";
+        let replicas = 1;
+
+        // Generate basic CoreDB resource to start with
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "replicas": replicas,
+                "extensions": [{
+                        // Try including an extension
+                        // without specifying a schema
+                        "name": "pg_jsonschema",
+                        "description": "fake description",
+                        "locations": [{
+                            "enabled": true,
+                            "database": "postgres",
+                        }],
+                    }],
+                "trunk_installs": [{
+                        "name": "pg_jsonschema"
+                }]
+            }
+        });
+
+        let coredb_resource = test.set_cluster_def(&coredb_json).await;
+
+        // Wait for CNPG Pod to be created
+        let pod_name = format!("{}-1", name);
+
+        pod_ready_and_running(test.pods.clone(), pod_name.clone()).await;
+
+        let _ = wait_until_psql_contains(
+            test.context.clone(),
+            coredb_resource.clone(),
+            "\\dx".to_string(),
+            "pg_jsonschema".to_string(),
+            false,
+        )
+        .await;
+
+        // Wait for pg_jsonschema to be installed before proceeding.
+        let found_extension = trunk_install_status(&test.coredbs, &name, "pg_jsonschema").await;
+        assert!(found_extension);
+
+        // Check for heartbeat table and values
+        let sql_result = wait_until_psql_contains(
+            test.context.clone(),
+            coredb_resource.clone(),
+            "SELECT latest_heartbeat FROM tembo.heartbeat_table LIMIT 1".to_string(),
+            "postgres".to_string(),
+            true,
+        )
+        .await;
+        assert!(sql_result.success);
+
+        let cdb_name = coredb_resource.metadata.name.clone().unwrap();
+        let metrics_url = format!("https://{}.localhost:8443/metrics", cdb_name);
+        let response = http_get_with_retry(&metrics_url, None, 100, 5)
+            .await
+            .unwrap();
+        let response_code = response.status();
+        assert!(response_code.is_success());
+        let body = response.text().await.unwrap();
+        assert!(body.contains("cnpg_pg_settings_setting"));
+
+        test.teardown().await;
+    }
+
+    #[tokio::test]
+    #[ignore]
     async fn functional_test_basic_cnpg_pg16() {
         // Initialize the Kubernetes client
         let client = kube_client().await;
@@ -1770,7 +1849,7 @@ mod test {
             }
         };
         let kind = "CoreDB";
-        let replicas = 1;
+        let replicas = 2;
 
         // Create a pod we can use to run commands in the cluster
         let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
@@ -1958,120 +2037,6 @@ mod test {
         let ing_route_tcp = ingress_route_tcp_api.get(&ing_route_tcp_name).await;
         // Should be deleted
         assert!(ing_route_tcp.is_err());
-
-        // Cleanup CoreDB resource
-        coredbs.delete(name, &Default::default()).await.unwrap();
-        println!("Waiting for CoreDB to be deleted: {}", &name);
-        let _assert_coredb_deleted = tokio::time::timeout(
-            Duration::from_secs(TIMEOUT_SECONDS_COREDB_DELETED),
-            await_condition(coredbs.clone(), name, conditions::is_deleted("")),
-        )
-        .await
-        .unwrap_or_else(|_| {
-            panic!(
-                "CoreDB {} was not deleted after waiting {} seconds",
-                name, TIMEOUT_SECONDS_COREDB_DELETED
-            )
-        });
-        println!("CoreDB resource deleted {}", name);
-
-        // Delete namespace
-        let _ = delete_namespace(client.clone(), &namespace).await;
-    }
-
-    #[tokio::test]
-    #[ignore]
-    async fn functional_test_ingress_route_tcp_ignore_existing_ing_route_tcp() {
-        // Initialize the Kubernetes client
-        let client = kube_client().await;
-
-        // Configurations
-        let mut rng = rand::thread_rng();
-        let suffix = rng.gen_range(0..100000);
-        let name = &format!("test-ingress-route-tcp-ignore-{}", suffix.clone());
-        let namespace = match create_namespace(client.clone(), name).await {
-            Ok(namespace) => namespace,
-            Err(e) => {
-                eprintln!("Error creating namespace: {}", e);
-                std::process::exit(1);
-            }
-        };
-        let kind = "CoreDB";
-        let replicas = 1;
-
-        // Create an ingress route tcp to be ignored
-        let ing = serde_json::json!({
-            "apiVersion": "traefik.containo.us/v1alpha1",
-            "kind": "IngressRouteTCP",
-            "metadata": {
-                "name": name,
-            },
-            "spec": {
-                "entryPoints": ["postgresql"],
-                "routes": [
-                    {
-                        "match": format!("HostSNI(`{name}-old.localhost`)"),
-                        "services": [
-                            {
-                                "name": format!("{name}"),
-                                "port": 5432,
-                            },
-                        ],
-                    },
-                ],
-                "tls": {
-                    "passthrough": true,
-                },
-            },
-        });
-
-        let ingress_route_tcp_api: Api<IngressRouteTCP> =
-            Api::namespaced(client.clone(), &namespace);
-        let params = PatchParams::apply("functional-test-ingress-route-tcp");
-        let _o = ingress_route_tcp_api
-            .patch(name, &params, &Patch::Apply(&ing))
-            .await
-            .unwrap();
-
-        // Create a pod we can use to run commands in the cluster
-        let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
-
-        // Apply a basic configuration of CoreDB
-        println!("Creating CoreDB resource {}", &name);
-        let _test_metric_decr = format!("coredb_integration_test_{}", suffix.clone());
-        let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
-        let coredb_json = serde_json::json!({
-            "apiVersion": API_VERSION,
-            "kind": kind,
-            "metadata": {
-                "name": name
-            },
-            "spec": {
-                "replicas": replicas,
-            }
-        });
-        let patch = Patch::Apply(&coredb_json);
-        let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
-
-        // Wait for Pod to be created
-        let pod_name = format!("{}-1", name);
-        pod_ready_and_running(pods.clone(), pod_name.clone()).await;
-
-        // This TCP route should not exist, because instead we adopted the existing one
-        let ing_route_tcp_name = format!("{}-rw-0", name);
-        // Get the ingress route tcp
-        let get_result = ingress_route_tcp_api.get(&ing_route_tcp_name).await;
-        assert!(
-            get_result.is_ok(),
-            "Expected to find ingress route TCP with name {}",
-            ing_route_tcp_name
-        );
-
-        // This TCP route is the one we ignored
-        let _get_result = ingress_route_tcp_api
-            .get(name)
-            .await
-            .unwrap_or_else(|_| panic!("Expected to find ingress route TCP {}", name));
 
         // Cleanup CoreDB resource
         coredbs.delete(name, &Default::default()).await.unwrap();

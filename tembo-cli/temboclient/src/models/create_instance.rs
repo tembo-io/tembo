@@ -31,7 +31,6 @@ pub struct CreateInstance {
     #[serde(
         rename = "extensions",
         default,
-        with = "::serde_with::rust::double_option",
         skip_serializing_if = "Option::is_none"
     )]
     pub extensions: Option<Option<Vec<crate::models::Extension>>>,

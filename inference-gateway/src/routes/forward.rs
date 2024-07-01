@@ -1,7 +1,12 @@
 use actix_web::{web, HttpRequest, HttpResponse};
 use serde::{Deserialize, Serialize};
+use sqlx::postgres::PgPool;
 use sqlx::{self, Pool, Postgres};
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
+use crate::authorization;
 use crate::errors::{AuthError, PlatformError};
 
 pub async fn forward_request(
@@ -9,7 +14,8 @@ pub async fn forward_request(
     body: web::Json<serde_json::Value>,
     config: web::Data<crate::config::Config>,
     client: web::Data<reqwest::Client>,
-    dbclient: web::Data<Pool<Postgres>>,
+    dbclient: web::Data<Arc<PgPool>>,
+    cache: web::Data<Arc<RwLock<HashMap<String, bool>>>>,
 ) -> Result<HttpResponse, PlatformError> {
     let headers = req.headers();
     let x_tembo_org = if let Some(header) = headers.get("X-TEMBO-ORG") {
@@ -22,6 +28,13 @@ pub async fn forward_request(
     } else {
         return Err(AuthError::Forbidden("Missing request headers".to_string()).into());
     };
+
+    if config.org_auth_enabled {
+        let is_valid = authorization::auth_org(x_tembo_org, &cache).await;
+        if !is_valid {
+            return Err(AuthError::Forbidden("Organization is not authorized".to_string()).into());
+        }
+    }
 
     let path = req.uri().path();
 
@@ -64,7 +77,6 @@ pub async fn forward_request(
     }
 }
 
-// Function to insert data into Postgres
 async fn insert_data(
     org: &str,
     isnt: &str,

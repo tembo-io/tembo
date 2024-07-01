@@ -1,82 +1,104 @@
-name: 'Argo CD update'
-description: 'Push changes to a branch in ArgoCD'
+name: "Argo CD update"
+description: "Push changes to a branch in ArgoCD"
 inputs:
   repository:
-    description: 'The ArgoCD repository'
+    description: "The ArgoCD repository"
     required: true
   ssh_key:
-    description: 'The SSH key for the repository'
+    description: "The SSH key for the repository"
     required: true
   branch:
-    description: 'The branch to update'
+    description: "The branch to update"
     required: true
   version:
-    description: 'The version to use for updating'
+    description: "The version to use for updating"
     required: true
   subdirectory:
-    description: 'The subdirectory to update'
+    description: "The subdirectory to update"
     required: true
   clone_into:
-    description: 'The directory to clone the argocd repo into'
-    default: 'argocd-repo'
+    description: "The directory to clone the argocd repo into"
+    default: "argocd-repo"
     required: false
 outputs: {}
 runs:
   using: "composite"
   steps:
-  - name: Check out the repo
-    uses: actions/checkout@v4
-    with:
-      repository: ${{ inputs.repository }}
-      ssh-key: ${{ inputs.ssh_key }}
-      path: ${{ inputs.clone_into }}
-  - name: Git commit and push to remote
-    shell: bash
-    run: |
-      set -xe
-      cd ${{ inputs.clone_into }}
-      git config --global user.name "coredb-service-user"
-      git config --global user.email "admin+github@coredb.io"
-      git fetch origin ${{ inputs.branch }} && git checkout ${{ inputs.branch }} || git checkout -b ${{ inputs.branch }}
-  - name: Update conductor helm chart
-    uses: mikefarah/yq@v4.44.1
-    with:
-      cmd: yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/data-plane.yaml
-  - name: Update conductor image
-    uses: mikefarah/yq@v4.44.1
-    with:
-      cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/data-plane.yaml
-  - name: Update dataplane webserver image
-    uses: mikefarah/yq@v4.44.1
-    with:
-      cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/dataplane-webserver.yaml
-  - name: Update operator helm chart
-    uses: mikefarah/yq@v4.44.1
-    with:
-      cmd: yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator.yaml
-  - name: Update operator image
-    uses: mikefarah/yq@v4.44.1
-    with:
-      cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "controller.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator.yaml
-  - name: Update pod-init image
-    uses: mikefarah/yq@v4.44.1
-    with:
-      cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "pod-init.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator.yaml
-  - name: Update Tembo AI images
-    uses: mikefarah/yq@v4.44.1
-    with:
-      cmd: yq -i '(.spec.source.helm.parameters.[] | select(.name == "inferenceGateway.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-ai.yaml
-  - name: Update Tembo AI chart
-    uses: mikefarah/yq@v4.44.1
-    with:
-      cmd: yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-ai.yaml
-  - name: Git commit and push to remote
-    shell: bash
-    run: |
-      set -xe
-      cd ${{ inputs.clone_into }}
-      git add --all
-      # debugging
-      git diff HEAD
-      git commit -m "Update from tembo-io/tembo: ${{ inputs.version }}"
-      git push origin ${{ inputs.branch }}
+    - name: Check out the repo
+      uses: actions/checkout@v4
+      with:
+        repository: ${{ inputs.repository }}
+        ssh-key: ${{ inputs.ssh_key }}
+        path: ${{ inputs.clone_into }}
+
+    - name: Git commit and push to remote
+      shell: bash
+      run: |
+        set -xe
+        cd ${{ inputs.clone_into }}
+        git config --global user.name "coredb-service-user"
+        git config --global user.email "admin+github@coredb.io"
+        git fetch origin ${{ inputs.branch }} && git checkout ${{ inputs.branch }} || git checkout -b ${{ inputs.branch }}
+
+    - name: Update for dev or staging deployments
+      if: inputs.branch == 'staging-updates' || (inputs.branch == 'main' && inputs.subdirectory == 'dev')
+      uses: mikefarah/yq@v4.44.2
+      with:
+        cmd: |
+          yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/data-plane.yaml
+          yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/data-plane-euc1.yaml
+          yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/data-plane.yaml
+          yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/data-plane-euc1.yaml
+          yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/dataplane-webserver.yaml
+          yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/dataplane-webserver-euc1.yaml
+          yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator.yaml
+          yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator-euc1.yaml
+          yq -i '(.spec.source.helm.parameters.[] | select(.name == "controller.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator.yaml
+          yq -i '(.spec.source.helm.parameters.[] | select(.name == "controller.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator-euc1.yaml
+          yq -i '(.spec.source.helm.parameters.[] | select(.name == "pod-init.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator.yaml
+          yq -i '(.spec.source.helm.parameters.[] | select(.name == "pod-init.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator-euc1.yaml
+          yq -i '(.spec.source.helm.parameters.[] | select(.name == "inferenceGateway.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-ai.yaml
+          yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-ai.yaml
+
+    - name: Update for prod deployments
+      if: inputs.branch == 'prod-updates'
+      uses: mikefarah/yq@v4.44.2
+      with:
+        cmd: |
+          yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/data-plane.yaml
+          yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/data-plane-euc1.yaml
+          yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/data-plane-apse1.yaml
+          yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/data-plane-usw2.yaml
+          yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/data-plane.yaml
+          yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/data-plane-euc1.yaml
+          yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/data-plane-apse1.yaml
+          yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/data-plane-usw2.yaml
+          yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/dataplane-webserver.yaml
+          yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/dataplane-webserver-euc1.yaml
+          yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/dataplane-webserver-apse1.yaml
+          yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/dataplane-webserver-usw2.yaml
+          yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator.yaml
+          yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator-euc1.yaml
+          yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator-apse1.yaml
+          yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator-usw2.yaml
+          yq -i '(.spec.source.helm.parameters.[] | select(.name == "controller.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator.yaml
+          yq -i '(.spec.source.helm.parameters.[] | select(.name == "controller.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator-euc1.yaml
+          yq -i '(.spec.source.helm.parameters.[] | select(.name == "controller.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator-apse1.yaml
+          yq -i '(.spec.source.helm.parameters.[] | select(.name == "controller.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator-usw2.yaml
+          yq -i '(.spec.source.helm.parameters.[] | select(.name == "pod-init.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator.yaml
+          yq -i '(.spec.source.helm.parameters.[] | select(.name == "pod-init.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator-euc1.yaml
+          yq -i '(.spec.source.helm.parameters.[] | select(.name == "pod-init.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator-apse1.yaml
+          yq -i '(.spec.source.helm.parameters.[] | select(.name == "pod-init.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator-usw2.yaml
+          yq -i '(.spec.source.helm.parameters.[] | select(.name == "inferenceGateway.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-ai.yaml
+          yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-ai.yaml
+
+    - name: Git commit and push to remote
+      shell: bash
+      run: |
+        set -xe
+        cd ${{ inputs.clone_into }}
+        git add --all
+        # debugging
+        git diff HEAD
+        git commit -m "Update from tembo-io/tembo: ${{ inputs.version }}"
+        git push origin ${{ inputs.branch }}
