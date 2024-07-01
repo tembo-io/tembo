@@ -25,8 +25,12 @@ impl CloudFormationParams {
     fn parameters(self) -> Vec<Parameter> {
         vec![
             Parameter::builder()
-                .parameter_key("BucketName")
+                .parameter_key("BackupsBucketName")
                 .parameter_value(self.backups_bucket_name)
+                .build(),
+            Parameter::builder()
+                .parameter_key("StorageBucketName")
+                .parameter_value(self.storage_bucket_name)
                 .build(),
             Parameter::builder()
                 .parameter_key("ReadPathPrefix")
