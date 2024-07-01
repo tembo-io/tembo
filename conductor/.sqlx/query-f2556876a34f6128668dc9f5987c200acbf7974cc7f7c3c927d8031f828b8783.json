@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO deleted_instances (namespace) VALUES ($1) ON CONFLICT (namespace) DO NOTHING",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Varchar"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "f2556876a34f6128668dc9f5987c200acbf7974cc7f7c3c927d8031f828b8783"
+}

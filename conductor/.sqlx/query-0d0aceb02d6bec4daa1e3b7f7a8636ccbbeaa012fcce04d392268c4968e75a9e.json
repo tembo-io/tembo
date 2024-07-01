@@ -1,0 +1,28 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "SELECT * FROM deleted_instances WHERE namespace = $1;",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "namespace",
+        "type_info": "Varchar"
+      },
+      {
+        "ordinal": 1,
+        "name": "deleted_at",
+        "type_info": "Timestamptz"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Text"
+      ]
+    },
+    "nullable": [
+      false,
+      true
+    ]
+  },
+  "hash": "0d0aceb02d6bec4daa1e3b7f7a8636ccbbeaa012fcce04d392268c4968e75a9e"
+}

@@ -10,6 +10,7 @@ WORKDIR /build
 ENV SQLX_OFFLINE=true
 
 COPY sqlx-data.json .
+COPY .sqlx/ .sqlx/
 COPY Cargo.toml .
 COPY Cargo.lock .
 COPY ./src ./src
