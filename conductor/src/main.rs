@@ -54,6 +54,8 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         env::var("DATA_PLANE_BASEDOMAIN").expect("DATA_PLANE_BASEDOMAIN must be set");
     let backup_archive_bucket =
         env::var("BACKUP_ARCHIVE_BUCKET").expect("BACKUP_ARCHIVE_BUCKET must be set");
+    let storage_archive_bucket =
+        env::var("STORAGE_ARCHIVE_BUCKET").expect("STORAGE_ARCHIVE_BUCKET must be set");
     let cf_template_bucket =
         env::var("CF_TEMPLATE_BUCKET").expect("CF_TEMPLATE_BUCKET must be set");
     let max_read_ct: i32 = env::var("MAX_READ_CT")
@@ -226,6 +228,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                 match init_cloud_perms(
                     aws_region.clone(),
                     backup_archive_bucket.clone(),
+                    storage_archive_bucket.clone(),
                     cf_template_bucket.clone(),
                     &read_msg,
                     &mut coredb_spec,
@@ -666,6 +669,7 @@ async fn main() -> std::io::Result<()> {
 async fn init_cloud_perms(
     aws_region: String,
     backup_archive_bucket: String,
+    storage_archive_bucket: String,
     cf_template_bucket: String,
     read_msg: &Message<CRUDevent>,
     coredb_spec: &mut CoreDBSpec,
@@ -679,6 +683,7 @@ async fn init_cloud_perms(
     create_cloudformation(
         aws_region.clone(),
         backup_archive_bucket.clone(),
+        storage_archive_bucket.clone(),
         read_msg.message.namespace.clone(),
         read_msg.message.backups_read_path.clone(),
         read_msg.message.backups_write_path.clone(),

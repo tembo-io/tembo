@@ -80,6 +80,7 @@ watch:
 	DATA_PLANE_BASEDOMAIN=coredb-development.com \
 	CF_TEMPLATE_BUCKET=cdb-plat-use1-dev-eks-data-1-conductor-cf-templates \
 	BACKUP_ARCHIVE_BUCKET=cdb-plat-use1-dev-instance-backups \
+	STORAGE_ARCHIVE_BUCKET=cdb-plat-use1-dev-instance-storage \
 	IS_CLOUD_FORMATION=false \
 	cargo watch -x run
 
