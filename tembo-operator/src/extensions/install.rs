@@ -130,26 +130,27 @@ pub fn find_trunk_installs_to_pod<'a>(cdb: &'a CoreDB, pod_name: &str) -> Vec<&'
         cdb.name_any()
     );
 
+    let pod_name = pod_name.to_owned();
     let mut trunk_installs_to_install = Vec::new();
 
     // Get extensions in spec.trunk_install that are not in status.trunk_install
-    for ext in cdb.spec.trunk_installs.iter() {
-        if !cdb
+    for ext in &cdb.spec.trunk_installs {
+        // All TrunkInstallStatus in CDB spec
+        let trunk_install_statuses = cdb
             .status
-            .clone()
-            .unwrap_or_default()
-            .trunk_installs
-            .unwrap_or_default()
-            .iter()
-            .any(|ext_status| {
-                ext.name == ext_status.name
-                    && ext_status
-                        .installed_to_pods
-                        .clone()
-                        .unwrap_or_default()
-                        .contains(&pod_name.to_string())
-            })
-        {
+            .as_ref()
+            .and_then(|status| status.trunk_installs.as_deref())
+            .unwrap_or_default();
+
+        if !trunk_install_statuses.iter().any(|ext_status| {
+            ext.name == ext_status.name
+                && !ext_status.error
+                && ext_status
+                    .installed_to_pods
+                    .as_deref()
+                    .unwrap_or_default()
+                    .contains(&pod_name)
+        }) {
             trunk_installs_to_install.push(ext);
         }
     }
