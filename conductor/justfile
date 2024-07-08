@@ -86,7 +86,7 @@ watch:
 
 run-postgres:
 	docker rm --force pgmq-pg || true
-	docker run -d --name pgmq-pg -e POSTGRES_PASSWORD=postgres -p 5431:5432 quay.io/tembo/pgmq-pg:v0.14.2
+	docker run -d --name pgmq-pg -e POSTGRES_PASSWORD=postgres -p 5431:5432 quay.io/tembo/pg16-pgmq:v1.3.3
 
 run-tests:
 	echo "Running unit tests"

@@ -666,6 +666,7 @@ async fn main() -> std::io::Result<()> {
     .await
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn init_cloud_perms(
     aws_region: String,
     backup_archive_bucket: String,
