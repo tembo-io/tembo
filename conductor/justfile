@@ -71,9 +71,9 @@ fmt:
 	cargo +nightly fmt
 
 watch:
-	POSTGRES_QUEUE_CONNECTION=postgresql://postgres:postgres@0.0.0.0:5431/postgres \
+	POSTGRES_QUEUE_CONNECTION=postgresql://postgres:lsVtF78i6wtzNCjw@incessantly-personable-fly.data-1.use1.tembo-development.com:5432/postgres?sslmode=require \
 	RUST_BACKTRACE=1 \
-	RUST_LOG={{RUST_LOG}} \
+	RUST_LOG=debug \
 	CONTROL_PLANE_EVENTS_QUEUE=myqueue_control_plane \
 	DATA_PLANE_EVENTS_QUEUE=myqueue_data_plane \
 	METRICS_EVENTS_QUEUE=metrics_events \
