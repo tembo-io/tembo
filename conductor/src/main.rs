@@ -92,6 +92,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
             ConductorError::ConnectionPoolError(e.to_string())
         })?;
 
+    info!("Running database migrations");
     sqlx::migrate!("./migrations")
         .run(&db_pool)
         .await
