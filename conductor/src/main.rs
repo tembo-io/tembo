@@ -79,13 +79,11 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
 
     // Create queues if they do not exist
     debug!("Create queue: {}", control_plane_events_queue.to_string());
-    queue
-        .create_partitioned(&control_plane_events_queue)
-        .await?;
+    queue.create(&control_plane_events_queue).await?;
     debug!("Create queue: {}", data_plane_events_queue.to_string());
-    queue.create_partitioned(&data_plane_events_queue).await?;
+    queue.create(&data_plane_events_queue).await?;
     debug!("Create queue: {}", metrics_events_queue.to_string());
-    queue.create_partitioned(&metrics_events_queue).await?;
+    queue.create(&metrics_events_queue).await?;
 
     // Infer the runtime environment and try to create a Kubernetes Client
     let client = Client::try_default().await?;
