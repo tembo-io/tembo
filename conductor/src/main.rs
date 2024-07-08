@@ -72,18 +72,26 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         .expect("error parsing AWS_REGION");
 
     // Connect to pgmq
+    debug!("Connecting to message queue: {}", pg_conn_url);
     let queue = PGMQueueExt::new(pg_conn_url.clone(), 5).await?;
+    debug!("Initializing message queue");
     queue.init().await?;
 
     // Create queues if they do not exist
-    queue.create(&control_plane_events_queue).await?;
-    queue.create(&data_plane_events_queue).await?;
-    queue.create(&metrics_events_queue).await?;
+    debug!("Create queue: {}", control_plane_events_queue.to_string());
+    queue
+        .create_partitioned(&control_plane_events_queue)
+        .await?;
+    debug!("Create queue: {}", data_plane_events_queue.to_string());
+    queue.create_partitioned(&data_plane_events_queue).await?;
+    debug!("Create queue: {}", metrics_events_queue.to_string());
+    queue.create_partitioned(&metrics_events_queue).await?;
 
     // Infer the runtime environment and try to create a Kubernetes Client
     let client = Client::try_default().await?;
 
     // Connection Pool
+    debug!("Connecting to PG: {}", pg_conn_url);
     let db_pool = PgPoolOptions::new()
         .connect(&pg_conn_url)
         .await
@@ -92,6 +100,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
             ConductorError::ConnectionPoolError(e.to_string())
         })?;
 
+    info!("Running database migrations");
     sqlx::migrate!("./migrations")
         .run(&db_pool)
         .await
