@@ -75,9 +75,17 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
     let queue = PGMQueueExt::new(pg_conn_url.clone(), 5).await?;
     queue.init().await?;
 
+    // enable pg_partman in the queue -- pass in the connection to the queue to execution
+    sqlx::query("CREATE EXTENSION IF NOT EXISTS pg_partman;")
+        .execute(&queue.connection)
+        .await
+        .expect("failed to init pg_partman extension in the queue");
+
     // Create queues if they do not exist
-    queue.create(&control_plane_events_queue).await?;
-    queue.create(&data_plane_events_queue).await?;
+    queue
+        .create_partitioned(&control_plane_events_queue)
+        .await?;
+    queue.create_partitioned(&data_plane_events_queue).await?;
     queue.create(&metrics_events_queue).await?;
 
     // Infer the runtime environment and try to create a Kubernetes Client
