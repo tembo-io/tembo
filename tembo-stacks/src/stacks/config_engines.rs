@@ -168,7 +168,7 @@ fn olap_max_parallel_workers(cpu: f32) -> i32 {
 }
 
 fn olap_max_worker_processes(cpu: f32) -> i32 {
-    i32::max(1, cpu.round() as i32)
+    i32::max(1, cpu.round() as i32) + 1 // add one for cron
 }
 
 // olap formula for maintenance_work_mem
