@@ -45,8 +45,6 @@ spec:
             value: "false"
           - name: METRICS_REPORTER_ENABLED
             value: "true"
-          - name: METRICS_EVENTS_QUEUE
-            value: metrics_events
           - name: RUST_LOG
             value: {{ .Values.logLevel }}
           {{- if .Values.env }}{{ .Values.env | default list | toYaml | nindent 10 }}{{- end }}
