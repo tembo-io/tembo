@@ -381,7 +381,8 @@ mod tests {
             resources: None,
         };
         let user_embedding_app = AppType::Embeddings(Some(app_config));
-        let user_apps = vec![user_embedding_app];
+        let user_ai_app = AppType::AIProxy(None);
+        let user_apps = vec![user_embedding_app, user_ai_app];
         let stack_apps = vec![AppService {
             name: "embeddings".to_string(),
             env: Some(vec![EnvVar {
@@ -393,12 +394,26 @@ mod tests {
         }];
         let merged_configs: MergedConfigs =
             merge_app_reqs(Some(user_apps), Some(stack_apps), None, None, None).unwrap();
-        let app = merged_configs.app_services.unwrap()[0].clone();
+        for config in merged_configs.pg_configs.unwrap() {
+            if config.name == "vectorize.tembo_svc_url" {
+                assert_eq!(
+                    config.value.to_string(),
+                    "http://${NAMESPACE}-ai-proxy:8080/v1"
+                );
+            }
+        }
+        // filter for embedding app
+        let embedding_app = merged_configs
+            .app_services
+            .unwrap()
+            .iter()
+            .find(|a| a.name == "embeddings")
+            .unwrap()
+            .clone();
         let mut to_find = 2;
         // 3 embedding app defaults + 1 custom
-        println!("{:?}", app.env.as_ref().unwrap());
-        assert_eq!(app.env.as_ref().unwrap().len(), 4);
-        for e in app.env.unwrap() {
+        assert_eq!(embedding_app.env.as_ref().unwrap().len(), 4);
+        for e in embedding_app.env.unwrap() {
             match e.name.as_str() {
                 // custom env var is found
                 "APP_ENV" => {
@@ -416,7 +431,7 @@ mod tests {
         assert_eq!(to_find, 0);
 
         // validate metrics end up in final_app
-        let metrics = app.metrics.expect("metrics not found");
+        let metrics = embedding_app.metrics.expect("metrics not found");
         assert_eq!(metrics.path, "/metrics".to_string());
         assert_eq!(metrics.port, 3000);
     }
@@ -434,6 +449,16 @@ mod tests {
     #[test]
     fn test_pganalyze_spec() {
         let cfg = PGANALYZE.postgres_config.clone().unwrap();
+        for c in cfg {
+            if c.name == "log_line_prefix" {
+                assert_eq!(c.value.to_string(), "'%m [%p] %q[user=%u,app=%a] ',db=%d")
+            }
+        }
+    }
+
+    #[test]
+    fn test_ai_spec() {
+        let cfg = AI.postgres_config.clone().unwrap();
         for c in cfg {
             if c.name == "log_line_prefix" {
                 assert_eq!(c.value.to_string(), "'%m [%p] %q[user=%u,app=%a] ',db=%d")
