@@ -83,9 +83,5 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 Create the name of the service account to use
 */}}
 {{- define "conductor.serviceAccountName" -}}
-{{- if .Values.serviceAccount.create }}
 {{- default (include "conductor.fullname" .) .Values.serviceAccount.name }}
-{{- else }}
-{{- default "default" .Values.serviceAccount.name }}
-{{- end }}
 {{- end }}
