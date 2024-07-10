@@ -6,7 +6,7 @@
 {{- $svcPort := .Values.inferenceGateway.service.port -}}
 ---
 {{- if .Values.inferenceGateway.ingressRoute.rewrite.enabled -}}
-apiVersion: traefik.containo.us/v1alpha1
+apiVersion: traefik.io/v1alpha1
 kind: Middleware
 metadata:
   name: {{ $fullName }}-gateway-replace-path
@@ -17,7 +17,7 @@ spec:
     replacement: "{{ .Values.inferenceGateway.ingressRoute.rewrite.replacement }}"
 ---
 {{- end }}
-apiVersion: traefik.containo.us/v1alpha1
+apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: {{ $fullName }}-gateway
