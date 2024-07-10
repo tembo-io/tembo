@@ -5,6 +5,7 @@ use std::time::Duration;
 #[actix_web::main]
 async fn main() {
     env_logger::init();
+
     let cfg = gateway::config::Config::new().await;
     let startup_configs = gateway::server::webserver_startup_config(cfg).await;
     let server_port = startup_configs.cfg.server_port;
