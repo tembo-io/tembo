@@ -168,7 +168,7 @@ fn olap_max_parallel_workers(cpu: f32) -> i32 {
 }
 
 fn olap_max_worker_processes(cpu: f32) -> i32 {
-    i32::max(1, cpu.round() as i32)
+    i32::max(1, cpu.round() as i32) + 1 // add one for cron
 }
 
 // olap formula for maintenance_work_mem
@@ -535,7 +535,7 @@ mod tests {
         assert_eq!(configs[5].name, "max_wal_size");
         assert_eq!(configs[5].value.to_string(), "2GB");
         assert_eq!(configs[6].name, "max_worker_processes");
-        assert_eq!(configs[6].value.to_string(), "4");
+        assert_eq!(configs[6].value.to_string(), "5");
         assert_eq!(configs[7].name, "shared_buffers");
         assert_eq!(configs[7].value.to_string(), "4096MB");
         assert_eq!(configs[8].name, "work_mem");
@@ -568,7 +568,7 @@ mod tests {
         assert_eq!(configs[5].name, "max_wal_size");
         assert_eq!(configs[5].value.to_string(), "2GB");
         assert_eq!(configs[6].name, "max_worker_processes");
-        assert_eq!(configs[6].value.to_string(), "1");
+        assert_eq!(configs[6].value.to_string(), "2");
         assert_eq!(configs[7].name, "shared_buffers");
         assert_eq!(configs[7].value.to_string(), "2048MB");
         assert_eq!(configs[8].name, "work_mem");
