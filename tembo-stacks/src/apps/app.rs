@@ -55,6 +55,9 @@ pub fn merge_app_reqs(
                     if let Some(trunks) = ai.trunk_installs {
                         fin_app_trunk_installs.extend(trunks);
                     }
+                    if let Some(pg_cfg) = ai.postgres_config {
+                        final_pg_configs.extend(pg_cfg);
+                    }
                 }
                 AppType::RestAPI(config) => {
                     // there is only 1 app_service in the restAPI
