@@ -1,0 +1,8 @@
+server {
+  listen 8080;
+  location / {
+    proxy_pass http://$TEMBO_AI_SERVICE_HOST;
+    proxy_set_header X-Tembo-Org $TEMBO_ORG_ID;
+    proxy_set_header X-Tembo-Instance $TEMBO_INSTANCE_ID;
+  }
+}
