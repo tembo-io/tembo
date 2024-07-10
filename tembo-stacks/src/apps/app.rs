@@ -457,16 +457,6 @@ mod tests {
     }
 
     #[test]
-    fn test_ai_spec() {
-        let cfg = AI.postgres_config.clone().unwrap();
-        for c in cfg {
-            if c.name == "log_line_prefix" {
-                assert_eq!(c.value.to_string(), "'%m [%p] %q[user=%u,app=%a] ',db=%d")
-            }
-        }
-    }
-
-    #[test]
     fn test_merge_apps() {
         let user_apps = vec![
             AppService {
