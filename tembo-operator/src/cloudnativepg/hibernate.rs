@@ -11,7 +11,7 @@ use serde_json::json;
 use k8s_openapi::api::apps::v1::Deployment;
 
 use crate::app_service::manager::get_appservice_deployment_objects;
-use crate::cloudnativepg::cnpg_utils::patch_cluster_merge;
+use crate::cloudnativepg::cnpg_utils::{patch_cluster_merge, patch_scheduled_backup_merge};
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, error, info, warn};
@@ -129,6 +129,13 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
         }
     });
 
+    let scheduled_backup_value = cdb.spec.stop;
+    let patch_scheduled_backup_spec = json!({
+        "spec": {
+            "suspend": scheduled_backup_value
+        }
+    });
+
     // Check the annotation we are about to match was already there
 
     if let Some(current_hibernation_setting) = cluster_annotations.get("cnpg.io/hibernation") {
@@ -148,6 +155,12 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
     info!(
         "Toggled hibernation annotation of {} to '{}'",
         name, hibernation_value
+    );
+
+    patch_scheduled_backup_merge(cdb, ctx, patch_scheduled_backup_spec).await?;
+    info!(
+        "Toggled scheduled backup suspend of {} to '{}'",
+        name, scheduled_backup_value
     );
 
     let mut status = cdb.status.clone().unwrap_or_default();

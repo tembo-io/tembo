@@ -529,7 +529,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_latest_trunk_project_version() {
-        let result = get_latest_trunk_project_metadata("pgmq".into()).await;
+        let result = get_latest_trunk_project_metadata("pgmq").await;
         assert!(result.is_ok());
 
         let project = result.unwrap();
