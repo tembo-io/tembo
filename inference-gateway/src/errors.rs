@@ -2,6 +2,7 @@
 // All internal errors map to PlatformError
 // PlatformError maps to ErrorResponse
 
+use log;
 use serde::ser::SerializeMap;
 use serde::Serialize;
 use sqlx::error::Error as DbError;
@@ -75,7 +76,7 @@ pub enum PlatformError {
     S3Error(String),
 }
 
-// PUBLIC FACING ERROR RESPOSNES
+// PUBLIC FACING ERROR RESPONSES
 #[derive(Error, Debug)]
 pub enum ErrorResponse {
     #[error("{0}")]
@@ -110,9 +111,13 @@ impl ResponseError for PlatformError {
             PlatformError::NotFoundError(_) => ErrorResponse::NotFound(self.to_string()),
             PlatformError::InvalidQuery(_) => ErrorResponse::BadRequest(self.to_string()),
             PlatformError::ValueError(_) => ErrorResponse::BadRequest(self.to_string()),
-            _ => ErrorResponse::InternalServerError(
-                "Internal Server Error. Please contact support".to_string(),
-            ),
+            _ => {
+                // log the error locally
+                log::error!("Unhandled Error: {:?}", self.to_string());
+                ErrorResponse::InternalServerError(
+                    "Internal Server Error. Please contact support".to_string(),
+                )
+            }
         };
         HttpResponse::build(self.status_code()).json(resp)
     }
