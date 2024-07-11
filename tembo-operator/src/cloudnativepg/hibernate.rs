@@ -147,7 +147,7 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
     });
 
     // Check if scheduled_backup_suspend_status=false and cdb.spec.stop=true.  If so then patch the scheduled backup suspend status to true
-    if !scheduled_backup_suspend_status && cdb.spec.stop {
+    if scheduled_backup_suspend_status != cdb.spec.stop {
         patch_scheduled_backup_merge(cdb, ctx, patch_scheduled_backup_spec.clone()).await?;
         info!(
             "Toggled scheduled backup suspend of {} to '{}'",
@@ -174,12 +174,6 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
     info!(
         "Toggled hibernation annotation of {} to '{}'",
         name, hibernation_value
-    );
-
-    patch_scheduled_backup_merge(cdb, ctx, patch_scheduled_backup_spec.clone()).await?;
-    info!(
-        "Toggled scheduled backup suspend of {} to '{}'",
-        name, scheduled_backup_value
     );
 
     let mut status = cdb.status.clone().unwrap_or_default();
