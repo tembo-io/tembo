@@ -1,6 +1,7 @@
 pub use crate::{
     apis::coredb_types::CoreDB,
     cloudnativepg::clusters::{Cluster, ClusterStatusConditionsStatus},
+    cloudnativepg::scheduledbackups::ScheduledBackup,
     controller,
     extensions::database_queries::is_not_restarting,
     patch_cdb_status_merge, requeue_normal_with_jitter, Context, RESTARTED_AT,
@@ -123,7 +124,7 @@ pub(crate) async fn update_coredb_status(
     .await
 }
 
-// patch_cluster_merge takes a CoreDB, Cluster and serde_json::Value and patch merges the Cluster with the new spec
+// patch_cluster_merge takes a CoreDB, context and serde_json::Value and patch merges the Cluster with the new spec
 #[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any(), patch = %patch))]
 pub async fn patch_cluster_merge(
     cdb: &CoreDB,
@@ -149,6 +150,31 @@ pub async fn patch_cluster_merge(
     Ok(())
 }
 
+// patch_scheduled_backup_merge takes a CoreDB, context and serde_json::Value and patch merges the ScheduledBackup with the new spec
+#[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any(), patch = %patch))]
+pub async fn patch_scheduled_backup_merge(
+    cdb: &CoreDB,
+    ctx: &Arc<Context>,
+    patch: serde_json::Value,
+) -> Result<(), Action> {
+    let name = cdb.name_any();
+    let namespace = cdb.metadata.namespace.as_ref().ok_or_else(|| {
+        error!("Namespace is empty for instance: {}.", name);
+        Action::requeue(Duration::from_secs(300))
+    })?;
+
+    let scheduled_backup_api: Api<ScheduledBackup> = Api::namespaced(ctx.client.clone(), namespace);
+    let pp = PatchParams::apply("patch_merge");
+    let _ = scheduled_backup_api
+        .patch(&name, &pp, &Patch::Merge(&patch))
+        .await
+        .map_err(|e| {
+            error!("Error patching cluster: {}", e);
+            Action::requeue(Duration::from_secs(300))
+        });
+
+    Ok(())
+}
 // cdb: the CoreDB object
 // maybe_cluster, Option<Cluster> of the current CNPG cluster, if it exists
 // new_spec: the new Cluster spec to be applied
@@ -187,7 +213,7 @@ pub(crate) fn update_restarted_at(
     restart_annotation_updated
 }
 
-// patch_cluster is a async function that takes a CNPG cluster and patch applys it with the new spec
+// patch_cluster is a async function that takes a CNPG cluster and patch applies it with the new spec
 #[instrument(skip(cdb, ctx, cluster) fields(trace_id, instance_name = %cdb.name_any()))]
 pub(crate) async fn patch_cluster(
     cluster: &Cluster,

@@ -1,5 +1,5 @@
 use crate::apis::coredb_types::CoreDB;
-use crate::cloudnativepg::cnpg::get_cluster;
+use crate::cloudnativepg::cnpg::{get_cluster, get_scheduled_backup};
 use crate::Error;
 
 use crate::{patch_cdb_status_merge, requeue_normal_with_jitter, Context};
@@ -11,7 +11,7 @@ use serde_json::json;
 use k8s_openapi::api::apps::v1::Deployment;
 
 use crate::app_service::manager::get_appservice_deployment_objects;
-use crate::cloudnativepg::cnpg_utils::patch_cluster_merge;
+use crate::cloudnativepg::cnpg_utils::{patch_cluster_merge, patch_scheduled_backup_merge};
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, error, info, warn};
@@ -39,6 +39,15 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
         Some(cluster) => cluster,
         None => {
             warn!("Cluster {} does not exist yet. Proceeding...", name);
+            return Ok(());
+        }
+    };
+
+    let scheduled_backup = get_scheduled_backup(cdb, ctx.clone()).await;
+    let scheduled_backup = match scheduled_backup {
+        Some(scheduled_backup) => scheduled_backup,
+        None => {
+            warn!("ScheduledBackup {} does not exist yet. Proceeding...", name);
             return Ok(());
         }
     };
@@ -128,6 +137,23 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
             }
         }
     });
+
+    let scheduled_backup_suspend_status = scheduled_backup.spec.suspend.unwrap_or_default();
+    let scheduled_backup_value = cdb.spec.stop;
+    let patch_scheduled_backup_spec = json!({
+        "spec": {
+            "suspend": scheduled_backup_value
+        }
+    });
+
+    // Check if scheduled_backup_suspend_status=false and cdb.spec.stop=true.  If so then patch the scheduled backup suspend status to true
+    if scheduled_backup_suspend_status != cdb.spec.stop {
+        patch_scheduled_backup_merge(cdb, ctx, patch_scheduled_backup_spec.clone()).await?;
+        info!(
+            "Toggled scheduled backup suspend of {} to '{}'",
+            name, scheduled_backup_value
+        );
+    }
 
     // Check the annotation we are about to match was already there
 
