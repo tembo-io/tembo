@@ -45,7 +45,9 @@ use crate::{
             ClusterServiceAccountTemplate, ClusterServiceAccountTemplateMetadata, ClusterSpec,
             ClusterStorage, ClusterSuperuserSecret,
         },
-        cnpg_utils::{is_image_updated, patch_cluster, restart_and_wait_for_restart},
+        cnpg_utils::{
+            get_pooler_instances, is_image_updated, patch_cluster, restart_and_wait_for_restart,
+        },
         placement::cnpg_placement::PlacementConfig,
         poolers::{
             Pooler, PoolerCluster, PoolerPgbouncer, PoolerSpec, PoolerTemplate, PoolerTemplateSpec,
@@ -1295,6 +1297,7 @@ pub async fn reconcile_pooler(
         .and_then(|p| p.convert_pooler_topology_spread_constraints());
     let affinity = placement.as_ref().and_then(|p| p.convert_pooler_affinity());
     let node_selector = placement.as_ref().and_then(|p| p.node_selector.clone());
+    let instances = get_pooler_instances(cdb);
 
     // If pooler is enabled, create or update
     if cdb.spec.connectionPooler.enabled {
@@ -1311,7 +1314,7 @@ pub async fn reconcile_pooler(
                     name: cdb.name_any(),
                 },
                 deployment_strategy: None,
-                instances: Some(1),
+                instances,
                 monitoring: None,
                 pgbouncer: PoolerPgbouncer {
                     auth_query: None,
@@ -2247,13 +2250,44 @@ pub(crate) async fn get_scheduled_backup(
             debug!("ScheduledBackup {} exists", instance_name);
             Some(scheduled_backup)
         }
-        // return Ok(false) if the cluster does not exist (404)
+        // return Ok(false) if the ScheduledBackup does not exist (404)
         Err(kube::Error::Api(ae)) if ae.code == 404 => {
             debug!("ScheduledBackup {} does not exist", instance_name);
             None
         }
         Err(_e) => {
             error!("Error getting ScheduledBackup: {}", instance_name);
+            None
+        }
+    }
+}
+
+#[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any()))]
+pub(crate) async fn get_pooler(cdb: &CoreDB, ctx: Arc<Context>) -> Option<Pooler> {
+    let instance_name = cdb.name_any() + "-pooler";
+    let namespace = match cdb.namespace() {
+        Some(ns) => ns,
+        _ => {
+            error!("Namespace is not set for CoreDB {}", instance_name);
+            return None;
+        }
+    };
+
+    let pooler: Api<Pooler> = Api::namespaced(ctx.client.clone(), &namespace);
+    let p = pooler.get(&instance_name).await;
+
+    match p {
+        Ok(pooler) => {
+            debug!("Pooler {} exists", instance_name);
+            Some(pooler)
+        }
+        // return Ok(false) if the Pooler does not exist (404)
+        Err(kube::Error::Api(ae)) if ae.code == 404 => {
+            debug!("Pooler {} does not exist", instance_name);
+            None
+        }
+        Err(_e) => {
+            error!("Error getting Pooler: {}", instance_name);
             None
         }
     }
