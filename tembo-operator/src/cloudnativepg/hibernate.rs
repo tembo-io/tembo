@@ -162,7 +162,7 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
         return Err(action);
     }
 
-    // Patch the Pooler deployment to match the hibernation state
+    // Patch the Pooler cluster resource to match the hibernation state
     if let Err(action) = update_pooler_instances(&pooler, cdb, ctx).await {
         warn!(
             "Error updating pooler instances for {}. Requeuing...",
