@@ -78,7 +78,7 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
     // Conversely, setting it back to 1 if the cluster is started should reverse
     // the process.
 
-    let replicas = get_pooler_instances(cdb);
+    let replicas = if cdb.spec.stop { 0 } else { 1 };
     let replica_patch = json!({
         "apiVersion": "apps/v1",
         "kind": "Deployment",
@@ -115,7 +115,7 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
             None => continue,
         };
 
-        if replicas == spec.replicas {
+        if Some(replicas) == spec.replicas {
             continue;
         }
 
