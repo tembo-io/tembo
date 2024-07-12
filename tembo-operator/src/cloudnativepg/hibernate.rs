@@ -14,7 +14,7 @@ use k8s_openapi::api::apps::v1::Deployment;
 
 use crate::app_service::manager::get_appservice_deployment_objects;
 use crate::cloudnativepg::cnpg_utils::{
-    patch_cluster_merge, patch_pooler_merge, patch_scheduled_backup_merge,
+    get_pooler_instances, patch_cluster_merge, patch_pooler_merge, patch_scheduled_backup_merge,
 };
 use std::sync::Arc;
 use std::time::Duration;
@@ -78,7 +78,7 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
     // Conversely, setting it back to 1 if the cluster is started should reverse
     // the process.
 
-    let replicas = if cdb.spec.stop { 0 } else { 1 };
+    let replicas = get_pooler_instances(cdb);
     let replica_patch = json!({
         "apiVersion": "apps/v1",
         "kind": "Deployment",
@@ -115,7 +115,7 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
             None => continue,
         };
 
-        if Some(replicas) == spec.replicas {
+        if replicas == spec.replicas {
             continue;
         }
 
