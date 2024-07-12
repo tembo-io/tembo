@@ -219,31 +219,38 @@ async fn update_pooler_instances(
     match pooler {
         Some(p) => {
             let current_instances = p.spec.instances.unwrap_or(1);
-            let desired_instances = if cdb.spec.stop { 0 } else { 1 };
+            let desired_instances = get_pooler_instances(cdb);
 
-            if current_instances != desired_instances {
-                let patch_pooler_spec = json!({
-                    "spec": {
-                        "instances": desired_instances,
-                    }
-                });
+            if let Some(desired) = desired_instances {
+                if current_instances != desired {
+                    let patch_pooler_spec = json!({
+                        "spec": {
+                            "instances": desired,
+                        }
+                    });
 
-                match patch_pooler_merge(cdb, ctx, patch_pooler_spec).await {
-                    Ok(_) => {
-                        info!(
-                            "Updated Pooler instances for {} from {} to {}",
-                            name, current_instances, desired_instances
-                        );
+                    match patch_pooler_merge(cdb, ctx, patch_pooler_spec).await {
+                        Ok(_) => {
+                            info!(
+                                "Updated Pooler instances for {} from {} to {}",
+                                name, current_instances, desired
+                            );
+                        }
+                        Err(e) => {
+                            error!("Failed to update Pooler instances for {}: {:?}", name, e);
+                            return Err(requeue_normal_with_jitter());
+                        }
                     }
-                    Err(e) => {
-                        error!("Failed to update Pooler instances for {}: {:?}", name, e);
-                        return Err(requeue_normal_with_jitter());
-                    }
+                } else {
+                    debug!(
+                        "Pooler instances for {} already set to {}. No update needed.",
+                        name, current_instances
+                    );
                 }
             } else {
-                debug!(
-                    "Pooler instances for {} already set to {}. No update needed.",
-                    name, current_instances
+                warn!(
+                    "Could not determine desired instances for Pooler {}. Skipping update.",
+                    name
                 );
             }
         }
