@@ -18,11 +18,11 @@ metrics:
         "instance_id", "$1", "label_tembo_io_instance_id", "(.*)"
       )
     )
-- name: pg_database_size_bytes
+- name: pg_database_size_mebibytes
   query: |
     sum by (instance_id, pod) (
       label_replace(cnpg_pg_database_size_bytes{} * on(namespace) group_left(label_tembo_io_instance_id)
         kube_namespace_labels{label_tembo_io_instance_id!=""},
         "instance_id", "$1", "label_tembo_io_instance_id", "(.*)"
       )
-    )
+    ) / 1048576
