@@ -64,12 +64,11 @@ pub mod prometheus {
                     .ok_or_else(|| de::Error::invalid_length(1, &self))?;
 
                 let timestamp = f64_val.trunc() as i64;
-                let parsed_int = str_val
+                let parsed_float = str_val
                     .parse::<f64>()
-                    .map_err(|_| de::Error::custom("Failed to parse string into float"))?
-                    as i64;
+                    .map_err(|_| de::Error::custom("Failed to parse string into float"))?;
 
-                Ok((timestamp, parsed_int))
+                Ok((timestamp, parsed_float as i64))
             }
         }
 
