@@ -76,6 +76,7 @@ mod test {
         context: Arc<Context>,
         pods: Api<Pod>,
         coredbs: Api<CoreDB>,
+        poolers: Api<Pooler>,
     }
 
     /// Helper class to make writing tests easier / less messy
@@ -119,6 +120,8 @@ mod test {
             println!("Creating CoreDB resource {}", name);
             let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
 
+            let poolers: Api<Pooler> = Api::namespaced(client.clone(), &namespace);
+
             Self {
                 name,
                 namespace,
@@ -126,6 +129,7 @@ mod test {
                 context,
                 pods,
                 coredbs,
+                poolers,
             }
         }
 
@@ -3089,7 +3093,7 @@ mod test {
             assert!(result.contains("aggs_for_vecs.control"));
         }
 
-        // Now lets make the instance HA and ensure that all extenstions are present on both
+        // Now lets make the instance HA and ensure that all extensions are present on both
         // replicas
         let replicas = 2;
         let coredb_json = serde_json::json!({
@@ -3349,7 +3353,7 @@ mod test {
             }
         }
 
-        // Now lets make the instance HA and ensure that all extenstions are present on both
+        // Now lets make the instance HA and ensure that all extensions are present on both
         // replicas
         let replicas = 2;
         let coredb_json = serde_json::json!({
@@ -4526,6 +4530,42 @@ CREATE EVENT TRIGGER pgrst_watch
         false
     }
 
+    async fn pooler_status_running(poolers: &Api<Pooler>, name: &str) -> bool {
+        let max_retries = 20;
+        let wait_duration = Duration::from_secs(6); // Adjust as needed
+
+        for attempt in 1..=max_retries {
+            match poolers.get(name).await {
+                Ok(pooler) => {
+                    let instances = pooler
+                        .status
+                        .as_ref()
+                        .and_then(|s| s.instances)
+                        .unwrap_or(0);
+                    if instances == 1 {
+                        println!("Pooler {} is running", name);
+                        return true;
+                    } else {
+                        println!(
+                            "Attempt {}/{}: Pooler {} is not running yet (instances: {})",
+                            attempt, max_retries, name, instances
+                        );
+                    }
+                }
+                Err(e) => {
+                    println!("Error getting Pooler {}: {:?}", name, e);
+                    // Decide if you want to return false here or continue retrying
+                }
+            }
+            tokio::time::sleep(wait_duration).await;
+        }
+        println!(
+            "Pooler {} did not become running after {} attempts",
+            name, max_retries
+        );
+        false
+    }
+
     #[tokio::test]
     #[ignore]
     async fn functional_test_backup_and_restore() {
@@ -5498,6 +5538,7 @@ CREATE EVENT TRIGGER pgrst_watch
         let test_name = "test-hibernate-cnpg";
         let test = TestCore::new(test_name).await;
         let name = test.name.clone();
+        let pooler_name = format!("{}-pooler", name);
 
         // Generate very simple CoreDB JSON definitions. The first will be for
         // initializing and starting the cluster, and the second for stopping
@@ -5513,6 +5554,9 @@ CREATE EVENT TRIGGER pgrst_watch
             "spec": {
                 "replicas": 1,
                 "stop": false,
+                "connectionPooler": {
+                    "enabled": true
+                },
             }
         });
 
@@ -5525,6 +5569,7 @@ CREATE EVENT TRIGGER pgrst_watch
 
         let _ = test.set_cluster_def(&cluster_start).await;
         assert!(status_running(&test.coredbs, &name).await);
+        assert!(pooler_status_running(&test.poolers, &pooler_name).await);
 
         // Stop the cluster and check to make sure it's not running to ensure
         // hibernate is doing its job.
@@ -5532,12 +5577,18 @@ CREATE EVENT TRIGGER pgrst_watch
         let _ = test.set_cluster_def(&cluster_stop).await;
         let _ = wait_until_status_not_running(&test.coredbs, &name).await;
         assert!(status_running(&test.coredbs, &name).await.not());
+        assert!(pooler_status_running(&test.poolers, &pooler_name)
+            .await
+            .not());
 
         // Patch the cluster to start it up again, then check to ensure it
         // actually did so. This proves hibernation can be reversed.
 
+        println!("Starting cluster after hibernation");
+        println!("CoreDB: {}", cluster_start);
         let _ = test.set_cluster_def(&cluster_start).await;
         assert!(status_running(&test.coredbs, &name).await);
+        assert!(pooler_status_running(&test.poolers, &pooler_name).await);
 
         test.teardown().await;
     }
