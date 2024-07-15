@@ -65,8 +65,9 @@ pub mod prometheus {
 
                 let timestamp = f64_val.trunc() as i64;
                 let parsed_int = str_val
-                    .parse::<i64>()
-                    .map_err(|_| de::Error::custom("Failed to parse string into integer"))?;
+                    .parse::<f64>()
+                    .map_err(|_| de::Error::custom("Failed to parse string into float"))?
+                    as i64;
 
                 Ok((timestamp, parsed_int))
             }
@@ -150,6 +151,16 @@ mod tests {
                     1713365023.028,
                     "1005"
                  ]
+              },
+              {
+                 "metric":{
+                    "instance_id":"inst_0000000000001_AAAB0_1",
+                    "pod":"org-dummy-2-inst-dummy-1"
+                 },
+                 "value":[
+                    1713365023.028,
+                    "1006.123"
+                 ]
               }
            ]
         }
@@ -178,6 +189,13 @@ mod tests {
                             pod: "org-dummy-2-inst-dummy-1".into(),
                         },
                         value: (1713365023, 1005),
+                    },
+                    MetricsResult {
+                        metric: MetricLabels {
+                            instance_id: "inst_0000000000001_AAAB0_1".into(),
+                            pod: "org-dummy-2-inst-dummy-1".into(),
+                        },
+                        value: (1713365023, 1006),
                     },
                 ],
             },
