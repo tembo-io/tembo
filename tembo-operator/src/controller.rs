@@ -51,6 +51,7 @@ use crate::{
     postgres_exporter::reconcile_metrics_configmap,
     trunk::{extensions_that_require_load, reconcile_trunk_configmap},
 };
+use k8s_openapi::api::core::v1::Secret;
 use rand::Rng;
 use serde::Serialize;
 use serde_json::json;
@@ -953,7 +954,11 @@ pub async fn run(state: State) {
         info!("Installation: cargo run --bin crdgen | kubectl apply -f -");
         std::process::exit(1);
     }
+
+    let secret_api = Api::<Secret>::all(client.clone());
+
     Controller::new(coredb, watcherConfig::default().any_semantic())
+        .owns(secret_api, watcherConfig::default().any_semantic())
         .shutdown_on_signal()
         .run(reconcile, error_policy, state.create_context(client))
         .filter_map(|x| async move { std::result::Result::ok(x) })
