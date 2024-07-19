@@ -4,6 +4,7 @@ use conductor::metrics::{dataplane_metrics::DataPlaneMetrics, prometheus::Metric
 use log::info;
 use pgmq::PGMQueueExt;
 use serde::Deserialize;
+use std::time::Instant;
 use std::{env, time::Duration};
 use tokio::time::interval;
 
@@ -48,6 +49,7 @@ pub async fn run_metrics_reporter() -> Result<()> {
     loop {
         sync_interval.tick().await;
 
+        let now = Instant::now();
         for metric in &metrics {
             info!("Querying '{}' from {}", metric.name, metric.server);
 
@@ -81,6 +83,7 @@ pub async fn run_metrics_reporter() -> Result<()> {
                 info!("Enqueued batch {}/{} to PGMQ", i, batches);
                 i += 1;
             }
+            info!("Processed metric in {:?}", now.elapsed());
         }
     }
 }
