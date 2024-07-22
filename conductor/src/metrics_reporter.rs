@@ -1,7 +1,7 @@
 use anyhow::{bail, Context, Result};
 use conductor::metrics::dataplane_metrics::split_data_plane_metrics;
 use conductor::metrics::{dataplane_metrics::DataPlaneMetrics, prometheus::Metrics};
-use log::info;
+use log::{error, info};
 use pgmq::PGMQueueExt;
 use serde::Deserialize;
 use std::time::Instant;
@@ -44,7 +44,14 @@ pub async fn run_metrics_reporter() -> Result<()> {
     queue.init().await?;
     queue.create(&metrics_events_queue).await?;
 
-    let mut sync_interval = interval(Duration::from_secs(60));
+    let polling_interval_seconds = 60;
+    let number_of_metrics = metrics.len();
+    let timeout_ms = (polling_interval_seconds * 1000) / number_of_metrics as u64;
+    if timeout_ms < 1000 {
+        panic!("Configuration error: too many metrics, currently up to 60 metrics are supported.");
+    }
+
+    let mut sync_interval = interval(Duration::from_secs(polling_interval_seconds));
 
     loop {
         sync_interval.tick().await;
@@ -53,7 +60,19 @@ pub async fn run_metrics_reporter() -> Result<()> {
         for metric in &metrics {
             info!("Querying '{}' from {}", metric.name, metric.server);
 
-            let metrics = client.query(&metric.query, &metric.server).await?;
+            let metrics = match client
+                .query(&metric.query, &metric.server, timeout_ms)
+                .await
+            {
+                Ok(metrics) => metrics,
+                Err(e) => {
+                    error!(
+                        "Failed to query `{}` from {}. Skipping! {}",
+                        metric.name, metric.server, e
+                    );
+                    continue;
+                }
+            };
 
             let num_metrics = metrics.data.result.len();
             info!(
@@ -131,13 +150,22 @@ impl Client {
         }
     }
 
-    pub async fn query(&self, query: &str, server_type: &ServerType) -> Result<Metrics> {
+    pub async fn query(
+        &self,
+        query: &str,
+        server_type: &ServerType,
+        timeout_ms: u64,
+    ) -> Result<Metrics> {
         let query_url = match server_type {
             ServerType::Prometheus => &self.prometheus_url,
             ServerType::Loki => &self.loki_url,
         };
 
-        let mut request = self.client.get(query_url).query(&[("query", query)]);
+        let mut request = self
+            .client
+            .get(query_url)
+            .query(&[("query", query)])
+            .timeout(Duration::from_millis(timeout_ms));
 
         if matches!(server_type, ServerType::Loki) {
             request = request.header("X-Scope-OrgID", "internal");
