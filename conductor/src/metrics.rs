@@ -1,10 +1,6 @@
 /// Types to deserialize Prometheus query responses
 pub mod prometheus {
-    use std::fmt;
-
     use serde::de;
-    use serde::de::SeqAccess;
-    use serde::de::Visitor;
     use serde::Deserialize;
     use serde::Deserializer;
     use serde::Serialize;
@@ -35,52 +31,26 @@ pub mod prometheus {
 
     #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
     pub struct MetricLabels {
-        pub instance_id: String,
-        pub pod: String,
+        pub instance_id: Option<String>,
+        pub pod: Option<String>,
+        pub namespace: Option<String>,
     }
 
     fn custom_deserialize_tuple<'de, D>(deserializer: D) -> Result<(i64, i64), D::Error>
     where
         D: Deserializer<'de>,
     {
-        struct TupleVisitor;
-
-        impl<'de> Visitor<'de> for TupleVisitor {
-            type Value = (i64, i64);
-
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                formatter.write_str("a tuple of (f64, String)")
-            }
-
-            fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
-            where
-                A: SeqAccess<'de>,
-            {
-                let f64_val: f64 = seq
-                    .next_element()?
-                    .ok_or_else(|| de::Error::invalid_length(0, &self))?;
-                let str_val: &str = seq
-                    .next_element()?
-                    .ok_or_else(|| de::Error::invalid_length(1, &self))?;
-
-                let timestamp = f64_val.trunc() as i64;
-                let parsed_float = str_val
-                    .parse::<f64>()
-                    .map_err(|_| de::Error::custom("Failed to parse string into float"))?;
-
-                Ok((timestamp, parsed_float as i64))
-            }
-        }
-
-        deserializer.deserialize_seq(TupleVisitor)
+        let raw_value: (f64, String) = Deserialize::deserialize(deserializer)?;
+        let timestamp = raw_value.0.trunc() as i64;
+        let parsed_float = raw_value.1.parse::<f64>().map_err(de::Error::custom)?;
+        Ok((timestamp, parsed_float as i64))
     }
 }
 
 /// Data Plane metrics as packaged to be sent to Control Plane
 pub mod dataplane_metrics {
-    use serde::{Deserialize, Serialize};
-
     use super::prometheus::MetricsResult;
+    use serde::{Deserialize, Serialize};
 
     #[derive(Debug, Clone, Deserialize, Serialize, PartialEq)]
     #[serde(rename_all = "camelCase")]
@@ -166,6 +136,105 @@ mod tests {
      }
     "#;
 
+    const QUERY_REPONSE_LOKI: &str = r#"
+    {
+      "status": "success",
+      "data": {
+        "resultType": "vector",
+        "result": [
+          {
+            "metric": {
+              "namespace": "api"
+            },
+            "value": [
+              1721419629.355,
+              "1"
+            ]
+          },
+          {
+            "metric": {
+              "namespace": "basically-present-wolfhound"
+            },
+            "value": [
+              1721419629.355,
+              "5"
+            ]
+          },
+          {
+            "metric": {
+              "namespace": "blandly-jovial-limpet"
+            },
+            "value": [
+              1721419629.355,
+              "9"
+            ]
+          },
+          {
+            "metric": {
+              "namespace": "collectively-righteous-doggo"
+            },
+            "value": [
+              1721419629.355,
+              "1"
+            ]
+          },
+          {
+            "metric": {
+              "namespace": "damnably-chunky-peafowl"
+            },
+            "value": [
+              1721419629.355,
+              "2"
+            ]
+          },
+          {
+            "metric": {
+              "namespace": "quickly-chipper-lizard"
+            },
+            "value": [
+              1721419629.355,
+              "1"
+            ]
+          },
+          {
+            "metric": {
+              "namespace": "chipperly-resilient-cat"
+            },
+            "value": [
+              1721419629.355,
+              "154"
+            ]
+          }
+        ],
+        "stats": {
+          "summary": {
+            "bytesProcessedPerSecond": 123
+          },
+          "querier": {
+            "store": {
+              "totalChunksRef": 0,
+              "chunk": {
+                "headChunkBytes": 0,
+                "headChunkLines": 0
+              },
+              "chunkRefsFetchTime": 26837494
+            }
+          },
+          "ingester": {
+            "totalReached": 32,
+            "store": {
+              "chunksDownloadTime": 0,
+              "chunk": {
+                "decompressedStructuredMetadataBytes": 0
+              },
+              "chunkRefsFetchTime": 0
+            }
+          }
+        }
+      }
+    }
+    "#;
+
     #[test]
     fn deserializes_prometheus_responses_correctly() {
         let response: Metrics = serde_json::from_str(QUERY_RESPONSE).unwrap();
@@ -177,24 +246,99 @@ mod tests {
                 result: vec![
                     MetricsResult {
                         metric: MetricLabels {
-                            instance_id: "inst_0000000000000_AAAA0_1".into(),
-                            pod: "org-dummt-inst-dummy1".into(),
+                            instance_id: Some("inst_0000000000000_AAAA0_1".into()),
+                            pod: Some("org-dummt-inst-dummy1".into()),
+                            namespace: None,
                         },
                         value: (1713365010, 0),
                     },
                     MetricsResult {
                         metric: MetricLabels {
-                            instance_id: "inst_0000000000001_AAAB0_1".into(),
-                            pod: "org-dummy-2-inst-dummy-1".into(),
+                            instance_id: Some("inst_0000000000001_AAAB0_1".into()),
+                            pod: Some("org-dummy-2-inst-dummy-1".into()),
+                            namespace: None,
                         },
                         value: (1713365023, 1005),
                     },
                     MetricsResult {
                         metric: MetricLabels {
-                            instance_id: "inst_0000000000001_AAAB0_1".into(),
-                            pod: "org-dummy-2-inst-dummy-1".into(),
+                            instance_id: Some("inst_0000000000001_AAAB0_1".into()),
+                            pod: Some("org-dummy-2-inst-dummy-1".into()),
+                            namespace: None,
                         },
                         value: (1713365023, 1006),
+                    },
+                ],
+            },
+        };
+
+        assert_eq!(response, expected);
+    }
+
+    #[test]
+    fn deserializes_loki_responses_correctly() {
+        let response: Metrics = serde_json::from_str(QUERY_REPONSE_LOKI).unwrap();
+
+        let expected = Metrics {
+            status: "success".into(),
+            data: MetricsData {
+                result_type: "vector".into(),
+                result: vec![
+                    MetricsResult {
+                        metric: MetricLabels {
+                            instance_id: None,
+                            pod: None,
+                            namespace: Some("api".into()),
+                        },
+                        value: (1721419629, 1),
+                    },
+                    MetricsResult {
+                        metric: MetricLabels {
+                            instance_id: None,
+                            pod: None,
+                            namespace: Some("basically-present-wolfhound".into()),
+                        },
+                        value: (1721419629, 5),
+                    },
+                    MetricsResult {
+                        metric: MetricLabels {
+                            instance_id: None,
+                            pod: None,
+                            namespace: Some("blandly-jovial-limpet".into()),
+                        },
+                        value: (1721419629, 9),
+                    },
+                    MetricsResult {
+                        metric: MetricLabels {
+                            instance_id: None,
+                            pod: None,
+                            namespace: Some("collectively-righteous-doggo".into()),
+                        },
+                        value: (1721419629, 1),
+                    },
+                    MetricsResult {
+                        metric: MetricLabels {
+                            instance_id: None,
+                            pod: None,
+                            namespace: Some("damnably-chunky-peafowl".into()),
+                        },
+                        value: (1721419629, 2),
+                    },
+                    MetricsResult {
+                        metric: MetricLabels {
+                            instance_id: None,
+                            pod: None,
+                            namespace: Some("quickly-chipper-lizard".into()),
+                        },
+                        value: (1721419629, 1),
+                    },
+                    MetricsResult {
+                        metric: MetricLabels {
+                            instance_id: None,
+                            pod: None,
+                            namespace: Some("chipperly-resilient-cat".into()),
+                        },
+                        value: (1721419629, 154),
                     },
                 ],
             },
@@ -210,8 +354,9 @@ mod tests {
         for i in 0..2008 {
             results.push(MetricsResult {
                 metric: MetricLabels {
-                    instance_id: format!("inst_{}", i),
-                    pod: format!("pod_{}", i),
+                    instance_id: Some(format!("inst_{}", i)),
+                    pod: Some(format!("pod_{}", i)),
+                    namespace: None,
                 },
                 value: (i as i64, i as i64),
             });
@@ -253,8 +398,9 @@ mod tests {
         for i in 0..1000 {
             results.push(MetricsResult {
                 metric: MetricLabels {
-                    instance_id: format!("inst_{}", i),
-                    pod: format!("pod_{}", i),
+                    instance_id: Some(format!("inst_{}", i)),
+                    pod: Some(format!("pod_{}", i)),
+                    namespace: None,
                 },
                 value: (i as i64, i as i64),
             });

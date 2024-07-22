@@ -1,5 +1,6 @@
 metrics:
 - name: is_standby
+  server: prometheus
   query: |
     sum by (instance_id, pod) (
       label_replace(
@@ -9,6 +10,7 @@ metrics:
       )
     )
 - name: primary_available
+  server: prometheus
   query: |
     sum by (instance_id, pod) (
       label_replace(
@@ -19,6 +21,7 @@ metrics:
       )
     )
 - name: pg_database_size_mebibytes
+  server: prometheus
   query: |
     sum by (instance_id, pod) (
       label_replace(cnpg_pg_database_size_bytes{} * on(namespace) group_left(label_tembo_io_instance_id)
@@ -26,3 +29,15 @@ metrics:
         "instance_id", "$1", "label_tembo_io_instance_id", "(.*)"
       )
     ) / 1048576
+- name: new_sni_connections
+  server: loki
+  query: |
+    sum by (namespace) (
+      label_replace(
+        count_over_time({namespace="traefik"} |= `Connection logging` | json | event = `Connection logging` [1m]),
+        "namespace",
+        "$1",
+        "server_name",
+        "^([^\\.]+)\\..*"
+      )
+    )
