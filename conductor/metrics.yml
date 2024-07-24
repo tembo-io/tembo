@@ -32,12 +32,6 @@ metrics:
 - name: new_sni_connections
   server: loki
   query: |
-    sum by (namespace) (
-      label_replace(
-        count_over_time({namespace="traefik"} |= `Connection logging` | json | event = `Connection logging` [1m]),
-        "namespace",
-        "$1",
-        "server_name",
-        "^([^\\.]+)\\..*"
-      )
+    sum by (server_name) (
+        count_over_time({namespace="traefik"} |= `Connection logging` | json | event = `Connection logging` [1m])
     )
