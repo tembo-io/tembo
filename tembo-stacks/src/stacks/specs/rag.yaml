@@ -112,7 +112,7 @@ extensions:
     locations:
     - database: postgres
       enabled: true
-      version: 0.16.0
+      version: 0.17.0
   - name: pg_stat_statements
     locations:
       - database: postgres
