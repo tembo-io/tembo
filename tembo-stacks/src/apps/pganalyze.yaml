@@ -4,7 +4,7 @@ appServices:
     name: pganalyze
     env:
       - name: DB_URL
-        valueFromPlatform: ReadWriteConnection
+        valueFromPlatform: ReadOnlyConnection
       - name: DB_NAME
         value: "postgres, *"
       - name: PGA_API_SYSTEM_TYPE
