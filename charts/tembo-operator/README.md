@@ -1,6 +1,6 @@
 # tembo-operator
 
-![Version: 0.2.0](https://img.shields.io/badge/Version-0.2.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)
+![Version: 0.7.1](https://img.shields.io/badge/Version-0.2.0-informational?style=flat-square) ![Type: application](https://img.shields.io/badge/Type-application-informational?style=flat-square)
 
 Helm chart to deploy the tembo-operator
 
@@ -14,14 +14,14 @@ Helm chart to deploy the tembo-operator
 
 ## Source Code
 
-* <https://github.com/tembo-io/tembo-stacks>
+* <https://github.com/tembo-io/tembo/tree/main/tembo-operator>
 * <https://github.com/cloudnative-pg/cloudnative-pg>
 
 ## Requirements
 
 | Repository | Name | Version |
 |------------|------|---------|
-| https://cloudnative-pg.github.io/charts | cloudnative-pg | 0.18.2 |
+| https://cloudnative-pg.github.io/charts | cloudnative-pg | 0.20.1  |
 
 ## Values
 
