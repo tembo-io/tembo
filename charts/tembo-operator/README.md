@@ -14,7 +14,7 @@ Helm chart to deploy the tembo-operator
 
 ## Source Code
 
-* <https://github.com/tembo-io/tembo-stacks>
+* <https://github.com/tembo-io/tembo/tree/main/tembo-operator>
 * <https://github.com/cloudnative-pg/cloudnative-pg>
 
 ## Requirements
