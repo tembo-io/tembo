@@ -1561,56 +1561,53 @@ fn cnpg_scheduled_backup(
         status: None,
     };
 
-    // TODO: reenable this once we have a work around for snapshots
     // Because the snapshot name can easily be over the character limit for k8s
     // we will need to trim the name to 43 characters and append "-snap"
-    // let snap_name = generate_scheduled_backup_snapshot_name(name);
+    let snap_name = generate_scheduled_backup_snapshot_name(name);
 
     // Set a ScheduledBackup to backup to volume snapshot if enabled
-    // let volume_snapshot_scheduled_backup = cdb
-    //     .spec
-    //     .backup
-    //     .volume_snapshot
-    //     .as_ref()
-    //     .filter(|vs| vs.enabled)
-    //     .map(|_| ScheduledBackup {
-    //         metadata: ObjectMeta {
-    //             name: Some(snap_name),
-    //             namespace: Some(namespace),
-    //             ..ObjectMeta::default()
-    //         },
-    //         spec: ScheduledBackupSpec {
-    //             backup_owner_reference: Some(ScheduledBackupBackupOwnerReference::Cluster),
-    //             cluster: ScheduledBackupCluster {
-    //                 name: name.to_string(),
-    //             },
-    //             immediate: Some(true),
-    //             schedule: schedule_expression_from_cdb(cdb),
-    //             suspend: Some(false),
-    //             method: Some(ScheduledBackupMethod::VolumeSnapshot),
-    //             ..ScheduledBackupSpec::default()
-    //         },
-    //         status: None,
-    //     });
+    let volume_snapshot_scheduled_backup = cdb
+        .spec
+        .backup
+        .volume_snapshot
+        .as_ref()
+        .filter(|vs| vs.enabled)
+        .map(|_| ScheduledBackup {
+            metadata: ObjectMeta {
+                name: Some(snap_name),
+                namespace: Some(namespace),
+                ..ObjectMeta::default()
+            },
+            spec: ScheduledBackupSpec {
+                backup_owner_reference: Some(ScheduledBackupBackupOwnerReference::Cluster),
+                cluster: ScheduledBackupCluster {
+                    name: name.to_string(),
+                },
+                immediate: Some(true),
+                schedule: schedule_expression_from_cdb(cdb),
+                suspend: Some(false),
+                method: Some(ScheduledBackupMethod::VolumeSnapshot),
+                ..ScheduledBackupSpec::default()
+            },
+            status: None,
+        });
 
     // Return the ScheduledBackup objects
-    // Ok(vec![(
-    //     s3_scheduled_backup
-    //     // volume_snapshot_scheduled_backup,
-    // )])
-    Ok(vec![(s3_scheduled_backup, None)])
+    Ok(vec![(
+        s3_scheduled_backup,
+        volume_snapshot_scheduled_backup,
+    )])
 }
 
-// TODO: reenable this once we have a work around for snapshots
 // generate_scheduled_backup_snapshot_name generates a snapshot name for a scheduled backup
 // by appending "-snap" to the name and trimming the name to 43 characters if necessary
-// fn generate_scheduled_backup_snapshot_name(name: &str) -> String {
-//     // Trim the name to 43 characters if necessary
-//     let trimmed_name = if name.len() > 43 { &name[..43] } else { name };
+fn generate_scheduled_backup_snapshot_name(name: &str) -> String {
+    // Trim the name to 43 characters if necessary
+    let trimmed_name = if name.len() > 43 { &name[..43] } else { name };
 
-//     // Append "-snap" to the trimmed name
-//     format!("{}-snap", trimmed_name)
-// }
+    // Append "-snap" to the trimmed name
+    format!("{}-snap", trimmed_name)
+}
 
 // Reconcile a ScheduledBackup
 #[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any()))]
@@ -2228,36 +2225,76 @@ pub(crate) async fn get_cluster(cdb: &CoreDB, ctx: Arc<Context>) -> Option<Clust
     }
 }
 
+// #[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any()))]
+// pub(crate) async fn get_scheduled_backup(
+//     cdb: &CoreDB,
+//     ctx: Arc<Context>,
+// ) -> Option<ScheduledBackup> {
+//     let instance_name = cdb.name_any();
+//     let namespace = match cdb.namespace() {
+//         Some(ns) => ns,
+//         _ => {
+//             error!("Namespace is not set for CoreDB {}", instance_name);
+//             return None;
+//         }
+//     };
+//
+//     let scheduled_backup: Api<ScheduledBackup> = Api::namespaced(ctx.client.clone(), &namespace);
+//     let sbu = scheduled_backup.get(&instance_name).await;
+//
+//     match sbu {
+//         Ok(scheduled_backup) => {
+//             debug!("ScheduledBackup {} exists", instance_name);
+//             Some(scheduled_backup)
+//         }
+//         // return Ok(false) if the ScheduledBackup does not exist (404)
+//         Err(kube::Error::Api(ae)) if ae.code == 404 => {
+//             debug!("ScheduledBackup {} does not exist", instance_name);
+//             None
+//         }
+//         Err(_e) => {
+//             error!("Error getting ScheduledBackup: {}", instance_name);
+//             None
+//         }
+//     }
+// }
+
 #[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any()))]
-pub(crate) async fn get_scheduled_backup(
-    cdb: &CoreDB,
-    ctx: Arc<Context>,
-) -> Option<ScheduledBackup> {
+pub(crate) async fn get_scheduled_backups(cdb: &CoreDB, ctx: Arc<Context>) -> Vec<ScheduledBackup> {
     let instance_name = cdb.name_any();
     let namespace = match cdb.namespace() {
         Some(ns) => ns,
         _ => {
             error!("Namespace is not set for CoreDB {}", instance_name);
-            return None;
+            return Vec::new();
         }
     };
 
     let scheduled_backup: Api<ScheduledBackup> = Api::namespaced(ctx.client.clone(), &namespace);
-    let sbu = scheduled_backup.get(&instance_name).await;
 
-    match sbu {
-        Ok(scheduled_backup) => {
-            debug!("ScheduledBackup {} exists", instance_name);
-            Some(scheduled_backup)
+    // Create a ListParams object to filter the ScheduledBackups
+    let lp = ListParams::default().fields(&format!("metadata.name={}", instance_name));
+
+    match scheduled_backup.list(&lp).await {
+        Ok(list) => {
+            let backups = list.items;
+            if backups.is_empty() {
+                debug!("No ScheduledBackups found for {}", instance_name);
+            } else {
+                debug!(
+                    "Found {} ScheduledBackups for {}",
+                    backups.len(),
+                    instance_name
+                );
+            }
+            backups
         }
-        // return Ok(false) if the ScheduledBackup does not exist (404)
-        Err(kube::Error::Api(ae)) if ae.code == 404 => {
-            debug!("ScheduledBackup {} does not exist", instance_name);
-            None
-        }
-        Err(_e) => {
-            error!("Error getting ScheduledBackup: {}", instance_name);
-            None
+        Err(e) => {
+            error!(
+                "Error listing ScheduledBackups for {}: {}",
+                instance_name, e
+            );
+            Vec::new()
         }
     }
 }
@@ -3129,101 +3166,101 @@ mod tests {
         );
     }
 
-    // #[test]
-    // fn test_cnpg_cluster_volume_snapshot() {
-    //     let cdb_yaml = r#"
-    //     apiVersion: coredb.io/v1alpha1
-    //     kind: CoreDB
-    //     metadata:
-    //       name: test
-    //       namespace: default
-    //     spec:
-    //       backup:
-    //         destinationPath: s3://tembo-backup/sample-standard-backup
-    //         encryption: ""
-    //         retentionPolicy: "30"
-    //         schedule: 17 9 * * *
-    //         endpointURL: http://minio:9000
-    //         volumeSnapshot:
-    //           enabled: true
-    //           snapshotClass: "csi-vsc"
-    //       image: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e
-    //       port: 5432
-    //       replicas: 1
-    //       resources:
-    //         limits:
-    //           cpu: "1"
-    //           memory: 0.5Gi
-    //       serviceAccountTemplate:
-    //         metadata:
-    //           annotations:
-    //             eks.amazonaws.com/role-arn: arn:aws:iam::012345678901:role/aws-iam-role-iam
-    //       sharedirStorage: 1Gi
-    //       stop: false
-    //       storage: 1Gi
-    //       storageClass: "gp3-enc"
-    //       uid: 999
-    //     "#;
+    #[test]
+    fn test_cnpg_cluster_volume_snapshot() {
+        let cdb_yaml = r#"
+        apiVersion: coredb.io/v1alpha1
+        kind: CoreDB
+        metadata:
+          name: test
+          namespace: default
+        spec:
+          backup:
+            destinationPath: s3://tembo-backup/sample-standard-backup
+            encryption: ""
+            retentionPolicy: "30"
+            schedule: 17 9 * * *
+            endpointURL: http://minio:9000
+            volumeSnapshot:
+              enabled: true
+              snapshotClass: "csi-vsc"
+          image: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e
+          port: 5432
+          replicas: 1
+          resources:
+            limits:
+              cpu: "1"
+              memory: 0.5Gi
+          serviceAccountTemplate:
+            metadata:
+              annotations:
+                eks.amazonaws.com/role-arn: arn:aws:iam::012345678901:role/aws-iam-role-iam
+          sharedirStorage: 1Gi
+          stop: false
+          storage: 1Gi
+          storageClass: "gp3-enc"
+          uid: 999
+        "#;
 
-    //     let cdb: CoreDB = serde_yaml::from_str(cdb_yaml).expect("Failed to parse YAML");
-    //     let snapshot = create_cluster_backup_volume_snapshot(&cdb);
-    //     let backups_result = cnpg_scheduled_backup(&cdb).unwrap();
-    //     let (s3_backup, volume_snapshot_backup) = &backups_result[0];
+        let cdb: CoreDB = serde_yaml::from_str(cdb_yaml).expect("Failed to parse YAML");
+        let snapshot = create_cluster_backup_volume_snapshot(&cdb);
+        let backups_result = cnpg_scheduled_backup(&cdb).unwrap();
+        let (s3_backup, volume_snapshot_backup) = &backups_result[0];
 
-    //     // Set an expected ClusterBackupVolumeSnapshot object
-    //     let expected_snapshot = ClusterBackupVolumeSnapshot {
-    //         class_name: Some("csi-vsc".to_string()), // Expected to match the YAML input
-    //         online: Some(true),
-    //         online_configuration: Some(ClusterBackupVolumeSnapshotOnlineConfiguration {
-    //             wait_for_archive: Some(true),
-    //             immediate_checkpoint: Some(true),
-    //         }),
-    //         snapshot_owner_reference: Some(
-    //             ClusterBackupVolumeSnapshotSnapshotOwnerReference::Cluster,
-    //         ),
-    //         ..ClusterBackupVolumeSnapshot::default()
-    //     };
+        // Set an expected ClusterBackupVolumeSnapshot object
+        let expected_snapshot = ClusterBackupVolumeSnapshot {
+            class_name: Some("csi-vsc".to_string()), // Expected to match the YAML input
+            online: Some(true),
+            online_configuration: Some(ClusterBackupVolumeSnapshotOnlineConfiguration {
+                wait_for_archive: Some(true),
+                immediate_checkpoint: Some(true),
+            }),
+            snapshot_owner_reference: Some(
+                ClusterBackupVolumeSnapshotSnapshotOwnerReference::Cluster,
+            ),
+            ..ClusterBackupVolumeSnapshot::default()
+        };
 
-    //     // Assert to make sure that the snapshot.snapshot_class and expected_snapshot.snapshot_class are the same
-    //     assert_eq!(snapshot, expected_snapshot);
+        // Assert to make sure that the snapshot.snapshot_class and expected_snapshot.snapshot_class are the same
+        assert_eq!(snapshot, expected_snapshot);
 
-    //     // Assert to make sure that the ScheduledBackup method is set to VolumeSnapshot
-    //     if let Some(volume_snapshot_backup) = volume_snapshot_backup {
-    //         assert_eq!(
-    //             volume_snapshot_backup.spec.method,
-    //             Some(ScheduledBackupMethod::VolumeSnapshot)
-    //         );
-    //     } else {
-    //         panic!("Expected volume snapshot backup to be Some, but was None");
-    //     }
+        // Assert to make sure that the ScheduledBackup method is set to VolumeSnapshot
+        if let Some(volume_snapshot_backup) = volume_snapshot_backup {
+            assert_eq!(
+                volume_snapshot_backup.spec.method,
+                Some(ScheduledBackupMethod::VolumeSnapshot)
+            );
+        } else {
+            panic!("Expected volume snapshot backup to be Some, but was None");
+        }
 
-    //     // Assert to make sure that the ScheduledBackup method is set to BarmanObjectStore
-    //     assert_eq!(
-    //         s3_backup.spec.method,
-    //         Some(ScheduledBackupMethod::BarmanObjectStore)
-    //     );
-    // }
-    // #[test]
-    // fn test_generate_scheduled_backup_snapshot_name() {
-    //     // Longer than 43 characters
-    //     let long_name = "thin-heartbreaking-knowledgeable-spoonbills-obnoxious-tough-lumpy-lapwing";
-    //     assert_eq!(
-    //         generate_scheduled_backup_snapshot_name(long_name),
-    //         "thin-heartbreaking-knowledgeable-spoonbills-snap"
-    //     );
+        // Assert to make sure that the ScheduledBackup method is set to BarmanObjectStore
+        assert_eq!(
+            s3_backup.spec.method,
+            Some(ScheduledBackupMethod::BarmanObjectStore)
+        );
+    }
+    #[test]
+    fn test_generate_scheduled_backup_snapshot_name() {
+        // Longer than 43 characters
+        let long_name = "thin-heartbreaking-knowledgeable-spoonbills-obnoxious-tough-lumpy-lapwing";
+        assert_eq!(
+            generate_scheduled_backup_snapshot_name(long_name),
+            "thin-heartbreaking-knowledgeable-spoonbills-snap"
+        );
 
-    //     // Exactly 43 characters
-    //     let exact_length_name = "lying-high-pitched-guanaco-absent-aardvarks";
-    //     assert_eq!(
-    //         generate_scheduled_backup_snapshot_name(exact_length_name),
-    //         "lying-high-pitched-guanaco-absent-aardvarks-snap"
-    //     );
+        // Exactly 43 characters
+        let exact_length_name = "lying-high-pitched-guanaco-absent-aardvarks";
+        assert_eq!(
+            generate_scheduled_backup_snapshot_name(exact_length_name),
+            "lying-high-pitched-guanaco-absent-aardvarks-snap"
+        );
 
-    //     // Shorter than 43 characters
-    //     let short_name = "stormy-capybara";
-    //     assert_eq!(
-    //         generate_scheduled_backup_snapshot_name(short_name),
-    //         "stormy-capybara-snap"
-    //     );
-    // }
+        // Shorter than 43 characters
+        let short_name = "stormy-capybara";
+        assert_eq!(
+            generate_scheduled_backup_snapshot_name(short_name),
+            "stormy-capybara-snap"
+        );
+    }
 }

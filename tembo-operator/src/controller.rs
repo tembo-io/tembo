@@ -83,7 +83,7 @@ pub fn requeue_normal_with_jitter() -> Action {
 #[instrument(skip(ctx, cdb), fields(trace_id))]
 async fn reconcile(cdb: Arc<CoreDB>, ctx: Arc<Context>) -> Result<Action> {
     let trace_id = telemetry::get_trace_id();
-    Span::current().record("trace_id", &field::display(&trace_id));
+    Span::current().record("trace_id", field::display(&trace_id));
     let cfg = Config::default();
     let _timer = ctx.metrics.count_and_measure();
     ctx.diagnostics.write().await.last_event = Utc::now();
