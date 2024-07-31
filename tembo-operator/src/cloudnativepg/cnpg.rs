@@ -26,8 +26,9 @@ use crate::{
             ClusterBackupVolumeSnapshotOnlineConfiguration,
             ClusterBackupVolumeSnapshotSnapshotOwnerReference, ClusterBootstrap,
             ClusterBootstrapInitdb, ClusterBootstrapRecovery,
-            ClusterBootstrapRecoveryRecoveryTarget, ClusterCertificates, ClusterExternalClusters,
-            ClusterExternalClustersBarmanObjectStore,
+            ClusterBootstrapRecoveryRecoveryTarget, ClusterBootstrapRecoveryVolumeSnapshots,
+            ClusterBootstrapRecoveryVolumeSnapshotsStorage, ClusterCertificates,
+            ClusterExternalClusters, ClusterExternalClustersBarmanObjectStore,
             ClusterExternalClustersBarmanObjectStoreS3Credentials,
             ClusterExternalClustersBarmanObjectStoreS3CredentialsAccessKeyId,
             ClusterExternalClustersBarmanObjectStoreS3CredentialsRegion,
@@ -45,6 +46,7 @@ use crate::{
             ClusterServiceAccountTemplate, ClusterServiceAccountTemplateMetadata, ClusterSpec,
             ClusterStorage, ClusterSuperuserSecret,
         },
+        cnpg_backups::create_backup_if_needed,
         cnpg_utils::{
             get_pooler_instances, is_image_updated, patch_cluster, restart_and_wait_for_restart,
         },
@@ -64,6 +66,7 @@ use crate::{
     is_postgres_ready,
     postgres_exporter::EXPORTER_CONFIGMAP_PREFIX,
     psql::PsqlOutput,
+    snapshots::volumesnapshots::reconcile_volume_snapshot_restore,
     trunk::extensions_that_require_load,
     Context,
 };
@@ -513,7 +516,7 @@ fn cnpg_cluster_bootstrap(cdb: &CoreDB, restore: bool) -> ClusterBootstrap {
 
 // TODO: reenable this once we have a work around for snapshots
 fn cnpg_cluster_bootstrap_recovery_volume_snapshots(
-    _cdb: &CoreDB,
+    cdb: &CoreDB,
 ) -> Option<ClusterBootstrapRecoveryVolumeSnapshots> {
     if let Some(restore) = &cdb.spec.restore {
         if restore.volume_snapshot == Some(true) {
