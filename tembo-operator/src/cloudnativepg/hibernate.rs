@@ -265,52 +265,6 @@ async fn update_pooler_instances(
     Ok(())
 }
 
-// async fn update_scheduled_backups(
-//     scheduled_backup: &Option<ScheduledBackup>,
-//     cdb: &CoreDB,
-//     ctx: &Arc<Context>,
-// ) -> Result<(), Action> {
-//     let name = cdb.name_any();
-//
-//     if let Some(sb) = scheduled_backup {
-//         let scheduled_backup_suspend_status = sb.spec.suspend.unwrap_or_default();
-//         let scheduled_backup_value = cdb.spec.stop;
-//
-//         if scheduled_backup_suspend_status != scheduled_backup_value {
-//             let patch_scheduled_backup_spec = json!({
-//                 "spec": {
-//                     "suspend": scheduled_backup_value
-//                 }
-//             });
-//
-//             match patch_scheduled_backup_merge(cdb, ctx, patch_scheduled_backup_spec).await {
-//                 Ok(_) => {
-//                     info!(
-//                         "Toggled scheduled backup suspend of {} to '{}'",
-//                         name, scheduled_backup_value
-//                     );
-//                 }
-//                 Err(e) => {
-//                     error!("Failed to update ScheduledBackup for {}: {:?}", name, e);
-//                     return Err(requeue_normal_with_jitter());
-//                 }
-//             }
-//         } else {
-//             debug!(
-//                 "ScheduledBackup suspend for {} already set to {}. No update needed.",
-//                 name, scheduled_backup_value
-//             );
-//         }
-//     } else {
-//         info!(
-//             "Skipping ScheduledBackup operations as it doesn't exist for {}",
-//             name
-//         );
-//     }
-//
-//     Ok(())
-// }
-
 async fn update_scheduled_backups(
     scheduled_backups: &[ScheduledBackup],
     cdb: &CoreDB,

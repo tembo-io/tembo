@@ -2225,40 +2225,6 @@ pub(crate) async fn get_cluster(cdb: &CoreDB, ctx: Arc<Context>) -> Option<Clust
     }
 }
 
-// #[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any()))]
-// pub(crate) async fn get_scheduled_backup(
-//     cdb: &CoreDB,
-//     ctx: Arc<Context>,
-// ) -> Option<ScheduledBackup> {
-//     let instance_name = cdb.name_any();
-//     let namespace = match cdb.namespace() {
-//         Some(ns) => ns,
-//         _ => {
-//             error!("Namespace is not set for CoreDB {}", instance_name);
-//             return None;
-//         }
-//     };
-//
-//     let scheduled_backup: Api<ScheduledBackup> = Api::namespaced(ctx.client.clone(), &namespace);
-//     let sbu = scheduled_backup.get(&instance_name).await;
-//
-//     match sbu {
-//         Ok(scheduled_backup) => {
-//             debug!("ScheduledBackup {} exists", instance_name);
-//             Some(scheduled_backup)
-//         }
-//         // return Ok(false) if the ScheduledBackup does not exist (404)
-//         Err(kube::Error::Api(ae)) if ae.code == 404 => {
-//             debug!("ScheduledBackup {} does not exist", instance_name);
-//             None
-//         }
-//         Err(_e) => {
-//             error!("Error getting ScheduledBackup: {}", instance_name);
-//             None
-//         }
-//     }
-// }
-
 #[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any()))]
 pub(crate) async fn get_scheduled_backups(cdb: &CoreDB, ctx: Arc<Context>) -> Vec<ScheduledBackup> {
     let instance_name = cdb.name_any();
