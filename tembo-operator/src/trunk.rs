@@ -177,8 +177,7 @@ async fn requires_load_list_from_trunk() -> Result<Vec<String>, TrunkError> {
     let response = reqwest::get(&url).await?;
 
     if response.status().is_success() {
-        let response_body = response.text().await?;
-        let libraries: Vec<String> = serde_json::from_str(&response_body)?;
+        let libraries = response.json().await?;
         Ok(libraries)
     } else {
         error!(
@@ -198,9 +197,8 @@ pub async fn get_trunk_projects() -> Result<Vec<TrunkProjectMetadata>, TrunkErro
     let response = reqwest::get(&url).await?;
 
     if response.status().is_success() {
-        let response_body = response.text().await?;
-        let project_metadata: Vec<TrunkProjectMetadata> = serde_json::from_str(&response_body)?;
-        Ok(project_metadata.clone())
+        let project_metadata: Vec<TrunkProjectMetadata> = response.json().await?;
+        Ok(project_metadata)
     } else {
         error!("Failed to fetch all trunk projects: {}", response.status());
         Err(TrunkError::NetworkFailure(
@@ -218,11 +216,10 @@ pub async fn get_trunk_project_names() -> Result<Vec<String>, TrunkError> {
     let response = reqwest::get(&url).await?;
 
     if response.status().is_success() {
-        let response_body = response.text().await?;
-        let project_metadata: Vec<TrunkProjectMetadata> = serde_json::from_str(&response_body)?;
-        let project_names: Vec<String> = project_metadata
-            .iter()
-            .map(|project_metadata| project_metadata.name.clone())
+        let project_metadata: Vec<TrunkProjectMetadata> = response.json().await?;
+        let project_names = project_metadata
+            .into_iter()
+            .map(|project_metadata| project_metadata.name)
             .collect();
         Ok(project_names)
     } else {
@@ -303,8 +300,7 @@ pub async fn get_trunk_project_metadata_for_version(
     let response = reqwest::get(&url).await?;
 
     if response.status().is_success() {
-        let response_body = response.text().await?;
-        let project_metadata: Vec<TrunkProjectMetadata> = serde_json::from_str(&response_body)?;
+        let project_metadata: Vec<TrunkProjectMetadata> = response.json().await?;
         // There will only be one index here, so we can safely assume index 0
         let project_metadata = match project_metadata.first() {
             Some(project_metadata) => project_metadata,
