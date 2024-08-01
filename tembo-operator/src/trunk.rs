@@ -316,7 +316,7 @@ pub async fn get_trunk_project_metadata_for_version(
                 Some(project_metadata) => project_metadata,
                 None => {
                     error!(
-                        "Failed to fetch metadata for trunk project {trunk_project_name} with extension version {version}"
+                        "Failed to fetch metadata for trunk project {trunk_project_name} with Trunk project version {version}"
                     );
                     return Err(TrunkError::TrunkProjectVersionNotFound(version.to_string()));
                 }
