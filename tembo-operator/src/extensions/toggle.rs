@@ -429,7 +429,7 @@ async fn check_for_extensions_enabled_with_load(
                     get_trunk_project_for_extension(extension.name.clone()).await?;
                 let description = get_trunk_project_description(
                     trunk_project_name.as_deref().unwrap(),
-                    Version::Extension(extension.version.as_deref().unwrap()),
+                    Version::TrunkProject(extension.version.as_deref().unwrap()),
                 )
                 .await?;
 
