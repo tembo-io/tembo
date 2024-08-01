@@ -566,6 +566,28 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_get_trunk_project_metadata_for_extension_version() {
+        // Find metadata on citext with extension version 1.6
+        let result =
+            get_trunk_project_metadata_for_version("citext", super::Version::Extension("1.6"))
+                .await;
+
+        let trunk_project = result.unwrap();
+
+        assert!(trunk_project.version == "1.6.0");
+        assert!(trunk_project.name == "citext");
+
+        // Ensure that if we tried to find citext through an extension version of 1.6.0 (which is incorrect),
+        // we'd find no results
+        assert!(get_trunk_project_metadata_for_version(
+            "citext",
+            super::Version::Extension("1.6.0"),
+        )
+        .await
+        .is_err())
+    }
+
+    #[tokio::test]
     async fn test_extension_name_matches_trunk_project() {
         let extension_name = "auto_explain".to_string();
         let result = extension_name_matches_trunk_project(extension_name).await;
@@ -610,7 +632,7 @@ mod tests {
     async fn test_is_control_file_absent() {
         let trunk_project = "auto_explain";
         let version = "15.3.0";
-        let result = is_control_file_absent(trunk_project, version).await;
+        let result = is_control_file_absent(trunk_project, Version::TrunkProject(version)).await;
         assert!(result.is_ok());
         assert!(result.unwrap());
     }
@@ -620,7 +642,12 @@ mod tests {
         let trunk_project = "auto_explain";
         let version = "15.3.0";
         let extension_name = "auto_explain";
-        let result = get_loadable_library_name(trunk_project, version, extension_name).await;
+        let result = get_loadable_library_name(
+            trunk_project,
+            Version::TrunkProject(version),
+            extension_name,
+        )
+        .await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), Some("auto_explain".to_string()));
     }
@@ -629,7 +656,8 @@ mod tests {
     async fn test_get_trunk_project_description() {
         let trunk_project = "auto_explain";
         let version = "15.3.0";
-        let result = get_trunk_project_description(trunk_project, version).await;
+        let result =
+            get_trunk_project_description(trunk_project, Version::TrunkProject(version)).await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), Some("The auto_explain module provides a means for logging execution plans of slow statements automatically, without having to run EXPLAIN by hand.".to_string()));
     }
