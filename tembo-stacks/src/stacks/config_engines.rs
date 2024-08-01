@@ -266,7 +266,7 @@ fn parse_storage(stack: &Stack) -> Result<f64, ValueError> {
 // Standard formula for shared buffers, 25% of system memory
 // returns the value as string including units, e.g. 128MB
 fn mq_shared_buffers(mem_mb: f64) -> i32 {
-    (mem_mb * 0.6).floor() as i32
+    (mem_mb * 0.3).floor() as i32
 }
 
 // Standard formula for shared buffers, 25% of system memory
