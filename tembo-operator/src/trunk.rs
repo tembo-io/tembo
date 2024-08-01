@@ -285,6 +285,16 @@ pub async fn get_trunk_project_metadata_for_version(
     let domain = env::var("TRUNK_REGISTRY_DOMAIN")
         .unwrap_or_else(|_| DEFAULT_TRUNK_REGISTRY_DOMAIN.to_string());
 
+    let converted_semver;
+
+    let version = match version {
+        Version::TrunkProject(version) => {
+            converted_semver = convert_to_semver(version);
+            Version::TrunkProject(&converted_semver)
+        },
+        extension => extension,
+    };
+
     let url = match version {
         Version::TrunkProject(trunk_project_version) => format!(
             "https://{domain}/api/v1/trunk-projects/{trunk_project_name}/version/{trunk_project_version}"
@@ -562,7 +572,27 @@ mod tests {
         let trunk_project = result.unwrap();
 
         assert!(trunk_project.version == "15.3.0");
-        assert!(trunk_project.name == "auto_explain");
+        assert!(trunk_project.name == "auto_explain");        
+    }
+
+    #[tokio::test]
+    async fn test_get_trunk_project_metadata_for_converted_version() {
+        let trunk_project = "plperl";
+        let version = "1.0";
+
+        // Despite using an incorrect Trunk project version, the function will detect
+        // we supplied a non-semver Trunk project version and attempt to convert
+        let result = get_trunk_project_metadata_for_version(
+            trunk_project,
+            super::Version::TrunkProject(version),
+        )
+        .await;
+        assert!(result.is_ok());
+
+        let trunk_project = result.unwrap();
+
+        assert!(trunk_project.version == "1.0.0");
+        assert!(trunk_project.name == "plperl");        
     }
 
     #[tokio::test]
@@ -577,8 +607,6 @@ mod tests {
         assert!(trunk_project.version == "1.6.0");
         assert!(trunk_project.name == "citext");
 
-        // Ensure that if we tried to find citext through an extension version of 1.6.0 (which is incorrect),
-        // we'd find no results
         assert!(get_trunk_project_metadata_for_version(
             "citext",
             super::Version::Extension("1.6.0"),
