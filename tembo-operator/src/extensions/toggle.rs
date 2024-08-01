@@ -1,10 +1,12 @@
 use crate::{
     apis::coredb_types::CoreDB,
     extensions::{
-        database_queries, kubernetes_queries, types,
-        types::{Extension, ExtensionInstallLocationStatus, ExtensionStatus},
+        database_queries, kubernetes_queries,
+        types::{self, Extension, ExtensionInstallLocationStatus, ExtensionStatus},
     },
-    get_current_coredb_resource, Context,
+    get_current_coredb_resource,
+    trunk::{self, Version},
+    Context,
 };
 use kube::runtime::controller::Action;
 
@@ -87,19 +89,21 @@ async fn toggle_extensions(
                         get_trunk_project_version(cdb, &proj_name, location_to_toggle).await?;
 
                     // If version is None, error
-                    if trunk_project_version.is_none() {
+                    let Some(trunk_project_version) = trunk_project_version else {
                         error!("Version for {} is none. Version should never be none when toggling an extension", extension_to_toggle.name);
                         continue;
-                    }
+                    };
+
                     let loadable_library_name = get_loadable_library_name(
                         &proj_name,
-                        trunk_project_version.as_ref().unwrap(),
+                        Version::TrunkProject(&trunk_project_version),
                         &extension_to_toggle.name,
                     )
                     .await?;
+
                     let control_file_absent = is_control_file_absent(
                         &proj_name,
-                        trunk_project_version.as_deref().unwrap(),
+                        Version::TrunkProject(&trunk_project_version),
                     )
                     .await?;
                     if control_file_absent && loadable_library_name.is_some() {
@@ -425,7 +429,7 @@ async fn check_for_extensions_enabled_with_load(
                     get_trunk_project_for_extension(extension.name.clone()).await?;
                 let description = get_trunk_project_description(
                     trunk_project_name.as_deref().unwrap(),
-                    extension.version.as_deref().unwrap(),
+                    Version::Extension(extension.version.as_deref().unwrap()),
                 )
                 .await?;
 
@@ -498,10 +502,12 @@ async fn get_trunk_project_version(
         // If the version is not specified in Trunk installs:  and the version specified
         if trunk_project_version.is_none() && is_semver(&location_version) {
             // Check if trunk project with extension version exists
-            let trunk_project_version_exists =
-                get_trunk_project_metadata_for_version(trunk_project_name, &location_version)
-                    .await
-                    .is_ok();
+            let trunk_project_version_exists = get_trunk_project_metadata_for_version(
+                trunk_project_name,
+                trunk::Version::TrunkProject(&location_version),
+            )
+            .await
+            .is_ok();
             // If trunk project exists for this version, use it
             if trunk_project_version_exists {
                 trunk_project_version.clone_from(&location_to_toggle.version);
