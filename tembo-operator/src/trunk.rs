@@ -5,6 +5,8 @@ use schemars::JsonSchema;
 use serde::de::Error;
 use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
+use std::fmt::Display;
+use std::ops::Not;
 use std::{collections::BTreeMap, env, time::Duration};
 
 use crate::configmap::apply_configmap;
@@ -16,6 +18,22 @@ const DEFAULT_TRUNK_REGISTRY_DOMAIN: &str = "registry.pgtrunk.io";
 // One configmap per namespace
 // multiple DBs in the same namespace can share the same configmap
 const TRUNK_CONFIGMAP_NAME: &str = "trunk-metadata";
+
+pub enum Version<'a> {
+    TrunkProject(&'a str),
+    Extension(&'a str),
+}
+
+impl Display for Version<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let version = match self {
+            Version::TrunkProject(v) => v,
+            Version::Extension(v) => v,
+        };
+
+        f.write_str(version)
+    }
+}
 
 pub struct ExtensionRequiresLoad {
     pub name: String,
@@ -230,32 +248,6 @@ pub async fn get_trunk_project_names() -> Result<Vec<String>, TrunkError> {
     }
 }
 
-// Get all metadata entries for a given trunk project
-#[allow(unused)]
-async fn get_trunk_project_metadata(
-    trunk_project: String,
-) -> Result<Vec<TrunkProjectMetadata>, TrunkError> {
-    let domain = env::var("TRUNK_REGISTRY_DOMAIN")
-        .unwrap_or_else(|_| DEFAULT_TRUNK_REGISTRY_DOMAIN.to_string());
-    let url = format!("https://{}/api/v1/trunk-projects/{}", domain, trunk_project);
-
-    let response = reqwest::get(&url).await?;
-
-    if response.status().is_success() {
-        Ok(response.json().await?)
-    } else {
-        error!(
-            "Failed to fetch metadata for trunk project {}: {}",
-            trunk_project,
-            response.status()
-        );
-
-        Err(TrunkError::NetworkFailure(
-            response.error_for_status().unwrap_err(),
-        ))
-    }
-}
-
 // Get the latest metadata entries for a given Trunk project
 async fn get_latest_trunk_project_metadata(
     trunk_project: &str,
@@ -299,34 +291,35 @@ pub async fn get_trunk_project_metadata_for_version(
 
     let response = reqwest::get(&url).await?;
 
-    if response.status().is_success() {
-        let project_metadata: Vec<TrunkProjectMetadata> = response.json().await?;
-        // There will only be one index here, so we can safely assume index 0
-        let project_metadata = match project_metadata.first() {
-            Some(project_metadata) => project_metadata,
-            None => {
-                error!(
-                    "Failed to fetch metadata for trunk project {} version {}",
-                    trunk_project, version
-                );
-                return Err(TrunkError::ParsingIssue(serde_json::Error::custom(
-                    "No metadata found",
-                )));
-            }
-        };
-
-        Ok(project_metadata.clone())
-    } else {
+    if response.status().is_success().not() {
         error!(
             "Failed to fetch metadata for trunk project {} version {}: {}",
             trunk_project,
             version,
             response.status()
         );
-        Err(TrunkError::NetworkFailure(
+
+        return Err(TrunkError::NetworkFailure(
             response.error_for_status().unwrap_err(),
-        ))
+        ));
     }
+
+    let mut project_metadata: Vec<TrunkProjectMetadata> = response.json().await?;
+    // There will only be one index here, so we can safely assume index 0
+    let project_metadata = match project_metadata.pop() {
+        Some(project_metadata) => project_metadata,
+        None => {
+            error!(
+                "Failed to fetch metadata for trunk project {} version {}",
+                trunk_project, version
+            );
+            return Err(TrunkError::ParsingIssue(serde_json::Error::custom(
+                "No metadata found",
+            )));
+        }
+    };
+
+    Ok(project_metadata)
 }
 
 // Check if extension name is in list of trunk project names
