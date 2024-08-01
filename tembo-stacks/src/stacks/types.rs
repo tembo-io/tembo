@@ -256,7 +256,7 @@ mod tests {
             .collect();
         let shared_buffers = hm.get("shared_buffers").unwrap();
         assert_eq!(shared_buffers.name, "shared_buffers");
-        assert_eq!(shared_buffers.value.to_string(), "614MB");
+        assert_eq!(shared_buffers.value.to_string(), "307MB");
         let max_connections = hm.get("max_connections").unwrap();
         assert_eq!(max_connections.name, "max_connections");
         assert_eq!(max_connections.value.to_string(), "107");

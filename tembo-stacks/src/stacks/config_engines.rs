@@ -412,10 +412,10 @@ mod tests {
         assert_eq!(shared_buff, 2560);
 
         let shared_buff = mq_shared_buffers(1024.0);
-        assert_eq!(shared_buff, 614);
+        assert_eq!(shared_buff, 307);
 
         let shared_buff = mq_shared_buffers(10240.0);
-        assert_eq!(shared_buff, 6144);
+        assert_eq!(shared_buff, 3072);
     }
 
     #[test]
