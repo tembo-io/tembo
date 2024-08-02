@@ -1,19 +1,21 @@
 use crate::{
     apis::coredb_types::CoreDB,
     extensions::{
-        database_queries, kubernetes_queries, types,
-        types::{Extension, ExtensionInstallLocationStatus, ExtensionStatus},
+        database_queries, kubernetes_queries,
+        types::{self, Extension, ExtensionInstallLocationStatus, ExtensionStatus},
     },
-    get_current_coredb_resource, Context,
+    get_current_coredb_resource,
+    trunk::{self, Version},
+    Context,
 };
 use kube::runtime::controller::Action;
 
 use crate::extensions::install::check_for_so_files;
 use crate::extensions::types::TrunkInstall;
 use crate::trunk::{
-    convert_to_semver, get_latest_trunk_project_version, get_loadable_library_name,
-    get_trunk_project_description, get_trunk_project_for_extension,
-    get_trunk_project_metadata_for_version, is_control_file_absent, is_semver,
+    get_latest_trunk_project_version, get_loadable_library_name, get_trunk_project_description,
+    get_trunk_project_for_extension, get_trunk_project_metadata_for_version,
+    is_control_file_absent,
 };
 use crate::{
     apis::coredb_types::CoreDBStatus,
@@ -70,6 +72,7 @@ async fn toggle_extensions(
         extensions_that_require_load(ctx.client.clone(), &cdb.metadata.namespace.clone().unwrap())
             .await?;
     let mut ext_status_updates = ext_status_updates.clone();
+
     for extension_to_toggle in toggle_these_extensions {
         for location_to_toggle in &extension_to_toggle.locations {
             let expected_library_name = match requires_load.get(&extension_to_toggle.name) {
@@ -87,19 +90,21 @@ async fn toggle_extensions(
                         get_trunk_project_version(cdb, &proj_name, location_to_toggle).await?;
 
                     // If version is None, error
-                    if trunk_project_version.is_none() {
+                    let Some(trunk_project_version) = trunk_project_version else {
                         error!("Version for {} is none. Version should never be none when toggling an extension", extension_to_toggle.name);
                         continue;
-                    }
+                    };
+
                     let loadable_library_name = get_loadable_library_name(
                         &proj_name,
-                        trunk_project_version.as_ref().unwrap(),
+                        Version::TrunkProject(&trunk_project_version),
                         &extension_to_toggle.name,
                     )
                     .await?;
+
                     let control_file_absent = is_control_file_absent(
                         &proj_name,
-                        trunk_project_version.as_deref().unwrap(),
+                        Version::TrunkProject(&trunk_project_version),
                     )
                     .await?;
                     if control_file_absent && loadable_library_name.is_some() {
@@ -425,7 +430,7 @@ async fn check_for_extensions_enabled_with_load(
                     get_trunk_project_for_extension(extension.name.clone()).await?;
                 let description = get_trunk_project_description(
                     trunk_project_name.as_deref().unwrap(),
-                    extension.version.as_deref().unwrap(),
+                    Version::TrunkProject(extension.version.as_deref().unwrap()),
                 )
                 .await?;
 
@@ -479,44 +484,32 @@ async fn get_trunk_project_version(
     trunk_project_name: &str,
     location_to_toggle: &types::ExtensionInstallLocation,
 ) -> Result<Option<String>, Action> {
-    let mut trunk_project_version = None;
-
     // Check if version is provided in cdb.spec.trunk_installs
     for trunk_install in &cdb.spec.trunk_installs {
         if trunk_install.name == trunk_project_name {
-            trunk_project_version.clone_from(&trunk_install.version);
-        }
-    }
-
-    if let Some(location_version) = location_to_toggle.version.as_deref() {
-        let location_version = if is_semver(location_version) {
-            location_version.into()
-        } else {
-            convert_to_semver(location_version)
-        };
-
-        // If the version is not specified in Trunk installs:  and the version specified
-        if trunk_project_version.is_none() && is_semver(&location_version) {
-            // Check if trunk project with extension version exists
-            let trunk_project_version_exists =
-                get_trunk_project_metadata_for_version(trunk_project_name, &location_version)
-                    .await
-                    .is_ok();
-            // If trunk project exists for this version, use it
-            if trunk_project_version_exists {
-                trunk_project_version.clone_from(&location_to_toggle.version);
+            if let Some(trunk_install_version) = &trunk_install.version {
+                return Ok(Some(trunk_install_version.clone()));
             }
         }
     }
 
-    if trunk_project_version.is_none() {
-        // If we still haven't managed to identify the latest Trunk project version,
-        // assume the latest version
-        let latest_version = get_latest_trunk_project_version(trunk_project_name).await?;
-        trunk_project_version = Some(latest_version);
+    if let Some(extension_version) = &location_to_toggle.version {
+        let maybe_trunk_project = get_trunk_project_metadata_for_version(
+            trunk_project_name,
+            trunk::Version::Extension(&extension_version),
+        )
+        .await;
+
+        if let Ok(trunk_project) = maybe_trunk_project {
+            return Ok(Some(trunk_project.version));
+        }
     }
 
-    Ok(trunk_project_version)
+    // If we still haven't managed to identify the latest Trunk project version,
+    // assume the latest version
+    let latest_trunk_project_version = get_latest_trunk_project_version(trunk_project_name).await?;
+
+    Ok(Some(latest_trunk_project_version))
 }
 
 #[cfg(test)]
