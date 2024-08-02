@@ -291,7 +291,7 @@ pub async fn get_trunk_project_metadata_for_version(
         Version::TrunkProject(version) => {
             converted_semver = convert_to_semver(version);
             Version::TrunkProject(&converted_semver)
-        },
+        }
         extension => extension,
     };
 
@@ -572,7 +572,7 @@ mod tests {
         let trunk_project = result.unwrap();
 
         assert!(trunk_project.version == "15.3.0");
-        assert!(trunk_project.name == "auto_explain");        
+        assert!(trunk_project.name == "auto_explain");
     }
 
     #[tokio::test]
@@ -592,7 +592,7 @@ mod tests {
         let trunk_project = result.unwrap();
 
         assert!(trunk_project.version == "1.0.0");
-        assert!(trunk_project.name == "plperl");        
+        assert!(trunk_project.name == "plperl");
     }
 
     #[tokio::test]
@@ -699,6 +699,8 @@ mod tests {
         let version = "1.2";
         let result = is_semver(version);
         assert!(!result);
+
+        assert_eq!(is_semver("1.0"), false);
     }
 
     #[test]
