@@ -487,7 +487,9 @@ async fn get_trunk_project_version(
     // Check if version is provided in cdb.spec.trunk_installs
     for trunk_install in &cdb.spec.trunk_installs {
         if trunk_install.name == trunk_project_name {
-            return Ok(trunk_install.version.clone());
+            if let Some(trunk_install_version) = &trunk_install.version {
+                return Ok(Some(trunk_install_version.clone()));
+            }
         }
     }
 
