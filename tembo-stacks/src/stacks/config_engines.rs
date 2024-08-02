@@ -266,7 +266,7 @@ fn parse_storage(stack: &Stack) -> Result<f64, ValueError> {
 // Standard formula for shared buffers, 25% of system memory
 // returns the value as string including units, e.g. 128MB
 fn mq_shared_buffers(mem_mb: f64) -> i32 {
-    (mem_mb * 0.6).floor() as i32
+    (mem_mb * 0.3).floor() as i32
 }
 
 // Standard formula for shared buffers, 25% of system memory
@@ -412,10 +412,10 @@ mod tests {
         assert_eq!(shared_buff, 2560);
 
         let shared_buff = mq_shared_buffers(1024.0);
-        assert_eq!(shared_buff, 614);
+        assert_eq!(shared_buff, 307);
 
         let shared_buff = mq_shared_buffers(10240.0);
-        assert_eq!(shared_buff, 6144);
+        assert_eq!(shared_buff, 3072);
     }
 
     #[test]
