@@ -1,67 +1,78 @@
-use anyhow::Context;
+use anyhow::{Context, Result};
+use chrono::{DateTime, Utc};
 use log::info;
 use pgmq::PGMQueueExt;
 use serde::{Deserialize, Serialize};
 use sqlx::{Pool, Postgres};
 use std::{env, time::Duration};
 use tokio::time::interval;
+use uuid::Uuid;
 
-pub fn split_events(events: Message, max_size: usize) -> Vec<Message> {
-    let mut result = Vec::new();
-    let mut chunk = Vec::new();
+use crate::db::connect;
+use crate::errors::DatabaseError;
 
-    for item in metrics.result.into_iter() {
-        if chunk.len() == max_size {
-            result.push(DataPlaneMetrics {
-                name: metrics.name.clone(),
-                result: chunk,
-            });
-            chunk = Vec::new();
-        }
-        chunk.push(item);
-    }
-
-    if !chunk.is_empty() {
-        result.push(DataPlaneMetrics {
-            name: metrics.name.clone(),
-            result: chunk,
-        });
-    }
-
-    result
+pub fn split_events(events: Vec<Events>, max_size: usize) -> Vec<Message> {
+    events
+        .chunks(max_size)
+        .map(|chunk| Message {
+            id: Uuid::new_v4().to_string(),
+            message: chunk.to_vec(),
+        })
+        .collect()
 }
 
 pub async fn get_usage(
     dbclient: &Pool<Postgres>,
-    start_time: String,
-    end_time: String,
-) -> Vec<Events> {
-    let rows = sqlx::query!(
-        "
+    start_time: DateTime<Utc>,
+    end_time: DateTime<Utc>,
+) -> Result<Vec<Events>, DatabaseError> {
+    let rows = sqlx::query_as!(
+        UsageData,
+        r#"
         SELECT
           organization_id,
           instance_id,
+          duration_ms,
           prompt_tokens,
-          completion_tokens
+          completion_tokens,
+          model,
+          completed_at
         FROM inference.requests
         WHERE
           completed_at >= $1 AND completed_at < $2
-        GROUP BY organization_id, instance_id;
-        ",
+        "#,
         start_time,
         end_time
     )
     .fetch_all(dbclient)
     .await?;
 
-    Ok(rows)
+    Ok(rows_to_events(rows))
 }
 
-pub async fn events_reporter() -> Results<()> {
+pub fn rows_to_events(rows: Vec<UsageData>) -> Vec<Events> {
+    rows.into_iter()
+        .map(|row| Events {
+            idempotency_key: Uuid::new_v4().to_string(),
+            organization_id: row.organization_id,
+            instance_id: row.instance_id,
+            payload: Payload {
+                completed_at: row.completed_at.to_string(),
+                duration_ms: row.duration_ms,
+                model: row.model,
+                prompt_tokens: row.prompt_tokens.to_string(),
+                completion_tokens: row.completion_tokens.to_string(),
+            },
+        })
+        .collect()
+}
+
+pub async fn events_reporter() -> Result<()> {
     const BATCH_SIZE: usize = 1000;
 
     let pg_conn_url = env::var("POSTGRES_QUEUE_CONNECTION")
         .with_context(|| "POSTGRES_QUEUE_CONNECTION must be set")?;
+    let dbclient = connect(&pg_conn_url, 5).await?;
 
     let queue = PGMQueueExt::new(pg_conn_url, 5).await?;
 
@@ -72,12 +83,15 @@ pub async fn events_reporter() -> Results<()> {
     queue.init().await?;
     queue.create(&metrics_events_queue).await?;
 
-    let mut sync_interval = interval(Duration::from_secs(60));
+    let mut sync_interval = interval(Duration::from_secs(3600));
 
     loop {
         sync_interval.tick().await;
 
-        let events = get_usage('t', "2024-07-01".to_string(), "2024-06-01".to_string());
+        let end_time = Utc::now();
+        let start_time = end_time - chrono::Duration::hours(1);
+        // TODO: Get the correct postgres connection URL
+        let events = get_usage(&dbclient, start_time, end_time).await?;
 
         let metrics_to_send = split_events(events, BATCH_SIZE);
         let batches = metrics_to_send.len();
@@ -112,9 +126,21 @@ pub struct Events {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Payload {
-    pub completed_at: String, // Note sure if this is the best type for timestamps
-    pub duration_ms: i32,     // We may not need for orb, but never hurts to have more information
+    pub completed_at: String,
+    pub duration_ms: i32,
     pub model: String,
     pub prompt_tokens: String,
     pub completion_tokens: String,
 }
+
+pub struct UsageData {
+    organization_id: String,
+    instance_id: String,
+    duration_ms: i32,
+    prompt_tokens: i32,
+    completion_tokens: i32,
+    model: String,
+    completed_at: DateTime<Utc>,
+}
+
+//TODO: Add unit tests
