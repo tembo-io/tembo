@@ -533,7 +533,7 @@ mod tests {
         assert!(result.is_ok());
 
         let project = result.unwrap();
-        assert!(project.version == "1.3.3");
+        assert!(project.version == "1.4.0");
         assert!(project.name == "pgmq");
     }
 
