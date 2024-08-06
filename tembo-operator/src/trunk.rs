@@ -185,25 +185,17 @@ pub async fn reconcile_trunk_configmap(client: Client, namespace: &str) -> Resul
     }
 }
 
-// TODO(ianstanton) This information is now available in the trunk project metadata. We should fetch it from there
-//  instead
+/// List of extensions that require load
 async fn requires_load_list_from_trunk() -> Result<Vec<String>, TrunkError> {
-    let domain = env::var("TRUNK_REGISTRY_DOMAIN")
-        .unwrap_or_else(|_| DEFAULT_TRUNK_REGISTRY_DOMAIN.to_string());
-    let url = format!("https://{}/extensions/libraries", domain);
+    let projects = get_trunk_projects().await?;
+    let libraries = projects
+        .into_iter()
+        .flat_map(|project| project.extensions)
+        .filter_map(|extension| extension.loadable_libraries)
+        .flat_map(|libraries| libraries.into_iter().map(|library| library.library_name))
+        .collect();
 
-    let response = reqwest::get(&url).await?;
-
-    if response.status().is_success() {
-        let libraries = response.json().await?;
-        Ok(libraries)
-    } else {
-        error!(
-            "Failed to update extensions libraries list from trunk: {}",
-            response.status()
-        );
-        Err(TrunkError::ConfigMapApplyError)
-    }
+    Ok(libraries)
 }
 
 // Get all trunk projects
@@ -712,5 +704,22 @@ mod tests {
         let version = "1.2";
         let result = convert_to_semver(version);
         assert_eq!(result, "1.2.0".to_string());
+    }
+
+    #[tokio::test]
+    async fn test_requires_load_list_from_trunk() {
+        // To ensure backwards compatibility with the older endpoint, let's ensure
+        // that all of the results in that list are contained in the response from the newer v1 endpoint
+        let libraries_from_legacy_endpoint = requires_load_list_from_trunk().await.unwrap();
+        assert!(libraries_from_legacy_endpoint.is_empty().not());
+
+        let libraries_from_v1_endpoint = requires_load_list_from_trunk().await.unwrap();
+
+        for expected_library in libraries_from_legacy_endpoint {
+            assert!(
+                libraries_from_v1_endpoint.contains(&expected_library),
+                "Missing library in v1 endpoint"
+            );
+        }
     }
 }
