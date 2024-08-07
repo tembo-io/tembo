@@ -1,6 +1,7 @@
 name: !embeddings
 appServices:
-  - image: 387894460527.dkr.ecr.us-east-1.amazonaws.com/tembo-io/vector-serve:6397964
+  - repository: 387894460527.dkr.ecr.us-east-1.amazonaws.com/tembo-io
+    image: vector-serve:6397964
     name: embeddings
     metrics:
       path: /metrics
