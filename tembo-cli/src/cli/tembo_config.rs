@@ -140,3 +140,20 @@ pub struct LoadableLibrary {
     pub library_name: String,
     pub priority: i32,
 }
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct TemboTomlConfig {
+    #[serde(rename = "instance_name")]
+    pub name: String,
+    pub environment: String,
+    pub cpu: String,
+    pub memory: String,
+    pub storage: String,
+    pub replicas: i32,
+    pub stack_type: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub postgres_configurations: Option<HashMap<String, Value>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extensions: Option<HashMap<String, Extension>>,
+    pub pg_version: u8,
+}
