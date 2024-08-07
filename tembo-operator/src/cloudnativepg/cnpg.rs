@@ -1564,7 +1564,6 @@ fn cnpg_scheduled_backup(
         status: None,
     };
 
-    // TODO: reenable this once we have a work around for snapshots
     // Because the snapshot name can easily be over the character limit for k8s
     // we will need to trim the name to 43 characters and append "-snap"
     let snap_name = generate_scheduled_backup_snapshot_name(name);
@@ -1603,7 +1602,6 @@ fn cnpg_scheduled_backup(
     )])
 }
 
-// TODO: reenable this once we have a work around for snapshots
 // generate_scheduled_backup_snapshot_name generates a snapshot name for a scheduled backup
 // by appending "-snap" to the name and trimming the name to 43 characters if necessary
 fn generate_scheduled_backup_snapshot_name(name: &str) -> String {
@@ -2231,35 +2229,41 @@ pub(crate) async fn get_cluster(cdb: &CoreDB, ctx: Arc<Context>) -> Option<Clust
 }
 
 #[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any()))]
-pub(crate) async fn get_scheduled_backup(
-    cdb: &CoreDB,
-    ctx: Arc<Context>,
-) -> Option<ScheduledBackup> {
+pub(crate) async fn get_scheduled_backups(cdb: &CoreDB, ctx: Arc<Context>) -> Vec<ScheduledBackup> {
     let instance_name = cdb.name_any();
     let namespace = match cdb.namespace() {
         Some(ns) => ns,
         _ => {
             error!("Namespace is not set for CoreDB {}", instance_name);
-            return None;
+            return Vec::new();
         }
     };
 
     let scheduled_backup: Api<ScheduledBackup> = Api::namespaced(ctx.client.clone(), &namespace);
-    let sbu = scheduled_backup.get(&instance_name).await;
 
-    match sbu {
-        Ok(scheduled_backup) => {
-            debug!("ScheduledBackup {} exists", instance_name);
-            Some(scheduled_backup)
+    // Create a ListParams object to filter the ScheduledBackups
+    let lp = ListParams::default().fields(&format!("metadata.name={}", instance_name));
+
+    match scheduled_backup.list(&lp).await {
+        Ok(list) => {
+            let backups = list.items;
+            if backups.is_empty() {
+                debug!("No ScheduledBackups found for {}", instance_name);
+            } else {
+                debug!(
+                    "Found {} ScheduledBackups for {}",
+                    backups.len(),
+                    instance_name
+                );
+            }
+            backups
         }
-        // return Ok(false) if the ScheduledBackup does not exist (404)
-        Err(kube::Error::Api(ae)) if ae.code == 404 => {
-            debug!("ScheduledBackup {} does not exist", instance_name);
-            None
-        }
-        Err(_e) => {
-            error!("Error getting ScheduledBackup: {}", instance_name);
-            None
+        Err(e) => {
+            error!(
+                "Error listing ScheduledBackups for {}: {}",
+                instance_name, e
+            );
+            Vec::new()
         }
     }
 }
@@ -3205,7 +3209,6 @@ mod tests {
             Some(ScheduledBackupMethod::BarmanObjectStore)
         );
     }
-
     #[test]
     fn test_generate_scheduled_backup_snapshot_name() {
         // Longer than 43 characters
