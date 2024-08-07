@@ -1,4 +1,4 @@
-FROM rust:1.77.0-slim-buster as builder
+FROM rust:1.80.0-slim-buster as builder
 
 RUN apt-get update && \
     apt-get install -y pkg-config libssl-dev && apt-get clean && \
@@ -13,7 +13,7 @@ COPY migrations/ /build/migrations
 
 RUN SQLX_OFFLINE=true cargo build --release
 
-FROM rust:1.77.0-slim-buster
+FROM rust:1.80.0-slim-buster
 
 COPY --from=builder /build/target/release/gateway /usr/local/bin/gateway
 

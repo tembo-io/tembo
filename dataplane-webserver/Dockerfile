@@ -1,4 +1,4 @@
-FROM quay.io/tembo/rust:1.77-slim
+FROM quay.io/tembo/rust:1.80-slim
 
 RUN apt-get update \
     && apt-get install -y pkg-config libssl-dev \

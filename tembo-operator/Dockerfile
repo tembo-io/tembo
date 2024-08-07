@@ -1,6 +1,6 @@
 # This does not build on ARM laptops, even with the --platform flag.
 
-FROM --platform=linux/amd64 quay.io/tembo/muslrust:1.77.0-stable AS builder
+FROM --platform=linux/amd64 quay.io/tembo/muslrust:1.80.0-stable AS builder
 
 WORKDIR /build
 
