@@ -166,6 +166,7 @@ pub async fn get_instance(
 
     match v {
         Ok(result) => {
+            println!("Result: {:?}",result);
             println!("Found {} instances", result.len());
             for instance in &result {
                 println!("Instance: {}", instance.instance_name);
