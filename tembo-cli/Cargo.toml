@@ -38,7 +38,7 @@ home = "0.5.5"
 semver = "1.0.18"
 mockall = "0.11.4"
 toml = "0.7.6"
-chrono = { version = "0.4.38", features = ["serde"] }
+chrono = { version = "0.4.29", features = ["serde"] }
 simplelog = { version = "^0.12.1", features = ["paris"] }
 clerk-rs = "0.1.7"
 jsonwebtoken = "8.3.0"

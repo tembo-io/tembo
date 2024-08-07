@@ -143,17 +143,17 @@ pub struct LoadableLibrary {
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct TemboTomlConfig {
+    pub environment: String,
     #[serde(rename = "instance_name")]
     pub name: String,
-    pub environment: String,
     pub cpu: String,
     pub memory: String,
     pub storage: String,
     pub replicas: i32,
-    pub stack_type: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub postgres_configurations: Option<HashMap<String, Value>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub extensions: Option<HashMap<String, Extension>>,
+    pub stack_type: String,
     pub pg_version: u8,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub postgres_configurations: Option<HashMap<String, String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub extensions: Option<HashMap<String, HashMap<String, String>>>,
 }
