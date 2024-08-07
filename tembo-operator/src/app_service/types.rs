@@ -9,6 +9,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
+use crate::defaults::default_repository;
+
 pub const COMPONENT_NAME: &str = "appService";
 
 /// StorageConfig is used to configure the storage for the appService.
@@ -46,7 +48,8 @@ pub struct StorageConfig {
 ///  
 ///   appServices:
 ///     - name: postgrest
-///       image: postgrest/postgrest:v10.0.0
+///       repository: postgrest
+///       image: postgrest:v10.0.0
 ///       routing:
 ///       # only expose /rest/v1 and /graphql/v1
 ///         - port: 3000
@@ -90,6 +93,11 @@ pub struct StorageConfig {
 pub struct AppService {
     /// Defines the name of the appService.
     pub name: String,
+
+    /// Repository hosting the Docker image used in this app
+    /// Default: "quay.io/tembo"
+    #[serde(default = "default_repository")]
+    pub repository: String,
 
     /// Defines the container image to use for the appService.
     pub image: String,

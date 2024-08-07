@@ -509,6 +509,7 @@ fn generate_deployment(
     let topology_spread_constraints = placement
         .as_ref()
         .and_then(|p| p.topology_spread_constraints.clone());
+    let image_link = format!("{}/{}", appsvc.repository, appsvc.image);
 
     let pod_spec = PodSpec {
         affinity,
@@ -516,7 +517,7 @@ fn generate_deployment(
             args: appsvc.args.clone(),
             command: appsvc.command.clone(),
             env: Some(env_vars),
-            image: Some(appsvc.image.clone()),
+            image: Some(image_link),
             name: appsvc.name.clone(),
             ports: container_ports,
             resources: Some(appsvc.resources.clone()),

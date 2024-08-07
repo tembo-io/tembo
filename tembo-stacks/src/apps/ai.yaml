@@ -1,6 +1,7 @@
 name: !ai-proxy
 appServices:
-  - image: quay.io/tembo/ai-proxy:2024.06.03
+  - repository: "quay.io/tembo"
+    image: ai-proxy:2024.06.03
     name: ai-proxy
     resources:
       limits:
