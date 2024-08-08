@@ -104,6 +104,6 @@ jobs:
           cd ${{ matrix.path }} && cargo test
         env:
           ORG_ID: ${{ secrets.ORG_ID }}
-          ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+          ACCESS_TOKEN: ${{ secrets.TEMBO_TOKEN_TEST_ORG_DEV }}
           TEMBO_HOST: ${{ secrets.TEMBO_HOST }}
           TEMBO_DATA_HOST: ${{ secrets.TEMBO_DATA_HOST }}
