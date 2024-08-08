@@ -49,10 +49,8 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
     cmd.arg("apply");
     cmd.assert().success();
 
-    let output = cmd.output()?;
-    println!("{:?}", output);
-
     let env = get_current_context()?;
+    println!("{:?}", env);
     let profile = env.clone().selected_profile.unwrap();
     let config = Configuration {
         base_path: profile.get_tembo_host(),
