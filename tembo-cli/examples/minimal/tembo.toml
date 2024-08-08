@@ -1,7 +1,5 @@
 [minimal]
 environment = "prod"
 instance_name = "minimal"
-cpu = "0.25"
-memory = "1Gi"
-storage = "10Gi"
+pg_version = 15
 stack_type = "Standard"

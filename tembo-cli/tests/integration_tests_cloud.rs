@@ -169,34 +169,21 @@ pub async fn get_instance(
     config: &Configuration,
     env: &Environment,
 ) -> Result<Option<Instance>, anyhow::Error> {
-    println!("Searching for instance: {}", instance_name);
-    println!("OrgID: {}", env.org_id.clone().unwrap_or_default());
+    let v = get_all(config, env.org_id.clone().unwrap().as_str()).await;
 
-    let v = get_all(config, env.org_id.clone().unwrap_or_default().as_str()).await;
+    println!("OrgID: {}", env.org_id.clone().unwrap().as_str());
 
     match v {
         Ok(result) => {
-            println!("Result: {:?}", result);
-            println!("Found {} instances", result.len());
-            for instance in &result {
-                println!("Instance: {}", instance.instance_name);
-            }
-
             let maybe_instance = result
                 .iter()
                 .find(|instance| instance.instance_name == instance_name);
 
             if let Some(instance) = maybe_instance {
-                println!("Found matching instance: {}", instance.instance_name);
-                Ok(Some(instance.clone()))
-            } else {
-                println!("No matching instance found for name: {}", instance_name);
-                Ok(None)
+                return Ok(Some(instance.clone()));
             }
         }
-        Err(error) => {
-            eprintln!("Error getting instances: {}", error);
-            Err(anyhow::anyhow!("Failed to get instances: {}", error))
-        }
-    }
+        Err(error) => eprintln!("Error getting instance: {}", error),
+    };
+    Ok(None)
 }
