@@ -652,12 +652,15 @@ fn create_new_instance(
                                 if let Some(error) = json.get("error").and_then(Value::as_str) {
                                     format!("{}: {}", status, error)
                                 } else {
-                                    format!("HTTP Error {}: Unable to extract error message", status)
+                                    format!(
+                                        "HTTP Error {}: Unable to extract error message",
+                                        status
+                                    )
                                 }
                             } else {
                                 format!("HTTP Error {}: {}", status, content)
                             }
-                        },
+                        }
                         _ => format!("Unexpected error: {:?}", e),
                     };
                     Err(error_message)

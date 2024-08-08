@@ -50,7 +50,7 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
     cmd.assert().success();
 
     let output = cmd.output()?;
-    println!("{:?}",output);
+    println!("{:?}", output);
 
     let env = get_current_context()?;
     let profile = env.clone().selected_profile.unwrap();
