@@ -1,5 +1,5 @@
 use anyhow::Context as AnyhowContext;
-use anyhow::Error;
+use anyhow::{Error, Result};
 use clap::Args;
 use colorful::Colorful;
 use controller::apis::postgres_parameters::ConfigValue as ControllerConfigValue;
@@ -624,7 +624,6 @@ fn create_new_instance(
     env: Environment,
 ) -> Result<String, String> {
     let maybe_instance = get_create_instance(value);
-    println!("{:?}", maybe_instance);
 
     match maybe_instance {
         Ok(instance) => {
@@ -643,9 +642,28 @@ fn create_new_instance(
 
                     Ok(result.instance_id)
                 }
-                Err(error) => {
-                    eprintln!("Error creating instance: {}", error);
-                    Err(error.to_string())
+                Err(e) => {
+                    let error_message = match e {
+                        temboclient::apis::Error::ResponseError(resp_err) => {
+                            let status = resp_err.status;
+                            let content = resp_err.content;
+
+                            if let Ok(json) = serde_json::from_str::<Value>(&content) {
+                                if let Some(error) = json.get("error").and_then(Value::as_str) {
+                                    format!("{}: {}", status, error)
+                                } else {
+                                    format!(
+                                        "HTTP Error {}: Unable to extract error message",
+                                        status
+                                    )
+                                }
+                            } else {
+                                format!("HTTP Error {}: {}", status, content)
+                            }
+                        }
+                        _ => format!("Unexpected error: {:?}", e),
+                    };
+                    Err(error_message)
                 }
             }
         }
