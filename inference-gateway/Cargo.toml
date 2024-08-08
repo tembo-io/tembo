@@ -9,6 +9,7 @@ actix-cors = "0.7.0"
 actix-rt = "2.10.0"
 actix-web = "4.5.1"
 anyhow = "1.0.86"
+chrono = "0.4.29"
 env_logger = "0.11.3"
 log = "0.4.21"
 reqwest = { version = "0.12.4", features = ["json"] }
@@ -18,6 +19,8 @@ sqlx = { version = "0.7.4",  features = [ "runtime-tokio-native-tls", "postgres"
 thiserror = "1.0.60"
 tokio = { version = "1", features = ["full"] }
 url = "2.5.0"
+uuid = { version = "1.10.0", features = ["v4"] }
+pgmq = "0.28.2"
 
 [dev-dependencies]
 actix-http = "3.6.0"
