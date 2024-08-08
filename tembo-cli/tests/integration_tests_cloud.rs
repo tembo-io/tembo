@@ -49,8 +49,18 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
     cmd.arg("apply");
     cmd.assert().success();
 
+    let output = cmd.output()?;
+
+    if output
+        .stdout
+        .windows(b"Error creating instance".len())
+        .any(|window| window == b"Error creating instance")
+    {
+        println!("Output: {}", String::from_utf8_lossy(&output.stdout));
+        panic!("Error: Instance creation failed");
+    }
+
     let env = get_current_context()?;
-    println!("{:?}", env);
     let profile = env.clone().selected_profile.unwrap();
     let config = Configuration {
         base_path: profile.get_tembo_host(),
@@ -166,7 +176,7 @@ pub async fn get_instance(
 
     match v {
         Ok(result) => {
-            println!("Result: {:?}",result);
+            println!("Result: {:?}", result);
             println!("Found {} instances", result.len());
             for instance in &result {
                 println!("Instance: {}", instance.instance_name);
