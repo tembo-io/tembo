@@ -33,13 +33,14 @@ pub async fn get_usage(
           organization_id,
           instance_id,
           duration_ms,
-          prompt_tokens,
-          completion_tokens,
+          SUM(prompt_tokens) as prompt_tokens,
+          SUM(completion_tokens) as completion_tokens,
           model,
           completed_at
         FROM inference.requests
         WHERE
           completed_at >= $1 AND completed_at < $2
+        GROUP BY organization_id, instance_id
         "#,
         start_time,
         end_time
@@ -52,17 +53,25 @@ pub async fn get_usage(
 
 pub fn rows_to_events(rows: Vec<UsageData>) -> Vec<Events> {
     rows.into_iter()
-        .map(|row| Events {
-            idempotency_key: Uuid::new_v4().to_string(),
-            organization_id: row.organization_id,
-            instance_id: row.instance_id,
-            payload: Payload {
-                completed_at: row.completed_at.to_string(),
-                duration_ms: row.duration_ms,
-                model: row.model,
-                prompt_tokens: row.prompt_tokens.to_string(),
-                completion_tokens: row.completion_tokens.to_string(),
-            },
+        .map(|row|{
+            // Parse the completed_at string into a DateTime<Utc> and convert to hour
+            let completed_at = DateTime::parse_from_rfc3339(&row.completed_at)
+                .expect("Failed to parse completed_at")
+                .with_timezone(&Utc)
+                .format("%Y%m%d%H").to_string();
+
+            Events {
+                idempotency_key: format!("{}-{}-{}", row.instance_id, row.model, timestamp_to_hour);,
+                organization_id: row.organization_id,
+                instance_id: row.instance_id,
+                payload: Payload {
+                    completed_at: row.completed_at.to_string(),
+                    duration_ms: row.duration_ms,
+                    model: row.model,
+                    prompt_tokens: row.prompt_tokens.to_string(),
+                    completion_tokens: row.completion_tokens.to_string(),
+                },
+            }
         })
         .collect()
 }
