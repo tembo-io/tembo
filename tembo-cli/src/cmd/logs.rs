@@ -398,6 +398,7 @@ mod tests {
         cmd.arg("--name");
         cmd.arg("local");
         cmd.assert().success();
+        //comment
 
         // tembo apply
         let mut cmd = Command::cargo_bin(CARGO_BIN)?;
