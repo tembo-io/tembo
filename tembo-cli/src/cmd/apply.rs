@@ -945,7 +945,7 @@ fn get_extensions(
                     database: Some("postgres".to_string()),
                     schema: None,
                     version: version,
-                    enabled: extension.enabled,
+                    enabled: extension.enabled.is_some(),
                 }];
 
             vec_extensions.push(Extension {
@@ -971,7 +971,7 @@ fn get_extensions_controller(
                 database: String::new(),
                 schema: None,
                 version: None,
-                enabled: extension.enabled,
+                enabled: extension.enabled.is_some(),
             });
 
             vec_extensions.push(ControllerExtension {
