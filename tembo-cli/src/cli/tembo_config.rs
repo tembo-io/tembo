@@ -103,15 +103,10 @@ fn default_extensions() -> Option<HashMap<String, Extension>> {
     Some(HashMap::new())
 }
 
-fn default_as_true() -> bool {
-    true
-}
-
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct Extension {
     pub version: Option<String>,
-    #[serde(default = "default_as_true")]
-    pub enabled: bool,
+    pub enabled: Option<bool>,
     pub trunk_project: Option<String>,
     pub trunk_project_version: Option<String>,
 }
@@ -139,21 +134,4 @@ pub struct TrunkExtension {
 pub struct LoadableLibrary {
     pub library_name: String,
     pub priority: i32,
-}
-
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub struct TemboTomlConfig {
-    pub environment: String,
-    #[serde(rename = "instance_name")]
-    pub name: String,
-    pub cpu: String,
-    pub memory: String,
-    pub storage: String,
-    pub replicas: i32,
-    pub stack_type: String,
-    pub pg_version: u8,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub postgres_configurations: Option<HashMap<String, String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub extensions: Option<HashMap<String, HashMap<String, String>>>,
 }
