@@ -3,9 +3,9 @@ description: A Postgres instance equipped with configuration and extensions for 
 repository: "quay.io/tembo"
 organization: tembo
 images:
-  14: "dw-cnpg:14-023bf95"
-  15: "dw-cnpg:15-023bf95"
-  16: "dw-cnpg:16-023bf95"
+  14: "dw-cnpg:14-c19d507"
+  15: "dw-cnpg:15-c19d507"
+  16: "dw-cnpg:16-c19d507"
 stack_version: 0.1.0
 postgres_config_engine: olap
 postgres_config:
