@@ -1,9 +1,9 @@
 apiVersion: coredb.io/v1alpha1
 kind: CoreDB
 metadata:
-  name: tembo-dw
+  name: sample-dw
 spec:
-  image: quay.io/tembo/dw-cnpg:15-a0a5ab5
+  image: quay.io/tembo/dw-cnpg:15-023bf95
   stack:
     name: DataWarehouse
   runtime_config:
@@ -43,7 +43,7 @@ spec:
     - name: multicorn 
       version: 2.5.0
     - name: pg_tier 
-      version: 0.0.3
+      version: 0.0.5
   extensions:
     - name: pg_stat_statements
       locations:
@@ -71,7 +71,7 @@ spec:
       locations:
       - database: postgres
         enabled: true
-        version: '1.1'
+        version: '0.4'
     - name: redis_fdw
       description: redis_fdw
       locations:
@@ -95,4 +95,4 @@ spec:
       locations:
       - database: postgres
         enabled: true
-        version:  0.0.3
+        version:  0.0.5
