@@ -33,7 +33,7 @@ pub mod prometheus {
     pub struct MetricLabels {
         pub instance_id: Option<String>,
         pub pod: Option<String>,
-        pub namespace: Option<String>,
+        pub server_name: Option<String>,
     }
 
     fn custom_deserialize_tuple<'de, D>(deserializer: D) -> Result<(i64, i64), D::Error>
@@ -144,7 +144,7 @@ mod tests {
         "result": [
           {
             "metric": {
-              "namespace": "api"
+              "server_name": "api.data-1.use1.tembo-development.com"
             },
             "value": [
               1721419629.355,
@@ -153,7 +153,7 @@ mod tests {
           },
           {
             "metric": {
-              "namespace": "basically-present-wolfhound"
+              "server_name": "basically-present-wolfhound.data-1.use1.tembo-development.com"
             },
             "value": [
               1721419629.355,
@@ -162,7 +162,7 @@ mod tests {
           },
           {
             "metric": {
-              "namespace": "blandly-jovial-limpet"
+              "server_name": "blandly-jovial-limpet.data-1.use1.tembo-development.com"
             },
             "value": [
               1721419629.355,
@@ -171,7 +171,7 @@ mod tests {
           },
           {
             "metric": {
-              "namespace": "collectively-righteous-doggo"
+              "server_name": "collectively-righteous-doggo.data-1.use1.tembo-development.com"
             },
             "value": [
               1721419629.355,
@@ -180,7 +180,7 @@ mod tests {
           },
           {
             "metric": {
-              "namespace": "damnably-chunky-peafowl"
+              "server_name": "damnably-chunky-peafowl.data-1.use1.tembo-development.com"
             },
             "value": [
               1721419629.355,
@@ -189,7 +189,7 @@ mod tests {
           },
           {
             "metric": {
-              "namespace": "quickly-chipper-lizard"
+              "server_name": "quickly-chipper-lizard.data-1.use1.tembo-development.com"
             },
             "value": [
               1721419629.355,
@@ -198,7 +198,7 @@ mod tests {
           },
           {
             "metric": {
-              "namespace": "chipperly-resilient-cat"
+              "server_name": "chipperly-resilient-cat.data-1.use1.tembo-development.com"
             },
             "value": [
               1721419629.355,
@@ -248,7 +248,7 @@ mod tests {
                         metric: MetricLabels {
                             instance_id: Some("inst_0000000000000_AAAA0_1".into()),
                             pod: Some("org-dummt-inst-dummy1".into()),
-                            namespace: None,
+                            server_name: None,
                         },
                         value: (1713365010, 0),
                     },
@@ -256,7 +256,7 @@ mod tests {
                         metric: MetricLabels {
                             instance_id: Some("inst_0000000000001_AAAB0_1".into()),
                             pod: Some("org-dummy-2-inst-dummy-1".into()),
-                            namespace: None,
+                            server_name: None,
                         },
                         value: (1713365023, 1005),
                     },
@@ -264,7 +264,7 @@ mod tests {
                         metric: MetricLabels {
                             instance_id: Some("inst_0000000000001_AAAB0_1".into()),
                             pod: Some("org-dummy-2-inst-dummy-1".into()),
-                            namespace: None,
+                            server_name: None,
                         },
                         value: (1713365023, 1006),
                     },
@@ -288,7 +288,7 @@ mod tests {
                         metric: MetricLabels {
                             instance_id: None,
                             pod: None,
-                            namespace: Some("api".into()),
+                            server_name: Some("api.data-1.use1.tembo-development.com".into()),
                         },
                         value: (1721419629, 1),
                     },
@@ -296,7 +296,10 @@ mod tests {
                         metric: MetricLabels {
                             instance_id: None,
                             pod: None,
-                            namespace: Some("basically-present-wolfhound".into()),
+                            server_name: Some(
+                                "basically-present-wolfhound.data-1.use1.tembo-development.com"
+                                    .into(),
+                            ),
                         },
                         value: (1721419629, 5),
                     },
@@ -304,7 +307,9 @@ mod tests {
                         metric: MetricLabels {
                             instance_id: None,
                             pod: None,
-                            namespace: Some("blandly-jovial-limpet".into()),
+                            server_name: Some(
+                                "blandly-jovial-limpet.data-1.use1.tembo-development.com".into(),
+                            ),
                         },
                         value: (1721419629, 9),
                     },
@@ -312,7 +317,10 @@ mod tests {
                         metric: MetricLabels {
                             instance_id: None,
                             pod: None,
-                            namespace: Some("collectively-righteous-doggo".into()),
+                            server_name: Some(
+                                "collectively-righteous-doggo.data-1.use1.tembo-development.com"
+                                    .into(),
+                            ),
                         },
                         value: (1721419629, 1),
                     },
@@ -320,7 +328,9 @@ mod tests {
                         metric: MetricLabels {
                             instance_id: None,
                             pod: None,
-                            namespace: Some("damnably-chunky-peafowl".into()),
+                            server_name: Some(
+                                "damnably-chunky-peafowl.data-1.use1.tembo-development.com".into(),
+                            ),
                         },
                         value: (1721419629, 2),
                     },
@@ -328,7 +338,9 @@ mod tests {
                         metric: MetricLabels {
                             instance_id: None,
                             pod: None,
-                            namespace: Some("quickly-chipper-lizard".into()),
+                            server_name: Some(
+                                "quickly-chipper-lizard.data-1.use1.tembo-development.com".into(),
+                            ),
                         },
                         value: (1721419629, 1),
                     },
@@ -336,7 +348,9 @@ mod tests {
                         metric: MetricLabels {
                             instance_id: None,
                             pod: None,
-                            namespace: Some("chipperly-resilient-cat".into()),
+                            server_name: Some(
+                                "chipperly-resilient-cat.data-1.use1.tembo-development.com".into(),
+                            ),
                         },
                         value: (1721419629, 154),
                     },
@@ -356,7 +370,7 @@ mod tests {
                 metric: MetricLabels {
                     instance_id: Some(format!("inst_{}", i)),
                     pod: Some(format!("pod_{}", i)),
-                    namespace: None,
+                    server_name: None,
                 },
                 value: (i as i64, i as i64),
             });
@@ -400,7 +414,7 @@ mod tests {
                 metric: MetricLabels {
                     instance_id: Some(format!("inst_{}", i)),
                     pod: Some(format!("pod_{}", i)),
-                    namespace: None,
+                    server_name: None,
                 },
                 value: (i as i64, i as i64),
             });

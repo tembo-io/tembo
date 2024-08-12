@@ -62,7 +62,7 @@ impl ExprVisitor for NamespaceVisitor {
             }
             Expr::MatrixSelector(matrix_selector) => {
                 let authorized_query =
-                    validate_vector_selector(&self.namespace, &matrix_selector.vector_selector);
+                    validate_vector_selector(&self.namespace, &matrix_selector.vs);
                 if !authorized_query {
                     return Ok(false);
                 }

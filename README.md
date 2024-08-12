@@ -19,7 +19,7 @@ Postgres is the best OSS database in the world, with millions of active deployme
 * [Tembo Dataplane Web Server](https://github.com/tembo-io/tembo/tree/main/dataplane-webserver) - reports readiness and liviness of Postgres instances in a data plane
 * [Tembo Pod Init](https://github.com/tembo-io/tembo/tree/main/tembo-pod-init) - allows us to bootstrap the folder structure needed to add our required mutability
 * [Tembo Conductor](https://github.com/tembo-io/tembo/tree/main/conductor) - runs in the dataplane; receive desired states from control plane and reports back status
-* [Tembo LLM Inference Server](https://github.com/tembo-io/tembo/tree/main/inference-server) - a LLM hosting service that is built on top of [vLLM](https://github.com/vllm-project/vllm) with usage tracking
+* [Tembo LLM Inference Server](https://github.com/tembo-io/tembo/tree/main/inference-gateway) - a LLM hosting service that is built on top of [vLLM](https://github.com/vllm-project/vllm) with usage tracking
 
 ## Our other open-source projects 
 

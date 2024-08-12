@@ -1,5 +1,5 @@
 use crate::apis::coredb_types::CoreDB;
-use crate::cloudnativepg::cnpg::{get_cluster, get_pooler, get_scheduled_backup};
+use crate::cloudnativepg::cnpg::{get_cluster, get_pooler, get_scheduled_backups};
 use crate::cloudnativepg::poolers::Pooler;
 use crate::cloudnativepg::scheduledbackups::ScheduledBackup;
 use crate::Error;
@@ -51,8 +51,8 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
         }
     };
 
-    let scheduled_backup = get_scheduled_backup(cdb, ctx.clone()).await;
-    if scheduled_backup.is_none() {
+    let scheduled_backups = get_scheduled_backups(cdb, ctx.clone()).await;
+    if scheduled_backups.is_empty() {
         warn!(
             "ScheduledBackup {} does not exist or backups are disabled. Proceeding without it...",
             name
@@ -154,7 +154,7 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
     });
 
     // Update ScheduledBackup if it exists
-    if let Err(action) = update_scheduled_backup(&scheduled_backup, cdb, ctx).await {
+    if let Err(action) = update_scheduled_backups(&scheduled_backups, cdb, ctx).await {
         warn!(
             "Error updating scheduled backup for {}. Requeuing...",
             cdb.name_any()
@@ -265,16 +265,25 @@ async fn update_pooler_instances(
     Ok(())
 }
 
-async fn update_scheduled_backup(
-    scheduled_backup: &Option<ScheduledBackup>,
+async fn update_scheduled_backups(
+    scheduled_backups: &[ScheduledBackup],
     cdb: &CoreDB,
     ctx: &Arc<Context>,
 ) -> Result<(), Action> {
     let name = cdb.name_any();
 
-    if let Some(sb) = scheduled_backup {
+    if scheduled_backups.is_empty() {
+        info!(
+            "Skipping ScheduledBackup operations as none exist for {}",
+            name
+        );
+        return Ok(());
+    }
+
+    let scheduled_backup_value = cdb.spec.stop;
+
+    for sb in scheduled_backups {
         let scheduled_backup_suspend_status = sb.spec.suspend.unwrap_or_default();
-        let scheduled_backup_value = cdb.spec.stop;
 
         if scheduled_backup_suspend_status != scheduled_backup_value {
             let patch_scheduled_backup_spec = json!({
@@ -287,25 +296,26 @@ async fn update_scheduled_backup(
                 Ok(_) => {
                     info!(
                         "Toggled scheduled backup suspend of {} to '{}'",
-                        name, scheduled_backup_value
+                        sb.metadata.name.as_ref().unwrap_or(&name),
+                        scheduled_backup_value
                     );
                 }
                 Err(e) => {
-                    error!("Failed to update ScheduledBackup for {}: {:?}", name, e);
+                    error!(
+                        "Failed to update ScheduledBackup {}: {:?}",
+                        sb.metadata.name.as_ref().unwrap_or(&name),
+                        e
+                    );
                     return Err(requeue_normal_with_jitter());
                 }
             }
         } else {
             debug!(
                 "ScheduledBackup suspend for {} already set to {}. No update needed.",
-                name, scheduled_backup_value
+                sb.metadata.name.as_ref().unwrap_or(&name),
+                scheduled_backup_value
             );
         }
-    } else {
-        info!(
-            "Skipping ScheduledBackup operations as it doesn't exist for {}",
-            name
-        );
     }
 
     Ok(())
