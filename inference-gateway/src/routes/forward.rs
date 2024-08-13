@@ -21,12 +21,16 @@ pub async fn forward_request(
     let x_tembo_org = if let Some(header) = headers.get("X-TEMBO-ORG") {
         header.to_str().unwrap()
     } else {
-        return Err(AuthError::Forbidden("Missing request headers".to_string()).into());
+        return Err(
+            AuthError::Forbidden("Missing request header `X-TEMBO-ORG`".to_string()).into(),
+        );
     };
     let x_tembo_inst = if let Some(header) = headers.get("X-TEMBO-INSTANCE") {
         header.to_str().unwrap()
     } else {
-        return Err(AuthError::Forbidden("Missing request headers".to_string()).into());
+        return Err(
+            AuthError::Forbidden("Missing request header `X-TEMBO-INSTANCE`".to_string()).into(),
+        );
     };
 
     if config.org_auth_enabled {
@@ -37,6 +41,9 @@ pub async fn forward_request(
     }
 
     let path = req.uri().path();
+    if path.contains("embeddings") {
+        return Ok(HttpResponse::BadRequest().body("Embedding generation is not yet supported"));
+    }
 
     let mut new_url = config.llm_service_host_port.clone();
     new_url.set_path(path);
