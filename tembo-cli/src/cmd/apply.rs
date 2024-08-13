@@ -944,7 +944,7 @@ fn get_extensions(
                 vec![ExtensionInstallLocation {
                     database: Some("postgres".to_string()),
                     schema: None,
-                    version: Some(version),
+                    version,
                     enabled: extension.enabled.unwrap_or(false),
                 }];
 
