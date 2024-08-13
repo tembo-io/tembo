@@ -944,7 +944,7 @@ fn get_extensions(
                 vec![ExtensionInstallLocation {
                     database: Some("postgres".to_string()),
                     schema: None,
-                    version: version,
+                    version: Some(version),
                     enabled: extension.enabled.unwrap_or(false),
                 }];
 
@@ -1002,7 +1002,7 @@ fn get_trunk_installs(
             if extension.trunk_project.is_some() {
                 vec_trunk_installs.push(TrunkInstall {
                     name: extension.trunk_project.unwrap(),
-                    version: version,
+                    version: Some(version),
                 });
             }
         }
