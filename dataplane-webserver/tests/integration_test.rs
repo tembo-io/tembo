@@ -9,8 +9,9 @@ mod tests {
     use actix_web::test;
     use dataplane_webserver::config;
     use dataplane_webserver::routes::health::{lively, ready};
-    use dataplane_webserver::routes::{metrics, root};
+    use dataplane_webserver::routes::{metrics, root, secrets};
     use reqwest::Url;
+    use serde_json::{Value,json};
 
     #[actix_web::test]
     async fn test_probes() {
@@ -152,4 +153,58 @@ mod tests {
         let resp = test::call_service(&app, req).await;
         assert!(resp.status().is_success());
     }
+
+    #[actix_web::test]
+    async fn test_get_secret_v1() {
+        let cfg = config::Config::default();
+        let http_client = reqwest::Client::builder()
+            .build()
+            .expect("Failed to create HTTP client");
+    
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(cfg.clone()))
+                .app_data(web::Data::new(http_client.clone()))
+                .service(
+                    web::scope("/api/v1/orgs/{org_id}/instances/{instance_id}")
+                        .service(secrets::get_secret_v1)
+                ),
+        )
+        .await;
+    
+        let jwt = "Bearer eyJhbGciOiJSUzI1NiIsImNhdCI6ImNsX0I3ZDRQRDIyMkFBQSIsImtpZCI6Imluc18yUDJhR2Ezb1ZkZGVISmtpeG43bXdlYXpNaHciLCJ0eXAiOiJKV1QifQ.eyJhenAiOiJodHRwczovL2Nsb3VkLnRlbWJvLmlvIiwiZXhwIjoxNzIzNTk5Mjk0LCJpYXQiOjE3MjM1MTI4OTQsImlzcyI6Imh0dHBzOi8vY2xlcmsudGVtYm8uaW8iLCJqdGkiOiI1YmFjYTViZTIzYTU3OTQ1NzBjYyIsIm5iZiI6MTcyMzUxMjg4OSwib3JnX2lkIjoib3JnXzJYNkZLVzVOZzBUZnEwOGJ5MzJwZng1R05hcSIsIm9yZ19yb2xlIjoiYWRtaW4iLCJvcmdfc2x1ZyI6InVjIiwib3JnYW5pemF0aW9ucyI6eyJvcmdfMlg2RktXNU5nMFRmcTA4YnkzMnBmeDVHTmFxIjoiYWRtaW4ifSwic2lkIjoiYXBpLXRva2VuIiwic3ViIjoidXNlcl8yWDZGSjJKbGtXdUpjdkdNYm5tNmJkYU5Ld1cifQ.T8uGuzwAkU5rfJrT08H7MBWMOZ86Cqw41RvjQ7pPFRMRiAyA7zTRvxOPWjs3TwSzNDTFr9lVeiIfSJ6RHDKmxYfCrFzipoylDuGmWukgOBRZzsitjfixPX6eC0h4AGvDVEoMPHxMes-GsO9XNdx-PgRnvYwEuQ6aSmYs4BS_YSMRNNG2AvavvEah4gzYWkC0v6ubhPy86DR35CIUkEniHaqz6RprYe2dW8QceLZ9YQLIOL3SEDjiLXBIs29hJMXM-b1TewcM4OTd8Xc6UDKOyPhsCmEH5SsHo7TepRQLODd_3FfmNwC7Mbu2dP4YbK_RAS88EhtgQ98IfPCdtBQG4g";
+        let org_id = "org_2X6FKW5Ng0Tfq08by32pfx5GNaq";
+        let instance_id = "inst_1723054469096_bNPpJJ_3";
+    
+        let req = test::TestRequest::get()
+            .uri(&format!("/api/v1/orgs/{}/instances/{}/secrets", org_id, instance_id))
+            .insert_header(("Authorization", jwt))
+            .to_request();
+    
+        let resp = test::call_service(&app, req).await;
+        
+        assert!(resp.status().is_success());
+    
+        // Optionally, you can check the response body
+        let body: Value = test::read_body_json(resp).await;
+        
+        // Add assertions based on the expected response structure
+        assert!(body.is_array());
+        assert!(!body.as_array().unwrap().is_empty());
+    
+        // You might want to check for specific secrets if you know they should be present
+        let secret_names: Vec<String> = body
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| s["name"].as_str().unwrap().to_string())
+            .collect();
+    
+        assert!(secret_names.contains(&"app-role".to_string()));
+        assert!(secret_names.contains(&"readonly-role".to_string()));
+        assert!(secret_names.contains(&"superuser-role".to_string()));
+        assert!(secret_names.contains(&"certificate".to_string()));
+    }
+
+
 }
