@@ -4405,7 +4405,7 @@ dependencies = [
 
 [[package]]
 name = "temboclient"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "reqwest",
  "serde",
