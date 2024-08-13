@@ -1002,7 +1002,7 @@ fn get_trunk_installs(
             if extension.trunk_project.is_some() {
                 vec_trunk_installs.push(TrunkInstall {
                     name: extension.trunk_project.unwrap(),
-                    version: Some(version),
+                    version,
                 });
             }
         }
