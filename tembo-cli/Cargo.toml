@@ -1,7 +1,7 @@
 workspace = { members = ["temboclient", "tembodataclient"] }
 [package]
 name = "tembo-cli"
-version = "0.20.5"
+version = "0.20.6"
 edition = "2021"
 authors = ["Tembo.io"]
 description = "The CLI for Tembo"
