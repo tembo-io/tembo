@@ -250,6 +250,12 @@ pub async fn reconcile_postgres_ing_route_tcp(
     middleware_names: Vec<String>,
     delete: bool,
 ) -> Result<(), OperatorError> {
+    // Check if the basedomain is set
+    if basedomain.is_empty() {
+        debug!("Base domain is not set. Skipping IngressRouteTCP reconciliation.");
+        return Ok(());
+    }
+
     let client = ctx.client.clone();
     // Initialize kube api for ingress route tcp
     let ingress_route_tcp_api: Api<IngressRouteTCP> = Api::namespaced(client, namespace);

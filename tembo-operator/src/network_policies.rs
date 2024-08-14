@@ -381,7 +381,7 @@ async fn lookup_kubernetes_api_ips(client: &Client) -> Result<Vec<String>, Actio
     Ok(results)
 }
 
-async fn apply_network_policy(
+pub async fn apply_network_policy(
     namespace: &str,
     np_api: &Api<NetworkPolicy>,
     np: Value,

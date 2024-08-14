@@ -2135,6 +2135,42 @@ spec:
                         type: object
                     type: object
                 type: object
+              dedicated_networking:
+                description: |-
+                  Configuration for dedicated networking.
+
+                  **Default**: disabled
+                nullable: true
+                properties:
+                  enabled:
+                    default: false
+                    description: |-
+                      Enable dedicated networking for the CoreDB instance.
+
+                      **Default**: false.
+                    type: boolean
+                  include_standby:
+                    default: false
+                    description: |-
+                      Include a separate load balancer for the standby (replica) server.
+
+                      **Default**: false.
+                    type: boolean
+                  public:
+                    default: false
+                    description: |-
+                      Configure the load balancer to be public or private.
+
+                      **Default**: false.
+                    type: boolean
+                  service_type:
+                    default: LoadBalancer
+                    description: |-
+                      The type of Kubernetes Service to create (LoadBalancer or ClusterIP).
+
+                      **Default**: LoadBalancer.
+                    type: string
+                type: object
               extensions:
                 default: []
                 description: |-

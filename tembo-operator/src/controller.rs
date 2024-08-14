@@ -23,6 +23,7 @@ use crate::{
     psql::{PsqlCommand, PsqlOutput},
     secret::{reconcile_postgres_role_secret, reconcile_secret},
     telemetry, Error, Metrics, Result,
+    dedicated_networking::reconcile_dedicated_networking,
 };
 use k8s_openapi::{
     api::core::v1::{Namespace, Pod},
@@ -276,6 +277,12 @@ impl CoreDB {
                     // IngressRouteTCP does not have expected errors during reconciliation.
                     Action::requeue(Duration::from_secs(300))
                 })?;
+
+                reconcile_dedicated_networking(self, ctx.clone()).await.map_err(|e| {
+                    error!("Error reconciling dedicated networking: {:?}", e);
+                    Action::requeue(Duration::from_secs(300))
+                })?;
+                
 
                 let name_pooler = format!("{}-pooler", self.name_any().as_str());
                 let prefix_pooler = format!("{}-pooler-", self.name_any().as_str());

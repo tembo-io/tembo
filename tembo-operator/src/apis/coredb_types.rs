@@ -365,6 +365,40 @@ pub struct PgBouncer {
     pub resources: Option<PoolerTemplateSpecContainersResources>,
 }
 
+#[derive(Deserialize, Serialize, Clone, Debug, JsonSchema, Default)]
+pub struct DedicatedNetworking {
+    /// Enable dedicated networking for the CoreDB instance.
+    ///
+    /// **Default**: false.
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// Include a separate load balancer for the standby (replica) server.
+    ///
+    /// **Default**: false.
+    #[serde(default)]
+    pub include_standby: bool,
+
+    /// Configure the load balancer to be public or private.
+    ///
+    /// **Default**: false.
+    #[serde(default)]
+    pub public: bool,
+
+    /// The type of Kubernetes Service to create (LoadBalancer or ClusterIP).
+    ///
+    /// **Default**: LoadBalancer.
+    #[serde(default = "defaults::default_service_type")]
+    pub service_type: String,
+}
+
+impl DedicatedNetworking {
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+}
+
+
 /// Generate the Kubernetes wrapper struct `CoreDB` from our Spec and Status struct
 ///
 /// This provides a hook for generating the CRD yaml (in crdgen.rs)
@@ -439,6 +473,12 @@ pub struct CoreDBSpec {
     /// This is no longer used and will be removed in a future release.
     #[serde(default = "defaults::default_postgres_exporter_image")]
     pub postgresExporterImage: String,
+
+    /// Configuration for dedicated networking.
+    ///
+    /// **Default**: disabled
+    #[serde(default)]
+    pub dedicated_networking: Option<DedicatedNetworking>,
 
     /// The port to expose the Postgres service on.
     ///
