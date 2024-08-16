@@ -103,15 +103,10 @@ fn default_extensions() -> Option<HashMap<String, Extension>> {
     Some(HashMap::new())
 }
 
-fn default_as_true() -> bool {
-    true
-}
-
 #[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
 pub struct Extension {
     pub version: Option<String>,
-    #[serde(default = "default_as_true")]
-    pub enabled: bool,
+    pub enabled: Option<bool>,
     pub trunk_project: Option<String>,
     pub trunk_project_version: Option<String>,
 }
