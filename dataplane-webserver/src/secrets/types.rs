@@ -14,7 +14,7 @@ pub struct AvailableSecret {
     pub formatter: SecretNameFormatter,
 }
 
-#[derive(Deserialize, ToSchema)]
+#[derive(Serialize, Deserialize, ToSchema)]
 pub struct PasswordString {
     /// The New Password
     pub password: String,

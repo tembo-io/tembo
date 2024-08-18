@@ -12,6 +12,7 @@ mod tests {
     use dataplane_webserver::routes::{metrics, root, secrets};
     use reqwest::Url;
     use serde_json::{Value,json};
+    use dataplane_webserver::secrets::types::PasswordString;
 
     #[actix_web::test]
     async fn test_probes() {
@@ -200,6 +201,18 @@ mod tests {
             .trim_start_matches("http://localhost")
             .to_string()
     }
+
+    fn format_update_postgres_password(org_id: &str, instance_id: &str, secret_name: &str) -> String {
+        let url = format!(
+            "http://localhost/api/v1/orgs/{}/instances/{}/secrets/{}",
+            org_id, instance_id, secret_name
+        );
+        Url::parse(url.as_str())
+            .expect("Failed to format URL")
+            .to_string()
+            .trim_start_matches("http://localhost")
+            .to_string()
+    }
     
 
     #[actix_web::test]
@@ -228,6 +241,40 @@ mod tests {
 
         // Print the body
         println!("{:?}", body);
+        panic!("Testing out");
+
+
+        }
+
+    #[actix_web::test]
+    async fn test_update_secret() {
+        let cfg = config::Config::default();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(cfg.clone()))
+                .service(web::scope("/api/v1/orgs/{org_id}/instances/{instance_id}")
+                    .service(secrets::update_postgres_password)),
+        )
+        .await;
+
+        // Test valid request
+        let url = format_update_postgres_password(
+            "org_2a8iaiQUhH66QjY11FH9lgKxyBr",
+            "inst_1721747309879_2NpSYd_23",
+            "readonly-role",
+        );
+        let req = test::TestRequest::get().uri(url.as_str()).insert_header(("Authorization", "Bearer eyJhbGciOiJSUzI1NiIsImNhdCI6ImNsX0I3ZDRQRDIyMkFBQSIsImtpZCI6Imluc18yTnh4R3NWRmMzZGRCeGZWZUo0UjU1dzFsVEciLCJ0eXAiOiJKV1QifQ.eyJhenAiOiJodHRwczovL2Nsb3VkLmNkYi1kZXYuY29tIiwiZXhwIjoxNzI0MTA1Njg2LCJpYXQiOjE3MjQwMTkyODYsImlzcyI6Imh0dHBzOi8vZXZvbHZpbmctYmxvd2Zpc2gtNzMuY2xlcmsuYWNjb3VudHMuZGV2IiwianRpIjoiOWNkZTUyNjE2YzY5NmU5M2E0ZDgiLCJuYmYiOjE3MjQwMTkyODEsIm9yZ19pZCI6Im9yZ18yYThpYWlRVWhINjZRalkxMUZIOWxnS3h5QnIiLCJvcmdfcm9sZSI6ImFkbWluIiwib3JnX3NsdWciOiJqb3NoIiwib3JnYW5pemF0aW9ucyI6eyJvcmdfMmE4aWFpUVVoSDY2UWpZMTFGSDlsZ0t4eUJyIjoiYWRtaW4ifSwic2lkIjoiYXBpLXRva2VuIiwic3ViIjoidXNlcl8yYThpWThjR0trVTBFbmwxYkdVVVpDT3UwNm8ifQ.s3K2DszKpSoleghb0uFUJVbAy0VswYIC3cLFSFkHT742eh941wXb79b6Ay0pnY9RtnL3BF8vCFaPuK2ZIZH3HOtEiFM26X1MCA1tF1BI74pwKOn8MPNdT5Rg2eoDTgkqgGNrwhZaZON96LlruNWTkSrpRa3jdvNji_yL8hmCpZ8uqcO9Mqq2xQZlzw2C1Tvmo6BuWjvg4uswy5_wFURX48w25CJbe9msn5NVmXBoyuiTXqzc6yQoUX0fTDIgAMWCiNlnfpL7rKxvN5Sa8fzB190cUYzPcmaQwPb9bPv2ij6cYI3RhPxxNaQdqvmUjlzAzv09K3Mi24YzUIHqPPqCLw")).set_json(&PasswordString {
+            password: "aerthaergeargaergaergaergaergaer".to_string(),  // Example new password
+        }).to_request();
+        let resp = test::call_service(&app, req).await;
+
+        // Extract the body
+        let body = test::read_body(resp).await;
+
+        // Print the body
+        println!("{:?}", body);
+        panic!("Testing out");
 
 
         }
