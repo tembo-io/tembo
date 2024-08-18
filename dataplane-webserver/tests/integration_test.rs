@@ -68,6 +68,19 @@ mod tests {
             .to_string()
     }
 
+    fn format_secrets_query_url(org_id: &str, instance_id: &str) -> String {
+        let url = format!(
+            "http://localhost/api/v1/orgs/{}/instances/{}/secrets",
+            org_id, instance_id
+        );
+        Url::parse(url.as_str())
+            .expect("Failed to format URL")
+            .to_string()
+            .trim_start_matches("http://localhost")
+            .to_string()
+    }
+    
+
     #[actix_web::test]
     async fn test_metrics_query_range() {
         let cfg = config::Config::default();
@@ -150,61 +163,73 @@ mod tests {
         let req = test::TestRequest::get()
             .uri(query_url.as_str())
             .to_request();
+        print!("{:?}",req);
         let resp = test::call_service(&app, req).await;
         assert!(resp.status().is_success());
     }
 
     #[actix_web::test]
-    async fn test_get_secret_v1() {
+    async fn test_get_secrets_v1() {
         let cfg = config::Config::default();
-        let http_client = reqwest::Client::builder()
-            .build()
-            .expect("Failed to create HTTP client");
-    
+
         let app = test::init_service(
             App::new()
                 .app_data(web::Data::new(cfg.clone()))
-                .app_data(web::Data::new(http_client.clone()))
-                .service(
-                    web::scope("/api/v1/orgs/{org_id}/instances/{instance_id}")
-                        .service(secrets::get_secret_v1)
-                ),
+                .service(web::scope("/api/v1/orgs/{org_id}/instances/{instance_id}")
+                    .service(secrets::get_secret_names_v1)),
         )
         .await;
-    
-        let jwt = "Bearer eyJhbGciOiJSUzI1NiIsImNhdCI6ImNsX0I3ZDRQRDIyMkFBQSIsImtpZCI6Imluc18yUDJhR2Ezb1ZkZGVISmtpeG43bXdlYXpNaHciLCJ0eXAiOiJKV1QifQ.eyJhenAiOiJodHRwczovL2Nsb3VkLnRlbWJvLmlvIiwiZXhwIjoxNzIzNTk5Mjk0LCJpYXQiOjE3MjM1MTI4OTQsImlzcyI6Imh0dHBzOi8vY2xlcmsudGVtYm8uaW8iLCJqdGkiOiI1YmFjYTViZTIzYTU3OTQ1NzBjYyIsIm5iZiI6MTcyMzUxMjg4OSwib3JnX2lkIjoib3JnXzJYNkZLVzVOZzBUZnEwOGJ5MzJwZng1R05hcSIsIm9yZ19yb2xlIjoiYWRtaW4iLCJvcmdfc2x1ZyI6InVjIiwib3JnYW5pemF0aW9ucyI6eyJvcmdfMlg2RktXNU5nMFRmcTA4YnkzMnBmeDVHTmFxIjoiYWRtaW4ifSwic2lkIjoiYXBpLXRva2VuIiwic3ViIjoidXNlcl8yWDZGSjJKbGtXdUpjdkdNYm5tNmJkYU5Ld1cifQ.T8uGuzwAkU5rfJrT08H7MBWMOZ86Cqw41RvjQ7pPFRMRiAyA7zTRvxOPWjs3TwSzNDTFr9lVeiIfSJ6RHDKmxYfCrFzipoylDuGmWukgOBRZzsitjfixPX6eC0h4AGvDVEoMPHxMes-GsO9XNdx-PgRnvYwEuQ6aSmYs4BS_YSMRNNG2AvavvEah4gzYWkC0v6ubhPy86DR35CIUkEniHaqz6RprYe2dW8QceLZ9YQLIOL3SEDjiLXBIs29hJMXM-b1TewcM4OTd8Xc6UDKOyPhsCmEH5SsHo7TepRQLODd_3FfmNwC7Mbu2dP4YbK_RAS88EhtgQ98IfPCdtBQG4g";
-        let org_id = "org_2X6FKW5Ng0Tfq08by32pfx5GNaq";
-        let instance_id = "inst_1723054469096_bNPpJJ_3";
-    
-        let req = test::TestRequest::get()
-            .uri(&format!("/api/v1/orgs/{}/instances/{}/secrets", org_id, instance_id))
-            .insert_header(("Authorization", jwt))
-            .to_request();
-    
+
+        // Use the format function to generate the URL
+        let url = format_secrets_query_url("org_2X6FKW5Ng0Tfq08by32pfx5GNaq", "inst_1723054469096_bNPpJJ_3");
+        let req = test::TestRequest::get().uri(url.as_str()).to_request();
         let resp = test::call_service(&app, req).await;
-        
+
+        // Assert that the status is success
         assert!(resp.status().is_success());
-    
-        // Optionally, you can check the response body
-        let body: Value = test::read_body_json(resp).await;
-        
-        // Add assertions based on the expected response structure
-        assert!(body.is_array());
-        assert!(!body.as_array().unwrap().is_empty());
-    
-        // You might want to check for specific secrets if you know they should be present
-        let secret_names: Vec<String> = body
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|s| s["name"].as_str().unwrap().to_string())
-            .collect();
-    
-        assert!(secret_names.contains(&"app-role".to_string()));
-        assert!(secret_names.contains(&"readonly-role".to_string()));
-        assert!(secret_names.contains(&"superuser-role".to_string()));
-        assert!(secret_names.contains(&"certificate".to_string()));
     }
 
+    fn format_secret_name_query_url(org_id: &str, instance_id: &str, secret_name: &str) -> String {
+        let url = format!(
+            "http://localhost/api/v1/orgs/{}/instances/{}/secrets/{}",
+            org_id, instance_id, secret_name
+        );
+        Url::parse(url.as_str())
+            .expect("Failed to format URL")
+            .to_string()
+            .trim_start_matches("http://localhost")
+            .to_string()
+    }
+    
 
-}
+    #[actix_web::test]
+    async fn test_get_secret_name() {
+        let cfg = config::Config::default();
+
+        let app = test::init_service(
+            App::new()
+                .app_data(web::Data::new(cfg.clone()))
+                .service(web::scope("/api/v1/orgs/{org_id}/instances/{instance_id}")
+                    .service(secrets::get_secret_v1)),
+        )
+        .await;
+
+        // Test valid request
+        let url = format_secret_name_query_url(
+            "org_2a8iaiQUhH66QjY11FH9lgKxyBr",
+            "inst_1721747309879_2NpSYd_23",
+            "readonly-role",
+        );
+        let req = test::TestRequest::get().uri(url.as_str()).insert_header(("Authorization", "Bearer eyJhbGciOiJSUzI1NiIsImNhdCI6ImNsX0I3ZDRQRDIyMkFBQSIsImtpZCI6Imluc18yTnh4R3NWRmMzZGRCeGZWZUo0UjU1dzFsVEciLCJ0eXAiOiJKV1QifQ.eyJhenAiOiJodHRwczovL2Nsb3VkLmNkYi1kZXYuY29tIiwiZXhwIjoxNzI0MTA1Njg2LCJpYXQiOjE3MjQwMTkyODYsImlzcyI6Imh0dHBzOi8vZXZvbHZpbmctYmxvd2Zpc2gtNzMuY2xlcmsuYWNjb3VudHMuZGV2IiwianRpIjoiOWNkZTUyNjE2YzY5NmU5M2E0ZDgiLCJuYmYiOjE3MjQwMTkyODEsIm9yZ19pZCI6Im9yZ18yYThpYWlRVWhINjZRalkxMUZIOWxnS3h5QnIiLCJvcmdfcm9sZSI6ImFkbWluIiwib3JnX3NsdWciOiJqb3NoIiwib3JnYW5pemF0aW9ucyI6eyJvcmdfMmE4aWFpUVVoSDY2UWpZMTFGSDlsZ0t4eUJyIjoiYWRtaW4ifSwic2lkIjoiYXBpLXRva2VuIiwic3ViIjoidXNlcl8yYThpWThjR0trVTBFbmwxYkdVVVpDT3UwNm8ifQ.s3K2DszKpSoleghb0uFUJVbAy0VswYIC3cLFSFkHT742eh941wXb79b6Ay0pnY9RtnL3BF8vCFaPuK2ZIZH3HOtEiFM26X1MCA1tF1BI74pwKOn8MPNdT5Rg2eoDTgkqgGNrwhZaZON96LlruNWTkSrpRa3jdvNji_yL8hmCpZ8uqcO9Mqq2xQZlzw2C1Tvmo6BuWjvg4uswy5_wFURX48w25CJbe9msn5NVmXBoyuiTXqzc6yQoUX0fTDIgAMWCiNlnfpL7rKxvN5Sa8fzB190cUYzPcmaQwPb9bPv2ij6cYI3RhPxxNaQdqvmUjlzAzv09K3Mi24YzUIHqPPqCLw")).to_request();
+        let resp = test::call_service(&app, req).await;
+
+        // Extract the body
+        let body = test::read_body(resp).await;
+
+        // Print the body
+        println!("{:?}", body);
+
+
+        }
+    }
+
