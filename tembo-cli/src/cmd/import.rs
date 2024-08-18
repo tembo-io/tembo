@@ -86,7 +86,7 @@ pub fn execute(import_cmd: ImportCommand) -> Result<()> {
 async fn fetch_toml(org_id: &str, instance_id: &str, config: &Configuration) -> Result<String> {
     let client = reqwest::Client::new();
     let url = format!(
-        "http://localhost:8080/api/v1/orgs/{}/instances/{}/toml",
+        "https://api.tembo.io/api/v1/orgs/{}/instances/{}/toml",
         org_id, instance_id
     );
 
