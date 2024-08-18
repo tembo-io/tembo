@@ -73,6 +73,14 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
         if let Some(instance) = maybe_instance {
             println!("Instance is {:?}", instance.state);
             if instance.state == State::Up {
+                let instance_id = get_instance_id(&instance_name, &config, &env).await?;
+                let mut cmd = Command::cargo_bin(CARGO_BIN).unwrap();
+                    cmd.arg("import");
+                    cmd.arg(env.clone().org_id.unwrap());
+                    cmd.arg(instance_id.unwrap());
+                    cmd.assert().success();
+
+                println!("Attempt {}: {:?}",attempt,cmd.output());
                 break;
             }
 
