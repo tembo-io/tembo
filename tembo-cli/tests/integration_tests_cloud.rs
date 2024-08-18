@@ -228,6 +228,14 @@ async fn import_cloud() -> Result<(), Box<dyn Error>> {
     let instance_name = "e2e-import-test";
     setup_env(&instance_name.to_string())?;
 
+    let env = get_current_context()?;
+    let profile = env.clone().selected_profile.unwrap();
+    let config = Configuration {
+        base_path: profile.get_tembo_host(),
+        bearer_access_token: Some(profile.tembo_access_token),
+        ..Default::default()
+    };
+
     // tembo context set --name prod
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
     cmd.arg("context");
@@ -241,7 +249,9 @@ async fn import_cloud() -> Result<(), Box<dyn Error>> {
     cmd.arg("apply");
     cmd.assert().success();
 
-    let output = cmd.output()?;
+    let mut output = cmd.output()?;
+
+    println!("{:?}",output);
 
     if output
         .stdout
@@ -252,15 +262,9 @@ async fn import_cloud() -> Result<(), Box<dyn Error>> {
         panic!("Error: Instance creation failed");
     }
 
-    let env = get_current_context()?;
-    let profile = env.clone().selected_profile.unwrap();
-    let config = Configuration {
-        base_path: profile.get_tembo_host(),
-        bearer_access_token: Some(profile.tembo_access_token),
-        ..Default::default()
-    };
 
     for attempt in 1..=5 {
+        println!("Attempt {}",attempt);
         let maybe_instance = get_instance_id(&instance_name, &config, &env).await?;
         if let Some(instance) = maybe_instance {
             std::fs::write("tembo.toml", "")?;
@@ -270,6 +274,9 @@ async fn import_cloud() -> Result<(), Box<dyn Error>> {
             cmd.arg(env.clone().org_id.unwrap());
             cmd.arg(instance);
             cmd.assert().success();
+
+            output = cmd.output()?;
+            println!("{:?}",output);
 
             let tembo_toml_content = std::fs::read_to_string("tembo.toml")?;
             let expected_content = format!(
