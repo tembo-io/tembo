@@ -73,14 +73,6 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
         if let Some(instance) = maybe_instance {
             println!("Instance is {:?}", instance.state);
             if instance.state == State::Up {
-                let instance_id = get_instance_id(&instance_name, &config, &env).await?;
-                let mut cmd = Command::cargo_bin(CARGO_BIN).unwrap();
-                    cmd.arg("import");
-                    cmd.arg(env.clone().org_id.unwrap());
-                    cmd.arg(instance_id.unwrap());
-                    cmd.assert().success();
-
-                println!("Attempt {}: {:?}",attempt,cmd.output());
                 break;
             }
 
@@ -270,10 +262,11 @@ async fn import_cloud() -> Result<(), Box<dyn Error>> {
         panic!("Error: Instance creation failed");
     }
 
+    let config_clone = config.clone();
+    let jwt = config_clone.bearer_access_token;
+    println!("{:?}",jwt);
 
-    for attempt in 1..=5 {
-        println!("Attempt {}",attempt);
-        let maybe_instance = get_instance_id(&instance_name, &config, &env).await?;
+    let maybe_instance = get_instance_id(&instance_name, &config, &env).await?;
         if let Some(instance) = maybe_instance {
             std::fs::write("tembo.toml", "")?;
 
@@ -301,16 +294,13 @@ async fn import_cloud() -> Result<(), Box<dyn Error>> {
 
             if tembo_toml_content.contains(&expected_content) {
                 println!("Expected content found in tembo.toml");
-                break;
             } else {
                 println!("Expected content not found in tembo.toml. Retrying");
             }
-        } else if attempt == 5 {
+        } else {
             panic!("Failed to import instance");
         }
 
-        tokio::time::sleep(Duration::from_secs(10)).await;
-    }
 
     // tembo delete
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
