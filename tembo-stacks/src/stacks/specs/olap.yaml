@@ -4,8 +4,8 @@ repository: "quay.io/tembo"
 organization: tembo
 images:
   # duckdb is installed into pg16, but not pg14 or pg15 (not compatible)
-  14: "standard-cnpg:14-389a437"
-  15: "standard-cnpg:15-389a437"
+  14: "standard-cnpg:14-5120dd1"
+  15: "standard-cnpg:15-5120dd1"
   16: "analytics-cnpg:16-5120dd1"
 stack_version: 0.1.0
 postgres_config_engine: olap
