@@ -21,6 +21,7 @@ sqlx = "0.8.0"
 utoipa = { version = "3", features = ["actix_extras", "chrono", "indexmap"] }
 utoipa-swagger-ui = { version = "3.1.3", features = ["actix-web"]}
 utoipa-redoc = { version = "0.1.0", features = ["actix-web"] }
+mockall = "0.13.0"
 promql-parser = "0.1.1"
 reqwest = { version = "0.11.18", features = ["json"]}
 lazy_static = "1.4.0"
