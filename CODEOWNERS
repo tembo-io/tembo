@@ -6,5 +6,5 @@ conductor/** @sjmiller609 @nhudson @ianstanton @ChuckHend
 tembo-pod-init/** @nhudson
 tembo-cli/** @shahadarsh @vrmiguel @DarrenBaldwin07 @sjmiller609
 tembo-py/** @chuckhend @EvanHStanton
-tembo-stacks/** @chuckhend @jasonmp85
+tembo-stacks/** @chuckhend @jasonmp85 @shhnwz
 inference-gateway/** @chuckhend @jasonmp85 @shhnwz
