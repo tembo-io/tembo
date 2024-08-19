@@ -8,9 +8,13 @@ use conductor::{
     get_one, get_pg_conn, lookup_role_arn, restart_coredb, types,
 };
 
+use crate::metrics_reporter::run_metrics_reporter;
+use crate::status_reporter::run_status_reporter;
+use conductor::routes::health::background_threads_running;
 use controller::apis::coredb_types::{
     Backup, CoreDBSpec, S3Credentials, ServiceAccountTemplate, VolumeSnapshot,
 };
+use controller::apis::postgres_parameters::{ConfigValue, PgConfig};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use kube::Client;
 use log::{debug, error, info, warn};
@@ -23,10 +27,6 @@ use sqlx::postgres::PgPoolOptions;
 use std::env;
 use std::sync::{Arc, Mutex};
 use std::{thread, time};
-
-use crate::metrics_reporter::run_metrics_reporter;
-use crate::status_reporter::run_status_reporter;
-use conductor::routes::health::background_threads_running;
 use types::{CRUDevent, Event};
 
 mod metrics_reporter;
@@ -303,6 +303,12 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     None => String::from("NA"),
                 };
 
+                include_storage_configuration(
+                    storage_archive_bucket.clone(),
+                    &read_msg,
+                    &mut coredb_spec,
+                );
+
                 let spec = generate_spec(
                     org_id,
                     &stack_type,
@@ -519,6 +525,30 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
             .add(&opentelemetry::Context::current(), 1, &[]);
 
         info!("{}: archived: {:?}", read_msg.msg_id, archived);
+    }
+}
+
+fn include_storage_configuration(
+    storage_archive_bucket: String,
+    read_msg: &Message<CRUDevent>,
+    coredb_spec: &mut CoreDBSpec,
+) {
+    if let Some(write_path) = &read_msg.message.backups_write_path {
+        let extra_pg_config = PgConfig {
+            name: "tembo.storage_bucket_and_path".to_string(),
+            value: ConfigValue::Single(format!("{}/{}", storage_archive_bucket, write_path)),
+        };
+        let mut contains_storage_already = false;
+        let mut current_config = coredb_spec.runtime_config.clone().unwrap_or_default();
+        for config in current_config.iter() {
+            if config.name == "tembo.storage_bucket_and_path" {
+                contains_storage_already = true;
+            }
+        }
+        if !contains_storage_already {
+            current_config.push(extra_pg_config);
+            coredb_spec.runtime_config = Some(current_config);
+        }
     }
 }
 

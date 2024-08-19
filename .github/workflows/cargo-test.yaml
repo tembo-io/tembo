@@ -103,7 +103,7 @@ jobs:
           export PROMETHEUS_URL=https://prometheus-data-1.use1.dev.plat.cdb-svc.com
           cd ${{ matrix.path }} && cargo test
         env:
-          ORG_ID: ${{ secrets.ORG_ID }}
-          ACCESS_TOKEN: ${{ secrets.ACCESS_TOKEN }}
+          ORG_ID: org_2YW4TYIMI1LeOqJTXIyvkHOHCUo 
+          ACCESS_TOKEN: ${{ secrets.TEMBO_TOKEN_TEST_ORG_DEV }}
           TEMBO_HOST: ${{ secrets.TEMBO_HOST }}
           TEMBO_DATA_HOST: ${{ secrets.TEMBO_DATA_HOST }}
