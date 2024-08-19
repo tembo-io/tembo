@@ -6,6 +6,8 @@ use crate::stacks::types::{Stack, StackType};
 use lazy_static::lazy_static;
 
 lazy_static! {
+    pub static ref ANALYTICS: Stack = serde_yaml::from_str(include_str!("specs/analytics.yaml"))
+        .expect("analytics.yaml not found");
     pub static ref API: Stack =
         serde_yaml::from_str(include_str!("specs/api.yaml")).expect("api.yaml not found");
     pub static ref DATAWAREHOUSE: Stack =
@@ -36,6 +38,7 @@ lazy_static! {
 
 pub fn get_stack(entity: StackType) -> Stack {
     match entity {
+        StackType::Analytics => ANALYTICS.clone(),
         StackType::API => API.clone(),
         StackType::DataWarehouse => DATAWAREHOUSE.clone(),
         StackType::Geospatial => GEOSPATIAL.clone(),
