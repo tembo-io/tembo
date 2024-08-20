@@ -53,15 +53,16 @@ pub async fn get_usage(
 
 pub fn rows_to_events(rows: Vec<UsageData>) -> Vec<Events> {
     rows.into_iter()
-        .map(|row|{
+        .map(|row| {
             // Parse the completed_at string into a DateTime<Utc> and convert to hour
-            let completed_at = DateTime::parse_from_rfc3339(&row.completed_at)
-                .expect("Failed to parse completed_at")
+            let completed_at = row
+                .completed_at
                 .with_timezone(&Utc)
-                .format("%Y%m%d%H").to_string();
+                .format("%Y%m%d%H")
+                .to_string();
 
             Events {
-                idempotency_key: format!("{}-{}-{}", row.instance_id, row.model, timestamp_to_hour);,
+                idempotency_key: format!("{}-{}-{}", row.instance_id, row.model, completed_at),
                 organization_id: row.organization_id,
                 instance_id: row.instance_id,
                 payload: Payload {
