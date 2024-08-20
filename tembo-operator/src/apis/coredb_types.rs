@@ -398,7 +398,6 @@ impl DedicatedNetworking {
     }
 }
 
-
 /// Generate the Kubernetes wrapper struct `CoreDB` from our Spec and Status struct
 ///
 /// This provides a hook for generating the CRD yaml (in crdgen.rs)

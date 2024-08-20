@@ -49,7 +49,6 @@ pub fn default_service_type() -> String {
     "LoadBalancer".to_string()
 }
 
-
 pub fn default_postgres_exporter_enabled() -> bool {
     false
 }
