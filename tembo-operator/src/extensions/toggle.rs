@@ -67,7 +67,6 @@ async fn toggle_extensions(
     toggle_these_extensions: Vec<Extension>,
 ) -> Result<Vec<ExtensionStatus>, Action> {
     let current_shared_preload_libraries = list_shared_preload_libraries(cdb, ctx.clone()).await?;
-    // TODO(ianstanton) Don't fetch from this list anymore. Instead, fetch from trunk's extension metadata
     let requires_load =
         extensions_that_require_load(ctx.client.clone(), &cdb.metadata.namespace.clone().unwrap())
             .await?;
