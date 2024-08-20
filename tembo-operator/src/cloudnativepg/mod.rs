@@ -1,8 +1,8 @@
+pub(crate) mod archive;
 pub mod backups;
 pub mod clusters;
 pub(crate) mod cnpg;
-// pub(crate) mod cnpg_backups;
-pub(crate) mod archive;
+pub(crate) mod cnpg_backups;
 pub mod cnpg_utils;
 pub mod hibernate;
 pub(crate) mod placement;

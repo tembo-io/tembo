@@ -26,8 +26,9 @@ use crate::{
             ClusterBackupVolumeSnapshotOnlineConfiguration,
             ClusterBackupVolumeSnapshotSnapshotOwnerReference, ClusterBootstrap,
             ClusterBootstrapInitdb, ClusterBootstrapRecovery,
-            ClusterBootstrapRecoveryRecoveryTarget, ClusterCertificates, ClusterExternalClusters,
-            ClusterExternalClustersBarmanObjectStore,
+            ClusterBootstrapRecoveryRecoveryTarget, ClusterBootstrapRecoveryVolumeSnapshots,
+            ClusterBootstrapRecoveryVolumeSnapshotsStorage, ClusterCertificates,
+            ClusterExternalClusters, ClusterExternalClustersBarmanObjectStore,
             ClusterExternalClustersBarmanObjectStoreS3Credentials,
             ClusterExternalClustersBarmanObjectStoreS3CredentialsAccessKeyId,
             ClusterExternalClustersBarmanObjectStoreS3CredentialsRegion,
@@ -45,6 +46,7 @@ use crate::{
             ClusterServiceAccountTemplate, ClusterServiceAccountTemplateMetadata, ClusterSpec,
             ClusterStorage, ClusterSuperuserSecret,
         },
+        cnpg_backups::create_backup_if_needed,
         cnpg_utils::{
             get_pooler_instances, is_image_updated, patch_cluster, restart_and_wait_for_restart,
         },
@@ -64,6 +66,7 @@ use crate::{
     is_postgres_ready,
     postgres_exporter::EXPORTER_CONFIGMAP_PREFIX,
     psql::PsqlOutput,
+    snapshots::volumesnapshots::reconcile_volume_snapshot_restore,
     trunk::extensions_that_require_load,
     Context,
 };
@@ -496,7 +499,7 @@ fn cnpg_cluster_bootstrap(cdb: &CoreDB, restore: bool) -> ClusterBootstrap {
                     }
                 }),
                 // TODO: reenable this once we have a work around for snapshots
-                // volume_snapshots: cnpg_cluster_bootstrap_recovery_volume_snapshots(cdb),
+                volume_snapshots: cnpg_cluster_bootstrap_recovery_volume_snapshots(cdb),
                 ..ClusterBootstrapRecovery::default()
             }),
             ..ClusterBootstrap::default()
@@ -512,25 +515,25 @@ fn cnpg_cluster_bootstrap(cdb: &CoreDB, restore: bool) -> ClusterBootstrap {
 }
 
 // TODO: reenable this once we have a work around for snapshots
-// fn cnpg_cluster_bootstrap_recovery_volume_snapshots(
-//     _cdb: &CoreDB,
-// ) -> Option<ClusterBootstrapRecoveryVolumeSnapshots> {
-//     if let Some(restore) = &cdb.spec.restore {
-//         if restore.volume_snapshot == Some(true) {
-//             return Some(ClusterBootstrapRecoveryVolumeSnapshots {
-//                 storage: ClusterBootstrapRecoveryVolumeSnapshotsStorage {
-//                     // todo: Work on getting this from the VolumeSnapshot we created
-//                     // during the restore process
-//                     name: format!("{}-restore-vs", cdb.name_any()),
-//                     kind: "VolumeSnapshot".to_string(),
-//                     api_group: Some("snapshot.storage.k8s.io".to_string()),
-//                 },
-//                 ..ClusterBootstrapRecoveryVolumeSnapshots::default()
-//             });
-//         }
-//     }
-//     None
-// }
+fn cnpg_cluster_bootstrap_recovery_volume_snapshots(
+    cdb: &CoreDB,
+) -> Option<ClusterBootstrapRecoveryVolumeSnapshots> {
+    if let Some(restore) = &cdb.spec.restore {
+        if restore.volume_snapshot == Some(true) {
+            return Some(ClusterBootstrapRecoveryVolumeSnapshots {
+                storage: ClusterBootstrapRecoveryVolumeSnapshotsStorage {
+                    // todo: Work on getting this from the VolumeSnapshot we created
+                    // during the restore process
+                    name: format!("{}-restore-vs", cdb.name_any()),
+                    kind: "VolumeSnapshot".to_string(),
+                    api_group: Some("snapshot.storage.k8s.io".to_string()),
+                },
+                ..ClusterBootstrapRecoveryVolumeSnapshots::default()
+            });
+        }
+    }
+    None
+}
 
 // Get PGConfig from CoreDB and convert it to a postgres_parameters and shared_preload_libraries
 fn cnpg_postgres_config(
@@ -1003,12 +1006,12 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
     // If we are restoring and have volume snapshots enabled, make sure we setup
     // the VolumeSnapshotContent and VolumeSnapshot so that the Cluster will have
     // something to restore from.
-    // if let Some(restore) = &cdb.spec.restore {
-    //     if restore.volume_snapshot == Some(true) {
-    //         debug!("Reconciling VolumeSnapshotContent and VolumeSnapshot for restore");
-    //         reconcile_volume_snapshot_restore(cdb, ctx.clone()).await?;
-    //     }
-    // }
+    if let Some(restore) = &cdb.spec.restore {
+        if restore.volume_snapshot == Some(true) {
+            debug!("Reconciling VolumeSnapshotContent and VolumeSnapshot for restore");
+            reconcile_volume_snapshot_restore(cdb, ctx.clone()).await?;
+        }
+    }
 
     debug!("Generating CNPG spec");
     let mut cluster = cnpg_cluster_from_cdb(cdb, Some(pods_to_fence), requires_load);
@@ -1145,9 +1148,9 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
     }
 
     // TODO: Add back support for using VolumeSnapshots
-    // if let Ok(cluster) = maybe_cluster {
-    //     create_backup_if_needed(cdb, &ctx, &cluster).await?;
-    // }
+    if let Ok(cluster) = maybe_cluster {
+        create_backup_if_needed(cdb, &ctx, &cluster).await?;
+    }
 
     // For manual changes conflicting with the operator, we have .force()
     //
