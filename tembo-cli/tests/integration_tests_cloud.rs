@@ -111,12 +111,12 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
 }
 
 fn setup_env(instance_name: &String) -> Result<(), Box<dyn Error>> {
-    replace_vars_in_file(tembo_context_file_path(), "ORG_ID", &env::var("ORG_ID")?)?;
+    replace_vars_in_file(tembo_context_file_path(), "ORG_ID", "org_2X6FKW5Ng0Tfq08by32pfx5GNaq")?;
 
     replace_vars_in_file(
         tembo_credentials_file_path(),
         "ACCESS_TOKEN",
-        &env::var("ACCESS_TOKEN")?,
+        "eyJhbGciOiJSUzI1NiIsImNhdCI6ImNsX0I3ZDRQRDIyMkFBQSIsImtpZCI6Imluc18yUDJhR2Ezb1ZkZGVISmtpeG43bXdlYXpNaHciLCJ0eXAiOiJKV1QifQ.eyJhenAiOiJodHRwczovL2Nsb3VkLnRlbWJvLmlvIiwiZXhwIjoxNzI0MjMwMjg2LCJpYXQiOjE3MjQxNDM4ODYsImlzcyI6Imh0dHBzOi8vY2xlcmsudGVtYm8uaW8iLCJqdGkiOiI5NDJhMDI2ODBmYjFlMDUzYTJmMiIsIm5iZiI6MTcyNDE0Mzg4MSwib3JnX2lkIjoib3JnXzJYNkZLVzVOZzBUZnEwOGJ5MzJwZng1R05hcSIsIm9yZ19yb2xlIjoiYWRtaW4iLCJvcmdfc2x1ZyI6InVjIiwib3JnYW5pemF0aW9ucyI6eyJvcmdfMlg2RktXNU5nMFRmcTA4YnkzMnBmeDVHTmFxIjoiYWRtaW4ifSwic2lkIjoiYXBpLXRva2VuIiwic3ViIjoidXNlcl8yWDZGSjJKbGtXdUpjdkdNYm5tNmJkYU5Ld1cifQ.nNBblte6LOWG-2Ft9naakGfiBUX5808pxQrwKJPNr1bLntVwave-IAqso8d7WNqmStyV-SsC96hL5IJoRpolGBRc0UWr0_1HAnBDiUNiIfn9Ovw4l2YhKz9l6Pae7gMqstIMQaJylb61i7rgCFon8Cr-ZQRkuCTeH78aw4ktyLYQbPfvta45KHvm0BrV6KVDsBZ7JQiuZdUMVl3Vu_jSu52XMC4UkWaHuTYQ9lin0eA1Hnbh2I3OS02gXtqYtY13bZE02f15n4N4L2HynDbhnV8fjkDzlSJxKUTlg23FvTfAms7dyHMx-J9FhttRx8uY3L_RTShYLu3iMq7YfipFZA",
     )?;
 
     replace_vars_in_file(
