@@ -24,7 +24,7 @@ use kube::{
     Client, Resource,
 };
 use lazy_static::lazy_static;
-use std::{collections::BTreeMap, sync::Arc, time::Duration};
+use std::{collections::BTreeMap, ops::Not, sync::Arc, time::Duration};
 
 use crate::{
     app_service::ingress::{generate_ingress_tcp_routes, reconcile_ingress_tcp},
@@ -432,21 +432,32 @@ fn generate_deployment(
         }
     }
 
+    let has_instance_id = env_vars.iter().any(|env| env.name == "TEMBO_INSTANCE_ID");
+    let has_org_id = env_vars.iter().any(|env| env.name == "TEMBO_ORG_ID");
+
     // Check for tembo.io/instance_id and tembo.io/organization_id annotations
-    if let Some(instance_id) = annotations.get("tembo.io/instance_id") {
-        env_vars.push(EnvVar {
-            name: "TEMBO_INSTANCE_ID".to_string(),
-            value: Some(instance_id.clone()),
-            ..EnvVar::default()
-        });
+    if has_instance_id.not() {
+        if let Some(instance_id) = annotations.get("tembo.io/instance_id") {
+            env_vars.push(EnvVar {
+                name: "TEMBO_INSTANCE_ID".to_string(),
+                value: Some(instance_id.clone()),
+                ..EnvVar::default()
+            });
+        }
+    } else {
+        tracing::info!("Not applying TEMBO_INSTANCE_ID to env since it's already present");
     }
 
-    if let Some(organization_id) = annotations.get("tembo.io/organization_id") {
-        env_vars.push(EnvVar {
-            name: "TEMBO_ORG_ID".to_string(),
-            value: Some(organization_id.clone()),
-            ..EnvVar::default()
-        });
+    if has_org_id.not() {
+        if let Some(organization_id) = annotations.get("tembo.io/organization_id") {
+            env_vars.push(EnvVar {
+                name: "TEMBO_ORG_ID".to_string(),
+                value: Some(organization_id.clone()),
+                ..EnvVar::default()
+            });
+        }
+    } else {
+        tracing::info!("Not applying TEMBO_ORG_ID to env since it's already present");
     }
 
     // Add the pre-loaded forwarded environment variables
