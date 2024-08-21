@@ -495,7 +495,7 @@ async fn get_trunk_project_version(
     if let Some(extension_version) = &location_to_toggle.version {
         let maybe_trunk_project = get_trunk_project_metadata_for_version(
             trunk_project_name,
-            trunk::Version::Extension(&extension_version),
+            trunk::Version::Extension(extension_version),
         )
         .await;
 

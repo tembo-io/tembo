@@ -444,6 +444,8 @@ fn generate_deployment(
                 ..EnvVar::default()
             });
         }
+    } else {
+        tracing::info!("Not applying TEMBO_INSTANCE_ID to env since it's already present");
     }
 
     if has_org_id.not() {
@@ -454,6 +456,8 @@ fn generate_deployment(
                 ..EnvVar::default()
             });
         }
+    } else {
+        tracing::info!("Not applying TEMBO_ORG_ID to env since it's already present");
     }
 
     // Add the pre-loaded forwarded environment variables
