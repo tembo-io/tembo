@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2021"
 publish = false
 
+[[bin]]
+name = "gateway-daemon"
+path = "src/daemon.rs"
+
 [dependencies]
 actix-cors = "0.7.0"
 actix-rt = "2.10.0"

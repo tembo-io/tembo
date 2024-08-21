@@ -55,7 +55,7 @@ pub async fn get_usage(
     Ok(rows_to_events(rows))
 }
 
-pub fn rows_to_events(rows: Vec<UsageData>) -> Vec<Events> {
+fn rows_to_events(rows: Vec<UsageData>) -> Vec<Events> {
     rows.into_iter()
         .map(|row| {
             // Parse the completed_at string into a DateTime<Utc> and convert to hour
@@ -83,6 +83,8 @@ pub fn rows_to_events(rows: Vec<UsageData>) -> Vec<Events> {
 
 pub async fn events_reporter() -> Result<()> {
     const BATCH_SIZE: usize = 1000;
+    // Run once per hour
+    const SYNC_PERIOD: Duration = Duration::from_secs(60 * 60);
 
     let pg_conn_url = env::var("POSTGRES_QUEUE_CONNECTION")
         .with_context(|| "POSTGRES_QUEUE_CONNECTION must be set")?;
@@ -97,7 +99,7 @@ pub async fn events_reporter() -> Result<()> {
     queue.init().await?;
     queue.create(&metrics_events_queue).await?;
 
-    let mut sync_interval = interval(Duration::from_secs(3600));
+    let mut sync_interval = interval(SYNC_PERIOD);
 
     loop {
         sync_interval.tick().await;
