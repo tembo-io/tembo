@@ -30,17 +30,21 @@ pub async fn get_usage(
         UsageData,
         r#"
         SELECT
-          organization_id,
-          instance_id,
-          duration_ms,
-          SUM(prompt_tokens) as prompt_tokens,
-          SUM(completion_tokens) as completion_tokens,
-          model,
-          completed_at
-        FROM inference.requests
-        WHERE
-          completed_at >= $1 AND completed_at < $2
-        GROUP BY organization_id, instance_id
+        organization_id,
+        instance_id,
+        model,
+        MAX(completed_at) AS completed_at,
+        SUM(prompt_tokens) AS prompt_tokens,
+        SUM(completion_tokens) AS completion_tokens
+    FROM
+        inference.requests
+    WHERE
+        completed_at >= $1
+        AND completed_at <= $2
+    GROUP BY
+        organization_id,
+        instance_id,
+        model
         "#,
         start_time,
         end_time
@@ -57,6 +61,7 @@ pub fn rows_to_events(rows: Vec<UsageData>) -> Vec<Events> {
             // Parse the completed_at string into a DateTime<Utc> and convert to hour
             let completed_at = row
                 .completed_at
+                .unwrap()
                 .with_timezone(&Utc)
                 .format("%Y%m%d%H")
                 .to_string();
@@ -66,11 +71,10 @@ pub fn rows_to_events(rows: Vec<UsageData>) -> Vec<Events> {
                 organization_id: row.organization_id,
                 instance_id: row.instance_id,
                 payload: Payload {
-                    completed_at: row.completed_at.to_string(),
-                    duration_ms: row.duration_ms,
+                    completed_at: row.completed_at.unwrap_or_default().to_string(),
                     model: row.model,
-                    prompt_tokens: row.prompt_tokens.to_string(),
-                    completion_tokens: row.completion_tokens.to_string(),
+                    prompt_tokens: row.prompt_tokens.unwrap_or(0).to_string(),
+                    completion_tokens: row.completion_tokens.unwrap_or(0).to_string(),
                 },
             }
         })
@@ -137,20 +141,18 @@ pub struct Events {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct Payload {
     pub completed_at: String,
-    pub duration_ms: i32,
     pub model: String,
     pub prompt_tokens: String,
     pub completion_tokens: String,
 }
 
-pub struct UsageData {
+struct UsageData {
     organization_id: String,
     instance_id: String,
-    duration_ms: i32,
-    prompt_tokens: i32,
-    completion_tokens: i32,
+    prompt_tokens: Option<i64>,
+    completion_tokens: Option<i64>,
     model: String,
-    completed_at: DateTime<Utc>,
+    completed_at: Option<DateTime<Utc>>,
 }
 
 //TODO: Add unit tests
