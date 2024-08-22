@@ -1952,17 +1952,7 @@ mod test {
         let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
 
         let pod_name = format!("{}-1", name);
-        let _check_for_pod = tokio::time::timeout(
-            Duration::from_secs(TIMEOUT_SECONDS_START_POD),
-            await_condition(pods.clone(), &pod_name, conditions::is_pod_running()),
-        )
-        .await
-        .unwrap_or_else(|_| {
-            panic!(
-                "Did not find the pod {} to be running after waiting {} seconds",
-                pod_name, TIMEOUT_SECONDS_START_POD
-            )
-        });
+        pod_ready_and_running(pods.clone(), pod_name.clone()).await;
 
         assert!(service_exists(
             context.clone(),
@@ -2018,6 +2008,30 @@ mod test {
             "true"
         );
 
+        let cluster: Api<Cluster> = Api::namespaced(client.clone(), &namespace);
+        let restart = Utc::now()
+            .to_rfc3339_opts(SecondsFormat::Secs, true)
+            .to_string();
+        let patch_json = serde_json::json!({
+            "metadata": {
+                "annotations": {
+                    "kubectl.kubernetes.io/restartedAt": restart
+                }
+            }
+        });
+        let patch = Patch::Merge(patch_json);
+        let _patch = cluster.patch(name, &params, &patch);
+
+        let service = service_exists(
+            context.clone(),
+            &namespace,
+            &format!("{}-dedicated", name),
+            false,
+        )
+        .await;
+        assert!(service.is_some());
+
+        // Disable dedicated networking and ensure service is deleted
         let coredb_json = serde_json::json!({
             "apiVersion": API_VERSION,
             "kind": kind,
