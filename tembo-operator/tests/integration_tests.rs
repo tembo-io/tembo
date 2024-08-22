@@ -490,6 +490,83 @@ mod test {
         }
     }
 
+    async fn service_exists(
+        context: Arc<Context>,
+        namespace: &str,
+        service_name: &str,
+        inverse: bool,
+    ) -> Option<Service> {
+        println!(
+            "Checking for service existence: {}, inverse: {}",
+            service_name, inverse
+        );
+        let services: Api<Service> = Api::namespaced(context.client.clone(), namespace);
+        let lp = ListParams::default().labels(&format!("app={}", service_name));
+
+        const TIMEOUT_SECONDS_SERVICE_CHECK: u64 = 300;
+        let start_time = std::time::Instant::now();
+
+        loop {
+            let service_result = services.list(&lp).await;
+            let mut service_found = false;
+            if let Ok(service_list) = service_result {
+                for service in service_list.items {
+                    if let Some(name) = &service.metadata.name {
+                        if name == service_name {
+                            println!("Found service: {}", name);
+                            if inverse {
+                                if await_condition(
+                                    services.clone(),
+                                    name,
+                                    conditions::is_deleted(""),
+                                )
+                                .await
+                                .is_ok()
+                                {
+                                    service_found = true;
+                                    break;
+                                }
+                            } else {
+                                service_found = true;
+                                break;
+                            }
+                        }
+                    } else {
+                        println!("Found service with no name");
+                    }
+                }
+            } else {
+                println!("Service {} not found, retrying...", service_name);
+            }
+
+            if service_found {
+                if inverse {
+                    println!("Service {} has been deleted", service_name);
+                    return None;
+                } else {
+                    println!("Service {} exists", service_name);
+                    return Some(services.get(service_name).await.unwrap());
+                }
+            }
+
+            if start_time.elapsed() > Duration::from_secs(TIMEOUT_SECONDS_SERVICE_CHECK) {
+                println!(
+                    "Failed to find service {} after waiting {} seconds",
+                    service_name, TIMEOUT_SECONDS_SERVICE_CHECK
+                );
+                break;
+            }
+
+            tokio::time::sleep(Duration::from_secs(5)).await;
+        }
+
+        if inverse {
+            Some(services.get(service_name).await.unwrap())
+        } else {
+            None
+        }
+    }
+
     // Create namespace for the test to run in
     async fn create_namespace(client: Client, name: &str) -> Result<String, Error> {
         let ns_api: Api<Namespace> = Api::all(client);
@@ -1836,15 +1913,14 @@ mod test {
     }
 
     #[tokio::test]
-    #[ignore]
-    async fn functional_test_ingress_route_tcp() {
-        // Initialize the Kubernetes client
+    async fn test_networking() {
         let client = kube_client().await;
+        let state = State::default();
+        let context = state.create_context(client.clone());
 
-        // Configurations
         let mut rng = rand::thread_rng();
         let suffix = rng.gen_range(0..100000);
-        let name = &format!("test-ingress-route-tcp-{}", suffix.clone());
+        let name = &format!("test-networking-{}", suffix);
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
             Err(e) => {
@@ -1852,15 +1928,13 @@ mod test {
                 std::process::exit(1);
             }
         };
+
         let kind = "CoreDB";
         let replicas = 2;
 
-        // Create a pod we can use to run commands in the cluster
         let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
 
-        // Apply a basic configuration of CoreDB
         println!("Creating CoreDB resource {}", name);
-        let _test_metric_decr = format!("coredb_integration_test_{}", suffix.clone());
         let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
         let coredb_json = serde_json::json!({
             "apiVersion": API_VERSION,
@@ -1872,11 +1946,10 @@ mod test {
                 "replicas": replicas,
             }
         });
-        let params = PatchParams::apply("functional-test-ingress-route-tcp");
+        let params = PatchParams::apply("functional-test-networking");
         let patch = Patch::Apply(&coredb_json);
         let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
 
-        // Wait for Pod to be created
         let pod_name = format!("{}-1", name);
         let _check_for_pod = tokio::time::timeout(
             Duration::from_secs(TIMEOUT_SECONDS_START_POD),
@@ -1890,45 +1963,14 @@ mod test {
             )
         });
 
-        let ing_route_tcp_name = format!("{}-rw-0", name);
-        let ingress_route_tcp_api: Api<IngressRouteTCP> =
-            Api::namespaced(client.clone(), &namespace);
-        // Get the ingress route tcp
-        let ing_route_tcp = ingress_route_tcp_api
-            .get(&ing_route_tcp_name)
-            .await
-            .unwrap_or_else(|_| {
-                panic!("Expected to find ingress route TCP {}", ing_route_tcp_name)
-            });
-        let service_name = ing_route_tcp.spec.routes[0]
-            .services
-            .clone()
-            .expect("Ingress route has no services")[0]
-            .name
-            .clone();
-        // Assert the ingress route tcp service points to coredb service
-        // The coredb service is named the same as the coredb resource
-        assert_eq!(&service_name, format!("{}-rw", name).as_str());
-
-        let ing_route_tcp_name = format!("{}-ro-0", name);
-        let ingress_route_tcp_api: Api<IngressRouteTCP> =
-            Api::namespaced(client.clone(), &namespace);
-        // Get the ingress route tcp
-        let ing_route_tcp = ingress_route_tcp_api
-            .get(&ing_route_tcp_name)
-            .await
-            .unwrap_or_else(|_| {
-                panic!("Expected to find ingress route TCP {}", ing_route_tcp_name)
-            });
-        let service_name = ing_route_tcp.spec.routes[0]
-            .services
-            .clone()
-            .expect("Ingress route has no services")[0]
-            .name
-            .clone();
-        // Assert the ingress route tcp service points to coredb service
-        // The coredb service is named the same as the coredb resource
-        assert_eq!(&service_name, format!("{}-ro", name).as_str());
+        assert!(service_exists(
+            context.clone(),
+            &namespace,
+            &format!("{}-dedicated", name),
+            true
+        )
+        .await
+        .is_none());
 
         let coredb_json = serde_json::json!({
             "apiVersion": API_VERSION,
@@ -1937,39 +1979,42 @@ mod test {
                 "name": name
             },
             "spec": {
-                "extra_domains_rw": ["any-given-domain.com", "another-domain.com"]
+                "dedicatedNetworking": {
+                    "enabled": true,
+                    "include_standby": true,
+                    "public": true,
+                    "service_type": "ClusterIP"
+                }
             }
         });
-        let params = PatchParams::apply("functional-test-ingress-route-tcp");
-        let patch = Patch::Merge(&coredb_json);
+        let patch = Patch::Apply(&coredb_json);
         let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
 
-        // extra domains should be created almost right away, within a few milliseconds
         tokio::time::sleep(Duration::from_secs(5)).await;
 
-        let ing_route_tcp_name = format!("extra-{}-rw", name);
-        let ingress_route_tcp_api: Api<IngressRouteTCP> =
-            Api::namespaced(client.clone(), &namespace);
-        // Get the ingress route tcp
-        let ing_route_tcp = ingress_route_tcp_api
-            .get(&ing_route_tcp_name)
-            .await
-            .unwrap_or_else(|_| {
-                panic!("Expected to find ingress route TCP {}", ing_route_tcp_name)
-            });
-        let service_name = ing_route_tcp.spec.routes[0]
-            .services
-            .clone()
-            .expect("Ingress route has no services")[0]
-            .name
-            .clone();
-        // Assert the ingress route tcp service points to coredb service
-        // The coredb service is named the same as the coredb resource
-        assert_eq!(&service_name, format!("{}-rw", name).as_str());
-        let matcher = ing_route_tcp.spec.routes[0].r#match.clone();
+        let service = service_exists(
+            context.clone(),
+            &namespace,
+            &format!("{}-dedicated", name),
+            false,
+        )
+        .await;
+        assert!(service.is_some());
+
+        let service = service.unwrap();
         assert_eq!(
-            matcher,
-            "HostSNI(`another-domain.com`) || HostSNI(`any-given-domain.com`)"
+            service.spec.as_ref().unwrap().type_,
+            Some("ClusterIP".to_string())
+        );
+        assert_eq!(
+            service
+                .metadata
+                .labels
+                .as_ref()
+                .expect("Labels should be present")
+                .get("public")
+                .expect("Public label should be present"),
+            "true"
         );
 
         let coredb_json = serde_json::json!({
@@ -1979,70 +2024,25 @@ mod test {
                 "name": name
             },
             "spec": {
-                "extra_domains_rw": ["new-domain.com"]
+                "dedicatedNetworking": {
+                    "enabled": false,
+                }
             }
         });
-        let params = PatchParams::apply("functional-test-ingress-route-tcp");
-        let patch = Patch::Merge(&coredb_json);
-        let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
-
-        // extra domains should be created almost right away, within a few milliseconds
-        tokio::time::sleep(Duration::from_secs(5)).await;
-
-        // Get the ingress route tcp
-        let ing_route_tcp = ingress_route_tcp_api
-            .get(&ing_route_tcp_name)
-            .await
-            .unwrap_or_else(|_| {
-                panic!("Expected to find ingress route TCP {}", ing_route_tcp_name)
-            });
-        let service_name = ing_route_tcp.spec.routes[0]
-            .services
-            .clone()
-            .expect("Ingress route has no services")[0]
-            .name
-            .clone();
-        // Assert the ingress route tcp service points to coredb service
-        // The coredb service is named the same as the coredb resource
-        assert_eq!(&service_name, format!("{}-rw", name).as_str());
-        let matcher = ing_route_tcp.spec.routes[0].r#match.clone();
-        assert_eq!(matcher, "HostSNI(`new-domain.com`)");
-
-        // Check that a middleware was applied
-        let middlewares = ing_route_tcp.spec.routes[0].middlewares.clone().unwrap();
-        assert_eq!(middlewares.len(), 1);
-
-        let coredb_json = serde_json::json!({
-            "apiVersion": API_VERSION,
-            "kind": kind,
-            "metadata": {
-                "name": name
-            },
-            "spec": {
-                "replicas": replicas,
-                "extra_domains_rw": [],
-            }
-        });
-        let params = PatchParams::apply("functional-test-ingress-route-tcp").force();
         let patch = Patch::Apply(&coredb_json);
         let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
 
-        // wait for ingress route tcp to be deleted
-        let mut i = 0;
-        loop {
-            tokio::time::sleep(Duration::from_secs(5)).await;
-            let ing_route_tcp = ingress_route_tcp_api.get(&ing_route_tcp_name).await;
-            if i > 5 || ing_route_tcp.is_err() {
-                break;
-            }
-            i += 1;
-        }
-        // Get the ingress route tcp
-        let ing_route_tcp = ingress_route_tcp_api.get(&ing_route_tcp_name).await;
-        // Should be deleted
-        assert!(ing_route_tcp.is_err());
+        tokio::time::sleep(Duration::from_secs(5)).await;
 
-        // Cleanup CoreDB resource
+        assert!(service_exists(
+            context.clone(),
+            &namespace,
+            &format!("{}-dedicated", name),
+            true
+        )
+        .await
+        .is_none());
+
         coredbs.delete(name, &Default::default()).await.unwrap();
         println!("Waiting for CoreDB to be deleted: {}", &name);
         let _assert_coredb_deleted = tokio::time::timeout(
@@ -2058,7 +2058,6 @@ mod test {
         });
         println!("CoreDB resource deleted {}", name);
 
-        // Delete namespace
         let _ = delete_namespace(client.clone(), &namespace).await;
     }
 

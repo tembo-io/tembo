@@ -2135,7 +2135,7 @@ spec:
                         type: object
                     type: object
                 type: object
-              dedicated_networking:
+              dedicatedNetworking:
                 description: |-
                   Configuration for dedicated networking.
 
@@ -2149,7 +2149,7 @@ spec:
 
                       **Default**: false.
                     type: boolean
-                  include_standby:
+                  includeStandby:
                     default: false
                     description: |-
                       Include a separate load balancer for the standby (replica) server.
@@ -2163,7 +2163,7 @@ spec:
 
                       **Default**: false.
                     type: boolean
-                  service_type:
+                  serviceType:
                     default: LoadBalancer
                     description: |-
                       The type of Kubernetes Service to create (LoadBalancer or ClusterIP).

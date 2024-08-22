@@ -366,6 +366,7 @@ pub struct PgBouncer {
 }
 
 #[derive(Deserialize, Serialize, Clone, Debug, JsonSchema, Default)]
+#[allow(non_snake_case)]
 pub struct DedicatedNetworking {
     /// Enable dedicated networking for the CoreDB instance.
     ///
@@ -377,7 +378,7 @@ pub struct DedicatedNetworking {
     ///
     /// **Default**: false.
     #[serde(default)]
-    pub include_standby: bool,
+    pub includeStandby: bool,
 
     /// Configure the load balancer to be public or private.
     ///
@@ -389,7 +390,7 @@ pub struct DedicatedNetworking {
     ///
     /// **Default**: LoadBalancer.
     #[serde(default = "defaults::default_service_type")]
-    pub service_type: String,
+    pub serviceType: String,
 }
 
 impl DedicatedNetworking {
@@ -477,7 +478,7 @@ pub struct CoreDBSpec {
     ///
     /// **Default**: disabled
     #[serde(default)]
-    pub dedicated_networking: Option<DedicatedNetworking>,
+    pub dedicatedNetworking: Option<DedicatedNetworking>,
 
     /// The port to expose the Postgres service on.
     ///

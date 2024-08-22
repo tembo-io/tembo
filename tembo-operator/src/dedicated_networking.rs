@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use crate::{apis::coredb_types::CoreDB, Context};
 use k8s_openapi::api::networking::v1::NetworkPolicy;
 use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
@@ -9,12 +7,13 @@ use kube::{
 };
 use serde_json::json;
 use std::env;
+use std::sync::Arc;
 use tracing::{debug, error, info};
 
 use crate::{
     errors::OperatorError,
     ingress::{reconcile_ip_allowlist_middleware, reconcile_postgres_ing_route_tcp},
-    network_policies::{apply_network_policy, reconcile_network_policies},
+    network_policies::apply_network_policy,
 };
 use k8s_openapi::api::core::v1::Service;
 
@@ -31,23 +30,31 @@ pub async fn reconcile_dedicated_networking(
     cdb: &CoreDB,
     ctx: Arc<Context>,
 ) -> Result<(), OperatorError> {
-    let ns = cdb.namespace().unwrap();
+    let ns = cdb.namespace().unwrap_or_else(|| {
+        error!(
+            "Namespace not found for CoreDB instance: {}",
+            cdb.name_any()
+        );
+        "default".to_string()
+    });
     let basedomain = env::var("DATA_PLANE_BASEDOMAIN").unwrap_or_else(|_| "localhost".to_string());
     let port = IntOrString::Int(5432);
     let client = ctx.client.clone();
 
     info!(
-        "Starting reconciliation of dedicated networking for CoreDB instance: {}",
-        cdb.name_any()
+        "Starting reconciliation of dedicated networking for CoreDB instance: {} in namespace: {}",
+        cdb.name_any(),
+        ns
     );
 
-    if let Some(dedicated_networking) = &cdb.spec.dedicated_networking {
+    if let Some(dedicated_networking) = &cdb.spec.dedicatedNetworking {
         if dedicated_networking.enabled {
             info!(
                 "Dedicated networking is enabled for CoreDB instance: {}",
                 cdb.name_any()
             );
 
+            // Reconcile Network Policies
             info!(
                 "Reconciling network policies for dedicated networking in namespace: {}",
                 ns
@@ -56,16 +63,27 @@ pub async fn reconcile_dedicated_networking(
                 client.clone(),
                 &ns,
                 &cdb.name_any(),
-                "172.31.0.0/16", // Replace
+                "172.31.0.0/16", // Replace with the actual CIDR for your dedicated network
             )
-            .await?;
+            .await
+            .map_err(|e| {
+                error!("Failed to reconcile network policies: {:?}", e);
+                e
+            })?;
 
+            // Reconcile IP Allowlist Middleware
             info!(
                 "Reconciling IP allow list middleware for CoreDB instance: {}",
                 cdb.name_any()
             );
-            let middleware_name = reconcile_ip_allowlist_middleware(cdb, ctx.clone()).await?;
+            let middleware_name = reconcile_ip_allowlist_middleware(cdb, ctx.clone())
+                .await
+                .map_err(|e| {
+                    error!("Failed to reconcile IP allowlist middleware: {:?}", e);
+                    e
+                })?;
 
+            // Reconcile Primary Service Ingress
             info!(
                 "Handling primary service ingress for CoreDB instance: {}",
                 cdb.name_any()
@@ -77,7 +95,11 @@ pub async fn reconcile_dedicated_networking(
                 dedicated_networking.public,
                 false,
             )
-            .await?;
+            .await
+            .map_err(|e| {
+                error!("Failed to reconcile primary service ingress: {:?}", e);
+                e
+            })?;
 
             reconcile_dedicated_networking_ing_route_tcp(
                 cdb,
@@ -91,10 +113,14 @@ pub async fn reconcile_dedicated_networking(
                 false,
                 false, // primary service
             )
-            .await?;
+            .await
+            .map_err(|e| {
+                error!("Failed to reconcile primary ingress route: {:?}", e);
+                e
+            })?;
 
-            // Handle standby service ingress if `include_standby` is true
-            if dedicated_networking.include_standby {
+            // Handle Standby Service Ingress if included
+            if dedicated_networking.includeStandby {
                 info!(
                     "Handling standby service ingress for CoreDB instance: {}",
                     cdb.name_any()
@@ -106,7 +132,11 @@ pub async fn reconcile_dedicated_networking(
                     dedicated_networking.public,
                     true,
                 )
-                .await?;
+                .await
+                .map_err(|e| {
+                    error!("Failed to reconcile standby service ingress: {:?}", e);
+                    e
+                })?;
 
                 reconcile_dedicated_networking_ing_route_tcp(
                     cdb,
@@ -120,18 +150,32 @@ pub async fn reconcile_dedicated_networking(
                     false,
                     true,
                 )
-                .await?;
+                .await
+                .map_err(|e| {
+                    error!("Failed to reconcile standby ingress route: {:?}", e);
+                    e
+                })?;
             }
         } else {
+            // If dedicated networking is disabled, clean up resources
             info!(
-                "Deleting dedicated networking services for CoreDB instance: {} as dedicated networking is disabled",
+                "Dedicated networking is disabled. Deleting services and ingress routes for CoreDB instance: {}",
                 cdb.name_any()
             );
 
             delete_dedicated_networking_service(client.clone(), &ns, &cdb.name_any(), false)
-                .await?;
+                .await
+                .map_err(|e| {
+                    error!("Failed to delete primary service: {:?}", e);
+                    e
+                })?;
 
-            delete_dedicated_networking_service(client.clone(), &ns, &cdb.name_any(), true).await?;
+            delete_dedicated_networking_service(client.clone(), &ns, &cdb.name_any(), true)
+                .await
+                .map_err(|e| {
+                    error!("Failed to delete standby service: {:?}", e);
+                    e
+                })?;
 
             reconcile_dedicated_networking_ing_route_tcp(
                 cdb,
@@ -145,7 +189,11 @@ pub async fn reconcile_dedicated_networking(
                 true,
                 false,
             )
-            .await?;
+            .await
+            .map_err(|e| {
+                error!("Failed to delete primary ingress route: {:?}", e);
+                e
+            })?;
 
             reconcile_dedicated_networking_ing_route_tcp(
                 cdb,
@@ -159,13 +207,23 @@ pub async fn reconcile_dedicated_networking(
                 true,
                 true,
             )
-            .await?;
+            .await
+            .map_err(|e| {
+                error!("Failed to delete standby ingress route: {:?}", e);
+                e
+            })?;
         }
+    } else {
+        info!(
+            "Dedicated networking is not configured for CoreDB instance: {}",
+            cdb.name_any()
+        );
     }
 
     info!(
-        "Completed reconciliation of dedicated networking for CoreDB instance: {}",
-        cdb.name_any()
+        "Completed reconciliation of dedicated networking for CoreDB instance: {} in namespace: {}",
+        cdb.name_any(),
+        ns
     );
     Ok(())
 }
@@ -188,12 +246,18 @@ async fn reconcile_dedicated_networking_network_policies(
 ) -> Result<(), OperatorError> {
     let np_api: Api<NetworkPolicy> = Api::namespaced(client, namespace);
 
+    let policy_name = format!("{}-allow-nlb", cdb_name);
+    info!(
+        "Applying network policy: {} in namespace: {} to allow traffic from CIDR: {}",
+        policy_name, namespace, cidr
+    );
+
     let dedicated_network_policy = serde_json::json!({
         "apiVersion": "networking.k8s.io/v1",
         "kind": "NetworkPolicy",
         "metadata": {
-            "name": format!("{}-allow-nlb", cdb_name),
-            "namespace": format!("{namespace}"),
+            "name": policy_name,
+            "namespace": namespace,
         },
         "spec": {
             "podSelector": {
@@ -226,12 +290,16 @@ async fn reconcile_dedicated_networking_network_policies(
         .await
         .map_err(|e| {
             error!(
-                "Failed to apply dedicated networking network policy: {:?}",
-                e
+                "Failed to apply network policy: {} in namespace: {}. Error: {:?}",
+                policy_name, namespace, e
             );
             OperatorError::NetworkPolicyError(format!("Failed to apply network policy: {:?}", e))
         })?;
 
+    info!(
+        "Successfully applied network policy: {} in namespace: {}",
+        policy_name, namespace
+    );
     Ok(())
 }
 
@@ -269,6 +337,12 @@ async fn reconcile_dedicated_networking_ing_route_tcp(
     } else {
         format!("dedicated.{}", namespace)
     };
+
+    let action = if delete { "Deleting" } else { "Applying" };
+    info!(
+        "{} IngressRouteTCP for service: {} in namespace: {}",
+        action, service_name, namespace
+    );
 
     reconcile_postgres_ing_route_tcp(
         cdb,
@@ -316,6 +390,11 @@ async fn reconcile_dedicated_networking_service(
     };
     let lb_internal = if is_public { "false" } else { "true" };
 
+    info!(
+        "Applying Service: {} in namespace: {} with scheme: {}",
+        service_name, namespace, lb_scheme
+    );
+
     let service = json!({
         "apiVersion": "v1",
         "kind": "Service",
@@ -324,7 +403,7 @@ async fn reconcile_dedicated_networking_service(
             "namespace": namespace,
             "annotations": {
                 "external-dns.alpha.kubernetes.io/hostname": format!("{}.{}", service_name, "example.com"),
-                "service.beta.kubernetes.io/aws-load-balancer-internal": "true",
+                "service.beta.kubernetes.io/aws-load-balancer-internal": lb_scheme,
                 "service.beta.kubernetes.io/aws-load-balancer-scheme": lb_internal,
                 "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": "ip",
                 "service.beta.kubernetes.io/aws-load-balancer-type": "nlb-ip",
@@ -355,13 +434,23 @@ async fn reconcile_dedicated_networking_service(
     let svc_api: Api<Service> = Api::namespaced(client, namespace);
     let patch_params = PatchParams::apply("conductor").force();
     let patch = Patch::Apply(&service);
+
+    // Applying the service
     svc_api
         .patch(&service_name, &patch_params, &patch)
         .await
         .map_err(|e| {
-            error!("Failed to apply service {}: {}", service_name, e);
-            OperatorError::ServiceError(format!("Failed to apply network policy: {:?}", e))
+            error!(
+                "Failed to apply service: {} in namespace: {}. Error: {}",
+                service_name, namespace, e
+            );
+            OperatorError::ServiceError(format!("Failed to apply service: {:?}", e))
         })?;
+
+    info!(
+        "Successfully applied service: {} in namespace: {}",
+        service_name, namespace
+    );
 
     Ok(())
 }
@@ -388,16 +477,38 @@ async fn delete_dedicated_networking_service(
     };
 
     let svc_api: Api<Service> = Api::namespaced(client, namespace);
+
+    info!(
+        "Checking if service: {} exists in namespace: {} for deletion",
+        service_name, namespace
+    );
+
     if svc_api.get(&service_name).await.is_ok() {
+        info!(
+            "Service: {} exists in namespace: {}. Proceeding with deletion.",
+            service_name, namespace
+        );
+
         svc_api
             .delete(&service_name, &Default::default())
             .await
             .map_err(|e| {
-                error!("Failed to delete service {}: {}", service_name, e);
-                OperatorError::ServiceError(format!("Failed to apply network policy: {:?}", e))
+                error!(
+                    "Failed to delete service: {} in namespace: {}. Error: {}",
+                    service_name, namespace, e
+                );
+                OperatorError::ServiceError(format!("Failed to delete service: {:?}", e))
             })?;
+
+        info!(
+            "Successfully deleted service: {} in namespace: {}",
+            service_name, namespace
+        );
     } else {
-        debug!("Service {} does not exist, skipping deletion", service_name);
+        debug!(
+            "Service: {} does not exist in namespace: {}. Skipping deletion.",
+            service_name, namespace
+        );
     }
 
     Ok(())
