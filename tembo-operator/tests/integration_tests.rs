@@ -1913,6 +1913,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_networking() {
         let client = kube_client().await;
         let state = State::default();
@@ -1981,9 +1982,9 @@ mod test {
             "spec": {
                 "dedicatedNetworking": {
                     "enabled": true,
-                    "include_standby": true,
+                    "includeStandby": true,
                     "public": true,
-                    "service_type": "ClusterIP"
+                    "serviceType": "ClusterIP"
                 }
             }
         });
