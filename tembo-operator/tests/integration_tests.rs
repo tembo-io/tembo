@@ -1957,7 +1957,7 @@ mod test {
         assert!(service_exists(
             context.clone(),
             &namespace,
-            &format!("{}-dedicated", name),
+            &format!("{}", name),
             true
         )
         .await
