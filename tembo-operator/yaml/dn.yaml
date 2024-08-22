@@ -4,9 +4,9 @@ metadata:
   name: sample-dedicated
 spec:
   image: "quay.io/tembo/standard-cnpg:15-a0a5ab5"
-  dedicatedNetworking:
+  dedicated_networking:
     enabled: true
     includeStandby: true   # Optional: include if you want a separate LB for standby
     public: true           # Optional: true for public LB, false for private LB
-    serviceType: LoadBalancer  # Optional: specify service type, default is LoadBalancer
+    serviceType: ClusterIP  # Optional: specify service type, default is LoadBalancer
   # Other configurations...

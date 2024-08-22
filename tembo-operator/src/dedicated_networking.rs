@@ -54,7 +54,6 @@ pub async fn reconcile_dedicated_networking(
                 cdb.name_any()
             );
 
-            // Reconcile Network Policies
             info!(
                 "Reconciling network policies for dedicated networking in namespace: {}",
                 ns
@@ -71,7 +70,6 @@ pub async fn reconcile_dedicated_networking(
                 e
             })?;
 
-            // Reconcile IP Allowlist Middleware
             info!(
                 "Reconciling IP allow list middleware for CoreDB instance: {}",
                 cdb.name_any()
@@ -83,7 +81,6 @@ pub async fn reconcile_dedicated_networking(
                     e
                 })?;
 
-            // Reconcile Primary Service Ingress
             info!(
                 "Handling primary service ingress for CoreDB instance: {}",
                 cdb.name_any()
@@ -94,6 +91,7 @@ pub async fn reconcile_dedicated_networking(
                 &cdb.name_any(),
                 dedicated_networking.public,
                 false,
+                &dedicated_networking.serviceType,
             )
             .await
             .map_err(|e| {
@@ -111,7 +109,7 @@ pub async fn reconcile_dedicated_networking(
                 port.clone(),
                 vec![middleware_name.clone()],
                 false,
-                false, // primary service
+                false,
             )
             .await
             .map_err(|e| {
@@ -119,7 +117,6 @@ pub async fn reconcile_dedicated_networking(
                 e
             })?;
 
-            // Handle Standby Service Ingress if included
             if dedicated_networking.includeStandby {
                 info!(
                     "Handling standby service ingress for CoreDB instance: {}",
@@ -131,6 +128,7 @@ pub async fn reconcile_dedicated_networking(
                     &cdb.name_any(),
                     dedicated_networking.public,
                     true,
+                    &dedicated_networking.serviceType,
                 )
                 .await
                 .map_err(|e| {
@@ -157,7 +155,6 @@ pub async fn reconcile_dedicated_networking(
                 })?;
             }
         } else {
-            // If dedicated networking is disabled, clean up resources
             info!(
                 "Dedicated networking is disabled. Deleting services and ingress routes for CoreDB instance: {}",
                 cdb.name_any()
@@ -376,6 +373,7 @@ async fn reconcile_dedicated_networking_service(
     cdb_name: &str,
     is_public: bool,
     is_standby: bool,
+    service_type: &str,
 ) -> Result<(), OperatorError> {
     let service_name = if is_standby {
         format!("{}-dedicated-ro", cdb_name)
@@ -391,8 +389,8 @@ async fn reconcile_dedicated_networking_service(
     let lb_internal = if is_public { "false" } else { "true" };
 
     info!(
-        "Applying Service: {} in namespace: {} with scheme: {}",
-        service_name, namespace, lb_scheme
+        "Applying Service: {} in namespace: {} with type: {} and scheme: {}",
+        service_name, namespace, service_type, lb_scheme
     );
 
     let service = json!({
@@ -427,7 +425,7 @@ async fn reconcile_dedicated_networking_service(
                 "role": if is_standby { "replica" } else { "primary" }
             },
             "sessionAffinity": "None",
-            "type": "LoadBalancer"
+            "type": service_type
         }
     });
 
@@ -435,7 +433,6 @@ async fn reconcile_dedicated_networking_service(
     let patch_params = PatchParams::apply("conductor").force();
     let patch = Patch::Apply(&service);
 
-    // Applying the service
     svc_api
         .patch(&service_name, &patch_params, &patch)
         .await
