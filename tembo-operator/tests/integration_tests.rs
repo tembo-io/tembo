@@ -501,54 +501,30 @@ mod test {
             service_name, inverse
         );
         let services: Api<Service> = Api::namespaced(context.client.clone(), namespace);
-        let lp = ListParams::default().labels(&format!("app={}", service_name));
 
         const TIMEOUT_SECONDS_SERVICE_CHECK: u64 = 300;
         let start_time = std::time::Instant::now();
 
         loop {
-            let service_result = services.list(&lp).await;
-            let mut service_found = false;
-            if let Ok(service_list) = service_result {
-                for service in service_list.items {
-                    if let Some(name) = &service.metadata.name {
-                        if name == service_name {
-                            println!("Found service: {}", name);
-                            if inverse {
-                                if await_condition(
-                                    services.clone(),
-                                    name,
-                                    conditions::is_deleted(""),
-                                )
-                                .await
-                                .is_ok()
-                                {
-                                    service_found = true;
-                                    break;
-                                }
-                            } else {
-                                service_found = true;
-                                break;
-                            }
-                        }
+            match services.get(service_name).await {
+                Ok(service) => {
+                    if inverse {
+                        println!("Service {} should not exist, but it does", service_name);
+                        return Some(service);
                     } else {
-                        println!("Found service with no name");
+                        println!("Service {} exists", service_name);
+                        return Some(service);
                     }
                 }
-            } else {
-                println!("Service {} not found, retrying...", service_name);
-            }
-
-            if service_found {
-                if inverse {
-                    println!("Service {} has been deleted", service_name);
-                    return None;
-                } else {
-                    println!("Service {} exists", service_name);
-                    return services.get(service_name).await.ok();
+                Err(_) => {
+                    if inverse {
+                        return None;
+                    } else {
+                        println!("Service {} not found, retrying...", service_name);
+                    }
                 }
             }
-            // add comment
+
             if start_time.elapsed() > Duration::from_secs(TIMEOUT_SECONDS_SERVICE_CHECK) {
                 println!(
                     "Failed to find service {} after waiting {} seconds",
@@ -574,11 +550,7 @@ mod test {
             tokio::time::sleep(Duration::from_secs(5)).await;
         }
 
-        if inverse {
-            None
-        } else {
-            services.get(service_name).await.ok()
-        }
+        None
     }
 
     // Create namespace for the test to run in
@@ -1023,11 +995,14 @@ mod test {
         let pod_name = format!("{}-1", name);
         pod_ready_and_running(pods.clone(), pod_name.clone()).await;
 
-        assert!(
-            service_exists(context.clone(), &namespace, &format!("{}", name), true)
-                .await
-                .is_none()
-        );
+        assert!(service_exists(
+            context.clone(),
+            &namespace,
+            &format!("{}-dedicated", name),
+            true
+        )
+        .await
+        .is_none());
 
         let coredb_json = serde_json::json!({
             "apiVersion": API_VERSION,
