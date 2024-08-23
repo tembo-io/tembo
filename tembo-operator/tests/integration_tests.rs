@@ -554,6 +554,20 @@ mod test {
                     "Failed to find service {} after waiting {} seconds",
                     service_name, TIMEOUT_SECONDS_SERVICE_CHECK
                 );
+
+                if let Ok(service_list) = services.list(&ListParams::default()).await {
+                    println!("Services in namespace {}:", namespace);
+                    for service in service_list.items {
+                        println!(
+                            "Service: {}, Labels: {:?}",
+                            service.metadata.name.unwrap_or_default(),
+                            service.metadata.labels.unwrap_or_default()
+                        );
+                    }
+                } else {
+                    println!("Failed to list services in namespace {}", namespace);
+                }
+
                 break;
             }
 

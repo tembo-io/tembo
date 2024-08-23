@@ -1,6 +1,7 @@
 use crate::{apis::coredb_types::CoreDB, Context};
 use k8s_openapi::api::networking::v1::NetworkPolicy;
-use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
+use k8s_openapi::apimachinery::pkg::{apis::meta::v1::OwnerReference, util::intstr::IntOrString};
+use kube::Resource;
 use kube::{
     api::{Api, Patch, PatchParams, ResourceExt},
     client::Client,
@@ -85,6 +86,7 @@ pub async fn reconcile_dedicated_networking(
                 "Handling primary service ingress for CoreDB instance: {}",
                 cdb.name_any()
             );
+            let owner_reference = cdb.controller_owner_ref(&()).unwrap();
             reconcile_dedicated_networking_service(
                 client.clone(),
                 &ns,
@@ -92,6 +94,7 @@ pub async fn reconcile_dedicated_networking(
                 dedicated_networking.public,
                 false,
                 &dedicated_networking.serviceType,
+                owner_reference.clone(),
             )
             .await
             .map_err(|e| {
@@ -129,6 +132,7 @@ pub async fn reconcile_dedicated_networking(
                     dedicated_networking.public,
                     true,
                     &dedicated_networking.serviceType,
+                    owner_reference,
                 )
                 .await
                 .map_err(|e| {
@@ -374,6 +378,7 @@ async fn reconcile_dedicated_networking_service(
     is_public: bool,
     is_standby: bool,
     service_type: &str,
+    owner_reference: OwnerReference,
 ) -> Result<(), OperatorError> {
     let service_name = if is_standby {
         format!("{}-dedicated-ro", cdb_name)
@@ -393,24 +398,60 @@ async fn reconcile_dedicated_networking_service(
         service_name, namespace, service_type, lb_scheme
     );
 
+    let mut annotations = serde_json::Map::new();
+    annotations.insert(
+        "external-dns.alpha.kubernetes.io/hostname".to_string(),
+        serde_json::Value::String(format!("{}.{}", service_name, "example.com")),
+    );
+
+    if service_type == "LoadBalancer" {
+        annotations.insert(
+            "service.beta.kubernetes.io/aws-load-balancer-internal".to_string(),
+            serde_json::Value::String(lb_scheme.to_string()),
+        );
+        annotations.insert(
+            "service.beta.kubernetes.io/aws-load-balancer-scheme".to_string(),
+            serde_json::Value::String(lb_internal.to_string()),
+        );
+        annotations.insert(
+            "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type".to_string(),
+            serde_json::Value::String("ip".to_string()),
+        );
+        annotations.insert(
+            "service.beta.kubernetes.io/aws-load-balancer-type".to_string(),
+            serde_json::Value::String("nlb-ip".to_string()),
+        );
+        annotations.insert(
+            "service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol".to_string(),
+            serde_json::Value::String("TCP".to_string()),
+        );
+        annotations.insert(
+            "service.beta.kubernetes.io/aws-load-balancer-healthcheck-port".to_string(),
+            serde_json::Value::String("5432".to_string()),
+        );
+    }
+
+    let mut labels = serde_json::Map::new();
+    labels.insert(
+        "cnpg.io/cluster".to_string(),
+        serde_json::Value::String(cdb_name.to_string()),
+    );
+    if is_public {
+        labels.insert(
+            "public".to_string(),
+            serde_json::Value::String("true".to_string()),
+        );
+    }
+
     let service = json!({
         "apiVersion": "v1",
         "kind": "Service",
         "metadata": {
             "name": service_name,
             "namespace": namespace,
-            "annotations": {
-                "external-dns.alpha.kubernetes.io/hostname": format!("{}.{}", service_name, "example.com"),
-                "service.beta.kubernetes.io/aws-load-balancer-internal": lb_scheme,
-                "service.beta.kubernetes.io/aws-load-balancer-scheme": lb_internal,
-                "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type": "ip",
-                "service.beta.kubernetes.io/aws-load-balancer-type": "nlb-ip",
-                "service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol": "TCP",
-                "service.beta.kubernetes.io/aws-load-balancer-healthcheck-port": "5432"
-            },
-            "labels": {
-                "cnpg.io/cluster": cdb_name
-            }
+            "annotations": annotations,
+            "ownerReferences": [owner_reference],
+            "labels": labels
         },
         "spec": {
             "loadBalancerSourceRanges": [ /* Add your IP allow list here */ ],
