@@ -1916,9 +1916,9 @@ mod test {
         };
         let kind = "CoreDB";
         let replicas = 2;
-    
+
         let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
-    
+
         println!("Creating CoreDB resource {}", name);
         let _test_metric_decr = format!("coredb_integration_test_{}", suffix.clone());
         let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
@@ -1935,7 +1935,7 @@ mod test {
         let params = PatchParams::apply("functional-test-networking");
         let patch = Patch::Apply(&coredb_json);
         let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
-    
+
         let pod_name = format!("{}-1", name);
         let _check_for_pod = tokio::time::timeout(
             Duration::from_secs(TIMEOUT_SECONDS_START_POD),
@@ -1948,9 +1948,10 @@ mod test {
                 pod_name, TIMEOUT_SECONDS_START_POD
             )
         });
-    
+
         let ing_route_tcp_name = format!("{}-rw-0", name);
-        let ingress_route_tcp_api: Api<IngressRouteTCP> = Api::namespaced(client.clone(), &namespace);
+        let ingress_route_tcp_api: Api<IngressRouteTCP> =
+            Api::namespaced(client.clone(), &namespace);
         let ing_route_tcp = ingress_route_tcp_api
             .get(&ing_route_tcp_name)
             .await
@@ -1964,9 +1965,10 @@ mod test {
             .name
             .clone();
         assert_eq!(&service_name, format!("{}-rw", name).as_str());
-    
+
         let ing_route_tcp_name = format!("{}-ro-0", name);
-        let ingress_route_tcp_api: Api<IngressRouteTCP> = Api::namespaced(client.clone(), &namespace);
+        let ingress_route_tcp_api: Api<IngressRouteTCP> =
+            Api::namespaced(client.clone(), &namespace);
         let ing_route_tcp = ingress_route_tcp_api
             .get(&ing_route_tcp_name)
             .await
@@ -1980,7 +1982,7 @@ mod test {
             .name
             .clone();
         assert_eq!(&service_name, format!("{}-ro", name).as_str());
-    
+
         let coredb_json = serde_json::json!({
             "apiVersion": API_VERSION,
             "kind": kind,
@@ -1994,11 +1996,12 @@ mod test {
         let params = PatchParams::apply("functional-test-networking");
         let patch = Patch::Merge(&coredb_json);
         let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
-    
+
         tokio::time::sleep(Duration::from_secs(5)).await;
-    
+
         let ing_route_tcp_name = format!("extra-{}-rw", name);
-        let ingress_route_tcp_api: Api<IngressRouteTCP> = Api::namespaced(client.clone(), &namespace);
+        let ingress_route_tcp_api: Api<IngressRouteTCP> =
+            Api::namespaced(client.clone(), &namespace);
         let ing_route_tcp = ingress_route_tcp_api
             .get(&ing_route_tcp_name)
             .await
@@ -2017,7 +2020,7 @@ mod test {
             matcher,
             "HostSNI(`another-domain.com`) || HostSNI(`any-given-domain.com`)"
         );
-    
+
         let coredb_json = serde_json::json!({
             "apiVersion": API_VERSION,
             "kind": kind,
@@ -2031,9 +2034,9 @@ mod test {
         let params = PatchParams::apply("functional-test-networking");
         let patch = Patch::Merge(&coredb_json);
         let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
-    
+
         tokio::time::sleep(Duration::from_secs(5)).await;
-    
+
         let ing_route_tcp = ingress_route_tcp_api
             .get(&ing_route_tcp_name)
             .await
@@ -2049,10 +2052,10 @@ mod test {
         assert_eq!(&service_name, format!("{}-rw", name).as_str());
         let matcher = ing_route_tcp.spec.routes[0].r#match.clone();
         assert_eq!(matcher, "HostSNI(`new-domain.com`)");
-    
+
         let middlewares = ing_route_tcp.spec.routes[0].middlewares.clone().unwrap();
         assert_eq!(middlewares.len(), 1);
-    
+
         let coredb_json = serde_json::json!({
             "apiVersion": API_VERSION,
             "kind": kind,
@@ -2067,7 +2070,7 @@ mod test {
         let params = PatchParams::apply("functional-test-networking").force();
         let patch = Patch::Apply(&coredb_json);
         let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
-    
+
         let mut i = 0;
         loop {
             tokio::time::sleep(Duration::from_secs(5)).await;
@@ -2079,10 +2082,10 @@ mod test {
         }
         let ing_route_tcp = ingress_route_tcp_api.get(&ing_route_tcp_name).await;
         assert!(ing_route_tcp.is_err());
-    
+
         // Enable Dedicated Networking Test
         let context = state.create_context(client.clone());
-    
+
         let coredb_json = serde_json::json!({
             "apiVersion": API_VERSION,
             "kind": kind,
@@ -2101,15 +2104,27 @@ mod test {
         let params = PatchParams::apply("functional-test-dedicated-networking");
         let patch = Patch::Apply(&coredb_json);
         let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
-    
+
         tokio::time::sleep(Duration::from_secs(10)).await;
-    
-        let service_dedicated = service_exists(context.clone(), &namespace, &format!("{}-dedicated", name), false).await;
-        let service_dedicated_ro = service_exists(context.clone(), &namespace, &format!("{}-dedicated-ro", name), false).await;
-    
+
+        let service_dedicated = service_exists(
+            context.clone(),
+            &namespace,
+            &format!("{}-dedicated", name),
+            false,
+        )
+        .await;
+        let service_dedicated_ro = service_exists(
+            context.clone(),
+            &namespace,
+            &format!("{}-dedicated-ro", name),
+            false,
+        )
+        .await;
+
         assert!(service_dedicated.is_some());
         assert!(service_dedicated_ro.is_some());
-    
+
         let service = service_dedicated.unwrap();
         assert_eq!(
             service.spec.as_ref().unwrap().type_,
@@ -2125,7 +2140,7 @@ mod test {
                 .expect("Public label should be present"),
             "true"
         );
-    
+
         let service = service_dedicated_ro.unwrap();
         assert_eq!(
             service.spec.as_ref().unwrap().type_,
@@ -2141,7 +2156,7 @@ mod test {
                 .expect("Public label should be present"),
             "true"
         );
-    
+
         // Disable dedicated networking
         let coredb_json = serde_json::json!({
             "apiVersion": API_VERSION,
@@ -2157,15 +2172,29 @@ mod test {
         });
         let patch = Patch::Apply(&coredb_json);
         let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
-    
+
         tokio::time::sleep(Duration::from_secs(10)).await;
-    
-        let service_deleted = service_exists(context.clone(), &namespace, &format!("{}-dedicated", name), true).await.is_none();
-        let service_ro_deleted = service_exists(context.clone(), &namespace, &format!("{}-dedicated-ro", name), true).await.is_none();
-    
+
+        let service_deleted = service_exists(
+            context.clone(),
+            &namespace,
+            &format!("{}-dedicated", name),
+            true,
+        )
+        .await
+        .is_none();
+        let service_ro_deleted = service_exists(
+            context.clone(),
+            &namespace,
+            &format!("{}-dedicated-ro", name),
+            true,
+        )
+        .await
+        .is_none();
+
         assert!(service_deleted);
         assert!(service_ro_deleted);
-    
+
         coredbs.delete(name, &Default::default()).await.unwrap();
         println!("Waiting for CoreDB to be deleted: {}", &name);
         let _assert_coredb_deleted = tokio::time::timeout(
@@ -2180,7 +2209,7 @@ mod test {
             )
         });
         println!("CoreDB resource deleted {}", name);
-    
+
         let _ = delete_namespace(client.clone(), &namespace).await;
     }
 
