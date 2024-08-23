@@ -1,6 +1,12 @@
 use crate::{apis::coredb_types::CoreDB, Context};
+use crate::{
+    errors::OperatorError,
+    ingress::{reconcile_ip_allowlist_middleware, reconcile_postgres_ing_route_tcp},
+    network_policies::apply_network_policy,
+};
+use k8s_openapi::api::core::v1::Service;
 use k8s_openapi::api::networking::v1::NetworkPolicy;
-use k8s_openapi::apimachinery::pkg::{apis::meta::v1::OwnerReference, util::intstr::IntOrString};
+use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 use kube::Resource;
 use kube::{
     api::{Api, Patch, PatchParams, ResourceExt},
@@ -10,13 +16,6 @@ use serde_json::json;
 use std::env;
 use std::sync::Arc;
 use tracing::{debug, error, info};
-
-use crate::{
-    errors::OperatorError,
-    ingress::{reconcile_ip_allowlist_middleware, reconcile_postgres_ing_route_tcp},
-    network_policies::apply_network_policy,
-};
-use k8s_openapi::api::core::v1::Service;
 
 /// Reconcile dedicated networking resources for the CoreDB instance.
 ///
@@ -59,17 +58,12 @@ pub async fn reconcile_dedicated_networking(
                 "Reconciling network policies for dedicated networking in namespace: {}",
                 ns
             );
-            reconcile_dedicated_networking_network_policies(
-                client.clone(),
-                &ns,
-                &cdb.name_any(),
-                "172.31.0.0/16", // Replace with the actual CIDR for your dedicated network
-            )
-            .await
-            .map_err(|e| {
-                error!("Failed to reconcile network policies: {:?}", e);
-                e
-            })?;
+            reconcile_dedicated_networking_network_policies(cdb.clone(), client.clone(), &ns)
+                .await
+                .map_err(|e| {
+                    error!("Failed to reconcile network policies: {:?}", e);
+                    e
+                })?;
 
             info!(
                 "Reconciling IP allow list middleware for CoreDB instance: {}",
@@ -86,15 +80,13 @@ pub async fn reconcile_dedicated_networking(
                 "Handling primary service ingress for CoreDB instance: {}",
                 cdb.name_any()
             );
-            let owner_reference = cdb.controller_owner_ref(&()).unwrap();
             reconcile_dedicated_networking_service(
+                cdb,
                 client.clone(),
                 &ns,
-                &cdb.name_any(),
                 dedicated_networking.public,
                 false,
                 &dedicated_networking.serviceType,
-                owner_reference.clone(),
             )
             .await
             .map_err(|e| {
@@ -126,13 +118,12 @@ pub async fn reconcile_dedicated_networking(
                     cdb.name_any()
                 );
                 reconcile_dedicated_networking_service(
+                    cdb,
                     client.clone(),
                     &ns,
-                    &cdb.name_any(),
                     dedicated_networking.public,
                     true,
                     &dedicated_networking.serviceType,
-                    owner_reference,
                 )
                 .await
                 .map_err(|e| {
@@ -240,12 +231,16 @@ pub async fn reconcile_dedicated_networking(
 /// - `cdb_name`: The name of the CoreDB instance.
 /// - `cidr`: The CIDR block to allow traffic from.
 async fn reconcile_dedicated_networking_network_policies(
+    cdb: CoreDB,
     client: Client,
     namespace: &str,
-    cdb_name: &str,
-    cidr: &str,
 ) -> Result<(), OperatorError> {
+    let cdb_name = cdb.name_any();
     let np_api: Api<NetworkPolicy> = Api::namespaced(client, namespace);
+    let cidr = match cdb.spec.ip_allow_list.clone() {
+        None => "0.0.0.0/0".to_string(),
+        Some(ips) => ips.get(0).cloned().unwrap_or("0.0.0.0/0".to_string()),
+    };
 
     let policy_name = format!("{}-allow-nlb", cdb_name);
     info!(
@@ -372,14 +367,15 @@ async fn reconcile_dedicated_networking_ing_route_tcp(
 /// - `is_public`: Whether the service is public or private.
 /// - `is_standby`: Whether the service is for a standby (read-only) instance.
 async fn reconcile_dedicated_networking_service(
+    cdb: &CoreDB,
     client: Client,
     namespace: &str,
-    cdb_name: &str,
     is_public: bool,
     is_standby: bool,
     service_type: &str,
-    owner_reference: OwnerReference,
 ) -> Result<(), OperatorError> {
+    let cdb_name = &cdb.name_any();
+    let owner_reference = cdb.controller_owner_ref(&()).unwrap();
     let service_name = if is_standby {
         format!("{}-dedicated-ro", cdb_name)
     } else {
@@ -443,6 +439,11 @@ async fn reconcile_dedicated_networking_service(
         );
     }
 
+    let load_balancer_source_ranges = match cdb.spec.ip_allow_list.clone() {
+        None => vec!["0.0.0.0/0".to_string()],
+        Some(ips) => ips,
+    };
+
     let service = json!({
         "apiVersion": "v1",
         "kind": "Service",
@@ -454,7 +455,7 @@ async fn reconcile_dedicated_networking_service(
             "labels": labels
         },
         "spec": {
-            "loadBalancerSourceRanges": [ /* Add your IP allow list here */ ],
+            "loadBalancerSourceRanges": load_balancer_source_ranges,
             "ports": [{
                 "name": "postgres",
                 "port": 5432,
