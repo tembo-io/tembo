@@ -7,6 +7,7 @@ use dataplane_webserver::routes::secrets::{
     get_secret_names_v1, get_secret_v1, update_postgres_password,
 };
 use serde_json::json;
+use tracing_test::traced_test;
 
 async fn create_test_app() -> impl actix_web::dev::Service<
     actix_http::Request,
@@ -30,9 +31,9 @@ async fn create_test_app() -> impl actix_web::dev::Service<
     .await
 }
 
+#[traced_test]
 #[actix_web::test]
 async fn test_get_secret_names_v1() {
-    tracing_subscriber::fmt().init();
 
     let app = create_test_app().await;
 
@@ -81,10 +82,9 @@ async fn test_get_secret_names_v1() {
     );
 }
 
+#[traced_test]
 #[actix_web::test]
 async fn test_get_secret_v1() {
-    tracing_subscriber::fmt().init();
-
     let app = create_test_app().await;
 
     let req = test::TestRequest::get()
