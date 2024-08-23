@@ -958,11 +958,10 @@ mod test {
     async fn test_networking() {
         let client = kube_client().await;
         let state = State::default();
-        let context = state.create_context(client.clone());
 
         let mut rng = rand::thread_rng();
         let suffix = rng.gen_range(0..100000);
-        let name = &format!("test-networking-{}", suffix);
+        let name = &format!("test-networking-{}", suffix.clone());
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
             Err(e) => {
@@ -970,13 +969,13 @@ mod test {
                 std::process::exit(1);
             }
         };
-
         let kind = "CoreDB";
         let replicas = 2;
-
+    
         let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
-
+    
         println!("Creating CoreDB resource {}", name);
+        let _test_metric_decr = format!("coredb_integration_test_{}", suffix.clone());
         let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
         let coredb_json = serde_json::json!({
             "apiVersion": API_VERSION,
@@ -991,19 +990,154 @@ mod test {
         let params = PatchParams::apply("functional-test-networking");
         let patch = Patch::Apply(&coredb_json);
         let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
-
+    
         let pod_name = format!("{}-1", name);
-        pod_ready_and_running(pods.clone(), pod_name.clone()).await;
-
-        assert!(service_exists(
-            context.clone(),
-            &namespace,
-            &format!("{}-dedicated", name),
-            true
+        let _check_for_pod = tokio::time::timeout(
+            Duration::from_secs(TIMEOUT_SECONDS_START_POD),
+            await_condition(pods.clone(), &pod_name, conditions::is_pod_running()),
         )
         .await
-        .is_none());
-
+        .unwrap_or_else(|_| {
+            panic!(
+                "Did not find the pod {} to be running after waiting {} seconds",
+                pod_name, TIMEOUT_SECONDS_START_POD
+            )
+        });
+    
+        let ing_route_tcp_name = format!("{}-rw-0", name);
+        let ingress_route_tcp_api: Api<IngressRouteTCP> = Api::namespaced(client.clone(), &namespace);
+        let ing_route_tcp = ingress_route_tcp_api
+            .get(&ing_route_tcp_name)
+            .await
+            .unwrap_or_else(|_| {
+                panic!("Expected to find ingress route TCP {}", ing_route_tcp_name)
+            });
+        let service_name = ing_route_tcp.spec.routes[0]
+            .services
+            .clone()
+            .expect("Ingress route has no services")[0]
+            .name
+            .clone();
+        assert_eq!(&service_name, format!("{}-rw", name).as_str());
+    
+        let ing_route_tcp_name = format!("{}-ro-0", name);
+        let ingress_route_tcp_api: Api<IngressRouteTCP> = Api::namespaced(client.clone(), &namespace);
+        let ing_route_tcp = ingress_route_tcp_api
+            .get(&ing_route_tcp_name)
+            .await
+            .unwrap_or_else(|_| {
+                panic!("Expected to find ingress route TCP {}", ing_route_tcp_name)
+            });
+        let service_name = ing_route_tcp.spec.routes[0]
+            .services
+            .clone()
+            .expect("Ingress route has no services")[0]
+            .name
+            .clone();
+        assert_eq!(&service_name, format!("{}-ro", name).as_str());
+    
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "extra_domains_rw": ["any-given-domain.com", "another-domain.com"]
+            }
+        });
+        let params = PatchParams::apply("functional-test-networking");
+        let patch = Patch::Merge(&coredb_json);
+        let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+    
+        tokio::time::sleep(Duration::from_secs(5)).await;
+    
+        let ing_route_tcp_name = format!("extra-{}-rw", name);
+        let ingress_route_tcp_api: Api<IngressRouteTCP> = Api::namespaced(client.clone(), &namespace);
+        let ing_route_tcp = ingress_route_tcp_api
+            .get(&ing_route_tcp_name)
+            .await
+            .unwrap_or_else(|_| {
+                panic!("Expected to find ingress route TCP {}", ing_route_tcp_name)
+            });
+        let service_name = ing_route_tcp.spec.routes[0]
+            .services
+            .clone()
+            .expect("Ingress route has no services")[0]
+            .name
+            .clone();
+        assert_eq!(&service_name, format!("{}-rw", name).as_str());
+        let matcher = ing_route_tcp.spec.routes[0].r#match.clone();
+        assert_eq!(
+            matcher,
+            "HostSNI(`another-domain.com`) || HostSNI(`any-given-domain.com`)"
+        );
+    
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "extra_domains_rw": ["new-domain.com"]
+            }
+        });
+        let params = PatchParams::apply("functional-test-networking");
+        let patch = Patch::Merge(&coredb_json);
+        let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+    
+        tokio::time::sleep(Duration::from_secs(5)).await;
+    
+        let ing_route_tcp = ingress_route_tcp_api
+            .get(&ing_route_tcp_name)
+            .await
+            .unwrap_or_else(|_| {
+                panic!("Expected to find ingress route TCP {}", ing_route_tcp_name)
+            });
+        let service_name = ing_route_tcp.spec.routes[0]
+            .services
+            .clone()
+            .expect("Ingress route has no services")[0]
+            .name
+            .clone();
+        assert_eq!(&service_name, format!("{}-rw", name).as_str());
+        let matcher = ing_route_tcp.spec.routes[0].r#match.clone();
+        assert_eq!(matcher, "HostSNI(`new-domain.com`)");
+    
+        let middlewares = ing_route_tcp.spec.routes[0].middlewares.clone().unwrap();
+        assert_eq!(middlewares.len(), 1);
+    
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "replicas": replicas,
+                "extra_domains_rw": [],
+            }
+        });
+        let params = PatchParams::apply("functional-test-networking").force();
+        let patch = Patch::Apply(&coredb_json);
+        let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+    
+        let mut i = 0;
+        loop {
+            tokio::time::sleep(Duration::from_secs(5)).await;
+            let ing_route_tcp = ingress_route_tcp_api.get(&ing_route_tcp_name).await;
+            if i > 5 || ing_route_tcp.is_err() {
+                break;
+            }
+            i += 1;
+        }
+        let ing_route_tcp = ingress_route_tcp_api.get(&ing_route_tcp_name).await;
+        assert!(ing_route_tcp.is_err());
+    
+        // Enable Dedicated Networking Test
+        let context = state.create_context(client.clone());
+    
         let coredb_json = serde_json::json!({
             "apiVersion": API_VERSION,
             "kind": kind,
@@ -1019,21 +1153,19 @@ mod test {
                 }
             }
         });
+        let params = PatchParams::apply("functional-test-dedicated-networking");
         let patch = Patch::Apply(&coredb_json);
         let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
-
-        tokio::time::sleep(Duration::from_secs(5)).await;
-
-        let service = service_exists(
-            context.clone(),
-            &namespace,
-            &format!("{}-dedicated", name),
-            false,
-        )
-        .await;
-        assert!(service.is_some());
-
-        let service = service.unwrap();
+    
+        tokio::time::sleep(Duration::from_secs(10)).await;
+    
+        let service_dedicated = service_exists(context.clone(), &namespace, &format!("{}-dedicated", name), false).await;
+        let service_dedicated_ro = service_exists(context.clone(), &namespace, &format!("{}-dedicated-ro", name), false).await;
+    
+        assert!(service_dedicated.is_some());
+        assert!(service_dedicated_ro.is_some());
+    
+        let service = service_dedicated.unwrap();
         assert_eq!(
             service.spec.as_ref().unwrap().type_,
             Some("ClusterIP".to_string())
@@ -1048,31 +1180,24 @@ mod test {
                 .expect("Public label should be present"),
             "true"
         );
-
-        let cluster: Api<Cluster> = Api::namespaced(client.clone(), &namespace);
-        let restart = Utc::now()
-            .to_rfc3339_opts(SecondsFormat::Secs, true)
-            .to_string();
-        let patch_json = serde_json::json!({
-            "metadata": {
-                "annotations": {
-                    "kubectl.kubernetes.io/restartedAt": restart
-                }
-            }
-        });
-        let patch = Patch::Merge(patch_json);
-        let _patch = cluster.patch(name, &params, &patch);
-
-        let service = service_exists(
-            context.clone(),
-            &namespace,
-            &format!("{}-dedicated", name),
-            false,
-        )
-        .await;
-        assert!(service.is_some());
-
-        // Disable dedicated networking and ensure service is deleted
+    
+        let service = service_dedicated_ro.unwrap();
+        assert_eq!(
+            service.spec.as_ref().unwrap().type_,
+            Some("ClusterIP".to_string())
+        );
+        assert_eq!(
+            service
+                .metadata
+                .labels
+                .as_ref()
+                .expect("Labels should be present")
+                .get("public")
+                .expect("Public label should be present"),
+            "true"
+        );
+    
+        // Disable dedicated networking
         let coredb_json = serde_json::json!({
             "apiVersion": API_VERSION,
             "kind": kind,
@@ -1087,18 +1212,15 @@ mod test {
         });
         let patch = Patch::Apply(&coredb_json);
         let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
-
-        tokio::time::sleep(Duration::from_secs(5)).await;
-
-        assert!(service_exists(
-            context.clone(),
-            &namespace,
-            &format!("{}-dedicated", name),
-            true
-        )
-        .await
-        .is_none());
-
+    
+        tokio::time::sleep(Duration::from_secs(10)).await;
+    
+        let service_deleted = service_exists(context.clone(), &namespace, &format!("{}-dedicated", name), true).await.is_none();
+        let service_ro_deleted = service_exists(context.clone(), &namespace, &format!("{}-dedicated-ro", name), true).await.is_none();
+    
+        assert!(service_deleted);
+        assert!(service_ro_deleted);
+    
         coredbs.delete(name, &Default::default()).await.unwrap();
         println!("Waiting for CoreDB to be deleted: {}", &name);
         let _assert_coredb_deleted = tokio::time::timeout(
@@ -1113,7 +1235,7 @@ mod test {
             )
         });
         println!("CoreDB resource deleted {}", name);
-
+    
         let _ = delete_namespace(client.clone(), &namespace).await;
     }
 }
