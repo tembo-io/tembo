@@ -23,33 +23,33 @@ postgres_config:
   - name: shared_preload_libraries
     value: vectorize,pg_stat_statements,pgml,pg_cron,pg_later
   - name: vectorize.embedding_service_url
-    value: http://${NAMESPACE}-embeddings.${NAMESPACE}.svc.cluster.local:3000/v1/embeddings
+    value: http://${NAMESPACE}-embeddings.${NAMESPACE}.svc.cluster.local:3000/v1
   - name: pglater.host
     value: postgresql:///postgres?host=/controller/run
 trunk_installs:
   - name: pgvector
-    version: 0.7.3
+    version: 0.7.4
   - name: postgresml
     version: 2.7.1
   - name: pg_cron
     version: 1.6.2
   - name: pgmq
-    version: 1.3.3
+    version: 1.4.2
   - name: vectorize
-    version: 0.17.0
+    version: 0.18.0
   - name: pg_later
     version: 0.1.0
   - name: plpython3u
     version: 1.0.0
   - name: vectorscale
-    version: 0.2.0
+    version: 0.3.0
 extensions:
   # trunk project pg_vector
   - name: vector
     locations:
       - database: postgres
         enabled: true
-        version: 0.7.3
+        version: 0.7.4
   # trunk project postgresml
   - name: pgml
     locations:
@@ -65,12 +65,12 @@ extensions:
     locations:
     - database: postgres
       enabled: true
-      version: 1.3.3
+      version: 1.4.2
   - name: vectorize
     locations:
     - database: postgres
       enabled: true
-      version: 0.17.0
+      version: 0.18.0
   - name: pg_later
     locations:
     - database: postgres
@@ -85,4 +85,4 @@ extensions:
     locations:
       - database: postgres
         enabled: true
-        version: 0.2.0
+        version: 0.3.0
