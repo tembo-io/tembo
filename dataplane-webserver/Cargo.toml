@@ -30,3 +30,6 @@ indexmap = "2.0.0"
 regex = "1.9.6"
 actix-http = "3.9.0"
 jsonwebtoken = "8.3.0"
+
+[dev-dependencies]
+tracing-subscriber = "0.3.18"
