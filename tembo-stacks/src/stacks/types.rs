@@ -72,7 +72,7 @@ impl std::str::FromStr for StackType {
 impl StackType {
     pub fn as_str(&self) -> &str {
         match self {
-            StackType::Search=> "Search",
+            StackType::Search => "Search",
             StackType::Analytics => "Analytics",
             StackType::API => "API",
             StackType::DataWarehouse => "DataWarehouse",
@@ -297,7 +297,7 @@ mod tests {
     fn test_all_stack_deserialization() {
         for stack in StackType::iter() {
             match stack {
-                StackType::Search=> {
+                StackType::Search => {
                     get_stack(StackType::Search);
                 }
                 StackType::Analytics => {
