@@ -1905,8 +1905,8 @@ mod test {
         let state = State::default();
 
         let mut rng = rand::thread_rng();
-        let suffix = rng.gen_range(0..100000);
-        let name = &format!("example-dedicated-networking-{}", suffix.clone());
+        let suffix = rng.gen_range(0..10000);
+        let name = &format!("test-dedicated-networking-{}", suffix.clone());
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
             Err(e) => {
@@ -2137,6 +2137,15 @@ mod test {
                 .get("public")
                 .expect("Public label should be present"),
             "true"
+        );
+
+        let annotations = service.metadata.annotations.as_ref().expect("Annotations should be present");
+        let basedomain = std::env::var("DATA_PLANE_BASEDOMAIN").unwrap();
+        let expected_hostname = format!("{}.{}", namespace, basedomain);
+
+        assert_eq!(
+            annotations.get("external-dns.alpha.kubernetes.io/hostname").expect("Hostname annotation should be present"),
+            &expected_hostname
         );
 
         let service = service_dedicated_ro.unwrap();

@@ -1,12 +1,10 @@
 use crate::{apis::coredb_types::CoreDB, Context};
 use crate::{
     errors::OperatorError,
-    ingress::{reconcile_ip_allowlist_middleware, reconcile_postgres_ing_route_tcp},
     network_policies::apply_network_policy,
 };
 use k8s_openapi::api::core::v1::Service;
 use k8s_openapi::api::networking::v1::NetworkPolicy;
-use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 use kube::Resource;
 use kube::{
     api::{Api, Patch, PatchParams, ResourceExt},
@@ -38,7 +36,6 @@ pub async fn reconcile_dedicated_networking(
         );
         "default".to_string()
     });
-    let port = IntOrString::Int(5432);
     let client = ctx.client.clone();
 
     debug!(
@@ -64,18 +61,6 @@ pub async fn reconcile_dedicated_networking(
                     error!("Failed to reconcile network policies: {:?}", e);
                     e
                 })?;
-
-            debug!(
-                "Reconciling IP allow list middleware for CoreDB instance: {}",
-                cdb.name_any()
-            );
-            let middleware_name = reconcile_ip_allowlist_middleware(cdb, ctx.clone())
-                .await
-                .map_err(|e| {
-                    error!("Failed to reconcile IP allowlist middleware: {:?}", e);
-                    e
-                })?;
-
             debug!(
                 "Handling primary service ingress for CoreDB instance: {}",
                 cdb.name_any()
@@ -87,28 +72,11 @@ pub async fn reconcile_dedicated_networking(
                 dedicated_networking.public,
                 false,
                 &dedicated_networking.serviceType,
+                basedomain,
             )
             .await
             .map_err(|e| {
                 error!("Failed to reconcile primary service ingress: {:?}", e);
-                e
-            })?;
-
-            reconcile_dedicated_networking_ing_route_tcp(
-                cdb,
-                ctx.clone(),
-                &ns,
-                basedomain,
-                "dedicated",
-                &format!("{}-dedicated", cdb.name_any()),
-                port.clone(),
-                vec![middleware_name.clone()],
-                false,
-                false,
-            )
-            .await
-            .map_err(|e| {
-                error!("Failed to reconcile primary ingress route: {:?}", e);
                 e
             })?;
 
@@ -124,30 +92,24 @@ pub async fn reconcile_dedicated_networking(
                     dedicated_networking.public,
                     true,
                     &dedicated_networking.serviceType,
+                    basedomain,
                 )
                 .await
                 .map_err(|e| {
                     error!("Failed to reconcile standby service ingress: {:?}", e);
                     e
                 })?;
-
-                reconcile_dedicated_networking_ing_route_tcp(
-                    cdb,
-                    ctx.clone(),
-                    &ns,
-                    basedomain,
-                    "dedicated-ro",
-                    &format!("{}-dedicated-ro", cdb.name_any()),
-                    port.clone(),
-                    vec![middleware_name],
-                    false,
-                    true,
-                )
-                .await
-                .map_err(|e| {
-                    error!("Failed to reconcile standby ingress route: {:?}", e);
-                    e
-                })?;
+            } else {
+                info!(
+                    "Standby service is not included. Deleting standby service for CoreDB instance: {}",
+                    cdb.name_any()
+                );
+                delete_dedicated_networking_service(client.clone(), &ns, &cdb.name_any(), true)
+                    .await
+                    .map_err(|e| {
+                        error!("Failed to delete standby service: {:?}", e);
+                        e
+                    })?;
             }
         } else {
             info!(
@@ -168,42 +130,6 @@ pub async fn reconcile_dedicated_networking(
                     error!("Failed to delete standby service: {:?}", e);
                     e
                 })?;
-
-            reconcile_dedicated_networking_ing_route_tcp(
-                cdb,
-                ctx.clone(),
-                &ns,
-                basedomain,
-                "dedicated",
-                &format!("{}-dedicated", cdb.name_any()),
-                port.clone(),
-                vec![],
-                true,
-                false,
-            )
-            .await
-            .map_err(|e| {
-                error!("Failed to delete primary ingress route: {:?}", e);
-                e
-            })?;
-
-            reconcile_dedicated_networking_ing_route_tcp(
-                cdb,
-                ctx,
-                &ns,
-                basedomain,
-                "dedicated-ro",
-                &format!("{}-dedicated-ro", cdb.name_any()),
-                port,
-                vec![],
-                true,
-                true,
-            )
-            .await
-            .map_err(|e| {
-                error!("Failed to delete standby ingress route: {:?}", e);
-                e
-            })?;
         }
     } else {
         info!(
@@ -245,7 +171,7 @@ async fn reconcile_dedicated_networking_network_policies(
         .collect::<Vec<String>>();
 
     let policy_name = format!("{}-allow-nlb", cdb_name);
-    info!(
+    debug!(
         "Applying network policy: {} in namespace: {} to allow traffic from CIDRs: {:?}",
         policy_name, namespace, cidr_list
     );
@@ -299,68 +225,13 @@ async fn reconcile_dedicated_networking_network_policies(
             OperatorError::NetworkPolicyError(format!("Failed to apply network policy: {:?}", e))
         })?;
 
-    info!(
+    debug!(
         "Successfully applied network policy: {} in namespace: {}",
         policy_name, namespace
     );
     Ok(())
 }
 
-/// Reconcile the IngressRouteTCP resources for dedicated networking.
-///
-/// This function creates or deletes IngressRouteTCP resources for both the primary and standby
-/// services based on the dedicated networking configuration.
-///
-/// # Parameters
-/// - `cdb`: The CoreDB custom resource instance.
-/// - `ctx`: The operator context containing the Kubernetes client and other configurations.
-/// - `namespace`: The namespace in which to apply the ingress routes.
-/// - `basedomain`: The base domain for the ingress routes.
-/// - `ingress_name_prefix`: The prefix for the ingress resource names.
-/// - `service_name`: The name of the service associated with the ingress route.
-/// - `port`: The port for the service.
-/// - `middleware_names`: A list of middleware names to associate with the ingress route.
-/// - `delete`: Whether to delete the ingress route.
-/// - `is_standby`: Whether the ingress route is for a standby service.
-#[allow(clippy::too_many_arguments)]
-async fn reconcile_dedicated_networking_ing_route_tcp(
-    cdb: &CoreDB,
-    ctx: Arc<Context>,
-    namespace: &str,
-    basedomain: &str,
-    ingress_name_prefix: &str,
-    service_name: &str,
-    port: IntOrString,
-    middleware_names: Vec<String>,
-    delete: bool,
-    is_standby: bool,
-) -> Result<(), OperatorError> {
-    let subdomain = if is_standby {
-        format!("dedicated-ro.{}", namespace)
-    } else {
-        format!("dedicated.{}", namespace)
-    };
-
-    let action = if delete { "Deleting" } else { "Applying" };
-    info!(
-        "{} IngressRouteTCP for service: {} in namespace: {}",
-        action, service_name, namespace
-    );
-
-    reconcile_postgres_ing_route_tcp(
-        cdb,
-        ctx,
-        &subdomain,
-        basedomain,
-        namespace,
-        ingress_name_prefix,
-        service_name,
-        port,
-        middleware_names,
-        delete,
-    )
-    .await
-}
 
 /// Reconcile the Service resource for dedicated networking.
 ///
@@ -380,6 +251,7 @@ async fn reconcile_dedicated_networking_service(
     is_public: bool,
     is_standby: bool,
     service_type: &str,
+    basedomain: &str,
 ) -> Result<(), OperatorError> {
     let cdb_name = &cdb.name_any();
     let owner_reference = cdb.controller_owner_ref(&()).unwrap();
@@ -404,7 +276,7 @@ async fn reconcile_dedicated_networking_service(
     let mut annotations = serde_json::Map::new();
     annotations.insert(
         "external-dns.alpha.kubernetes.io/hostname".to_string(),
-        serde_json::Value::String(format!("{}", namespace)),
+        serde_json::Value::String(format!("{}.{}", namespace, basedomain)),
     );
 
     annotations.extend([
@@ -507,7 +379,7 @@ async fn reconcile_dedicated_networking_service(
             OperatorError::ServiceError(format!("Failed to apply service: {:?}", e))
         })?;
 
-    info!(
+    debug!(
         "Successfully applied service: {} in namespace: {}",
         service_name, namespace
     );
