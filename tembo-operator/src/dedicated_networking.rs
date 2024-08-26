@@ -78,7 +78,7 @@ pub async fn reconcile_dedicated_networking(
             })?;
 
             if dedicated_networking.includeStandby {
-                info!(
+                debug!(
                     "Handling standby service ingress for CoreDB instance: {}",
                     cdb.name_any()
                 );
@@ -97,7 +97,7 @@ pub async fn reconcile_dedicated_networking(
                     e
                 })?;
             } else {
-                info!(
+                debug!(
                     "Standby service is not included. Deleting standby service for CoreDB instance: {}",
                     cdb.name_any()
                 );
@@ -109,7 +109,7 @@ pub async fn reconcile_dedicated_networking(
                     })?;
             }
         } else {
-            info!(
+            debug!(
                 "Dedicated networking is disabled. Deleting services and ingress routes for CoreDB instance: {}",
                 cdb.name_any()
             );
@@ -129,13 +129,13 @@ pub async fn reconcile_dedicated_networking(
                 })?;
         }
     } else {
-        info!(
+        debug!(
             "Dedicated networking is not configured for CoreDB instance: {}",
             cdb.name_any()
         );
     }
 
-    info!(
+    debug!(
         "Completed reconciliation of dedicated networking for CoreDB instance: {} in namespace: {}",
         cdb.name_any(),
         ns
@@ -168,7 +168,7 @@ async fn reconcile_dedicated_networking_network_policies(
         .collect::<Vec<String>>();
 
     let policy_name = format!("{}-allow-nlb", cdb_name);
-    debug!(
+    info!(
         "Applying network policy: {} in namespace: {} to allow traffic from CIDRs: {:?}",
         policy_name, namespace, cidr_list
     );
@@ -222,7 +222,7 @@ async fn reconcile_dedicated_networking_network_policies(
             OperatorError::NetworkPolicyError(format!("Failed to apply network policy: {:?}", e))
         })?;
 
-    debug!(
+    info!(
         "Successfully applied network policy: {} in namespace: {}",
         policy_name, namespace
     );
@@ -264,7 +264,7 @@ async fn reconcile_dedicated_networking_service(
     };
     let lb_internal = if is_public { "false" } else { "true" };
 
-    debug!(
+    info!(
         "Applying Service: {} in namespace: {} with type: {} and scheme: {}",
         service_name, namespace, service_type, lb_scheme
     );
@@ -375,7 +375,7 @@ async fn reconcile_dedicated_networking_service(
             OperatorError::ServiceError(format!("Failed to apply service: {:?}", e))
         })?;
 
-    debug!(
+    info!(
         "Successfully applied service: {} in namespace: {}",
         service_name, namespace
     );
@@ -406,13 +406,13 @@ async fn delete_dedicated_networking_service(
 
     let svc_api: Api<Service> = Api::namespaced(client, namespace);
 
-    debug!(
+    info!(
         "Checking if service: {} exists in namespace: {} for deletion",
         service_name, namespace
     );
 
     if svc_api.get(&service_name).await.is_ok() {
-        info!(
+        debug!(
             "Service: {} exists in namespace: {}. Proceeding with deletion.",
             service_name, namespace
         );
