@@ -133,6 +133,20 @@ pub async fn reconcile_dedicated_networking(
             "Dedicated networking is not configured for CoreDB instance: {}",
             cdb.name_any()
         );
+
+        delete_dedicated_networking_service(client.clone(), &ns, &cdb.name_any(), false)
+            .await
+            .map_err(|e| {
+                error!("Failed to delete primary service: {:?}", e);
+                e
+            })?;
+
+        delete_dedicated_networking_service(client.clone(), &ns, &cdb.name_any(), true)
+            .await
+            .map_err(|e| {
+                error!("Failed to delete standby service: {:?}", e);
+                e
+            })?;
     }
 
     debug!(
@@ -168,7 +182,7 @@ async fn reconcile_dedicated_networking_network_policies(
         .collect::<Vec<String>>();
 
     let policy_name = format!("{}-allow-nlb", cdb_name);
-    info!(
+    debug!(
         "Applying network policy: {} in namespace: {} to allow traffic from CIDRs: {:?}",
         policy_name, namespace, cidr_list
     );
@@ -222,7 +236,7 @@ async fn reconcile_dedicated_networking_network_policies(
             OperatorError::NetworkPolicyError(format!("Failed to apply network policy: {:?}", e))
         })?;
 
-    info!(
+    debug!(
         "Successfully applied network policy: {} in namespace: {}",
         policy_name, namespace
     );
@@ -264,7 +278,7 @@ async fn reconcile_dedicated_networking_service(
     };
     let lb_internal = if is_public { "false" } else { "true" };
 
-    info!(
+    debug!(
         "Applying Service: {} in namespace: {} with type: {} and scheme: {}",
         service_name, namespace, service_type, lb_scheme
     );
@@ -375,7 +389,7 @@ async fn reconcile_dedicated_networking_service(
             OperatorError::ServiceError(format!("Failed to apply service: {:?}", e))
         })?;
 
-    info!(
+    debug!(
         "Successfully applied service: {} in namespace: {}",
         service_name, namespace
     );
@@ -406,13 +420,13 @@ async fn delete_dedicated_networking_service(
 
     let svc_api: Api<Service> = Api::namespaced(client, namespace);
 
-    info!(
+    debug!(
         "Checking if service: {} exists in namespace: {} for deletion",
         service_name, namespace
     );
 
     if svc_api.get(&service_name).await.is_ok() {
-        debug!(
+        info!(
             "Service: {} exists in namespace: {}. Proceeding with deletion.",
             service_name, namespace
         );

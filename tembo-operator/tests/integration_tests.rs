@@ -1905,7 +1905,7 @@ mod test {
         let state = State::default();
 
         let mut rng = rand::thread_rng();
-        let suffix = rng.gen_range(0..10000);
+        let suffix = rng.gen_range(1000..10000);
         let name = &format!("test-dedicated-networking-{}", suffix.clone());
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
