@@ -2139,12 +2139,18 @@ mod test {
             "true"
         );
 
-        let annotations = service.metadata.annotations.as_ref().expect("Annotations should be present");
+        let annotations = service
+            .metadata
+            .annotations
+            .as_ref()
+            .expect("Annotations should be present");
         let basedomain = std::env::var("DATA_PLANE_BASEDOMAIN").unwrap();
         let expected_hostname = format!("{}.{}", namespace, basedomain);
 
         assert_eq!(
-            annotations.get("external-dns.alpha.kubernetes.io/hostname").expect("Hostname annotation should be present"),
+            annotations
+                .get("external-dns.alpha.kubernetes.io/hostname")
+                .expect("Hostname annotation should be present"),
             &expected_hostname
         );
 

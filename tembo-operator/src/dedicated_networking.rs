@@ -1,8 +1,5 @@
 use crate::{apis::coredb_types::CoreDB, Context};
-use crate::{
-    errors::OperatorError,
-    network_policies::apply_network_policy,
-};
+use crate::{errors::OperatorError, network_policies::apply_network_policy};
 use k8s_openapi::api::core::v1::Service;
 use k8s_openapi::api::networking::v1::NetworkPolicy;
 use kube::Resource;
@@ -231,7 +228,6 @@ async fn reconcile_dedicated_networking_network_policies(
     );
     Ok(())
 }
-
 
 /// Reconcile the Service resource for dedicated networking.
 ///
