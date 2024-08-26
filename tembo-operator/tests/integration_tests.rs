@@ -1233,7 +1233,7 @@ mod test {
                     "enabled": true,
                     "includeStandby": true,
                     "public": true,
-                    "serviceType": "ClusterIP"
+                    "serviceType": "LoadBalancer"
                 }
             }
         });
