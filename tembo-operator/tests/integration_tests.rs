@@ -2097,7 +2097,7 @@ mod test {
                     "enabled": true,
                     "includeStandby": true,
                     "public": true,
-                    "serviceType": "ClusterIP"
+                    "serviceType": "LoadBalancer"
                 }
             }
         });
@@ -2128,7 +2128,7 @@ mod test {
         let service = service_dedicated.unwrap();
         assert_eq!(
             service.spec.as_ref().unwrap().type_,
-            Some("ClusterIP".to_string())
+            Some("LoadBalancer".to_string())
         );
         assert_eq!(
             service
@@ -2144,7 +2144,7 @@ mod test {
         let service = service_dedicated_ro.unwrap();
         assert_eq!(
             service.spec.as_ref().unwrap().type_,
-            Some("ClusterIP".to_string())
+            Some("LoadBalancer".to_string())
         );
         assert_eq!(
             service

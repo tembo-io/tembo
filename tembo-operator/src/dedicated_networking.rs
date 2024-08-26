@@ -401,30 +401,32 @@ async fn reconcile_dedicated_networking_service(
     );
 
     if service_type == "LoadBalancer" {
-        annotations.insert(
-            "service.beta.kubernetes.io/aws-load-balancer-internal".to_string(),
-            serde_json::Value::String(lb_scheme.to_string()),
-        );
-        annotations.insert(
-            "service.beta.kubernetes.io/aws-load-balancer-scheme".to_string(),
-            serde_json::Value::String(lb_internal.to_string()),
-        );
-        annotations.insert(
-            "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type".to_string(),
-            serde_json::Value::String("ip".to_string()),
-        );
-        annotations.insert(
-            "service.beta.kubernetes.io/aws-load-balancer-type".to_string(),
-            serde_json::Value::String("nlb-ip".to_string()),
-        );
-        annotations.insert(
-            "service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol".to_string(),
-            serde_json::Value::String("TCP".to_string()),
-        );
-        annotations.insert(
-            "service.beta.kubernetes.io/aws-load-balancer-healthcheck-port".to_string(),
-            serde_json::Value::String("5432".to_string()),
-        );
+        annotations.extend([
+            (
+                "service.beta.kubernetes.io/aws-load-balancer-internal".to_string(),
+                serde_json::Value::String(lb_scheme.to_string()),
+            ),
+            (
+                "service.beta.kubernetes.io/aws-load-balancer-scheme".to_string(),
+                serde_json::Value::String(lb_internal.to_string()),
+            ),
+            (
+                "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type".to_string(),
+                serde_json::Value::String("ip".to_string()),
+            ),
+            (
+                "service.beta.kubernetes.io/aws-load-balancer-type".to_string(),
+                serde_json::Value::String("nlb-ip".to_string()),
+            ),
+            (
+                "service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol".to_string(),
+                serde_json::Value::String("TCP".to_string()),
+            ),
+            (
+                "service.beta.kubernetes.io/aws-load-balancer-healthcheck-port".to_string(),
+                serde_json::Value::String("5432".to_string()),
+            ),
+        ]);
     }
 
     let mut labels = serde_json::Map::new();
@@ -439,10 +441,36 @@ async fn reconcile_dedicated_networking_service(
         );
     }
 
-    let load_balancer_source_ranges = match cdb.spec.ip_allow_list.clone() {
-        None => vec!["0.0.0.0/0".to_string()],
-        Some(ips) => ips,
-    };
+    let mut service_spec = serde_json::Map::new();
+    service_spec.insert(
+        "ports".to_string(),
+        json!([{
+            "name": "postgres",
+            "port": 5432,
+            "protocol": "TCP",
+            "targetPort": 5432
+        }]),
+    );
+    service_spec.insert(
+        "selector".to_string(),
+        json!({
+            "cnpg.io/cluster": cdb_name,
+            "role": if is_standby { "replica" } else { "primary" }
+        }),
+    );
+    service_spec.insert("sessionAffinity".to_string(), json!("None"));
+    service_spec.insert("type".to_string(), json!(service_type));
+
+    if service_type == "LoadBalancer" {
+        let load_balancer_source_ranges = match cdb.spec.ip_allow_list.clone() {
+            None => vec!["0.0.0.0/0".to_string()],
+            Some(ips) => ips,
+        };
+        service_spec.insert(
+            "loadBalancerSourceRanges".to_string(),
+            json!(load_balancer_source_ranges),
+        );
+    }
 
     let service = json!({
         "apiVersion": "v1",
@@ -454,21 +482,7 @@ async fn reconcile_dedicated_networking_service(
             "ownerReferences": [owner_reference],
             "labels": labels
         },
-        "spec": {
-            "loadBalancerSourceRanges": load_balancer_source_ranges,
-            "ports": [{
-                "name": "postgres",
-                "port": 5432,
-                "protocol": "TCP",
-                "targetPort": 5432
-            }],
-            "selector": {
-                "cnpg.io/cluster": cdb_name,
-                "role": if is_standby { "replica" } else { "primary" }
-            },
-            "sessionAffinity": "None",
-            "type": service_type
-        }
+        "spec": service_spec
     });
 
     let svc_api: Api<Service> = Api::namespaced(client, namespace);
