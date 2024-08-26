@@ -278,7 +278,7 @@ impl CoreDB {
                     Action::requeue(Duration::from_secs(300))
                 })?;
 
-                reconcile_dedicated_networking(self, ctx.clone())
+                reconcile_dedicated_networking(self, ctx.clone(), basedomain.as_str())
                     .await
                     .map_err(|e| {
                         error!("Error reconciling dedicated networking: {:?}", e);

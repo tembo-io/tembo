@@ -29,6 +29,7 @@ use tracing::{debug, error, info};
 pub async fn reconcile_dedicated_networking(
     cdb: &CoreDB,
     ctx: Arc<Context>,
+    basedomain: &str,
 ) -> Result<(), OperatorError> {
     let ns = cdb.namespace().unwrap_or_else(|| {
         error!(
@@ -37,11 +38,10 @@ pub async fn reconcile_dedicated_networking(
         );
         "default".to_string()
     });
-    let basedomain = env::var("DATA_PLANE_BASEDOMAIN").unwrap_or_else(|_| "localhost".to_string());
     let port = IntOrString::Int(5432);
     let client = ctx.client.clone();
 
-    info!(
+    debug!(
         "Starting reconciliation of dedicated networking for CoreDB instance: {} in namespace: {}",
         cdb.name_any(),
         ns
@@ -49,12 +49,12 @@ pub async fn reconcile_dedicated_networking(
 
     if let Some(dedicated_networking) = &cdb.spec.dedicatedNetworking {
         if dedicated_networking.enabled {
-            info!(
+            debug!(
                 "Dedicated networking is enabled for CoreDB instance: {}",
                 cdb.name_any()
             );
 
-            info!(
+            debug!(
                 "Reconciling network policies for dedicated networking in namespace: {}",
                 ns
             );
@@ -65,7 +65,7 @@ pub async fn reconcile_dedicated_networking(
                     e
                 })?;
 
-            info!(
+            debug!(
                 "Reconciling IP allow list middleware for CoreDB instance: {}",
                 cdb.name_any()
             );
@@ -76,7 +76,7 @@ pub async fn reconcile_dedicated_networking(
                     e
                 })?;
 
-            info!(
+            debug!(
                 "Handling primary service ingress for CoreDB instance: {}",
                 cdb.name_any()
             );
@@ -98,7 +98,7 @@ pub async fn reconcile_dedicated_networking(
                 cdb,
                 ctx.clone(),
                 &ns,
-                &basedomain,
+                basedomain,
                 "dedicated",
                 &format!("{}-dedicated", cdb.name_any()),
                 port.clone(),
@@ -135,7 +135,7 @@ pub async fn reconcile_dedicated_networking(
                     cdb,
                     ctx.clone(),
                     &ns,
-                    &basedomain,
+                    basedomain,
                     "dedicated-ro",
                     &format!("{}-dedicated-ro", cdb.name_any()),
                     port.clone(),
@@ -173,7 +173,7 @@ pub async fn reconcile_dedicated_networking(
                 cdb,
                 ctx.clone(),
                 &ns,
-                &basedomain,
+                basedomain,
                 "dedicated",
                 &format!("{}-dedicated", cdb.name_any()),
                 port.clone(),
@@ -191,7 +191,7 @@ pub async fn reconcile_dedicated_networking(
                 cdb,
                 ctx,
                 &ns,
-                &basedomain,
+                basedomain,
                 "dedicated-ro",
                 &format!("{}-dedicated-ro", cdb.name_any()),
                 port,
@@ -237,16 +237,39 @@ async fn reconcile_dedicated_networking_network_policies(
 ) -> Result<(), OperatorError> {
     let cdb_name = cdb.name_any();
     let np_api: Api<NetworkPolicy> = Api::namespaced(client, namespace);
-    let cidr = match cdb.spec.ip_allow_list.clone() {
-        None => "0.0.0.0/0".to_string(),
-        Some(ips) => ips.get(0).cloned().unwrap_or("0.0.0.0/0".to_string()),
-    };
+
+    let cidr_list = env::var("CLOUD_LOAD_BALANCER_INTERNAL_IP_CIDR")
+        .unwrap_or_else(|_| "10.0.0.0/8".to_string())
+        .split(',')
+        .map(|s| s.trim().to_string())
+        .collect::<Vec<String>>();
 
     let policy_name = format!("{}-allow-nlb", cdb_name);
     info!(
-        "Applying network policy: {} in namespace: {} to allow traffic from CIDR: {}",
-        policy_name, namespace, cidr
+        "Applying network policy: {} in namespace: {} to allow traffic from CIDRs: {:?}",
+        policy_name, namespace, cidr_list
     );
+
+    let ingress_rules = cidr_list
+        .into_iter()
+        .map(|cidr| {
+            serde_json::json!({
+                "from": [
+                    {
+                        "ipBlock": {
+                            "cidr": cidr
+                        }
+                    }
+                ],
+                "ports": [
+                    {
+                        "protocol": "TCP",
+                        "port": 5432
+                    }
+                ]
+            })
+        })
+        .collect::<Vec<_>>();
 
     let dedicated_network_policy = serde_json::json!({
         "apiVersion": "networking.k8s.io/v1",
@@ -262,23 +285,7 @@ async fn reconcile_dedicated_networking_network_policies(
                 }
             },
             "policyTypes": ["Ingress"],
-            "ingress": [
-                {
-                    "from": [
-                        {
-                            "ipBlock": {
-                                "cidr": cidr
-                            }
-                        }
-                    ],
-                    "ports": [
-                        {
-                            "protocol": "TCP",
-                            "port": 5432
-                        }
-                    ]
-                }
-            ]
+            "ingress": ingress_rules
         }
     });
 
@@ -389,7 +396,7 @@ async fn reconcile_dedicated_networking_service(
     };
     let lb_internal = if is_public { "false" } else { "true" };
 
-    info!(
+    debug!(
         "Applying Service: {} in namespace: {} with type: {} and scheme: {}",
         service_name, namespace, service_type, lb_scheme
     );
@@ -397,37 +404,35 @@ async fn reconcile_dedicated_networking_service(
     let mut annotations = serde_json::Map::new();
     annotations.insert(
         "external-dns.alpha.kubernetes.io/hostname".to_string(),
-        serde_json::Value::String(format!("{}.{}", service_name, "example.com")),
+        serde_json::Value::String(format!("{}", namespace)),
     );
 
-    if service_type == "LoadBalancer" {
-        annotations.extend([
-            (
-                "service.beta.kubernetes.io/aws-load-balancer-internal".to_string(),
-                serde_json::Value::String(lb_scheme.to_string()),
-            ),
-            (
-                "service.beta.kubernetes.io/aws-load-balancer-scheme".to_string(),
-                serde_json::Value::String(lb_internal.to_string()),
-            ),
-            (
-                "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type".to_string(),
-                serde_json::Value::String("ip".to_string()),
-            ),
-            (
-                "service.beta.kubernetes.io/aws-load-balancer-type".to_string(),
-                serde_json::Value::String("nlb-ip".to_string()),
-            ),
-            (
-                "service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol".to_string(),
-                serde_json::Value::String("TCP".to_string()),
-            ),
-            (
-                "service.beta.kubernetes.io/aws-load-balancer-healthcheck-port".to_string(),
-                serde_json::Value::String("5432".to_string()),
-            ),
-        ]);
-    }
+    annotations.extend([
+        (
+            "service.beta.kubernetes.io/aws-load-balancer-internal".to_string(),
+            serde_json::Value::String(lb_scheme.to_string()),
+        ),
+        (
+            "service.beta.kubernetes.io/aws-load-balancer-scheme".to_string(),
+            serde_json::Value::String(lb_internal.to_string()),
+        ),
+        (
+            "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type".to_string(),
+            serde_json::Value::String("ip".to_string()),
+        ),
+        (
+            "service.beta.kubernetes.io/aws-load-balancer-type".to_string(),
+            serde_json::Value::String("nlb-ip".to_string()),
+        ),
+        (
+            "service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol".to_string(),
+            serde_json::Value::String("TCP".to_string()),
+        ),
+        (
+            "service.beta.kubernetes.io/aws-load-balancer-healthcheck-port".to_string(),
+            serde_json::Value::String("5432".to_string()),
+        ),
+    ]);
 
     let mut labels = serde_json::Map::new();
     labels.insert(
@@ -462,10 +467,12 @@ async fn reconcile_dedicated_networking_service(
     service_spec.insert("type".to_string(), json!(service_type));
 
     if service_type == "LoadBalancer" {
-        let load_balancer_source_ranges = match cdb.spec.ip_allow_list.clone() {
-            None => vec!["0.0.0.0/0".to_string()],
-            Some(ips) => ips,
-        };
+        let load_balancer_source_ranges = env::var("CLOUD_LOAD_BALANCER_INTERNAL_IP_CIDR")
+            .unwrap_or_else(|_| "10.0.0.0/8".to_string())
+            .split(',')
+            .map(|s| s.trim().to_string())
+            .collect::<Vec<String>>();
+
         service_spec.insert(
             "loadBalancerSourceRanges".to_string(),
             json!(load_balancer_source_ranges),
@@ -486,7 +493,7 @@ async fn reconcile_dedicated_networking_service(
     });
 
     let svc_api: Api<Service> = Api::namespaced(client, namespace);
-    let patch_params = PatchParams::apply("conductor").force();
+    let patch_params = PatchParams::apply("cntrlr").force();
     let patch = Patch::Apply(&service);
 
     svc_api
@@ -531,7 +538,7 @@ async fn delete_dedicated_networking_service(
 
     let svc_api: Api<Service> = Api::namespaced(client, namespace);
 
-    info!(
+    debug!(
         "Checking if service: {} exists in namespace: {} for deletion",
         service_name, namespace
     );

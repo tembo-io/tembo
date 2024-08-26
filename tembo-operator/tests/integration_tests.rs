@@ -1906,7 +1906,7 @@ mod test {
 
         let mut rng = rand::thread_rng();
         let suffix = rng.gen_range(0..100000);
-        let name = &format!("test-networking-{}", suffix.clone());
+        let name = &format!("example-dedicated-networking-{}", suffix.clone());
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
             Err(e) => {
@@ -2104,8 +2104,6 @@ mod test {
         let params = PatchParams::apply("functional-test-dedicated-networking");
         let patch = Patch::Apply(&coredb_json);
         let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
-
-        tokio::time::sleep(Duration::from_secs(10)).await;
 
         let service_dedicated = service_exists(
             context.clone(),
