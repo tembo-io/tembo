@@ -1,9 +1,9 @@
-                     CoreDB Community License Agreement
+                     Tembo Community License Agreement
                                  Version 1.0
 
-This CoreDB Community License Agreement Version 1.0 (the “Agreement”) sets 
-forth the terms on which CoreDB, Inc. (“CoreDB”) makes available certain 
-software made available by CoreDB under this Agreement (the “Software”).  
+This Tembo Community License Agreement Version 1.0 (the “Agreement”) sets 
+forth the terms on which Tembo, Inc. (“Tembo”) makes available certain 
+software made available by Tembo under this Agreement (the “Software”).  
 BY INSTALLING, DOWNLOADING, ACCESSING, USING OR DISTRIBUTING ANY OF THE SOFTWARE, 
 YOU AGREE TO THE TERMS AND CONDITIONS OF THIS AGREEMENT. IF YOU DO NOT AGREE TO 
 SUCH TERMS AND CONDITIONS, YOU MUST NOT USE THE SOFTWARE.  IF YOU ARE RECEIVING 
@@ -15,7 +15,7 @@ whose behalf you are receiving the Software.
    1. LICENSE GRANT AND CONDITIONS.
 
       1.1 License.  Subject to the terms and conditions of this Agreement,
-      CoreDB hereby grants to Licensee a non-exclusive, royalty-free,
+      Tembo hereby grants to Licensee a non-exclusive, royalty-free,
       worldwide, non-transferable, non-sublicenseable license during the term
       of this Agreement to: (a) use the Software; (b) prepare modifications and
       derivative works of the Software; (c) distribute the Software (including
@@ -25,7 +25,7 @@ whose behalf you are receiving the Software.
       Purpose.  For purposes of this Agreement, “Excluded Purpose” means making
       available any software-as-a-service, platform-as-a-service,
       infrastructure-as-a-service or other similar online service that competes
-      with CoreDB products or services that provide the Software.
+      with Tembo products or services that provide the Software.
 
       1.2 Conditions.  In consideration of the License, Licensee’s distribution
       of the Software is subject to the following conditions:
@@ -34,13 +34,13 @@ whose behalf you are receiving the Software.
          prominent notices stating that Licensee modified the Software.
 
          (b) On each Software copy, Licensee shall reproduce and not remove or
-         alter all CoreDB or third party copyright or other proprietary
+         alter all Tembo or third party copyright or other proprietary
          notices contained in the Software, and Licensee must provide the
          notice below with each copy.  
 
-            “This software is made available by CoreDB, Inc., under the
-            terms of the CoreDB Community License Agreement, Version 1.0
-            located at http://www.coredb.io/coredb-community-license.  BY
+            “This software is made available by Tembo, Inc., under the
+            terms of the Tembo Community License Agreement, Version 1.0
+            located at http://tembo.io/tembo-community-license.  BY
             INSTALLING, DOWNLOADING, ACCESSING, USING OR DISTRIBUTING ANY OF
             THE SOFTWARE, YOU AGREE TO THE TERMS OF SUCH LICENSE AGREEMENT.”
 
@@ -50,7 +50,7 @@ whose behalf you are receiving the Software.
       Licensee’s modifications.  While redistributing the Software or
       modifications thereof, Licensee may choose to offer, for a fee or free of
       charge, support, warranty, indemnity, or other obligations. Licensee, and
-      not CoreDB, will be responsible for any such obligations.
+      not Tembo, will be responsible for any such obligations.
 
       1.4	No Sublicensing.  The License does not include the right to
       sublicense the Software, however, each recipient to which Licensee
@@ -63,19 +63,19 @@ whose behalf you are receiving the Software.
    terminate automatically and the License will terminate automatically and
    permanently.
 
-   3. INTELLECTUAL PROPERTY.  As between the parties, CoreDB will retain all
+   3. INTELLECTUAL PROPERTY.  As between the parties, Tembo will retain all
    right, title, and interest in the Software, and all intellectual property
-   rights therein. CoreDB hereby reserves all rights not expressly granted
-   to Licensee in this Agreement.  CoreDB hereby reserves all rights in its
+   rights therein. Tembo hereby reserves all rights not expressly granted
+   to Licensee in this Agreement.  Tembo hereby reserves all rights in its
    trademarks and service marks, and no licenses therein are granted in this
    Agreement.
 
-   4. DISCLAIMER. COREDB HEREBY DISCLAIMS ANY AND ALL WARRANTIES AND
+   4. DISCLAIMER. TEMBO HEREBY DISCLAIMS ANY AND ALL WARRANTIES AND
    CONDITIONS, EXPRESS, IMPLIED, STATUTORY, OR OTHERWISE, AND SPECIFICALLY
    DISCLAIMS ANY WARRANTY OF MERCHANTABILITY OR FITNESS FOR A PARTICULAR
    PURPOSE, WITH RESPECT TO THE SOFTWARE.  
 
-   5. LIMITATION OF LIABILITY. COREDB WILL NOT BE LIABLE FOR ANY DAMAGES OF
+   5. LIMITATION OF LIABILITY. TEMBO WILL NOT BE LIABLE FOR ANY DAMAGES OF
    ANY KIND, INCLUDING BUT NOT LIMITED TO, LOST PROFITS OR ANY CONSEQUENTIAL,
    SPECIAL, INCIDENTAL, INDIRECT, OR DIRECT DAMAGES, HOWEVER CAUSED AND ON ANY
    THEORY OF LIABILITY, ARISING OUT OF THIS AGREEMENT. THE FOREGOING SHALL
@@ -98,7 +98,7 @@ whose behalf you are receiving the Software.
       be entered in any court having jurisdiction thereof.
 
       6.2 Assignment.  Licensee is not authorized to assign its rights under
-      this Agreement to any third party. CoreDB may freely assign its rights
+      this Agreement to any third party. Tembo may freely assign its rights
       under this Agreement to any third party.
 
       6.3 Other.  This Agreement is the entire agreement between the parties
@@ -108,7 +108,7 @@ whose behalf you are receiving the Software.
       parties.  In the event that any provision, including without limitation
       any condition, of this Agreement is held to be unenforceable, this
       Agreement and all licenses and rights granted hereunder will immediately
-      terminate.  Waiver by CoreDB of a breach of any provision of this
-      Agreement or the failure by CoreDB to exercise any right hereunder
+      terminate.  Waiver by Tembo of a breach of any provision of this
+      Agreement or the failure by Tembo to exercise any right hereunder
       will not be construed as a waiver of any subsequent breach of that right
       or as a waiver of any other right.
