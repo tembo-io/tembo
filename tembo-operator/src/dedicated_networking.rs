@@ -15,12 +15,12 @@ use tracing::{debug, error, info};
 /// Reconcile dedicated networking resources for the CoreDB instance.
 ///
 /// This function handles the creation, update, or deletion of Kubernetes resources
-/// required for dedicated networking, including services, network policies, and
-/// ingress routes.
+/// required for dedicated networking, including services and network policies
 ///
 /// # Parameters
 /// - `cdb`: The CoreDB custom resource instance.
 /// - `ctx`: The operator context containing the Kubernetes client and other configurations.
+/// - `basedomain`: The base domain for the service.
 pub async fn reconcile_dedicated_networking(
     cdb: &CoreDB,
     ctx: Arc<Context>,
@@ -52,7 +52,7 @@ pub async fn reconcile_dedicated_networking(
                 "Reconciling network policies for dedicated networking in namespace: {}",
                 ns
             );
-            reconcile_dedicated_networking_network_policies(cdb.clone(), client.clone(), &ns)
+            reconcile_dedicated_network_policies(cdb.clone(), client.clone(), &ns)
                 .await
                 .map_err(|e| {
                     error!("Failed to reconcile network policies: {:?}", e);
@@ -108,11 +108,25 @@ pub async fn reconcile_dedicated_networking(
                         e
                     })?;
             }
+
+            debug!(
+                "Completed reconciliation of dedicated networking for CoreDB instance: {} in namespace: {}",
+                cdb.name_any(),
+                ns
+            );
         } else {
             debug!(
-                "Dedicated networking is disabled. Deleting services and ingress routes for CoreDB instance: {}",
+                "Dedicated networking is disabled for CoreDB instance: {}",
                 cdb.name_any()
             );
+
+            // Handling the case if dedicatedNetworking is disabled
+            delete_dedicated_networking_policies(client.clone(), &ns, &cdb.name_any())
+                .await
+                .map_err(|e| {
+                    error!("Failed to delete network policies: {:?}", e);
+                    e
+                })?;
 
             delete_dedicated_networking_service(client.clone(), &ns, &cdb.name_any(), false)
                 .await
@@ -134,6 +148,14 @@ pub async fn reconcile_dedicated_networking(
             cdb.name_any()
         );
 
+        // Handling the case even if dedicatedNetworking is not present in the spec
+        delete_dedicated_networking_policies(client.clone(), &ns, &cdb.name_any())
+            .await
+            .map_err(|e| {
+                error!("Failed to delete network policies: {:?}", e);
+                e
+            })?;
+
         delete_dedicated_networking_service(client.clone(), &ns, &cdb.name_any(), false)
             .await
             .map_err(|e| {
@@ -149,11 +171,6 @@ pub async fn reconcile_dedicated_networking(
             })?;
     }
 
-    debug!(
-        "Completed reconciliation of dedicated networking for CoreDB instance: {} in namespace: {}",
-        cdb.name_any(),
-        ns
-    );
     Ok(())
 }
 
@@ -163,11 +180,10 @@ pub async fn reconcile_dedicated_networking(
 /// to the CoreDB pods.
 ///
 /// # Parameters
+/// - `cdb`: The CoreDB Spec
 /// - `client`: The Kubernetes client.
 /// - `namespace`: The namespace in which to apply the network policy.
-/// - `cdb_name`: The name of the CoreDB instance.
-/// - `cidr`: The CIDR block to allow traffic from.
-async fn reconcile_dedicated_networking_network_policies(
+async fn reconcile_dedicated_network_policies(
     cdb: CoreDB,
     client: Client,
     namespace: &str,
@@ -243,17 +259,74 @@ async fn reconcile_dedicated_networking_network_policies(
     Ok(())
 }
 
-/// Reconcile the Service resource for dedicated networking.
+/// Delete the NetworkPolicy resource for dedicated networking.
 ///
-/// This function creates or deletes a Service resource for the primary or standby service
-/// based on the dedicated networking configuration.
+/// This function deletes the NetworkPolicy resource associated with the CoreDB instance.
 ///
 /// # Parameters
 /// - `client`: The Kubernetes client.
-/// - `namespace`: The namespace in which to create the service.
+/// - `namespace`: The namespace in which to delete the network policy.
 /// - `cdb_name`: The name of the CoreDB instance.
+async fn delete_dedicated_networking_policies(
+    client: Client,
+    namespace: &str,
+    cdb_name: &str,
+) -> Result<(), OperatorError> {
+    let np_api: Api<NetworkPolicy> = Api::namespaced(client, namespace);
+    let policy_name = format!("{}-allow-nlb", cdb_name);
+
+    debug!(
+        "Checking if network policy: {} exists in namespace: {} for deletion",
+        policy_name, namespace
+    );
+
+    if np_api.get(&policy_name).await.is_ok() {
+        info!(
+            "Network policy: {} exists in namespace: {}. Proceeding with deletion.",
+            policy_name, namespace
+        );
+
+        np_api
+            .delete(&policy_name, &Default::default())
+            .await
+            .map_err(|e| {
+                error!(
+                    "Failed to delete network policy: {} in namespace: {}. Error: {}",
+                    policy_name, namespace, e
+                );
+                OperatorError::NetworkPolicyError(format!(
+                    "Failed to delete network policy: {:?}",
+                    e
+                ))
+            })?;
+
+        info!(
+            "Successfully deleted network policy: {} in namespace: {}",
+            policy_name, namespace
+        );
+    } else {
+        debug!(
+            "Network policy: {} does not exist in namespace: {}. Skipping deletion.",
+            policy_name, namespace
+        );
+    }
+
+    Ok(())
+}
+
+/// Reconcile the Service resource for dedicated networking.
+///
+/// This function creates or updates a Service resource for the primary or standby service
+/// based on the dedicated networking configuration.
+///
+/// # Parameters
+/// - `cdb`: The CoreDB custom resource instance.
+/// - `client`: The Kubernetes client.
+/// - `namespace`: The namespace in which to create or update the service.
 /// - `is_public`: Whether the service is public or private.
 /// - `is_standby`: Whether the service is for a standby (read-only) instance.
+/// - `service_type`: The type of the Kubernetes Service (e.g., "LoadBalancer", "ClusterIP").
+/// - `basedomain`: The base domain for the service.
 async fn reconcile_dedicated_networking_service(
     cdb: &CoreDB,
     client: Client,

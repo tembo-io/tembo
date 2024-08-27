@@ -1901,9 +1901,11 @@ mod test {
     #[tokio::test]
     #[ignore]
     async fn test_networking() {
+        // Initialize the Kubernetes client
         let client = kube_client().await;
         let state = State::default();
 
+        // Configurations
         let mut rng = rand::thread_rng();
         let suffix = rng.gen_range(1000..10000);
         let name = &format!("test-dedicated-networking-{}", suffix.clone());
@@ -1917,8 +1919,10 @@ mod test {
         let kind = "CoreDB";
         let replicas = 2;
 
+        // Create a pod we can use to run commands in the cluster
         let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
 
+        // Apply a basic configuration of CoreDB
         println!("Creating CoreDB resource {}", name);
         let _test_metric_decr = format!("coredb_integration_test_{}", suffix.clone());
         let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
@@ -1936,6 +1940,7 @@ mod test {
         let patch = Patch::Apply(&coredb_json);
         let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
 
+        // Wait for Pod to be created
         let pod_name = format!("{}-1", name);
         let _check_for_pod = tokio::time::timeout(
             Duration::from_secs(TIMEOUT_SECONDS_START_POD),
@@ -1952,6 +1957,7 @@ mod test {
         let ing_route_tcp_name = format!("{}-rw-0", name);
         let ingress_route_tcp_api: Api<IngressRouteTCP> =
             Api::namespaced(client.clone(), &namespace);
+        // Get the ingress route tcp
         let ing_route_tcp = ingress_route_tcp_api
             .get(&ing_route_tcp_name)
             .await
@@ -1964,11 +1970,14 @@ mod test {
             .expect("Ingress route has no services")[0]
             .name
             .clone();
+        // Assert the ingress route tcp service points to coredb service
+        // The coredb service is named the same as the coredb resource
         assert_eq!(&service_name, format!("{}-rw", name).as_str());
 
         let ing_route_tcp_name = format!("{}-ro-0", name);
         let ingress_route_tcp_api: Api<IngressRouteTCP> =
             Api::namespaced(client.clone(), &namespace);
+        // Get the ingress route tcp
         let ing_route_tcp = ingress_route_tcp_api
             .get(&ing_route_tcp_name)
             .await
@@ -1981,6 +1990,8 @@ mod test {
             .expect("Ingress route has no services")[0]
             .name
             .clone();
+        // Assert the ingress route tcp service points to coredb service
+        // The coredb service is named the same as the coredb resource
         assert_eq!(&service_name, format!("{}-ro", name).as_str());
 
         let coredb_json = serde_json::json!({
@@ -1997,11 +2008,13 @@ mod test {
         let patch = Patch::Merge(&coredb_json);
         let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
 
+        // extra domains should be created almost right away, within a few milliseconds
         tokio::time::sleep(Duration::from_secs(5)).await;
 
         let ing_route_tcp_name = format!("extra-{}-rw", name);
         let ingress_route_tcp_api: Api<IngressRouteTCP> =
             Api::namespaced(client.clone(), &namespace);
+        // Get the ingress route tcp
         let ing_route_tcp = ingress_route_tcp_api
             .get(&ing_route_tcp_name)
             .await
@@ -2014,6 +2027,8 @@ mod test {
             .expect("Ingress route has no services")[0]
             .name
             .clone();
+        // Assert the ingress route tcp service points to coredb service
+        // The coredb service is named the same as the coredb resource
         assert_eq!(&service_name, format!("{}-rw", name).as_str());
         let matcher = ing_route_tcp.spec.routes[0].r#match.clone();
         assert_eq!(
@@ -2035,8 +2050,10 @@ mod test {
         let patch = Patch::Merge(&coredb_json);
         let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
 
+        // extra domains should be created almost right away, within a few milliseconds
         tokio::time::sleep(Duration::from_secs(5)).await;
 
+        // Get the ingress route tcp
         let ing_route_tcp = ingress_route_tcp_api
             .get(&ing_route_tcp_name)
             .await
@@ -2049,10 +2066,13 @@ mod test {
             .expect("Ingress route has no services")[0]
             .name
             .clone();
+        // Assert the ingress route tcp service points to coredb service
+        // The coredb service is named the same as the coredb resource
         assert_eq!(&service_name, format!("{}-rw", name).as_str());
         let matcher = ing_route_tcp.spec.routes[0].r#match.clone();
         assert_eq!(matcher, "HostSNI(`new-domain.com`)");
 
+        // Check that a middleware was applied
         let middlewares = ing_route_tcp.spec.routes[0].middlewares.clone().unwrap();
         assert_eq!(middlewares.len(), 1);
 
@@ -2071,6 +2091,7 @@ mod test {
         let patch = Patch::Apply(&coredb_json);
         let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
 
+        // wait for ingress route tcp to be deleted
         let mut i = 0;
         loop {
             tokio::time::sleep(Duration::from_secs(5)).await;
@@ -2080,7 +2101,9 @@ mod test {
             }
             i += 1;
         }
+        // Get the ingress route tcp
         let ing_route_tcp = ingress_route_tcp_api.get(&ing_route_tcp_name).await;
+        // Should be deleted
         assert!(ing_route_tcp.is_err());
 
         // Enable Dedicated Networking Test
@@ -2223,6 +2246,7 @@ mod test {
         });
         println!("CoreDB resource deleted {}", name);
 
+        // Delete namespace
         let _ = delete_namespace(client.clone(), &namespace).await;
     }
 
