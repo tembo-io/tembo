@@ -13,6 +13,12 @@ pub enum OperatorError {
     #[error("An IngressRouteTCP failed to Create, Update, or Delete")]
     IngressRouteTcpError,
 
+    #[error("Failed to create, update, or delete NetworkPolicy: {0}")]
+    NetworkPolicyError(String),
+
+    #[error("Failed to create, update, or delete Service: {0}")]
+    ServiceError(String),
+
     #[error("KubeErr: {0}")]
     KubeErr(#[from] kube::Error),
 
