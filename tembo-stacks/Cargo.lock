@@ -2471,7 +2471,7 @@ dependencies = [
 
 [[package]]
 name = "tembo-stacks"
-version = "0.14.1"
+version = "0.15.1"
 dependencies = [
  "anyhow",
  "clap",
