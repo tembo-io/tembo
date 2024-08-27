@@ -1,0 +1,11 @@
+apiVersion: coredb.io/v1alpha1
+kind: CoreDB
+metadata:
+  name: sample-dedicated
+spec:
+  image: "quay.io/tembo/standard-cnpg:15-a0a5ab5"
+  dedicatedNetworking:
+    enabled: true
+    includeStandby: true 
+    public: true          
+    serviceType: ClusterIP
