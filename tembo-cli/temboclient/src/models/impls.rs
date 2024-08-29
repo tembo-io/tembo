@@ -77,6 +77,7 @@ impl FromStr for StackType {
             "OLAP" => Ok(StackType::Olap),
             "VectorDB" => Ok(StackType::VectorDb),
             "OLTP" => Ok(StackType::Oltp),
+            "Analytics" => Ok(StackType::Analytics),
             "DataWarehouse" => Ok(StackType::DataWarehouse),
             "Geospatial" => Ok(StackType::Geospatial),
             "MongoAlternative" => Ok(StackType::MongoAlternative),
