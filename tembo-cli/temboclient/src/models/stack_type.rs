@@ -21,6 +21,8 @@ pub enum StackType {
     Olap,
     #[serde(rename = "OLTP")]
     Oltp,
+    #[serde(rename = "Analytics")]
+    Analytics,
     #[serde(rename = "VectorDB")]
     VectorDb,
     #[serde(rename = "DataWarehouse")]
@@ -43,6 +45,7 @@ impl ToString for StackType {
             Self::MachineLearning => String::from("MachineLearning"),
             Self::Olap => String::from("OLAP"),
             Self::Oltp => String::from("OLTP"),
+            Self::Analytics => String::from("Analytics"),
             Self::VectorDb => String::from("VectorDB"),
             Self::DataWarehouse => String::from("DataWarehouse"),
             Self::Geospatial => String::from("Geospatial"),
