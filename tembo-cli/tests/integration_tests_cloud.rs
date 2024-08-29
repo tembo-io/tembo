@@ -49,6 +49,17 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
     cmd.arg("apply");
     cmd.assert().success();
 
+    let output = cmd.output()?;
+
+    if output
+        .stdout
+        .windows(b"Error creating instance".len())
+        .any(|window| window == b"Error creating instance")
+    {
+        println!("Output: {}", String::from_utf8_lossy(&output.stdout));
+        panic!("Error: Instance creation failed");
+    }
+
     let env = get_current_context()?;
     let profile = env.clone().selected_profile.unwrap();
     let config = Configuration {
@@ -124,6 +135,12 @@ fn setup_env(instance_name: &String) -> Result<(), Box<dyn Error>> {
         "tembo.toml".to_string(),
         "instance_name = \"minimal\"",
         &format!("instance_name = \"{instance_name}\""),
+    )?;
+
+    replace_vars_in_file(
+        "tembo.toml".to_string(),
+        "[minimal]",
+        &format!("[{instance_name}]"),
     )?;
 
     Ok(())

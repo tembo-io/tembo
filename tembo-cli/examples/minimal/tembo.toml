@@ -2,4 +2,4 @@
 environment = "prod"
 instance_name = "minimal"
 pg_version = 15
-stack_type = "Standard"
+stack_type = "OLTP"
