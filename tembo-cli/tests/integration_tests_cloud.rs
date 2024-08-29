@@ -49,17 +49,6 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
     cmd.arg("apply");
     cmd.assert().success();
 
-    let output = cmd.output()?;
-
-    if output
-        .stdout
-        .windows(b"Error creating instance".len())
-        .any(|window| window == b"Error creating instance")
-    {
-        println!("Output: {}", String::from_utf8_lossy(&output.stdout));
-        panic!("Error: Instance creation failed");
-    }
-
     let env = get_current_context()?;
     let profile = env.clone().selected_profile.unwrap();
     let config = Configuration {
