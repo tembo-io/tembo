@@ -34,8 +34,8 @@ trunk_installs:
     version: 4.7.4
   - name: pg_cron
     version: 1.6.2
-  - name: pg_lakehouse
-    version: 0.9.0
+  - name: pg_analytics
+    version: 0.1.2
 extensions:
   - name: pg_stat_statements
     locations:
@@ -53,9 +53,9 @@ extensions:
     - database: postgres
       enabled: true
       version: 1.6.2
-  - name: pg_lakehouse
-    description: pg_lakehouse
+  - name: pg_analytics
+    description: pg_analytics
     locations:
     - database: postgres
       enabled: true
-      version: 0.9.0
+      version: 0.1.2
