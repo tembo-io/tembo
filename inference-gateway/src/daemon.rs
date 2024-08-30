@@ -7,6 +7,4 @@ use tokio::sync::Mutex;
 async fn main() {
     let background_threads: Arc<Mutex<Vec<tokio::task::JoinHandle<()>>>> =
         Arc::new(Mutex::new(Vec::new()));
-    
-    
 }
