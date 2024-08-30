@@ -123,7 +123,6 @@ fn get_hourly_chunks(
 }
 
 pub async fn events_reporter() -> Result<()> {
-    const BATCH_SIZE: usize = 1000;
     // Run once per hour
     const SYNC_PERIOD: Duration = Duration::from_secs(60 * 60);
 
@@ -142,34 +141,48 @@ pub async fn events_reporter() -> Result<()> {
 
     let mut sync_interval = interval(SYNC_PERIOD);
 
-    let last_reported_at = get_reporter_watermark(&dbclient)
-        .await?
-        .map(|watermark| watermark.last_reported_at)
-        .unwrap_or(Utc::now() - Duration::from_secs(60 * 60));
-
     loop {
         sync_interval.tick().await;
 
-        let end_time = Utc::now();
-        let start_time = end_time - chrono::Duration::hours(1);
-        // TODO: Get the correct postgres connection URL
-        let events = get_usage(&dbclient, start_time, end_time).await?;
+        let last_reported_at = get_reporter_watermark(&dbclient)
+            .await?
+            .map(|watermark| watermark.last_reported_at)
+            .unwrap_or(Utc::now() - Duration::from_secs(60 * 60));
+        let now = Utc::now();
 
-        let metrics_to_send = split_events(events, BATCH_SIZE);
-        let batches = metrics_to_send.len();
+        let chunks = get_hourly_chunks(last_reported_at, now);
 
-        info!(
-            "Split metrics into {} chunks, each with {} results",
-            batches, BATCH_SIZE
-        );
-
-        let mut i = 1;
-        for event in &metrics_to_send {
-            queue.send(&metrics_events_queue, event).await?;
-            info!("Enqueued batch {}/{} to PGMQ", i, batches);
-            i += 1;
+        for (start_time, end_time) in chunks {
+            enqueue_event(&dbclient, &queue, &metrics_events_queue, start_time, end_time).await?;
         }
     }
+}
+
+async fn enqueue_event(
+    pool: &Pool<Postgres>,
+    queue: &PGMQueueExt,
+    metrics_events_queue: &str,
+    start_time: DateTime<Utc>,
+    end_time: DateTime<Utc>
+) -> Result<(), anyhow::Error> {
+    const BATCH_SIZE: usize = 1000;
+
+    let events = get_usage(pool, start_time, end_time).await?;
+    let metrics_to_send = split_events(events, BATCH_SIZE);
+    let batches = metrics_to_send.len();
+    info!(
+        "Split metrics into {} chunks, each with {} results",
+        batches, BATCH_SIZE
+    );
+    let mut i = 1;
+
+    for event in &metrics_to_send {
+        queue.send(metrics_events_queue, event).await?;
+        info!("Enqueued batch {}/{} for {} to PGMQ", i, batches, start_time.format("%Y-%m-%d %H:%M:%S %Z"));
+        i += 1;
+    }
+
+    Ok(())
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
@@ -262,17 +275,26 @@ mod tests {
             // 2023-05-10 12:00:00 UTC to 2023-05-10 12:59:59 UTC
             (
                 Utc.with_ymd_and_hms(2023, 5, 10, 12, 0, 0).unwrap(),
-                Utc.with_ymd_and_hms(2023, 5, 10, 12, 59, 59).unwrap().with_nanosecond(999999999).unwrap(),
+                Utc.with_ymd_and_hms(2023, 5, 10, 12, 59, 59)
+                    .unwrap()
+                    .with_nanosecond(999999999)
+                    .unwrap(),
             ),
             // 2023-05-10 13:00:00 UTC to 2023-05-10 13:59:59 UTC
             (
                 Utc.with_ymd_and_hms(2023, 5, 10, 13, 0, 0).unwrap(),
-                Utc.with_ymd_and_hms(2023, 5, 10, 13, 59, 59).unwrap().with_nanosecond(999999999).unwrap(),
+                Utc.with_ymd_and_hms(2023, 5, 10, 13, 59, 59)
+                    .unwrap()
+                    .with_nanosecond(999999999)
+                    .unwrap(),
             ),
             // 2023-05-10 14:00:00 UTC to 2023-05-10 14:59:59 UTC
             (
                 Utc.with_ymd_and_hms(2023, 5, 10, 14, 0, 0).unwrap(),
-                Utc.with_ymd_and_hms(2023, 5, 10, 14, 59, 59).unwrap().with_nanosecond(999999999).unwrap(),
+                Utc.with_ymd_and_hms(2023, 5, 10, 14, 59, 59)
+                    .unwrap()
+                    .with_nanosecond(999999999)
+                    .unwrap(),
             ),
         ];
 
