@@ -1,7 +1,7 @@
 workspace = { members = ["temboclient", "tembodataclient"] }
 [package]
 name = "tembo-cli"
-version = "0.20.6"
+version = "0.20.7"
 edition = "2021"
 authors = ["Tembo.io"]
 description = "The CLI for Tembo"
@@ -65,7 +65,7 @@ tokio = { version = "1.26.0", features = [
 tungstenite ="0.21.0"
 futures-util = "0.3.30"
 dirs = "5.0.1"
-controller = "0.47.0"
+controller = "0.49.8"
 sqlx = { version = "0.7.3", features = ["runtime-tokio-native-tls", "postgres", "chrono", "json"] }
 base64 = "0.21.5"
 colorful = "0.2.2"
@@ -75,7 +75,7 @@ tiny-gradient = "0.1.0"
 urlencoding = "2.1.3"
 spinoff = "0.8.0"
 k8s-openapi = { version = "0.18.0", features = ["v1_25", "schemars"], default-features = false }
-tembo-stacks = "0.7.0"
+tembo-stacks = "0.15.2"
 itertools = "0.12.1"
 random-string = "1.1.0"
 test-case = "=2.0.0-rc2"
