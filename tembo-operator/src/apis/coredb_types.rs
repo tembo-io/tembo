@@ -160,6 +160,52 @@ pub struct S3CredentialsSessionToken {
     pub name: String,
 }
 
+impl S3Credentials {
+    pub fn is_empty(&self) -> bool {
+        self.access_key_id.is_none()
+            && self.inherit_from_iam_role.is_none()
+            && self.region.is_none()
+            && self.secret_access_key.is_none()
+            && self.session_token.is_none()
+    }
+}
+
+/// GoogleCredentials is the type for the credentials to be used to upload files to Google Cloud Storage.
+/// It can be provided in two alternative ways:
+/// * The secret containing the Google Cloud Storage JSON file with the credentials (applicationCredentials)
+/// * inheriting the role from the pod (GKE) environment by setting gkeEnvironment to true
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+pub struct GoogleCredentials {
+    /// The reference to the secret containing the Google Cloud Storage JSON file with the credentials
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "applicationCredentials"
+    )]
+    pub application_credentials: Option<GoogleCredentialsApplicationCredentials>,
+
+    /// Use the role based authentication without providing explicitly the keys.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "gkeEnvironment"
+    )]
+    pub gke_environment: Option<bool>,
+}
+
+/// GoogleCredentialsApplicationCredentials is the type for the reference to the secret containing the Google Cloud Storage JSON file with the credentials
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+pub struct GoogleCredentialsApplicationCredentials {
+    pub key: String,
+    pub name: String,
+}
+
+impl GoogleCredentials {
+    pub fn is_empty(&self) -> bool {
+        self.application_credentials.is_none() && self.gke_environment.is_none()
+    }
+}
+
 /// VolumeSnapshots is the type for the configuration of the volume snapshots
 /// to be used for backups instead of object storage
 #[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
@@ -222,13 +268,20 @@ pub struct Backup {
     #[serde(default = "defaults::default_backup_schedule")]
     pub schedule: Option<String>,
 
-    /// The S3 compatable endpoint URL
+    /// The S3 compatible endpoint URL
     #[serde(default, rename = "endpointURL")]
     pub endpoint_url: Option<String>,
 
     /// The S3 credentials to use for backups (if not using IAM Role)
     #[serde(default = "defaults::default_s3_credentials", rename = "s3Credentials")]
     pub s3_credentials: Option<S3Credentials>,
+
+    /// The Google Cloud Storage credentials to use for backups
+    #[serde(
+        default = "defaults::default_google_credentials",
+        rename = "googleCredentials"
+    )]
+    pub google_credentials: Option<GoogleCredentials>,
 
     /// Enable using Volume Snapshots for backups instead of Object Storage
     #[serde(
@@ -255,7 +308,7 @@ pub struct Backup {
 ///       inheritFromIAMRole: true
 /// ```
 ///
-/// For more information plese read through the [cloudnative-pg documentation](https://cloudnative-pg.io/documentation/1.20/recovery/#pitr-from-an-object-store)
+/// For more information please read through the [cloudnative-pg documentation](https://cloudnative-pg.io/documentation/1.20/recovery/#pitr-from-an-object-store)
 #[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
 pub struct Restore {
     /// The name of the instance you wish to restore.  This maps to the `Backup`
@@ -275,6 +328,8 @@ pub struct Restore {
     /// **Example**: If you have an instance with `spec.backup.destinationPath`
     /// set to `s3://my-bucket/v2/test-db` then you would set `backupsPath` to `s3://my-bucket/v2/test-db`.
     /// And backups are saved in that bucket under `s3://my-bucket/v2/test-db/server_name`
+    ///
+    /// For GCS Buckets, the path should be in the format `gs://my-bucket/v2/test-db`
     #[serde(rename = "backupsPath")]
     pub backups_path: Option<String>,
 
@@ -282,13 +337,17 @@ pub struct Restore {
     #[serde(rename = "recoveryTargetTime")]
     pub recovery_target_time: Option<String>,
 
-    /// endpointURL is the S3 compatable endpoint URL
+    /// endpointURL is the S3 compatible endpoint URL
     #[serde(default, rename = "endpointURL")]
     pub endpoint_url: Option<String>,
 
     /// s3Credentials is the S3 credentials to use for backups.
     #[serde(rename = "s3Credentials")]
     pub s3_credentials: Option<S3Credentials>,
+
+    /// googleCredentials is the Google Cloud Storage credentials to use for backups.
+    #[serde(rename = "googleCredentials")]
+    pub google_credentials: Option<GoogleCredentials>,
 
     /// volumeSnapshot is a boolean to enable restoring from a Volume Snapshot
     #[serde(rename = "volumeSnapshot")]
@@ -494,7 +553,7 @@ pub struct CoreDBSpec {
     pub uid: i32,
 
     /// A list of extensions to enable on the CoreDB instance.
-    /// This list should be a lits of extension names that are already available
+    /// This list should be a list of extension names that are already available
     /// on the Postgres instance you are running.  To install extensions at runtime
     /// please see the `trunk_installs` field.
     ///
@@ -607,7 +666,7 @@ pub struct CoreDBSpec {
     /// A AffinityConfiguration provides a way to configure the CoreDB instance to run
     /// on specific nodes in the cluster based off of nodeSelector, nodeAffinity and tolerations
     ///
-    /// For more informaton on AffinityConfiguration please see the [Cloudnative-PG documentation](https://cloudnative-pg.io/documentation/1.22/cloudnative-pg.v1/#postgresql-cnpg-io-v1-AffinityConfiguration)
+    /// For more information on AffinityConfiguration please see the [Cloudnative-PG documentation](https://cloudnative-pg.io/documentation/1.22/cloudnative-pg.v1/#postgresql-cnpg-io-v1-AffinityConfiguration)
     ///
     /// **Default**:
     /// ```yaml
@@ -629,7 +688,7 @@ pub struct CoreDBSpec {
     /// The topologySpreadConstraints provides a way to spread matching pods among the given topology
     ///
     /// For more information see the Kubernetes documentation on [Topology Spread Constraints](https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/)
-    /// Tembo is compatable with the `v1` version of the TopologySpreadConstraints up to [Kubernetes 1.25](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#topologyspreadconstraint-v1-core)
+    /// Tembo is compatible with the `v1` version of the TopologySpreadConstraints up to [Kubernetes 1.25](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#topologyspreadconstraint-v1-core)
     ///
     /// **Default**: `None`
     #[serde(rename = "topologySpreadConstraints")]

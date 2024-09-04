@@ -7,7 +7,7 @@ use crate::ingress_route_crd::{
 };
 use crate::{
     apis::{
-        coredb_types::{CoreDB, S3Credentials},
+        coredb_types::{CoreDB, GoogleCredentials, S3Credentials},
         postgres_parameters::MergeError,
     },
     cloudnativepg::{
@@ -16,6 +16,8 @@ use crate::{
             Cluster, ClusterBackup, ClusterBackupBarmanObjectStore,
             ClusterBackupBarmanObjectStoreData, ClusterBackupBarmanObjectStoreDataCompression,
             ClusterBackupBarmanObjectStoreDataEncryption,
+            ClusterBackupBarmanObjectStoreGoogleCredentials,
+            ClusterBackupBarmanObjectStoreGoogleCredentialsApplicationCredentials,
             ClusterBackupBarmanObjectStoreS3Credentials,
             ClusterBackupBarmanObjectStoreS3CredentialsAccessKeyId,
             ClusterBackupBarmanObjectStoreS3CredentialsRegion,
@@ -28,6 +30,8 @@ use crate::{
             ClusterBootstrapInitdb, ClusterBootstrapRecovery,
             ClusterBootstrapRecoveryRecoveryTarget, ClusterCertificates, ClusterExternalClusters,
             ClusterExternalClustersBarmanObjectStore,
+            ClusterExternalClustersBarmanObjectStoreGoogleCredentials,
+            ClusterExternalClustersBarmanObjectStoreGoogleCredentialsApplicationCredentials,
             ClusterExternalClustersBarmanObjectStoreS3Credentials,
             ClusterExternalClustersBarmanObjectStoreS3CredentialsAccessKeyId,
             ClusterExternalClustersBarmanObjectStoreS3CredentialsRegion,
@@ -129,15 +133,37 @@ fn create_cluster_backup_barman_object_store(
     cdb: &CoreDB,
     endpoint_url: &str,
     backup_path: &str,
-    s3_credentials: &ClusterBackupBarmanObjectStoreS3Credentials,
+    s3_credentials: Option<&ClusterBackupBarmanObjectStoreS3Credentials>,
+    google_credentials: Option<&ClusterBackupBarmanObjectStoreGoogleCredentials>,
 ) -> ClusterBackupBarmanObjectStore {
-    ClusterBackupBarmanObjectStore {
-        data: create_cluster_backup_barman_data(cdb),
-        endpoint_url: Some(endpoint_url.to_string()),
-        destination_path: backup_path.to_string(),
-        s3_credentials: Some(s3_credentials.clone()),
-        wal: create_cluster_backup_barman_wal(cdb),
-        ..ClusterBackupBarmanObjectStore::default()
+    let s3_creds = s3_credentials.map_or(true, |creds| creds.is_empty());
+    let google_creds = google_credentials.map_or(true, |creds| creds.is_empty());
+
+    match (s3_creds, google_creds) {
+        (true, true) => {
+            warn!("No S3 or Google credentials provided for backups, disabling backups");
+            ClusterBackupBarmanObjectStore::default()
+        }
+        (false, false) => {
+            warn!("Both S3 and Google credentials provided for backups, disabling backups");
+            ClusterBackupBarmanObjectStore::default()
+        }
+        (false, true) => ClusterBackupBarmanObjectStore {
+            data: create_cluster_backup_barman_data(cdb),
+            endpoint_url: Some(endpoint_url.to_string()),
+            destination_path: backup_path.to_string(),
+            s3_credentials: s3_credentials.cloned(),
+            wal: create_cluster_backup_barman_wal(cdb),
+            ..ClusterBackupBarmanObjectStore::default()
+        },
+        (true, false) => ClusterBackupBarmanObjectStore {
+            data: create_cluster_backup_barman_data(cdb),
+            endpoint_url: Some(endpoint_url.to_string()),
+            destination_path: backup_path.to_string(),
+            google_credentials: google_credentials.cloned(),
+            wal: create_cluster_backup_barman_wal(cdb),
+            ..ClusterBackupBarmanObjectStore::default()
+        },
     }
 }
 
@@ -193,7 +219,8 @@ fn create_cluster_backup(
     cdb: &CoreDB,
     endpoint_url: &str,
     backup_path: &str,
-    s3_credentials: &ClusterBackupBarmanObjectStoreS3Credentials,
+    s3_credentials: Option<&ClusterBackupBarmanObjectStoreS3Credentials>,
+    google_credentials: Option<&ClusterBackupBarmanObjectStoreGoogleCredentials>,
 ) -> Option<ClusterBackup> {
     let retention_days = match &cdb.spec.backup.retentionPolicy {
         None => "30d".to_string(),
@@ -222,6 +249,7 @@ fn create_cluster_backup(
             endpoint_url,
             backup_path,
             s3_credentials,
+            google_credentials,
         )),
         retention_policy: Some(retention_days),
         volume_snapshot,
@@ -245,7 +273,7 @@ pub fn cnpg_backup_configuration(
     // Check for backup path
     let backup_path = cdb.spec.backup.destinationPath.clone();
     if backup_path.is_none() {
-        warn!("Backups are disabled because we don't have an S3 backup path");
+        warn!("Backups are disabled because we don't have an S3/GCS backup path");
         return (None, None);
     }
 
@@ -328,8 +356,15 @@ pub fn cnpg_backup_configuration(
     // Copy the endpoint_url and s3_credentials from cdb to configure backups
     let endpoint_url = cdb.spec.backup.endpoint_url.as_deref().unwrap_or_default();
     let s3_credentials = generate_s3_backup_credentials(cdb.spec.backup.s3_credentials.as_ref());
-    let cluster_backup =
-        create_cluster_backup(cdb, endpoint_url, &backup_path.unwrap(), &s3_credentials);
+    let google_credentials =
+        generate_google_backup_credentials(cdb.spec.backup.google_credentials.as_ref());
+    let cluster_backup = create_cluster_backup(
+        cdb,
+        endpoint_url,
+        &backup_path.unwrap(),
+        Some(&s3_credentials),
+        Some(&google_credentials),
+    );
 
     (cluster_backup, service_account_template)
 }
@@ -415,7 +450,43 @@ pub fn cnpg_cluster_bootstrap_from_cdb(
     let superuser_secret_name = format!("{}-connection", cluster_name);
 
     let coredb_cluster = if let Some(restore) = &cdb.spec.restore {
-        let s3_credentials = generate_s3_restore_credentials(restore.s3_credentials.as_ref());
+        let (s3_credentials, google_credentials) = match (
+            restore
+                .s3_credentials
+                .as_ref()
+                .map(|creds| !creds.is_empty()),
+            restore
+                .google_credentials
+                .as_ref()
+                .map(|creds| !creds.is_empty()),
+        ) {
+            (Some(true), None | Some(false)) => (
+                Some(generate_s3_restore_credentials(
+                    restore.s3_credentials.as_ref(),
+                )),
+                None,
+            ),
+            (None | Some(false), Some(true)) => (
+                None,
+                Some(generate_google_restore_credentials(
+                    restore.google_credentials.as_ref(),
+                )),
+            ),
+            (None | Some(false), None | Some(false)) => {
+                warn!("No valid S3 or Google credentials provided for restore, proceeding without credentials");
+                (None, None)
+            }
+            (Some(true), Some(true)) => {
+                warn!("Both S3 and Google credentials provided for restore, using S3 credentials");
+                (
+                    Some(generate_s3_restore_credentials(
+                        restore.s3_credentials.as_ref(),
+                    )),
+                    None,
+                )
+            }
+        };
+        // let s3_credentials = generate_s3_restore_credentials(restore.s3_credentials.as_ref());
         // Find destination_path from Backup to generate the restore destination path
         let restore_destination_path = generate_restore_destination_path(restore, &cdb.spec.backup);
         ClusterExternalClusters {
@@ -423,7 +494,8 @@ pub fn cnpg_cluster_bootstrap_from_cdb(
             barman_object_store: Some(ClusterExternalClustersBarmanObjectStore {
                 destination_path: restore_destination_path,
                 endpoint_url: restore.endpoint_url.clone(),
-                s3_credentials: Some(s3_credentials),
+                s3_credentials,
+                google_credentials,
                 wal: Some(ClusterExternalClustersBarmanObjectStoreWal {
                     max_parallel: Some(8),
                     encryption: Some(ClusterExternalClustersBarmanObjectStoreWalEncryption::Aes256),
@@ -2095,6 +2167,37 @@ fn generate_s3_backup_credentials(
     }
 }
 
+// generate_google_backup_credentials function will generate the google backup credentials from
+// GoogleCredentials object and return a ClusterBackupBarmanObjectStoreGoogleCredentials object
+#[instrument(fields(trace_id, creds))]
+fn generate_google_backup_credentials(
+    creds: Option<&GoogleCredentials>,
+) -> ClusterBackupBarmanObjectStoreGoogleCredentials {
+    if let Some(creds) = creds {
+        if creds.application_credentials.is_none() {
+            return ClusterBackupBarmanObjectStoreGoogleCredentials {
+                gke_environment: Some(true),
+                ..Default::default()
+            };
+        }
+
+        ClusterBackupBarmanObjectStoreGoogleCredentials {
+            application_credentials: creds.application_credentials.as_ref().map(|app| {
+                ClusterBackupBarmanObjectStoreGoogleCredentialsApplicationCredentials {
+                    key: app.key.clone(),
+                    name: app.name.clone(),
+                }
+            }),
+            gke_environment: Some(false),
+        }
+    } else {
+        ClusterBackupBarmanObjectStoreGoogleCredentials {
+            gke_environment: Some(true),
+            ..Default::default()
+        }
+    }
+}
+
 // generate_s3_restore_credentials function will generate the s3 restore credentials from
 // S3Credentials object and return a ClusterExternalClustersBarmanObjectStoreS3Credentials object
 #[instrument(fields(trace_id, creds))]
@@ -2139,6 +2242,37 @@ fn generate_s3_restore_credentials(
     } else {
         ClusterExternalClustersBarmanObjectStoreS3Credentials {
             inherit_from_iam_role: Some(true),
+            ..Default::default()
+        }
+    }
+}
+
+// generate_google_restore_credentials function will generate the google restore credentials from
+// GoogleCredentials object and return a ClusterExternalClustersBarmanObjectStoreGoogleCredentials object
+#[instrument(fields(trace_id, creds))]
+fn generate_google_restore_credentials(
+    creds: Option<&GoogleCredentials>,
+) -> ClusterExternalClustersBarmanObjectStoreGoogleCredentials {
+    if let Some(creds) = creds {
+        if creds.application_credentials.is_none() {
+            return ClusterExternalClustersBarmanObjectStoreGoogleCredentials {
+                gke_environment: Some(true),
+                ..Default::default()
+            };
+        }
+
+        ClusterExternalClustersBarmanObjectStoreGoogleCredentials {
+            application_credentials: creds.application_credentials.as_ref().map(|app| {
+                ClusterExternalClustersBarmanObjectStoreGoogleCredentialsApplicationCredentials {
+                    key: app.key.clone(),
+                    name: app.name.clone(),
+                }
+            }),
+            gke_environment: Some(false),
+        }
+    } else {
+        ClusterExternalClustersBarmanObjectStoreGoogleCredentials {
+            gke_environment: Some(true),
             ..Default::default()
         }
     }
@@ -3227,6 +3361,131 @@ mod tests {
         assert_eq!(
             generate_scheduled_backup_snapshot_name(short_name),
             "stormy-capybara-snap"
+        );
+    }
+
+    // Test GCP Backup configuration
+    fn create_test_coredb() -> CoreDB {
+        let cdb_yaml = r#"
+        apiVersion: coredb.io/v1alpha1
+        kind: CoreDB
+        metadata:
+          name: test
+          namespace: default
+        spec:
+          backup:
+            destinationPath: gcs://tembo-backup/sample-standard-backup
+            googleCredentials:
+              gkeEnvironment: true
+            encryption: "AES256"
+            retentionPolicy: "30"
+            schedule: 17 9 * * *
+            volumeSnapshot:
+              enabled: true
+              snapshotClass: "csi-vsc"
+          image: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e
+          port: 5432
+          replicas: 1
+          resources:
+            limits:
+              cpu: "1"
+              memory: 0.5Gi
+          serviceAccountTemplate:
+            metadata:
+              annotations:
+                iam.gke.io/gcp-service-account: tembo-operator-test-abc123@test-123456.iam.gserviceaccount.com
+          sharedirStorage: 1Gi
+          stop: false
+          storage: 1Gi
+          storageClass: "gp3-enc"
+          uid: 999
+        "#;
+
+        serde_yaml::from_str(cdb_yaml).expect("Failed to parse YAML")
+    }
+
+    #[test]
+    fn test_create_cluster_backup_default_google() {
+        let cdb = create_test_coredb();
+        let snapshot = create_cluster_backup_volume_snapshot(&cdb);
+        let endpoint_url = cdb.spec.backup.endpoint_url.as_deref().unwrap_or_default();
+        let backup_path = cdb.spec.backup.destinationPath.clone();
+        let s3_credentials = ClusterBackupBarmanObjectStoreS3Credentials {
+            ..Default::default()
+        };
+        let google_credentials =
+            generate_google_backup_credentials(cdb.spec.backup.google_credentials.as_ref());
+
+        let backups_result = cnpg_scheduled_backup(&cdb).unwrap();
+        let (scheduled_backup, volume_snapshot_backup) = &backups_result[0];
+
+        let result = create_cluster_backup(
+            &cdb,
+            endpoint_url,
+            &backup_path.unwrap(),
+            Some(&s3_credentials),
+            Some(&google_credentials),
+        );
+
+        assert!(result.is_some());
+        let backup = result.unwrap();
+
+        match backup.barman_object_store {
+            Some(barman_store) => {
+                // Assert to make sure that the destination path is set correctly and starts with `gcs://`
+                assert!(
+                    barman_store.destination_path.starts_with("gcs://"),
+                    "Destination path should start with 'gcs://', but got: {}",
+                    barman_store.destination_path
+                );
+
+                // Check Google credentials
+                match barman_store.google_credentials {
+                    Some(goog_credentials) => {
+                        assert_eq!(
+                            goog_credentials.gke_environment,
+                            Some(true),
+                            "Expected GKE environment to be true, but got: {:?}",
+                            goog_credentials.gke_environment
+                        );
+                    }
+                    None => panic!("Expected Google credentials to be Some, but got None"),
+                }
+            }
+            None => panic!("Expected barman_object_store to be Some, but got None"),
+        }
+
+        // Set an expected ClusterBackupVolumeSnapshot object
+        let expected_snapshot = ClusterBackupVolumeSnapshot {
+            class_name: Some("csi-vsc".to_string()), // Expected to match the YAML input
+            online: Some(true),
+            online_configuration: Some(ClusterBackupVolumeSnapshotOnlineConfiguration {
+                wait_for_archive: Some(true),
+                immediate_checkpoint: Some(true),
+            }),
+            snapshot_owner_reference: Some(
+                ClusterBackupVolumeSnapshotSnapshotOwnerReference::Cluster,
+            ),
+            ..ClusterBackupVolumeSnapshot::default()
+        };
+
+        // Assert to make sure that the snapshot.snapshot_class and expected_snapshot.snapshot_class are the same
+        assert_eq!(snapshot, expected_snapshot);
+
+        // Assert to make sure that the ScheduledBackup method is set to VolumeSnapshot
+        if let Some(volume_snapshot_backup) = volume_snapshot_backup {
+            assert_eq!(
+                volume_snapshot_backup.spec.method,
+                Some(ScheduledBackupMethod::VolumeSnapshot)
+            );
+        } else {
+            panic!("Expected volume snapshot backup to be Some, but was None");
+        }
+
+        // Assert to make sure that the ScheduledBackup method is set to BarmanObjectStore
+        assert_eq!(
+            scheduled_backup.spec.method,
+            Some(ScheduledBackupMethod::BarmanObjectStore)
         );
     }
 }

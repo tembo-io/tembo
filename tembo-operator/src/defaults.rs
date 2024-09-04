@@ -1,7 +1,8 @@
 use crate::apis::coredb_types::CoreDB;
 use crate::{
     apis::coredb_types::{
-        Backup, ConnectionPooler, PgBouncer, S3Credentials, ServiceAccountTemplate, VolumeSnapshot,
+        Backup, ConnectionPooler, GoogleCredentials, PgBouncer, S3Credentials,
+        ServiceAccountTemplate, VolumeSnapshot,
     },
     cloudnativepg::clusters::ClusterAffinity,
     cloudnativepg::poolers::{PoolerPgbouncerPoolMode, PoolerTemplateSpecContainersResources},
@@ -42,6 +43,7 @@ pub fn default_resources() -> ResourceRequirements {
     ResourceRequirements {
         limits: Some(limits),
         requests: Some(requests),
+        claims: None,
     }
 }
 
@@ -231,8 +233,18 @@ pub fn default_pgbouncer() -> PgBouncer {
 
 pub fn default_s3_credentials() -> Option<S3Credentials> {
     Some(S3Credentials {
-        inherit_from_iam_role: Some(true),
-        ..Default::default()
+        inherit_from_iam_role: None,
+        region: None,
+        access_key_id: None,
+        secret_access_key: None,
+        session_token: None,
+    })
+}
+
+pub fn default_google_credentials() -> Option<GoogleCredentials> {
+    Some(GoogleCredentials {
+        gke_environment: None,
+        application_credentials: None,
     })
 }
 
