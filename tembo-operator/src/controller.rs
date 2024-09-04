@@ -1215,8 +1215,9 @@ mod test {
     use crate::{error_policy, Error};
     use futures::pin_mut;
     use http::{Request, Response, StatusCode};
+    use hyper::Body;
     use k8s_openapi::api::core::v1::Pod;
-    use kube::{api::Api, client::Body, Client};
+    use kube::{api::Api, Client};
     use serde_json::json;
     use tower_test::mock;
 
@@ -1239,19 +1240,21 @@ mod test {
             pin_mut!(handle);
             if let Some((_request, send)) = handle.next_request().await {
                 // We don't check the specifics of the request here, focusing on the response
-                let body = json!({
-                    "kind": "Status",
-                    "apiVersion": "v1",
-                    "metadata": {},
-                    "status": "Failure",
-                    "message": "Too Many Requests",
-                    "reason": "TooManyRequests",
-                    "code": 429
-                });
                 send.send_response(
                     Response::builder()
                         .status(StatusCode::TOO_MANY_REQUESTS)
-                        .body(Body::from(body.to_string().into_bytes())) // Convert to bytes
+                        .body(Body::from(
+                            json!({
+                                "kind": "Status",
+                                "apiVersion": "v1",
+                                "metadata": {},
+                                "status": "Failure",
+                                "message": "Too Many Requests",
+                                "reason": "TooManyRequests",
+                                "code": 429
+                            })
+                            .to_string(),
+                        ))
                         .unwrap(),
                 );
             }
@@ -1300,20 +1303,21 @@ mod test {
         let spawned = tokio::spawn(async move {
             pin_mut!(handle);
             if let Some((_request, send)) = handle.next_request().await {
-                // We don't check the specifics of the request here, focusing on the response
-                let body = json!({
-                    "kind": "Status",
-                    "apiVersion": "v1",
-                    "metadata": {},
-                    "status": "Failure",
-                    "message": "Not Found",
-                    "reason": "Not Found",
-                    "code": 404
-                });
                 send.send_response(
                     Response::builder()
-                        .status(StatusCode::TOO_MANY_REQUESTS)
-                        .body(Body::from(body.to_string().into_bytes())) // Convert to bytes
+                        .status(StatusCode::NOT_FOUND)
+                        .body(Body::from(
+                            json!({
+                                "kind": "Status",
+                                "apiVersion": "v1",
+                                "metadata": {},
+                                "status": "Failure",
+                                "message": "Not Found",
+                                "reason": "NotFound",
+                                "code": 404
+                            })
+                            .to_string(),
+                        ))
                         .unwrap(),
                 );
             }
