@@ -992,7 +992,7 @@ pub enum ClusterBackupBarmanObjectStoreDataCompression {
 }
 
 /// The configuration to be used to backup the data files When not defined, base backups files will be stored uncompressed and may be unencrypted in the object store, according to the bucket default policy.
-#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema)]
+#[derive(Serialize, Deserialize, Clone, Debug, JsonSchema, PartialEq)]
 pub enum ClusterBackupBarmanObjectStoreDataEncryption {
     #[serde(rename = "AES256")]
     Aes256,

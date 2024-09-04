@@ -39,42 +39,68 @@ pub async fn reconcile_network_policies(client: Client, namespace: &str) -> Resu
         "apiVersion": "networking.k8s.io/v1",
         "kind": "NetworkPolicy",
         "metadata": {
-          "name": "allow-egress-to-kube-dns",
-          "namespace": format!("{namespace}"),
+            "name": "allow-egress-to-gke-dns",
+            "namespace": format!("{namespace}"),
         },
         "spec": {
-          "podSelector": {},
-          "policyTypes": [
-            "Egress"
-          ],
-          "egress": [
-            {
-              "to": [
+            "podSelector": {},
+            "policyTypes": [
+                "Egress"
+            ],
+            "egress": [
                 {
-                  "podSelector": {
-                    "matchLabels": {
-                      "k8s-app": "kube-dns"
-                    }
-                  },
-                  "namespaceSelector": {
-                    "matchLabels": {
-                      "kubernetes.io/metadata.name": "kube-system"
-                    }
-                  }
-                }
-              ],
-              "ports": [
-                {
-                  "protocol": "UDP",
-                  "port": 53
+                    "to": [
+                        {
+                            "namespaceSelector": {
+                                "matchLabels": {
+                                    "kubernetes.io/metadata.name": "kube-system"
+                                }
+                            },
+                            "podSelector": {
+                                "matchLabels": {
+                                    "k8s-app": "node-local-dns"
+                                }
+                            }
+                        }
+                    ],
+                    "ports": [
+                        {
+                            "protocol": "UDP",
+                            "port": 53
+                        },
+                        {
+                            "protocol": "TCP",
+                            "port": 53
+                        }
+                    ]
                 },
                 {
-                  "protocol": "TCP",
-                  "port": 53
+                    "to": [
+                        {
+                            "namespaceSelector": {
+                                "matchLabels": {
+                                    "kubernetes.io/metadata.name": "kube-system"
+                                }
+                            },
+                            "podSelector": {
+                                "matchLabels": {
+                                    "k8s-app": "kube-dns"
+                                }
+                            }
+                        }
+                    ],
+                    "ports": [
+                        {
+                            "protocol": "UDP",
+                            "port": 53
+                        },
+                        {
+                            "protocol": "TCP",
+                            "port": 53
+                        }
+                    ]
                 }
-              ]
-            }
-          ]
+            ]
         }
     });
     apply_network_policy(namespace, &np_api, allow_dns).await?;

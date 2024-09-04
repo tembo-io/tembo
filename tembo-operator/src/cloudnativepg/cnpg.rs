@@ -284,116 +284,270 @@ fn create_cluster_backup(
     })
 }
 
+// pub fn cnpg_backup_configuration(
+//     cdb: &CoreDB,
+//     cfg: &Config,
+// ) -> (Option<ClusterBackup>, Option<ClusterServiceAccountTemplate>) {
+//     let mut service_account_template: Option<ClusterServiceAccountTemplate> = None;
+//
+//     // Check if backups are enabled
+//     if !cfg.enable_backup {
+//         return (None, None);
+//     }
+//
+//     debug!("Backups are enabled, configuring...");
+//
+//     // Check for backup path
+//     let backup_path = cdb.spec.backup.destinationPath.clone();
+//     if backup_path.is_none() {
+//         warn!("Backups are disabled because we don't have an S3/GCS backup path");
+//         return (None, None);
+//     }
+//
+//     let should_set_service_account_template = (cdb.spec.backup.endpoint_url.is_none()
+//         && cdb.spec.backup.s3_credentials.is_none())
+//         || (cdb
+//             .spec
+//             .backup
+//             .s3_credentials
+//             .as_ref()
+//             .and_then(|cred| cred.inherit_from_iam_role)
+//             .unwrap_or(false)
+//             && cdb
+//                 .spec
+//                 .serviceAccountTemplate
+//                 .metadata
+//                 .as_ref()
+//                 .and_then(|meta| meta.annotations.as_ref())
+//                 .map_or(false, |annots| {
+//                     annots.contains_key("eks.amazonaws.com/role-arn")
+//                 }));
+//
+//     let should_reset_service_account_template = cdb
+//         .spec
+//         .backup
+//         .s3_credentials
+//         .as_ref()
+//         .and_then(|cred| cred.inherit_from_iam_role)
+//         == Some(false)
+//         && (cdb
+//             .spec
+//             .backup
+//             .s3_credentials
+//             .as_ref()
+//             .map_or(false, |cred| {
+//                 cred.access_key_id.is_some()
+//                     || cred.region.is_some()
+//                     || cred.secret_access_key.is_some()
+//                     || cred.session_token.is_some()
+//             }));
+//
+//     if should_reset_service_account_template {
+//         service_account_template = None;
+//     } else if should_set_service_account_template {
+//         let service_account_metadata = cdb.spec.serviceAccountTemplate.metadata.clone();
+//         if service_account_metadata.is_none() {
+//             warn!("Backups are disabled because we don't have a service account template");
+//             return (None, None);
+//         }
+//         let service_account_annotations = service_account_metadata
+//             .expect("Expected service account template metadata")
+//             .annotations;
+//         if service_account_annotations.is_none() {
+//             warn!("Backups are disabled because we don't have a service account template with annotations");
+//             return (None, None);
+//         }
+//         let annotations =
+//             service_account_annotations.expect("Expected service account template annotations");
+//         let service_account_role_arn = annotations.get("eks.amazonaws.com/role-arn");
+//         if service_account_role_arn.is_none() {
+//             warn!(
+//                 "Backups are disabled because we don't have a service account template with an EKS role ARN"
+//             );
+//             return (None, None);
+//         }
+//         let role_arn = service_account_role_arn
+//             .expect("Expected service account template annotations to contain an EKS role ARN")
+//             .clone();
+//
+//         service_account_template = Some(ClusterServiceAccountTemplate {
+//             metadata: ClusterServiceAccountTemplateMetadata {
+//                 annotations: Some(BTreeMap::from([(
+//                     "eks.amazonaws.com/role-arn".to_string(),
+//                     role_arn,
+//                 )])),
+//                 ..ClusterServiceAccountTemplateMetadata::default()
+//             },
+//         });
+//     }
+//     // Copy the endpoint_url and s3_credentials from cdb to configure backups
+//     let endpoint_url = cdb.spec.backup.endpoint_url.as_deref().unwrap_or_default();
+//     let s3_credentials = generate_s3_backup_credentials(cdb.spec.backup.s3_credentials.as_ref());
+//     let google_credentials =
+//         generate_google_backup_credentials(cdb.spec.backup.google_credentials.as_ref());
+//     let cluster_backup = create_cluster_backup(
+//         cdb,
+//         endpoint_url,
+//         &backup_path.unwrap(),
+//         s3_credentials.as_ref(),
+//         google_credentials.as_ref(),
+//     );
+//
+//     (cluster_backup, service_account_template)
+// }
+
 pub fn cnpg_backup_configuration(
     cdb: &CoreDB,
     cfg: &Config,
 ) -> (Option<ClusterBackup>, Option<ClusterServiceAccountTemplate>) {
-    let mut service_account_template: Option<ClusterServiceAccountTemplate> = None;
-
-    // Check if backups are enabled
     if !cfg.enable_backup {
         return (None, None);
     }
 
-    debug!("Backups are enabled, configuring...");
-
-    // Check for backup path
-    let backup_path = cdb.spec.backup.destinationPath.clone();
-    if backup_path.is_none() {
-        warn!("Backups are disabled because we don't have an S3/GCS backup path");
-        return (None, None);
-    }
-
-    let should_set_service_account_template = (cdb.spec.backup.endpoint_url.is_none()
-        && cdb.spec.backup.s3_credentials.is_none())
-        || (cdb
-            .spec
-            .backup
-            .s3_credentials
-            .as_ref()
-            .and_then(|cred| cred.inherit_from_iam_role)
-            .unwrap_or(false)
-            && cdb
-                .spec
-                .serviceAccountTemplate
-                .metadata
-                .as_ref()
-                .and_then(|meta| meta.annotations.as_ref())
-                .map_or(false, |annots| {
-                    annots.contains_key("eks.amazonaws.com/role-arn")
-                }));
-
-    let should_reset_service_account_template = cdb
-        .spec
-        .backup
-        .s3_credentials
-        .as_ref()
-        .and_then(|cred| cred.inherit_from_iam_role)
-        == Some(false)
-        && (cdb
-            .spec
-            .backup
-            .s3_credentials
-            .as_ref()
-            .map_or(false, |cred| {
-                cred.access_key_id.is_some()
-                    || cred.region.is_some()
-                    || cred.secret_access_key.is_some()
-                    || cred.session_token.is_some()
-            }));
-
-    if should_reset_service_account_template {
-        service_account_template = None;
-    } else if should_set_service_account_template {
-        let service_account_metadata = cdb.spec.serviceAccountTemplate.metadata.clone();
-        if service_account_metadata.is_none() {
-            warn!("Backups are disabled because we don't have a service account template");
+    let backup_path = match cdb.spec.backup.destinationPath.as_ref() {
+        Some(path) => path,
+        None => {
+            warn!("Backups are disabled because we don't have an S3/GCS backup path");
             return (None, None);
         }
-        let service_account_annotations = service_account_metadata
-            .expect("Expected service account template metadata")
-            .annotations;
-        if service_account_annotations.is_none() {
-            warn!("Backups are disabled because we don't have a service account template with annotations");
-            return (None, None);
-        }
-        let annotations =
-            service_account_annotations.expect("Expected service account template annotations");
-        let service_account_role_arn = annotations.get("eks.amazonaws.com/role-arn");
-        if service_account_role_arn.is_none() {
-            warn!(
-                "Backups are disabled because we don't have a service account template with an EKS role ARN"
-            );
-            return (None, None);
-        }
-        let role_arn = service_account_role_arn
-            .expect("Expected service account template annotations to contain an EKS role ARN")
-            .clone();
+    };
 
-        service_account_template = Some(ClusterServiceAccountTemplate {
-            metadata: ClusterServiceAccountTemplateMetadata {
-                annotations: Some(BTreeMap::from([(
-                    "eks.amazonaws.com/role-arn".to_string(),
-                    role_arn,
-                )])),
-                ..ClusterServiceAccountTemplateMetadata::default()
-            },
-        });
-    }
-    // Copy the endpoint_url and s3_credentials from cdb to configure backups
+    let service_account_template = determine_service_account_template(cdb);
     let endpoint_url = cdb.spec.backup.endpoint_url.as_deref().unwrap_or_default();
     let s3_credentials = generate_s3_backup_credentials(cdb.spec.backup.s3_credentials.as_ref());
     let google_credentials =
         generate_google_backup_credentials(cdb.spec.backup.google_credentials.as_ref());
+
     let cluster_backup = create_cluster_backup(
         cdb,
         endpoint_url,
-        &backup_path.unwrap(),
+        backup_path,
         s3_credentials.as_ref(),
         google_credentials.as_ref(),
     );
 
     (cluster_backup, service_account_template)
+}
+
+fn determine_service_account_template(cdb: &CoreDB) -> Option<ClusterServiceAccountTemplate> {
+    if should_reset_service_account_template(cdb) {
+        return None;
+    }
+
+    if should_set_service_account_template(cdb) {
+        return get_service_account_template(cdb);
+    }
+
+    None
+}
+
+fn should_set_service_account_template(cdb: &CoreDB) -> bool {
+    let no_credentials = cdb.spec.backup.endpoint_url.is_none()
+        && cdb.spec.backup.s3_credentials.is_none()
+        && cdb.spec.backup.google_credentials.is_none();
+
+    let inherit_iam_role = cdb
+        .spec
+        .backup
+        .s3_credentials
+        .as_ref()
+        .and_then(|cred| cred.inherit_from_iam_role)
+        .unwrap_or(false);
+
+    let inherit_gke_environment = cdb
+        .spec
+        .backup
+        .google_credentials
+        .as_ref()
+        .and_then(|cred| cred.gke_environment)
+        .unwrap_or(false);
+
+    let has_eks_role_arn = cdb
+        .spec
+        .serviceAccountTemplate
+        .metadata
+        .as_ref()
+        .and_then(|meta| meta.annotations.as_ref())
+        .map_or(false, |annots| {
+            annots.contains_key("eks.amazonaws.com/role-arn")
+        });
+
+    let has_gke_service_account = cdb
+        .spec
+        .serviceAccountTemplate
+        .metadata
+        .as_ref()
+        .and_then(|meta| meta.annotations.as_ref())
+        .map_or(false, |annots| {
+            annots.contains_key("iam.gke.io/gcp-service-account")
+        });
+
+    no_credentials
+        || (inherit_iam_role && has_eks_role_arn)
+        || (inherit_gke_environment && has_gke_service_account)
+}
+
+fn should_reset_service_account_template(cdb: &CoreDB) -> bool {
+    let reset_s3 = cdb
+        .spec
+        .backup
+        .s3_credentials
+        .as_ref()
+        .map_or(false, |cred| {
+            cred.inherit_from_iam_role == Some(false)
+                && (cred.access_key_id.is_some()
+                    || cred.region.is_some()
+                    || cred.secret_access_key.is_some()
+                    || cred.session_token.is_some())
+        });
+
+    let reset_google = cdb
+        .spec
+        .backup
+        .google_credentials
+        .as_ref()
+        .map_or(false, |cred| {
+            cred.gke_environment == Some(false) && cred.application_credentials.is_some()
+        });
+
+    reset_s3 || reset_google
+}
+
+fn get_service_account_template(cdb: &CoreDB) -> Option<ClusterServiceAccountTemplate> {
+    cdb.spec
+        .serviceAccountTemplate
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.annotations.as_ref())
+        .and_then(|annotations| {
+            if let Some(role_arn) = annotations.get("eks.amazonaws.com/role-arn") {
+                Some(create_service_account_template(
+                    "eks.amazonaws.com/role-arn",
+                    role_arn,
+                ))
+            } else if let Some(gcp_service_account) =
+                annotations.get("iam.gke.io/gcp-service-account")
+            {
+                Some(create_service_account_template(
+                    "iam.gke.io/gcp-service-account",
+                    gcp_service_account,
+                ))
+            } else {
+                warn!(
+                    "Backups are disabled because we don't have a valid service account annotation"
+                );
+                None
+            }
+        })
+}
+
+fn create_service_account_template(key: &str, value: &str) -> ClusterServiceAccountTemplate {
+    ClusterServiceAccountTemplate {
+        metadata: ClusterServiceAccountTemplateMetadata {
+            annotations: Some(BTreeMap::from([(key.to_string(), value.to_string())])),
+            ..ClusterServiceAccountTemplateMetadata::default()
+        },
+    }
 }
 
 // parse_target_time returns the parsed target_time which is used for point-in-time-recovery
@@ -2445,7 +2599,12 @@ pub(crate) async fn get_pooler(cdb: &CoreDB, ctx: Arc<Context>) -> Option<Pooler
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{apis::coredb_types::CoreDB, cloudnativepg::clusters::Cluster};
+    use crate::{
+        apis::coredb_types::{
+            CoreDB, GoogleCredentialsApplicationCredentials, S3CredentialsAccessKeyId,
+        },
+        cloudnativepg::clusters::Cluster,
+    };
     use serde_json::json;
     use std::collections::BTreeMap;
 
@@ -3379,7 +3538,7 @@ mod tests {
     }
 
     // Test GCP Backup configuration
-    fn create_test_coredb() -> CoreDB {
+    fn create_gke_test_coredb() -> CoreDB {
         let cdb_yaml = r#"
         apiVersion: coredb.io/v1alpha1
         kind: CoreDB
@@ -3388,7 +3547,7 @@ mod tests {
           namespace: default
         spec:
           backup:
-            destinationPath: gcs://tembo-backup/sample-standard-backup
+            destinationPath: gs://tembo-backup/sample-standard-backup
             googleCredentials:
               gkeEnvironment: true
             encryption: "AES256"
@@ -3418,9 +3577,47 @@ mod tests {
         serde_yaml::from_str(cdb_yaml).expect("Failed to parse YAML")
     }
 
+    fn create_aws_test_coredb() -> CoreDB {
+        let cdb_yaml = r#"
+        apiVersion: coredb.io/v1alpha1
+        kind: CoreDB
+        metadata:
+          name: test
+          namespace: default
+        spec:
+          backup:
+            destinationPath: s3://tembo-backup/sample-standard-backup
+            s3Credentials:
+              inheritFromIAMRole: true
+            encryption: "AES256"
+            retentionPolicy: "30"
+            schedule: 17 9 * * *
+            volumeSnapshot:
+              enabled: true
+              snapshotClass: "csi-vsc"
+          image: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e
+          port: 5432
+          replicas: 1
+          resources:
+            limits:
+              cpu: "1"
+              memory: 0.5Gi
+          serviceAccountTemplate:
+            metadata:
+              annotations:
+                eks.amazonaws.com/role-arn: arn:aws:iam::012345678901:role/aws-iam-role-iam
+          sharedirStorage: 1Gi
+          stop: false
+          storage: 1Gi
+          storageClass: "gp3-enc"
+          uid: 999
+        "#;
+
+        serde_yaml::from_str(cdb_yaml).expect("Failed to parse YAML")
+    }
     #[test]
     fn test_create_cluster_backup_default_google() {
-        let cdb = create_test_coredb();
+        let cdb = create_gke_test_coredb();
         let snapshot = create_cluster_backup_volume_snapshot(&cdb);
         let endpoint_url = cdb.spec.backup.endpoint_url.as_deref().unwrap_or_default();
         let backup_path = cdb.spec.backup.destinationPath.clone();
@@ -3446,10 +3643,10 @@ mod tests {
 
         match backup.barman_object_store {
             Some(barman_store) => {
-                // Assert to make sure that the destination path is set correctly and starts with `gcs://`
+                // Assert to make sure that the destination path is set correctly and starts with `gs://`
                 assert!(
-                    barman_store.destination_path.starts_with("gcs://"),
-                    "Destination path should start with 'gcs://', but got: {}",
+                    barman_store.destination_path.starts_with("gs://"),
+                    "Destination path should start with 'gs://', but got: {}",
                     barman_store.destination_path
                 );
 
@@ -3501,5 +3698,176 @@ mod tests {
             scheduled_backup.spec.method,
             Some(ScheduledBackupMethod::BarmanObjectStore)
         );
+    }
+
+    #[test]
+    fn test_should_set_service_account_template() {
+        let cdb = create_gke_test_coredb();
+
+        // Test with GCP credentials and GKE environment
+        assert!(should_set_service_account_template(&cdb));
+
+        // Test with AWS credentials
+        let aws_cdb = create_aws_test_coredb();
+        assert!(should_set_service_account_template(&aws_cdb));
+
+        // Test with no credentials
+        let mut no_cred_cdb = cdb.clone();
+        no_cred_cdb.spec.backup.google_credentials = None;
+        no_cred_cdb.spec.backup.s3_credentials = None;
+        assert!(should_set_service_account_template(&no_cred_cdb));
+    }
+
+    #[test]
+    fn test_should_reset_service_account_template() {
+        let mut cdb = create_gke_test_coredb();
+
+        // Initially, it should not reset (GKE environment is true)
+        assert!(!should_reset_service_account_template(&cdb));
+
+        // Test with Google credentials set to not use GKE environment
+        cdb.spec.backup.google_credentials = Some(GoogleCredentials {
+            gke_environment: Some(false),
+            application_credentials: Some(GoogleCredentialsApplicationCredentials {
+                key: "test-key".to_string(),
+                name: "test-name".to_string(),
+            }),
+        });
+        assert!(should_reset_service_account_template(&cdb));
+
+        // Test with S3 credentials
+        cdb.spec.backup.google_credentials = None;
+        cdb.spec.backup.s3_credentials = Some(S3Credentials {
+            inherit_from_iam_role: Some(false),
+            access_key_id: Some(S3CredentialsAccessKeyId {
+                key: "test-key".to_string(),
+                name: "test-name".to_string(),
+            }),
+            ..Default::default()
+        });
+        assert!(should_reset_service_account_template(&cdb));
+    }
+
+    #[test]
+    fn test_get_service_account_template() {
+        let cdb = create_gke_test_coredb();
+
+        // Test with GCP service account
+        let template = get_service_account_template(&cdb);
+        assert!(template.is_some());
+        assert_eq!(
+            template
+                .unwrap()
+                .metadata
+                .annotations
+                .unwrap()
+                .get("iam.gke.io/gcp-service-account"),
+            Some(&"tembo-operator-test-abc123@test-123456.iam.gserviceaccount.com".to_string())
+        );
+
+        // Test with EKS role
+        let eks_cdb = create_aws_test_coredb();
+        let template = get_service_account_template(&eks_cdb);
+        assert!(template.is_some());
+        assert_eq!(
+            template
+                .unwrap()
+                .metadata
+                .annotations
+                .unwrap()
+                .get("eks.amazonaws.com/role-arn"),
+            Some(&"arn:aws:iam::012345678901:role/aws-iam-role-iam".to_string())
+        );
+
+        // Test with no valid annotation
+        let mut invalid_cdb = cdb.clone();
+        invalid_cdb
+            .spec
+            .serviceAccountTemplate
+            .metadata
+            .as_mut()
+            .unwrap()
+            .annotations
+            .as_mut()
+            .unwrap()
+            .clear();
+        let template = get_service_account_template(&invalid_cdb);
+        assert!(template.is_none());
+    }
+
+    #[test]
+    fn test_cnpg_backup_configuration() {
+        let cdb = create_gke_test_coredb();
+        let cfg = Config {
+            enable_backup: true,
+            enable_volume_snapshot: true,
+            reconcile_ttl: 30,
+            reconcile_timestamp_ttl: 90,
+        };
+
+        // Test with backups enabled and valid path
+        let (backup, template) = cnpg_backup_configuration(&cdb, &cfg);
+        assert!(backup.is_some());
+        assert!(template.is_some());
+
+        // Verify backup configuration
+        if let Some(backup) = backup {
+            assert_eq!(
+                backup
+                    .barman_object_store
+                    .as_ref()
+                    .unwrap()
+                    .destination_path,
+                "gs://tembo-backup/sample-standard-backup"
+            );
+            assert_eq!(
+                backup
+                    .barman_object_store
+                    .as_ref()
+                    .unwrap()
+                    .data
+                    .as_ref()
+                    .unwrap()
+                    .encryption,
+                Some(ClusterBackupBarmanObjectStoreDataEncryption::Aes256)
+            );
+            assert_eq!(backup.retention_policy, Some("30d".to_string()));
+            assert!(backup.volume_snapshot.is_some());
+            assert_eq!(backup.volume_snapshot.as_ref().unwrap().online, Some(true));
+            assert_eq!(
+                backup.volume_snapshot.unwrap().class_name,
+                Some("csi-vsc".to_string())
+            );
+        }
+
+        // Verify service account template
+        if let Some(template) = template {
+            assert_eq!(
+                template
+                    .metadata
+                    .annotations
+                    .unwrap()
+                    .get("iam.gke.io/gcp-service-account"),
+                Some(&"tembo-operator-test-abc123@test-123456.iam.gserviceaccount.com".to_string())
+            );
+        }
+
+        // Test with backups disabled
+        let cfg_disabled = Config {
+            enable_backup: false,
+            enable_volume_snapshot: false,
+            reconcile_ttl: 30,
+            reconcile_timestamp_ttl: 90,
+        };
+        let (backup, template) = cnpg_backup_configuration(&cdb, &cfg_disabled);
+        assert!(backup.is_none());
+        assert!(template.is_none());
+
+        // Test with no backup path
+        let mut no_path_cdb = cdb.clone();
+        no_path_cdb.spec.backup.destinationPath = None;
+        let (backup, template) = cnpg_backup_configuration(&no_path_cdb, &cfg);
+        assert!(backup.is_none());
+        assert!(template.is_none());
     }
 }
