@@ -327,7 +327,7 @@ pub(crate) async fn is_image_updated(
 impl ClusterBackupBarmanObjectStoreS3Credentials {
     pub fn is_empty(&self) -> bool {
         self.access_key_id.is_none()
-            && self.inherit_from_iam_role.is_none()
+            && self.inherit_from_iam_role != Some(true)
             && self.region.is_none()
             && self.secret_access_key.is_none()
             && self.session_token.is_none()
@@ -336,6 +336,6 @@ impl ClusterBackupBarmanObjectStoreS3Credentials {
 
 impl ClusterBackupBarmanObjectStoreGoogleCredentials {
     pub fn is_empty(&self) -> bool {
-        self.application_credentials.is_none() && self.gke_environment.is_none()
+        self.application_credentials.is_none() && self.gke_environment != Some(true)
     }
 }

@@ -136,34 +136,59 @@ fn create_cluster_backup_barman_object_store(
     s3_credentials: Option<&ClusterBackupBarmanObjectStoreS3Credentials>,
     google_credentials: Option<&ClusterBackupBarmanObjectStoreGoogleCredentials>,
 ) -> ClusterBackupBarmanObjectStore {
-    let s3_creds = s3_credentials.map_or(true, |creds| creds.is_empty());
-    let google_creds = google_credentials.map_or(true, |creds| creds.is_empty());
+    let s3_creds = s3_credentials.map_or(false, |creds| !creds.is_empty());
+    let google_creds = google_credentials.map_or(false, |creds| !creds.is_empty());
 
     match (s3_creds, google_creds) {
-        (true, true) => {
-            warn!("No S3 or Google credentials provided for backups, disabling backups");
+        (false, false) => {
+            warn!("No valid S3 or Google credentials provided for backups, disabling backups");
             ClusterBackupBarmanObjectStore::default()
         }
-        (false, false) => {
+        (true, true) => {
             warn!("Both S3 and Google credentials provided for backups, disabling backups");
             ClusterBackupBarmanObjectStore::default()
         }
-        (false, true) => ClusterBackupBarmanObjectStore {
-            data: create_cluster_backup_barman_data(cdb),
-            endpoint_url: Some(endpoint_url.to_string()),
-            destination_path: backup_path.to_string(),
-            s3_credentials: s3_credentials.cloned(),
-            wal: create_cluster_backup_barman_wal(cdb),
-            ..ClusterBackupBarmanObjectStore::default()
-        },
-        (true, false) => ClusterBackupBarmanObjectStore {
-            data: create_cluster_backup_barman_data(cdb),
-            endpoint_url: Some(endpoint_url.to_string()),
-            destination_path: backup_path.to_string(),
-            google_credentials: google_credentials.cloned(),
-            wal: create_cluster_backup_barman_wal(cdb),
-            ..ClusterBackupBarmanObjectStore::default()
-        },
+        (true, false) => {
+            create_s3_backup_object_store(cdb, endpoint_url, backup_path, s3_credentials.unwrap())
+        }
+        (false, true) => create_google_backup_object_store(
+            cdb,
+            endpoint_url,
+            backup_path,
+            google_credentials.unwrap(),
+        ),
+    }
+}
+
+fn create_s3_backup_object_store(
+    cdb: &CoreDB,
+    endpoint_url: &str,
+    backup_path: &str,
+    s3_credentials: &ClusterBackupBarmanObjectStoreS3Credentials,
+) -> ClusterBackupBarmanObjectStore {
+    ClusterBackupBarmanObjectStore {
+        data: create_cluster_backup_barman_data(cdb),
+        endpoint_url: Some(endpoint_url.to_string()),
+        destination_path: backup_path.to_string(),
+        s3_credentials: Some(s3_credentials.clone()),
+        wal: create_cluster_backup_barman_wal(cdb),
+        ..ClusterBackupBarmanObjectStore::default()
+    }
+}
+
+fn create_google_backup_object_store(
+    cdb: &CoreDB,
+    endpoint_url: &str,
+    backup_path: &str,
+    google_credentials: &ClusterBackupBarmanObjectStoreGoogleCredentials,
+) -> ClusterBackupBarmanObjectStore {
+    ClusterBackupBarmanObjectStore {
+        data: create_cluster_backup_barman_data(cdb),
+        endpoint_url: Some(endpoint_url.to_string()),
+        destination_path: backup_path.to_string(),
+        google_credentials: Some(google_credentials.clone()),
+        wal: create_cluster_backup_barman_wal(cdb),
+        ..ClusterBackupBarmanObjectStore::default()
     }
 }
 
@@ -243,14 +268,16 @@ fn create_cluster_backup(
         }
     });
 
+    let barman_object_store = create_cluster_backup_barman_object_store(
+        cdb,
+        endpoint_url,
+        backup_path,
+        s3_credentials,
+        google_credentials,
+    );
+
     Some(ClusterBackup {
-        barman_object_store: Some(create_cluster_backup_barman_object_store(
-            cdb,
-            endpoint_url,
-            backup_path,
-            s3_credentials,
-            google_credentials,
-        )),
+        barman_object_store: Some(barman_object_store),
         retention_policy: Some(retention_days),
         volume_snapshot,
         ..ClusterBackup::default()
@@ -362,8 +389,8 @@ pub fn cnpg_backup_configuration(
         cdb,
         endpoint_url,
         &backup_path.unwrap(),
-        Some(&s3_credentials),
-        Some(&google_credentials),
+        s3_credentials.as_ref(),
+        google_credentials.as_ref(),
     );
 
     (cluster_backup, service_account_template)
@@ -461,16 +488,12 @@ pub fn cnpg_cluster_bootstrap_from_cdb(
                 .map(|creds| !creds.is_empty()),
         ) {
             (Some(true), None | Some(false)) => (
-                Some(generate_s3_restore_credentials(
-                    restore.s3_credentials.as_ref(),
-                )),
+                generate_s3_restore_credentials(restore.s3_credentials.as_ref()),
                 None,
             ),
             (None | Some(false), Some(true)) => (
                 None,
-                Some(generate_google_restore_credentials(
-                    restore.google_credentials.as_ref(),
-                )),
+                generate_google_restore_credentials(restore.google_credentials.as_ref()),
             ),
             (None | Some(false), None | Some(false)) => {
                 warn!("No valid S3 or Google credentials provided for restore, proceeding without credentials");
@@ -479,15 +502,12 @@ pub fn cnpg_cluster_bootstrap_from_cdb(
             (Some(true), Some(true)) => {
                 warn!("Both S3 and Google credentials provided for restore, using S3 credentials");
                 (
-                    Some(generate_s3_restore_credentials(
-                        restore.s3_credentials.as_ref(),
-                    )),
+                    generate_s3_restore_credentials(restore.s3_credentials.as_ref()),
                     None,
                 )
             }
         };
-        // let s3_credentials = generate_s3_restore_credentials(restore.s3_credentials.as_ref());
-        // Find destination_path from Backup to generate the restore destination path
+
         let restore_destination_path = generate_restore_destination_path(restore, &cdb.spec.backup);
         ClusterExternalClusters {
             name: "tembo-recovery".to_string(),
@@ -2123,47 +2143,45 @@ fn generate_restore_destination_path(restore: &Restore, backup: &coredb_types::B
 #[instrument(fields(trace_id, creds))]
 fn generate_s3_backup_credentials(
     creds: Option<&S3Credentials>,
-) -> ClusterBackupBarmanObjectStoreS3Credentials {
-    if let Some(creds) = creds {
-        if creds.access_key_id.is_none() && creds.secret_access_key.is_none() {
-            return ClusterBackupBarmanObjectStoreS3Credentials {
-                inherit_from_iam_role: Some(true),
-                ..Default::default()
-            };
+) -> Option<ClusterBackupBarmanObjectStoreS3Credentials> {
+    match creds {
+        Some(creds) if !creds.is_empty() => {
+            if creds.access_key_id.is_none() && creds.secret_access_key.is_none() {
+                Some(ClusterBackupBarmanObjectStoreS3Credentials {
+                    inherit_from_iam_role: Some(true),
+                    ..Default::default()
+                })
+            } else {
+                Some(ClusterBackupBarmanObjectStoreS3Credentials {
+                    access_key_id: creds.access_key_id.as_ref().map(|id| {
+                        ClusterBackupBarmanObjectStoreS3CredentialsAccessKeyId {
+                            key: id.key.clone(),
+                            name: id.name.clone(),
+                        }
+                    }),
+                    inherit_from_iam_role: Some(false),
+                    region: creds.region.as_ref().map(|r| {
+                        ClusterBackupBarmanObjectStoreS3CredentialsRegion {
+                            key: r.key.clone(),
+                            name: r.name.clone(),
+                        }
+                    }),
+                    secret_access_key: creds.secret_access_key.as_ref().map(|key| {
+                        ClusterBackupBarmanObjectStoreS3CredentialsSecretAccessKey {
+                            key: key.key.clone(),
+                            name: key.name.clone(),
+                        }
+                    }),
+                    session_token: creds.session_token.as_ref().map(|token| {
+                        ClusterBackupBarmanObjectStoreS3CredentialsSessionToken {
+                            key: token.key.clone(),
+                            name: token.name.clone(),
+                        }
+                    }),
+                })
+            }
         }
-
-        ClusterBackupBarmanObjectStoreS3Credentials {
-            access_key_id: creds.access_key_id.as_ref().map(|id| {
-                ClusterBackupBarmanObjectStoreS3CredentialsAccessKeyId {
-                    key: id.key.clone(),
-                    name: id.name.clone(),
-                }
-            }),
-            inherit_from_iam_role: Some(false),
-            region: creds.region.as_ref().map(|r| {
-                ClusterBackupBarmanObjectStoreS3CredentialsRegion {
-                    key: r.key.clone(),
-                    name: r.name.clone(),
-                }
-            }),
-            secret_access_key: creds.secret_access_key.as_ref().map(|key| {
-                ClusterBackupBarmanObjectStoreS3CredentialsSecretAccessKey {
-                    key: key.key.clone(),
-                    name: key.name.clone(),
-                }
-            }),
-            session_token: creds.session_token.as_ref().map(|token| {
-                ClusterBackupBarmanObjectStoreS3CredentialsSessionToken {
-                    key: token.key.clone(),
-                    name: token.name.clone(),
-                }
-            }),
-        }
-    } else {
-        ClusterBackupBarmanObjectStoreS3Credentials {
-            inherit_from_iam_role: Some(true),
-            ..Default::default()
-        }
+        _ => None,
     }
 }
 
@@ -2172,29 +2190,27 @@ fn generate_s3_backup_credentials(
 #[instrument(fields(trace_id, creds))]
 fn generate_google_backup_credentials(
     creds: Option<&GoogleCredentials>,
-) -> ClusterBackupBarmanObjectStoreGoogleCredentials {
-    if let Some(creds) = creds {
-        if creds.application_credentials.is_none() {
-            return ClusterBackupBarmanObjectStoreGoogleCredentials {
-                gke_environment: Some(true),
-                ..Default::default()
-            };
+) -> Option<ClusterBackupBarmanObjectStoreGoogleCredentials> {
+    match creds {
+        Some(creds) if !creds.is_empty() => {
+            if creds.application_credentials.is_some() {
+                Some(ClusterBackupBarmanObjectStoreGoogleCredentials {
+                    application_credentials: creds.application_credentials.as_ref().map(|app| {
+                        ClusterBackupBarmanObjectStoreGoogleCredentialsApplicationCredentials {
+                            key: app.key.clone(),
+                            name: app.name.clone(),
+                        }
+                    }),
+                    gke_environment: Some(false),
+                })
+            } else {
+                Some(ClusterBackupBarmanObjectStoreGoogleCredentials {
+                    gke_environment: Some(true),
+                    application_credentials: None,
+                })
+            }
         }
-
-        ClusterBackupBarmanObjectStoreGoogleCredentials {
-            application_credentials: creds.application_credentials.as_ref().map(|app| {
-                ClusterBackupBarmanObjectStoreGoogleCredentialsApplicationCredentials {
-                    key: app.key.clone(),
-                    name: app.name.clone(),
-                }
-            }),
-            gke_environment: Some(false),
-        }
-    } else {
-        ClusterBackupBarmanObjectStoreGoogleCredentials {
-            gke_environment: Some(true),
-            ..Default::default()
-        }
+        _ => None,
     }
 }
 
@@ -2203,47 +2219,45 @@ fn generate_google_backup_credentials(
 #[instrument(fields(trace_id, creds))]
 fn generate_s3_restore_credentials(
     creds: Option<&S3Credentials>,
-) -> ClusterExternalClustersBarmanObjectStoreS3Credentials {
-    if let Some(creds) = creds {
-        if creds.access_key_id.is_none() && creds.secret_access_key.is_none() {
-            return ClusterExternalClustersBarmanObjectStoreS3Credentials {
-                inherit_from_iam_role: Some(true),
-                ..Default::default()
-            };
+) -> Option<ClusterExternalClustersBarmanObjectStoreS3Credentials> {
+    match creds {
+        Some(creds) if !creds.is_empty() => {
+            if creds.access_key_id.is_none() && creds.secret_access_key.is_none() {
+                Some(ClusterExternalClustersBarmanObjectStoreS3Credentials {
+                    inherit_from_iam_role: Some(true),
+                    ..Default::default()
+                })
+            } else {
+                Some(ClusterExternalClustersBarmanObjectStoreS3Credentials {
+                    access_key_id: creds.access_key_id.as_ref().map(|id| {
+                        ClusterExternalClustersBarmanObjectStoreS3CredentialsAccessKeyId {
+                            key: id.key.clone(),
+                            name: id.name.clone(),
+                        }
+                    }),
+                    inherit_from_iam_role: Some(false),
+                    region: creds.region.as_ref().map(|r| {
+                        ClusterExternalClustersBarmanObjectStoreS3CredentialsRegion {
+                            key: r.key.clone(),
+                            name: r.name.clone(),
+                        }
+                    }),
+                    secret_access_key: creds.secret_access_key.as_ref().map(|key| {
+                        ClusterExternalClustersBarmanObjectStoreS3CredentialsSecretAccessKey {
+                            key: key.key.clone(),
+                            name: key.name.clone(),
+                        }
+                    }),
+                    session_token: creds.session_token.as_ref().map(|token| {
+                        ClusterExternalClustersBarmanObjectStoreS3CredentialsSessionToken {
+                            key: token.key.clone(),
+                            name: token.name.clone(),
+                        }
+                    }),
+                })
+            }
         }
-
-        ClusterExternalClustersBarmanObjectStoreS3Credentials {
-            access_key_id: creds.access_key_id.as_ref().map(|id| {
-                ClusterExternalClustersBarmanObjectStoreS3CredentialsAccessKeyId {
-                    key: id.key.clone(),
-                    name: id.name.clone(),
-                }
-            }),
-            inherit_from_iam_role: Some(false),
-            region: creds.region.as_ref().map(|r| {
-                ClusterExternalClustersBarmanObjectStoreS3CredentialsRegion {
-                    key: r.key.clone(),
-                    name: r.name.clone(),
-                }
-            }),
-            secret_access_key: creds.secret_access_key.as_ref().map(|key| {
-                ClusterExternalClustersBarmanObjectStoreS3CredentialsSecretAccessKey {
-                    key: key.key.clone(),
-                    name: key.name.clone(),
-                }
-            }),
-            session_token: creds.session_token.as_ref().map(|token| {
-                ClusterExternalClustersBarmanObjectStoreS3CredentialsSessionToken {
-                    key: token.key.clone(),
-                    name: token.name.clone(),
-                }
-            }),
-        }
-    } else {
-        ClusterExternalClustersBarmanObjectStoreS3Credentials {
-            inherit_from_iam_role: Some(true),
-            ..Default::default()
-        }
+        _ => None,
     }
 }
 
@@ -2252,29 +2266,27 @@ fn generate_s3_restore_credentials(
 #[instrument(fields(trace_id, creds))]
 fn generate_google_restore_credentials(
     creds: Option<&GoogleCredentials>,
-) -> ClusterExternalClustersBarmanObjectStoreGoogleCredentials {
-    if let Some(creds) = creds {
-        if creds.application_credentials.is_none() {
-            return ClusterExternalClustersBarmanObjectStoreGoogleCredentials {
-                gke_environment: Some(true),
-                ..Default::default()
-            };
+) -> Option<ClusterExternalClustersBarmanObjectStoreGoogleCredentials> {
+    match creds {
+        Some(creds) if !creds.is_empty() => {
+            if creds.application_credentials.is_some() {
+                Some(ClusterExternalClustersBarmanObjectStoreGoogleCredentials {
+                    application_credentials: creds.application_credentials.as_ref().map(|app| {
+                        ClusterExternalClustersBarmanObjectStoreGoogleCredentialsApplicationCredentials {
+                            key: app.key.clone(),
+                            name: app.name.clone(),
+                        }
+                    }),
+                    gke_environment: Some(false),
+                })
+            } else {
+                Some(ClusterExternalClustersBarmanObjectStoreGoogleCredentials {
+                    gke_environment: Some(true),
+                    application_credentials: None,
+                })
+            }
         }
-
-        ClusterExternalClustersBarmanObjectStoreGoogleCredentials {
-            application_credentials: creds.application_credentials.as_ref().map(|app| {
-                ClusterExternalClustersBarmanObjectStoreGoogleCredentialsApplicationCredentials {
-                    key: app.key.clone(),
-                    name: app.name.clone(),
-                }
-            }),
-            gke_environment: Some(false),
-        }
-    } else {
-        ClusterExternalClustersBarmanObjectStoreGoogleCredentials {
-            gke_environment: Some(true),
-            ..Default::default()
-        }
+        _ => None,
     }
 }
 
@@ -2802,6 +2814,8 @@ mod tests {
           backup:
             destinationPath: s3://aws-s3-bucket/tembo/backup
             encryption: AES256
+            s3Credentials:
+              inheritFromIAMRole: true
             retentionPolicy: "45"
             schedule: 55 7 * * *
             volumeSnapshot:
@@ -3424,7 +3438,7 @@ mod tests {
             endpoint_url,
             &backup_path.unwrap(),
             Some(&s3_credentials),
-            Some(&google_credentials),
+            google_credentials.as_ref(),
         );
 
         assert!(result.is_some());
