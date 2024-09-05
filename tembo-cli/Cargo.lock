@@ -774,9 +774,9 @@ checksum = "c2459377285ad874054d797f3ccebf984978aa39129f6eafde5cdc8315b612f8"
 
 [[package]]
 name = "controller"
-version = "0.49.8"
+version = "0.47.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f9a725357b58c462d925d582054f39ad535301b8bc2663d2ea2087dacaecfcef"
+checksum = "908fdd592e8580af4fb1b970e93a6c7ba36a77393d87e814831f05dc4e023c7f"
 dependencies = [
  "actix-web",
  "anyhow",
@@ -4349,7 +4349,7 @@ dependencies = [
 
 [[package]]
 name = "tembo-cli"
-version = "0.20.7"
+version = "0.20.6"
 dependencies = [
  "actix-cors",
  "actix-service",
@@ -4412,19 +4412,18 @@ dependencies = [
 
 [[package]]
 name = "tembo-stacks"
-version = "0.15.3"
+version = "0.7.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "19684d15ba6bc55ed68101760e28c8a93565ea8e33f99f0e72493e65b6e2172d"
+checksum = "6b2381329dc54a5a372fdb31f00f97d732d28988af049f9f8b8522623babcf02"
 dependencies = [
  "anyhow",
- "clap",
  "controller",
  "futures",
  "k8s-openapi",
  "lazy_static",
+ "regex",
  "schemars",
  "serde",
- "serde_json",
  "serde_yaml",
  "strum",
  "strum_macros",
