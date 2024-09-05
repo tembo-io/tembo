@@ -41,7 +41,7 @@ pub async fn reconcile_dedicated_networking(
         ns
     );
 
-    if let Some(dedicated_networking) = &cdb.spec.dedicatedNetworking {
+    if let Some(dedicated_networking) = &cdb.spec.dedicated_networking {
         if dedicated_networking.enabled {
             debug!(
                 "Dedicated networking is enabled for CoreDB instance: {}",
@@ -77,7 +77,7 @@ pub async fn reconcile_dedicated_networking(
                 e
             })?;
 
-            if dedicated_networking.includeStandby {
+            if dedicated_networking.include_standby {
                 debug!(
                     "Handling standby service ingress for CoreDB instance: {}",
                     cdb.name_any()
