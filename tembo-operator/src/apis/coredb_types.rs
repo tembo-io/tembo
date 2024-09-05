@@ -589,8 +589,7 @@ pub struct CoreDBSpec {
     /// backups and WAL archive uploads to an S3 compatible object store.
     ///
     /// **Default**: disabled
-    #[serde(default = "defaults::default_backup")]
-    pub backup: Backup,
+    pub backup: Option<Backup>,
 
     /// The metrics configuration to allow for custom Postgres metrics to be
     /// exposed in postgres-exporter and Prometheus.

@@ -18,7 +18,7 @@ install-calico:
 
 install-traefik:
 	kubectl create namespace traefik || true
-	helm upgrade --install --namespace=traefik --version=28.3.0 --values=./testdata/traefik-values.yaml traefik traefik/traefik
+	helm upgrade --install --namespace=traefik --version=29.0.1 --values=./testdata/traefik-values.yaml traefik traefik/traefik
 
 install-operator:
 	just install-cert-manager

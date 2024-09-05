@@ -1924,20 +1924,11 @@ spec:
                 nullable: true
                 type: array
               backup:
-                default:
-                  destinationPath: s3://
-                  encryption: AES256
-                  retentionPolicy: '30'
-                  schedule: 0 0 * * *
-                  endpointURL: null
-                  s3Credentials: {}
-                  googleCredentials: null
-                  volumeSnapshot:
-                    enabled: false
                 description: |-
                   The backup configuration for the CoreDB instance to facilitate database backups and WAL archive uploads to an S3 compatible object store.
 
                   **Default**: disabled
+                nullable: true
                 properties:
                   destinationPath:
                     default: s3://
