@@ -377,8 +377,8 @@ pub struct DedicatedNetworking {
     /// Include a separate load balancer for the standby (replica) server.
     ///
     /// **Default**: false.
-    #[serde(default)]
-    pub includeStandby: bool,
+    #[serde(default, rename = "includeStandby")]
+    pub include_standby: bool,
 
     /// Configure the load balancer to be public or private.
     ///
@@ -477,8 +477,8 @@ pub struct CoreDBSpec {
     /// Configuration for dedicated networking.
     ///
     /// **Default**: disabled
-    #[serde(default)]
-    pub dedicatedNetworking: Option<DedicatedNetworking>,
+    #[serde(default, rename = "dedicatedNetworking")]
+    pub dedicated_networking: Option<DedicatedNetworking>,
 
     /// The port to expose the Postgres service on.
     ///
