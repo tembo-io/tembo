@@ -50,7 +50,7 @@ jobs:
         with:
           toolchain: stable
       - name: install dependencies
-        run: cargo install sqlx-cli --version 0.7.4
+        run: cargo install sqlx-cli --version 0.8.2
       - name: Start Postgres
         run: |
           make run-postgres
