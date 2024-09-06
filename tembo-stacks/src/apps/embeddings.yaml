@@ -61,7 +61,7 @@ trunk_installs:
   - name: pgvector
     version: 0.7.4
   - name: vectorize
-    version: 0.18.1
+    version: 0.18.2
   - name: vectorscale
     version: 0.3.0
 extensions:
@@ -84,7 +84,7 @@ extensions:
     locations:
       - database: postgres
         enabled: true
-        version: 0.18.1
+        version: 0.18.2
   - name: vectorscale
     locations:
       - database: postgres
