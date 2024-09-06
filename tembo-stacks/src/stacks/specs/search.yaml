@@ -41,7 +41,7 @@ trunk_installs:
   - name: pg_stat_statements
     version: 1.10.0
   - name: pg_search
-    version: 0.7.6
+    version: 0.9.4
 extensions:
   - name: pg_stat_statements
     locations:
@@ -52,4 +52,4 @@ extensions:
     locations:
       - database: postgres
         enabled: true
-        version: 0.7.6
+        version: 0.9.4
