@@ -2,7 +2,7 @@ NAME := "conductor"
 VERSION := `git rev-parse HEAD`
 SEMVER_VERSION := `grep version Cargo.toml | awk -F"\"" '{print $2}' | head -n 1`
 NAMESPACE := "default"
-KUBE_VERSION := env_var_or_default('KUBE_VERSION', '1.25.8')
+KUBE_VERSION := env_var_or_default('KUBE_VERSION', '1.29.8')
 RUST_LOG := "info"
 
 default:
@@ -10,9 +10,7 @@ default:
 
 install-traefik:
 	kubectl create namespace traefik || true
-	helm upgrade --install --namespace=traefik --version=20.8.0 --values=./testdata/traefik-values.yaml traefik traefik/traefik
-	# https://github.com/traefik/traefik-helm-chart/issues/757#issuecomment-1753995542
-	kubectl apply -f https://raw.githubusercontent.com/traefik/traefik/v3.0.0-beta2/docs/content/reference/dynamic-configuration/kubernetes-crd-definition-v1.yml
+	helm upgrade --install --namespace=traefik --version=29.0.1 --values=./testdata/traefik-values.yaml traefik traefik/traefik
 
 install-operator:
   just install-cert-manager
@@ -70,7 +68,7 @@ fmt:
 	cargo clippy --fix
 	cargo +nightly fmt
 
-watch:
+watch: run-operator
 	POSTGRES_QUEUE_CONNECTION=postgresql://postgres:postgres@0.0.0.0:5431/postgres \
 	RUST_BACKTRACE=1 \
 	RUST_LOG={{RUST_LOG}} \
