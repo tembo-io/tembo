@@ -122,7 +122,7 @@ fn get_hourly_chunks(
     chunks
 }
 
-pub async fn events_reporter() -> Result<()> {
+pub async fn run_events_reporter() -> Result<()> {
     // Run once per hour
     const SYNC_PERIOD: Duration = Duration::from_secs(60 * 60);
 
@@ -153,7 +153,14 @@ pub async fn events_reporter() -> Result<()> {
         let chunks = get_hourly_chunks(last_reported_at, now);
 
         for (start_time, end_time) in chunks {
-            enqueue_event(&dbclient, &queue, &metrics_events_queue, start_time, end_time).await?;
+            enqueue_event(
+                &dbclient,
+                &queue,
+                &metrics_events_queue,
+                start_time,
+                end_time,
+            )
+            .await?;
         }
     }
 }
@@ -163,7 +170,7 @@ async fn enqueue_event(
     queue: &PGMQueueExt,
     metrics_events_queue: &str,
     start_time: DateTime<Utc>,
-    end_time: DateTime<Utc>
+    end_time: DateTime<Utc>,
 ) -> Result<(), anyhow::Error> {
     const BATCH_SIZE: usize = 1000;
 
@@ -178,7 +185,12 @@ async fn enqueue_event(
 
     for event in &metrics_to_send {
         queue.send(metrics_events_queue, event).await?;
-        info!("Enqueued batch {}/{} for {} to PGMQ", i, batches, start_time.format("%Y-%m-%d %H:%M:%S %Z"));
+        info!(
+            "Enqueued batch {}/{} for {} to PGMQ",
+            i,
+            batches,
+            start_time.format("%Y-%m-%d %H:%M:%S %Z")
+        );
         i += 1;
     }
 
