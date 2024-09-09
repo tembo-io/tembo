@@ -3,7 +3,8 @@ use actix_web_opentelemetry::{PrometheusMetricsHandler, RequestTracing};
 use conductor::errors::ConductorError;
 use conductor::monitoring::CustomMetrics;
 use conductor::{
-    create_cloudformation, create_namespace, create_or_update, delete, delete_cloudformation,
+    create_cloudformation, create_gcp_storage_workload_identity_binding, create_namespace,
+    create_or_update, delete, delete_cloudformation, delete_gcp_storage_workload_identity_binding,
     delete_namespace, generate_cron_expression, generate_spec, get_coredb_error_without_status,
     get_one, get_pg_conn, lookup_role_arn, restart_coredb, types,
 };
@@ -12,7 +13,7 @@ use crate::metrics_reporter::run_metrics_reporter;
 use crate::status_reporter::run_status_reporter;
 use conductor::routes::health::background_threads_running;
 use controller::apis::coredb_types::{
-    Backup, CoreDBSpec, S3Credentials, ServiceAccountTemplate, VolumeSnapshot,
+    Backup, CoreDBSpec, GoogleCredentials, S3Credentials, ServiceAccountTemplate, VolumeSnapshot,
 };
 use controller::apis::postgres_parameters::{ConfigValue, PgConfig};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
@@ -40,36 +41,54 @@ const REQUEUE_VT_SEC_SHORT: i32 = 5;
 // that we would want to try again after awhile.
 const REQUEUE_VT_SEC_LONG: i32 = 300;
 
+fn get_env_var(key: &str, default: Option<&str>) -> Result<String, ConductorError> {
+    Ok(env::var(key).unwrap_or_else(|_| default.unwrap_or("").to_owned()))
+}
+
 async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
     // Read connection info from environment variable
-    let pg_conn_url =
-        env::var("POSTGRES_QUEUE_CONNECTION").expect("POSTGRES_QUEUE_CONNECTION must be set");
-    let control_plane_events_queue =
-        env::var("CONTROL_PLANE_EVENTS_QUEUE").expect("CONTROL_PLANE_EVENTS_QUEUE must be set");
-    let metrics_events_queue =
-        env::var("METRICS_EVENTS_QUEUE").expect("METRICS_EVENTS_QUEUE must be set");
-    let data_plane_events_queue =
-        env::var("DATA_PLANE_EVENTS_QUEUE").expect("DATA_PLANE_EVENTS_QUEUE must be set");
-    let data_plane_basedomain =
-        env::var("DATA_PLANE_BASEDOMAIN").expect("DATA_PLANE_BASEDOMAIN must be set");
-    let backup_archive_bucket =
-        env::var("BACKUP_ARCHIVE_BUCKET").expect("BACKUP_ARCHIVE_BUCKET must be set");
-    let storage_archive_bucket =
-        env::var("STORAGE_ARCHIVE_BUCKET").expect("STORAGE_ARCHIVE_BUCKET must be set");
-    let cf_template_bucket =
-        env::var("CF_TEMPLATE_BUCKET").expect("CF_TEMPLATE_BUCKET must be set");
-    let max_read_ct: i32 = env::var("MAX_READ_CT")
-        .unwrap_or_else(|_| "100".to_owned())
+    let pg_conn_url = get_env_var("POSTGRES_QUEUE_CONNECTION", None)?;
+    let control_plane_events_queue = get_env_var("CONTROL_PLANE_EVENTS_QUEUE", None)?;
+    let metrics_events_queue = get_env_var("METRICS_EVENTS_QUEUE", None)?;
+    let data_plane_events_queue = get_env_var("DATA_PLANE_EVENTS_QUEUE", None)?;
+    let data_plane_basedomain = get_env_var("DATA_PLANE_BASEDOMAIN", None)?;
+    let backup_archive_bucket = get_env_var("BACKUP_ARCHIVE_BUCKET", None)?;
+    let storage_archive_bucket = get_env_var("STORAGE_ARCHIVE_BUCKET", None)?;
+    let cf_template_bucket = get_env_var("CF_TEMPLATE_BUCKET", None)?;
+
+    let max_read_ct: i32 = get_env_var("MAX_READ_CT", Some("100"))?
         .parse()
-        .expect("error parsing MAX_READ_CT");
-    let is_cloud_formation: bool = env::var("IS_CLOUD_FORMATION")
-        .unwrap_or_else(|_| "true".to_owned())
+        .map_err(|e| {
+            ConductorError::ConnectionPoolError(format!("Failed to parse MAX_READ_CT: {}", e))
+        })?;
+    let is_cloud_formation: bool = get_env_var("IS_CLOUD_FORMATION", Some("true"))?
         .parse()
-        .expect("error parsing IS_CLOUD_FORMATION");
-    let aws_region: String = env::var("AWS_REGION")
-        .unwrap_or_else(|_| "us-east-1".to_owned())
-        .parse()
-        .expect("error parsing AWS_REGION");
+        .map_err(|e| {
+            ConductorError::ConnectionPoolError(format!(
+                "Failed to parse IS_CLOUD_FORMATION: {}",
+                e
+            ))
+        })?;
+    let aws_region = get_env_var("AWS_REGION", Some("us-east-1"))?;
+    let is_gcp: bool = get_env_var("IS_GCP", Some("false"))?.parse().map_err(|e| {
+        ConductorError::ConnectionPoolError(format!("Failed to parse IS_GCP: {}", e))
+    })?;
+    let gcp_project_id = get_env_var("GCP_PROJECT_ID", None)?;
+    let gcp_project_number = get_env_var("GCP_PROJECT_NUMBER", None)?;
+
+    // Error and exit if both IS_CLOUD_FORMATION and IS_GCP are set to true
+    if is_cloud_formation && is_gcp {
+        return Err(ConductorError::ConnectionPoolError(
+            "Cannot have both IS_CLOUD_FORMATION and IS_GCP set to true".into(),
+        ));
+    }
+
+    // Error and exit if IS_GCP is true and GCP_PROJECT_ID or GCP_PROJECT_NUMBER are not set
+    if is_gcp && (gcp_project_id.is_empty() || gcp_project_number.is_empty()) {
+        return Err(ConductorError::ConnectionPoolError(
+            "GCP_PROJECT_ID and GCP_PROJECT_NUMBER must be set if IS_GCP is true".into(),
+        ));
+    }
 
     // Connect to pgmq
     let queue = PGMQueueExt::new(pg_conn_url.clone(), 5).await?;
@@ -293,6 +312,17 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     },
                 };
 
+                init_gcp_storage_workload_identity(
+                    is_gcp,
+                    gcp_project_id.clone(),
+                    gcp_project_number.clone(),
+                    &read_msg,
+                    &mut coredb_spec,
+                    backup_archive_bucket.clone(),
+                    storage_archive_bucket.clone(),
+                )
+                .await?;
+
                 info!("{}: Creating namespace", read_msg.msg_id);
                 // create Namespace
                 create_namespace(client.clone(), &namespace, org_id, instance_id).await?;
@@ -419,6 +449,21 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
 
                 info!("{}: Deleting cloudformation stack", read_msg.msg_id);
                 delete_cloudformation(aws_region.clone(), &namespace).await?;
+
+                if is_gcp {
+                    info!(
+                        "{}: Deleting GCP storage workload identity binding",
+                        read_msg.msg_id
+                    );
+                    delete_gcp_storage_workload_identity_binding(
+                        &gcp_project_id,
+                        &gcp_project_number,
+                        &backup_archive_bucket,
+                        &storage_archive_bucket,
+                        &namespace,
+                    )
+                    .await?;
+                }
 
                 let insert_query = sqlx::query!(
                     "INSERT INTO deleted_instances (namespace) VALUES ($1) ON CONFLICT (namespace) DO NOTHING",
@@ -773,6 +818,62 @@ async fn init_cloud_perms(
 
     coredb_spec.backup = Some(backup);
     coredb_spec.serviceAccountTemplate = service_account_template;
+
+    Ok(())
+}
+
+async fn init_gcp_storage_workload_identity(
+    is_gcp: bool,
+    gcp_project_id: String,
+    gcp_project_number: String,
+    read_msg: &Message<CRUDevent>,
+    coredb_spec: &mut CoreDBSpec,
+    backup_archive_bucket: String,
+    storage_archive_bucket: String,
+) -> Result<(), ConductorError> {
+    if !is_gcp {
+        return Ok(());
+    }
+
+    // Create the Workload Identity binding to the instance's service account and namespace.
+    create_gcp_storage_workload_identity_binding(
+        &gcp_project_id,
+        &gcp_project_number,
+        &backup_archive_bucket,
+        &storage_archive_bucket,
+        &read_msg.message.namespace,
+    )
+    .await?;
+
+    // Generate Backup spec for CoreDB
+    // TODO: disable volumesnapshots for now until we can make them work with CNPG
+    // Enable VolumeSnapshots for all instances being created
+    let volume_snapshot = Some(VolumeSnapshot {
+        enabled: false,
+        snapshot_class: None,
+    });
+
+    let write_path = read_msg
+        .message
+        .backups_write_path
+        .clone()
+        .unwrap_or(format!("v2/{}", read_msg.message.namespace));
+
+    let backup = Backup {
+        destinationPath: Some(format!("gs://{}/{}", backup_archive_bucket, write_path)),
+        encryption: Some(String::from("AES256")),
+        retentionPolicy: Some(String::from("30")),
+        schedule: Some(generate_cron_expression(&read_msg.message.namespace)),
+        s3_credentials: None,
+        endpoint_url: None,
+        google_credentials: Some(GoogleCredentials {
+            gke_environment: Some(true),
+            ..Default::default()
+        }),
+        volume_snapshot,
+    };
+
+    coredb_spec.backup = Some(backup);
 
     Ok(())
 }
