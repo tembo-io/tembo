@@ -45,6 +45,10 @@ spec:
             value: "true"
           - name: RUST_LOG
             value: {{ .Values.logLevel }}
+          {{- if .Values.baseDomain }}
+          - name: DATA_PLANE_BASEDOMAIN
+            value: {{ include "conductor.dataPlaneDomain" . }}
+          {{- end }}
           {{- if .Values.env }}{{ .Values.env | default list | toYaml | nindent 10 }}{{- end }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}

@@ -85,3 +85,13 @@ Create the name of the service account to use
 {{- define "conductor.serviceAccountName" -}}
 {{- default (include "conductor.fullname" .) .Values.serviceAccount.name }}
 {{- end }}
+
+{{/*
+If .Values.baseDomain is present, create dataPlaneDomain.
+This is for Self Hosted installations.
+*/}}
+{{- define "conductor.dataPlaneDomain" -}}
+{{- if .Values.baseDomain }}
+{{- printf "dataplane.%s" .Values.baseDomain }}
+{{- end }}
+{{- end }}
