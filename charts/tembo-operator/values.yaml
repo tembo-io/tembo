@@ -109,6 +109,8 @@ controller:
   # -- Affinity for the controller to be installed.
   affinity: {}
 
+  baseDomain: ~
+
 # -- The pod-init configuration
 pod-init:
   enabled: true

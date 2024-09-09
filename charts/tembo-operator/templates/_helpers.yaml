@@ -84,3 +84,13 @@ app.kubernetes.io/name: {{ include "controller.fullname" . | quote }}
 app.kubernetes.io/version: {{ default (index .Values "controller").image.tag .Chart.Version }}
 app.kubernetes.io/component: "controller"
 {{- end }}
+
+{{/*
+If .Values.baseDomain is present, create dataPlaneDomain.
+This is for Self Hosted installations.
+*/}}
+{{- define "controller.dataPlaneDomain" -}}
+{{- if .Values.controller.baseDomain }}
+{{- printf "dataplane.%s" .Values.controller.baseDomain }}
+{{- end }}
+{{- end }}
