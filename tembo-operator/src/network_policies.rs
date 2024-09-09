@@ -39,7 +39,7 @@ pub async fn reconcile_network_policies(client: Client, namespace: &str) -> Resu
         "apiVersion": "networking.k8s.io/v1",
         "kind": "NetworkPolicy",
         "metadata": {
-            "name": "allow-egress-to-gke-dns",
+            "name": "allow-egress-to-dns",
             "namespace": format!("{namespace}"),
         },
         "spec": {
