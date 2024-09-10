@@ -144,7 +144,7 @@ impl Stack {
             image: format!(
                 "{repo}/{image}",
                 repo = self.repository,
-                image = self.images.pg16.clone()
+                image = self.images.pg16.as_ref().unwrap()
             ),
             extensions: self.extensions.unwrap_or_default(),
             trunk_installs: self.trunk_installs.unwrap_or_default(),
