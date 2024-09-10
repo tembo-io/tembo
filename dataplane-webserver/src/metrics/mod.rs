@@ -177,6 +177,10 @@ pub async fn query_prometheus(
 }
 
 fn parse_duration(duration: &str) -> Result<Duration, &'static str> {
+    if duration.is_empty() {
+        return Err("Duration cannot be empty");
+    }
+
     let mut total_seconds = 0u64;
     let mut current_number = String::new();
 
@@ -204,4 +208,31 @@ fn parse_duration(duration: &str) -> Result<Duration, &'static str> {
     }
 
     Ok(Duration::from_secs(total_seconds))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parse_duration_valid_inputs() {
+        assert_eq!(parse_duration("5s").unwrap(), Duration::from_secs(5));
+        assert_eq!(parse_duration("2m").unwrap(), Duration::from_secs(120));
+        assert_eq!(parse_duration("1h").unwrap(), Duration::from_secs(3600));
+        assert_eq!(parse_duration("1d").unwrap(), Duration::from_secs(86400));
+        assert_eq!(parse_duration("1w").unwrap(), Duration::from_secs(604800));
+        assert_eq!(parse_duration("1y").unwrap(), Duration::from_secs(31536000));
+        assert_eq!(parse_duration("1h30m").unwrap(), Duration::from_secs(5400));
+        assert_eq!(parse_duration("2d12h").unwrap(), Duration::from_secs(216000));
+    }
+
+    #[test]
+    fn test_parse_duration_invalid_inputs() {
+        assert!(parse_duration("").is_err());
+        assert!(parse_duration("5").is_err());
+        assert!(parse_duration("m5").is_err());
+        assert!(parse_duration("5x").is_err());
+        assert!(parse_duration("5m6").is_err());
+        assert!(parse_duration("5.5h").is_err());
+    }
 }
