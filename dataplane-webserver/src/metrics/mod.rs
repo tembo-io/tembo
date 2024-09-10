@@ -185,10 +185,12 @@ fn parse_duration(duration: &str) -> Result<Duration, &'static str> {
     let mut current_number = String::new();
 
     for c in duration.chars() {
-        if c.is_digit(10) {
+        if c.is_ascii_digit() {
             current_number.push(c);
         } else {
-            let number = current_number.parse::<u64>().map_err(|_| "Invalid number")?;
+            let number = current_number
+                .parse::<u64>()
+                .map_err(|_| "Invalid number")?;
             current_number.clear();
 
             match c {
@@ -223,7 +225,10 @@ mod tests {
         assert_eq!(parse_duration("1w").unwrap(), Duration::from_secs(604800));
         assert_eq!(parse_duration("1y").unwrap(), Duration::from_secs(31536000));
         assert_eq!(parse_duration("1h30m").unwrap(), Duration::from_secs(5400));
-        assert_eq!(parse_duration("2d12h").unwrap(), Duration::from_secs(216000));
+        assert_eq!(
+            parse_duration("2d12h").unwrap(),
+            Duration::from_secs(216000)
+        );
     }
 
     #[test]
