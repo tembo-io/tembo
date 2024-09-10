@@ -122,15 +122,11 @@ fn get_hourly_chunks(
     chunks
 }
 
-pub async fn run_events_reporter() -> Result<()> {
+pub async fn run_events_reporter(pool: PgPool) -> Result<()> {
     // Run once per hour
     const SYNC_PERIOD: Duration = Duration::from_secs(60 * 60);
 
-    let pg_conn_url = env::var("POSTGRES_QUEUE_CONNECTION")
-        .with_context(|| "POSTGRES_QUEUE_CONNECTION must be set")?;
-    let dbclient = connect(&pg_conn_url, 5).await?;
-
-    let queue = PGMQueueExt::new(pg_conn_url, 5).await?;
+    // let queue = PGMQueueExt::new(pg_conn_url, 5).await?;
 
     // TODO: Need to set this env variable
     let metrics_events_queue =
