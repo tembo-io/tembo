@@ -91,7 +91,7 @@ If .Values.baseDomain is present, create dataPlaneDomain.
 This is for Self Hosted installations.
 */}}
 {{- define "conductor.dataPlaneDomain" -}}
-{{- if .Values.baseDomain }}
-{{- printf "dataplane.%s" .Values.baseDomain }}
+{{- if .Values.global.baseDomain }}
+{{- printf "dataplane.%s" .Values.global.baseDomain }}
 {{- end }}
 {{- end }}

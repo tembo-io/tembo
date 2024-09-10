@@ -45,7 +45,7 @@ spec:
             value: "true"
           - name: RUST_LOG
             value: {{ .Values.logLevel }}
-          {{- if .Values.baseDomain }}
+          {{- if .Values.global.baseDomain }}
           - name: DATA_PLANE_BASEDOMAIN
             value: {{ include "conductor.dataPlaneDomain" . }}
           {{- end }}

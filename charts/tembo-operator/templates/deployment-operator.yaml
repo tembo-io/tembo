@@ -33,7 +33,7 @@ spec:
           imagePullPolicy: {{ (index .Values "controller").image.pullPolicy }}
           name: tembo-controller
           env:
-            {{- if .Values.controller.baseDomain }}
+            {{- if .Values.global.baseDomain }}
             - name: DATA_PLANE_BASEDOMAIN
               value: {{ include "controller.dataPlaneDomain" . }}
             {{- end }}
