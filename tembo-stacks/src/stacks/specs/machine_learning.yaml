@@ -3,8 +3,6 @@ description: A Postgres instance equipped with machine learning extensions and o
 repository: "quay.io/tembo"
 organization: tembo
 images:
-# currently an issue with plpython2u and plpythonu in image build for pg14
-  14: "ml-cnpg:14-a0a5ab5"
   15: "ml-cnpg:15-5120dd1"
   16: "ml-cnpg:16-5120dd1"
 stack_version: 0.3.0
