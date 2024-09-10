@@ -41,7 +41,6 @@ serviceAccount:
   # when this is set to empty string.
   name: ""
 
-baseDomain: ~
 imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
