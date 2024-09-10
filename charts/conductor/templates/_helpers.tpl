@@ -87,11 +87,15 @@ Create the name of the service account to use
 {{- end }}
 
 {{/*
-If .Values.baseDomain is present, create dataPlaneDomain.
+If .Values.global.baseDomain is present, create dataPlaneDomain.
 This is for Self Hosted installations.
 */}}
 {{- define "conductor.dataPlaneDomain" -}}
+{{- if .Values.env | toString | regexMatch "DATA_PLANE_BASEDOMAIN" -}}
+{{- else -}}
 {{- if .Values.global.baseDomain }}
-{{- printf "dataplane.%s" .Values.global.baseDomain }}
+- name: DATA_PLANE_BASEDOMAIN
+  value: {{- printf " dataplane.%s" .Values.global.baseDomain }}
 {{- end }}
 {{- end }}
+{{- end -}}

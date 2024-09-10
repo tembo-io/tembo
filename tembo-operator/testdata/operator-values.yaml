@@ -8,6 +8,8 @@ pod-init:
   extraEnv:
     - name: OPENTELEMETRY_ENDPOINT_URL
       value: http://tempo.monitoring.svc.cluster.local:4317
+    - name: DATA_PLANE_BASEDOMAIN
+      value: data-1.example.tembo.io
   resources:
     requests:
       cpu: 50m
