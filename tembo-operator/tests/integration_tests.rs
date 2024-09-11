@@ -490,50 +490,6 @@ mod test {
         }
     }
 
-    async fn wait_for_last_archiver_status_updated(
-        context: Arc<Context>,
-        namespace: &str,
-        name: &str,
-    ) {
-        println!("Waiting for last archiver status to update for: {}", name);
-
-        let coredbs: Api<CoreDB> = Api::namespaced(context.client.clone(), namespace);
-        const TIMEOUT_SECONDS_BACKUP_COMPLETED: u64 = 300;
-        const POLLING_INTERVAL: u64 = 5;
-
-        let start_time = std::time::Instant::now();
-
-        loop {
-            match coredbs.get(name).await {
-                Ok(cdb) => {
-                    if let Some(status) = &cdb.status {
-                        if let Some(archiver_status) = &status.last_archiver_status {
-                            // Dereference and use the value
-                            let _ = *archiver_status; // If this doesn't panic, the value is valid
-
-                            println!("Last archiver status is now: {}", archiver_status);
-                            break; // Exit the loop if condition is met
-                        }
-                    }
-                }
-                Err(e) => {
-                    println!("Error fetching CoreDB status: {:?}", e);
-                }
-            }
-
-            // Check elapsed time and panic if timeout is exceeded
-            if start_time.elapsed() > Duration::from_secs(TIMEOUT_SECONDS_BACKUP_COMPLETED) {
-                println!(
-                    "Timeout waiting for archiver status to update for: {}",
-                    name
-                );
-                panic!("Timeout waiting for archiver status");
-            }
-
-            tokio::time::sleep(Duration::from_secs(POLLING_INTERVAL)).await;
-        }
-    }
-
     async fn service_exists(
         context: Arc<Context>,
         namespace: &str,
@@ -4928,7 +4884,6 @@ CREATE EVENT TRIGGER pgrst_watch
 
         // Check to make sure the initial backup has run and its completed
         has_backup_completed(context.clone(), &namespace, name).await;
-        wait_for_last_archiver_status_updated(context.clone(), &namespace, name).await;
 
         // Create a table and insert some data
         let result = psql_with_retry(
@@ -4978,7 +4933,6 @@ CREATE EVENT TRIGGER pgrst_watch
 
         // Wait for backup to complete
         has_backup_completed(context.clone(), &namespace, &backup_name).await;
-        wait_for_last_archiver_status_updated(context.clone(), &namespace, name).await;
 
         // Check to make sure CoreDBStatus has last_archiver_status set to a DateTime<Utc>
         let cdbstatus = coredbs.get(name).await.unwrap();

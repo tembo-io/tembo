@@ -172,7 +172,7 @@ fn is_volume_snapshot_update_needed(
     volume_snapshot: Option<&VolumeSnapshot>,
     enable_volume_snapshot: bool,
 ) -> bool {
-    let current_enabled = volume_snapshot.map_or(false, |vs| vs.enabled);
+    let current_enabled = volume_snapshot.map(|vs| vs.enabled).unwrap_or(false);
     current_enabled != enable_volume_snapshot
 }
 
