@@ -1955,7 +1955,6 @@ spec:
                     nullable: true
                     type: string
                   googleCredentials:
-                    default: {}
                     description: The Google Cloud Storage credentials to use for backups
                     nullable: true
                     properties:

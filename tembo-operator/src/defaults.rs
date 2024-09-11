@@ -1,8 +1,7 @@
 use crate::apis::coredb_types::CoreDB;
 use crate::{
     apis::coredb_types::{
-        Backup, ConnectionPooler, GoogleCredentials, PgBouncer, S3Credentials,
-        ServiceAccountTemplate, VolumeSnapshot,
+        Backup, ConnectionPooler, PgBouncer, S3Credentials, ServiceAccountTemplate, VolumeSnapshot,
     },
     cloudnativepg::clusters::ClusterAffinity,
     cloudnativepg::poolers::{PoolerPgbouncerPoolMode, PoolerTemplateSpecContainersResources},

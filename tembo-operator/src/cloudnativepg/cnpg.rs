@@ -139,6 +139,9 @@ fn create_cluster_backup_barman_object_store(
     let s3_creds = s3_credentials.map_or(false, |creds| !creds.is_empty());
     let google_creds = google_credentials.map_or(false, |creds| !creds.is_empty());
 
+    println!("s3_creds: {:?}", s3_creds);
+    println!("google_creds: {:?}", google_creds);
+
     match (s3_creds, google_creds) {
         (false, false) => {
             warn!("No valid S3 or Google credentials provided for backups, disabling backups");
@@ -276,6 +279,8 @@ fn create_cluster_backup(
         google_credentials,
     );
 
+    println!("barman_object_store: {:?}", barman_object_store);
+
     // If the destination path is empty, check if we need to enabled volume snapshots
     // if not then return None and disable backups
     if barman_object_store.destination_path.is_empty() {
@@ -302,6 +307,7 @@ pub fn cnpg_backup_configuration(
     }
 
     let backup_path = cdb.spec.backup.destinationPath.clone();
+    println!("backup_path: {:?}", backup_path);
     if backup_path.is_none() {
         warn!("Backups are disabled because we don't have an S3 backup path");
         return (None, None);
@@ -320,6 +326,8 @@ pub fn cnpg_backup_configuration(
         s3_credentials.as_ref(),
         google_credentials.as_ref(),
     );
+
+    println!("cluster_backup: {:?}", cluster_backup);
 
     (cluster_backup, service_account_template)
 }

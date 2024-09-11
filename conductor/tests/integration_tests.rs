@@ -313,19 +313,12 @@ mod test {
         let new_backup_spec = update_coredb.spec.backup.clone();
 
         // assert that the backup.schedule for old_backup_spec are equal to new_backup_spec
-        assert_eq!(
-            old_backup_spec.as_ref().and_then(|b| b.schedule.clone()),
-            new_backup_spec.as_ref().and_then(|b| b.schedule.clone())
-        );
+        assert_eq!(old_backup_spec.schedule, new_backup_spec.schedule);
 
         // assert that the destination paths for old_backup_spec are equal to new_backup_spec
         assert_eq!(
-            old_backup_spec
-                .as_ref()
-                .and_then(|b| b.destinationPath.clone()),
-            new_backup_spec
-                .as_ref()
-                .and_then(|b| b.destinationPath.clone())
+            old_backup_spec.destinationPath,
+            new_backup_spec.destinationPath
         );
 
         // Lets now test sending an Event::Restart to the queue and see if the
