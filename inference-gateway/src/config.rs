@@ -4,11 +4,19 @@ use url::Url;
 
 #[derive(Clone, Debug)]
 pub struct Config {
+    /// service and port of the inference service
+    /// Must be an OpenAI compatible interface
     pub llm_service_host_port: Url,
+    /// Postgres connection string to the timeseries databse which logs token usage
     pub pg_conn_str: String,
+    /// Port to run the inference gateway on
     pub server_port: u16,
+    /// Number of actix workers to spawn
     pub server_workers: u16,
+    /// Boolean to toggle billing request authorization.
+    /// When true, callers must have an active payment method on file
     pub org_auth_enabled: bool,
+    /// Interval to refresh the billing authorization cache
     pub org_auth_cache_refresh_interval_sec: u64,
 }
 

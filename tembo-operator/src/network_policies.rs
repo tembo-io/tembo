@@ -311,6 +311,46 @@ pub async fn reconcile_network_policies(client: Client, namespace: &str) -> Resu
 
     apply_network_policy(namespace, &np_api, allow_proxy_to_access_tembo_ai_gateway).await?;
 
+    let allow_proxy_to_access_tembo_ai_gateway_internal_lb = serde_json::json!({
+        "apiVersion": "networking.k8s.io/v1",
+        "kind": "NetworkPolicy",
+        "metadata": {
+          "name": "allow-proxy-to-access-tembo-ai-gateway-internal-lb",
+          "namespace": format!("{namespace}"),
+        },
+        "spec": {
+          "podSelector": {
+            "matchLabels": {
+              "app": format!("{}-ai-proxy", namespace)
+            }
+          },
+          "policyTypes": ["Egress"],
+          "egress": [
+            {
+              "ports": [
+                {
+                  "port": 8080,
+                  "protocol": "TCP"
+                }
+              ],
+              "to": [
+                {
+                  "ipBlock": {
+                    "cidr": "10.0.0.0/8"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+    });
+
+    apply_network_policy(
+        namespace,
+        &np_api,
+        allow_proxy_to_access_tembo_ai_gateway_internal_lb,
+    )
+    .await?;
     Ok(())
 }
 
