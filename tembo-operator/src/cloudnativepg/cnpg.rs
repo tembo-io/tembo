@@ -1,5 +1,5 @@
-use crate::apis::coredb_types::{self, GcsCredentials};
 use crate::apis::coredb_types::Restore;
+use crate::apis::coredb_types::{self, GcsCredentials};
 use crate::extensions::install::find_trunk_installs_to_pod;
 use crate::ingress_route_crd::{
     IngressRoute, IngressRouteRoutes, IngressRouteRoutesKind, IngressRouteRoutesServices,
@@ -81,7 +81,10 @@ use std::{collections::BTreeMap, sync::Arc};
 use tokio::time::Duration;
 use tracing::{debug, error, info, instrument, warn};
 
-use super::clusters::{ClusterBackupBarmanObjectStoreGoogleCredentials, ClusterBackupBarmanObjectStoreGoogleCredentialsApplicationCredentials};
+use super::clusters::{
+    ClusterBackupBarmanObjectStoreGoogleCredentials,
+    ClusterBackupBarmanObjectStoreGoogleCredentialsApplicationCredentials,
+};
 
 pub struct PostgresConfig {
     pub postgres_parameters: Option<BTreeMap<String, String>>,
@@ -138,7 +141,7 @@ fn create_cluster_backup_barman_object_store(
         ClusterBackupBarmanObjectStoreS3Credentials {
             inherit_from_iam_role: Some(true),
             ..Default::default()
-        }
+        },
     ));
 
     let mut object_store = ClusterBackupBarmanObjectStore {
@@ -216,7 +219,6 @@ fn create_cluster_backup(
     backup_path: &str,
     credentials: Option<BackupCredentials>,
 ) -> Option<ClusterBackup> {
-
     let retention_days = match &cdb.spec.backup.retentionPolicy {
         None => "30d".to_string(),
         Some(retention_policy) => match retention_policy.parse::<i32>() {
@@ -243,7 +245,7 @@ fn create_cluster_backup(
             cdb,
             endpoint_url,
             backup_path,
-            credentials
+            credentials,
         )),
         retention_policy: Some(retention_days),
         volume_snapshot,
@@ -350,10 +352,11 @@ pub fn cnpg_backup_configuration(
     // Copy the endpoint_url and s3_credentials from cdb to configure backups
     let endpoint_url = cdb.spec.backup.endpoint_url.as_deref().unwrap_or_default();
     let backup_credentials = if let Some(s3_creds) = cdb.spec.backup.s3_credentials.as_ref() {
-        Some(BackupCredentials::S3(generate_s3_backup_credentials(Some(s3_creds))))
+        Some(BackupCredentials::S3(generate_s3_backup_credentials(Some(
+            s3_creds,
+        ))))
     } else if let Some(gcs_creds) = cdb.spec.backup.gcs_credentials.as_ref() {
-        generate_google_backup_credentials(Some(gcs_creds.clone()))
-            .map(BackupCredentials::Google)
+        generate_google_backup_credentials(Some(gcs_creds.clone())).map(BackupCredentials::Google)
     } else {
         None
     };

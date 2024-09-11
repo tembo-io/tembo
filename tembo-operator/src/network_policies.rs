@@ -123,7 +123,6 @@ pub async fn reconcile_network_policies(client: Client, namespace: &str) -> Resu
     });
     apply_network_policy(namespace, &np_api, allow_node_local_dns).await?;
 
-
     // Namespaces that should be allowed to access an instance namespace
     let allow_system_ingress = serde_json::json!({
         "apiVersion": "networking.k8s.io/v1",
