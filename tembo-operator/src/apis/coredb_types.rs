@@ -277,10 +277,7 @@ pub struct Backup {
     pub s3_credentials: Option<S3Credentials>,
 
     /// The Google Cloud Storage credentials to use for backups
-    #[serde(
-        default = "defaults::default_google_credentials",
-        rename = "googleCredentials"
-    )]
+    #[serde(rename = "googleCredentials")]
     pub google_credentials: Option<GoogleCredentials>,
 
     /// Enable using Volume Snapshots for backups instead of Object Storage

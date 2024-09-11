@@ -237,13 +237,6 @@ pub fn default_s3_credentials() -> Option<S3Credentials> {
     })
 }
 
-pub fn default_google_credentials() -> Option<GoogleCredentials> {
-    Some(GoogleCredentials {
-        gke_environment: None,
-        application_credentials: None,
-    })
-}
-
 pub fn default_volume_snapshot() -> Option<VolumeSnapshot> {
     Some(VolumeSnapshot {
         enabled: false,
