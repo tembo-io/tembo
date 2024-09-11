@@ -41,53 +41,52 @@ const REQUEUE_VT_SEC_SHORT: i32 = 5;
 // that we would want to try again after awhile.
 const REQUEUE_VT_SEC_LONG: i32 = 300;
 
-fn get_env_var_with_default(key: &str, default: &str) -> String {
-    env::var(key).unwrap_or_else(|_| default.to_string())
-}
-
-fn get_env_var(key: &str) -> String {
-    env::var(key).unwrap_or_else(|_| panic!("Environment variable {} is not set", key))
-}
-
 async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
-    // Read connection info from environment variable
-    let pg_conn_url = get_env_var("POSTGRES_QUEUE_CONNECTION");
-    let control_plane_events_queue = get_env_var("CONTROL_PLANE_EVENTS_QUEUE");
-    let metrics_events_queue = get_env_var("METRICS_EVENTS_QUEUE");
-    let data_plane_events_queue = get_env_var("DATA_PLANE_EVENTS_QUEUE");
-    let data_plane_basedomain = get_env_var("DATA_PLANE_BASEDOMAIN");
-    let backup_archive_bucket = get_env_var("BACKUP_ARCHIVE_BUCKET");
-    let storage_archive_bucket = get_env_var("STORAGE_ARCHIVE_BUCKET");
-    let cf_template_bucket = get_env_var("CF_TEMPLATE_BUCKET");
-
-    let max_read_ct: i32 = get_env_var_with_default("MAX_READ_CT", "100")
+    let pg_conn_url =
+        env::var("POSTGRES_QUEUE_CONNECTION").expect("POSTGRES_QUEUE_CONNECTION must be set");
+    let control_plane_events_queue =
+        env::var("CONTROL_PLANE_EVENTS_QUEUE").expect("CONTROL_PLANE_EVENTS_QUEUE must be set");
+    let metrics_events_queue =
+        env::var("METRICS_EVENTS_QUEUE").expect("METRICS_EVENTS_QUEUE must be set");
+    let data_plane_events_queue =
+        env::var("DATA_PLANE_EVENTS_QUEUE").expect("DATA_PLANE_EVENTS_QUEUE must be set");
+    let data_plane_basedomain =
+        env::var("DATA_PLANE_BASEDOMAIN").expect("DATA_PLANE_BASEDOMAIN must be set");
+    let backup_archive_bucket =
+        env::var("BACKUP_ARCHIVE_BUCKET").expect("BACKUP_ARCHIVE_BUCKET must be set");
+    let storage_archive_bucket =
+        env::var("STORAGE_ARCHIVE_BUCKET").expect("STORAGE_ARCHIVE_BUCKET must be set");
+    let cf_template_bucket =
+        env::var("CF_TEMPLATE_BUCKET").expect("CF_TEMPLATE_BUCKET must be set");
+    let max_read_ct: i32 = env::var("MAX_READ_CT")
+        .unwrap_or_else(|_| "100".to_owned())
         .parse()
-        .map_err(|e| {
-            ConductorError::ConnectionPoolError(format!("Failed to parse MAX_READ_CT: {}", e))
-        })?;
-    let is_cloud_formation: bool = get_env_var_with_default("IS_CLOUD_FORMATION", "true")
+        .expect("error parsing MAX_READ_CT");
+    let is_cloud_formation: bool = env::var("IS_CLOUD_FORMATION")
+        .unwrap_or_else(|_| "true".to_owned())
         .parse()
-        .map_err(|e| {
-            ConductorError::ConnectionPoolError(format!(
-                "Failed to parse IS_CLOUD_FORMATION: {}",
-                e
-            ))
-        })?;
-    let aws_region = get_env_var_with_default("AWS_REGION", "us-east-1");
-    let is_gcp: bool = get_env_var_with_default("IS_GCP", "false")
+        .expect("error parsing IS_CLOUD_FORMATION");
+    let aws_region: String = env::var("AWS_REGION")
+        .unwrap_or_else(|_| "us-east-1".to_owned())
         .parse()
-        .map_err(|e| {
-            ConductorError::ConnectionPoolError(format!("Failed to parse IS_GCP: {}", e))
-        })?;
+        .expect("error parsing AWS_REGION");
+    let is_gcp: bool = env::var("IS_GCP")
+        .unwrap_or_else(|_| "false".to_owned())
+        .parse()
+        .expect("error parsing IS_GCP");
+    let gcp_project_id: String = env::var("GCP_PROJECT_ID")
+        .unwrap_or_else(|_| "".to_owned())
+        .parse()
+        .expect("error parsing GCP_PROJECT_ID");
+    let gcp_project_number: String = env::var("GCP_PROJECT_NUMBER")
+        .unwrap_or_else(|_| "".to_owned())
+        .parse()
+        .expect("error parsing GCP_PROJECT_NUMBER");
 
     // Error and exit if both IS_CLOUD_FORMATION and IS_GCP are set to true
     if is_cloud_formation && is_gcp {
         panic!("Cannot have both IS_CLOUD_FORMATION and IS_GCP set to true");
     }
-
-    // Declare GCP-related variables outside the if block
-    let gcp_project_id = get_env_var_with_default("GCP_PROJECT_ID", "");
-    let gcp_project_number = get_env_var_with_default("GCP_PROJECT_NUMBER", "");
 
     // Error and exit if IS_GCP is true and GCP_PROJECT_ID or GCP_PROJECT_NUMBER are not set
     if is_gcp && (gcp_project_id.is_empty() || gcp_project_number.is_empty()) {
