@@ -41,27 +41,31 @@ const REQUEUE_VT_SEC_SHORT: i32 = 5;
 // that we would want to try again after awhile.
 const REQUEUE_VT_SEC_LONG: i32 = 300;
 
-fn get_env_var(key: &str, default: Option<&str>) -> Result<String, ConductorError> {
-    Ok(env::var(key).unwrap_or_else(|_| default.unwrap_or("").to_owned()))
+fn get_env_var_with_default(key: &str, default: &str) -> String {
+    env::var(key).unwrap_or_else(|_| default.to_string())
+}
+
+fn get_env_var(key: &str) -> String {
+    env::var(key).unwrap_or_else(|_| panic!("Environment variable {} is not set", key))
 }
 
 async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
     // Read connection info from environment variable
-    let pg_conn_url = get_env_var("POSTGRES_QUEUE_CONNECTION", None)?;
-    let control_plane_events_queue = get_env_var("CONTROL_PLANE_EVENTS_QUEUE", None)?;
-    let metrics_events_queue = get_env_var("METRICS_EVENTS_QUEUE", None)?;
-    let data_plane_events_queue = get_env_var("DATA_PLANE_EVENTS_QUEUE", None)?;
-    let data_plane_basedomain = get_env_var("DATA_PLANE_BASEDOMAIN", None)?;
-    let backup_archive_bucket = get_env_var("BACKUP_ARCHIVE_BUCKET", None)?;
-    let storage_archive_bucket = get_env_var("STORAGE_ARCHIVE_BUCKET", None)?;
-    let cf_template_bucket = get_env_var("CF_TEMPLATE_BUCKET", None)?;
+    let pg_conn_url = get_env_var("POSTGRES_QUEUE_CONNECTION");
+    let control_plane_events_queue = get_env_var("CONTROL_PLANE_EVENTS_QUEUE");
+    let metrics_events_queue = get_env_var("METRICS_EVENTS_QUEUE");
+    let data_plane_events_queue = get_env_var("DATA_PLANE_EVENTS_QUEUE");
+    let data_plane_basedomain = get_env_var("DATA_PLANE_BASEDOMAIN");
+    let backup_archive_bucket = get_env_var("BACKUP_ARCHIVE_BUCKET");
+    let storage_archive_bucket = get_env_var("STORAGE_ARCHIVE_BUCKET");
+    let cf_template_bucket = get_env_var("CF_TEMPLATE_BUCKET");
 
-    let max_read_ct: i32 = get_env_var("MAX_READ_CT", Some("100"))?
+    let max_read_ct: i32 = get_env_var_with_default("MAX_READ_CT", "100")
         .parse()
         .map_err(|e| {
             ConductorError::ConnectionPoolError(format!("Failed to parse MAX_READ_CT: {}", e))
         })?;
-    let is_cloud_formation: bool = get_env_var("IS_CLOUD_FORMATION", Some("true"))?
+    let is_cloud_formation: bool = get_env_var_with_default("IS_CLOUD_FORMATION", "true")
         .parse()
         .map_err(|e| {
             ConductorError::ConnectionPoolError(format!(
@@ -69,25 +73,25 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                 e
             ))
         })?;
-    let aws_region = get_env_var("AWS_REGION", Some("us-east-1"))?;
-    let is_gcp: bool = get_env_var("IS_GCP", Some("false"))?.parse().map_err(|e| {
-        ConductorError::ConnectionPoolError(format!("Failed to parse IS_GCP: {}", e))
-    })?;
-    let gcp_project_id = get_env_var("GCP_PROJECT_ID", None)?;
-    let gcp_project_number = get_env_var("GCP_PROJECT_NUMBER", None)?;
+    let aws_region = get_env_var_with_default("AWS_REGION", "us-east-1");
+    let is_gcp: bool = get_env_var_with_default("IS_GCP", "false")
+        .parse()
+        .map_err(|e| {
+            ConductorError::ConnectionPoolError(format!("Failed to parse IS_GCP: {}", e))
+        })?;
 
     // Error and exit if both IS_CLOUD_FORMATION and IS_GCP are set to true
     if is_cloud_formation && is_gcp {
-        return Err(ConductorError::ConnectionPoolError(
-            "Cannot have both IS_CLOUD_FORMATION and IS_GCP set to true".into(),
-        ));
+        panic!("Cannot have both IS_CLOUD_FORMATION and IS_GCP set to true");
     }
+
+    // Declare GCP-related variables outside the if block
+    let gcp_project_id = get_env_var_with_default("GCP_PROJECT_ID", "");
+    let gcp_project_number = get_env_var_with_default("GCP_PROJECT_NUMBER", "");
 
     // Error and exit if IS_GCP is true and GCP_PROJECT_ID or GCP_PROJECT_NUMBER are not set
     if is_gcp && (gcp_project_id.is_empty() || gcp_project_number.is_empty()) {
-        return Err(ConductorError::ConnectionPoolError(
-            "GCP_PROJECT_ID and GCP_PROJECT_NUMBER must be set if IS_GCP is true".into(),
-        ));
+        panic!("GCP_PROJECT_ID and GCP_PROJECT_NUMBER must be set if IS_GCP is true");
     }
 
     // Connect to pgmq
@@ -447,8 +451,10 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                 info!("{}: Deleting namespace {}", read_msg.msg_id, &namespace);
                 delete_namespace(client.clone(), &namespace).await?;
 
-                info!("{}: Deleting cloudformation stack", read_msg.msg_id);
-                delete_cloudformation(aws_region.clone(), &namespace).await?;
+                if is_cloud_formation {
+                    info!("{}: Deleting cloudformation stack", read_msg.msg_id);
+                    delete_cloudformation(aws_region.clone(), &namespace).await?;
+                }
 
                 if is_gcp {
                     info!(
