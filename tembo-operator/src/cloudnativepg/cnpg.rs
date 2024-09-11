@@ -91,16 +91,14 @@ pub struct PostgresConfig {
 }
 
 fn create_cluster_backup_barman_data(cdb: &CoreDB) -> Option<ClusterBackupBarmanObjectStoreData> {
-    let encryption = cdb.spec.backup.as_ref().and_then(|backup| {
-        backup
-            .encryption
-            .as_ref()
-            .and_then(|encryption| match encryption.as_str() {
-                "AES256" => Some(ClusterBackupBarmanObjectStoreDataEncryption::Aes256),
-                "aws:kms" => Some(ClusterBackupBarmanObjectStoreDataEncryption::AwsKms),
-                _ => None,
-            })
-    });
+    let encryption = match &cdb.spec.backup.encryption {
+        Some(encryption) => match encryption.as_str() {
+            "AES256" => Some(ClusterBackupBarmanObjectStoreDataEncryption::Aes256),
+            "aws:kms" => Some(ClusterBackupBarmanObjectStoreDataEncryption::AwsKms),
+            _ => None,
+        },
+        _ => None,
+    };
 
     Some(ClusterBackupBarmanObjectStoreData {
         compression: Some(ClusterBackupBarmanObjectStoreDataCompression::Snappy),
@@ -111,16 +109,14 @@ fn create_cluster_backup_barman_data(cdb: &CoreDB) -> Option<ClusterBackupBarman
 }
 
 fn create_cluster_backup_barman_wal(cdb: &CoreDB) -> Option<ClusterBackupBarmanObjectStoreWal> {
-    let encryption = cdb.spec.backup.as_ref().and_then(|backup| {
-        backup
-            .encryption
-            .as_ref()
-            .and_then(|encryption| match encryption.as_str() {
-                "AES256" => Some(ClusterBackupBarmanObjectStoreWalEncryption::Aes256),
-                "aws:kms" => Some(ClusterBackupBarmanObjectStoreWalEncryption::AwsKms),
-                _ => None,
-            })
-    });
+    let encryption = match &cdb.spec.backup.encryption {
+        Some(encryption) => match encryption.as_str() {
+            "AES256" => Some(ClusterBackupBarmanObjectStoreWalEncryption::Aes256),
+            "aws:kms" => Some(ClusterBackupBarmanObjectStoreWalEncryption::AwsKms),
+            _ => None,
+        },
+        _ => None,
+    };
 
     if encryption.is_some() {
         Some(ClusterBackupBarmanObjectStoreWal {
@@ -226,8 +222,8 @@ fn create_cluster_backup_volume_snapshot(cdb: &CoreDB) -> ClusterBackupVolumeSna
     let class_name = cdb
         .spec
         .backup
+        .volume_snapshot
         .as_ref()
-        .and_then(|backup| backup.volume_snapshot.as_ref())
         .and_then(|vs| vs.snapshot_class.as_ref())
         .cloned()
         .unwrap_or_else(|| crate::cloudnativepg::VOLUME_SNAPSHOT_CLASS_NAME.to_string());
@@ -251,27 +247,26 @@ fn create_cluster_backup(
     s3_credentials: Option<&ClusterBackupBarmanObjectStoreS3Credentials>,
     google_credentials: Option<&ClusterBackupBarmanObjectStoreGoogleCredentials>,
 ) -> Option<ClusterBackup> {
-    let retention_days = cdb.spec.backup.as_ref()
-        .and_then(|backup| backup.retentionPolicy.as_ref())
-        .map_or_else(
-            || "30d".to_string(),
-            |retention_policy| retention_policy.parse::<i32>()
-                .map_or_else(
-                    |_| {
-                        warn!("Invalid retention policy because could not convert to i32, using default of 30 days");
-                        "30d".to_string()
-                    },
-                    |days| format!("{}d", days)
-                )
-        );
+    let retention_days = match &cdb.spec.backup.retentionPolicy {
+        None => "30d".to_string(),
+        Some(retention_policy) => match retention_policy.parse::<i32>() {
+            Ok(days) => {
+                format!("{}d", days)
+            }
+            Err(_) => {
+                warn!("Invalid retention policy because could not convert to i32, using default of 30 days");
+                "30d".to_string()
+            }
+        },
+    };
 
-    let volume_snapshot = cdb
-        .spec
-        .backup
-        .as_ref()
-        .and_then(|backup| backup.volume_snapshot.as_ref())
-        .filter(|vs| vs.enabled)
-        .map(|_| create_cluster_backup_volume_snapshot(cdb));
+    let volume_snapshot = cdb.spec.backup.volume_snapshot.as_ref().and_then(|vs| {
+        if vs.enabled {
+            Some(create_cluster_backup_volume_snapshot(cdb))
+        } else {
+            None
+        }
+    });
 
     let barman_object_store = create_cluster_backup_barman_object_store(
         cdb,
@@ -306,40 +301,22 @@ pub fn cnpg_backup_configuration(
         return (None, None);
     }
 
-    let backup_path = match cdb
-        .spec
-        .backup
-        .as_ref()
-        .and_then(|backup| backup.destinationPath.as_ref())
-    {
-        Some(path) => path,
-        None => {
-            warn!("Backups are disabled because we don't have an S3/GCS backup path");
-            return (None, None);
-        }
-    };
+    let backup_path = cdb.spec.backup.destinationPath.clone();
+    if backup_path.is_none() {
+        warn!("Backups are disabled because we don't have an S3 backup path");
+        return (None, None);
+    }
 
     let service_account_template = determine_service_account_template(cdb);
-    let endpoint_url = cdb
-        .spec
-        .backup
-        .as_ref()
-        .and_then(|backup| backup.endpoint_url.as_deref())
-        .unwrap_or_default();
-    let s3_credentials = cdb
-        .spec
-        .backup
-        .as_ref()
-        .and_then(|backup| generate_s3_backup_credentials(backup.s3_credentials.as_ref()));
+    let endpoint_url = cdb.spec.backup.endpoint_url.as_deref().unwrap_or_default();
+    let s3_credentials = generate_s3_backup_credentials(cdb.spec.backup.s3_credentials.as_ref());
     let google_credentials =
-        cdb.spec.backup.as_ref().and_then(|backup| {
-            generate_google_backup_credentials(backup.google_credentials.as_ref())
-        });
+        generate_google_backup_credentials(cdb.spec.backup.google_credentials.as_ref());
 
     let cluster_backup = create_cluster_backup(
         cdb,
         endpoint_url,
-        backup_path,
+        &backup_path.unwrap(),
         s3_credentials.as_ref(),
         google_credentials.as_ref(),
     );
@@ -360,25 +337,23 @@ fn determine_service_account_template(cdb: &CoreDB) -> Option<ClusterServiceAcco
 }
 
 fn should_set_service_account_template(cdb: &CoreDB) -> bool {
-    let no_credentials = cdb.spec.backup.as_ref().map_or(true, |backup| {
-        backup.endpoint_url.is_none()
-            && backup.s3_credentials.is_none()
-            && backup.google_credentials.is_none()
-    });
+    let no_credentials = cdb.spec.backup.endpoint_url.is_none()
+        && cdb.spec.backup.s3_credentials.is_none()
+        && cdb.spec.backup.google_credentials.is_none();
 
     let inherit_iam_role = cdb
         .spec
         .backup
+        .s3_credentials
         .as_ref()
-        .and_then(|backup| backup.s3_credentials.as_ref())
         .and_then(|cred| cred.inherit_from_iam_role)
         .unwrap_or(false);
 
     let inherit_gke_environment = cdb
         .spec
         .backup
+        .google_credentials
         .as_ref()
-        .and_then(|backup| backup.google_credentials.as_ref())
         .and_then(|cred| cred.gke_environment)
         .unwrap_or(false);
 
@@ -411,21 +386,27 @@ fn should_reset_service_account_template(cdb: &CoreDB) -> bool {
     let reset_s3 = cdb
         .spec
         .backup
+        .s3_credentials
         .as_ref()
-        .and_then(|backup| backup.s3_credentials.as_ref())
-        .map_or(false, |cred| {
-            cred.inherit_from_iam_role == Some(false)
-                && (cred.access_key_id.is_some()
+        .and_then(|cred| cred.inherit_from_iam_role)
+        == Some(false)
+        && (cdb
+            .spec
+            .backup
+            .s3_credentials
+            .as_ref()
+            .map_or(false, |cred| {
+                cred.access_key_id.is_some()
                     || cred.region.is_some()
                     || cred.secret_access_key.is_some()
-                    || cred.session_token.is_some())
-        });
+                    || cred.session_token.is_some()
+            }));
 
     let reset_google = cdb
         .spec
         .backup
+        .google_credentials
         .as_ref()
-        .and_then(|backup| backup.google_credentials.as_ref())
         .map_or(false, |cred| {
             cred.gke_environment == Some(false) && cred.application_credentials.is_some()
         });
@@ -582,8 +563,7 @@ pub fn cnpg_cluster_bootstrap_from_cdb(
             }
         };
 
-        let restore_destination_path =
-            generate_restore_destination_path(restore, cdb.spec.backup.as_ref());
+        let restore_destination_path = generate_restore_destination_path(restore, &cdb.spec.backup);
         ClusterExternalClusters {
             name: "tembo-recovery".to_string(),
             barman_object_store: Some(ClusterExternalClustersBarmanObjectStore {
@@ -1660,8 +1640,9 @@ async fn setup_pgbouncer_function(
 fn schedule_expression_from_cdb(cdb: &CoreDB) -> String {
     // Default to daily at midnight
     let default = "0 0 0 * * *".to_string();
-    cdb.spec.backup.as_ref().and_then(|backup| backup.schedule.as_ref())
-        .map_or(default.clone(), |expression| {
+    match &cdb.spec.backup.schedule {
+        None => default,
+        Some(expression) => {
             let terms: Vec<&str> = expression.split(' ').collect();
             let terms = if terms.len() == 5 {
                 // pre-pend "0" to the vector
@@ -1676,13 +1657,19 @@ fn schedule_expression_from_cdb(cdb: &CoreDB) -> String {
             };
             // check that all terms are either parsable as int32 or "*"
             for term in &terms {
-                if *term != "*" && term.parse::<i32>().is_err() {
-                     warn!("Invalid schedule expression, only integers and '*' are accepted, setting as default. Found: {}", expression);
-                     return default;
-                 }
+                if *term != "*" {
+                    match term.parse::<i32>() {
+                        Ok(_) => {}
+                        Err(_) => {
+                            warn!("Invalid schedule expression, only integers and '*' are accepted, setting as default. Found: {}", expression);
+                            return default;
+                        }
+                    }
+                }
             }
             terms.join(" ")
-        })
+        }
+    }
 }
 
 // Generate a ScheduledBackup
@@ -1729,13 +1716,13 @@ fn cnpg_scheduled_backup(
     let volume_snapshot_scheduled_backup = cdb
         .spec
         .backup
+        .volume_snapshot
         .as_ref()
-        .and_then(|backup| backup.volume_snapshot.as_ref())
         .filter(|vs| vs.enabled)
         .map(|_| ScheduledBackup {
             metadata: ObjectMeta {
-                name: Some(snap_name.clone()),
-                namespace: Some(namespace.to_string()),
+                name: Some(snap_name),
+                namespace: Some(namespace),
                 ..ObjectMeta::default()
             },
             spec: ScheduledBackupSpec {
@@ -2188,23 +2175,20 @@ pub async fn unfence_pod(cdb: &CoreDB, ctx: Arc<Context>, pod_name: &str) -> Res
 // generate_restore_destination_path function will generate the restore destination path from the backup
 // object and return a string
 #[instrument(fields(trace_id, path))]
-fn generate_restore_destination_path(
-    restore: &Restore,
-    backup: Option<&coredb_types::Backup>,
-) -> String {
-    match &restore.backups_path {
-        Some(path) => path.clone(),
+fn generate_restore_destination_path(restore: &Restore, backup: &coredb_types::Backup) -> String {
+    match restore.backups_path.clone() {
+        Some(path) => return path.clone(),
         None => {
-            let this_instance_destination_path = backup
-                .and_then(|b| b.destinationPath.as_ref())
-                .cloned()
-                .unwrap_or_else(|| "".to_string());
-
+            let this_instance_destination_path = match backup.destinationPath.clone() {
+                Some(path) => path.clone(),
+                None => "".to_string(),
+            };
             let mut path_prefix_from_this_instance: Vec<&str> =
                 this_instance_destination_path.split('/').collect();
             path_prefix_from_this_instance.pop();
             let prefix = path_prefix_from_this_instance.join("/");
-            format!("{}/{}", prefix, restore.server_name)
+            let destination_path = format!("{}/{}", prefix, restore.server_name.clone());
+            destination_path
         }
     }
 }
@@ -3141,7 +3125,7 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(
-            generate_restore_destination_path(&restore, Some(&backup)),
+            generate_restore_destination_path(&restore, &backup),
             "s3://cdb-plat-use1-dev-instance-backups/v2/org-foobar-inst-test".to_string()
         );
     }
@@ -3161,7 +3145,7 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(
-            generate_restore_destination_path(&restore, Some(&backup)),
+            generate_restore_destination_path(&restore, &backup),
             "s3://cdb-plat-use1-dev-instance-backups/coredb/coredb/org-coredb-inst-pgtrunkio-dev"
                 .to_string()
         );
@@ -3181,7 +3165,7 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(
-            generate_restore_destination_path(&restore, Some(&backup)),
+            generate_restore_destination_path(&restore, &backup),
             "s3://cdb-plat-use1-dev-instance-backups/coredb/coredb/org-coredb-inst-pgtrunkio-dev"
                 .to_string()
         );
@@ -3203,7 +3187,7 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(
-            generate_restore_destination_path(&restore, Some(&backup)),
+            generate_restore_destination_path(&restore, &backup),
             "s3://cdb-plat-use1-dev-instance-backups/v2/org-coredb-inst-pgtrunkio-dev".to_string()
         );
     }
@@ -3311,45 +3295,28 @@ mod tests {
     fn test_schedule_expression_from_cdb() {
         let mut coredb = CoreDB::test();
 
-        // Ensure Backup exists
-        if coredb.spec.backup.is_none() {
-            coredb.spec.backup = Some(Default::default());
-        }
-
         // Test case 1: No schedule specified, should return default
-        if let Some(b) = coredb.spec.backup.as_mut() {
-            b.schedule = None;
-        }
+        coredb.spec.backup.schedule = None;
         assert_eq!(schedule_expression_from_cdb(&coredb), "0 0 0 * * *");
 
         // Test case 2: Valid 6-term schedule expression
-        if let Some(b) = coredb.spec.backup.as_mut() {
-            b.schedule = Some("30 12 * * * *".to_string());
-        }
+        coredb.spec.backup.schedule = Some("30 12 * * * *".to_string());
         assert_eq!(schedule_expression_from_cdb(&coredb), "30 12 * * * *");
 
         // Test case 3: Valid 5-term schedule expression
-        if let Some(b) = coredb.spec.backup.as_mut() {
-            b.schedule = Some("30 12 * * *".to_string());
-        }
+        coredb.spec.backup.schedule = Some("30 12 * * *".to_string());
         assert_eq!(schedule_expression_from_cdb(&coredb), "0 30 12 * * *");
 
         // Test case 4: Invalid schedule expression with less than 5 terms
-        if let Some(b) = coredb.spec.backup.as_mut() {
-            b.schedule = Some("30 12 * *".to_string());
-        }
+        coredb.spec.backup.schedule = Some("30 12 * *".to_string());
         assert_eq!(schedule_expression_from_cdb(&coredb), "0 0 0 * * *");
 
         // Test case 5: Invalid schedule expression with more than 6 terms
-        if let Some(b) = coredb.spec.backup.as_mut() {
-            b.schedule = Some("30 12 * * * * *".to_string());
-        }
+        coredb.spec.backup.schedule = Some("30 12 * * * * *".to_string());
         assert_eq!(schedule_expression_from_cdb(&coredb), "0 0 0 * * *");
 
         // Test case 6: Invalid schedule expression with non-integer term
-        if let Some(b) = coredb.spec.backup.as_mut() {
-            b.schedule = Some("30 12 * * * abc".to_string());
-        }
+        coredb.spec.backup.schedule = Some("30 12 * * * abc".to_string());
         assert_eq!(schedule_expression_from_cdb(&coredb), "0 0 0 * * *");
     }
 
@@ -3554,35 +3521,25 @@ mod tests {
     fn test_create_cluster_backup_default_google() {
         let cdb = create_gke_test_coredb();
         let snapshot = create_cluster_backup_volume_snapshot(&cdb);
-        let endpoint_url = cdb
-            .spec
-            .backup
-            .as_ref()
-            .and_then(|b| b.endpoint_url.as_deref())
-            .unwrap_or_default();
-        let backup_path = cdb
-            .spec
-            .backup
-            .as_ref()
-            .and_then(|b| b.destinationPath.as_ref())
-            .cloned();
+        let endpoint_url = cdb.spec.backup.endpoint_url.clone();
+        let backup_path = cdb.spec.backup.destinationPath.clone();
         let s3_credentials = ClusterBackupBarmanObjectStoreS3Credentials {
             ..Default::default()
         };
         let google_credentials = cdb
             .spec
             .backup
+            .google_credentials
             .as_ref()
-            .and_then(|b| b.google_credentials.as_ref())
-            .and_then(|creds| generate_google_backup_credentials(Some(creds)));
+            .and_then(|creds| generate_google_backup_credentials(Some(&creds)));
 
         let backups_result = cnpg_scheduled_backup(&cdb).unwrap();
         let (scheduled_backup, volume_snapshot_backup) = &backups_result[0];
 
         let result = create_cluster_backup(
             &cdb,
-            endpoint_url,
-            backup_path.as_deref().unwrap(),
+            &endpoint_url.unwrap(),
+            &backup_path.unwrap(),
             Some(&s3_credentials),
             google_credentials.as_ref(),
         );
@@ -3662,11 +3619,8 @@ mod tests {
 
         // Test with no credentials
         let mut no_cred_cdb = cdb.clone();
-        no_cred_cdb.spec.backup = no_cred_cdb.spec.backup.map(|mut backup| {
-            backup.google_credentials = None;
-            backup.s3_credentials = None;
-            backup
-        });
+        no_cred_cdb.spec.backup.google_credentials = None;
+        no_cred_cdb.spec.backup.s3_credentials = None;
         assert!(should_set_service_account_template(&no_cred_cdb));
     }
 
@@ -3678,30 +3632,25 @@ mod tests {
         assert!(!should_reset_service_account_template(&cdb));
 
         // Test with Google credentials set to not use GKE environment
-        cdb.spec.backup = cdb.spec.backup.map(|mut backup| {
-            backup.google_credentials = Some(GoogleCredentials {
-                gke_environment: Some(false),
-                application_credentials: Some(GoogleCredentialsApplicationCredentials {
-                    key: "test-key".to_string(),
-                    name: "test-name".to_string(),
-                }),
-            });
-            backup
+        // Test with Google credentials set to not use GKE environment
+        cdb.spec.backup.google_credentials = Some(GoogleCredentials {
+            gke_environment: Some(false),
+            application_credentials: Some(GoogleCredentialsApplicationCredentials {
+                key: "test-key".to_string(),
+                name: "test-name".to_string(),
+            }),
         });
         assert!(should_reset_service_account_template(&cdb));
 
         // Test with S3 credentials
-        cdb.spec.backup = cdb.spec.backup.map(|mut backup| {
-            backup.google_credentials = None;
-            backup.s3_credentials = Some(S3Credentials {
-                inherit_from_iam_role: Some(false),
-                access_key_id: Some(S3CredentialsAccessKeyId {
-                    key: "test-key".to_string(),
-                    name: "test-name".to_string(),
-                }),
-                ..Default::default()
-            });
-            backup
+        cdb.spec.backup.google_credentials = None;
+        cdb.spec.backup.s3_credentials = Some(S3Credentials {
+            inherit_from_iam_role: Some(false),
+            access_key_id: Some(S3CredentialsAccessKeyId {
+                key: "test-key".to_string(),
+                name: "test-name".to_string(),
+            }),
+            ..Default::default()
         });
         assert!(should_reset_service_account_template(&cdb));
     }
@@ -3817,15 +3766,6 @@ mod tests {
             reconcile_timestamp_ttl: 90,
         };
         let (backup, template) = cnpg_backup_configuration(&cdb, &cfg_disabled);
-        assert!(backup.is_none());
-        assert!(template.is_none());
-
-        // Test with no backup path
-        let mut no_path_cdb = cdb.clone();
-        if let Some(backup) = no_path_cdb.spec.backup.as_mut() {
-            backup.destinationPath = None;
-        }
-        let (backup, template) = cnpg_backup_configuration(&no_path_cdb, &cfg);
         assert!(backup.is_none());
         assert!(template.is_none());
     }

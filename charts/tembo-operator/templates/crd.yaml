@@ -1972,7 +1972,8 @@ spec:
                     nullable: true
                     type: string
                   s3Credentials:
-                    default: {}
+                    default:
+                      inheritFromIAMRole: true
                     description: The S3 credentials to use for backups (if not using IAM Role)
                     nullable: true
                     properties:

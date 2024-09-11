@@ -1,8 +1,8 @@
 use crate::apis::coredb_types::CoreDB;
 use crate::{
     apis::coredb_types::{
-        ConnectionPooler, GoogleCredentials, PgBouncer, S3Credentials, ServiceAccountTemplate,
-        VolumeSnapshot,
+        Backup, ConnectionPooler, GoogleCredentials, PgBouncer, S3Credentials,
+        ServiceAccountTemplate, VolumeSnapshot,
     },
     cloudnativepg::clusters::ClusterAffinity,
     cloudnativepg::poolers::{PoolerPgbouncerPoolMode, PoolerTemplateSpecContainersResources},
@@ -157,6 +157,18 @@ pub fn default_service_account_template() -> ServiceAccountTemplate {
     ServiceAccountTemplate { metadata: None }
 }
 
+pub fn default_backup() -> Backup {
+    Backup {
+        destinationPath: default_destination_path(),
+        encryption: default_encryption(),
+        retentionPolicy: default_retention_policy(),
+        schedule: default_backup_schedule(),
+        s3_credentials: default_s3_credentials(),
+        volume_snapshot: default_volume_snapshot(),
+        ..Default::default()
+    }
+}
+
 pub fn default_destination_path() -> Option<String> {
     Some("s3://".to_string())
 }
@@ -220,11 +232,8 @@ pub fn default_pgbouncer() -> PgBouncer {
 
 pub fn default_s3_credentials() -> Option<S3Credentials> {
     Some(S3Credentials {
-        inherit_from_iam_role: None,
-        region: None,
-        access_key_id: None,
-        secret_access_key: None,
-        session_token: None,
+        inherit_from_iam_role: Some(true),
+        ..Default::default()
     })
 }
 

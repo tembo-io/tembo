@@ -771,7 +771,7 @@ async fn init_cloud_perms(
         ..Default::default()
     };
 
-    coredb_spec.backup = Some(backup);
+    coredb_spec.backup = backup;
     coredb_spec.serviceAccountTemplate = service_account_template;
 
     Ok(())
