@@ -46,6 +46,12 @@ spec:
           - name: RUST_LOG
             value: {{ .Values.logLevel }}
           {{- if .Values.env }}{{ .Values.env | default list | toYaml | nindent 10 }}{{- end }}
+          {{- with (index .Values ).extraEnv }}
+          {{- range . }}
+          - name: {{ .name }}
+            value: {{ tpl (.value | quote) $ }}
+          {{- end }}
+          {{- end }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
