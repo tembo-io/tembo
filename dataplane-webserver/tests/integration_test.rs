@@ -139,12 +139,6 @@ async fn test_get_secret_v1() {
 
     let resp = test::call_service(&app, req).await;
 
-    // Print response details
-    println!("Response status: {:?}", resp.status());
-    println!("Response headers: {:?}", resp.headers());
-    
-    let body = test::read_body(resp).await;
-    println!("Response body: {:?}", String::from_utf8_lossy(&body));
     let status_code = resp.status();
     if status_code.is_success().not() {
         let bytes = test::read_body(resp).await;
@@ -157,11 +151,6 @@ async fn test_get_secret_v1() {
 
     let body: serde_json::Value = serde_json::from_slice(&body).expect("Failed to parse JSON");
     assert!(body.is_object(), "Response body is not an object");
-    assert_eq!(body, serde_json::json!({
-        "username": "test_user",
-        "password": "test_password"
-    }), "Unexpected response body");
-}
     assert!(
         body.get("username").is_some(),
         "username not found in response"
