@@ -1,14 +1,14 @@
-use anyhow::{Context, Result};
+use anyhow::Result;
 use chrono::{DateTime, Datelike, Duration as ChronoDuration, TimeZone, Timelike, Utc};
 use log::info;
 use pgmq::PGMQueueExt;
 use serde::{Deserialize, Serialize};
 use sqlx::{PgPool, Pool, Postgres};
-use std::{env, time::Duration};
+use std::time::Duration;
 use tokio::time::interval;
 use uuid::Uuid;
 
-use crate::db::connect;
+use crate::db::{self};
 use crate::errors::DatabaseError;
 
 pub fn split_events(events: Vec<Events>, max_size: usize) -> Vec<Message> {
@@ -122,25 +122,24 @@ fn get_hourly_chunks(
     chunks
 }
 
-pub async fn run_events_reporter(pool: PgPool) -> Result<()> {
+pub async fn run_events_reporter(pg_conn: String) -> Result<()> {
     // Run once per hour
     const SYNC_PERIOD: Duration = Duration::from_secs(60 * 60);
+    const BILLING_QUEUE: &str = "billing_aws_data_1_use1";
 
-    // let queue = PGMQueueExt::new(pg_conn_url, 5).await?;
+    let pool = db::connect(&pg_conn, 2).await?;
 
-    // TODO: Need to set this env variable
-    let metrics_events_queue =
-        env::var("BILLING_EVENTS_QUEUE").expect("BILLING_EVENTS_QUEUE must be set");
+    let queue = PGMQueueExt::new(pg_conn, 2).await?;
 
     queue.init().await?;
-    queue.create(&metrics_events_queue).await?;
+    queue.create("").await?;
 
     let mut sync_interval = interval(SYNC_PERIOD);
 
     loop {
         sync_interval.tick().await;
 
-        let last_reported_at = get_reporter_watermark(&dbclient)
+        let last_reported_at = get_reporter_watermark(&pool)
             .await?
             .map(|watermark| watermark.last_reported_at)
             .unwrap_or(Utc::now() - Duration::from_secs(60 * 60));
@@ -149,14 +148,7 @@ pub async fn run_events_reporter(pool: PgPool) -> Result<()> {
         let chunks = get_hourly_chunks(last_reported_at, now);
 
         for (start_time, end_time) in chunks {
-            enqueue_event(
-                &dbclient,
-                &queue,
-                &metrics_events_queue,
-                start_time,
-                end_time,
-            )
-            .await?;
+            enqueue_event(&pool, &queue, BILLING_QUEUE, start_time, end_time).await?;
         }
     }
 }
@@ -231,7 +223,7 @@ struct ReporterWatermark {
 
 #[cfg(test)]
 mod tests {
-    use chrono::{DateTime, Duration, FixedOffset, TimeZone, Timelike, Utc};
+    use chrono::{DateTime, FixedOffset, TimeZone, Timelike, Utc};
 
     use crate::events_reporter::start_of_the_hour;
 

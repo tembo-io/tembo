@@ -3,9 +3,7 @@
 use actix_web::{get, web, App, HttpResponse, HttpServer, Responder};
 use gateway::config::Config;
 use gateway::events_reporter::run_events_reporter;
-use gateway::{db, events_reporter};
 use log::info;
-use sqlx::PgPool;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::Mutex;
@@ -13,9 +11,6 @@ use tokio::sync::Mutex;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cfg = Config::new().await;
-    let pool: PgPool = db::connect(&cfg.pg_conn_str, cfg.server_workers as u32)
-        .await
-        .expect("Failed to connect to database");
 
     let background_threads: Arc<Mutex<Vec<tokio::task::JoinHandle<()>>>> =
         Arc::new(Mutex::new(Vec::new()));
@@ -25,11 +20,15 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if cfg.run_billing_reporter {
         info!("Spawning AI billing reporter thread");
 
-        background_threads_guard.push(tokio::spawn(async {
-            if let Err(err) = run_events_reporter().await {
-                log::error!("Tembo AI billing reporter error: {err}");
-                log::info!("Restarting Tembo AI billing reporter in 30 sec");
-                tokio::time::sleep(Duration::from_secs(30)).await;
+        let pg_conn = cfg.pg_conn_str.clone();
+
+        background_threads_guard.push(tokio::spawn(async move {
+            loop {
+                if let Err(err) = run_events_reporter(pg_conn.clone()).await {
+                    log::error!("Tembo AI billing reporter error: {err}");
+                    log::info!("Restarting Tembo AI billing reporter in 30 sec");
+                    tokio::time::sleep(Duration::from_secs(30)).await;
+                }
             }
         }));
     }
