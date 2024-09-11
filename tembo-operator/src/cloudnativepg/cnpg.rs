@@ -132,7 +132,7 @@ fn create_cluster_backup_barman_wal(cdb: &CoreDB) -> Option<ClusterBackupBarmanO
 
 fn create_cluster_backup_barman_object_store(
     cdb: &CoreDB,
-    endpoint_url: &str,
+    endpoint_url: Option<String>,
     backup_path: &str,
     credentials: Option<BackupCredentials>,
 ) -> ClusterBackupBarmanObjectStore {
@@ -146,7 +146,7 @@ fn create_cluster_backup_barman_object_store(
 
     let mut object_store = ClusterBackupBarmanObjectStore {
         data: create_cluster_backup_barman_data(cdb),
-        endpoint_url: Some(endpoint_url.to_string()),
+        endpoint_url,
         destination_path: backup_path.to_string(),
         wal: create_cluster_backup_barman_wal(cdb),
         ..ClusterBackupBarmanObjectStore::default()
@@ -215,7 +215,7 @@ enum BackupCredentials {
 
 fn create_cluster_backup(
     cdb: &CoreDB,
-    endpoint_url: &str,
+    endpoint_url: Option<String>,
     backup_path: &str,
     credentials: Option<BackupCredentials>,
 ) -> Option<ClusterBackup> {
@@ -257,100 +257,24 @@ pub fn cnpg_backup_configuration(
     cdb: &CoreDB,
     cfg: &Config,
 ) -> (Option<ClusterBackup>, Option<ClusterServiceAccountTemplate>) {
-    let mut service_account_template: Option<ClusterServiceAccountTemplate> = None;
-
-    // Check if backups are enabled
-    if !cfg.enable_backup {
-        return (None, None);
-    }
-
-    debug!("Backups are enabled, configuring...");
-
-    // Check for backup path
-    let backup_path = cdb.spec.backup.destinationPath.clone();
-    if backup_path.is_none() {
-        warn!("Backups are disabled because we don't have an S3 backup path");
-        return (None, None);
-    }
-
-    let should_set_service_account_template = (cdb.spec.backup.endpoint_url.is_none()
-        && cdb.spec.backup.s3_credentials.is_none())
-        || (cdb
-            .spec
-            .backup
-            .s3_credentials
-            .as_ref()
-            .and_then(|cred| cred.inherit_from_iam_role)
-            .unwrap_or(false)
-            && cdb
-                .spec
-                .serviceAccountTemplate
-                .metadata
-                .as_ref()
-                .and_then(|meta| meta.annotations.as_ref())
-                .map_or(false, |annots| {
-                    annots.contains_key("eks.amazonaws.com/role-arn")
-                }));
-
-    let should_reset_service_account_template = cdb
-        .spec
-        .backup
-        .s3_credentials
-        .as_ref()
-        .and_then(|cred| cred.inherit_from_iam_role)
-        == Some(false)
-        && (cdb
-            .spec
-            .backup
-            .s3_credentials
-            .as_ref()
-            .map_or(false, |cred| {
-                cred.access_key_id.is_some()
-                    || cred.region.is_some()
-                    || cred.secret_access_key.is_some()
-                    || cred.session_token.is_some()
-            }));
-
-    if should_reset_service_account_template {
-        service_account_template = None;
-    } else if should_set_service_account_template {
-        let service_account_metadata = cdb.spec.serviceAccountTemplate.metadata.clone();
-        if service_account_metadata.is_none() {
-            warn!("Backups are disabled because we don't have a service account template");
-            return (None, None);
-        }
-        let service_account_annotations = service_account_metadata
-            .expect("Expected service account template metadata")
-            .annotations;
-        if service_account_annotations.is_none() {
-            warn!("Backups are disabled because we don't have a service account template with annotations");
-            return (None, None);
-        }
-        let annotations =
-            service_account_annotations.expect("Expected service account template annotations");
-        let service_account_role_arn = annotations.get("eks.amazonaws.com/role-arn");
-        if service_account_role_arn.is_none() {
-            warn!(
-                "Backups are disabled because we don't have a service account template with an EKS role ARN"
-            );
-            return (None, None);
-        }
-        let role_arn = service_account_role_arn
-            .expect("Expected service account template annotations to contain an EKS role ARN")
-            .clone();
-
-        service_account_template = Some(ClusterServiceAccountTemplate {
+    let requested_service_account = cdb.spec.serviceAccountTemplate.clone();
+    let service_account_template = match requested_service_account.metadata {
+        Some(metadata) => Some(ClusterServiceAccountTemplate {
             metadata: ClusterServiceAccountTemplateMetadata {
-                annotations: Some(BTreeMap::from([(
-                    "eks.amazonaws.com/role-arn".to_string(),
-                    role_arn,
-                )])),
-                ..ClusterServiceAccountTemplateMetadata::default()
+                annotations: metadata.annotations,
+                labels: metadata.labels,
             },
-        });
+        }),
+        None => None,
+    };
+
+    let backup_path = cdb.spec.backup.destinationPath.clone();
+    if !cfg.enable_backup || backup_path.is_none() {
+        return (None, service_account_template);
     }
+    let backup_path = backup_path.unwrap();
+
     // Copy the endpoint_url and s3_credentials from cdb to configure backups
-    let endpoint_url = cdb.spec.backup.endpoint_url.as_deref().unwrap_or_default();
     let backup_credentials = if let Some(s3_creds) = cdb.spec.backup.s3_credentials.as_ref() {
         Some(BackupCredentials::S3(generate_s3_backup_credentials(Some(
             s3_creds,
@@ -360,8 +284,12 @@ pub fn cnpg_backup_configuration(
     } else {
         None
     };
-    let cluster_backup =
-        create_cluster_backup(cdb, endpoint_url, &backup_path.unwrap(), backup_credentials);
+    let cluster_backup = create_cluster_backup(
+        cdb,
+        cdb.spec.backup.endpoint_url.clone(),
+        &backup_path,
+        backup_credentials,
+    );
 
     (cluster_backup, service_account_template)
 }
