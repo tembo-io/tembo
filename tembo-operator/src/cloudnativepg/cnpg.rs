@@ -84,6 +84,8 @@ use tracing::{debug, error, info, instrument, warn};
 use super::clusters::{
     ClusterBackupBarmanObjectStoreGoogleCredentials,
     ClusterBackupBarmanObjectStoreGoogleCredentialsApplicationCredentials,
+    ClusterExternalClustersBarmanObjectStoreGoogleCredentials,
+    ClusterExternalClustersBarmanObjectStoreGoogleCredentialsApplicationCredentials,
 };
 
 pub struct PostgresConfig {
@@ -375,7 +377,9 @@ pub fn cnpg_cluster_bootstrap_from_cdb(
     let superuser_secret_name = format!("{}-connection", cluster_name);
 
     let coredb_cluster = if let Some(restore) = &cdb.spec.restore {
+        // This generates the default is s3_credentials was none
         let s3_credentials = generate_s3_restore_credentials(restore.s3_credentials.as_ref());
+        let google_credentials = generate_gcs_restore_credentials(restore.gcs_credentials.as_ref());
         // Find destination_path from Backup to generate the restore destination path
         let restore_destination_path = generate_restore_destination_path(restore, &cdb.spec.backup);
         ClusterExternalClusters {
@@ -383,7 +387,8 @@ pub fn cnpg_cluster_bootstrap_from_cdb(
             barman_object_store: Some(ClusterExternalClustersBarmanObjectStore {
                 destination_path: restore_destination_path,
                 endpoint_url: restore.endpoint_url.clone(),
-                s3_credentials: Some(s3_credentials),
+                s3_credentials,
+                google_credentials,
                 wal: Some(ClusterExternalClustersBarmanObjectStoreWal {
                     max_parallel: Some(8),
                     encryption: Some(ClusterExternalClustersBarmanObjectStoreWalEncryption::Aes256),
@@ -2086,28 +2091,38 @@ fn generate_s3_backup_credentials(
     }
 }
 
+#[instrument(fields(trace_id, creds))]
+fn generate_gcs_restore_credentials(
+    creds: Option<&GcsCredentials>,
+) -> Option<ClusterExternalClustersBarmanObjectStoreGoogleCredentials> {
+    creds.map(
+        |creds| ClusterExternalClustersBarmanObjectStoreGoogleCredentials {
+            application_credentials: creds.application_credentials.as_ref().map(|ac| {
+                ClusterExternalClustersBarmanObjectStoreGoogleCredentialsApplicationCredentials {
+                    key: ac.key.clone(),
+                    name: ac.name.clone(),
+                }
+            }),
+            gke_environment: creds.gke_environment,
+        },
+    )
+}
+
 // generate_s3_restore_credentials function will generate the s3 restore credentials from
 // S3Credentials object and return a ClusterExternalClustersBarmanObjectStoreS3Credentials object
 #[instrument(fields(trace_id, creds))]
 fn generate_s3_restore_credentials(
     creds: Option<&S3Credentials>,
-) -> ClusterExternalClustersBarmanObjectStoreS3Credentials {
-    if let Some(creds) = creds {
-        if creds.access_key_id.is_none() && creds.secret_access_key.is_none() {
-            return ClusterExternalClustersBarmanObjectStoreS3Credentials {
-                inherit_from_iam_role: Some(true),
-                ..Default::default()
-            };
-        }
-
-        ClusterExternalClustersBarmanObjectStoreS3Credentials {
+) -> Option<ClusterExternalClustersBarmanObjectStoreS3Credentials> {
+    creds.map(
+        |creds| ClusterExternalClustersBarmanObjectStoreS3Credentials {
             access_key_id: creds.access_key_id.as_ref().map(|id| {
                 ClusterExternalClustersBarmanObjectStoreS3CredentialsAccessKeyId {
                     key: id.key.clone(),
                     name: id.name.clone(),
                 }
             }),
-            inherit_from_iam_role: Some(false),
+            inherit_from_iam_role: creds.inherit_from_iam_role,
             region: creds.region.as_ref().map(|r| {
                 ClusterExternalClustersBarmanObjectStoreS3CredentialsRegion {
                     key: r.key.clone(),
@@ -2126,13 +2141,8 @@ fn generate_s3_restore_credentials(
                     name: token.name.clone(),
                 }
             }),
-        }
-    } else {
-        ClusterExternalClustersBarmanObjectStoreS3Credentials {
-            inherit_from_iam_role: Some(true),
-            ..Default::default()
-        }
-    }
+        },
+    )
 }
 
 // is_restore_backup_running_pending_completed checks if a backup is running or

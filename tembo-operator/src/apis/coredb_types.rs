@@ -323,6 +323,10 @@ pub struct Restore {
     #[serde(rename = "s3Credentials")]
     pub s3_credentials: Option<S3Credentials>,
 
+    /// s3Credentials is the S3 credentials to use for backups.
+    #[serde(rename = "s3Credentials")]
+    pub gcs_credentials: Option<GcsCredentials>,
+
     /// volumeSnapshot is a boolean to enable restoring from a Volume Snapshot
     #[serde(rename = "volumeSnapshot")]
     pub volume_snapshot: Option<bool>,
