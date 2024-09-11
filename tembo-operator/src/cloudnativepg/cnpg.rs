@@ -1,4 +1,4 @@
-use crate::apis::coredb_types;
+use crate::apis::coredb_types::{self, GcsCredentials};
 use crate::apis::coredb_types::Restore;
 use crate::extensions::install::find_trunk_installs_to_pod;
 use crate::ingress_route_crd::{
@@ -81,6 +81,8 @@ use std::{collections::BTreeMap, sync::Arc};
 use tokio::time::Duration;
 use tracing::{debug, error, info, instrument, warn};
 
+use super::clusters::{ClusterBackupBarmanObjectStoreGoogleCredentials, ClusterBackupBarmanObjectStoreGoogleCredentialsApplicationCredentials};
+
 pub struct PostgresConfig {
     pub postgres_parameters: Option<BTreeMap<String, String>>,
     pub shared_preload_libraries: Option<Vec<String>>,
@@ -129,16 +131,30 @@ fn create_cluster_backup_barman_object_store(
     cdb: &CoreDB,
     endpoint_url: &str,
     backup_path: &str,
-    s3_credentials: &ClusterBackupBarmanObjectStoreS3Credentials,
+    credentials: Option<BackupCredentials>,
 ) -> ClusterBackupBarmanObjectStore {
-    ClusterBackupBarmanObjectStore {
+    // For backwards compatibility, default to inherited IAM role
+    let credentials = credentials.unwrap_or(BackupCredentials::S3(
+        ClusterBackupBarmanObjectStoreS3Credentials {
+            inherit_from_iam_role: Some(true),
+            ..Default::default()
+        }
+    ));
+
+    let mut object_store = ClusterBackupBarmanObjectStore {
         data: create_cluster_backup_barman_data(cdb),
         endpoint_url: Some(endpoint_url.to_string()),
         destination_path: backup_path.to_string(),
-        s3_credentials: Some(s3_credentials.clone()),
         wal: create_cluster_backup_barman_wal(cdb),
         ..ClusterBackupBarmanObjectStore::default()
+    };
+
+    match credentials {
+        BackupCredentials::S3(creds) => object_store.s3_credentials = Some(creds),
+        BackupCredentials::Google(creds) => object_store.google_credentials = Some(creds),
     }
+
+    object_store
 }
 
 fn create_cluster_certificates(cdb: &CoreDB) -> Option<ClusterCertificates> {
@@ -189,12 +205,18 @@ fn create_cluster_backup_volume_snapshot(cdb: &CoreDB) -> ClusterBackupVolumeSna
     }
 }
 
+enum BackupCredentials {
+    S3(ClusterBackupBarmanObjectStoreS3Credentials),
+    Google(ClusterBackupBarmanObjectStoreGoogleCredentials),
+}
+
 fn create_cluster_backup(
     cdb: &CoreDB,
     endpoint_url: &str,
     backup_path: &str,
-    s3_credentials: &ClusterBackupBarmanObjectStoreS3Credentials,
+    credentials: Option<BackupCredentials>,
 ) -> Option<ClusterBackup> {
+
     let retention_days = match &cdb.spec.backup.retentionPolicy {
         None => "30d".to_string(),
         Some(retention_policy) => match retention_policy.parse::<i32>() {
@@ -221,7 +243,7 @@ fn create_cluster_backup(
             cdb,
             endpoint_url,
             backup_path,
-            s3_credentials,
+            credentials
         )),
         retention_policy: Some(retention_days),
         volume_snapshot,
@@ -327,9 +349,16 @@ pub fn cnpg_backup_configuration(
     }
     // Copy the endpoint_url and s3_credentials from cdb to configure backups
     let endpoint_url = cdb.spec.backup.endpoint_url.as_deref().unwrap_or_default();
-    let s3_credentials = generate_s3_backup_credentials(cdb.spec.backup.s3_credentials.as_ref());
+    let backup_credentials = if let Some(s3_creds) = cdb.spec.backup.s3_credentials.as_ref() {
+        Some(BackupCredentials::S3(generate_s3_backup_credentials(Some(s3_creds))))
+    } else if let Some(gcs_creds) = cdb.spec.backup.gcs_credentials.as_ref() {
+        generate_google_backup_credentials(Some(gcs_creds.clone()))
+            .map(BackupCredentials::Google)
+    } else {
+        None
+    };
     let cluster_backup =
-        create_cluster_backup(cdb, endpoint_url, &backup_path.unwrap(), &s3_credentials);
+        create_cluster_backup(cdb, endpoint_url, &backup_path.unwrap(), backup_credentials);
 
     (cluster_backup, service_account_template)
 }
@@ -2043,6 +2072,37 @@ fn generate_restore_destination_path(restore: &Restore, backup: &coredb_types::B
             let destination_path = format!("{}/{}", prefix, restore.server_name.clone());
             destination_path
         }
+    }
+}
+
+// generate_google_backup_credentials function will generate the google backup credentials from
+// GoogleCredentials object and return a ClusterBackupBarmanObjectStoreGoogleCredentials object
+#[instrument(fields(trace_id, creds))]
+fn generate_google_backup_credentials(
+    creds: Option<GcsCredentials>,
+) -> Option<ClusterBackupBarmanObjectStoreGoogleCredentials> {
+    match creds {
+        Some(creds) => {
+            if creds.application_credentials.is_some() {
+                Some(ClusterBackupBarmanObjectStoreGoogleCredentials {
+                    application_credentials: creds.application_credentials.as_ref().map(|app| {
+                        ClusterBackupBarmanObjectStoreGoogleCredentialsApplicationCredentials {
+                            key: app.key.clone(),
+                            name: app.name.clone(),
+                        }
+                    }),
+                    gke_environment: Some(false),
+                })
+            } else if creds.gke_environment.unwrap_or(false) {
+                Some(ClusterBackupBarmanObjectStoreGoogleCredentials {
+                    gke_environment: Some(true),
+                    application_credentials: None,
+                })
+            } else {
+                None
+            }
+        }
+        None => None,
     }
 }
 

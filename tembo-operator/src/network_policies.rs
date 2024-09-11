@@ -79,6 +79,51 @@ pub async fn reconcile_network_policies(client: Client, namespace: &str) -> Resu
     });
     apply_network_policy(namespace, &np_api, allow_dns).await?;
 
+    let allow_node_local_dns = serde_json::json!({
+        "apiVersion": "networking.k8s.io/v1",
+        "kind": "NetworkPolicy",
+        "metadata": {
+          "name": "allow-egress-to-node-local-dns",
+          "namespace": format!("{namespace}"),
+        },
+        "spec": {
+          "podSelector": {},
+          "policyTypes": [
+            "Egress"
+          ],
+          "egress": [
+            {
+              "to": [
+                {
+                  "podSelector": {
+                    "matchLabels": {
+                      "k8s-app": "node-local-dns"
+                    }
+                  },
+                  "namespaceSelector": {
+                    "matchLabels": {
+                      "kubernetes.io/metadata.name": "kube-system"
+                    }
+                  }
+                }
+              ],
+              "ports": [
+                {
+                  "protocol": "UDP",
+                  "port": 53
+                },
+                {
+                  "protocol": "TCP",
+                  "port": 53
+                }
+              ]
+            }
+          ]
+        }
+    });
+    apply_network_policy(namespace, &np_api, allow_node_local_dns).await?;
+
+
     // Namespaces that should be allowed to access an instance namespace
     let allow_system_ingress = serde_json::json!({
         "apiVersion": "networking.k8s.io/v1",
