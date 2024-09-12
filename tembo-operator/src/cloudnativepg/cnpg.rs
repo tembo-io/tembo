@@ -295,8 +295,6 @@ pub fn cnpg_backup_configuration(
         backup_credentials,
     );
 
-    println!("cluster_backup: {:?}", cluster_backup);
-
     (cluster_backup, service_account_template)
 }
 
