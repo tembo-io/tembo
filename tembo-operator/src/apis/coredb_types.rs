@@ -160,6 +160,36 @@ pub struct S3CredentialsSessionToken {
     pub name: String,
 }
 
+/// GoogleCredentials is the type for the credentials to be used to upload files to Google Cloud Storage.
+/// It can be provided in two alternative ways:
+/// * The secret containing the Google Cloud Storage JSON file with the credentials (applicationCredentials)
+/// * inheriting the role from the pod (GKE) environment by setting gkeEnvironment to true
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+pub struct GoogleCredentials {
+    /// The reference to the secret containing the Google Cloud Storage JSON file with the credentials
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "applicationCredentials"
+    )]
+    pub application_credentials: Option<GoogleCredentialsApplicationCredentials>,
+
+    /// Use the role based authentication without providing explicitly the keys.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "gkeEnvironment"
+    )]
+    pub gke_environment: Option<bool>,
+}
+
+/// GoogleCredentialsApplicationCredentials is the type for the reference to the secret containing the Google Cloud Storage JSON file with the credentials
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+pub struct GoogleCredentialsApplicationCredentials {
+    pub key: String,
+    pub name: String,
+}
+
 /// VolumeSnapshots is the type for the configuration of the volume snapshots
 /// to be used for backups instead of object storage
 #[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
@@ -227,8 +257,11 @@ pub struct Backup {
     pub endpoint_url: Option<String>,
 
     /// The S3 credentials to use for backups (if not using IAM Role)
-    #[serde(default = "defaults::default_s3_credentials", rename = "s3Credentials")]
+    #[serde(rename = "s3Credentials")]
     pub s3_credentials: Option<S3Credentials>,
+
+    #[serde(rename = "googleCredentials")]
+    pub google_credentials: Option<GoogleCredentials>,
 
     /// Enable using Volume Snapshots for backups instead of Object Storage
     #[serde(
@@ -289,6 +322,10 @@ pub struct Restore {
     /// s3Credentials is the S3 credentials to use for backups.
     #[serde(rename = "s3Credentials")]
     pub s3_credentials: Option<S3Credentials>,
+
+    /// s3Credentials is the S3 credentials to use for backups.
+    #[serde(rename = "googleCredentials")]
+    pub google_credentials: Option<GoogleCredentials>,
 
     /// volumeSnapshot is a boolean to enable restoring from a Volume Snapshot
     #[serde(rename = "volumeSnapshot")]
