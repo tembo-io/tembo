@@ -18,6 +18,7 @@ pub struct Config {
     pub org_auth_enabled: bool,
     /// Interval to refresh the billing authorization cache
     pub org_auth_cache_refresh_interval_sec: u64,
+    pub run_billing_reporter: bool,
 }
 
 impl Config {
@@ -43,6 +44,9 @@ impl Config {
             )
             .parse()
             .expect("ORG_AUTH_CACHE_REFRESH_INTERVAL_SEC must be an integer"),
+            run_billing_reporter: from_env_default("RUN_BILLING_REPORTER", "false")
+                .parse()
+                .unwrap(),
         }
     }
 }
