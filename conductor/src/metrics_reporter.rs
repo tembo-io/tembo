@@ -42,7 +42,7 @@ pub async fn run_metrics_reporter() -> Result<()> {
         env::var("METRICS_EVENTS_QUEUE").expect("METRICS_EVENTS_QUEUE must be set");
 
     queue.init().await?;
-    queue.create(&metrics_events_queue).await?;
+    queue.create_partitioned(&metrics_events_queue).await?;
 
     let polling_interval_seconds = 60;
     let number_of_metrics = metrics.len();
