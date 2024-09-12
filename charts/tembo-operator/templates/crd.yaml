@@ -40,7 +40,7 @@ spec:
                 description: |-
                   A AffinityConfiguration provides a way to configure the CoreDB instance to run on specific nodes in the cluster based off of nodeSelector, nodeAffinity and tolerations
 
-                  For more information on AffinityConfiguration please see the [Cloudnative-PG documentation](https://cloudnative-pg.io/documentation/1.22/cloudnative-pg.v1/#postgresql-cnpg-io-v1-AffinityConfiguration)
+                  For more informaton on AffinityConfiguration please see the [Cloudnative-PG documentation](https://cloudnative-pg.io/documentation/1.22/cloudnative-pg.v1/#postgresql-cnpg-io-v1-AffinityConfiguration)
 
                   **Default**: ```yaml apiVersion: coredb.io/v1alpha1 kind: CoreDB metadata: name: test-db-restore spec: affinityConfiguration: podAntiAffinityType: preferred topologyKey: topology.kubernetes.io/zone ```
                 nullable: true
@@ -1930,8 +1930,7 @@ spec:
                   retentionPolicy: '30'
                   schedule: 0 0 * * *
                   endpointURL: null
-                  s3Credentials:
-                    inheritFromIAMRole: true
+                  s3Credentials: null
                   googleCredentials: null
                   volumeSnapshot:
                     enabled: false
@@ -1951,11 +1950,11 @@ spec:
                     nullable: true
                     type: string
                   endpointURL:
-                    description: The S3 compatible endpoint URL
+                    description: The S3 compatable endpoint URL
                     nullable: true
                     type: string
                   googleCredentials:
-                    description: The Google Cloud Storage credentials to use for backups
+                    description: 'GoogleCredentials is the type for the credentials to be used to upload files to Google Cloud Storage. It can be provided in two alternative ways: * The secret containing the Google Cloud Storage JSON file with the credentials (applicationCredentials) * inheriting the role from the pod (GKE) environment by setting gkeEnvironment to true'
                     nullable: true
                     properties:
                       applicationCredentials:
@@ -1981,8 +1980,6 @@ spec:
                     nullable: true
                     type: string
                   s3Credentials:
-                    default:
-                      inheritFromIAMRole: true
                     description: The S3 credentials to use for backups (if not using IAM Role)
                     nullable: true
                     properties:
@@ -2196,7 +2193,7 @@ spec:
               extensions:
                 default: []
                 description: |-
-                  A list of extensions to enable on the CoreDB instance. This list should be a list of extension names that are already available on the Postgres instance you are running.  To install extensions at runtime please see the `trunk_installs` field.
+                  A list of extensions to enable on the CoreDB instance. This list should be a lits of extension names that are already available on the Postgres instance you are running.  To install extensions at runtime please see the `trunk_installs` field.
 
                   **Default**: []
                 items:
@@ -2399,16 +2396,14 @@ spec:
                       The object storage path and bucket name of the instance you wish to restore from.  This maps to the `Backup` `destinationPath` field for the original instance.
 
                       **Example**: If you have an instance with `spec.backup.destinationPath` set to `s3://my-bucket/v2/test-db` then you would set `backupsPath` to `s3://my-bucket/v2/test-db`. And backups are saved in that bucket under `s3://my-bucket/v2/test-db/server_name`
-
-                      For GCS Buckets, the path should be in the format `gs://my-bucket/v2/test-db`
                     nullable: true
                     type: string
                   endpointURL:
-                    description: endpointURL is the S3 compatible endpoint URL
+                    description: endpointURL is the S3 compatable endpoint URL
                     nullable: true
                     type: string
                   googleCredentials:
-                    description: googleCredentials is the Google Cloud Storage credentials to use for backups.
+                    description: s3Credentials is the S3 credentials to use for backups.
                     nullable: true
                     properties:
                       applicationCredentials:
@@ -2735,7 +2730,7 @@ spec:
                 description: |-
                   The topologySpreadConstraints provides a way to spread matching pods among the given topology
 
-                  For more information see the Kubernetes documentation on [Topology Spread Constraints](https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/) Tembo is compatible with the `v1` version of the TopologySpreadConstraints up to [Kubernetes 1.25](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#topologyspreadconstraint-v1-core)
+                  For more information see the Kubernetes documentation on [Topology Spread Constraints](https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/) Tembo is compatable with the `v1` version of the TopologySpreadConstraints up to [Kubernetes 1.25](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#topologyspreadconstraint-v1-core)
 
                   **Default**: `None`
                 items:
