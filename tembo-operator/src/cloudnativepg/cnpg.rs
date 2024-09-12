@@ -271,6 +271,7 @@ pub fn cnpg_backup_configuration(
     };
 
     let backup_path = cdb.spec.backup.destinationPath.clone();
+
     if !cfg.enable_backup || backup_path.is_none() {
         return (None, service_account_template);
     }
@@ -286,12 +287,15 @@ pub fn cnpg_backup_configuration(
     } else {
         None
     };
+
     let cluster_backup = create_cluster_backup(
         cdb,
         cdb.spec.backup.endpoint_url.clone(),
         &backup_path,
         backup_credentials,
     );
+
+    println!("cluster_backup: {:?}", cluster_backup);
 
     (cluster_backup, service_account_template)
 }
