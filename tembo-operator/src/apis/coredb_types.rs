@@ -160,16 +160,6 @@ pub struct S3CredentialsSessionToken {
     pub name: String,
 }
 
-impl S3Credentials {
-    pub fn is_empty(&self) -> bool {
-        self.access_key_id.is_none()
-            && self.inherit_from_iam_role.is_none()
-            && self.region.is_none()
-            && self.secret_access_key.is_none()
-            && self.session_token.is_none()
-    }
-}
-
 /// GoogleCredentials is the type for the credentials to be used to upload files to Google Cloud Storage.
 /// It can be provided in two alternative ways:
 /// * The secret containing the Google Cloud Storage JSON file with the credentials (applicationCredentials)
@@ -198,12 +188,6 @@ pub struct GoogleCredentials {
 pub struct GoogleCredentialsApplicationCredentials {
     pub key: String,
     pub name: String,
-}
-
-impl GoogleCredentials {
-    pub fn is_empty(&self) -> bool {
-        self.application_credentials.is_none() && self.gke_environment.is_none()
-    }
 }
 
 /// VolumeSnapshots is the type for the configuration of the volume snapshots
@@ -268,19 +252,15 @@ pub struct Backup {
     #[serde(default = "defaults::default_backup_schedule")]
     pub schedule: Option<String>,
 
-    /// The S3 compatible endpoint URL
+    /// The S3 compatable endpoint URL
     #[serde(default, rename = "endpointURL")]
     pub endpoint_url: Option<String>,
 
     /// The S3 credentials to use for backups (if not using IAM Role)
-    #[serde(default = "defaults::default_s3_credentials", rename = "s3Credentials")]
+    #[serde(rename = "s3Credentials")]
     pub s3_credentials: Option<S3Credentials>,
 
-    /// The Google Cloud Storage credentials to use for backups
-    #[serde(
-        default = "defaults::default_google_credentials",
-        rename = "googleCredentials"
-    )]
+    #[serde(rename = "googleCredentials")]
     pub google_credentials: Option<GoogleCredentials>,
 
     /// Enable using Volume Snapshots for backups instead of Object Storage
@@ -308,7 +288,7 @@ pub struct Backup {
 ///       inheritFromIAMRole: true
 /// ```
 ///
-/// For more information please read through the [cloudnative-pg documentation](https://cloudnative-pg.io/documentation/1.20/recovery/#pitr-from-an-object-store)
+/// For more information plese read through the [cloudnative-pg documentation](https://cloudnative-pg.io/documentation/1.20/recovery/#pitr-from-an-object-store)
 #[derive(Deserialize, Serialize, Clone, Debug, Default, JsonSchema)]
 pub struct Restore {
     /// The name of the instance you wish to restore.  This maps to the `Backup`
@@ -328,8 +308,6 @@ pub struct Restore {
     /// **Example**: If you have an instance with `spec.backup.destinationPath`
     /// set to `s3://my-bucket/v2/test-db` then you would set `backupsPath` to `s3://my-bucket/v2/test-db`.
     /// And backups are saved in that bucket under `s3://my-bucket/v2/test-db/server_name`
-    ///
-    /// For GCS Buckets, the path should be in the format `gs://my-bucket/v2/test-db`
     #[serde(rename = "backupsPath")]
     pub backups_path: Option<String>,
 
@@ -337,7 +315,7 @@ pub struct Restore {
     #[serde(rename = "recoveryTargetTime")]
     pub recovery_target_time: Option<String>,
 
-    /// endpointURL is the S3 compatible endpoint URL
+    /// endpointURL is the S3 compatable endpoint URL
     #[serde(default, rename = "endpointURL")]
     pub endpoint_url: Option<String>,
 
@@ -345,7 +323,7 @@ pub struct Restore {
     #[serde(rename = "s3Credentials")]
     pub s3_credentials: Option<S3Credentials>,
 
-    /// googleCredentials is the Google Cloud Storage credentials to use for backups.
+    /// s3Credentials is the S3 credentials to use for backups.
     #[serde(rename = "googleCredentials")]
     pub google_credentials: Option<GoogleCredentials>,
 
@@ -553,7 +531,7 @@ pub struct CoreDBSpec {
     pub uid: i32,
 
     /// A list of extensions to enable on the CoreDB instance.
-    /// This list should be a list of extension names that are already available
+    /// This list should be a lits of extension names that are already available
     /// on the Postgres instance you are running.  To install extensions at runtime
     /// please see the `trunk_installs` field.
     ///
@@ -589,7 +567,8 @@ pub struct CoreDBSpec {
     /// backups and WAL archive uploads to an S3 compatible object store.
     ///
     /// **Default**: disabled
-    pub backup: Option<Backup>,
+    #[serde(default = "defaults::default_backup")]
+    pub backup: Backup,
 
     /// The metrics configuration to allow for custom Postgres metrics to be
     /// exposed in postgres-exporter and Prometheus.
@@ -665,7 +644,7 @@ pub struct CoreDBSpec {
     /// A AffinityConfiguration provides a way to configure the CoreDB instance to run
     /// on specific nodes in the cluster based off of nodeSelector, nodeAffinity and tolerations
     ///
-    /// For more information on AffinityConfiguration please see the [Cloudnative-PG documentation](https://cloudnative-pg.io/documentation/1.22/cloudnative-pg.v1/#postgresql-cnpg-io-v1-AffinityConfiguration)
+    /// For more informaton on AffinityConfiguration please see the [Cloudnative-PG documentation](https://cloudnative-pg.io/documentation/1.22/cloudnative-pg.v1/#postgresql-cnpg-io-v1-AffinityConfiguration)
     ///
     /// **Default**:
     /// ```yaml
@@ -687,7 +666,7 @@ pub struct CoreDBSpec {
     /// The topologySpreadConstraints provides a way to spread matching pods among the given topology
     ///
     /// For more information see the Kubernetes documentation on [Topology Spread Constraints](https://kubernetes.io/docs/concepts/scheduling-eviction/topology-spread-constraints/)
-    /// Tembo is compatible with the `v1` version of the TopologySpreadConstraints up to [Kubernetes 1.25](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#topologyspreadconstraint-v1-core)
+    /// Tembo is compatable with the `v1` version of the TopologySpreadConstraints up to [Kubernetes 1.25](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.25/#topologyspreadconstraint-v1-core)
     ///
     /// **Default**: `None`
     #[serde(rename = "topologySpreadConstraints")]

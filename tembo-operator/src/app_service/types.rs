@@ -159,7 +159,7 @@ pub struct AppMetrics {
 }
 
 // Secrets are injected into the container as environment variables
-// this allows users to map these secrets to environment variable of their choice
+// ths allows users to map these secrets to environment variable of their choice
 #[derive(Clone, Debug, Serialize, Deserialize, ToSchema, JsonSchema, PartialEq)]
 pub struct EnvVar {
     pub name: String,

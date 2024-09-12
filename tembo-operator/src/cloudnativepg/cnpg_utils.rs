@@ -1,9 +1,6 @@
 pub use crate::{
     apis::coredb_types::CoreDB,
-    cloudnativepg::clusters::{
-        Cluster, ClusterBackupBarmanObjectStoreGoogleCredentials,
-        ClusterBackupBarmanObjectStoreS3Credentials, ClusterStatusConditionsStatus,
-    },
+    cloudnativepg::clusters::{Cluster, ClusterStatusConditionsStatus},
     cloudnativepg::poolers::Pooler,
     cloudnativepg::scheduledbackups::ScheduledBackup,
     controller,
@@ -322,20 +319,4 @@ pub(crate) async fn is_image_updated(
     }
 
     Ok(())
-}
-
-impl ClusterBackupBarmanObjectStoreS3Credentials {
-    pub fn is_empty(&self) -> bool {
-        self.access_key_id.is_none()
-            && self.inherit_from_iam_role != Some(true)
-            && self.region.is_none()
-            && self.secret_access_key.is_none()
-            && self.session_token.is_none()
-    }
-}
-
-impl ClusterBackupBarmanObjectStoreGoogleCredentials {
-    pub fn is_empty(&self) -> bool {
-        self.application_credentials.is_none() && self.gke_environment != Some(true)
-    }
 }
