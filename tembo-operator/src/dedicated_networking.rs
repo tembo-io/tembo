@@ -365,11 +365,11 @@ async fn reconcile_dedicated_networking_service(
     annotations.extend([
         (
             "service.beta.kubernetes.io/aws-load-balancer-internal".to_string(),
-            serde_json::Value::String(lb_scheme.to_string()),
+            serde_json::Value::String(lb_internal.to_string()),
         ),
         (
             "service.beta.kubernetes.io/aws-load-balancer-scheme".to_string(),
-            serde_json::Value::String(lb_internal.to_string()),
+            serde_json::Value::String(lb_scheme.to_string()),
         ),
         (
             "service.beta.kubernetes.io/aws-load-balancer-nlb-target-type".to_string(),
