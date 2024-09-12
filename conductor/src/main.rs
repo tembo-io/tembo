@@ -878,7 +878,7 @@ async fn init_gcp_storage_workload_identity(
         volume_snapshot,
     };
 
-    coredb_spec.backup = Some(backup);
+    coredb_spec.backup = backup;
 
     Ok(())
 }
