@@ -132,7 +132,7 @@ pub async fn run_events_reporter(pg_conn: String) -> Result<()> {
     let queue = PGMQueueExt::new(pg_conn, 2).await?;
 
     queue.init().await?;
-    queue.create("").await?;
+    queue.create(BILLING_QUEUE).await?;
 
     let mut sync_interval = interval(SYNC_PERIOD);
 
