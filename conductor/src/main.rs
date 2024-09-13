@@ -56,7 +56,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         env::var("BACKUP_ARCHIVE_BUCKET").expect("BACKUP_ARCHIVE_BUCKET must be set");
     let storage_archive_bucket =
         env::var("STORAGE_ARCHIVE_BUCKET").expect("STORAGE_ARCHIVE_BUCKET must be set");
-    let cf_template_bucket = env::var("CF_TEMPLATE_BUCKET")
+    let cf_template_bucket: String = env::var("CF_TEMPLATE_BUCKET")
         .unwrap_or_else(|_| "".to_owned())
         .parse()
         .expect("error parsing CF_TEMPLATE_BUCKET");
@@ -84,12 +84,12 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         .unwrap_or_else(|_| "".to_owned())
         .parse()
         .expect("error parsing GCP_PROJECT_NUMBER");
-    
+
     // Error and exit if CF_TEMPLATE_BUCKET is not set when IS_CLOUD_FORMATION is enabled
     if is_cloud_formation && cf_template_bucket.is_empty() {
         panic!("CF_TEMPLATE_BUCKET is required when IS_CLOUD_FORMATION is true");
     }
-    
+
     // Error and exit if both IS_CLOUD_FORMATION and IS_GCP are set to true
     if is_cloud_formation && is_gcp {
         panic!("Cannot have both IS_CLOUD_FORMATION and IS_GCP set to true");
