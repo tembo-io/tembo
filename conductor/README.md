@@ -28,9 +28,9 @@ Prerequisites:
 
    `❯ just run-postgres`
 
-4. Run Conductor
+4. Run & watch Conductor
 
-   `❯ just run-local`
+   `❯ just watch`
 
 6. Run unit and functional tests
 
