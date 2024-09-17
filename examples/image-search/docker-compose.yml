@@ -1,0 +1,17 @@
+services:
+  notebook:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - 8888:8888
+    volumes:
+      - .:/app
+    command: jupyter notebook --allow-root
+  postgres:
+    image: quay.io/tembo/vectorize-pg:latest
+    ports:
+      - 5433:5432
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
