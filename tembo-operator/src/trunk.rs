@@ -707,7 +707,7 @@ mod tests {
         let result = is_semver(version);
         assert!(!result);
 
-        assert_eq!(is_semver("1.0"), false);
+        assert!(!is_semver("1.0"));
     }
 
     #[test]

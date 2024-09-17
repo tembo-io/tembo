@@ -1930,8 +1930,8 @@ spec:
                   retentionPolicy: '30'
                   schedule: 0 0 * * *
                   endpointURL: null
-                  s3Credentials:
-                    inheritFromIAMRole: true
+                  s3Credentials: null
+                  googleCredentials: null
                   volumeSnapshot:
                     enabled: false
                 description: |-
@@ -1953,14 +1953,33 @@ spec:
                     description: The S3 compatable endpoint URL
                     nullable: true
                     type: string
+                  googleCredentials:
+                    description: 'GoogleCredentials is the type for the credentials to be used to upload files to Google Cloud Storage. It can be provided in two alternative ways: * The secret containing the Google Cloud Storage JSON file with the credentials (applicationCredentials) * inheriting the role from the pod (GKE) environment by setting gkeEnvironment to true'
+                    nullable: true
+                    properties:
+                      applicationCredentials:
+                        description: The reference to the secret containing the Google Cloud Storage JSON file with the credentials
+                        nullable: true
+                        properties:
+                          key:
+                            type: string
+                          name:
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                      gkeEnvironment:
+                        description: Use the role based authentication without providing explicitly the keys.
+                        nullable: true
+                        type: boolean
+                    type: object
                   retentionPolicy:
                     default: '30'
                     description: The number of days to retain backups for
                     nullable: true
                     type: string
                   s3Credentials:
-                    default:
-                      inheritFromIAMRole: true
                     description: The S3 credentials to use for backups (if not using IAM Role)
                     nullable: true
                     properties:
@@ -2383,6 +2402,27 @@ spec:
                     description: endpointURL is the S3 compatable endpoint URL
                     nullable: true
                     type: string
+                  googleCredentials:
+                    description: s3Credentials is the S3 credentials to use for backups.
+                    nullable: true
+                    properties:
+                      applicationCredentials:
+                        description: The reference to the secret containing the Google Cloud Storage JSON file with the credentials
+                        nullable: true
+                        properties:
+                          key:
+                            type: string
+                          name:
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                      gkeEnvironment:
+                        description: Use the role based authentication without providing explicitly the keys.
+                        nullable: true
+                        type: boolean
+                    type: object
                   recoveryTargetTime:
                     description: recovery_target_time is the time base target for point-in-time recovery.
                     nullable: true
