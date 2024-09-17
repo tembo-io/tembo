@@ -430,10 +430,8 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                 let spec_js = serde_json::to_string(&current_spec.spec).unwrap();
                 debug!("dbname: {}, current_spec: {:?}", &namespace, spec_js);
 
-                if read_msg.message.event_type == Event::Stop {
-                    if is_cloud_formation {
-                        let status = current_spec.status.clone().unwrap();
-
+                if is_cloud_formation && read_msg.message.event_type == Event::Stop {
+                    if let Some(status) = current_spec.clone().status {
                         match status.running {
                             false => {
                                 info!("{}: Deleting cloudformation stack", read_msg.msg_id);
