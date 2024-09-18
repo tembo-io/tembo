@@ -47,17 +47,22 @@ runs:
         cmd: |
           yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/data-plane.yaml
           yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/data-plane-euc1.yaml
+          yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/data-plane-gke-usc1.yaml
           yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/data-plane.yaml
           yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/data-plane-euc1.yaml
+          yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/data-plane-gke-usc1.yaml
           yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/dataplane-webserver.yaml
           yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/dataplane-webserver-euc1.yaml
+          yq -i '(.spec.source.helm.parameters.[] | select(.name == "image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/dataplane-webserver-gke-usc1.yaml
           yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator.yaml
           yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator-euc1.yaml
+          yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator-gke-usc1.yaml
           yq -i '(.spec.source.helm.parameters.[] | select(.name == "controller.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator.yaml
           yq -i '(.spec.source.helm.parameters.[] | select(.name == "controller.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator-euc1.yaml
           yq -i '(.spec.source.helm.parameters.[] | select(.name == "pod-init.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator.yaml
           yq -i '(.spec.source.helm.parameters.[] | select(.name == "pod-init.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator-euc1.yaml
           yq -i '(.spec.source.helm.parameters.[] | select(.name == "inferenceGateway.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-ai.yaml
+          yq -i '(.spec.source.helm.parameters.[] | select(.name == "controller.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator-gke-usc1.yaml
           yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-ai.yaml
 
     - name: Update for prod deployments
