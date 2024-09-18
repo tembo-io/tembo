@@ -9,6 +9,9 @@ fmt:
 	cargo fmt --all
 	cargo clippy
 
+prepare:
+	cargo sqlx prepare
+
 check:
 	cargo fmt --all --check
 	cargo clippy

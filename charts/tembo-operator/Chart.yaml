@@ -3,7 +3,7 @@ name: tembo-operator
 description: "Helm chart to deploy the tembo-operator"
 type: application
 icon: https://cloud.tembo.io/images/TemboElephant.png
-version: 0.7.2
+version: 0.7.3
 home: https://tembo.io
 sources:
   - https://github.com/tembo-io/tembo
@@ -17,6 +17,6 @@ maintainers:
     url: https://tembocommunity.slack.com
 dependencies:
   - name: cloudnative-pg
-    version: 0.20.1
+    version: 0.21.6
     repository: https://cloudnative-pg.github.io/charts
     condition: cloudnative-pg.enabled

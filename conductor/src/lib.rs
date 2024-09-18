@@ -1,6 +1,7 @@
 pub mod aws;
 pub mod errors;
 pub mod extensions;
+pub mod gcp;
 pub mod metrics;
 pub mod monitoring;
 pub mod routes;
@@ -500,6 +501,53 @@ pub fn generate_cron_expression(input: &str) -> String {
 
     // Construct the 5-term cron expression for a daily job
     format!("{} {} * * *", minute, hour)
+}
+
+// Create GCP Workload Identity Binding on Buckets for each instance service account
+pub async fn create_gcp_storage_workload_identity_binding(
+    gcp_project_id: &str,
+    gcp_project_number: &str,
+    backup_archive_bucket: &str,
+    storage_archive_bucket: &str,
+    namespace: &str,
+) -> Result<(), ConductorError> {
+    let service_account_name = namespace;
+    let buckets = vec![backup_archive_bucket, storage_archive_bucket];
+
+    // Create a new GCP Storage Client
+    let gcp_storage_client =
+        gcp::client::GcpStorageClient::new(gcp_project_id, gcp_project_number).await?;
+    let gcp_iam_manager = gcp::bucket_manager::BucketIamManager::new(gcp_storage_client);
+
+    // Create a new workload identity binding to the bucket
+    gcp_iam_manager
+        .add_service_account_binding(buckets, namespace, service_account_name)
+        .await?;
+
+    Ok(())
+}
+
+pub async fn delete_gcp_storage_workload_identity_binding(
+    gcp_project_id: &str,
+    gcp_project_number: &str,
+    backup_archive_bucket: &str,
+    storage_archive_bucket: &str,
+    namespace: &str,
+) -> Result<(), ConductorError> {
+    let service_account_name = namespace;
+    let buckets = vec![backup_archive_bucket, storage_archive_bucket];
+
+    // Create a new GCP Storage Client
+    let gcp_storage_client =
+        gcp::client::GcpStorageClient::new(gcp_project_id, gcp_project_number).await?;
+    let gcp_iam_manager = gcp::bucket_manager::BucketIamManager::new(gcp_storage_client);
+
+    // Remove the workload identity binding from the bucket
+    gcp_iam_manager
+        .remove_service_account_binding(buckets, namespace, service_account_name)
+        .await?;
+
+    Ok(())
 }
 
 #[cfg(test)]

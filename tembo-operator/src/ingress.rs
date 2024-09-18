@@ -289,12 +289,7 @@ pub async fn reconcile_postgres_ing_route_tcp(
 }
 
 fn generate_ip_allow_list_middleware_tcp(cdb: &CoreDB) -> MiddlewareTCP {
-    let source_range = match cdb.spec.ip_allow_list.clone() {
-        None => {
-            vec![]
-        }
-        Some(ips) => ips,
-    };
+    let source_range = cdb.spec.ip_allow_list.clone().unwrap_or_default();
 
     let mut valid_ips = valid_cidrs(&source_range);
 
