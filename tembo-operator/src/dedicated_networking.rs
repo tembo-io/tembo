@@ -356,11 +356,10 @@ async fn reconcile_dedicated_networking_service(
         service_name, namespace, service_type, lb_scheme
     );
 
-    let external_dns_hostname = if is_standby {
-        format!("dedicated-ro.{}.{}", namespace, basedomain)
-    } else {
-        format!("dedicated.{}.{}", namespace, basedomain)
-    };
+    let external_dns_hostname = format!(
+        "dedicated{prefix}.{namespace}.{basedomain}",
+        prefix = if is_standby { "-ro" } else { "" }
+    );
 
     let mut annotations = serde_json::Map::new();
     annotations.insert(
