@@ -7,3 +7,5 @@ WORKDIR /app
 RUN uv sync --frozen
 
 ENV PATH="/app/.venv/bin:$PATH"
+
+CMD ["uv", "run", "jupyter", "notebook", "--allow-root", "--ip 0.0.0.0"]

@@ -7,7 +7,7 @@ services:
       - 8888:8888
     volumes:
       - .:/app
-    command: jupyter notebook --allow-root
+    command: uv run jupyter notebook --allow-root --ip 0.0.0.0 --NotebookApp.token=''
   postgres:
     image: quay.io/tembo/vectorize-pg:latest
     ports:
