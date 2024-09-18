@@ -356,10 +356,16 @@ async fn reconcile_dedicated_networking_service(
         service_name, namespace, service_type, lb_scheme
     );
 
+    let external_dns_hostname = if is_standby {
+        format!("dedicated-ro.{}.{}", namespace, basedomain)
+    } else {
+        format!("dedicated.{}.{}", namespace, basedomain)
+    };
+
     let mut annotations = serde_json::Map::new();
     annotations.insert(
         "external-dns.alpha.kubernetes.io/hostname".to_string(),
-        serde_json::Value::String(format!("{}.{}", namespace, basedomain)),
+        serde_json::Value::String(external_dns_hostname),
     );
 
     annotations.extend([
@@ -420,18 +426,10 @@ async fn reconcile_dedicated_networking_service(
     );
     service_spec.insert("sessionAffinity".to_string(), json!("None"));
     service_spec.insert("type".to_string(), json!(service_type));
+    let ip_allow_list = cdb.spec.ip_allow_list.clone().unwrap_or_else(|| vec![]);
 
-    if service_type == "LoadBalancer" {
-        let load_balancer_source_ranges = env::var("CLOUD_LOAD_BALANCER_INTERNAL_IP_CIDR")
-            .unwrap_or_else(|_| "10.0.0.0/8".to_string())
-            .split(',')
-            .map(|s| s.trim().to_string())
-            .collect::<Vec<String>>();
-
-        service_spec.insert(
-            "loadBalancerSourceRanges".to_string(),
-            json!(load_balancer_source_ranges),
-        );
+    if service_type == "LoadBalancer" && !ip_allow_list.is_empty() {
+        service_spec.insert("loadBalancerSourceRanges".to_string(), json!(ip_allow_list));
     }
 
     let service = json!({

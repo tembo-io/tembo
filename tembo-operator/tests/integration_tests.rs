@@ -2168,7 +2168,7 @@ mod test {
             .as_ref()
             .expect("Annotations should be present");
         let basedomain = std::env::var("DATA_PLANE_BASEDOMAIN").unwrap();
-        let expected_hostname = format!("{}.{}", namespace, basedomain);
+        let expected_hostname = format!("dedicated.{}.{}", namespace, basedomain);
 
         assert_eq!(
             annotations
