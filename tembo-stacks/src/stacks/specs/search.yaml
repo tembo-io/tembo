@@ -3,9 +3,9 @@ description: A Postgres instance that enables full text search over heap tables 
 repository: "quay.io/tembo"
 organization: tembo
 images:
-  14: "standard-cnpg:14-389a437"
-  15: "standard-cnpg:15-389a437"
-  16: "standard-cnpg:16-389a437"
+  14: "standard-cnpg:14-5120dd1"
+  15: "standard-cnpg:15-5120dd1"
+  16: "standard-cnpg:16-5120dd1"
 stack_version: 0.1.0
 postgres_config_engine: standard
 postgres_config:
