@@ -1,5 +1,5 @@
-name: ParadeDB
-description: Postgres for Search and Analytics
+name: Search
+description: A Postgres instance that enables full text search over heap tables using the BM25 algorithm.
 repository: "quay.io/tembo"
 organization: tembo
 images:
