@@ -1,5 +1,21 @@
+use super::clusters::{
+    ClusterBackupBarmanObjectStoreAzureCredentials,
+    ClusterBackupBarmanObjectStoreAzureCredentialsConnectionString,
+    ClusterBackupBarmanObjectStoreAzureCredentialsStorageAccount,
+    ClusterBackupBarmanObjectStoreAzureCredentialsStorageKey,
+    ClusterBackupBarmanObjectStoreAzureCredentialsStorageSasToken,
+    ClusterBackupBarmanObjectStoreGoogleCredentials,
+    ClusterBackupBarmanObjectStoreGoogleCredentialsApplicationCredentials,
+    ClusterExternalClustersBarmanObjectStoreAzureCredentials,
+    ClusterExternalClustersBarmanObjectStoreAzureCredentialsConnectionString,
+    ClusterExternalClustersBarmanObjectStoreAzureCredentialsStorageAccount,
+    ClusterExternalClustersBarmanObjectStoreAzureCredentialsStorageKey,
+    ClusterExternalClustersBarmanObjectStoreAzureCredentialsStorageSasToken,
+    ClusterExternalClustersBarmanObjectStoreGoogleCredentials,
+    ClusterExternalClustersBarmanObjectStoreGoogleCredentialsApplicationCredentials,
+};
 use crate::apis::coredb_types::Restore;
-use crate::apis::coredb_types::{self, GoogleCredentials, AzureCredentials};
+use crate::apis::coredb_types::{self, AzureCredentials, GoogleCredentials};
 use crate::extensions::install::find_trunk_installs_to_pod;
 use crate::ingress_route_crd::{
     IngressRoute, IngressRouteRoutes, IngressRouteRoutesKind, IngressRouteRoutesServices,
@@ -80,7 +96,6 @@ use kube::{
 use std::{collections::BTreeMap, sync::Arc};
 use tokio::time::Duration;
 use tracing::{debug, error, info, instrument, warn};
-use super::clusters::{ClusterBackupBarmanObjectStoreAzureCredentials, ClusterBackupBarmanObjectStoreAzureCredentialsConnectionString, ClusterBackupBarmanObjectStoreAzureCredentialsStorageAccount, ClusterBackupBarmanObjectStoreAzureCredentialsStorageKey, ClusterBackupBarmanObjectStoreAzureCredentialsStorageSasToken, ClusterBackupBarmanObjectStoreGoogleCredentials, ClusterBackupBarmanObjectStoreGoogleCredentialsApplicationCredentials, ClusterExternalClustersBarmanObjectStoreGoogleCredentials, ClusterExternalClustersBarmanObjectStoreGoogleCredentialsApplicationCredentials};
 
 pub struct PostgresConfig {
     pub postgres_parameters: Option<BTreeMap<String, String>>,
@@ -381,6 +396,8 @@ pub fn cnpg_cluster_bootstrap_from_cdb(
         let s3_credentials = generate_s3_restore_credentials(restore.s3_credentials.as_ref());
         let google_credentials =
             generate_gcs_restore_credentials(restore.google_credentials.as_ref());
+        let azure_credentials =
+            generate_azure_restore_credentials(restore.azure_credentials.as_ref());
         // Find destination_path from Backup to generate the restore destination path
         let restore_destination_path = generate_restore_destination_path(restore, &cdb.spec.backup);
         ClusterExternalClusters {
@@ -390,6 +407,7 @@ pub fn cnpg_cluster_bootstrap_from_cdb(
                 endpoint_url: restore.endpoint_url.clone(),
                 s3_credentials,
                 google_credentials,
+                azure_credentials,
                 wal: Some(ClusterExternalClustersBarmanObjectStoreWal {
                     max_parallel: Some(8),
                     encryption: Some(ClusterExternalClustersBarmanObjectStoreWalEncryption::Aes256),
@@ -2107,7 +2125,7 @@ fn generate_azure_backup_credentials(
                     ..Default::default()
                 })
             } else if creds.connection_string.is_some() {
-                // If we're not inheriting from Azure AD, assume we are reading from a Kubernetes secret. 
+                // If we're not inheriting from Azure AD, assume we are reading from a Kubernetes secret.
                 // https://cloudnative-pg.io/documentation/1.16/backup_recovery/#azure-blob-storage
                 Some(ClusterBackupBarmanObjectStoreAzureCredentials {
                     connection_string: creds.connection_string.as_ref().map(|cs| {
@@ -2136,8 +2154,7 @@ fn generate_azure_backup_credentials(
                     }),
                     inherit_from_azure_ad: None,
                 })
-            }
-            else {
+            } else {
                 None
             }
         }
@@ -2193,6 +2210,43 @@ fn generate_s3_restore_credentials(
                 ClusterExternalClustersBarmanObjectStoreS3CredentialsSessionToken {
                     key: token.key.clone(),
                     name: token.name.clone(),
+                }
+            }),
+        },
+    )
+}
+
+// generate_azure_restore_credentials function will generate the azure restore credentials from
+// AzureCredentials object and return a ClusterExternalClustersBarmanObjectStoreAzureCredentials object
+#[instrument(fields(trace_id, creds))]
+fn generate_azure_restore_credentials(
+    creds: Option<&AzureCredentials>,
+) -> Option<ClusterExternalClustersBarmanObjectStoreAzureCredentials> {
+    creds.map(
+        |creds| ClusterExternalClustersBarmanObjectStoreAzureCredentials {
+            connection_string: creds.connection_string.as_ref().map(|cs| {
+                ClusterExternalClustersBarmanObjectStoreAzureCredentialsConnectionString {
+                    key: cs.key.clone(),
+                    name: cs.name.clone(),
+                }
+            }),
+            inherit_from_azure_ad: creds.inherit_from_azure_ad,
+            storage_account: creds.storage_account.as_ref().map(|sa| {
+                ClusterExternalClustersBarmanObjectStoreAzureCredentialsStorageAccount {
+                    key: sa.key.clone(),
+                    name: sa.name.clone(),
+                }
+            }),
+            storage_key: creds.storage_key.as_ref().map(|sk| {
+                ClusterExternalClustersBarmanObjectStoreAzureCredentialsStorageKey {
+                    key: sk.key.clone(),
+                    name: sk.name.clone(),
+                }
+            }),
+            storage_sas_token: creds.storage_sas_token.as_ref().map(|st| {
+                ClusterExternalClustersBarmanObjectStoreAzureCredentialsStorageSasToken {
+                    key: st.key.clone(),
+                    name: st.name.clone(),
                 }
             }),
         },
