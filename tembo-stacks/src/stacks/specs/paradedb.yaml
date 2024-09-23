@@ -1,5 +1,5 @@
-name: Search
-description: A Postgres instance that enables full text search over heap tables using the BM25 algorithm.
+name: ParadeDB
+description: Postgres for Search and Analytics
 repository: "quay.io/tembo"
 organization: tembo
 images:
@@ -40,6 +40,8 @@ postgres_config:
 trunk_installs:
   - name: pg_stat_statements
     version: 1.10.0
+  - name: pg_analytics
+    version: 0.1.4
   - name: pg_search
     version: 0.10.0
   - name: pg_cron
@@ -67,3 +69,9 @@ extensions:
     - database: postgres
       enabled: true
       version: 1.6.2
+  - name: pg_analytics
+    description: pg_analytics
+    locations:
+    - database: postgres
+      enabled: true
+      version: 0.1.2
