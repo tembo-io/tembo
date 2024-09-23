@@ -338,8 +338,13 @@ pub struct Backup {
     #[serde(rename = "s3Credentials")]
     pub s3_credentials: Option<S3Credentials>,
 
+    /// The Google Cloud credentials to use for backups
     #[serde(rename = "googleCredentials")]
     pub google_credentials: Option<GoogleCredentials>,
+
+    /// The Azure credentials to use for backups
+    #[serde(rename = "azureCredentials")]
+    pub azure_credentials: Option<AzureCredentials>,
 
     /// Enable using Volume Snapshots for backups instead of Object Storage
     #[serde(
@@ -393,17 +398,21 @@ pub struct Restore {
     #[serde(rename = "recoveryTargetTime")]
     pub recovery_target_time: Option<String>,
 
-    /// endpointURL is the S3 compatable endpoint URL
+    /// endpointURL is the S3 compatible endpoint URL
     #[serde(default, rename = "endpointURL")]
     pub endpoint_url: Option<String>,
 
-    /// s3Credentials is the S3 credentials to use for backups.
+    /// s3Credentials is the S3 credentials to use for restores.
     #[serde(rename = "s3Credentials")]
     pub s3_credentials: Option<S3Credentials>,
 
-    /// s3Credentials is the S3 credentials to use for backups.
+    /// googleCredentials is the Google Cloud credentials to use for restores.
     #[serde(rename = "googleCredentials")]
     pub google_credentials: Option<GoogleCredentials>,
+
+    /// azureCredentials is the Azure credentials to use for restores.
+    #[serde(rename = "azureCredentials")]
+    pub azure_credentials: Option<AzureCredentials>,
 
     /// volumeSnapshot is a boolean to enable restoring from a Volume Snapshot
     #[serde(rename = "volumeSnapshot")]
