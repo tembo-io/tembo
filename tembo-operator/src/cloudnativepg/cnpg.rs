@@ -1,5 +1,5 @@
 use crate::apis::coredb_types::Restore;
-use crate::apis::coredb_types::{self, GoogleCredentials};
+use crate::apis::coredb_types::{self, GoogleCredentials, AzureCredentials};
 use crate::extensions::install::find_trunk_installs_to_pod;
 use crate::ingress_route_crd::{
     IngressRoute, IngressRouteRoutes, IngressRouteRoutesKind, IngressRouteRoutesServices,
@@ -80,13 +80,7 @@ use kube::{
 use std::{collections::BTreeMap, sync::Arc};
 use tokio::time::Duration;
 use tracing::{debug, error, info, instrument, warn};
-
-use super::clusters::{
-    ClusterBackupBarmanObjectStoreGoogleCredentials,
-    ClusterBackupBarmanObjectStoreGoogleCredentialsApplicationCredentials,
-    ClusterExternalClustersBarmanObjectStoreGoogleCredentials,
-    ClusterExternalClustersBarmanObjectStoreGoogleCredentialsApplicationCredentials,
-};
+use super::clusters::{ClusterBackupBarmanObjectStoreAzureCredentials, ClusterBackupBarmanObjectStoreAzureCredentialsConnectionString, ClusterBackupBarmanObjectStoreAzureCredentialsStorageAccount, ClusterBackupBarmanObjectStoreAzureCredentialsStorageKey, ClusterBackupBarmanObjectStoreAzureCredentialsStorageSasToken, ClusterBackupBarmanObjectStoreGoogleCredentials, ClusterBackupBarmanObjectStoreGoogleCredentialsApplicationCredentials, ClusterExternalClustersBarmanObjectStoreGoogleCredentials, ClusterExternalClustersBarmanObjectStoreGoogleCredentialsApplicationCredentials};
 
 pub struct PostgresConfig {
     pub postgres_parameters: Option<BTreeMap<String, String>>,
@@ -157,6 +151,7 @@ fn create_cluster_backup_barman_object_store(
     match credentials {
         BackupCredentials::S3(creds) => object_store.s3_credentials = Some(creds),
         BackupCredentials::Google(creds) => object_store.google_credentials = Some(creds),
+        BackupCredentials::Azure(creds) => object_store.azure_credentials = Some(creds),
     }
 
     object_store
@@ -213,6 +208,7 @@ fn create_cluster_backup_volume_snapshot(cdb: &CoreDB) -> ClusterBackupVolumeSna
 enum BackupCredentials {
     S3(ClusterBackupBarmanObjectStoreS3Credentials),
     Google(ClusterBackupBarmanObjectStoreGoogleCredentials),
+    Azure(ClusterBackupBarmanObjectStoreAzureCredentials),
 }
 
 fn create_cluster_backup(
@@ -284,6 +280,8 @@ pub fn cnpg_backup_configuration(
         ))))
     } else if let Some(gcs_creds) = cdb.spec.backup.google_credentials.as_ref() {
         generate_google_backup_credentials(Some(gcs_creds.clone())).map(BackupCredentials::Google)
+    } else if let Some(azure_creds) = cdb.spec.backup.azure_credentials.as_ref() {
+        generate_azure_backup_credentials(Some(azure_creds.clone())).map(BackupCredentials::Azure)
     } else {
         None
     };
@@ -2091,6 +2089,59 @@ fn generate_s3_backup_credentials(
             inherit_from_iam_role: Some(true),
             ..Default::default()
         }
+    }
+}
+
+// generate_azure_backup_credentials function will generate the azure backup credentials from
+// AzureCredentials object and return a ClusterBackupBarmanObjectStoreAzureCredentials object
+#[instrument(fields(trace_id, creds))]
+fn generate_azure_backup_credentials(
+    creds: Option<AzureCredentials>,
+) -> Option<ClusterBackupBarmanObjectStoreAzureCredentials> {
+    match creds {
+        Some(creds) => {
+            // Check if we're inheriting credentials from Azure AD
+            if creds.inherit_from_azure_ad.unwrap_or(false) {
+                Some(ClusterBackupBarmanObjectStoreAzureCredentials {
+                    inherit_from_azure_ad: creds.inherit_from_azure_ad,
+                    ..Default::default()
+                })
+            } else if creds.connection_string.is_some() {
+                // If we're not inheriting from Azure AD, assume we are reading from a Kubernetes secret. 
+                // https://cloudnative-pg.io/documentation/1.16/backup_recovery/#azure-blob-storage
+                Some(ClusterBackupBarmanObjectStoreAzureCredentials {
+                    connection_string: creds.connection_string.as_ref().map(|cs| {
+                        ClusterBackupBarmanObjectStoreAzureCredentialsConnectionString {
+                            key: cs.key.clone(),
+                            name: cs.name.clone(),
+                        }
+                    }),
+                    storage_account: creds.storage_account.as_ref().map(|sa| {
+                        ClusterBackupBarmanObjectStoreAzureCredentialsStorageAccount {
+                            key: sa.key.clone(),
+                            name: sa.name.clone(),
+                        }
+                    }),
+                    storage_key: creds.storage_key.as_ref().map(|sk| {
+                        ClusterBackupBarmanObjectStoreAzureCredentialsStorageKey {
+                            key: sk.key.clone(),
+                            name: sk.name.clone(),
+                        }
+                    }),
+                    storage_sas_token: creds.storage_sas_token.as_ref().map(|st| {
+                        ClusterBackupBarmanObjectStoreAzureCredentialsStorageSasToken {
+                            key: st.key.clone(),
+                            name: st.name.clone(),
+                        }
+                    }),
+                    inherit_from_azure_ad: None,
+                })
+            }
+            else {
+                None
+            }
+        }
+        None => None,
     }
 }
 
