@@ -190,6 +190,84 @@ pub struct GoogleCredentialsApplicationCredentials {
     pub name: String,
 }
 
+/// AzureCredentials is the type for the credentials to be used to upload files to Azure Blob Storage.
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+pub struct AzureCredentials {
+    /// The connection string to be used
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "connectionString"
+    )]
+    pub connection_string: Option<AzureCredentialsConnectionString>,
+    /// Use the Azure AD based authentication without providing explicitly the keys.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "inheritFromAzureAD"
+    )]
+    pub inherit_from_azure_ad: Option<bool>,
+    /// The storage account where to upload data
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "storageAccount"
+    )]
+    pub storage_account: Option<AzureCredentialsStorageAccount>,
+    /// The storage account key to be used in conjunction with the storage account name
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "storageKey"
+    )]
+    pub storage_key: Option<AzureCredentialsStorageKey>,
+    /// A shared-access-signature to be used in conjunction with the storage account name
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "storageSasToken"
+    )]
+    pub storage_sas_token: Option<AzureCredentialsStorageSasToken>,
+}
+
+/// The connection string to be used for Azure Blob Storage backups
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+pub struct AzureCredentialsConnectionString {
+    /// The key to select
+    pub key: String,
+    /// Name of the referent.
+    pub name: String,
+}
+
+/// The storage account for Azure Blob Storage backups
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+pub struct AzureCredentialsStorageAccount {
+    /// The key to select
+    pub key: String,
+    /// Name of the referent.
+    pub name: String,
+}
+
+/// The storage account key to be used in conjunction with the storage account name for Azure Blob
+/// Storage backups
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+pub struct AzureCredentialsStorageKey {
+    /// The key to select
+    pub key: String,
+    /// Name of the referent.
+    pub name: String,
+}
+
+/// A shared-access-signature to be used in conjunction with the storage account name for Azure Blob
+/// Storage backups
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+pub struct AzureCredentialsStorageSasToken {
+    /// The key to select
+    pub key: String,
+    /// Name of the referent.
+    pub name: String,
+}
+
 /// VolumeSnapshots is the type for the configuration of the volume snapshots
 /// to be used for backups instead of object storage
 #[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
