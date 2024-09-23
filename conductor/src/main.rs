@@ -139,7 +139,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
 
     loop {
         // Read from queue (check for new message)
-        // messages that dont fit a CRUDevent will error
+        // messages that don't fit a CRUDevent will error
         // set visibility timeout to 90 seconds
         let read_msg = queue
             .read::<CRUDevent>(&control_plane_events_queue, 90_i32)
@@ -898,6 +898,7 @@ async fn init_gcp_storage_workload_identity(
         retentionPolicy: Some(String::from("30")),
         schedule: Some(generate_cron_expression(&read_msg.message.namespace)),
         s3_credentials: None,
+        azure_credentials: None,
         endpoint_url: None,
         google_credentials: Some(GoogleCredentials {
             gke_environment: Some(true),
