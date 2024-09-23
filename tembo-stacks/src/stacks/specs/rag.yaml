@@ -85,9 +85,9 @@ appServices:
         initialDelaySeconds: 10
 trunk_installs:
   - name: pgmq
-    version: 1.4.2
+    version: 1.4.4
   - name: vectorize
-    version: 0.18.2
+    version: 0.18.3
   - name: pgvector
     version: 0.7.4
   - name: pg_stat_statements
@@ -107,12 +107,12 @@ extensions:
     locations:
     - database: postgres
       enabled: true
-      version: 1.4.2
+      version: 1.4.4
   - name: vectorize
     locations:
     - database: postgres
       enabled: true
-      version: 0.18.2
+      version: 0.18.3
   - name: pg_stat_statements
     locations:
       - database: postgres
