@@ -1,5 +1,5 @@
-name: Search
-description: A Postgres instance that enables full text search over heap tables using the BM25 algorithm.
+name: ParadeDB
+description: Postgres for Search and Analytics
 repository: "quay.io/tembo"
 organization: tembo
 images:
@@ -7,45 +7,41 @@ images:
   15: "standard-cnpg:15-5120dd1"
   16: "standard-cnpg:16-5120dd1"
 stack_version: 0.1.0
-postgres_config_engine: standard
+postgres_config_engine: olap
 postgres_config:
-  - name: autovacuum_vacuum_cost_limit
-    value: -1
   - name: autovacuum_vacuum_scale_factor
     value: 0.05
   - name: autovacuum_vacuum_insert_scale_factor
     value: 0.05
-  - name: autovacuum_analyze_scale_factor
-    value: 0.05
+  - name: checkpoint_completion_target
+    value: 0.95
   - name: checkpoint_timeout
-    value: 10min
-  - name: track_activity_query_size
-    value: 2048
-  - name: wal_compression
-    value: 'on'
-  - name: track_io_timing
-    value: 'on'
-  - name: log_min_duration_statement # https://www.postgresql.org/docs/15/runtime-config-logging.html
-    value: 1000
-  - name: auto_explain.log_min_duration
-    value: 1000ms
-  - name: statement_timeout
-    value: 86400000
+    value: 30min
+  - name: cron.host
+    value: /controller/run
   - name: pg_stat_statements.track
     value: top
   - name: shared_preload_libraries
-    value: pg_stat_statements,auto_explain,pg_search
-  - name: random_page_cost
-    value: 1.1
+    value: pg_stat_statements,pg_cron
+  - name: track_io_timing
+    value: 'on'
+  - name: wal_level
+    value: logical
 trunk_installs:
   - name: pg_stat_statements
     version: 1.10.0
+  - name: pg_analytics
+    version: 0.1.4
   - name: pg_search
     version: 0.10.0
   - name: pg_cron
     version: 1.6.2
   - name: pgvector
     version: 0.7.4
+  - name: vectorscale
+    version: 0.3.0
+  - name: pg_ivm
+    version: 1.9.0
 extensions:
   - name: pg_stat_statements
     locations:
@@ -67,3 +63,19 @@ extensions:
     - database: postgres
       enabled: true
       version: 1.6.2
+  - name: pg_analytics
+    description: pg_analytics
+    locations:
+    - database: postgres
+      enabled: true
+      version: 0.1.2
+  - name: vectorscale
+    locations:
+      - database: postgres
+        enabled: true
+        version: 0.3.0
+  - name: pg_ivm
+    locations:
+    - database: postgres
+      enabled: true
+      version: 1.9
