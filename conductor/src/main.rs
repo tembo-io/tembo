@@ -12,7 +12,10 @@ use conductor::{
 use crate::metrics_reporter::run_metrics_reporter;
 use crate::status_reporter::run_status_reporter;
 use conductor::routes::health::background_threads_running;
-use controller::apis::coredb_types::{AzureCredentials, AzureCredentialsStorageAccount, AzureCredentialsStorageKey, Backup, CoreDBSpec, GoogleCredentials, S3Credentials, ServiceAccountTemplate, VolumeSnapshot};
+use controller::apis::coredb_types::{
+    AzureCredentials, AzureCredentialsStorageAccount, AzureCredentialsStorageKey, Backup,
+    CoreDBSpec, GoogleCredentials, S3Credentials, ServiceAccountTemplate, VolumeSnapshot,
+};
 use controller::apis::postgres_parameters::{ConfigValue, PgConfig};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use kube::Client;
