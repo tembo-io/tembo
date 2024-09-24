@@ -9,7 +9,7 @@ pub mod types;
 
 use crate::aws::cloudformation::{AWSConfigState, CloudFormationParams};
 use aws_sdk_cloudformation::config::Region;
-use controller::apis::coredb_types::{CoreDB, CoreDBSpec};
+use controller::apis::coredb_types::{CoreDB, CoreDBSpec, Restore};
 use errors::ConductorError;
 
 use k8s_openapi::api::core::v1::{Namespace, Secret};
@@ -36,6 +36,9 @@ pub async fn generate_spec(
     backups_bucket: &str,
     spec: &CoreDBSpec,
     is_cloud_formation: bool,
+    is_azure: bool,
+    azure_storage_account: &str,
+    write_path: &str,
 ) -> Value {
     let mut spec = spec.clone();
     // Add the bucket name into the backups_path if it's not already there
@@ -48,7 +51,24 @@ pub async fn generate_spec(
                 *backups_path = format!("s3://{}/{}", backups_bucket, path_suffix);
             }
         }
+        if is_azure {
+            let r = Restore {
+                azure_credentials: spec.backup.azure_credentials.clone(),
+                s3_credentials: None,
+                google_credentials: None,
+                backups_path: Some(format!(
+                    "https://{}.blob.core.windows.net/{}/{}",
+                    azure_storage_account, backups_bucket, write_path
+                )),
+                server_name: restore.server_name.clone(),
+                volume_snapshot: Some(false),
+                endpoint_url: None,
+                recovery_target_time: restore.recovery_target_time.clone(),
+            };
+            spec.restore = Some(r);
+        }
     }
+
     serde_json::json!({
         "apiVersion": "coredb.io/v1alpha1",
         "kind": "CoreDB",
