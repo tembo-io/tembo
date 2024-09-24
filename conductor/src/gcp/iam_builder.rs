@@ -121,7 +121,7 @@ mod tests {
     fn test_add_condition() {
         let condition = Condition {
             title: "test".to_string(),
-            description: "test condition".to_string(),
+            description: Some("test condition".to_string()),
             expression: "resource.type == \"storage.googleapis.com/Bucket\") || (resource.type == \"storage.googleapis.com/Object\"".to_string(),
         };
         let binding = IamBindingBuilder::new()
@@ -138,7 +138,7 @@ mod tests {
     fn test_build_with_all_options() {
         let condition = Condition {
             title: "test".to_string(),
-            description: "test condition".to_string(),
+            description: Some("test condition".to_string()),
             expression: "resource.type == \"storage.googleapis.com/Bucket\") || (resource.type == \"storage.googleapis.com/Object\"".to_string(),
         };
         let binding = IamBindingBuilder::new()

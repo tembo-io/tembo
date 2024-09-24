@@ -270,7 +270,7 @@ impl BucketIamManager {
     fn create_bucket_condition(&self, bucket_name: &str, instance_name: &str) -> Condition {
         Condition {
             title: "allow-bucket-and-path".to_string(),
-            description: "Conductor managed storage bucket IAM policy condition".to_string(),
+            description: Some("Conductor managed storage bucket IAM policy condition".to_string()),
             expression: format!(
                 r#"(resource.type == "storage.googleapis.com/Bucket") || (resource.type == "storage.googleapis.com/Object" && resource.name.startsWith("projects/_/buckets/{}/objects/{}/{}"))"#,
                 bucket_name, BUCKET_PATH_PREFIX, instance_name
