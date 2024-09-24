@@ -375,6 +375,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     &namespace,
                     &backup_archive_bucket,
                     &coredb_spec,
+                    is_cloud_formation,
                 )
                 .await;
 

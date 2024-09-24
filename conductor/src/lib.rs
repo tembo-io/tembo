@@ -35,12 +35,15 @@ pub async fn generate_spec(
     namespace: &str,
     backups_bucket: &str,
     spec: &CoreDBSpec,
+    is_cloud_formation: bool,
 ) -> Value {
     let mut spec = spec.clone();
     // Add the bucket name into the backups_path if it's not already there
+
     if let Some(restore) = &mut spec.restore {
         if let Some(backups_path) = &mut restore.backups_path {
-            if !backups_path.starts_with(&format!("s3://{}", backups_bucket)) {
+            if !backups_path.starts_with(&format!("s3://{}", backups_bucket)) && is_cloud_formation
+            {
                 let path_suffix = backups_path.trim_start_matches("s3://");
                 *backups_path = format!("s3://{}/{}", backups_bucket, path_suffix);
             }
