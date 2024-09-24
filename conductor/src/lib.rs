@@ -58,7 +58,7 @@ pub async fn generate_spec(
                 google_credentials: None,
                 backups_path: Some(format!(
                     "https://{}.blob.core.windows.net/{}/{}",
-                    azure_storage_account, backups_bucket, write_path
+                    azure_storage_account, backups_bucket, restore.server_name.clone()
                 )),
                 server_name: restore.server_name.clone(),
                 volume_snapshot: Some(false),
