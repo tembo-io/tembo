@@ -15,6 +15,7 @@ RUN SQLX_OFFLINE=true cargo build --release
 
 FROM rust:1.79.0-slim-buster
 
+COPY --from=builder /build/target/release/gateway-daemon /usr/local/bin/gateway-daemon
 COPY --from=builder /build/target/release/gateway /usr/local/bin/gateway
 
 CMD ["gateway"]
