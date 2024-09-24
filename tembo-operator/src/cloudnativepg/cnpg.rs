@@ -147,6 +147,7 @@ fn create_cluster_backup_barman_object_store(
     backup_path: &str,
     credentials: Option<BackupCredentials>,
 ) -> ClusterBackupBarmanObjectStore {
+    info!("Using backup credentials {:?}", credentials);
     // For backwards compatibility, default to inherited IAM role
     let credentials = credentials.unwrap_or(BackupCredentials::S3(
         ClusterBackupBarmanObjectStoreS3Credentials {
@@ -220,6 +221,7 @@ fn create_cluster_backup_volume_snapshot(cdb: &CoreDB) -> ClusterBackupVolumeSna
     }
 }
 
+#[derive(Debug)]
 enum BackupCredentials {
     S3(ClusterBackupBarmanObjectStoreS3Credentials),
     Google(ClusterBackupBarmanObjectStoreGoogleCredentials),
@@ -2127,16 +2129,11 @@ fn generate_azure_backup_credentials(
                     inherit_from_azure_ad: creds.inherit_from_azure_ad,
                     ..Default::default()
                 })
-            } else if creds.connection_string.is_some() {
+            } else if creds.storage_key.is_some() {
                 // If we're not inheriting from Azure AD, assume we are reading from a Kubernetes secret.
                 // https://cloudnative-pg.io/documentation/1.16/backup_recovery/#azure-blob-storage
                 Some(ClusterBackupBarmanObjectStoreAzureCredentials {
-                    connection_string: creds.connection_string.as_ref().map(|cs| {
-                        ClusterBackupBarmanObjectStoreAzureCredentialsConnectionString {
-                            key: cs.key.clone(),
-                            name: cs.name.clone(),
-                        }
-                    }),
+                    connection_string: None,
                     storage_account: creds.storage_account.as_ref().map(|sa| {
                         ClusterBackupBarmanObjectStoreAzureCredentialsStorageAccount {
                             key: sa.key.clone(),
@@ -2149,12 +2146,7 @@ fn generate_azure_backup_credentials(
                             name: sk.name.clone(),
                         }
                     }),
-                    storage_sas_token: creds.storage_sas_token.as_ref().map(|st| {
-                        ClusterBackupBarmanObjectStoreAzureCredentialsStorageSasToken {
-                            key: st.key.clone(),
-                            name: st.name.clone(),
-                        }
-                    }),
+                    storage_sas_token: None,
                     inherit_from_azure_ad: None,
                 })
             } else {
