@@ -667,6 +667,10 @@ mod tests {
             "namespace",
             "my-bucket",
             &spec,
+            true,
+            false,
+            "",
+            "",
         )
         .await;
         let expected_backups_path = "s3://my-bucket/coredb/coredb/org-coredb-inst-pgtrunkio-dev";
@@ -695,6 +699,10 @@ mod tests {
             "namespace",
             "my-bucket",
             &spec,
+            true,
+            false,
+            "",
+            "",
         )
         .await;
         let expected_backups_path = "s3://my-bucket/coredb/coredb/org-coredb-inst-pgtrunkio-dev";
@@ -721,6 +729,10 @@ mod tests {
             "namespace",
             "my-bucket",
             &spec,
+            true,
+            false,
+            "",
+            "",
         )
         .await;
         assert!(result["spec"]["restore"]["backupsPath"].is_null());
@@ -740,6 +752,10 @@ mod tests {
             "namespace",
             "my-bucket",
             &spec,
+            true,
+            false,
+            "",
+            "",
         )
         .await;
         assert!(result["spec"]["restore"].is_null());
