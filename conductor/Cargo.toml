@@ -35,7 +35,7 @@ sqlx = { version = "0.7", features = ["runtime-tokio-native-tls", "postgres"] }
 anyhow = "1.0.82"
 serde_yaml = "0.9.34"
 reqwest = { version = "0.12.3", features = ["json"] }
-google-cloud-storage = "0.22"
+google-cloud-storage = "0.22.1"
 
 [dependencies.kube]
 features = ["runtime", "client", "derive"]
