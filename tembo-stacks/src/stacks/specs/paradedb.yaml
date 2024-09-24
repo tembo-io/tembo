@@ -22,7 +22,7 @@ postgres_config:
   - name: pg_stat_statements.track
     value: top
   - name: shared_preload_libraries
-    value: pg_stat_statements,pg_cron
+    value: pg_stat_statements,pg_search,pg_analytics,pg_cron
   - name: track_io_timing
     value: 'on'
   - name: wal_level
@@ -33,7 +33,7 @@ trunk_installs:
   - name: pg_analytics
     version: 0.1.4
   - name: pg_search
-    version: 0.10.0
+    version: 0.10.1
   - name: pg_cron
     version: 1.6.2
   - name: pgvector
@@ -52,7 +52,7 @@ extensions:
     locations:
       - database: postgres
         enabled: true
-        version: 0.10.0
+        version: 0.10.1
   - name: vector
     locations:
       - database: postgres
