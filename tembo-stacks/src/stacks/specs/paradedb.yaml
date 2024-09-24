@@ -22,7 +22,7 @@ postgres_config:
   - name: pg_stat_statements.track
     value: top
   - name: shared_preload_libraries
-    value: pg_stat_statements,pg_cron
+    value: pg_stat_statements,pg_search,pg_analytics,pg_cron
   - name: track_io_timing
     value: 'on'
   - name: wal_level
