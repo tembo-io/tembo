@@ -317,10 +317,7 @@ fn beautify_logs(json_data: &str, app_name: Option<String>) -> Result<()> {
                                         &value[1]
                                     ),
                                 };
-                                entries
-                                    .entry(date_time)
-                                    .or_default()
-                                    .push(log_detail);
+                                entries.entry(date_time).or_default().push(log_detail);
                             }
                             _ => eprintln!("Invalid or ambiguous timestamp: {}", unix_timestamp),
                         }

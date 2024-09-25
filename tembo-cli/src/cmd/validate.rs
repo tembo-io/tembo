@@ -136,7 +136,7 @@ fn validate_stack_in_toml(config: &HashMap<String, InstanceSettings>) -> Result<
             || (settings.stack_file.is_none() && settings.stack_type.is_none())
         {
             return Err(Error::msg(
-                "You can only have either a stack_file or stack_type in tembo.toml file"
+                "You can only have either a stack_file or stack_type in tembo.toml file",
             ));
         }
     }

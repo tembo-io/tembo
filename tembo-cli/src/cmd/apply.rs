@@ -715,7 +715,7 @@ fn get_app_services(
                 tembo_stacks::apps::types::AppType::AIProxy(maybe_app_config) => vec_app_types
                     .push(temboclient::models::AppType::new(
                         get_final_app_config(maybe_app_config)?,
-                        None, 
+                        None,
                         None,
                         None,
                         None,
@@ -727,7 +727,7 @@ fn get_app_services(
                         get_final_app_config(maybe_app_config)?,
                         None,
                         None,
-                        None, 
+                        None,
                         None,
                         None,
                         None,
@@ -735,7 +735,7 @@ fn get_app_services(
                 tembo_stacks::apps::types::AppType::HTTP(maybe_app_config) => {
                     vec_app_types.push(temboclient::models::AppType::new(
                         None,
-                        None, 
+                        None,
                         get_final_app_config(maybe_app_config)?,
                         None,
                         None,
@@ -747,7 +747,7 @@ fn get_app_services(
                     vec_app_types.push(temboclient::models::AppType::new(
                         None,
                         None,
-                        None, 
+                        None,
                         get_final_app_config(maybe_app_config)?,
                         None,
                         None,
@@ -757,7 +757,7 @@ fn get_app_services(
                 tembo_stacks::apps::types::AppType::Embeddings(maybe_app_config) => vec_app_types
                     .push(temboclient::models::AppType::new(
                         None,
-                        None, 
+                        None,
                         None,
                         None,
                         get_final_app_config(maybe_app_config)?,
@@ -768,7 +768,7 @@ fn get_app_services(
                     .push(temboclient::models::AppType::new(
                         None,
                         None,
-                        None, 
+                        None,
                         None,
                         None,
                         get_final_app_config(maybe_app_config)?,

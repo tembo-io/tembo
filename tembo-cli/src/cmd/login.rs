@@ -274,9 +274,7 @@ pub fn update_profile(
 }
 
 fn append_to_file(file_path: &str, content: String) -> io::Result<()> {
-    let mut file = OpenOptions::new()
-        .append(true)
-        .open(file_path)?;
+    let mut file = OpenOptions::new().append(true).open(file_path)?;
     writeln!(file, "{}", content)?;
     Ok(())
 }
