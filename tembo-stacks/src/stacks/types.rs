@@ -28,7 +28,6 @@ use utoipa::ToSchema;
     strum_macros::Display,
 )]
 pub enum StackType {
-    Search,
     Analytics,
     API,
     DataWarehouse,
@@ -51,7 +50,6 @@ impl std::str::FromStr for StackType {
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
-            "Search" => Ok(StackType::Search),
             "Analytics" => Ok(StackType::Analytics),
             "API" => Ok(StackType::API),
             "DataWarehouse" => Ok(StackType::DataWarehouse),
@@ -74,7 +72,6 @@ impl std::str::FromStr for StackType {
 impl StackType {
     pub fn as_str(&self) -> &str {
         match self {
-            StackType::Search => "Search",
             StackType::Analytics => "Analytics",
             StackType::API => "API",
             StackType::DataWarehouse => "DataWarehouse",
@@ -300,9 +297,6 @@ mod tests {
     fn test_all_stack_deserialization() {
         for stack in StackType::iter() {
             match stack {
-                StackType::Search => {
-                    get_stack(StackType::Search);
-                }
                 StackType::Analytics => {
                     get_stack(StackType::Analytics);
                 }
