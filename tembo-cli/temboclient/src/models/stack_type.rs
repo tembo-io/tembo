@@ -35,6 +35,12 @@ pub enum StackType {
     Rag,
     #[serde(rename = "Timeseries")]
     Timeseries,
+    #[serde(rename = "API")]
+    API,
+    #[serde(rename = "ParadeDB")]
+    ParadeDB,
+
+
 }
 
 impl ToString for StackType {
@@ -52,6 +58,8 @@ impl ToString for StackType {
             Self::MongoAlternative => String::from("MongoAlternative"),
             Self::Rag => String::from("RAG"),
             Self::Timeseries => String::from("Timeseries"),
+            Self::API => String::from("API"),
+            Self::API => String::from("ParadeDB"),
         }
     }
 }
