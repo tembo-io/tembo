@@ -57,7 +57,7 @@ impl ToString for StackType {
             Self::Rag => String::from("RAG"),
             Self::Timeseries => String::from("Timeseries"),
             Self::API => String::from("API"),
-            Self::API => String::from("ParadeDB"),
+            Self::ParadeDB => String::from("ParadeDB"),
         }
     }
 }
