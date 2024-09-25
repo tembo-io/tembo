@@ -19,6 +19,8 @@ postgres_config:
     value: 30min
   - name: cron.host
     value: /controller/run
+  - name: cron.use_background_workers
+    value: 'on'
   - name: pg_stat_statements.track
     value: top
   - name: shared_preload_libraries
@@ -48,7 +50,7 @@ trunk_installs:
     version: 0.3.1
   - name: multicorn
     version: 2.5.0
-  - name: pg_tier 
+  - name: pg_tier
     version: 0.0.5
 extensions:
   - name: pg_stat_statements
@@ -101,8 +103,8 @@ extensions:
       - database: postgres
         enabled: true
         version: 2.5.0
-  - name: pg_tier 
-    description: pg_tier 
+  - name: pg_tier
+    description: pg_tier
     locations:
       - database: postgres
         enabled: true

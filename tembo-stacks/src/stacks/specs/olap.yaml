@@ -20,6 +20,8 @@ postgres_config:
     value: 30min
   - name: cron.host
     value: /controller/run
+  - name: cron.use_background_workers
+    value: 'on'
   - name: pg_stat_statements.track
     value: top
   - name: shared_preload_libraries
@@ -45,7 +47,7 @@ trunk_installs:
     version: 1.0.0
   - name: parquet_s3_fdw
     version: 1.1.0
-  - name: pg_tier 
+  - name: pg_tier
     version: 0.0.4
 extensions:
   - name: pg_stat_statements

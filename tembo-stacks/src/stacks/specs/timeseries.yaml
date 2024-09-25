@@ -11,6 +11,8 @@ postgres_config_engine: olap
 postgres_config:
   - name: cron.host
     value: /controller/run
+  - name: cron.use_background_workers
+    value: 'on'
   - name: autovacuum_vacuum_scale_factor
     value: 0.05
   - name: autovacuum_vacuum_insert_scale_factor

@@ -16,6 +16,8 @@ postgres_config:
     value: all
   - name: cron.host
     value: /controller/run
+  - name: cron.use_background_workers
+    value: 'on'
   - name: track_io_timing
     value: 'on'
   - name: shared_preload_libraries
