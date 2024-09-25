@@ -41,8 +41,7 @@ pub async fn generate_spec(
 
     if let Some(restore) = &mut spec.restore {
         if let Some(backups_path) = &mut restore.backups_path {
-            if !backups_path.starts_with(&format!("s3://{}", backups_bucket))
-            {
+            if !backups_path.starts_with(&format!("s3://{}", backups_bucket)) {
                 let path_suffix = backups_path.trim_start_matches("s3://");
                 *backups_path = format!("s3://{}/{}", backups_bucket, path_suffix);
             }
