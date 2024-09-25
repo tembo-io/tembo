@@ -375,14 +375,6 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     &namespace,
                     &backup_archive_bucket,
                     &coredb_spec,
-                    is_cloud_formation,
-                    is_azure,
-                    &azure_storage_account,
-                    &read_msg
-                        .message
-                        .backups_write_path
-                        .clone()
-                        .unwrap_or(format!("v2/{}", read_msg.message.namespace)),
                 )
                 .await;
 

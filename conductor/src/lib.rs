@@ -35,43 +35,19 @@ pub async fn generate_spec(
     namespace: &str,
     backups_bucket: &str,
     spec: &CoreDBSpec,
-    is_cloud_formation: bool,
-    is_azure: bool,
-    azure_storage_account: &str,
-    write_path: &str,
 ) -> Value {
     let mut spec = spec.clone();
     // Add the bucket name into the backups_path if it's not already there
 
     if let Some(restore) = &mut spec.restore {
         if let Some(backups_path) = &mut restore.backups_path {
-            if !backups_path.starts_with(&format!("s3://{}", backups_bucket)) && is_cloud_formation
+            if !backups_path.starts_with(&format!("s3://{}", backups_bucket))
             {
                 let path_suffix = backups_path.trim_start_matches("s3://");
                 *backups_path = format!("s3://{}/{}", backups_bucket, path_suffix);
             }
         }
-        if is_azure {
-            let r = Restore {
-                azure_credentials: spec.backup.azure_credentials.clone(),
-                s3_credentials: None,
-                google_credentials: None,
-                backups_path: Some(format!(
-                    "https://{}.blob.core.windows.net/{}/{}/{}",
-                    azure_storage_account,
-                    backups_bucket,
-                    restore.server_name.clone(),
-                    restore.server_name.clone()
-                )),
-                server_name: restore.server_name.clone(),
-                volume_snapshot: Some(false),
-                endpoint_url: None,
-                recovery_target_time: restore.recovery_target_time.clone(),
-            };
-            spec.restore = Some(r);
-        }
     }
-
     serde_json::json!({
         "apiVersion": "coredb.io/v1alpha1",
         "kind": "CoreDB",
@@ -670,10 +646,6 @@ mod tests {
             "namespace",
             "my-bucket",
             &spec,
-            true,
-            false,
-            "",
-            "",
         )
         .await;
         let expected_backups_path = "s3://my-bucket/coredb/coredb/org-coredb-inst-pgtrunkio-dev";
@@ -702,10 +674,6 @@ mod tests {
             "namespace",
             "my-bucket",
             &spec,
-            true,
-            false,
-            "",
-            "",
         )
         .await;
         let expected_backups_path = "s3://my-bucket/coredb/coredb/org-coredb-inst-pgtrunkio-dev";
@@ -732,10 +700,6 @@ mod tests {
             "namespace",
             "my-bucket",
             &spec,
-            true,
-            false,
-            "",
-            "",
         )
         .await;
         assert!(result["spec"]["restore"]["backupsPath"].is_null());
@@ -755,10 +719,6 @@ mod tests {
             "namespace",
             "my-bucket",
             &spec,
-            true,
-            false,
-            "",
-            "",
         )
         .await;
         assert!(result["spec"]["restore"].is_null());
