@@ -49,7 +49,7 @@ struct TokenRequest {
 pub fn execute(login_cmd: LoginCommand) -> Result<(), anyhow::Error> {
     let _ = list_context();
     let context_file_path = tembo_context_file_path();
-    let contents = fs::read_to_string(&context_file_path)?;
+    let contents = fs::read_to_string(context_file_path)?;
     let data: Context = toml::from_str(&contents)?;
 
     match (&login_cmd.organization_id, &login_cmd.profile) {
@@ -110,7 +110,7 @@ async fn handle_tokio(login_url: String, cmd: &LoginCommand) -> Result<(), anyho
 
     let result = time::timeout(Duration::from_secs(30), notify.notified()).await;
     if let Some(token) = shared_state_clone.token.lock().unwrap().as_ref() {
-        let _ = execute_command(&cmd, token);
+        let _ = execute_command(cmd, token);
     } else {
         println!("No token was received.");
     }
@@ -274,10 +274,7 @@ pub fn update_profile(
 }
 
 fn append_to_file(file_path: &str, content: String) -> io::Result<()> {
-    let mut file = OpenOptions::new()
-        .write(true)
-        .append(true)
-        .open(file_path)?;
+    let mut file = OpenOptions::new().append(true).open(file_path)?;
     writeln!(file, "{}", content)?;
     Ok(())
 }
