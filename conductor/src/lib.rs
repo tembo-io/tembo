@@ -9,7 +9,7 @@ pub mod types;
 
 use crate::aws::cloudformation::{AWSConfigState, CloudFormationParams};
 use aws_sdk_cloudformation::config::Region;
-use controller::apis::coredb_types::{CoreDB, CoreDBSpec, Restore};
+use controller::apis::coredb_types::{CoreDB, CoreDBSpec};
 use errors::ConductorError;
 
 use k8s_openapi::api::core::v1::{Namespace, Secret};
@@ -38,7 +38,6 @@ pub async fn generate_spec(
 ) -> Value {
     let mut spec = spec.clone();
     // Add the bucket name into the backups_path if it's not already there
-
     if let Some(restore) = &mut spec.restore {
         if let Some(backups_path) = &mut restore.backups_path {
             if !backups_path.starts_with(&format!("s3://{}", backups_bucket)) {

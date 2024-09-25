@@ -13,8 +13,7 @@ use crate::metrics_reporter::run_metrics_reporter;
 use crate::status_reporter::run_status_reporter;
 use conductor::routes::health::background_threads_running;
 use controller::apis::coredb_types::{
-    AzureCredentials, AzureCredentialsStorageAccount, AzureCredentialsStorageKey, Backup,
-    CoreDBSpec, GoogleCredentials, S3Credentials, ServiceAccountTemplate, VolumeSnapshot,
+    Backup, CoreDBSpec, GoogleCredentials, S3Credentials, ServiceAccountTemplate, VolumeSnapshot,
 };
 use controller::apis::postgres_parameters::{ConfigValue, PgConfig};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
@@ -34,12 +33,12 @@ use types::{CRUDevent, Event};
 mod metrics_reporter;
 mod status_reporter;
 
-// Amount of time to wait after re-queueing a message for an expected failure,
+// Amount of time to wait after requeueing a message for an expected failure,
 // where we will want to check often until it's ready.
 const REQUEUE_VT_SEC_SHORT: i32 = 5;
 
-// Amount of time to wait after re-queueing a message for an unexpected failure
-// that we would want to try again after a while.
+// Amount of time to wait after requeueing a message for an unexpected failure
+// that we would want to try again after awhile.
 const REQUEUE_VT_SEC_LONG: i32 = 300;
 
 async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
@@ -85,14 +84,6 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         .unwrap_or_else(|_| "".to_owned())
         .parse()
         .expect("error parsing GCP_PROJECT_NUMBER");
-    let is_azure: bool = env::var("IS_AZURE")
-        .unwrap_or_else(|_| "false".to_owned())
-        .parse()
-        .expect("error parsing IS_AZURE");
-    let azure_storage_account: String = env::var("AZURE_STORAGE_ACCOUNT")
-        .unwrap_or_else(|_| "".to_owned())
-        .parse()
-        .expect("error parsing AZURE_STORAGE_ACCOUNT");
 
     // Error and exit if CF_TEMPLATE_BUCKET is not set when IS_CLOUD_FORMATION is enabled
     if is_cloud_formation && cf_template_bucket.is_empty() {
@@ -148,7 +139,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
 
     loop {
         // Read from queue (check for new message)
-        // messages that don't fit a CRUDevent will error
+        // messages that dont fit a CRUDevent will error
         // set visibility timeout to 90 seconds
         let read_msg = queue
             .read::<CRUDevent>(&control_plane_events_queue, 90_i32)
@@ -339,15 +330,6 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     &mut coredb_spec,
                     backup_archive_bucket.clone(),
                     storage_archive_bucket.clone(),
-                )
-                .await?;
-
-                init_azure_storage(
-                    is_azure,
-                    &read_msg,
-                    &mut coredb_spec,
-                    backup_archive_bucket.clone(),
-                    azure_storage_account.clone(),
                 )
                 .await?;
 
@@ -916,68 +898,11 @@ async fn init_gcp_storage_workload_identity(
         retentionPolicy: Some(String::from("30")),
         schedule: Some(generate_cron_expression(&read_msg.message.namespace)),
         s3_credentials: None,
-        azure_credentials: None,
         endpoint_url: None,
         google_credentials: Some(GoogleCredentials {
             gke_environment: Some(true),
             ..Default::default()
         }),
-        volume_snapshot,
-    };
-
-    coredb_spec.backup = backup;
-
-    Ok(())
-}
-
-async fn init_azure_storage(
-    is_azure: bool,
-    read_msg: &Message<CRUDevent>,
-    coredb_spec: &mut CoreDBSpec,
-    backup_archive_bucket: String,
-    azure_storage_account: String,
-) -> Result<(), ConductorError> {
-    if !is_azure {
-        return Ok(());
-    }
-
-    // Generate Backup spec for CoreDB
-
-    let volume_snapshot = Some(VolumeSnapshot {
-        enabled: false,
-        snapshot_class: None,
-    });
-
-    let write_path = read_msg
-        .message
-        .backups_write_path
-        .clone()
-        .unwrap_or("v2".to_string());
-
-    let backup = Backup {
-        destinationPath: Some(format!(
-            "https://{}.blob.core.windows.net/{}/{}",
-            azure_storage_account, backup_archive_bucket, write_path
-        )),
-        encryption: Some(String::from("AES256")),
-        retentionPolicy: Some(String::from("30")),
-        schedule: Some(generate_cron_expression(&read_msg.message.namespace)),
-        s3_credentials: None,
-        azure_credentials: Some(AzureCredentials {
-            connection_string: None,
-            inherit_from_azure_ad: None,
-            storage_account: Some(AzureCredentialsStorageAccount {
-                key: "AZURE_STORAGE_ACCOUNT".to_string(),
-                name: "azure-creds".to_string(),
-            }),
-            storage_key: Some(AzureCredentialsStorageKey {
-                key: "AZURE_STORAGE_KEY".to_string(),
-                name: "azure-creds".to_string(),
-            }),
-            storage_sas_token: None,
-        }),
-        endpoint_url: None,
-        google_credentials: None,
         volume_snapshot,
     };
 
