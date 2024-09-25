@@ -268,7 +268,7 @@ fn docker_apply_instance(
         let mut file_path = PathBuf::from(FileUtils::get_current_working_dir());
         let stack_file = instance_setting.stack_file.clone().unwrap();
         let cleaned_stack_file = stack_file.trim_matches('"');
-        file_path.push(format!("{}", cleaned_stack_file));
+        file_path.push(cleaned_stack_file);
 
         let config_data = fs::read_to_string(&file_path).expect("File not found in the directory");
         stack = serde_yaml::from_str(&config_data).expect("Invalid YAML File");
@@ -685,7 +685,7 @@ fn get_create_instance(
         )
         .unwrap(),
         instance_name: instance_settings.instance_name.clone(),
-        stack_type: StackType::from_str(&instance_settings.stack_type.as_ref().unwrap()).unwrap(),
+        stack_type: StackType::from_str(instance_settings.stack_type.as_ref().unwrap()).unwrap(),
         storage: Storage::from_str(instance_settings.storage.as_str()).unwrap(),
         replicas: Some(instance_settings.replicas),
         app_services: get_app_services(instance_settings.app_services.clone())?,
@@ -712,11 +712,22 @@ fn get_app_services(
     if let Some(app_services) = maybe_app_services {
         for app_type in app_services.iter() {
             match app_type {
+                tembo_stacks::apps::types::AppType::AIProxy(maybe_app_config) => vec_app_types
+                    .push(temboclient::models::AppType::new(
+                        get_final_app_config(maybe_app_config)?,
+                        None, 
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                    )),
                 tembo_stacks::apps::types::AppType::RestAPI(maybe_app_config) => vec_app_types
                     .push(temboclient::models::AppType::new(
                         get_final_app_config(maybe_app_config)?,
                         None,
                         None,
+                        None, 
                         None,
                         None,
                         None,
@@ -724,6 +735,7 @@ fn get_app_services(
                 tembo_stacks::apps::types::AppType::HTTP(maybe_app_config) => {
                     vec_app_types.push(temboclient::models::AppType::new(
                         None,
+                        None, 
                         get_final_app_config(maybe_app_config)?,
                         None,
                         None,
@@ -735,6 +747,7 @@ fn get_app_services(
                     vec_app_types.push(temboclient::models::AppType::new(
                         None,
                         None,
+                        None, 
                         get_final_app_config(maybe_app_config)?,
                         None,
                         None,
@@ -744,6 +757,7 @@ fn get_app_services(
                 tembo_stacks::apps::types::AppType::Embeddings(maybe_app_config) => vec_app_types
                     .push(temboclient::models::AppType::new(
                         None,
+                        None, 
                         None,
                         None,
                         get_final_app_config(maybe_app_config)?,
@@ -754,13 +768,14 @@ fn get_app_services(
                     .push(temboclient::models::AppType::new(
                         None,
                         None,
+                        None, 
                         None,
                         None,
                         get_final_app_config(maybe_app_config)?,
                         None,
                     )),
                 tembo_stacks::apps::types::AppType::Custom(_) => vec_app_types.push(
-                    temboclient::models::AppType::new(None, None, None, None, None, None),
+                    temboclient::models::AppType::new(None, None, None, None, None, None, None),
                 ),
             }
         }
@@ -944,7 +959,7 @@ fn get_extensions(
                 vec![ExtensionInstallLocation {
                     database: Some("postgres".to_string()),
                     schema: None,
-                    version: version,
+                    version,
                     enabled: extension.enabled.unwrap_or(false),
                 }];
 
@@ -1002,7 +1017,7 @@ fn get_trunk_installs(
             if extension.trunk_project.is_some() {
                 vec_trunk_installs.push(TrunkInstall {
                     name: extension.trunk_project.unwrap(),
-                    version: version,
+                    version,
                 });
             }
         }
