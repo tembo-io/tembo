@@ -960,7 +960,7 @@ async fn init_azure_storage(
         .message
         .backups_write_path
         .clone()
-        .unwrap_or(format!("v2/{}", read_msg.message.namespace));
+        .unwrap_or("v2".to_string());
 
     let backup = Backup {
         destinationPath: Some(format!(
