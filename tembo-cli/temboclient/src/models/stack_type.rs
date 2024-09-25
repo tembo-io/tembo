@@ -39,8 +39,6 @@ pub enum StackType {
     API,
     #[serde(rename = "ParadeDB")]
     ParadeDB,
-
-
 }
 
 impl ToString for StackType {

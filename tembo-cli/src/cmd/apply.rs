@@ -760,14 +760,14 @@ fn get_app_services(
                         None,
                     )),
                 tembo_stacks::apps::types::AppType::AIProxy(maybe_app_config) => vec_app_types
-                .push(temboclient::models::AppType::new(
-                    None,
-                    None,
-                    None,
-                    None,
-                    get_final_app_config(maybe_app_config)?,
-                    None,
-                )),
+                    .push(temboclient::models::AppType::new(
+                        None,
+                        None,
+                        None,
+                        None,
+                        get_final_app_config(maybe_app_config)?,
+                        None,
+                    )),
                 tembo_stacks::apps::types::AppType::Custom(_) => vec_app_types.push(
                     temboclient::models::AppType::new(None, None, None, None, None, None),
                 ),
