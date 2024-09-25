@@ -35,18 +35,30 @@ pub async fn generate_spec(
     namespace: &str,
     backups_bucket: &str,
     spec: &CoreDBSpec,
-) -> Value {
+) -> Result<Value, ConductorError> {
     let mut spec = spec.clone();
+    let cloud_provider = data_plane_id.split('_').next().unwrap_or("");
+    let (prefix, trim_prefix) = match cloud_provider {
+        "aws" => ("s3://", "s3://"),
+        "gcp" => ("gs://", "gs://"),
+        _ => {
+            return Err(ConductorError::DataplaneError(format!(
+                "Unsupported cloud provider in data_plane_id: {}",
+                data_plane_id
+            )))
+        }
+    };
+
     // Add the bucket name into the backups_path if it's not already there
     if let Some(restore) = &mut spec.restore {
         if let Some(backups_path) = &mut restore.backups_path {
-            if !backups_path.starts_with(&format!("s3://{}", backups_bucket)) {
-                let path_suffix = backups_path.trim_start_matches("s3://");
-                *backups_path = format!("s3://{}/{}", backups_bucket, path_suffix);
+            if !backups_path.starts_with(&format!("{}{}", prefix, backups_bucket)) {
+                let path_suffix = backups_path.trim_start_matches(trim_prefix);
+                *backups_path = format!("{}{}/{}", prefix, backups_bucket, path_suffix);
             }
         }
     }
-    serde_json::json!({
+    Ok(serde_json::json!({
         "apiVersion": "coredb.io/v1alpha1",
         "kind": "CoreDB",
         "metadata": {
@@ -59,7 +71,7 @@ pub async fn generate_spec(
             }
         },
         "spec": spec,
-    })
+    }))
 }
 
 pub fn get_data_plane_id_from_coredb(coredb: &CoreDB) -> Result<String, Box<ConductorError>> {
@@ -640,12 +652,13 @@ mod tests {
             "org-id",
             "entity-name",
             "instance-id",
-            "data-plane-id",
+            "aws_data_1_use1",
             "namespace",
             "my-bucket",
             &spec,
         )
-        .await;
+        .await
+        .expect("Failed to generate spec");
         let expected_backups_path = "s3://my-bucket/coredb/coredb/org-coredb-inst-pgtrunkio-dev";
         assert_eq!(
             result["spec"]["restore"]["backupsPath"].as_str().unwrap(),
@@ -668,12 +681,13 @@ mod tests {
             "org-id",
             "entity-name",
             "instance-id",
-            "data-plane-id",
+            "aws_data_1_use1",
             "namespace",
             "my-bucket",
             &spec,
         )
-        .await;
+        .await
+        .expect("Failed to generate spec");
         let expected_backups_path = "s3://my-bucket/coredb/coredb/org-coredb-inst-pgtrunkio-dev";
         assert_eq!(
             result["spec"]["restore"]["backupsPath"].as_str().unwrap(),
@@ -694,12 +708,13 @@ mod tests {
             "org-id",
             "entity-name",
             "instance-id",
-            "data-plane-id",
+            "aws_data_1_use1",
             "namespace",
             "my-bucket",
             &spec,
         )
-        .await;
+        .await
+        .expect("Failed to generate spec");
         assert!(result["spec"]["restore"]["backupsPath"].is_null());
     }
 
@@ -713,12 +728,67 @@ mod tests {
             "org-id",
             "entity-name",
             "instance-id",
-            "data-plane-id",
+            "aws_data_1_use1",
             "namespace",
             "my-bucket",
             &spec,
         )
-        .await;
+        .await
+        .expect("Failed to generate spec");
         assert!(result["spec"]["restore"].is_null());
+    }
+
+    #[tokio::test]
+    async fn test_generate_spec_with_gcp_bucket() {
+        let spec = CoreDBSpec {
+            restore: Some(Restore {
+                backups_path: Some("v2/test-instance".to_string()),
+                ..Restore::default()
+            }),
+            ..CoreDBSpec::default()
+        };
+        let result = generate_spec(
+            "org-id",
+            "entity-name",
+            "instance-id",
+            "gcp_data_1_usc1",
+            "namespace",
+            "my-bucket",
+            &spec,
+        )
+        .await
+        .expect("Failed to generate spec");
+        let expected_backups_path = "gs://my-bucket/v2/test-instance";
+        assert_eq!(
+            result["spec"]["restore"]["backupsPath"].as_str().unwrap(),
+            expected_backups_path
+        );
+    }
+
+    #[tokio::test]
+    async fn test_generate_spec_with_gcp_bucket_full_path() {
+        let spec = CoreDBSpec {
+            restore: Some(Restore {
+                backups_path: Some("gs://my-bucket/v2/test-instance".to_string()),
+                ..Restore::default()
+            }),
+            ..CoreDBSpec::default()
+        };
+        let result = generate_spec(
+            "org-id",
+            "entity-name",
+            "instance-id",
+            "gcp_data_1_usc1",
+            "namespace",
+            "my-bucket",
+            &spec,
+        )
+        .await
+        .expect("Failed to generate spec");
+        let expected_backups_path = "gs://my-bucket/v2/test-instance";
+        assert_eq!(
+            result["spec"]["restore"]["backupsPath"].as_str().unwrap(),
+            expected_backups_path
+        );
     }
 }

@@ -358,7 +358,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     &backup_archive_bucket,
                     &coredb_spec,
                 )
-                .await;
+                .await?;
 
                 info!("{}: Creating or updating spec", read_msg.msg_id);
                 // create or update CoreDB
