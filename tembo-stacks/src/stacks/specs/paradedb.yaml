@@ -19,6 +19,8 @@ postgres_config:
     value: 30min
   - name: cron.host
     value: /controller/run
+  - name: cron.use_background_workers
+    value: 'on'
   - name: pg_stat_statements.track
     value: top
   - name: shared_preload_libraries

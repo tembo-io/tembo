@@ -34,9 +34,13 @@ postgres_config:
   - name: pg_stat_statements.track
     value: top
   - name: shared_preload_libraries
-    value: pg_stat_statements,auto_explain,pg_search
+    value: pg_stat_statements,auto_explain,pg_search,pg_cron
   - name: random_page_cost
     value: 1.1
+  - name: cron.host
+    value: /controller/run
+  - name: cron.use_background_workers
+    value: 'on'
 trunk_installs:
   - name: pg_stat_statements
     version: 1.10.0
