@@ -36,10 +36,8 @@ pub fn execute(verbose: bool) -> Result<(), anyhow::Error> {
             tembo_credentials_file_path()
         );
         has_error = true
-    } else {
-        if get_current_context()?.target == Target::TemboCloud.to_string() {
-            list_credential_profiles()?;
-        }
+    } else if get_current_context()?.target == Target::TemboCloud.to_string() {
+        list_credential_profiles()?;
     }
     if verbose {
         info("Credentials file exists");
@@ -135,9 +133,9 @@ fn validate_stack_in_toml(config: &HashMap<String, InstanceSettings>) -> Result<
         if (settings.stack_file.is_some() && settings.stack_type.is_some())
             || (settings.stack_file.is_none() && settings.stack_type.is_none())
         {
-            return Err(Error::msg(format!(
-                "You can only have either a stack_file or stack_type in tembo.toml file"
-            )));
+            return Err(Error::msg(
+                "You can only have either a stack_file or stack_type in tembo.toml file",
+            ));
         }
     }
 
