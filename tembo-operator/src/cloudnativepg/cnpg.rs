@@ -147,7 +147,6 @@ fn create_cluster_backup_barman_object_store(
     backup_path: &str,
     credentials: Option<BackupCredentials>,
 ) -> ClusterBackupBarmanObjectStore {
-    info!("Using backup credentials {:?}", credentials);
     // For backwards compatibility, default to inherited IAM role
     let credentials = credentials.unwrap_or(BackupCredentials::S3(
         ClusterBackupBarmanObjectStoreS3Credentials {
@@ -292,15 +291,12 @@ pub fn cnpg_backup_configuration(
 
     // Copy the endpoint_url and s3_credentials from cdb to configure backups
     let backup_credentials = if let Some(s3_creds) = cdb.spec.backup.s3_credentials.as_ref() {
-        info!("Using S3 credentials for backups");
         Some(BackupCredentials::S3(generate_s3_backup_credentials(Some(
             s3_creds,
         ))))
     } else if let Some(gcs_creds) = cdb.spec.backup.google_credentials.as_ref() {
-        info!("Using Google Cloud Storage credentials for backups");
         generate_google_backup_credentials(Some(gcs_creds.clone())).map(BackupCredentials::Google)
     } else if let Some(azure_creds) = cdb.spec.backup.azure_credentials.as_ref() {
-        info!("Using Azure Blob Storage credentials for backups");
         generate_azure_backup_credentials(Some(azure_creds.clone())).map(BackupCredentials::Azure)
     } else {
         None
