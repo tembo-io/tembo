@@ -109,7 +109,7 @@ pub fn execute(
 
 fn validate_overlay(merge_path: &str) -> Result<(), anyhow::Error> {
     let mut file_path = PathBuf::from(FileUtils::get_current_working_dir());
-    file_path.push(format!("{}", merge_path));
+    file_path.push(merge_path);
 
     let contents = fs::read_to_string(&file_path)?;
     let config: Result<HashMap<String, InstanceSettings>, toml::de::Error> =
@@ -262,22 +262,21 @@ fn docker_apply_instance(
         instance_setting.instance_name.clone(),
         instance_setting.instance_name.clone(),
     )?;
-    let stack: Stack;
 
-    if instance_setting.stack_file.is_some() {
+    let stack: Stack = if instance_setting.stack_file.is_some() {
         let mut file_path = PathBuf::from(FileUtils::get_current_working_dir());
         let stack_file = instance_setting.stack_file.clone().unwrap();
         let cleaned_stack_file = stack_file.trim_matches('"');
         file_path.push(cleaned_stack_file);
 
         let config_data = fs::read_to_string(&file_path).expect("File not found in the directory");
-        stack = serde_yaml::from_str(&config_data).expect("Invalid YAML File");
+        serde_yaml::from_str(&config_data).expect("Invalid YAML File")
     } else {
         let stack_type =
             ControllerStackType::from_str(&instance_setting.stack_type.clone().unwrap())
                 .unwrap_or(ControllerStackType::Standard);
-        stack = get_stack(stack_type);
-    }
+        get_stack(stack_type)
+    };
 
     let extensions = merge_options(
         stack.extensions.clone(),

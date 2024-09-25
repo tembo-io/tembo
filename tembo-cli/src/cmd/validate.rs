@@ -36,10 +36,8 @@ pub fn execute(verbose: bool) -> Result<(), anyhow::Error> {
             tembo_credentials_file_path()
         );
         has_error = true
-    } else {
-        if get_current_context()?.target == Target::TemboCloud.to_string() {
-            list_credential_profiles()?;
-        }
+    } else if get_current_context()?.target == Target::TemboCloud.to_string() {
+        list_credential_profiles()?;
     }
     if verbose {
         info("Credentials file exists");

@@ -328,7 +328,7 @@ fn beautify_logs(json_data: &str, app_name: Option<String>) -> Result<()> {
         }
     }
 
-    for (_date_time, logs) in &entries {
+    for logs in entries.values() {
         for log in logs {
             println!("{}", log);
         }
