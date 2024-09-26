@@ -220,7 +220,6 @@ fn create_cluster_backup_volume_snapshot(cdb: &CoreDB) -> ClusterBackupVolumeSna
     }
 }
 
-#[derive(Debug)]
 enum BackupCredentials {
     S3(ClusterBackupBarmanObjectStoreS3Credentials),
     Google(ClusterBackupBarmanObjectStoreGoogleCredentials),
