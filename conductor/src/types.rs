@@ -33,6 +33,7 @@ pub enum Event {
     Started,
     Restore,
     Restored,
+    Backup,
 }
 
 /// message returned to control plane
