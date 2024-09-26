@@ -3389,12 +3389,12 @@ mod tests {
         assert!(cdb.spec.backup.s3_credentials.is_none());
 
         let backup_credentials = if let Some(_s3_creds) = cdb.spec.backup.s3_credentials.as_ref() {
-            panic!("shouldnt get here");
+            panic!("shouldn't get here");
         } else if let Some(gcs_creds) = cdb.spec.backup.google_credentials.as_ref() {
             generate_google_backup_credentials(Some(gcs_creds.clone()))
                 .map(BackupCredentials::Google)
         } else {
-            panic!("shouldnt get here where it's None");
+            panic!("shouldn't get here where it's None");
         };
 
         let backups_result = cnpg_scheduled_backup(&cdb).unwrap();
@@ -3513,6 +3513,208 @@ mod tests {
                     .as_ref()
                     .and_then(|annots| annots.get("iam.gke.io/gcp-service-account")),
                 Some(&"tembo-operator-test-abc123@test-123456.iam.gserviceaccount.com".to_string())
+            );
+        }
+
+        // Test with backups disabled
+        let cfg_disabled = Config {
+            enable_backup: false,
+            enable_volume_snapshot: false,
+            reconcile_ttl: 30,
+            reconcile_timestamp_ttl: 90,
+        };
+        let (backup, template) = cnpg_backup_configuration(&cdb, &cfg_disabled);
+        assert!(backup.is_none());
+        assert!(template.is_some());
+    }
+
+    // Test Azure Backup configuration
+    fn create_azure_test_coredb() -> CoreDB {
+        let cdb_yaml = r#"
+                apiVersion: coredb.io/v1alpha1
+                kind: CoreDB
+                metadata:
+                  name: test
+                  namespace: default
+                spec:
+                  backup:
+                    destinationPath: https://tembobackups.blob.core.windows.net/tembo-backups/v2/sample-standard-backup
+                    azureCredentials:
+                      inheritFromAzureAD: true
+                    encryption: "AES256"
+                    retentionPolicy: "30"
+                    schedule: 17 9 * * *
+                    volumeSnapshot:
+                      enabled: true
+                      snapshotClass: "csi-vsc"
+                  image: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e
+                  port: 5432
+                  replicas: 1
+                  resources:
+                    limits:
+                      cpu: "1"
+                      memory: 0.5Gi
+                  serviceAccountTemplate:
+                    metadata:
+                      annotations:
+                        azure.workload.identity/client-id: "16aa0b7c-dcc6-4bf5-afb5-930aa327e1aa"
+                      labels:
+                        azure.workload.identity/use: "true"
+                  sharedirStorage: 1Gi
+                  stop: false
+                  storage: 1Gi
+                  storageClass: "gp3-enc"
+                  uid: 999
+                "#;
+
+        serde_yaml::from_str(cdb_yaml).expect("Failed to parse YAML")
+    }
+
+    #[test]
+    fn test_create_cluster_backup_default_azure() {
+        let cdb = create_azure_test_coredb();
+        let snapshot = create_cluster_backup_volume_snapshot(&cdb);
+        let endpoint_url = cdb.spec.backup.endpoint_url.clone();
+        let backup_path = cdb.spec.backup.destinationPath.clone();
+
+        assert!(cdb.spec.backup.s3_credentials.is_none());
+        assert!(cdb.spec.backup.google_credentials.is_none());
+
+        let backup_credentials = if let Some(_s3_creds) = cdb.spec.backup.s3_credentials.as_ref() {
+            panic!("shouldn't get here");
+        } else if let Some(gcs_creds) = cdb.spec.backup.google_credentials.as_ref() {
+            panic!("shouldn't get here");
+        } else if let Some(azure_creds) = cdb.spec.backup.azure_credentials.as_ref() {
+            generate_azure_backup_credentials(Some(azure_creds.clone()))
+                .map(BackupCredentials::Azure)
+        } else {
+            panic!("shouldn't get here where it's None");
+        };
+
+        let backups_result = cnpg_scheduled_backup(&cdb).unwrap();
+        let (scheduled_backup, volume_snapshot_backup) = &backups_result[0];
+
+        let result = create_cluster_backup(
+            &cdb,
+            endpoint_url,
+            &backup_path.unwrap(),
+            backup_credentials,
+        );
+        assert!(result.is_some());
+        let backup = result.unwrap();
+
+        match backup.barman_object_store {
+            Some(barman_store) => {
+                // Assert to make sure that the destination path is set correctly and starts with `https://`
+                assert!(
+                    barman_store.destination_path.starts_with("https://"),
+                    "Destination path should start with 'https://', but got: {}",
+                    barman_store.destination_path
+                );
+
+                // Check Azure credentials
+                match barman_store.azure_credentials {
+                    Some(az_credentials) => {
+                        assert_eq!(
+                            az_credentials.inherit_from_azure_ad,
+                            Some(true),
+                            "Expected inheritFromAzureAD to be true, but got: {:?}",
+                            az_credentials.inherit_from_azure_ad
+                        );
+                    }
+                    None => panic!("Expected Azure credentials to be Some, but got None"),
+                }
+            }
+            None => panic!("Expected barman_object_store to be Some, but got None"),
+        }
+
+        // Set an expected ClusterBackupVolumeSnapshot object
+        let expected_snapshot = ClusterBackupVolumeSnapshot {
+            class_name: Some("csi-vsc".to_string()), // Expected to match the YAML input
+            online: Some(true),
+            online_configuration: Some(ClusterBackupVolumeSnapshotOnlineConfiguration {
+                wait_for_archive: Some(true),
+                immediate_checkpoint: Some(true),
+            }),
+            snapshot_owner_reference: Some(
+                ClusterBackupVolumeSnapshotSnapshotOwnerReference::Cluster,
+            ),
+            ..ClusterBackupVolumeSnapshot::default()
+        };
+
+        // Assert to make sure that the snapshot.snapshot_class and expected_snapshot.snapshot_class are the same
+        assert_eq!(snapshot, expected_snapshot);
+
+        // Assert to make sure that the ScheduledBackup method is set to VolumeSnapshot
+        if let Some(volume_snapshot_backup) = volume_snapshot_backup {
+            assert_eq!(
+                volume_snapshot_backup.spec.method,
+                Some(ScheduledBackupMethod::VolumeSnapshot)
+            );
+        } else {
+            panic!("Expected volume snapshot backup to be Some, but was None");
+        }
+
+        // Assert to make sure that the ScheduledBackup method is set to BarmanObjectStore
+        assert_eq!(
+            scheduled_backup.spec.method,
+            Some(ScheduledBackupMethod::BarmanObjectStore)
+        );
+    }
+
+    #[test]
+    fn test_azure_backup_configuration() {
+        let cdb = create_azure_test_coredb();
+        let cfg = Config {
+            enable_backup: true,
+            enable_volume_snapshot: true,
+            reconcile_ttl: 30,
+            reconcile_timestamp_ttl: 90,
+        };
+
+        // Test with backups enabled and valid path
+        let (backup, template) = cnpg_backup_configuration(&cdb, &cfg);
+        assert!(backup.is_some());
+        assert!(template.is_some());
+
+        // Verify backup configuration
+        if let Some(backup) = backup {
+            assert_eq!(
+                backup
+                    .barman_object_store
+                    .as_ref()
+                    .map(|bos| bos.destination_path.as_str()),
+                Some("https://tembobackups.blob.core.windows.net/tembo-backups/v2/sample-standard-backup")
+            );
+            assert_eq!(backup.retention_policy.as_deref(), Some("30d"));
+            assert!(backup.volume_snapshot.is_some());
+            assert_eq!(
+                backup.volume_snapshot.as_ref().and_then(|vs| vs.online),
+                Some(true)
+            );
+            assert_eq!(
+                backup.volume_snapshot.and_then(|vs| vs.class_name),
+                Some("csi-vsc".to_string())
+            );
+        }
+
+        // Verify service account template
+        if let Some(template) = template {
+            assert_eq!(
+                template
+                    .metadata
+                    .annotations
+                    .as_ref()
+                    .and_then(|annots| annots.get("azure.workload.identity/client-id")),
+                Some(&"16aa0b7c-dcc6-4bf5-afb5-930aa327e1aa".to_string())
+            );
+            assert_eq!(
+                template
+                    .metadata
+                    .labels
+                    .as_ref()
+                    .and_then(|labels| labels.get("azure.workload.identity/use")),
+                Some(&"true".to_string())
             );
         }
 
