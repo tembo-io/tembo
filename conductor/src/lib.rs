@@ -22,7 +22,7 @@ use kube::api::{DeleteParams, ListParams, Patch, PatchParams};
 
 use chrono::{DateTime, SecondsFormat, Utc};
 use kube::{Api, Client, ResourceExt};
-use log::{debug, info};
+use log::{debug, info, warn};
 use serde_json::{from_str, to_string, Value};
 use std::{
     collections::hash_map::DefaultHasher,
@@ -44,19 +44,30 @@ pub async fn generate_spec(
 ) -> Result<Value, ConductorError> {
     let mut spec = spec.clone();
 
-    let prefix = cloud_provider.prefix();
+    match cloud_provider {
+        CloudProvider::AWS | CloudProvider::GCP => {
+            let prefix = cloud_provider.prefix();
 
-    // Format the backups_path with the correct prefix
-    if let Some(restore) = &mut spec.restore {
-        if let Some(backups_path) = &mut restore.backups_path {
-            let clean_path = remove_known_prefixes(backups_path);
-            if clean_path.starts_with(backups_bucket) {
-                // If the path already includes the bucket, just add the prefix
-                *backups_path = format!("{}{}", prefix, clean_path);
-            } else {
-                // If the path doesn't include the bucket, add both prefix and bucket
-                *backups_path = format!("{}{}/{}", prefix, backups_bucket, clean_path);
+            // Format the backups_path with the correct prefix
+            if let Some(restore) = &mut spec.restore {
+                if let Some(backups_path) = &mut restore.backups_path {
+                    let clean_path = remove_known_prefixes(backups_path);
+                    if clean_path.starts_with(backups_bucket) {
+                        // If the path already includes the bucket, just add the prefix
+                        *backups_path = format!("{}{}", prefix, clean_path);
+                    } else {
+                        // If the path doesn't include the bucket, add both prefix and bucket
+                        *backups_path = format!("{}{}/{}", prefix, backups_bucket, clean_path);
+                    }
+                }
             }
+        }
+        CloudProvider::Unknown => {
+            warn!(
+                "Unknown cloud provider or cloud provider is disabled, restore spec removed from Spec value",
+            );
+            // Remove the restore information if the cloud provider is unknown
+            spec.restore = None;
         }
     }
 

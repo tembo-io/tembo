@@ -142,7 +142,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
     let cloud_provider = CloudProvider::builder()
         .gcp(is_gcp)
         .aws(is_cloud_formation)
-        .build()?;
+        .build();
 
     loop {
         // Read from queue (check for new message)

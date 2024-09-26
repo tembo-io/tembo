@@ -1,6 +1,4 @@
 // Add this enum at the top of your file or in a separate module
-use crate::errors::ConductorError;
-
 pub struct CloudProviderBuilder {
     gcp: bool,
     aws: bool,
@@ -24,16 +22,13 @@ impl CloudProviderBuilder {
         self
     }
 
-    pub fn build(self) -> Result<CloudProvider, ConductorError> {
+    pub fn build(self) -> CloudProvider {
         if self.gcp {
-            Ok(CloudProvider::GCP)
+            CloudProvider::GCP
         } else if self.aws {
-            Ok(CloudProvider::AWS)
+            CloudProvider::AWS
         } else {
-            Err(ConductorError::DataplaneError(format!(
-                "Unsupported cloud provider got : gcp: {}, aws: {}",
-                self.gcp, self.aws
-            )))
+            CloudProvider::Unknown
         }
     }
 }
@@ -41,6 +36,7 @@ impl CloudProviderBuilder {
 pub enum CloudProvider {
     AWS,
     GCP,
+    Unknown,
 }
 
 impl CloudProvider {
@@ -48,6 +44,7 @@ impl CloudProvider {
         match self {
             CloudProvider::AWS => "aws",
             CloudProvider::GCP => "gcp",
+            CloudProvider::Unknown => "unknown",
         }
     }
 
@@ -55,6 +52,7 @@ impl CloudProvider {
         match self {
             CloudProvider::AWS => "s3://",
             CloudProvider::GCP => "gs://",
+            CloudProvider::Unknown => "",
         }
     }
 
