@@ -1,4 +1,5 @@
 pub mod aws;
+pub mod cloud;
 pub mod errors;
 pub mod extensions;
 pub mod gcp;
@@ -7,7 +8,10 @@ pub mod monitoring;
 pub mod routes;
 pub mod types;
 
-use crate::aws::cloudformation::{AWSConfigState, CloudFormationParams};
+use crate::{
+    aws::cloudformation::{AWSConfigState, CloudFormationParams},
+    cloud::CloudProvider,
+};
 use aws_sdk_cloudformation::config::Region;
 use controller::apis::coredb_types::{CoreDB, CoreDBSpec};
 use errors::ConductorError;
@@ -27,6 +31,7 @@ use std::{
 
 pub type Result<T, E = ConductorError> = std::result::Result<T, E>;
 
+#[allow(clippy::too_many_arguments)]
 pub async fn generate_spec(
     org_id: &str,
     entity_name: &str,
@@ -35,29 +40,26 @@ pub async fn generate_spec(
     namespace: &str,
     backups_bucket: &str,
     spec: &CoreDBSpec,
+    cloud_provider: &CloudProvider,
 ) -> Result<Value, ConductorError> {
     let mut spec = spec.clone();
-    let cloud_provider = data_plane_id.split('_').next().unwrap_or("");
-    let (prefix, trim_prefix) = match cloud_provider {
-        "aws" => ("s3://", "s3://"),
-        "gcp" => ("gs://", "gs://"),
-        _ => {
-            return Err(ConductorError::DataplaneError(format!(
-                "Unsupported cloud provider in data_plane_id: {}",
-                data_plane_id
-            )))
-        }
-    };
 
-    // Add the bucket name into the backups_path if it's not already there
+    let prefix = cloud_provider.prefix();
+
+    // Format the backups_path with the correct prefix
     if let Some(restore) = &mut spec.restore {
         if let Some(backups_path) = &mut restore.backups_path {
-            if !backups_path.starts_with(&format!("{}{}", prefix, backups_bucket)) {
-                let path_suffix = backups_path.trim_start_matches(trim_prefix);
-                *backups_path = format!("{}{}/{}", prefix, backups_bucket, path_suffix);
+            let clean_path = remove_known_prefixes(backups_path);
+            if clean_path.starts_with(backups_bucket) {
+                // If the path already includes the bucket, just add the prefix
+                *backups_path = format!("{}{}", prefix, clean_path);
+            } else {
+                // If the path doesn't include the bucket, add both prefix and bucket
+                *backups_path = format!("{}{}/{}", prefix, backups_bucket, clean_path);
             }
         }
     }
+
     Ok(serde_json::json!({
         "apiVersion": "coredb.io/v1alpha1",
         "kind": "CoreDB",
@@ -72,6 +74,17 @@ pub async fn generate_spec(
         },
         "spec": spec,
     }))
+}
+
+// Remove known prefixes from the backup path
+fn remove_known_prefixes(path: &str) -> &str {
+    let known_prefixes = ["s3://", "gs://", "https://"];
+    for prefix in &known_prefixes {
+        if let Some(stripped) = path.strip_prefix(prefix) {
+            return stripped;
+        }
+    }
+    path
 }
 
 pub fn get_data_plane_id_from_coredb(coredb: &CoreDB) -> Result<String, Box<ConductorError>> {
@@ -648,6 +661,7 @@ mod tests {
             }),
             ..CoreDBSpec::default()
         };
+        let cloud_provider = CloudProvider::AWS;
         let result = generate_spec(
             "org-id",
             "entity-name",
@@ -656,6 +670,7 @@ mod tests {
             "namespace",
             "my-bucket",
             &spec,
+            &cloud_provider,
         )
         .await
         .expect("Failed to generate spec");
@@ -677,6 +692,7 @@ mod tests {
             }),
             ..CoreDBSpec::default()
         };
+        let cloud_provider = CloudProvider::AWS;
         let result = generate_spec(
             "org-id",
             "entity-name",
@@ -685,6 +701,7 @@ mod tests {
             "namespace",
             "my-bucket",
             &spec,
+            &cloud_provider,
         )
         .await
         .expect("Failed to generate spec");
@@ -704,6 +721,7 @@ mod tests {
             }),
             ..CoreDBSpec::default()
         };
+        let cloud_provider = CloudProvider::AWS;
         let result = generate_spec(
             "org-id",
             "entity-name",
@@ -712,6 +730,7 @@ mod tests {
             "namespace",
             "my-bucket",
             &spec,
+            &cloud_provider,
         )
         .await
         .expect("Failed to generate spec");
@@ -724,6 +743,7 @@ mod tests {
             restore: None,
             ..CoreDBSpec::default()
         };
+        let cloud_provider = CloudProvider::AWS;
         let result = generate_spec(
             "org-id",
             "entity-name",
@@ -732,6 +752,7 @@ mod tests {
             "namespace",
             "my-bucket",
             &spec,
+            &cloud_provider,
         )
         .await
         .expect("Failed to generate spec");
@@ -739,14 +760,15 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_generate_spec_with_gcp_bucket() {
+    async fn test_generate_spec_with_non_matching_gcp_bucket() {
         let spec = CoreDBSpec {
             restore: Some(Restore {
-                backups_path: Some("v2/test-instance".to_string()),
+                backups_path: Some("gs://v2/test-instance".to_string()),
                 ..Restore::default()
             }),
             ..CoreDBSpec::default()
         };
+        let cloud_provider = CloudProvider::GCP;
         let result = generate_spec(
             "org-id",
             "entity-name",
@@ -755,6 +777,7 @@ mod tests {
             "namespace",
             "my-bucket",
             &spec,
+            &cloud_provider,
         )
         .await
         .expect("Failed to generate spec");
@@ -766,7 +789,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_generate_spec_with_gcp_bucket_full_path() {
+    async fn test_generate_spec_with_gcp_bucket() {
         let spec = CoreDBSpec {
             restore: Some(Restore {
                 backups_path: Some("gs://my-bucket/v2/test-instance".to_string()),
@@ -774,6 +797,7 @@ mod tests {
             }),
             ..CoreDBSpec::default()
         };
+        let cloud_provider = CloudProvider::GCP;
         let result = generate_spec(
             "org-id",
             "entity-name",
@@ -782,6 +806,7 @@ mod tests {
             "namespace",
             "my-bucket",
             &spec,
+            &cloud_provider,
         )
         .await
         .expect("Failed to generate spec");
