@@ -36,6 +36,8 @@ anyhow = "1.0.82"
 serde_yaml = "0.9.34"
 reqwest = { version = "0.12.3", features = ["json"] }
 google-cloud-storage = "0.22.1"
+azure_identity = "0.20.0"
+azure_core = "0.20.0"
 
 [dependencies.kube]
 features = ["runtime", "client", "derive"]

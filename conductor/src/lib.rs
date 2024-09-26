@@ -1,4 +1,5 @@
 pub mod aws;
+pub mod azure;
 pub mod errors;
 pub mod extensions;
 pub mod gcp;
