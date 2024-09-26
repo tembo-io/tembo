@@ -1,31 +1,24 @@
-use azure_identity::ClientSecretCredential;
-use azure_identity::oauth2;
+use azure_identity::WorkloadIdentityCredential;
+use azure_core::auth::TokenCredential;
 use reqwest::Client;
 use reqwest::Url;
 use std::sync::Arc;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Replace with your Azure credentials
-    let tenant_id = "your_tenant_id";
-    let client_id = oauth2::ClientId::new("your_client_id");
-    let client_secret = Some(oauth2::ClientSecret::new("your_client_secret"));
+    let tenant_id = "your_tenant_id".to_string();
+    let client_id = "your_client_id".to_string();
     let subscription_id = "your_subscription_id";
     let resource_group_name = "your_resource_group_name";
 
     let http_client = Arc::new(reqwest::Client::new());
     let authority_host = Url::parse("https://login.microsoftonline.com/")?;
 
-    let credential = ClientSecretCredential {
-        http_client,
-        authority_host,
-        tenant_id: tenant_id.to_string(),
-        client_id,
-        client_secret,
-        cache: None, // or provide a custom TokenCache implementation
-    };
+    let scopes = vec!["https://management.azure.com/.default"];
+    
+    let credential = WorkloadIdentityCredential::new(http_client, authority_host, tenant_id, client_id, None);
+    let token = credential.get_token(&scopes).await?;
 
-    let token = credential.get_token("https://management.azure.com/").await?.token.secret();
 
     let client = Client::new();
     let base_url = format!("https://management.azure.com/subscriptions/{}/resourceGroups/{}/providers/Microsoft.ManagedIdentity/userAssignedIdentities", subscription_id, resource_group_name);
