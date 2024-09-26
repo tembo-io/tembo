@@ -2169,20 +2169,12 @@ mod test {
             .expect("Annotations should be present");
         let basedomain = std::env::var("DATA_PLANE_BASEDOMAIN").unwrap();
         let expected_hostname = format!("dedicated.{}.{}", namespace, basedomain);
-        let expected_hostname_standby = format!("dedicated-ro.{}.{}", namespace, basedomain);
 
         assert_eq!(
             annotations
                 .get("external-dns.alpha.kubernetes.io/hostname")
                 .expect("Hostname annotation should be present"),
             &expected_hostname
-        );
-
-        assert_eq!(
-            annotations
-                .get("external-dns.alpha.kubernetes.io/hostname")
-                .expect("Hostname annotation should be present"),
-            &expected_hostname_standby
         );
 
         assert_eq!(
@@ -2241,6 +2233,14 @@ mod test {
                 .get("public")
                 .expect("Public label should be present"),
             "true"
+        );
+
+        let expected_hostname = format!("dedicated-ro.{}.{}", namespace, basedomain);
+        assert_eq!(
+            annotations
+                .get("external-dns.alpha.kubernetes.io/hostname")
+                .expect("Hostname annotation should be present"),
+            &expected_hostname
         );
 
         // Disable dedicated networking
