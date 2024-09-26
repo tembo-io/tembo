@@ -357,8 +357,8 @@ async fn reconcile_dedicated_networking_service(
     );
 
     let external_dns_hostname = format!(
-        "dedicated{prefix}.{namespace}.{basedomain}",
-        prefix = if is_standby { "-ro" } else { "" }
+        "dedicated{suffix}.{namespace}.{basedomain}",
+        suffix = if is_standby { "-ro" } else { "" }
     );
 
     let mut annotations = serde_json::Map::new();
