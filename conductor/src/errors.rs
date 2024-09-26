@@ -54,7 +54,7 @@ pub enum ConductorError {
     #[error("Google Cloud Storage error: {0}")]
     GcsError(#[from] GcsError),
 
-    /// Google Cloud Storage error
+    /// Dataplane error
     #[error("Dataplane not found error: {0}")]
     DataplaneError(String),
 }
