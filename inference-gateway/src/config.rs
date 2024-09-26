@@ -9,6 +9,8 @@ pub struct Config {
     pub llm_service_host_port: Url,
     /// Postgres connection string to the timeseries databse which logs token usage
     pub pg_conn_str: String,
+    /// Postgres connection string for control-plane-queue
+    pub billing_queue_conn_str: String,
     /// Port to run the inference gateway on
     pub server_port: u16,
     /// Number of actix workers to spawn
@@ -27,6 +29,10 @@ impl Config {
             llm_service_host_port: parse_llm_service(),
             pg_conn_str: from_env_default(
                 "DATABASE_URL",
+                "postgresql://postgres:postgres@0.0.0.0:5432/postgres",
+            ),
+            billing_queue_conn_str: from_env_default(
+                "QUEUE_CONN_URL",
                 "postgresql://postgres:postgres@0.0.0.0:5432/postgres",
             ),
             server_port: from_env_default("WEBSERVER_PORT", "8080")

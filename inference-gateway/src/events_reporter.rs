@@ -66,6 +66,12 @@ fn rows_to_events(rows: Vec<UsageData>) -> Vec<Events> {
                 .format("%Y%m%d%H")
                 .to_string();
 
+            let input_tokens = row.prompt_tokens.unwrap_or(0);
+            let output_tokens = row.completion_tokens.unwrap_or(0);
+
+            let input_tokens = (input_tokens as f64) / 1_000_000_f64;
+            let output_tokens = (output_tokens as f64) / 1_000_000_f64;
+
             Events {
                 idempotency_key: format!("{}-{}-{}", row.instance_id, row.model, completed_at),
                 organization_id: row.organization_id,
@@ -73,8 +79,8 @@ fn rows_to_events(rows: Vec<UsageData>) -> Vec<Events> {
                 payload: Payload {
                     completed_at: row.completed_at.unwrap_or_default().to_string(),
                     model: row.model,
-                    prompt_tokens: row.prompt_tokens.unwrap_or(0).to_string(),
-                    completion_tokens: row.completion_tokens.unwrap_or(0).to_string(),
+                    input_token: input_tokens.to_string(),
+                    output_token: output_tokens.to_string(),
                 },
             }
         })
@@ -116,7 +122,7 @@ fn get_hourly_chunks(
     while chunk_start < last_complete_hour {
         let chunk_end = chunk_start + ChronoDuration::hours(1) - ChronoDuration::nanoseconds(1);
         chunks.push((chunk_start, chunk_end));
-        chunk_start = chunk_start + ChronoDuration::hours(1);
+        chunk_start += ChronoDuration::hours(1);
     }
 
     chunks
@@ -203,8 +209,10 @@ pub struct Events {
 pub struct Payload {
     pub completed_at: String,
     pub model: String,
-    pub prompt_tokens: String,
-    pub completion_tokens: String,
+    /// Amount of prompt tokens used, divided by a million
+    pub input_token: String,
+    /// Amount of completion tokens used, divided by a million
+    pub output_token: String,
 }
 
 struct UsageData {

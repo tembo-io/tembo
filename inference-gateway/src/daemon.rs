@@ -20,7 +20,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     if cfg.run_billing_reporter {
         info!("Spawning AI billing reporter thread");
 
-        let pg_conn = cfg.pg_conn_str.clone();
+        let pg_conn = cfg.billing_queue_conn_str.clone();
 
         background_threads_guard.push(tokio::spawn(async move {
             loop {
