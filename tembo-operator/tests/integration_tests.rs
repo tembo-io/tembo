@@ -2235,12 +2235,61 @@ mod test {
             "true"
         );
 
+        let annotations = service
+            .metadata
+            .annotations
+            .as_ref()
+            .expect("Annotations should be present");
+        let basedomain = std::env::var("DATA_PLANE_BASEDOMAIN").unwrap();
         let expected_hostname = format!("dedicated-ro.{}.{}", namespace, basedomain);
+
         assert_eq!(
             annotations
                 .get("external-dns.alpha.kubernetes.io/hostname")
                 .expect("Hostname annotation should be present"),
             &expected_hostname
+        );
+
+        assert_eq!(
+            annotations
+                .get("service.beta.kubernetes.io/aws-load-balancer-internal")
+                .expect("AWS LB internal annotation should be present"),
+            &serde_json::Value::String("false".to_string())
+        );
+
+        assert_eq!(
+            annotations
+                .get("service.beta.kubernetes.io/aws-load-balancer-scheme")
+                .expect("AWS LB scheme annotation should be present"),
+            &serde_json::Value::String("internet-facing".to_string())
+        );
+
+        assert_eq!(
+            annotations
+                .get("service.beta.kubernetes.io/aws-load-balancer-nlb-target-type")
+                .expect("AWS LB NLB target type annotation should be present"),
+            &serde_json::Value::String("ip".to_string())
+        );
+
+        assert_eq!(
+            annotations
+                .get("service.beta.kubernetes.io/aws-load-balancer-type")
+                .expect("AWS LB type annotation should be present"),
+            &serde_json::Value::String("nlb-ip".to_string())
+        );
+
+        assert_eq!(
+            annotations
+                .get("service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol")
+                .expect("AWS LB healthcheck protocol annotation should be present"),
+            &serde_json::Value::String("TCP".to_string())
+        );
+
+        assert_eq!(
+            annotations
+                .get("service.beta.kubernetes.io/aws-load-balancer-healthcheck-port")
+                .expect("AWS LB healthcheck port annotation should be present"),
+            &serde_json::Value::String("5432".to_string())
         );
 
         // Disable dedicated networking
