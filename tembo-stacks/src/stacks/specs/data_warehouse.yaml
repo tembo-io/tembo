@@ -37,7 +37,7 @@ trunk_installs:
   - name: pg_later
     version: 0.1.1
   - name: pg_partman
-    version: 4.7.4
+    version: 5.0.1
   - name: pg_cron
     version: 1.6.2
   - name: postgres_fdw

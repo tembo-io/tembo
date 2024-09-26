@@ -28,7 +28,6 @@ use utoipa::ToSchema;
     strum_macros::Display,
 )]
 pub enum StackType {
-    Search,
     Analytics,
     API,
     DataWarehouse,
@@ -39,6 +38,7 @@ pub enum StackType {
     OLAP,
     #[default]
     OLTP,
+    ParadeDB,
     RAG,
     Standard,
     Timeseries,
@@ -50,7 +50,6 @@ impl std::str::FromStr for StackType {
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
-            "Search" => Ok(StackType::Search),
             "Analytics" => Ok(StackType::Analytics),
             "API" => Ok(StackType::API),
             "DataWarehouse" => Ok(StackType::DataWarehouse),
@@ -60,6 +59,7 @@ impl std::str::FromStr for StackType {
             "MongoAlternative" => Ok(StackType::MongoAlternative),
             "OLAP" => Ok(StackType::OLAP),
             "OLTP" => Ok(StackType::OLTP),
+            "ParadeDB" => Ok(StackType::ParadeDB),
             "RAG" => Ok(StackType::RAG),
             "Standard" => Ok(StackType::Standard),
             "Timeseries" => Ok(StackType::Timeseries),
@@ -72,7 +72,6 @@ impl std::str::FromStr for StackType {
 impl StackType {
     pub fn as_str(&self) -> &str {
         match self {
-            StackType::Search => "Search",
             StackType::Analytics => "Analytics",
             StackType::API => "API",
             StackType::DataWarehouse => "DataWarehouse",
@@ -82,6 +81,7 @@ impl StackType {
             StackType::MongoAlternative => "MongoAlternative",
             StackType::OLAP => "OLAP",
             StackType::OLTP => "OLTP",
+            StackType::ParadeDB => "ParadeDB",
             StackType::RAG => "RAG",
             StackType::Standard => "Standard",
             StackType::Timeseries => "Timeseries",
@@ -297,9 +297,6 @@ mod tests {
     fn test_all_stack_deserialization() {
         for stack in StackType::iter() {
             match stack {
-                StackType::Search => {
-                    get_stack(StackType::Search);
-                }
                 StackType::Analytics => {
                     get_stack(StackType::Analytics);
                 }
@@ -326,6 +323,9 @@ mod tests {
                 }
                 StackType::OLTP => {
                     get_stack(StackType::OLTP);
+                }
+                StackType::ParadeDB => {
+                    get_stack(StackType::ParadeDB);
                 }
                 StackType::RAG => {
                     get_stack(StackType::RAG);

@@ -1,5 +1,5 @@
-name: Analytics
-description: A Postgres instance equipped ParadeDB's pg_analytics extension.
+name: ParadeDB
+description: Postgres for Search and Analytics
 repository: "quay.io/tembo"
 organization: tembo
 images:
@@ -22,7 +22,7 @@ postgres_config:
   - name: pg_stat_statements.track
     value: top
   - name: shared_preload_libraries
-    value: pg_stat_statements,pg_cron
+    value: pg_stat_statements,pg_search,pg_analytics,pg_cron
   - name: track_io_timing
     value: 'on'
   - name: wal_level
@@ -30,25 +30,35 @@ postgres_config:
 trunk_installs:
   - name: pg_stat_statements
     version: 1.10.0
-  - name: pg_partman
-    version: 5.0.1
-  - name: pg_cron
-    version: 1.6.2
   - name: pg_analytics
     version: 0.1.4
+  - name: pg_search
+    version: 0.10.2
+  - name: pg_cron
+    version: 1.6.2
+  - name: pgvector
+    version: 0.7.4
+  - name: vectorscale
+    version: 0.3.0
+  - name: pg_ivm
+    version: 1.9.0
 extensions:
   - name: pg_stat_statements
     locations:
       - database: postgres
         enabled: true
         version: 1.10.0
-  - name: pg_partman
+  - name: pg_search
     locations:
       - database: postgres
         enabled: true
-        version: 5.0.1
+        version: 0.10.2
+  - name: vector
+    locations:
+      - database: postgres
+        enabled: true
+        version: 0.7.4
   - name: pg_cron
-    description: pg_cron
     locations:
     - database: postgres
       enabled: true
@@ -59,3 +69,13 @@ extensions:
     - database: postgres
       enabled: true
       version: 0.1.2
+  - name: vectorscale
+    locations:
+      - database: postgres
+        enabled: true
+        version: 0.3.0
+  - name: pg_ivm
+    locations:
+    - database: postgres
+      enabled: true
+      version: 1.9

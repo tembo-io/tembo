@@ -6,8 +6,6 @@ use crate::stacks::types::{Stack, StackType};
 use lazy_static::lazy_static;
 
 lazy_static! {
-    pub static ref SEARCH: Stack =
-        serde_yaml::from_str(include_str!("specs/search.yaml")).expect("search.yaml not found");
     pub static ref ANALYTICS: Stack = serde_yaml::from_str(include_str!("specs/analytics.yaml"))
         .expect("analytics.yaml not found");
     pub static ref API: Stack =
@@ -28,6 +26,8 @@ lazy_static! {
         serde_yaml::from_str(include_str!("specs/olap.yaml")).expect("olap.yaml not found");
     pub static ref OLTP: Stack =
         serde_yaml::from_str(include_str!("specs/oltp.yaml")).expect("oltp.yaml not found");
+    pub static ref PARADEDB: Stack =
+        serde_yaml::from_str(include_str!("specs/paradedb.yaml")).expect("paradedb.yaml not found");
     pub static ref RAG: Stack =
         serde_yaml::from_str(include_str!("specs/rag.yaml")).expect("rag.yaml not found");
     pub static ref STANDARD: Stack =
@@ -40,7 +40,6 @@ lazy_static! {
 
 pub fn get_stack(entity: StackType) -> Stack {
     match entity {
-        StackType::Search => SEARCH.clone(),
         StackType::Analytics => ANALYTICS.clone(),
         StackType::API => API.clone(),
         StackType::DataWarehouse => DATAWAREHOUSE.clone(),
@@ -50,6 +49,7 @@ pub fn get_stack(entity: StackType) -> Stack {
         StackType::MongoAlternative => MONGO_ALTERNATIVE.clone(),
         StackType::OLAP => OLAP.clone(),
         StackType::OLTP => OLTP.clone(),
+        StackType::ParadeDB => PARADEDB.clone(),
         StackType::RAG => RAG.clone(),
         StackType::Standard => STANDARD.clone(),
         StackType::Timeseries => TIMESERIES.clone(),
