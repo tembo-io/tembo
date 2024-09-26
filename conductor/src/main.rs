@@ -437,7 +437,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
 
                 if is_cloud_formation
                     && (read_msg.message.event_type == Event::Stop
-                        || read_msg.message.event_type == Event::Stop)
+                        || read_msg.message.event_type == Event::Backup)
                 {
                     if let Some(status) = current_spec.clone().status {
                         match status.running {
