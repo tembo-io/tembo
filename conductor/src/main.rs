@@ -234,7 +234,12 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         // Based on message_type in message, create, update, delete CoreDB
         let event_msg: types::StateToControlPlane = match read_msg.message.event_type {
             // every event is for a single namespace
-            Event::Create | Event::Update | Event::Restore | Event::Start | Event::Stop => {
+            Event::Create
+            | Event::Update
+            | Event::Restore
+            | Event::Start
+            | Event::Stop
+            | Event::Backup => {
                 info!("{}: Got create, restore or update event", read_msg.msg_id);
 
                 // (todo: nhudson) in the future move this to be more specific
@@ -430,7 +435,10 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                 let spec_js = serde_json::to_string(&current_spec.spec).unwrap();
                 debug!("dbname: {}, current_spec: {:?}", &namespace, spec_js);
 
-                if is_cloud_formation && read_msg.message.event_type == Event::Stop {
+                if is_cloud_formation
+                    && (read_msg.message.event_type == Event::Stop
+                        || read_msg.message.event_type == Event::Backup)
+                {
                     if let Some(status) = current_spec.clone().status {
                         match status.running {
                             false => {
@@ -456,7 +464,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     Event::Update => Event::Updated,
                     Event::Restore => Event::Restored,
                     Event::Start => Event::Started,
-                    Event::Stop => Event::StopComplete,
+                    Event::Stop | Event::Backup => Event::StopComplete,
                     _ => unreachable!(),
                 };
                 types::StateToControlPlane {
