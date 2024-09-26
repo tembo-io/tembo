@@ -156,6 +156,7 @@ pub async fn patch_cluster_merge(
 pub async fn patch_scheduled_backup_merge(
     cdb: &CoreDB,
     ctx: &Arc<Context>,
+    backup_name: &str,
     patch: serde_json::Value,
 ) -> Result<(), Action> {
     let name = cdb.name_any();
@@ -167,7 +168,7 @@ pub async fn patch_scheduled_backup_merge(
     let scheduled_backup_api: Api<ScheduledBackup> = Api::namespaced(ctx.client.clone(), namespace);
     let pp = PatchParams::apply("patch_merge");
     let _ = scheduled_backup_api
-        .patch(&name, &pp, &Patch::Merge(&patch))
+        .patch(backup_name, &pp, &Patch::Merge(&patch))
         .await
         .map_err(|e| {
             error!("Error patching cluster: {}", e);

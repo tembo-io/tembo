@@ -283,6 +283,7 @@ async fn update_scheduled_backups(
     let scheduled_backup_value = cdb.spec.stop;
 
     for sb in scheduled_backups {
+        let scheduled_backup_name = sb.metadata.name.as_deref().unwrap_or(&name);
         let scheduled_backup_suspend_status = sb.spec.suspend.unwrap_or_default();
 
         if scheduled_backup_suspend_status != scheduled_backup_value {
@@ -292,7 +293,14 @@ async fn update_scheduled_backups(
                 }
             });
 
-            match patch_scheduled_backup_merge(cdb, ctx, patch_scheduled_backup_spec).await {
+            match patch_scheduled_backup_merge(
+                cdb,
+                ctx,
+                scheduled_backup_name,
+                patch_scheduled_backup_spec,
+            )
+            .await
+            {
                 Ok(_) => {
                     info!(
                         "Toggled scheduled backup suspend of {} to '{}'",
