@@ -2129,7 +2129,12 @@ fn generate_azure_backup_credentials(
                 // If we're not inheriting from Azure AD, assume we are reading from a Kubernetes secret.
                 // https://cloudnative-pg.io/documentation/1.16/backup_recovery/#azure-blob-storage
                 Some(ClusterBackupBarmanObjectStoreAzureCredentials {
-                    connection_string: None,
+                    connection_string: creds.connection_string.as_ref().map(|cs| {
+                        ClusterBackupBarmanObjectStoreAzureCredentialsConnectionString {
+                            key: cs.key.clone(),
+                            name: cs.name.clone(),
+                        }
+                    }),
                     storage_account: creds.storage_account.as_ref().map(|sa| {
                         ClusterBackupBarmanObjectStoreAzureCredentialsStorageAccount {
                             key: sa.key.clone(),
@@ -2142,7 +2147,12 @@ fn generate_azure_backup_credentials(
                             name: sk.name.clone(),
                         }
                     }),
-                    storage_sas_token: None,
+                    storage_sas_token: creds.storage_sas_token.as_ref().map(|st| {
+                        ClusterBackupBarmanObjectStoreAzureCredentialsStorageSasToken {
+                            key: st.key.clone(),
+                            name: st.name.clone(),
+                        }
+                    }),
                     inherit_from_azure_ad: None,
                 })
             } else {
