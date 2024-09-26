@@ -13,7 +13,8 @@ use crate::metrics_reporter::run_metrics_reporter;
 use crate::status_reporter::run_status_reporter;
 use conductor::routes::health::background_threads_running;
 use controller::apis::coredb_types::{
-    Backup, CoreDBSpec, GoogleCredentials, S3Credentials, ServiceAccountTemplate, VolumeSnapshot,
+    AzureCredentials, AzureCredentialsStorageAccount, AzureCredentialsStorageKey, Backup,
+    CoreDBSpec, GoogleCredentials, S3Credentials, ServiceAccountTemplate, VolumeSnapshot,
 };
 use controller::apis::postgres_parameters::{ConfigValue, PgConfig};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
@@ -84,6 +85,14 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         .unwrap_or_else(|_| "".to_owned())
         .parse()
         .expect("error parsing GCP_PROJECT_NUMBER");
+    let is_azure: bool = env::var("IS_AZURE")
+        .unwrap_or_else(|_| "false".to_owned())
+        .parse()
+        .expect("error parsing IS_AZURE");
+    let azure_storage_account: String = env::var("AZURE_STORAGE_ACCOUNT")
+        .unwrap_or_else(|_| "".to_owned())
+        .parse()
+        .expect("error parsing AZURE_STORAGE_ACCOUNT");
 
     // Error and exit if CF_TEMPLATE_BUCKET is not set when IS_CLOUD_FORMATION is enabled
     if is_cloud_formation && cf_template_bucket.is_empty() {
@@ -330,6 +339,15 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     &mut coredb_spec,
                     backup_archive_bucket.clone(),
                     storage_archive_bucket.clone(),
+                )
+                .await?;
+
+                init_azure_storage_workload_identity(
+                    is_azure,
+                    &read_msg,
+                    &mut coredb_spec,
+                    backup_archive_bucket.clone(),
+                    azure_storage_account.clone(),
                 )
                 .await?;
 
@@ -898,11 +916,63 @@ async fn init_gcp_storage_workload_identity(
         retentionPolicy: Some(String::from("30")),
         schedule: Some(generate_cron_expression(&read_msg.message.namespace)),
         s3_credentials: None,
+        azure_credentials: None,
         endpoint_url: None,
         google_credentials: Some(GoogleCredentials {
             gke_environment: Some(true),
             ..Default::default()
         }),
+        volume_snapshot,
+    };
+
+    coredb_spec.backup = backup;
+
+    Ok(())
+}
+
+async fn init_azure_storage_workload_identity(
+    is_azure: bool,
+    read_msg: &Message<CRUDevent>,
+    coredb_spec: &mut CoreDBSpec,
+    backup_archive_bucket: String,
+    azure_storage_account: String,
+) -> Result<(), ConductorError> {
+    if !is_azure {
+        return Ok(());
+    }
+
+    //TODO(ianstanton) Implement Azure Workload Identity
+
+    // Generate Backup spec for CoreDB
+    let volume_snapshot = Some(VolumeSnapshot {
+        enabled: false,
+        snapshot_class: None,
+    });
+
+    let write_path = read_msg
+        .message
+        .backups_write_path
+        .clone()
+        .unwrap_or("v2".to_string());
+
+    let backup = Backup {
+        destinationPath: Some(format!(
+            "https://{}.blob.core.windows.net/{}/{}",
+            azure_storage_account, backup_archive_bucket, write_path
+        )),
+        encryption: Some(String::from("AES256")),
+        retentionPolicy: Some(String::from("30")),
+        schedule: Some(generate_cron_expression(&read_msg.message.namespace)),
+        s3_credentials: None,
+        azure_credentials: Some(AzureCredentials {
+            connection_string: None,
+            inherit_from_azure_ad: Some(true),
+            storage_account: None,
+            storage_key: None,
+            storage_sas_token: None,
+        }),
+        endpoint_url: None,
+        google_credentials: None,
         volume_snapshot,
     };
 
