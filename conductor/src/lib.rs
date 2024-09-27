@@ -1,4 +1,5 @@
 pub mod aws;
+pub mod cloud;
 pub mod errors;
 pub mod extensions;
 pub mod gcp;
@@ -7,7 +8,10 @@ pub mod monitoring;
 pub mod routes;
 pub mod types;
 
-use crate::aws::cloudformation::{AWSConfigState, CloudFormationParams};
+use crate::{
+    aws::cloudformation::{AWSConfigState, CloudFormationParams},
+    cloud::CloudProvider,
+};
 use aws_sdk_cloudformation::config::Region;
 use controller::apis::coredb_types::{CoreDB, CoreDBSpec};
 use errors::ConductorError;
@@ -18,7 +22,7 @@ use kube::api::{DeleteParams, ListParams, Patch, PatchParams};
 
 use chrono::{DateTime, SecondsFormat, Utc};
 use kube::{Api, Client, ResourceExt};
-use log::{debug, info};
+use log::{debug, info, warn};
 use serde_json::{from_str, to_string, Value};
 use std::{
     collections::hash_map::DefaultHasher,
@@ -27,6 +31,7 @@ use std::{
 
 pub type Result<T, E = ConductorError> = std::result::Result<T, E>;
 
+#[allow(clippy::too_many_arguments)]
 pub async fn generate_spec(
     org_id: &str,
     entity_name: &str,
@@ -35,18 +40,38 @@ pub async fn generate_spec(
     namespace: &str,
     backups_bucket: &str,
     spec: &CoreDBSpec,
-) -> Value {
+    cloud_provider: &CloudProvider,
+) -> Result<Value, ConductorError> {
     let mut spec = spec.clone();
-    // Add the bucket name into the backups_path if it's not already there
-    if let Some(restore) = &mut spec.restore {
-        if let Some(backups_path) = &mut restore.backups_path {
-            if !backups_path.starts_with(&format!("s3://{}", backups_bucket)) {
-                let path_suffix = backups_path.trim_start_matches("s3://");
-                *backups_path = format!("s3://{}/{}", backups_bucket, path_suffix);
+
+    match cloud_provider {
+        CloudProvider::AWS | CloudProvider::GCP => {
+            let prefix = cloud_provider.prefix();
+
+            // Format the backups_path with the correct prefix
+            if let Some(restore) = &mut spec.restore {
+                if let Some(backups_path) = &mut restore.backups_path {
+                    let clean_path = remove_known_prefixes(backups_path);
+                    if clean_path.starts_with(backups_bucket) {
+                        // If the path already includes the bucket, just add the prefix
+                        *backups_path = format!("{}{}", prefix, clean_path);
+                    } else {
+                        // If the path doesn't include the bucket, add both prefix and bucket
+                        *backups_path = format!("{}{}/{}", prefix, backups_bucket, clean_path);
+                    }
+                }
             }
         }
+        CloudProvider::Unknown => {
+            warn!(
+                "Unknown cloud provider or cloud provider is disabled, restore spec removed from Spec value",
+            );
+            // Remove the restore information if the cloud provider is unknown
+            spec.restore = None;
+        }
     }
-    serde_json::json!({
+
+    Ok(serde_json::json!({
         "apiVersion": "coredb.io/v1alpha1",
         "kind": "CoreDB",
         "metadata": {
@@ -59,7 +84,18 @@ pub async fn generate_spec(
             }
         },
         "spec": spec,
-    })
+    }))
+}
+
+// Remove known prefixes from the backup path
+fn remove_known_prefixes(path: &str) -> &str {
+    let known_prefixes = ["s3://", "gs://", "https://"];
+    for prefix in &known_prefixes {
+        if let Some(stripped) = path.strip_prefix(prefix) {
+            return stripped;
+        }
+    }
+    path
 }
 
 pub fn get_data_plane_id_from_coredb(coredb: &CoreDB) -> Result<String, Box<ConductorError>> {
@@ -636,16 +672,19 @@ mod tests {
             }),
             ..CoreDBSpec::default()
         };
+        let cloud_provider = CloudProvider::AWS;
         let result = generate_spec(
             "org-id",
             "entity-name",
             "instance-id",
-            "data-plane-id",
+            "aws_data_1_use1",
             "namespace",
             "my-bucket",
             &spec,
+            &cloud_provider,
         )
-        .await;
+        .await
+        .expect("Failed to generate spec");
         let expected_backups_path = "s3://my-bucket/coredb/coredb/org-coredb-inst-pgtrunkio-dev";
         assert_eq!(
             result["spec"]["restore"]["backupsPath"].as_str().unwrap(),
@@ -664,16 +703,19 @@ mod tests {
             }),
             ..CoreDBSpec::default()
         };
+        let cloud_provider = CloudProvider::AWS;
         let result = generate_spec(
             "org-id",
             "entity-name",
             "instance-id",
-            "data-plane-id",
+            "aws_data_1_use1",
             "namespace",
             "my-bucket",
             &spec,
+            &cloud_provider,
         )
-        .await;
+        .await
+        .expect("Failed to generate spec");
         let expected_backups_path = "s3://my-bucket/coredb/coredb/org-coredb-inst-pgtrunkio-dev";
         assert_eq!(
             result["spec"]["restore"]["backupsPath"].as_str().unwrap(),
@@ -690,16 +732,19 @@ mod tests {
             }),
             ..CoreDBSpec::default()
         };
+        let cloud_provider = CloudProvider::AWS;
         let result = generate_spec(
             "org-id",
             "entity-name",
             "instance-id",
-            "data-plane-id",
+            "aws_data_1_use1",
             "namespace",
             "my-bucket",
             &spec,
+            &cloud_provider,
         )
-        .await;
+        .await
+        .expect("Failed to generate spec");
         assert!(result["spec"]["restore"]["backupsPath"].is_null());
     }
 
@@ -709,16 +754,77 @@ mod tests {
             restore: None,
             ..CoreDBSpec::default()
         };
+        let cloud_provider = CloudProvider::AWS;
         let result = generate_spec(
             "org-id",
             "entity-name",
             "instance-id",
-            "data-plane-id",
+            "aws_data_1_use1",
             "namespace",
             "my-bucket",
             &spec,
+            &cloud_provider,
         )
-        .await;
+        .await
+        .expect("Failed to generate spec");
         assert!(result["spec"]["restore"].is_null());
+    }
+
+    #[tokio::test]
+    async fn test_generate_spec_with_non_matching_gcp_bucket() {
+        let spec = CoreDBSpec {
+            restore: Some(Restore {
+                backups_path: Some("gs://v2/test-instance".to_string()),
+                ..Restore::default()
+            }),
+            ..CoreDBSpec::default()
+        };
+        let cloud_provider = CloudProvider::GCP;
+        let result = generate_spec(
+            "org-id",
+            "entity-name",
+            "instance-id",
+            "gcp_data_1_usc1",
+            "namespace",
+            "my-bucket",
+            &spec,
+            &cloud_provider,
+        )
+        .await
+        .expect("Failed to generate spec");
+        let expected_backups_path = "gs://my-bucket/v2/test-instance";
+        assert_eq!(
+            result["spec"]["restore"]["backupsPath"].as_str().unwrap(),
+            expected_backups_path
+        );
+    }
+
+    #[tokio::test]
+    async fn test_generate_spec_with_gcp_bucket() {
+        let spec = CoreDBSpec {
+            restore: Some(Restore {
+                backups_path: Some("gs://my-bucket/v2/test-instance".to_string()),
+                ..Restore::default()
+            }),
+            ..CoreDBSpec::default()
+        };
+        let cloud_provider = CloudProvider::GCP;
+        let result = generate_spec(
+            "org-id",
+            "entity-name",
+            "instance-id",
+            "gcp_data_1_usc1",
+            "namespace",
+            "my-bucket",
+            &spec,
+            &cloud_provider,
+        )
+        .await
+        .expect("Failed to generate spec");
+        let expected_backups_path = "gs://my-bucket/v2/test-instance";
+        assert_eq!(
+            result["spec"]["restore"]["backupsPath"].as_str().unwrap(),
+            expected_backups_path
+        );
     }
 }

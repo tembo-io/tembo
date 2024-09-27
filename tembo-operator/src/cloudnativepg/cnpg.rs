@@ -2243,7 +2243,7 @@ pub(crate) async fn get_scheduled_backups(cdb: &CoreDB, ctx: Arc<Context>) -> Ve
     let scheduled_backup: Api<ScheduledBackup> = Api::namespaced(ctx.client.clone(), &namespace);
 
     // Create a ListParams object to filter the ScheduledBackups
-    let lp = ListParams::default().fields(&format!("metadata.name={}", instance_name));
+    let lp = ListParams::default().fields(&format!("metadata.namespace={}", instance_name));
 
     match scheduled_backup.list(&lp).await {
         Ok(list) => {

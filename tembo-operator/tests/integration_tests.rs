@@ -1324,7 +1324,7 @@ mod test {
         // Assert no tables found
         let result =
             psql_with_retry(context.clone(), coredb_resource.clone(), "\\dt".to_string()).await;
-        println!("psql out: {}", result.stdout.clone().unwrap());
+        // println!("psql out: {}", result.stdout.clone().unwrap());
         assert!(!result.stdout.clone().unwrap().contains("customers"));
 
         let result = psql_with_retry(
@@ -1341,13 +1341,13 @@ mod test {
             .to_string(),
         )
         .await;
-        println!("{}", result.stdout.clone().unwrap());
+        // println!("{}", result.stdout.clone().unwrap());
         assert!(result.stdout.clone().unwrap().contains("CREATE TABLE"));
 
         // Assert table 'customers' exists
         let result =
             psql_with_retry(context.clone(), coredb_resource.clone(), "\\dt".to_string()).await;
-        println!("{}", result.stdout.clone().unwrap());
+        // println!("{}", result.stdout.clone().unwrap());
         assert!(result.stdout.clone().unwrap().contains("customers"));
 
         let result = wait_until_psql_contains(
@@ -1359,14 +1359,15 @@ mod test {
         )
         .await;
 
-        println!("{}", result.stdout.clone().unwrap());
+        // println!("{}", result.stdout.clone().unwrap());
         assert!(result.stdout.clone().unwrap().contains("aggs_for_vecs"));
 
         // Check for metrics and availability
         let metric_name = format!("cnpg_collector_up{{cluster=\"{}\"}} 1", name);
         match wait_for_metric(pods.clone(), pod_name.to_string(), &metric_name).await {
-            Ok(result_stdout) => {
-                println!("Metric found: {}", result_stdout);
+            Ok(_result_stdout) => {
+                println!("Metric found for: {}", pod_name);
+                // println!("Metrics: {}", result_stdout);
             }
             Err(e) => {
                 panic!("Failed to find metric: {}", e);
@@ -1375,8 +1376,9 @@ mod test {
 
         // Look for the custom metric
         match wait_for_metric(pods.clone(), pod_name.to_string(), &test_metric_decr).await {
-            Ok(result_stdout) => {
-                println!("Metric found: {}", result_stdout);
+            Ok(_result_stdout) => {
+                println!("Metric found for: {}", pod_name);
+                // println!("Metrics: {}", result_stdout);
             }
             Err(e) => {
                 panic!("Failed to find metric: {}", e);
@@ -2168,7 +2170,7 @@ mod test {
             .as_ref()
             .expect("Annotations should be present");
         let basedomain = std::env::var("DATA_PLANE_BASEDOMAIN").unwrap();
-        let expected_hostname = format!("{}.{}", namespace, basedomain);
+        let expected_hostname = format!("dedicated.{}.{}", namespace, basedomain);
 
         assert_eq!(
             annotations
@@ -2233,6 +2235,63 @@ mod test {
                 .get("public")
                 .expect("Public label should be present"),
             "true"
+        );
+
+        let annotations = service
+            .metadata
+            .annotations
+            .as_ref()
+            .expect("Annotations should be present");
+        let basedomain = std::env::var("DATA_PLANE_BASEDOMAIN").unwrap();
+        let expected_hostname = format!("dedicated-ro.{}.{}", namespace, basedomain);
+
+        assert_eq!(
+            annotations
+                .get("external-dns.alpha.kubernetes.io/hostname")
+                .expect("Hostname annotation should be present"),
+            &expected_hostname
+        );
+
+        assert_eq!(
+            annotations
+                .get("service.beta.kubernetes.io/aws-load-balancer-internal")
+                .expect("AWS LB internal annotation should be present"),
+            &serde_json::Value::String("false".to_string())
+        );
+
+        assert_eq!(
+            annotations
+                .get("service.beta.kubernetes.io/aws-load-balancer-scheme")
+                .expect("AWS LB scheme annotation should be present"),
+            &serde_json::Value::String("internet-facing".to_string())
+        );
+
+        assert_eq!(
+            annotations
+                .get("service.beta.kubernetes.io/aws-load-balancer-nlb-target-type")
+                .expect("AWS LB NLB target type annotation should be present"),
+            &serde_json::Value::String("ip".to_string())
+        );
+
+        assert_eq!(
+            annotations
+                .get("service.beta.kubernetes.io/aws-load-balancer-type")
+                .expect("AWS LB type annotation should be present"),
+            &serde_json::Value::String("nlb-ip".to_string())
+        );
+
+        assert_eq!(
+            annotations
+                .get("service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol")
+                .expect("AWS LB healthcheck protocol annotation should be present"),
+            &serde_json::Value::String("TCP".to_string())
+        );
+
+        assert_eq!(
+            annotations
+                .get("service.beta.kubernetes.io/aws-load-balancer-healthcheck-port")
+                .expect("AWS LB healthcheck port annotation should be present"),
+            &serde_json::Value::String("5432".to_string())
         );
 
         // Disable dedicated networking
