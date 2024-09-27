@@ -1,5 +1,6 @@
 pub use crate::{
     apis::coredb_types::CoreDB,
+    cloudnativepg::backups::Backup,
     cloudnativepg::clusters::{Cluster, ClusterStatusConditionsStatus},
     cloudnativepg::poolers::Pooler,
     cloudnativepg::scheduledbackups::ScheduledBackup,
@@ -7,8 +8,9 @@ pub use crate::{
     extensions::database_queries::is_not_restarting,
     patch_cdb_status_merge, requeue_normal_with_jitter, Context, RESTARTED_AT,
 };
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::Time;
 use kube::{
-    api::{Patch, PatchParams},
+    api::{DeleteParams, ListParams, Patch, PatchParams},
     runtime::controller::Action,
     Api, ResourceExt,
 };
@@ -315,6 +317,60 @@ pub(crate) async fn is_image_updated(
 
                 // Update Cluster with patch
                 patch_cluster_merge(cdb, &ctx, patch).await?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+// remove_stalled_backups function takes a CoreDB, Conext and removed any stalled
+// backups. A backup is considered stalled if it's older than 24 hours and does not have a phase set.
+#[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any()))]
+pub(crate) async fn removed_stalled_backups(
+    cdb: &CoreDB,
+    ctx: &Arc<Context>,
+) -> Result<(), Action> {
+    let name = cdb.name_any();
+    let namespace = cdb.metadata.namespace.as_ref().ok_or_else(|| {
+        error!("Namespace is empty for instance: {}.", name);
+        Action::requeue(Duration::from_secs(300))
+    })?;
+
+    let backup_api: Api<Backup> = Api::namespaced(ctx.client.clone(), namespace);
+
+    // List all backups for the cluster
+    let lp = ListParams {
+        label_selector: Some(format!("cnpg.io/cluster={}", name.as_str())),
+        ..ListParams::default()
+    };
+    let backups = backup_api.list(&lp).await.map_err(|e| {
+        error!("Error listing backups: {}", e);
+        Action::requeue(Duration::from_secs(300))
+    })?;
+
+    let twenty_four_hours_ago = Time(chrono::Utc::now() - chrono::Duration::hours(24));
+
+    // Filter backups that do not have a status set and are older than 24 hours
+    for backup in &backups.items {
+        if backup.status.is_none() {
+            if let Some(creation_time) = backup.metadata.creation_timestamp.as_ref() {
+                if creation_time < &twenty_four_hours_ago {
+                    info!("Deleting stalled backup: {}", backup.name_any());
+                    match backup_api
+                        .delete(&backup.name_any(), &DeleteParams::default())
+                        .await
+                    {
+                        Ok(_) => {
+                            info!("Successfully deleted stalled backup: {}", backup.name_any())
+                        }
+                        Err(e) => error!(
+                            "Failed to delete stalled backup {}: {}",
+                            backup.name_any(),
+                            e
+                        ),
+                    }
+                }
             }
         }
     }

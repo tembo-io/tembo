@@ -15,6 +15,7 @@ use k8s_openapi::api::apps::v1::Deployment;
 use crate::app_service::manager::get_appservice_deployment_objects;
 use crate::cloudnativepg::cnpg_utils::{
     get_pooler_instances, patch_cluster_merge, patch_pooler_merge, patch_scheduled_backup_merge,
+    removed_stalled_backups,
 };
 use std::sync::Arc;
 use std::time::Duration;
@@ -203,6 +204,9 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
     patch_cdb_status_merge(&coredbs, &name, patch_status).await?;
 
     if cdb.spec.stop {
+        // Only remove stalled backups if the instance is stopped/paused
+        info!("Remove any stalled backups for paused instance {}", name);
+        removed_stalled_backups(cdb, ctx).await?;
         info!("Fully reconciled stopped instance {}", name);
         return Err(requeue_normal_with_jitter());
     }
