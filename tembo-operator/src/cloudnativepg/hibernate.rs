@@ -180,6 +180,10 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
                 name, hibernation_value
             );
             if cdb.spec.stop {
+                // Only remove stalled backups if the instance is stopped/paused
+                info!("Remove any stalled backups for paused instance {}", name);
+                removed_stalled_backups(cdb, ctx).await?;
+
                 info!("Fully reconciled stopped instance {}", name);
                 return Err(requeue_normal_with_jitter());
             }
@@ -204,9 +208,6 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
     patch_cdb_status_merge(&coredbs, &name, patch_status).await?;
 
     if cdb.spec.stop {
-        // Only remove stalled backups if the instance is stopped/paused
-        info!("Remove any stalled backups for paused instance {}", name);
-        removed_stalled_backups(cdb, ctx).await?;
         info!("Fully reconciled stopped instance {}", name);
         return Err(requeue_normal_with_jitter());
     }
