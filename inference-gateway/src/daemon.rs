@@ -21,10 +21,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         info!("Spawning AI billing reporter thread");
 
         let pg_conn = cfg.pg_conn_str.clone();
+        let billing_queue_conn = cfg.billing_queue_conn_str.clone();
 
         background_threads_guard.push(tokio::spawn(async move {
             loop {
-                if let Err(err) = run_events_reporter(pg_conn.clone()).await {
+                if let Err(err) =
+                    run_events_reporter(pg_conn.clone(), billing_queue_conn.clone()).await
+                {
                     log::error!("Tembo AI billing reporter error: {err}");
                     log::info!("Restarting Tembo AI billing reporter in 30 sec");
                     tokio::time::sleep(Duration::from_secs(30)).await;

@@ -38,8 +38,6 @@ trunk_installs:
     version: 1.6.2
   - name: pgvector
     version: 0.7.4
-  - name: vectorscale
-    version: 0.3.0
   - name: pg_ivm
     version: 1.9.0
 extensions:
@@ -69,11 +67,6 @@ extensions:
     - database: postgres
       enabled: true
       version: 0.1.2
-  - name: vectorscale
-    locations:
-      - database: postgres
-        enabled: true
-        version: 0.3.0
   - name: pg_ivm
     locations:
     - database: postgres

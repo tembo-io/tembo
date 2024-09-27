@@ -3,10 +3,11 @@ use actix_web_opentelemetry::{PrometheusMetricsHandler, RequestTracing};
 use conductor::errors::ConductorError;
 use conductor::monitoring::CustomMetrics;
 use conductor::{
-    create_cloudformation, create_gcp_storage_workload_identity_binding, create_namespace,
-    create_or_update, delete, delete_cloudformation, delete_gcp_storage_workload_identity_binding,
-    delete_namespace, generate_cron_expression, generate_spec, get_coredb_error_without_status,
-    get_one, get_pg_conn, lookup_role_arn, restart_coredb, types,
+    cloud::CloudProvider, create_cloudformation, create_gcp_storage_workload_identity_binding,
+    create_namespace, create_or_update, delete, delete_cloudformation,
+    delete_gcp_storage_workload_identity_binding, delete_namespace, generate_cron_expression,
+    generate_spec, get_coredb_error_without_status, get_one, get_pg_conn, lookup_role_arn,
+    restart_coredb, types,
 };
 
 use crate::metrics_reporter::run_metrics_reporter;
@@ -136,6 +137,12 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         .expect("Failed to run database migrations");
 
     log::info!("Database migrations have been successfully applied.");
+
+    // Determine the cloud provider using the builder
+    let cloud_provider = CloudProvider::builder()
+        .gcp(is_gcp)
+        .aws(is_cloud_formation)
+        .build();
 
     loop {
         // Read from queue (check for new message)
@@ -357,8 +364,9 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     &namespace,
                     &backup_archive_bucket,
                     &coredb_spec,
+                    &cloud_provider,
                 )
-                .await;
+                .await?;
 
                 info!("{}: Creating or updating spec", read_msg.msg_id);
                 // create or update CoreDB
