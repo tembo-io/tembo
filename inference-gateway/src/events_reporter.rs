@@ -116,21 +116,20 @@ fn get_hourly_chunks(
     while chunk_start < last_complete_hour {
         let chunk_end = chunk_start + ChronoDuration::hours(1) - ChronoDuration::nanoseconds(1);
         chunks.push((chunk_start, chunk_end));
-        chunk_start = chunk_start + ChronoDuration::hours(1);
+        chunk_start += ChronoDuration::hours(1);
     }
 
     chunks
 }
 
-pub async fn run_events_reporter(pg_conn: String) -> Result<()> {
+pub async fn run_events_reporter(pg_conn: String, billing_queue_conn: String) -> Result<()> {
     // Run once per hour
     const SYNC_PERIOD: Duration = Duration::from_secs(60 * 60);
     const BILLING_QUEUE: &str = "billing_aws_data_1_use1";
 
-    let pool = db::connect(&pg_conn, 2).await?;
+    let inference_pool = db::connect(&pg_conn, 2).await?;
 
-    let queue = PGMQueueExt::new(pg_conn, 2).await?;
-
+    let queue = PGMQueueExt::new(billing_queue_conn, 2).await?;
     queue.init().await?;
     queue.create(BILLING_QUEUE).await?;
 
@@ -139,7 +138,7 @@ pub async fn run_events_reporter(pg_conn: String) -> Result<()> {
     loop {
         sync_interval.tick().await;
 
-        let last_reported_at = get_reporter_watermark(&pool)
+        let last_reported_at = get_reporter_watermark(&inference_pool)
             .await?
             .map(|watermark| watermark.last_reported_at)
             .unwrap_or(Utc::now() - Duration::from_secs(60 * 60));
@@ -148,7 +147,7 @@ pub async fn run_events_reporter(pg_conn: String) -> Result<()> {
         let chunks = get_hourly_chunks(last_reported_at, now);
 
         for (start_time, end_time) in chunks {
-            enqueue_event(&pool, &queue, BILLING_QUEUE, start_time, end_time).await?;
+            enqueue_event(&inference_pool, &queue, BILLING_QUEUE, start_time, end_time).await?;
         }
     }
 }
