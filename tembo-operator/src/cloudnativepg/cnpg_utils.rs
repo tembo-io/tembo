@@ -325,7 +325,8 @@ pub(crate) async fn is_image_updated(
 }
 
 // remove_stalled_backups function takes a CoreDB, Conext and removed any stalled
-// backups. A backup is considered stalled if it's older than 24 hours and does not have a phase set.
+// backups. A backup is considered stalled if it's older than 6 hours and does not have a status set.
+// If a status is missing this means that the backup was never started nor will it ever start.
 #[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any()))]
 pub(crate) async fn removed_stalled_backups(
     cdb: &CoreDB,
@@ -349,13 +350,13 @@ pub(crate) async fn removed_stalled_backups(
         Action::requeue(Duration::from_secs(300))
     })?;
 
-    let twenty_four_hours_ago = Time(chrono::Utc::now() - chrono::Duration::hours(24));
+    let stalled_time = Time(chrono::Utc::now() - chrono::Duration::hours(6));
 
     // Filter backups that do not have a status set and are older than 24 hours
     for backup in &backups.items {
         if backup.status.is_none() {
             if let Some(creation_time) = backup.metadata.creation_timestamp.as_ref() {
-                if creation_time < &twenty_four_hours_ago {
+                if creation_time < &stalled_time {
                     info!("Deleting stalled backup: {}", backup.name_any());
                     match backup_api
                         .delete(&backup.name_any(), &DeleteParams::default())
