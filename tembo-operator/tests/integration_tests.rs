@@ -1324,7 +1324,7 @@ mod test {
         // Assert no tables found
         let result =
             psql_with_retry(context.clone(), coredb_resource.clone(), "\\dt".to_string()).await;
-        println!("psql out: {}", result.stdout.clone().unwrap());
+        // println!("psql out: {}", result.stdout.clone().unwrap());
         assert!(!result.stdout.clone().unwrap().contains("customers"));
 
         let result = psql_with_retry(
@@ -1341,13 +1341,13 @@ mod test {
             .to_string(),
         )
         .await;
-        println!("{}", result.stdout.clone().unwrap());
+        // println!("{}", result.stdout.clone().unwrap());
         assert!(result.stdout.clone().unwrap().contains("CREATE TABLE"));
 
         // Assert table 'customers' exists
         let result =
             psql_with_retry(context.clone(), coredb_resource.clone(), "\\dt".to_string()).await;
-        println!("{}", result.stdout.clone().unwrap());
+        // println!("{}", result.stdout.clone().unwrap());
         assert!(result.stdout.clone().unwrap().contains("customers"));
 
         let result = wait_until_psql_contains(
@@ -1359,14 +1359,15 @@ mod test {
         )
         .await;
 
-        println!("{}", result.stdout.clone().unwrap());
+        // println!("{}", result.stdout.clone().unwrap());
         assert!(result.stdout.clone().unwrap().contains("aggs_for_vecs"));
 
         // Check for metrics and availability
         let metric_name = format!("cnpg_collector_up{{cluster=\"{}\"}} 1", name);
         match wait_for_metric(pods.clone(), pod_name.to_string(), &metric_name).await {
-            Ok(result_stdout) => {
-                println!("Metric found: {}", result_stdout);
+            Ok(_result_stdout) => {
+                println!("Metric found for: {}", pod_name);
+                // println!("Metrics: {}", result_stdout);
             }
             Err(e) => {
                 panic!("Failed to find metric: {}", e);
@@ -1375,8 +1376,9 @@ mod test {
 
         // Look for the custom metric
         match wait_for_metric(pods.clone(), pod_name.to_string(), &test_metric_decr).await {
-            Ok(result_stdout) => {
-                println!("Metric found: {}", result_stdout);
+            Ok(_result_stdout) => {
+                println!("Metric found for: {}", pod_name);
+                // println!("Metrics: {}", result_stdout);
             }
             Err(e) => {
                 panic!("Failed to find metric: {}", e);
