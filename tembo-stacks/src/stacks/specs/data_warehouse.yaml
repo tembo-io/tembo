@@ -45,7 +45,7 @@ trunk_installs:
   - name: redis_fdw
     version: 1.0.0
   - name: wrappers
-    version: 0.3.1
+    version: 0.4.2
   - name: multicorn
     version: 2.5.0
   - name: pg_tier 
@@ -94,7 +94,7 @@ extensions:
     locations:
       - database: postgres
         enabled: true
-        version: 0.3.1
+        version: 0.4.2
   - name: multicorn
     description: multicorn
     locations:
