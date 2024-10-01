@@ -1,6 +1,6 @@
-# :construction: Tembo Inference Server :construction:
+# Tembo Inference Server
 
-This is a LLM hosting service for the Tembo Platform. It is built on top of [vLLM](https://github.com/vllm-project/vllm), and provides additional functionality for audit logging to enable tracking usage metrics hosted models.
+This is a LLM hosting service for the Tembo Platform. It is built on top of [vLLM](https://github.com/vllm-project/vllm), and provides additional functionality for audit logging to enable tracking usage metrics for hosted models.
 
 ## Architecture
 

@@ -11,6 +11,41 @@ use gateway::db::{self, connect};
 
 #[ignore]
 #[actix_web::test]
+async fn test_model_mapping() {
+    env_logger::init();
+    let app = common::get_test_app(false).await;
+
+    let mut rng = rand::thread_rng();
+    let rnd = rng.gen_range(0..100000);
+    let instance = format!("MY-TEST-INSTANCE-{}", rnd);
+    let model = "meta-llama/Meta-Llama-3-8B-Instruct";
+    let payload = serde_json::json!({
+        "model": model,
+        "messages": [{"role": "user", "content": "San Francisco is a..."}]
+    });
+    let req = test::TestRequest::post()
+        .uri("/v1/chat/completions")
+        .insert_header(("X-TEMBO-ORG", "MY-TEST-ORG"))
+        .insert_header(("X-TEMBO-INSTANCE", instance.clone()))
+        .insert_header((header::CONTENT_TYPE, "application/json"))
+        .set_payload(payload.to_string())
+        .to_request();
+
+    let resp = test::call_service(&app, req).await;
+    assert!(
+        resp.status().is_success(),
+        "Failure: {:?}, {:?}",
+        resp.status(),
+        resp.into_body()
+    );
+    let body: serde_json::Value = test::read_body_json(resp).await;
+
+    let model = body.get("model").unwrap().as_str().unwrap();
+    assert_eq!(model, "meta-llama/Llama-3.1-8B-Instruct");
+}
+
+#[ignore]
+#[actix_web::test]
 async fn test_probes() {
     let app = common::get_test_app(false).await;
 

@@ -25,6 +25,7 @@ tokio = { version = "1", features = ["full"] }
 url = "2.5.0"
 uuid = { version = "1.10.0", features = ["v4"] }
 pgmq = "0.29.2"
+lazy_static = "1.5.0"
 
 [dev-dependencies]
 actix-http = "3.6.0"

@@ -11,7 +11,7 @@ use crate::errors::{AuthError, PlatformError};
 
 pub async fn forward_request(
     req: HttpRequest,
-    body: web::Json<serde_json::Value>,
+    mut body: web::Json<serde_json::Value>,
     config: web::Data<crate::config::Config>,
     client: web::Data<reqwest::Client>,
     dbclient: web::Data<Arc<PgPool>>,
@@ -48,6 +48,23 @@ pub async fn forward_request(
     let mut new_url = config.llm_service_host_port.clone();
     new_url.set_path(path);
     new_url.set_query(req.uri().query());
+
+    let req_model = body.get("model").ok_or_else(|| {
+        PlatformError::InvalidQuery("missing `model` field in request body".to_string())
+    })?;
+
+    let requested_model: String = serde_json::from_value(req_model.to_owned())?;
+
+    // map model and update request if necessary
+    if let Some(model) = crate::models::map_model(&requested_model) {
+        log::debug!("Mapping model {} to {}", requested_model, model);
+        if let Some(obj) = body.as_object_mut() {
+            obj.insert(
+                "model".to_string(),
+                serde_json::Value::String(model.to_string()),
+            );
+        }
+    }
 
     // log request duration
     let start = std::time::Instant::now();

@@ -858,6 +858,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "env_logger",
+ "lazy_static",
  "log",
  "pgmq",
  "rand",

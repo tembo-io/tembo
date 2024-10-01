@@ -1,4 +1,4 @@
-FROM rust:1.79.0-slim-buster as builder
+FROM rust:1.81.0-slim-buster as builder
 
 RUN apt-get update && \
     apt-get install -y pkg-config libssl-dev && apt-get clean && \
