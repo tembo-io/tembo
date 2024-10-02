@@ -3,7 +3,7 @@
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "tembo-ai.fullname" $ }}-{{ $service.name | default "default-service" }}-inference-service
+  name: {{ include "tembo-ai.fullname" $ }}-{{ $service.name }}
   labels:
     {{- include "tembo-ai.inferenceService.labels" $ | nindent 4 }}
 spec:
