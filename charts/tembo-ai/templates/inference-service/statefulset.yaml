@@ -1,8 +1,9 @@
 {{- if .Values.inferenceService.services }}
-{{- $defaults := .Values.inferenceService.defaults }}
-{{- range $serviceName, $serviceConfig := .Values.inferenceService.services }}
-{{- $mergedConfig := fromYaml (include "tembo-ai.mergeConfigs" (dict "defaults" $defaults "service" $serviceConfig)) }}
-{{- if (default false $mergedConfig.enabled) }}
+  {{- $defaults := .Values.inferenceService.defaults }}
+  {{- range $serviceName, $serviceConfig := .Values.inferenceService.services }}
+    {{- $mergedConfig := fromYaml (include "tembo-ai.mergeConfigs" (dict "defaults" $defaults "service" $serviceConfig)) }}
+    {{- $imageConfig := fromYaml (include "tembo-ai.inferenceService.imageConfig" (dict "defaultConfig" $.Values.inferenceService.defaults.image "serviceConfig" $serviceConfig.image)) }}
+    {{- if (default false $mergedConfig.enabled) }}
 ---
 apiVersion: apps/v1
 kind: StatefulSet
@@ -10,7 +11,8 @@ metadata:
   name: {{ include "tembo-ai.fullname" $ }}-{{ $serviceName }}
   namespace: {{ include "tembo-ai.namespace" $ }}
   labels:
-    {{- include "tembo-ai.inferenceService.labels" . | nindent 4 }}
+    {{- include "tembo-ai.inferenceService.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $serviceName }}
 spec:
   replicas: {{ $mergedConfig.replicaCount }}
   selector:
@@ -39,13 +41,13 @@ spec:
         - name: inference-service
           securityContext:
             {{- toYaml $mergedConfig.securityContext | nindent 12 }}
-          image: "{{ $mergedConfig.image.repository }}:{{ $mergedConfig.image.tag | default $.Chart.AppVersion }}"
+          image: "{{ $imageConfig.repository }}:{{ $imageConfig.tag }}"
           imagePullPolicy: {{ $mergedConfig.image.pullPolicy }}
           ports:
             - name: http
               containerPort: {{ $mergedConfig.service.port }}
               protocol: TCP
-          {{- if and $mergedConfig.podMonitor.enabled (ne $mergedConfig.podMonitor.port "http") }}
+          {{- if and $mergedConfig.podMonitor.enabled (ne $mergedConfig.podMonitor.portName "http") }}
             - name: {{ $mergedConfig.podMonitor.portName }}
               containerPort: {{ $mergedConfig.podMonitor.containerPort }}
               protocol: TCP
@@ -109,6 +111,7 @@ spec:
         name: models
         labels:
           {{- include "tembo-ai.inferenceService.labels" $ | nindent 10 }}
+          app.kubernetes.io/component: {{ $serviceName }}
       spec:
         accessModes:
           - {{ $mergedConfig.persistence.accessMode }}
@@ -119,6 +122,6 @@ spec:
         storageClassName: {{ $mergedConfig.persistence.storageClass }}
         {{- end }}
   {{- end }}
-{{- end }}
-{{- end }}
+    {{- end }}
+  {{- end }}
 {{- end }}

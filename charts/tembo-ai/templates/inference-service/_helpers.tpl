@@ -2,7 +2,6 @@
 Inference service specific labels
 */}}
 {{- define "tembo-ai.inferenceService.labels" -}}
-app.kubernetes.io/component: inference-service
 {{ include "tembo-ai.labels" . }}
 {{- end }}
 
@@ -25,27 +24,30 @@ Create the name of the inference-service service account to use
 Define the namespace to use across the inference-service templates
 */}}
 {{- define "tembo-ai.namespace" -}}
-{{- default .Release.Namespace -}}
+{{- default .Release.Namespace .Values.namespace }}
 {{- end -}}
 
 {{/*
-Create a default fully qualified app name.
-We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
-If release name contains chart name it will be used as a full name.
+Define the image configuration with override options
 */}}
-{{- define "tembo-ai.fullname" -}}
-{{- if .Values.fullnameOverride }}
-{{- .Values.fullnameOverride | trunc 63 | trimSuffix "-" }}
-{{- else }}
-{{- $name := default .Chart.Name .Values.nameOverride }}
-{{- if contains $name .Release.Name }}
-{{- .Release.Name | trunc 63 | trimSuffix "-" }}
-{{- else }}
-{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" }}
-{{- end }}
-{{- end }}
-{{- end }}
-
+{{- define "tembo-ai.inferenceService.imageConfig" -}}
+{{- $defaultConfig := .defaultConfig -}}
+{{- $serviceConfig := .serviceConfig -}}
+{{- $result := dict -}}
+{{- range $key, $value := $defaultConfig -}}
+  {{- if hasKey $serviceConfig $key -}}
+    {{- $_ := set $result $key (index $serviceConfig $key) -}}
+  {{- else -}}
+    {{- $_ := set $result $key $value -}}
+  {{- end -}}
+{{- end -}}
+{{- range $key, $value := $serviceConfig -}}
+  {{- if not (hasKey $result $key) -}}
+    {{- $_ := set $result $key $value -}}
+  {{- end -}}
+{{- end -}}
+{{- $result | toYaml -}}
+{{- end -}}
 
 {{/*
 Merge configurations with priority to service-specific configs, handling nested structures
