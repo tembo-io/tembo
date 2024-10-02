@@ -1,112 +1,116 @@
+{{- range $service := .Values.inferenceService }}
+  {{- if (default false $service.statefulSet.enabled) }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "tembo-ai.fullname" . }}-inference-service
+  name: {{ include "tembo-ai.fullname" $ }}-{{ $service.name | default "default-service" }}-inference-service
   labels:
-    {{- include "tembo-ai.inferenceService.labels" . | nindent 4 }}
+    {{- include "tembo-ai.inferenceService.labels" $ | nindent 4 }}
 spec:
-  replicas: {{ .Values.inferenceService.replicaCount }}
+  replicas: {{ default (index $.Values.inferenceService 0).replicaCount $service.replicaCount }}
   selector:
     matchLabels:
-      {{- include "tembo-ai.inferenceService.selectorLabels" . | nindent 6 }}
-  serviceName: {{ include "tembo-ai.fullname" . }}-inference-service
+      {{- include "tembo-ai.inferenceService.selectorLabels" $ | nindent 6 }}
+  serviceName: {{ include "tembo-ai.fullname" $ }}-{{ $service.name | default "default-service" }}-inference-service
   template:
     metadata:
-      {{- with .Values.inferenceService.podAnnotations }}
+      {{- with $service.podAnnotations }}
       annotations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        {{- include "tembo-ai.inferenceService.selectorLabels" . | nindent 8 }}
+        {{- include "tembo-ai.inferenceService.selectorLabels" $ | nindent 8 }}
     spec:
-      {{- with .Values.inferenceService.imagePullSecrets }}
+      {{- with $service.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "tembo-ai.inferenceService.serviceAccountName" . }}
+      serviceAccountName: {{ include "tembo-ai.inferenceService.serviceAccountName" $ }}-{{ $service.name | default "default-service" }}
       securityContext:
-        {{- toYaml .Values.inferenceService.podSecurityContext | nindent 8 }}
+        {{- toYaml $service.podSecurityContext | nindent 8 }}
       containers:
         - name: inference-service
           securityContext:
-            {{- toYaml .Values.inferenceService.securityContext | nindent 12 }}
-          image: "{{ .Values.inferenceService.image.repository }}:{{ .Values.inferenceService.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.inferenceService.image.pullPolicy }}
+            {{- toYaml $service.securityContext | nindent 12 }}
+          image: "{{ $service.image.repository }}:{{ $service.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ $service.image.pullPolicy }}
           ports:
             - name: http
-              containerPort: {{ .Values.inferenceService.service.port }}
+              containerPort: {{ $service.service.port }}
               protocol: TCP
-          {{- if and .Values.inferenceService.podMonitor.enabled (ne .Values.inferenceService.podMonitor.port "http") }}
-            - name: {{ .Values.inferenceService.podMonitor.portName }}
-              containerPort: {{ .Values.inferenceService.podMonitor.containerPort }}
+          {{- if and $service.podMonitor.enabled (ne $service.podMonitor.port "http") }}
+            - name: {{ $service.podMonitor.portName }}
+              containerPort: {{ $service.podMonitor.containerPort }}
               protocol: TCP
           {{- end }}
-          {{- if .Values.inferenceService.livenessProbe.enabled }}
+          {{- if $service.livenessProbe.enabled }}
           livenessProbe:
             httpGet:
-              path: {{ .Values.inferenceService.livenessProbe.path }}
-              port: {{ .Values.inferenceService.livenessProbe.port }}
+              path: {{ $service.livenessProbe.path }}
+              port: {{ $service.livenessProbe.port }}
           {{- end }}
-          {{- if .Values.inferenceService.readinessProbe.enabled }}
+          {{- if $service.readinessProbe.enabled }}
           readinessProbe:
             httpGet:
-              path: {{ .Values.inferenceService.readinessProbe.path }}
-              port: {{ .Values.inferenceService.readinessProbe.port }}
+              path: {{ $service.readinessProbe.path }}
+              port: {{ $service.readinessProbe.port }}
           {{- end }}
-          {{- if .Values.inferenceService.startupProbe.enabled }}
+          {{- if $service.startupProbe.enabled }}
           startupProbe:
             httpGet:
-              path: {{ .Values.inferenceService.startupProbe.path }}
-              port: {{ .Values.inferenceService.startupProbe.port }}
-            failureThreshold: {{ .Values.inferenceService.startupProbe.failureThreshold }}
-            periodSeconds: {{ .Values.inferenceService.startupProbe.periodSeconds }}
+              path: {{ $service.startupProbe.path }}
+              port: {{ $service.startupProbe.port }}
+            failureThreshold: {{ $service.startupProbe.failureThreshold }}
+            periodSeconds: {{ $service.startupProbe.periodSeconds }}
           {{- end }}
           resources:
-            {{- toYaml .Values.inferenceService.resources | nindent 12 }}
-          {{- with .Values.inferenceService.args }}
+            {{- toYaml $service.resources | nindent 12 }}
+          {{- with $service.args }}
           args:
             {{- toYaml . | nindent 10 }}
           {{- end }}
-          {{- with .Values.inferenceService.command }}
+          {{- with $service.command }}
           command:
             {{- toYaml . | nindent 10 }}
           {{- end }}
-          {{- with .Values.inferenceService.env }}
+          {{- with $service.env }}
           env:
             {{- toYaml . | nindent 10 }}
           {{- end }}
-          {{- if .Values.inferenceService.persistence.enabled }}
+          {{- if $service.persistence.enabled }}
           volumeMounts:
             - name: models
-              mountPath: {{ .Values.inferenceService.persistence.mountPath }}
+              mountPath: {{ $service.persistence.mountPath }}
           {{- end }}
-      {{- with .Values.inferenceService.nodeSelector }}
+      {{- with $service.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.inferenceService.affinity }}
+      {{- with $service.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.inferenceService.tolerations }}
+      {{- with $service.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
   volumeClaimTemplates:
-    {{- if .Values.inferenceService.persistence.enabled }}
+    {{- if $service.persistence.enabled }}
     - apiVersion: v1
       kind: PersistentVolumeClaim
       metadata:
         name: models
         labels:
-          {{- include "tembo-ai.inferenceService.labels" . | nindent 8 }}
+          {{- include "tembo-ai.inferenceService.labels" $ | nindent 8 }}
       spec:
         accessModes:
-          - {{ .Values.inferenceService.persistence.accessMode }}
+          - {{ $service.persistence.accessMode | default (index $.Values.inferenceService 0).persistence.accessMode }}
         resources:
           requests:
-            storage: {{ .Values.inferenceService.persistence.size }}
-        {{- if .Values.inferenceService.persistence.storageClass }}
-        storageClassName: {{ .Values.inferenceService.persistence.storageClass }}
+            storage: {{ $service.persistence.size | default (index $.Values.inferenceService 0).persistence.size }}
+        {{- if $service.persistence.storageClass }}
+        storageClassName: {{ $service.persistence.storageClass }}
         {{- end }}
     {{- end }}
+{{- end }}
+{{- end }}

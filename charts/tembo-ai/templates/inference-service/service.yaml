@@ -1,16 +1,20 @@
+{{- range $service := .Values.inferenceService }}
+  {{- if (default false $service.service.enabled) }}
 apiVersion: v1
 kind: Service
 metadata:
-  name: {{ include "tembo-ai.fullname" . }}-service
+  name: {{ include "tembo-ai.fullname" $ }}-{{ $service.name | default "default-service" }}
   labels:
-    {{- include "tembo-ai.inferenceService.labels" . | nindent 4 }}
+    {{- include "tembo-ai.inferenceService.labels" $ | nindent 4 }}
 spec:
   clusterIP: None
-  type: {{ .Values.inferenceService.service.type }}
+  type: {{ default (index $.Values.inferenceService 0).service.type $service.service.type }}
   ports:
-    - port: {{ .Values.inferenceService.service.port }}
+    - port: {{ default (index $.Values.inferenceService 0).service.port $service.service.port }}
       targetPort: http
       protocol: TCP
       name: http
   selector:
-    {{- include "tembo-ai.inferenceService.selectorLabels" . | nindent 4 }}
+    {{- include "tembo-ai.inferenceService.selectorLabels" $ | nindent 4 }}
+  {{- end }}
+{{- end }}
