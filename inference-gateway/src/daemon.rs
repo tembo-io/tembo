@@ -10,6 +10,8 @@ use tokio::sync::Mutex;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    env_logger::init();
+
     let cfg = Config::new().await;
 
     let background_threads: Arc<Mutex<Vec<tokio::task::JoinHandle<()>>>> =
