@@ -1,8 +1,7 @@
 {{- if .Values.inferenceService.services }}
   {{- $defaults := .Values.inferenceService.defaults }}
   {{- range $serviceName, $serviceConfig := .Values.inferenceService.services }}
-    {{- $mergedConfig := fromYaml (include "tembo-ai.mergeConfigs" (dict "defaults" $defaults "service" $serviceConfig)) }}
-    {{- $imageConfig := fromYaml (include "tembo-ai.inferenceService.imageConfig" (dict "defaultConfig" $.Values.inferenceService.defaults.image "serviceConfig" $serviceConfig.image)) }}
+    {{- $mergedConfig := fromYaml (include "tembo-ai.inferenceService.mergeConfigs" (dict "defaults" $defaults "service" $serviceConfig)) }}
     {{- if (default false $mergedConfig.enabled) }}
 ---
 apiVersion: apps/v1
@@ -41,7 +40,7 @@ spec:
         - name: inference-service
           securityContext:
             {{- toYaml $mergedConfig.securityContext | nindent 12 }}
-          image: "{{ $imageConfig.repository }}:{{ $imageConfig.tag }}"
+          image: "{{ $mergedConfig.image.repository }}:{{ $mergedConfig.image.tag }}"
           imagePullPolicy: {{ $mergedConfig.image.pullPolicy }}
           ports:
             - name: http

@@ -2,8 +2,15 @@
 Expand the name of the chart.
 */}}
 {{- define "tembo-ai.name" -}}
-{{- default $.Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
+{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" }}
 {{- end }}
+
+{{/* 
+Define the namespace to use across the inference-service templates
+*/}}
+{{- define "tembo-ai.namespace" -}}
+{{- default .Release.Namespace .Values.namespace }}
+{{- end -}}
 
 {{/*
 Create a default fully qualified app name.
