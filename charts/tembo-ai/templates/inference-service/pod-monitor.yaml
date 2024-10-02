@@ -1,9 +1,9 @@
 {{- if .Values.inferenceService.services }}
-{{- $defaults := .Values.inferenceService.defaults }}
-{{- $releaseName := default "release-name" .Release.Name }}
-{{- range $serviceName, $serviceConfig := .Values.inferenceService.services }}
-{{- $mergedConfig := fromYaml (include "tembo-ai.mergeConfigs" (dict "defaults" $defaults "service" $serviceConfig)) }}
-{{- if and (default false $mergedConfig.enabled) (default false $mergedConfig.podMonitor.enabled) }}
+  {{- $defaults := .Values.inferenceService.defaults }}
+  {{- $releaseName := default "release-name" .Release.Name }}
+  {{- range $serviceName, $serviceConfig := .Values.inferenceService.services }}
+    {{- $mergedConfig := fromYaml (include "tembo-ai.mergeConfigs" (dict "defaults" $defaults "service" $serviceConfig)) }}
+    {{- if and (default false $mergedConfig.enabled) (default false $mergedConfig.podMonitor.enabled) }}
 ---
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
@@ -29,6 +29,6 @@ spec:
   selector:
     matchLabels:
       {{- include "tembo-ai.inferenceService.selectorLabels" $ | nindent 6 }}
-{{- end }}
-{{- end }}
+    {{- end }}
+  {{- end }}
 {{- end }}

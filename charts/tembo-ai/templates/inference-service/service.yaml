@@ -1,8 +1,8 @@
 {{- if .Values.inferenceService.services }}
-{{- $defaults := .Values.inferenceService.defaults }}
-{{- range $serviceName, $serviceConfig := .Values.inferenceService.services }}
-{{- $mergedConfig := fromYaml (include "tembo-ai.mergeConfigs" (dict "defaults" $defaults "service" $serviceConfig)) }}
-{{- if and (default false $mergedConfig.enabled) (default true $mergedConfig.service.enabled) }}
+  {{- $defaults := .Values.inferenceService.defaults }}
+  {{- range $serviceName, $serviceConfig := .Values.inferenceService.services }}
+    {{- $mergedConfig := fromYaml (include "tembo-ai.mergeConfigs" (dict "defaults" $defaults "service" $serviceConfig)) }}
+    {{- if and (default false $mergedConfig.enabled) (default true $mergedConfig.service.enabled) }}
 ---
 apiVersion: v1
 kind: Service
@@ -23,6 +23,6 @@ spec:
   selector:
     {{- include "tembo-ai.inferenceService.selectorLabels" $ | nindent 4 }}
     app.kubernetes.io/component: {{ $serviceName }}
-{{- end }}
-{{- end }}
+    {{- end }}
+  {{- end }}
 {{- end }}
