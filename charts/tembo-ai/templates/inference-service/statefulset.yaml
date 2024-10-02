@@ -1,5 +1,5 @@
 {{- range $service := .Values.inferenceService }}
-  {{- if (default false $service.statefulSet.enabled) }}
+  {{- if (and $service.statefulSet (default false $service.statefulSet.enabled)) }}
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
