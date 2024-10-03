@@ -20,6 +20,7 @@ pub enum ConfigEngine {
     Standard,
     OLAP,
     MQ,
+    ParadeDB,
 }
 
 // The standard configuration engine
@@ -151,6 +152,12 @@ pub fn mq_config_engine(stack: &Stack) -> Vec<PgConfig> {
         }
     }
 
+    configs
+}
+
+pub fn paradedb_config_engine(stack: &Stack) -> Vec<PgConfig> {
+    let mut configs = olap_config_engine(stack);
+    configs.retain(|cfg| cfg.name != "columnar.min_parallel_processes");
     configs
 }
 
@@ -522,6 +529,8 @@ mod tests {
         };
         let configs = olap_config_engine(&stack);
 
+        assert_eq!(configs.len(), 11);
+
         assert_eq!(configs[0].name, "effective_cache_size");
         assert_eq!(configs[0].value.to_string(), "11468MB");
         assert_eq!(configs[1].name, "maintenance_work_mem");
@@ -573,5 +582,29 @@ mod tests {
         assert_eq!(configs[7].value.to_string(), "2048MB");
         assert_eq!(configs[8].name, "work_mem");
         assert_eq!(configs[8].value.to_string(), "45MB");
+    }
+
+    #[test]
+    fn test_paradedb_config_engine() {
+        let stack: Stack = Stack {
+            name: "test".to_owned(),
+            infrastructure: Some(Infrastructure {
+                cpu: "4".to_string(),
+                memory: "16Gi".to_string(),
+                storage: "10Gi".to_string(),
+            }),
+            postgres_config_engine: Some(ConfigEngine::Standard),
+            ..Stack::default()
+        };
+        let olap_configs = olap_config_engine(&stack);
+        assert_eq!(olap_configs.len(), 11);
+        assert!(olap_configs
+            .iter()
+            .any(|item| item.name == "columnar.min_parallel_processes"));
+        let paradedb_configs = paradedb_config_engine(&stack);
+        assert_eq!(paradedb_configs.len(), 10);
+        assert!(!paradedb_configs
+            .iter()
+            .any(|item| item.name == "columnar.min_parallel_processes"));
     }
 }
