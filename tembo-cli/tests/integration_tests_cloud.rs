@@ -22,14 +22,15 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
     let test_dir = PathBuf::from(root_dir).join("examples").join("minimal");
 
     env::set_current_dir(&test_dir)?;
+    
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("init");
+    cmd.assert().success();
 
     replace_file(tembo_context_file_path(), CONTEXT_EXAMPLE_TEXT)?;
     replace_file(tembo_credentials_file_path(), CREDENTIALS_EXAMPLE_TEXT)?;
 
     // tembo init
-    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
-    cmd.arg("init");
-    cmd.assert().success();
 
     let charset = "abcdefghijklmnopqrstuvwxyz";
     let instance_name = format!("e2e-cli-{}", generate(10, charset));
