@@ -4405,9 +4405,9 @@ dependencies = [
 
 [[package]]
 name = "tembo-stacks"
-version = "0.16.5"
+version = "0.16.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3b1dbdd630aa6ed903de34ddbb4e9fbf716ae7a91800df89775af4d3ca738309"
+checksum = "468edfeddb7ee7bc68d96c26f4af32252b4815c568727e3254b4a5171d969ec1"
 dependencies = [
  "anyhow",
  "clap",

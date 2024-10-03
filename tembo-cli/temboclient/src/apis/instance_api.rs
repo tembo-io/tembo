@@ -143,10 +143,6 @@ pub async fn create_instance(
     if !local_var_status.is_client_error() && !local_var_status.is_server_error() {
         serde_json::from_str(&local_var_content).map_err(Error::from)
     } else {
-        eprintln!(
-            "Error occurred: Status: {}, Content: {}",
-            local_var_status, local_var_content
-        );
         let local_var_entity: Option<CreateInstanceError> =
             serde_json::from_str(&local_var_content).ok();
         let local_var_error = ResponseContent {
