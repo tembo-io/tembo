@@ -22,7 +22,7 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
     let test_dir = PathBuf::from(root_dir).join("examples").join("minimal");
 
     env::set_current_dir(&test_dir)?;
-
+    
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
     cmd.arg("init");
     cmd.assert().success();
@@ -49,6 +49,9 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
     let mut cmd = Command::cargo_bin(CARGO_BIN).unwrap();
     cmd.arg("apply");
     cmd.assert().success();
+
+    let output = cmd.output()?;
+    println!("Output: {}", String::from_utf8_lossy(&output.stdout));
 
     let env = get_current_context()?;
     let profile = env.clone().selected_profile.unwrap();
