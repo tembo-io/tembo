@@ -6,10 +6,10 @@ Expand the name of the chart.
 {{- end }}
 
 {{/* 
-Define the namespace to use across the inference-service templates
+Define the namespace to use across the Helm chart
 */}}
 {{- define "tembo-ai.namespace" -}}
-{{- default .Release.Namespace .Values.namespace }}
+{{- default .Release.Namespace }}
 {{- end -}}
 
 {{/*
