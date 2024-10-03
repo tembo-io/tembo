@@ -47,9 +47,9 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
     // tembo apply
     let mut cmd = Command::cargo_bin(CARGO_BIN).unwrap();
     cmd.arg("apply");
-    cmd.assert().success();
 
     let output = cmd.output()?;
+    assert!(output.status.success(), "`tembo apply` did not succeed");
 
     if output
         .stdout
