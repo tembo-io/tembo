@@ -31,6 +31,7 @@ impl FromStr for Memory {
             "8Gi" => Ok(Memory::Variant8Gi),
             "16Gi" => Ok(Memory::Variant16Gi),
             "32Gi" => Ok(Memory::Variant32Gi),
+            "64Gi" => Ok(Memory::Variant64Gi),
             _ => Err(()),
         }
     }
@@ -84,7 +85,6 @@ impl FromStr for StackType {
             "RAG" => Ok(StackType::Rag),
             "Timeseries" => Ok(StackType::Timeseries),
             "ParadeDB" => Ok(StackType::ParadeDB),
-            "API" => Ok(StackType::API),
             _ => Err(()),
         }
     }
