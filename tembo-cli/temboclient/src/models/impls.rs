@@ -83,6 +83,7 @@ impl FromStr for StackType {
             "MongoAlternative" => Ok(StackType::MongoAlternative),
             "RAG" => Ok(StackType::Rag),
             "Timeseries" => Ok(StackType::Timeseries),
+            "ParadeDB" => Ok(StackType::ParadeDB),
             _ => Err(()),
         }
     }
