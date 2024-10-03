@@ -168,6 +168,6 @@ inferenceService:
       accessMode: ReadWriteOnce
       mountPath: /root/.cache/
   # Define individual inference services here
-  services: []
+  services: {}
     # service1:
     #   enabled: true

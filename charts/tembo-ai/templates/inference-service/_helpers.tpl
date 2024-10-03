@@ -21,28 +21,19 @@ Create the name of the inference-service service account to use
 {{- end }}
 
 {{/*
-Merge configurations with priority to service-specific configs, handling nested structures
+Deepmerge the inference-service default configs and the services sepecific configs
 */}}
-{{- define "tembo-ai.inferenceService.mergeConfigs" -}}
-{{- $result := dict -}}
-{{- range $key, $value := .defaults -}}
+{{- define "tembo-ai.inferenceService.deepMerge" -}}
+{{- $result := deepCopy (index . 0) -}}
+{{- range $key, $value := index . 1 -}}
   {{- if kindIs "map" $value -}}
-    {{- if hasKey $.service $key -}}
-      {{- $nested := dict "defaults" $value "service" (index $.service $key) -}}
-      {{- $_ := set $result $key (fromYaml (include "tembo-ai.mergeConfigs" $nested)) -}}
+    {{- if hasKey $result $key -}}
+      {{- $newValue := fromYaml (include "tembo-ai.inferenceService.deepMerge" (list (get $result $key) $value)) -}}
+      {{- $_ := set $result $key $newValue -}}
     {{- else -}}
       {{- $_ := set $result $key $value -}}
     {{- end -}}
   {{- else -}}
-    {{- if not (hasKey $.service $key) -}}
-      {{- $_ := set $result $key $value -}}
-    {{- else -}}
-      {{- $_ := set $result $key (index $.service $key) -}}
-    {{- end -}}
-  {{- end -}}
-{{- end -}}
-{{- range $key, $value := .service -}}
-  {{- if not (hasKey $result $key) -}}
     {{- $_ := set $result $key $value -}}
   {{- end -}}
 {{- end -}}

@@ -2,7 +2,7 @@
   {{- $defaults := .Values.inferenceService.defaults }}
   {{- $releaseName := default "release-name" .Release.Name }}
   {{- range $serviceName, $serviceConfig := .Values.inferenceService.services }}
-    {{- $mergedConfig := fromYaml (include "tembo-ai.inferenceService.mergeConfigs" (dict "defaults" $defaults "service" $serviceConfig)) }}
+    {{- $mergedConfig := fromYaml (include "tembo-ai.inferenceService.deepMerge" (list $defaults $serviceConfig)) }}
     {{- if and (default false $mergedConfig.enabled) (default false $mergedConfig.podMonitor.enabled) }}
 ---
 apiVersion: monitoring.coreos.com/v1
