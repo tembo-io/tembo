@@ -1,7 +1,7 @@
 workspace = { members = ["temboclient", "tembodataclient"] }
 [package]
 name = "tembo-cli"
-version = "0.20.7"
+version = "0.20.8"
 edition = "2021"
 authors = ["Tembo.io"]
 description = "The CLI for Tembo"
@@ -65,7 +65,7 @@ tokio = { version = "1.26.0", features = [
 tungstenite ="0.21.0"
 futures-util = "0.3.30"
 dirs = "5.0.1"
-controller = "0.50.0"
+controller = "0.50.1"
 sqlx = { version = "0.8.2", features = ["runtime-tokio-native-tls", "postgres", "chrono", "json"] }
 base64 = "0.21.5"
 colorful = "0.2.2"

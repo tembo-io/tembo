@@ -1,5 +1,4 @@
 [vector]
 environment = "prod"
 instance_name = "vector"
-pg_version = 16
 stack_type = "VectorDB"

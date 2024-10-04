@@ -109,6 +109,7 @@ fn validate_support(config: &HashMap<String, InstanceSettings>) -> Result<(), an
         validate_stack_support(settings, 16, "MessageQueue")?;
         validate_stack_support(settings, 16, "OLAP")?;
         validate_stack_support(settings, 16, "RAG")?;
+        validate_stack_support(settings, 16, "VectorDB")?;
     }
     Ok(())
 }
