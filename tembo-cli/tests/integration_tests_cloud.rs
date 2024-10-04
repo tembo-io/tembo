@@ -111,12 +111,11 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
 }
 
 fn setup_env(instance_name: &String) -> Result<(), Box<dyn Error>> {
-    replace_vars_in_file(tembo_context_file_path(), "ORG_ID", "org_2X6FKW5Ng0Tfq08by32pfx5GNaq")?;
-
+    replace_vars_in_file(tembo_context_file_path(), "ORG_ID", &env::var("ORG_ID")?)?;
     replace_vars_in_file(
         tembo_credentials_file_path(),
         "ACCESS_TOKEN",
-        "eyJhbGciOiJSUzI1NiIsImNhdCI6ImNsX0I3ZDRQRDIyMkFBQSIsImtpZCI6Imluc18yUDJhR2Ezb1ZkZGVISmtpeG43bXdlYXpNaHciLCJ0eXAiOiJKV1QifQ.eyJhenAiOiJodHRwczovL2Nsb3VkLnRlbWJvLmlvIiwiZXhwIjoxNzI0MjMwMjg2LCJpYXQiOjE3MjQxNDM4ODYsImlzcyI6Imh0dHBzOi8vY2xlcmsudGVtYm8uaW8iLCJqdGkiOiI5NDJhMDI2ODBmYjFlMDUzYTJmMiIsIm5iZiI6MTcyNDE0Mzg4MSwib3JnX2lkIjoib3JnXzJYNkZLVzVOZzBUZnEwOGJ5MzJwZng1R05hcSIsIm9yZ19yb2xlIjoiYWRtaW4iLCJvcmdfc2x1ZyI6InVjIiwib3JnYW5pemF0aW9ucyI6eyJvcmdfMlg2RktXNU5nMFRmcTA4YnkzMnBmeDVHTmFxIjoiYWRtaW4ifSwic2lkIjoiYXBpLXRva2VuIiwic3ViIjoidXNlcl8yWDZGSjJKbGtXdUpjdkdNYm5tNmJkYU5Ld1cifQ.nNBblte6LOWG-2Ft9naakGfiBUX5808pxQrwKJPNr1bLntVwave-IAqso8d7WNqmStyV-SsC96hL5IJoRpolGBRc0UWr0_1HAnBDiUNiIfn9Ovw4l2YhKz9l6Pae7gMqstIMQaJylb61i7rgCFon8Cr-ZQRkuCTeH78aw4ktyLYQbPfvta45KHvm0BrV6KVDsBZ7JQiuZdUMVl3Vu_jSu52XMC4UkWaHuTYQ9lin0eA1Hnbh2I3OS02gXtqYtY13bZE02f15n4N4L2HynDbhnV8fjkDzlSJxKUTlg23FvTfAms7dyHMx-J9FhttRx8uY3L_RTShYLu3iMq7YfipFZA",
+        &env::var("ACCESS_TOKEN")?,
     )?;
 
     replace_vars_in_file(
@@ -253,11 +252,9 @@ async fn import_cloud() -> Result<(), Box<dyn Error>> {
     // tembo apply
     let mut cmd = Command::cargo_bin(CARGO_BIN).unwrap();
     cmd.arg("apply");
-    cmd.assert().success();
 
     let mut output = cmd.output()?;
-
-    println!("{:?}",output);
+    assert!(output.status.success(), "`tembo apply` did not succeed");
 
     if output
         .stdout
@@ -270,24 +267,24 @@ async fn import_cloud() -> Result<(), Box<dyn Error>> {
 
     let config_clone = config.clone();
     let jwt = config_clone.bearer_access_token;
-    println!("{:?}",jwt);
+    println!("{:?}", jwt);
 
     let maybe_instance = get_instance_id(&instance_name, &config, &env).await?;
-        if let Some(instance) = maybe_instance {
-            std::fs::write("tembo.toml", "")?;
+    if let Some(instance) = maybe_instance {
+        std::fs::write("tembo.toml", "")?;
 
-            let mut cmd = Command::cargo_bin(CARGO_BIN).unwrap();
-            cmd.arg("import");
-            cmd.arg(env.clone().org_id.unwrap());
-            cmd.arg(instance);
-            cmd.assert().success();
+        let mut cmd = Command::cargo_bin(CARGO_BIN).unwrap();
+        cmd.arg("import");
+        cmd.arg(env.clone().org_id.unwrap());
+        cmd.arg(instance);
+        cmd.assert().success();
 
-            output = cmd.output()?;
-            println!("{:?}",output);
+        output = cmd.output()?;
+        println!("{:?}", output);
 
-            let tembo_toml_content = std::fs::read_to_string("tembo.toml")?;
-            let expected_content = format!(
-                r#"[e2e-import-test]
+        let tembo_toml_content = std::fs::read_to_string("tembo.toml")?;
+        let expected_content = format!(
+            r#"[e2e-import-test]
     cpu = "0.25"
     environment = "prod"
     instance_name = "e2e-import-test"
@@ -296,17 +293,16 @@ async fn import_cloud() -> Result<(), Box<dyn Error>> {
     replicas = 1
     stack_type = "Standard"
     storage = "10Gi""#
-            );
+        );
 
-            if tembo_toml_content.contains(&expected_content) {
-                println!("Expected content found in tembo.toml");
-            } else {
-                println!("Expected content not found in tembo.toml. Retrying");
-            }
+        if tembo_toml_content.contains(&expected_content) {
+            println!("Expected content found in tembo.toml");
         } else {
-            panic!("Failed to import instance");
+            println!("Expected content not found in tembo.toml. Retrying");
         }
-
+    } else {
+        panic!("Failed to import instance");
+    }
 
     // tembo delete
     let mut cmd = Command::cargo_bin(CARGO_BIN)?;
