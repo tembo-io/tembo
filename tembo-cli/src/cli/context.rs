@@ -1,3 +1,4 @@
+use std::fmt::Display;
 use std::fs;
 
 use anyhow::Error;
@@ -102,11 +103,11 @@ impl Profile {
     }
 }
 
-impl ToString for Target {
-    fn to_string(&self) -> String {
+impl Display for Target {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Docker => String::from("docker"),
-            Self::TemboCloud => String::from("tembo-cloud"),
+            Target::Docker => f.write_str("docker"),
+            Target::TemboCloud => f.write_str("tembo-cloud"),
         }
     }
 }

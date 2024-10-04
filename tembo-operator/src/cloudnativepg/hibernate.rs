@@ -15,6 +15,7 @@ use k8s_openapi::api::apps::v1::Deployment;
 use crate::app_service::manager::get_appservice_deployment_objects;
 use crate::cloudnativepg::cnpg_utils::{
     get_pooler_instances, patch_cluster_merge, patch_pooler_merge, patch_scheduled_backup_merge,
+    removed_stalled_backups,
 };
 use std::sync::Arc;
 use std::time::Duration;
@@ -179,6 +180,10 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
                 name, hibernation_value
             );
             if cdb.spec.stop {
+                // Only remove stalled backups if the instance is stopped/paused
+                info!("Remove any stalled backups for paused instance {}", name);
+                removed_stalled_backups(cdb, ctx).await?;
+
                 info!("Fully reconciled stopped instance {}", name);
                 return Err(requeue_normal_with_jitter());
             }
@@ -283,6 +288,7 @@ async fn update_scheduled_backups(
     let scheduled_backup_value = cdb.spec.stop;
 
     for sb in scheduled_backups {
+        let scheduled_backup_name = sb.metadata.name.as_deref().unwrap_or(&name);
         let scheduled_backup_suspend_status = sb.spec.suspend.unwrap_or_default();
 
         if scheduled_backup_suspend_status != scheduled_backup_value {
@@ -292,7 +298,14 @@ async fn update_scheduled_backups(
                 }
             });
 
-            match patch_scheduled_backup_merge(cdb, ctx, patch_scheduled_backup_spec).await {
+            match patch_scheduled_backup_merge(
+                cdb,
+                ctx,
+                scheduled_backup_name,
+                patch_scheduled_backup_spec,
+            )
+            .await
+            {
                 Ok(_) => {
                     info!(
                         "Toggled scheduled backup suspend of {} to '{}'",

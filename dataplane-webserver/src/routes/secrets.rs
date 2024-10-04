@@ -352,13 +352,11 @@ async fn update_postgres_password(
 
                 Ok(HttpResponse::Ok().json("Password updated successfully"))
             }
-            _ => {
-                return Err(actix_web::error::ErrorForbidden("Not authorized"));
-            }
+            _ => Err(actix_web::error::ErrorForbidden("Not authorized")),
         },
         Err(err) => {
             eprintln!("Error decoding token: {:?}", err);
-            return Err(actix_web::error::ErrorBadRequest("Invalid token"));
+            Err(actix_web::error::ErrorBadRequest("Invalid token"))
         }
     }
 }

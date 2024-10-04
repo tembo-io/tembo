@@ -56,3 +56,5 @@ env:
       secretKeyRef:
         name: data-plane
         key: _data-plane_postgres_connection_string
+extraEnv: []
+

@@ -97,13 +97,39 @@ mod tests {
         let resp = test::call_service(&app, req).await;
         assert!(resp.status().is_success());
 
-        // 25 hours ago, unix time
-        let start = SystemTime::now()
+        // Test with step parameter
+        let query_url = format!("{}&step=5m", query_url);
+        let req = test::TestRequest::get()
+            .uri(query_url.as_str())
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+
+        // Test with end parameter
+        let end = SystemTime::now()
             .duration_since(SystemTime::UNIX_EPOCH)
             .expect("Failed to get UNIX time")
-            .as_secs()
-            - 25 * 60 * 60;
+            .as_secs();
+        let query_url = format!("{}&end={}", query_url, end);
+        let req = test::TestRequest::get()
+            .uri(query_url.as_str())
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_success());
+
+        // Test with too many samples (more than 10,000)
         let query_url = format_prometheus_query(url, query, start);
+        let query_url = format!("{}&step=1s", query_url);
+        let req = test::TestRequest::get()
+            .uri(query_url.as_str())
+            .to_request();
+        let resp = test::call_service(&app, req).await;
+        assert!(resp.status().is_client_error());
+
+        // Test with end time before start time
+        let end = start - 1;
+        let query_url = format_prometheus_query(url, query, start);
+        let query_url = format!("{}&end={}", query_url, end);
         let req = test::TestRequest::get()
             .uri(query_url.as_str())
             .to_request();

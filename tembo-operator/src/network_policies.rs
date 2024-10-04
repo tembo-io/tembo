@@ -79,6 +79,50 @@ pub async fn reconcile_network_policies(client: Client, namespace: &str) -> Resu
     });
     apply_network_policy(namespace, &np_api, allow_dns).await?;
 
+    let allow_node_local_dns = serde_json::json!({
+        "apiVersion": "networking.k8s.io/v1",
+        "kind": "NetworkPolicy",
+        "metadata": {
+          "name": "allow-egress-to-node-local-dns",
+          "namespace": format!("{namespace}"),
+        },
+        "spec": {
+          "podSelector": {},
+          "policyTypes": [
+            "Egress"
+          ],
+          "egress": [
+            {
+              "to": [
+                {
+                  "podSelector": {
+                    "matchLabels": {
+                      "k8s-app": "node-local-dns"
+                    }
+                  },
+                  "namespaceSelector": {
+                    "matchLabels": {
+                      "kubernetes.io/metadata.name": "kube-system"
+                    }
+                  }
+                }
+              ],
+              "ports": [
+                {
+                  "protocol": "UDP",
+                  "port": 53
+                },
+                {
+                  "protocol": "TCP",
+                  "port": 53
+                }
+              ]
+            }
+          ]
+        }
+    });
+    apply_network_policy(namespace, &np_api, allow_node_local_dns).await?;
+
     // Namespaces that should be allowed to access an instance namespace
     let allow_system_ingress = serde_json::json!({
         "apiVersion": "networking.k8s.io/v1",
@@ -311,6 +355,46 @@ pub async fn reconcile_network_policies(client: Client, namespace: &str) -> Resu
 
     apply_network_policy(namespace, &np_api, allow_proxy_to_access_tembo_ai_gateway).await?;
 
+    let allow_proxy_to_access_tembo_ai_gateway_internal_lb = serde_json::json!({
+        "apiVersion": "networking.k8s.io/v1",
+        "kind": "NetworkPolicy",
+        "metadata": {
+          "name": "allow-proxy-to-access-tembo-ai-gateway-internal-lb",
+          "namespace": format!("{namespace}"),
+        },
+        "spec": {
+          "podSelector": {
+            "matchLabels": {
+              "app": format!("{}-ai-proxy", namespace)
+            }
+          },
+          "policyTypes": ["Egress"],
+          "egress": [
+            {
+              "ports": [
+                {
+                  "port": 8080,
+                  "protocol": "TCP"
+                }
+              ],
+              "to": [
+                {
+                  "ipBlock": {
+                    "cidr": "10.0.0.0/8"
+                  }
+                }
+              ]
+            }
+          ]
+        }
+    });
+
+    apply_network_policy(
+        namespace,
+        &np_api,
+        allow_proxy_to_access_tembo_ai_gateway_internal_lb,
+    )
+    .await?;
     Ok(())
 }
 
@@ -381,7 +465,7 @@ async fn lookup_kubernetes_api_ips(client: &Client) -> Result<Vec<String>, Actio
     Ok(results)
 }
 
-async fn apply_network_policy(
+pub async fn apply_network_policy(
     namespace: &str,
     np_api: &Api<NetworkPolicy>,
     np: Value,

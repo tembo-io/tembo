@@ -4,12 +4,23 @@ use url::Url;
 
 #[derive(Clone, Debug)]
 pub struct Config {
+    /// service and port of the inference service
+    /// Must be an OpenAI compatible interface
     pub llm_service_host_port: Url,
+    /// Postgres connection string to the timeseries databse which logs token usage
     pub pg_conn_str: String,
+    /// Postgres connection string for the Control Plane queue
+    pub billing_queue_conn_str: String,
+    /// Port to run the inference gateway on
     pub server_port: u16,
+    /// Number of actix workers to spawn
     pub server_workers: u16,
+    /// Boolean to toggle billing request authorization.
+    /// When true, callers must have an active payment method on file
     pub org_auth_enabled: bool,
+    /// Interval to refresh the billing authorization cache
     pub org_auth_cache_refresh_interval_sec: u64,
+    pub run_billing_reporter: bool,
 }
 
 impl Config {
@@ -18,6 +29,10 @@ impl Config {
             llm_service_host_port: parse_llm_service(),
             pg_conn_str: from_env_default(
                 "DATABASE_URL",
+                "postgresql://postgres:postgres@0.0.0.0:5432/postgres",
+            ),
+            billing_queue_conn_str: from_env_default(
+                "QUEUE_CONN_URL",
                 "postgresql://postgres:postgres@0.0.0.0:5432/postgres",
             ),
             server_port: from_env_default("WEBSERVER_PORT", "8080")
@@ -35,6 +50,9 @@ impl Config {
             )
             .parse()
             .expect("ORG_AUTH_CACHE_REFRESH_INTERVAL_SEC must be an integer"),
+            run_billing_reporter: from_env_default("RUN_BILLING_REPORTER", "false")
+                .parse()
+                .unwrap(),
         }
     }
 }

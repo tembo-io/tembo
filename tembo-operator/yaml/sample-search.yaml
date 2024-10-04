@@ -1,0 +1,67 @@
+apiVersion: coredb.io/v1alpha1
+kind: CoreDB
+metadata:
+  name: sample-search
+spec:
+  image: "quay.io/tembo/standard-cnpg:15-a0a5ab5"
+  stop: false
+  stack:
+    name: Search 
+    postgres_config:
+      - name: autovacuum_vacuum_cost_limit
+        value: "-1"
+      - name: autovacuum_vacuum_scale_factor
+        value: "0.05"
+      - name: autovacuum_vacuum_insert_scale_factor
+        value: "0.05"
+      - name: autovacuum_analyze_scale_factor
+        value: "0.05"
+      - name: checkpoint_timeout
+        value: "10min"
+      - name: track_activity_query_size
+        value: "2048"
+      - name: wal_compression
+        value: "on"
+      - name: track_io_timing
+        value: "on"
+      - name: log_min_duration_statement # https://www.postgresql.org/docs/15/runtime-config-logging.html
+        value: "1000"
+      - name: auto_explain.log_min_duration
+        value: "1000ms"
+      - name: statement_timeout
+        value: "86400000"
+      - name: pg_stat_statements.track
+        value: "top"
+      - name: shared_preload_libraries
+        value: pg_stat_statements,auto_explain,pg_search
+  trunk_installs:
+    - name: pg_stat_statements
+      version: 1.10.0
+    - name: pg_search
+      version: 0.9.4
+  extensions:
+    - name: pg_stat_statements
+      locations:
+        - database: postgres
+          enabled: true
+          version: 1.10.0
+    - name: pg_search
+      locations:
+        - database: postgres
+          enabled: true
+          version: 0.9.4
+  runtime_config:
+    - name: shared_buffers
+      value: 512MB
+    - name: max_connections
+      value: "431"
+    - name: work_mem
+      value: "5MB"
+    - name: bgwriter_delay
+      value: "200ms"
+    - name: effective_cache_size
+      value: "286MB"
+    - name: maintenance_work_mem
+      value: "20MB"
+    - name: max_wal_size
+      value: "1GB"

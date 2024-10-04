@@ -23,6 +23,8 @@ pub enum Memory {
     Variant16Gi,
     #[serde(rename = "32Gi")]
     Variant32Gi,
+    #[serde(rename = "64Gi")]
+    Variant64Gi,
 }
 
 impl ToString for Memory {
@@ -34,6 +36,7 @@ impl ToString for Memory {
             Self::Variant8Gi => String::from("8Gi"),
             Self::Variant16Gi => String::from("16Gi"),
             Self::Variant32Gi => String::from("32Gi"),
+            Self::Variant64Gi => String::from("64Gi"),
         }
     }
 }

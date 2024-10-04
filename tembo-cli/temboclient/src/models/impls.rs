@@ -31,6 +31,7 @@ impl FromStr for Memory {
             "8Gi" => Ok(Memory::Variant8Gi),
             "16Gi" => Ok(Memory::Variant16Gi),
             "32Gi" => Ok(Memory::Variant32Gi),
+            "64Gi" => Ok(Memory::Variant64Gi),
             _ => Err(()),
         }
     }
@@ -77,11 +78,13 @@ impl FromStr for StackType {
             "OLAP" => Ok(StackType::Olap),
             "VectorDB" => Ok(StackType::VectorDb),
             "OLTP" => Ok(StackType::Oltp),
+            "Analytics" => Ok(StackType::Analytics),
             "DataWarehouse" => Ok(StackType::DataWarehouse),
             "Geospatial" => Ok(StackType::Geospatial),
             "MongoAlternative" => Ok(StackType::MongoAlternative),
             "RAG" => Ok(StackType::Rag),
             "Timeseries" => Ok(StackType::Timeseries),
+            "ParadeDB" => Ok(StackType::ParadeDB),
             _ => Err(()),
         }
     }

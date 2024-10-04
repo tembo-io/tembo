@@ -1,0 +1,53 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "\n        SELECT\n        organization_id,\n        instance_id,\n        model,\n        MAX(completed_at) AS completed_at,\n        SUM(prompt_tokens) AS prompt_tokens,\n        SUM(completion_tokens) AS completion_tokens\n    FROM\n        inference.requests\n    WHERE\n        completed_at >= $1\n        AND completed_at <= $2\n    GROUP BY\n        organization_id,\n        instance_id,\n        model\n        ",
+  "describe": {
+    "columns": [
+      {
+        "ordinal": 0,
+        "name": "organization_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 1,
+        "name": "instance_id",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 2,
+        "name": "model",
+        "type_info": "Text"
+      },
+      {
+        "ordinal": 3,
+        "name": "completed_at",
+        "type_info": "Timestamptz"
+      },
+      {
+        "ordinal": 4,
+        "name": "prompt_tokens",
+        "type_info": "Int8"
+      },
+      {
+        "ordinal": 5,
+        "name": "completion_tokens",
+        "type_info": "Int8"
+      }
+    ],
+    "parameters": {
+      "Left": [
+        "Timestamptz",
+        "Timestamptz"
+      ]
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      null,
+      null,
+      null
+    ]
+  },
+  "hash": "6f665448b46642d95ae519fc0ca7f991767d0aa339aa0dc5ecc09a2299e41ed1"
+}

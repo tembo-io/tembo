@@ -15,6 +15,7 @@ use crate::{
         VOLUME_SNAPSHOT_CLASS_NAME,
     },
     config::Config,
+    dedicated_networking::reconcile_dedicated_networking,
     exec::{ExecCommand, ExecOutput},
     extensions::database_queries::is_not_restarting,
     heartbeat::reconcile_heartbeat,
@@ -276,6 +277,13 @@ impl CoreDB {
                     // IngressRouteTCP does not have expected errors during reconciliation.
                     Action::requeue(Duration::from_secs(300))
                 })?;
+
+                reconcile_dedicated_networking(self, ctx.clone(), basedomain.as_str())
+                    .await
+                    .map_err(|e| {
+                        error!("Error reconciling dedicated networking: {:?}", e);
+                        Action::requeue(Duration::from_secs(300))
+                    })?;
 
                 let name_pooler = format!("{}-pooler", self.name_any().as_str());
                 let prefix_pooler = format!("{}-pooler-", self.name_any().as_str());

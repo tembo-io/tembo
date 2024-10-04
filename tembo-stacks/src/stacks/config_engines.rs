@@ -86,9 +86,9 @@ pub fn olap_config_engine(stack: &Stack) -> Vec<PgConfig> {
     let max_wal_size_gb: i32 = dynamic_max_wal_size(sys_storage_gb as i32);
     let max_parallel_workers = olap_max_parallel_workers(vcpu);
     let max_parallel_workers_per_gather = olap_max_parallel_workers_per_gather(vcpu);
-    let max_worker_processes = olap_max_worker_processes(vcpu);
+    let max_worker_processes = olap_max_worker_processes(max_parallel_workers);
     let effective_io_concurrency: i32 = DEFAULT_EFFECTIVE_IO_CONCURRENCY;
-    let columnar_min_parallel_processes = olap_max_worker_processes(vcpu);
+    let columnar_min_parallel_processes = max_parallel_workers;
     vec![
         PgConfig {
             name: "effective_cache_size".to_owned(),
@@ -156,10 +156,10 @@ pub fn mq_config_engine(stack: &Stack) -> Vec<PgConfig> {
 
 // olap formula for max_parallel_workers_per_gather
 fn olap_max_parallel_workers_per_gather(cpu: f32) -> i32 {
-    // higher of default (2) or 0.5 * cpu
-    let scaled = i32::max((cpu * 0.5).floor() as i32, 2);
+    // higher of default (2) or 0.5 * cpu. PGTune uses ceiling; we will, too
+    let scaled = i32::max((cpu * 0.5).ceil() as i32, 2);
     // cap at 8
-    i32::max(scaled, 8)
+    i32::min(scaled, 8)
 }
 
 fn olap_max_parallel_workers(cpu: f32) -> i32 {
@@ -167,8 +167,16 @@ fn olap_max_parallel_workers(cpu: f32) -> i32 {
     i32::max(8, cpu.round() as i32)
 }
 
-fn olap_max_worker_processes(cpu: f32) -> i32 {
-    i32::max(1, cpu.round() as i32) + 1 // add one for cron
+fn olap_max_worker_processes(max_parallel_workers: i32) -> i32 {
+    /*
+     * Adding five for now to cover our bases:
+     *   - pg_cron launcher
+     *   - pg_partman bgw
+     *   - pg_analytics bgw
+     *   - pg_search bgw
+     *   - one to grow on
+     */
+    max_parallel_workers + 5
 }
 
 // olap formula for maintenance_work_mem
@@ -531,11 +539,11 @@ mod tests {
         assert_eq!(configs[3].name, "max_parallel_workers");
         assert_eq!(configs[3].value.to_string(), "8");
         assert_eq!(configs[4].name, "max_parallel_workers_per_gather");
-        assert_eq!(configs[4].value.to_string(), "8");
+        assert_eq!(configs[4].value.to_string(), "2");
         assert_eq!(configs[5].name, "max_wal_size");
         assert_eq!(configs[5].value.to_string(), "2GB");
         assert_eq!(configs[6].name, "max_worker_processes");
-        assert_eq!(configs[6].value.to_string(), "5");
+        assert_eq!(configs[6].value.to_string(), "13");
         assert_eq!(configs[7].name, "shared_buffers");
         assert_eq!(configs[7].value.to_string(), "4096MB");
         assert_eq!(configs[8].name, "work_mem");
@@ -564,11 +572,11 @@ mod tests {
         assert_eq!(configs[3].name, "max_parallel_workers");
         assert_eq!(configs[3].value.to_string(), "8");
         assert_eq!(configs[4].name, "max_parallel_workers_per_gather");
-        assert_eq!(configs[4].value.to_string(), "8");
+        assert_eq!(configs[4].value.to_string(), "2");
         assert_eq!(configs[5].name, "max_wal_size");
         assert_eq!(configs[5].value.to_string(), "2GB");
         assert_eq!(configs[6].name, "max_worker_processes");
-        assert_eq!(configs[6].value.to_string(), "2");
+        assert_eq!(configs[6].value.to_string(), "13");
         assert_eq!(configs[7].name, "shared_buffers");
         assert_eq!(configs[7].value.to_string(), "2048MB");
         assert_eq!(configs[8].name, "work_mem");
