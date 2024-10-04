@@ -4342,7 +4342,7 @@ dependencies = [
 
 [[package]]
 name = "tembo-cli"
-version = "0.20.7"
+version = "0.20.8"
 dependencies = [
  "actix-cors",
  "actix-service",
