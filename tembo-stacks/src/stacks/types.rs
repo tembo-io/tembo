@@ -1,5 +1,6 @@
 use crate::stacks::config_engines::{
-    mq_config_engine, olap_config_engine, standard_config_engine, ConfigEngine,
+    mq_config_engine, olap_config_engine, paradedb_config_engine, standard_config_engine,
+    ConfigEngine,
 };
 use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 use schemars::JsonSchema;
@@ -180,6 +181,7 @@ impl Stack {
             Some(ConfigEngine::Standard) => Some(standard_config_engine(self)),
             Some(ConfigEngine::OLAP) => Some(olap_config_engine(self)),
             Some(ConfigEngine::MQ) => Some(mq_config_engine(self)),
+            Some(ConfigEngine::ParadeDB) => Some(paradedb_config_engine(self)),
             None => Some(standard_config_engine(self)),
         }
     }
