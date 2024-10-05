@@ -799,6 +799,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "azure_mgmt_msi"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e707e87a141765b64c8f473c926078ea6ea56a3feb98f1541d88fa8a886300e6"
+dependencies = [
+ "azure_core",
+ "bytes",
+ "futures",
+ "log",
+ "once_cell",
+ "serde",
+ "serde_json",
+ "time",
+]
+
+[[package]]
 name = "backoff"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1009,8 +1025,8 @@ dependencies = [
  "anyhow",
  "aws-config",
  "aws-sdk-cloudformation",
- "azure_core",
  "azure_identity",
+ "azure_mgmt_msi",
  "base64 0.21.7",
  "chrono",
  "controller",
