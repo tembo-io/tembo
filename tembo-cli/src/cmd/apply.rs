@@ -1176,7 +1176,6 @@ pub fn get_rendered_dockerfile(
         _ => &stack.images.pg15,
     };
 
-    // Sorts trunk_installs so the installation order is deterministic, also make sure vector is last
     if let Some(mut installs) = trunk_installs.as_ref().cloned() {
         // Sort by name, but ensure "vector" is always last
         installs.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
@@ -1389,14 +1388,25 @@ async fn get_trunk_projects(name: &String) -> Result<Vec<TrunkProject>, Error> {
 pub fn get_rendered_dockercompose(
     instance_settings: HashMap<String, InstanceSettings>,
 ) -> Result<String, anyhow::Error> {
-    // Include the docker-compose template directly into the binary
     let contents = include_str!("../../tembo/docker-compose.yml.template");
 
     let mut tera = Tera::new("templates/**/*").unwrap();
     let _ = tera.add_raw_template("docker-compose", contents);
     let mut context = Context::new();
 
-    context.insert("instance_settings", &instance_settings);
+    // replace the image for VectorDB
+    let mut updated_instance_settings = instance_settings.clone();
+    for (_key, instance) in updated_instance_settings.iter_mut() {
+        if instance.stack_type == Some("VectorDB".to_string()) {
+            if let Some(app_services) = &mut instance.controller_app_services {
+                if let Some(embeddings) = app_services.get_mut("embeddings") {
+                    embeddings.image = "quay.io/tembo/vector-serve:latest".to_string();
+                }
+            }
+        }
+    }
+
+    context.insert("instance_settings", &updated_instance_settings);
 
     let rendered_dockercompose = tera.render("docker-compose", &context).unwrap();
 

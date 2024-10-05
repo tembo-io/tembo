@@ -1,5 +1,6 @@
 pub use crate::{
     apis::coredb_types::CoreDB,
+    cloudnativepg::backups::Backup,
     cloudnativepg::clusters::{Cluster, ClusterStatusConditionsStatus},
     cloudnativepg::poolers::Pooler,
     cloudnativepg::scheduledbackups::ScheduledBackup,
@@ -7,8 +8,9 @@ pub use crate::{
     extensions::database_queries::is_not_restarting,
     patch_cdb_status_merge, requeue_normal_with_jitter, Context, RESTARTED_AT,
 };
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::Time;
 use kube::{
-    api::{Patch, PatchParams},
+    api::{DeleteParams, ListParams, Patch, PatchParams},
     runtime::controller::Action,
     Api, ResourceExt,
 };
@@ -156,6 +158,7 @@ pub async fn patch_cluster_merge(
 pub async fn patch_scheduled_backup_merge(
     cdb: &CoreDB,
     ctx: &Arc<Context>,
+    backup_name: &str,
     patch: serde_json::Value,
 ) -> Result<(), Action> {
     let name = cdb.name_any();
@@ -167,7 +170,7 @@ pub async fn patch_scheduled_backup_merge(
     let scheduled_backup_api: Api<ScheduledBackup> = Api::namespaced(ctx.client.clone(), namespace);
     let pp = PatchParams::apply("patch_merge");
     let _ = scheduled_backup_api
-        .patch(&name, &pp, &Patch::Merge(&patch))
+        .patch(backup_name, &pp, &Patch::Merge(&patch))
         .await
         .map_err(|e| {
             error!("Error patching cluster: {}", e);
@@ -314,6 +317,61 @@ pub(crate) async fn is_image_updated(
 
                 // Update Cluster with patch
                 patch_cluster_merge(cdb, &ctx, patch).await?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+// remove_stalled_backups function takes a CoreDB, Conext and removed any stalled
+// backups. A backup is considered stalled if it's older than 6 hours and does not have a status set.
+// If a status is missing this means that the backup was never started nor will it ever start.
+#[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any()))]
+pub(crate) async fn removed_stalled_backups(
+    cdb: &CoreDB,
+    ctx: &Arc<Context>,
+) -> Result<(), Action> {
+    let name = cdb.name_any();
+    let namespace = cdb.metadata.namespace.as_ref().ok_or_else(|| {
+        error!("Namespace is empty for instance: {}.", name);
+        Action::requeue(Duration::from_secs(300))
+    })?;
+
+    let backup_api: Api<Backup> = Api::namespaced(ctx.client.clone(), namespace);
+
+    // List all backups for the cluster
+    let lp = ListParams {
+        label_selector: Some(format!("cnpg.io/cluster={}", name.as_str())),
+        ..ListParams::default()
+    };
+    let backups = backup_api.list(&lp).await.map_err(|e| {
+        error!("Error listing backups: {}", e);
+        Action::requeue(Duration::from_secs(300))
+    })?;
+
+    let stalled_time = Time(chrono::Utc::now() - chrono::Duration::hours(6));
+
+    // Filter backups that do not have a status set and are older than 24 hours
+    for backup in &backups.items {
+        if backup.status.is_none() {
+            if let Some(creation_time) = backup.metadata.creation_timestamp.as_ref() {
+                if creation_time < &stalled_time {
+                    info!("Deleting stalled backup: {}", backup.name_any());
+                    match backup_api
+                        .delete(&backup.name_any(), &DeleteParams::default())
+                        .await
+                    {
+                        Ok(_) => {
+                            info!("Successfully deleted stalled backup: {}", backup.name_any())
+                        }
+                        Err(e) => error!(
+                            "Failed to delete stalled backup {}: {}",
+                            backup.name_any(),
+                            e
+                        ),
+                    }
+                }
             }
         }
     }

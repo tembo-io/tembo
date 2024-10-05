@@ -29,11 +29,13 @@ postgres_config:
     value: logical
 trunk_installs:
   - name: pg_timeseries
-    version: 0.1.5
+    version: 0.1.6
   - name: hydra_columnar
     version: 1.1.1
   - name: pg_cron
     version: 1.6.2
+  - name: tembo_ivm
+    version: 1.9.1
   - name: pg_partman
     version: 5.0.1
   - name: pg_stat_statements
@@ -59,11 +61,17 @@ extensions:
       - database: postgres
         enabled: true
         version: 1.6.2
+  - name: pg_ivm
+    description: pg_ivm
+    locations:
+      - database: postgres
+        enabled: true
+        version: 1.9
   - name: timeseries
     locations:
       - database: postgres
         enabled: true
-        version: 0.1.5
+        version: 0.1.6
   - name: pg_stat_statements
     locations:
       - database: postgres

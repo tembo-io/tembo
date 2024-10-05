@@ -13,6 +13,7 @@ use super::clusters::{
     ClusterExternalClustersBarmanObjectStoreAzureCredentialsStorageSasToken,
     ClusterExternalClustersBarmanObjectStoreGoogleCredentials,
     ClusterExternalClustersBarmanObjectStoreGoogleCredentialsApplicationCredentials,
+    ClusterInheritedMetadata,
 };
 use crate::apis::coredb_types::Restore;
 use crate::apis::coredb_types::{self, AzureCredentials, GoogleCredentials};
@@ -618,6 +619,27 @@ fn default_cluster_annotations(cdb: &CoreDB) -> BTreeMap<String, String> {
     annotations
 }
 
+// Check if the cluster has azure credentials and return the inherited metadata
+// required for workload identity
+fn inherited_metadata(cdb: &CoreDB) -> Option<ClusterInheritedMetadata> {
+    if let Some(azure_creds) = &cdb.spec.backup.azure_credentials {
+        if azure_creds.inherit_from_azure_ad? {
+            return Some(ClusterInheritedMetadata {
+                annotations: None,
+                labels: Some(
+                    vec![(
+                        "azure.workload.identity/use".to_string(),
+                        "true".to_string(),
+                    )]
+                    .into_iter()
+                    .collect(),
+                ),
+            });
+        }
+    }
+    None
+}
+
 #[instrument(skip(cdb), fields(trace_id, instance_name = %cdb.name_any()))]
 pub fn cnpg_cluster_from_cdb(
     cdb: &CoreDB,
@@ -711,6 +733,7 @@ pub fn cnpg_cluster_from_cdb(
             enable_superuser_access: Some(true),
             failover_delay: Some(0),
             image_name: Some(image),
+            inherited_metadata: inherited_metadata(cdb),
             instances,
             log_level: Some(ClusterLogLevel::Info),
             managed: cluster_managed(&name),
@@ -2348,7 +2371,7 @@ pub(crate) async fn get_scheduled_backups(cdb: &CoreDB, ctx: Arc<Context>) -> Ve
     let scheduled_backup: Api<ScheduledBackup> = Api::namespaced(ctx.client.clone(), &namespace);
 
     // Create a ListParams object to filter the ScheduledBackups
-    let lp = ListParams::default().fields(&format!("metadata.name={}", instance_name));
+    let lp = ListParams::default().fields(&format!("metadata.namespace={}", instance_name));
 
     match scheduled_backup.list(&lp).await {
         Ok(list) => {

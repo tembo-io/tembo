@@ -7,7 +7,7 @@ images:
   15: "standard-cnpg:15-5120dd1"
   16: "standard-cnpg:16-5120dd1"
 stack_version: 0.1.0
-postgres_config_engine: olap
+postgres_config_engine: paradedb
 postgres_config:
   - name: autovacuum_vacuum_scale_factor
     value: 0.05
@@ -33,13 +33,11 @@ trunk_installs:
   - name: pg_analytics
     version: 0.1.4
   - name: pg_search
-    version: 0.10.2
+    version: 0.10.3
   - name: pg_cron
     version: 1.6.2
   - name: pgvector
     version: 0.7.4
-  - name: vectorscale
-    version: 0.3.0
   - name: pg_ivm
     version: 1.9.0
 extensions:
@@ -52,7 +50,7 @@ extensions:
     locations:
       - database: postgres
         enabled: true
-        version: 0.10.2
+        version: 0.10.3
   - name: vector
     locations:
       - database: postgres
@@ -69,11 +67,6 @@ extensions:
     - database: postgres
       enabled: true
       version: 0.1.2
-  - name: vectorscale
-    locations:
-      - database: postgres
-        enabled: true
-        version: 0.3.0
   - name: pg_ivm
     locations:
     - database: postgres
