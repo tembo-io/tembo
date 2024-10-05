@@ -799,6 +799,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "azure_mgmt_authorization"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0996028421d746deea5e44692c84dd79d6d1bd77b40f215cddb5b21a49b3d401"
+dependencies = [
+ "azure_core",
+ "bytes",
+ "futures",
+ "log",
+ "once_cell",
+ "serde",
+ "serde_json",
+ "time",
+]
+
+[[package]]
 name = "azure_mgmt_msi"
 version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1026,6 +1042,7 @@ dependencies = [
  "aws-config",
  "aws-sdk-cloudformation",
  "azure_identity",
+ "azure_mgmt_authorization",
  "azure_mgmt_msi",
  "base64 0.21.7",
  "chrono",
@@ -1064,7 +1081,7 @@ checksum = "373e9fafaa20882876db20562275ff58d50e0caa2590077fe7ce7bef90211d0d"
 
 [[package]]
 name = "controller"
-version = "0.50.0"
+version = "0.50.1"
 dependencies = [
  "actix-web",
  "anyhow",
