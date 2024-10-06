@@ -7,7 +7,7 @@ images:
   15: "standard-cnpg:15-5120dd1"
   16: "standard-cnpg:16-5120dd1"
 stack_version: 0.1.0
-postgres_config_engine: olap
+postgres_config_engine: paradedb
 postgres_config:
   - name: autovacuum_vacuum_scale_factor
     value: 0.05
