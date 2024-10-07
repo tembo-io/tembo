@@ -6,11 +6,15 @@ use azure_mgmt_msi::models::{Identity, TrackedResource};
 use std::sync::Arc;
 
 #[tokio::main]
-pub async fn create_uami() -> Result<Identity, Box<dyn std::error::Error>> {
+pub async fn create_uami(
+    resource_group: String,
+    instance_name: String,
+    region: String,
+) -> Result<Identity, Box<dyn std::error::Error>> {
     let credential = Arc::new(AzureCliCredential::new());
     let subscription_id = AzureCliCredential::get_subscription().await?;
-    let resource_group_name = "ian".to_string();
-    let uami_name = "test-uami".to_string();
+    let resource_group_name = resource_group;
+    let uami_name = instance_name;
     let msi_client = azure_mgmt_msi::Client::builder(credential.clone()).build()?;
 
     // Set parameters for User Assigned Managed Identity
@@ -18,7 +22,7 @@ pub async fn create_uami() -> Result<Identity, Box<dyn std::error::Error>> {
         tracked_resource: TrackedResource {
             resource: Default::default(),
             tags: None,
-            location: "eastus".to_string(),
+            location: region,
         },
         properties: None,
     };
