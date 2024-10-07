@@ -1041,6 +1041,7 @@ dependencies = [
  "anyhow",
  "aws-config",
  "aws-sdk-cloudformation",
+ "azure_core",
  "azure_identity",
  "azure_mgmt_authorization",
  "azure_mgmt_msi",
