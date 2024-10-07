@@ -1,11 +1,18 @@
-use azure_identity::AzureCliCredential;
 use azure_identity::WorkloadIdentityCredential;
+use azure_identity::{AzureCliCredential, TokenCredentialOptions};
 use azure_mgmt_authorization;
 use azure_mgmt_authorization::models::{RoleAssignment, RoleAssignmentProperties};
 use azure_mgmt_msi::models::{Identity, TrackedResource};
 use std::sync::Arc;
 
-#[tokio::main]
+// Get credentials from workload identity
+pub async fn get_credentials() -> Result<WorkloadIdentityCredential, Box<dyn std::error::Error>> {
+    let options: TokenCredentialOptions = Default::default();
+    let credential = WorkloadIdentityCredential::create(options)?;
+    Ok(credential)
+}
+
+// Create User Assigned Managed Identity
 pub async fn create_uami(
     resource_group: String,
     instance_name: String,
