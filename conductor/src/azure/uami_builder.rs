@@ -1,18 +1,19 @@
 use azure_identity::AzureCliCredential;
+use azure_identity::WorkloadIdentityCredential;
 use azure_mgmt_authorization;
-use azure_mgmt_authorization::models::RoleAssignmentProperties;
+use azure_mgmt_authorization::models::{RoleAssignment, RoleAssignmentProperties};
 use azure_mgmt_msi::models::{Identity, TrackedResource};
 use std::sync::Arc;
 
 #[tokio::main]
-pub async fn create_uami() -> Result<(), Box<dyn std::error::Error>> {
+pub async fn create_uami() -> Result<Identity, Box<dyn std::error::Error>> {
     let credential = Arc::new(AzureCliCredential::new());
     let subscription_id = AzureCliCredential::get_subscription().await?;
     let resource_group_name = "ian".to_string();
     let uami_name = "test-uami".to_string();
     let msi_client = azure_mgmt_msi::Client::builder(credential.clone()).build()?;
 
-    // Create User Assigned Managed Identity
+    // Set parameters for User Assigned Managed Identity
     let uami_params = Identity {
         tracked_resource: TrackedResource {
             resource: Default::default(),
@@ -22,6 +23,7 @@ pub async fn create_uami() -> Result<(), Box<dyn std::error::Error>> {
         properties: None,
     };
 
+    // Create User Assigned Managed Identity
     let uami_created = msi_client
         .user_assigned_identities_client()
         .create_or_update(
@@ -31,13 +33,18 @@ pub async fn create_uami() -> Result<(), Box<dyn std::error::Error>> {
             uami_params,
         )
         .await?;
-    println!("UAMI created: {uami_created:#?}");
+    Ok(uami_created)
+}
 
-    let uami_id = uami_created.properties.unwrap().principal_id.unwrap();
-
-    // Create Role Assignment for the UAMI created above
-    let role_name = "Contributor";
+// Create Role Assignment for UAMI
+pub async fn create_role_assignment(
+    subscription_id: &str,
+    uami_id: String,
+) -> Result<RoleAssignment, Box<dyn std::error::Error>> {
+    let credential = AzureCliCredential::new();
     let role_assignment_name = "00000000-0000-0000-0000-000000000000".to_string();
+
+    // Set parameters for Role Assignment
     let role_assignment_params = azure_mgmt_authorization::models::RoleAssignmentCreateParameters {
         properties: RoleAssignmentProperties {
             scope: None,
@@ -58,11 +65,10 @@ pub async fn create_uami() -> Result<(), Box<dyn std::error::Error>> {
     let role_assignment_client = azure_mgmt_authorization::Client::builder(credential).build()?;
     let scope = format!("/subscriptions/{subscription_id}");
 
+    // Create Role Assignment
     let role_assignment_created = role_assignment_client
         .role_assignments_client()
         .create(scope, role_assignment_name, role_assignment_params)
         .await?;
-    println!("Role Assignment created: {role_assignment_created:#?}");
-
-    Ok(())
+    Ok(role_assignment_created)
 }
