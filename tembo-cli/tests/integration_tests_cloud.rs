@@ -112,7 +112,6 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
 
 fn setup_env(instance_name: &String) -> Result<(), Box<dyn Error>> {
     replace_vars_in_file(tembo_context_file_path(), "ORG_ID", &env::var("ORG_ID")?)?;
-
     replace_vars_in_file(
         tembo_credentials_file_path(),
         "ACCESS_TOKEN",
@@ -192,4 +191,132 @@ pub async fn get_instance(
         Err(error) => eprintln!("Error getting instance: {}", error),
     };
     Ok(None)
+}
+
+pub async fn get_instance_id(
+    instance_name: &str,
+    config: &Configuration,
+    env: &Environment,
+) -> Result<Option<String>, anyhow::Error> {
+    let v = get_all(config, env.org_id.clone().unwrap().as_str()).await;
+
+    match v {
+        Ok(result) => {
+            let maybe_instance = result
+                .iter()
+                .find(|instance| instance.instance_name == instance_name);
+
+            if let Some(instance) = maybe_instance {
+                return Ok(Some(instance.instance_id.clone()));
+            }
+        }
+        Err(error) => eprintln!("Error getting instance: {}", error),
+    };
+    Ok(None)
+}
+
+#[tokio::test]
+async fn import_cloud() -> Result<(), Box<dyn Error>> {
+    let root_dir = env!("CARGO_MANIFEST_DIR");
+    let test_dir = PathBuf::from(root_dir).join("examples").join("import");
+
+    env::set_current_dir(&test_dir)?;
+
+    replace_file(tembo_context_file_path(), CONTEXT_EXAMPLE_TEXT)?;
+    replace_file(tembo_credentials_file_path(), CREDENTIALS_EXAMPLE_TEXT)?;
+
+    // tembo init
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("init");
+    cmd.assert().success();
+
+    let instance_name = "e2e-import-test";
+    setup_env(&instance_name.to_string())?;
+
+    let env = get_current_context()?;
+    let profile = env.clone().selected_profile.unwrap();
+    let config = Configuration {
+        base_path: profile.get_tembo_host(),
+        bearer_access_token: Some(profile.tembo_access_token),
+        ..Default::default()
+    };
+
+    // tembo context set --name prod
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("context");
+    cmd.arg("set");
+    cmd.arg("--name");
+    cmd.arg("prod");
+    cmd.assert().success();
+
+    // tembo apply
+    let mut cmd = Command::cargo_bin(CARGO_BIN).unwrap();
+    cmd.arg("apply");
+
+    let mut output = cmd.output()?;
+    assert!(output.status.success(), "`tembo apply` did not succeed");
+
+    if output
+        .stdout
+        .windows(b"Error creating instance".len())
+        .any(|window| window == b"Error creating instance")
+    {
+        println!("Output: {}", String::from_utf8_lossy(&output.stdout));
+        panic!("Error: Instance creation failed");
+    }
+
+    let config_clone = config.clone();
+    let jwt = config_clone.bearer_access_token;
+    println!("{:?}", jwt);
+
+    let maybe_instance = get_instance_id(&instance_name, &config, &env).await?;
+    if let Some(instance) = maybe_instance {
+        std::fs::write("tembo.toml", "")?;
+
+        let mut cmd = Command::cargo_bin(CARGO_BIN).unwrap();
+        cmd.arg("import");
+        cmd.arg(env.clone().org_id.unwrap());
+        cmd.arg(instance);
+        cmd.assert().success();
+
+        output = cmd.output()?;
+        println!("{:?}", output);
+
+        let tembo_toml_content = std::fs::read_to_string("tembo.toml")?;
+        let expected_content = format!(
+            r#"[e2e-import-test]
+    cpu = "0.25"
+    environment = "prod"
+    instance_name = "e2e-import-test"
+    memory = "1Gi"
+    pg_version = 15
+    replicas = 1
+    stack_type = "Standard"
+    storage = "10Gi""#
+        );
+
+        if tembo_toml_content.contains(&expected_content) {
+            println!("Expected content found in tembo.toml");
+        } else {
+            println!("Expected content not found in tembo.toml. Retrying");
+        }
+    } else {
+        panic!("Failed to import instance");
+    }
+
+    // tembo delete
+    let mut cmd = Command::cargo_bin(CARGO_BIN)?;
+    cmd.arg("delete");
+    let _ = cmd.ok();
+
+    tokio::time::sleep(Duration::from_secs(10)).await;
+
+    let maybe_instance = get_instance(&instance_name, &config, &env).await?;
+    if let Some(instance) = maybe_instance {
+        assert_eq!(instance.state, State::Deleting, "Instance isn't Deleting")
+    } else {
+        assert!(true, "Instance isn't Deleting")
+    }
+
+    Ok(())
 }

@@ -1,0 +1,9 @@
+[e2e-import-test]
+environment = "prod"
+instance_name = "e2e-import-test"
+cpu = "0.25"
+memory = "1Gi"
+pg_version = 15
+replicas = 1
+stack_type = "Standard"
+storage = "10Gi"
