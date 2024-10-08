@@ -419,7 +419,7 @@ pub struct DedicatedNetworking {
 
     /// Configure the load balancer to be public or private.
     ///
-    /// **Default**: false.
+    /// **Default**: true.
     #[serde(default)]
     pub public: bool,
 
