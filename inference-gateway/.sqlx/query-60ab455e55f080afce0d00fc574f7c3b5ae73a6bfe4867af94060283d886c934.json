@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "INSERT INTO billing.reporter_watermark (id, last_reported_at)\n        VALUES (1, $1)\n        ON CONFLICT (id)\n        DO UPDATE SET last_reported_at = EXCLUDED.last_reported_at",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "60ab455e55f080afce0d00fc574f7c3b5ae73a6bfe4867af94060283d886c934"
+}
