@@ -86,7 +86,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         .parse()
         .expect("error parsing GCP_PROJECT_NUMBER");
     let is_loadbalancer_public: bool = env::var("IS_LOADBALANCER_PUBLIC")
-        .unwrap_or_else(|_| "false".to_owned())
+        .unwrap_or_else(|_| "true".to_owned())
         .parse()
         .expect("error parsing IS_LOADBALANCER_PUBLIC");
 
