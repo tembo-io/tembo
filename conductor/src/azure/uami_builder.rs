@@ -3,7 +3,7 @@ use azure_identity::WorkloadIdentityCredential;
 use azure_identity::{AzureCliCredential, TokenCredentialOptions};
 use azure_mgmt_authorization;
 use azure_mgmt_authorization::models::{RoleAssignment, RoleAssignmentProperties};
-use azure_mgmt_msi::models::{Identity, TrackedResource};
+use azure_mgmt_msi::models::{FederatedIdentityCredential, Identity, TrackedResource};
 use std::sync::Arc;
 
 // Get credentials from workload identity
@@ -81,4 +81,33 @@ pub async fn create_role_assignment(
         .create(scope, role_assignment_name, role_assignment_params)
         .await?;
     Ok(role_assignment_created)
+}
+
+// Create Federated Identity Credentials for the UAMI
+pub async fn create_federated_identity_credentials(
+    subscription_id: &str,
+    resource_group: String,
+    instance_name: String,
+    credentials: Arc<dyn TokenCredential>,
+) -> Result<FederatedIdentityCredential, Box<dyn std::error::Error>> {
+    let federated_identity_client = azure_mgmt_msi::Client::builder(credentials).build()?;
+
+    // Set parameters for Federated Identity Credentials
+    let federated_identity_params = FederatedIdentityCredential {
+        proxy_resource: Default::default(),
+        properties: None,
+    };
+
+    // Create Federated Identity Credentials
+    let federated_identity_created = federated_identity_client
+        .federated_identity_credentials_client()
+        .create_or_update(
+            subscription_id,
+            resource_group,
+            &instance_name,
+            &instance_name,
+            federated_identity_params,
+        )
+        .await?;
+    Ok(federated_identity_created)
 }
