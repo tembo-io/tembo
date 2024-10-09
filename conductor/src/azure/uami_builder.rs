@@ -3,7 +3,9 @@ use azure_identity::WorkloadIdentityCredential;
 use azure_identity::{AzureCliCredential, TokenCredentialOptions};
 use azure_mgmt_authorization;
 use azure_mgmt_authorization::models::{RoleAssignment, RoleAssignmentProperties};
-use azure_mgmt_msi::models::{FederatedIdentityCredential, Identity, TrackedResource};
+use azure_mgmt_msi::models::{
+    FederatedIdentityCredential, FederatedIdentityCredentialProperties, Identity, TrackedResource,
+};
 use std::sync::Arc;
 
 // Get credentials from workload identity
@@ -89,13 +91,23 @@ pub async fn create_federated_identity_credentials(
     resource_group: String,
     instance_name: String,
     credentials: Arc<dyn TokenCredential>,
+    region: String,
 ) -> Result<FederatedIdentityCredential, Box<dyn std::error::Error>> {
     let federated_identity_client = azure_mgmt_msi::Client::builder(credentials).build()?;
+
+    // TODO(ianstanton)
+    // Get cluster issuer with something similar to this az command:
+    // export AKS_OIDC_ISSUER="$(az aks show --name "${CLUSTER_NAME}" --resource-group "${RESOURCE_GROUP}" --query "oidcIssuerProfile.issuerUrl" --output tsv)"
+    let cluster_issuer = "https://<region>.oic.prod-aks.azure.com/<tenant_id>/<client_id>/";
 
     // Set parameters for Federated Identity Credentials
     let federated_identity_params = FederatedIdentityCredential {
         proxy_resource: Default::default(),
-        properties: None,
+        properties: Some(FederatedIdentityCredentialProperties {
+            issuer: cluster_issuer.to_string(),
+            subject: format!("system:serviceaccount:{instance_name}:{instance_name}"),
+            audiences: vec!["api://AzureADTokenExchange".to_string()],
+        }),
     };
 
     // Create Federated Identity Credentials
