@@ -6,6 +6,7 @@ use azure_mgmt_authorization::models::{RoleAssignment, RoleAssignmentProperties}
 use azure_mgmt_msi::models::{
     FederatedIdentityCredential, FederatedIdentityCredentialProperties, Identity, TrackedResource,
 };
+use azure_mgmt_msi::user_assigned_identities::delete::Response;
 use std::sync::Arc;
 
 // Get credentials from workload identity
@@ -59,6 +60,8 @@ pub async fn create_role_assignment(
     let role_assignment_name = "00000000-0000-0000-0000-000000000000".to_string();
     let role_assignment_client = azure_mgmt_authorization::Client::builder(credentials).build()?;
     let scope = format!("/subscriptions/{subscription_id}");
+
+    // TODO(ianstanton) Fetch role_definition_id
 
     // TODO(ianstanton) Set conditions for Role Assignment. These should allow for read / write
     //  to the instance's directory in the blob
@@ -128,4 +131,18 @@ pub async fn create_federated_identity_credentials(
     Ok(federated_identity_created)
 }
 
-// TODO(ianstanton) Delete UAMI
+// Delete User Assigned Managed Identity
+pub async fn delete_uami(
+    subscription_id: &str,
+    resource_group: String,
+    instance_name: String,
+    credentials: Arc<dyn TokenCredential>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    let msi_client = azure_mgmt_msi::Client::builder(credentials).build()?;
+    msi_client
+        .user_assigned_identities_client()
+        .delete(subscription_id, resource_group, instance_name)
+        .send()
+        .await?;
+    Ok(())
+}
