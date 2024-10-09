@@ -55,9 +55,13 @@ pub async fn create_role_assignment(
     uami_id: String,
     credentials: Arc<dyn TokenCredential>,
 ) -> Result<RoleAssignment, Box<dyn std::error::Error>> {
+    // TODO(ianstanton) Determine what the role assignment name should be. This is a placeholder.
     let role_assignment_name = "00000000-0000-0000-0000-000000000000".to_string();
     let role_assignment_client = azure_mgmt_authorization::Client::builder(credentials).build()?;
     let scope = format!("/subscriptions/{subscription_id}");
+
+    // TODO(ianstanton) Set conditions for Role Assignment. These should allow for read / write
+    //  to the instance's directory in the blob
 
     // Set parameters for Role Assignment
     let role_assignment_params = azure_mgmt_authorization::models::RoleAssignmentCreateParameters {
@@ -96,8 +100,8 @@ pub async fn create_federated_identity_credentials(
     let federated_identity_client = azure_mgmt_msi::Client::builder(credentials).build()?;
 
     // TODO(ianstanton)
-    // Get cluster issuer with something similar to this az command:
-    // export AKS_OIDC_ISSUER="$(az aks show --name "${CLUSTER_NAME}" --resource-group "${RESOURCE_GROUP}" --query "oidcIssuerProfile.issuerUrl" --output tsv)"
+    //  Get cluster issuer with something similar to this az command:
+    //  export AKS_OIDC_ISSUER="$(az aks show --name "${CLUSTER_NAME}" --resource-group "${RESOURCE_GROUP}" --query "oidcIssuerProfile.issuerUrl" --output tsv)"
     let cluster_issuer = "https://<region>.oic.prod-aks.azure.com/<tenant_id>/<client_id>/";
 
     // Set parameters for Federated Identity Credentials
@@ -123,3 +127,5 @@ pub async fn create_federated_identity_credentials(
         .await?;
     Ok(federated_identity_created)
 }
+
+// TODO(ianstanton) Delete UAMI

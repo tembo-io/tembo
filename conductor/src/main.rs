@@ -524,6 +524,8 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     .await?;
                 }
 
+                // TODO(ianstanton) Delete Azure storage workload identity binding if Azure
+
                 let insert_query = sqlx::query!(
                     "INSERT INTO deleted_instances (namespace) VALUES ($1) ON CONFLICT (namespace) DO NOTHING",
                     namespace
