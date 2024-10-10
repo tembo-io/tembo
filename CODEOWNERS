@@ -1,10 +1,10 @@
-.github/** @nhudson @ianstanton @vrmiguel 
-charts/** @nhudson @ianstanton
+.github/** @nhudson @ianstanton @shahadarsh @vrmiguel 
+charts/**  @nhudson @ianstanton @shahadarsh
 dataplane-webserver/** @nhudson @ianstanton @vrmiguel 
-tembo-operator/** @nhudson @ianstanton @ChuckHend @vrmiguel 
-conductor/** @nhudson @ianstanton @ChuckHend @vrmiguel 
+tembo-operator/** @nhudson @ianstanton @ChuckHend @vrmiguel
+conductor/**  @nhudson @ianstanton @ChuckHend @vrmiguel
 tembo-pod-init/** @nhudson @ianstanton
-tembo-cli/** @shahadarsh @vrmiguel @DarrenBaldwin07
+tembo-cli/** @shahadarsh @vrmiguel @DarrenBaldwin07 @joshuajerin
 tembo-py/** @chuckhend
 tembo-stacks/** @chuckhend @jasonmp85
 inference-gateway/** @chuckhend @jasonmp85

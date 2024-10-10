@@ -775,9 +775,9 @@ checksum = "c2459377285ad874054d797f3ccebf984978aa39129f6eafde5cdc8315b612f8"
 
 [[package]]
 name = "controller"
-version = "0.50.0"
+version = "0.50.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "52a091a6cdf7977042f7d00a0992e1f977b746a9f4686486e6a23c5cf193229c"
+checksum = "b27fd81d5e9063aa4cacd8c922b9083cf4253cc17d3afa6d57811153c705bf74"
 dependencies = [
  "actix-web",
  "anyhow",
@@ -4342,7 +4342,7 @@ dependencies = [
 
 [[package]]
 name = "tembo-cli"
-version = "0.20.7"
+version = "0.20.8"
 dependencies = [
  "actix-cors",
  "actix-service",
@@ -4405,9 +4405,9 @@ dependencies = [
 
 [[package]]
 name = "tembo-stacks"
-version = "0.16.2"
+version = "0.16.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "10e27387bf43862850fe812887bdb57e84ffa1e6a829181602bca2dd33fd5da6"
+checksum = "468edfeddb7ee7bc68d96c26f4af32252b4815c568727e3254b4a5171d969ec1"
 dependencies = [
  "anyhow",
  "clap",
@@ -4427,7 +4427,7 @@ dependencies = [
 
 [[package]]
 name = "temboclient"
-version = "1.0.3"
+version = "1.0.4"
 dependencies = [
  "reqwest",
  "serde",
