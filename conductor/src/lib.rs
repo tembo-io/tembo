@@ -1,4 +1,5 @@
 pub mod aws;
+pub mod azure;
 pub mod cloud;
 pub mod errors;
 pub mod extensions;
@@ -585,6 +586,9 @@ pub async fn delete_gcp_storage_workload_identity_binding(
 
     Ok(())
 }
+
+// TODO(ianstanton) Add function for creating Azure Workload Identity Binding
+// TODO(ianstanton) Add function for deleting Azure Workload Identity Binding
 
 #[cfg(test)]
 mod tests {
