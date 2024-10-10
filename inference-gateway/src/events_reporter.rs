@@ -96,10 +96,8 @@ async fn save_reporter_watermark(
     now: DateTime<Utc>,
 ) -> Result<(), sqlx::Error> {
     sqlx::query!(
-        "INSERT INTO billing.reporter_watermark (id, last_reported_at)
-        VALUES (1, $1)
-        ON CONFLICT (id)
-        DO UPDATE SET last_reported_at = EXCLUDED.last_reported_at",
+        "UPDATE billing.reporter_watermark
+        SET last_reported_at = $1",
         now
     )
     .execute(inference_pool)

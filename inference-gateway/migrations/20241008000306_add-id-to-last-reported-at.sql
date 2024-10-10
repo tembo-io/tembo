@@ -1,1 +1,0 @@
-ALTER TABLE billing.reporter_watermark ADD COLUMN id INT DEFAULT 1 UNIQUE;

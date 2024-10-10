@@ -1,0 +1,14 @@
+{
+  "db_name": "PostgreSQL",
+  "query": "UPDATE billing.reporter_watermark\n        SET last_reported_at = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Left": [
+        "Timestamptz"
+      ]
+    },
+    "nullable": []
+  },
+  "hash": "be21197914e8a3778e818a1fca0080e9e700ba084f945fe20fda7b28e5a8f6af"
+}
