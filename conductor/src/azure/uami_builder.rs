@@ -57,7 +57,7 @@ pub async fn create_role_assignment(
     credentials: Arc<dyn TokenCredential>,
 ) -> Result<RoleAssignment, Box<dyn std::error::Error>> {
     // TODO(ianstanton) Determine what the role assignment name should be. This is a placeholder.
-    let role_assignment_name = "00000000-0000-0000-0000-000000000000".to_string();
+    let role_assignment_name = uuid::Uuid::new_v4().to_string();
     let role_assignment_client = azure_mgmt_authorization::Client::builder(credentials).build()?;
     let scope = format!("/subscriptions/{subscription_id}");
 
