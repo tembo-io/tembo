@@ -91,6 +91,21 @@ async fn get_reporter_watermark(conn: &PgPool) -> Result<Option<ReporterWatermar
     .map_err(Into::into)
 }
 
+async fn save_reporter_watermark(
+    inference_pool: &Pool<Postgres>,
+    now: DateTime<Utc>,
+) -> Result<(), sqlx::Error> {
+    sqlx::query!(
+        "UPDATE billing.reporter_watermark
+        SET last_reported_at = $1",
+        now
+    )
+    .execute(inference_pool)
+    .await
+    .map_err(Into::into)
+    .map(|_| ())
+}
+
 fn start_of_the_hour(datetime: DateTime<Utc>) -> DateTime<Utc> {
     // Safe unwrap since, according to chrono docs, Utc will never have double mappings
     Utc.with_ymd_and_hms(
@@ -149,6 +164,9 @@ pub async fn run_events_reporter(pg_conn: String, billing_queue_conn: String) ->
         for (start_time, end_time) in chunks {
             enqueue_event(&inference_pool, &queue, BILLING_QUEUE, start_time, end_time).await?;
         }
+
+        // Save new reporter watermark
+        save_reporter_watermark(&inference_pool, now).await?;
     }
 }
 
