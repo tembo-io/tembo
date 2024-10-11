@@ -2,11 +2,13 @@ use azure_core::auth::TokenCredential;
 use azure_identity::WorkloadIdentityCredential;
 use azure_identity::{AzureCliCredential, TokenCredentialOptions};
 use azure_mgmt_authorization;
-use azure_mgmt_authorization::models::{RoleAssignment, RoleAssignmentProperties};
+use azure_mgmt_authorization::models::{RoleAssignment, RoleAssignmentProperties, RoleDefinition};
 use azure_mgmt_msi::models::{
     FederatedIdentityCredential, FederatedIdentityCredentialProperties, Identity, TrackedResource,
 };
 use azure_mgmt_msi::user_assigned_identities::delete::Response;
+use futures::StreamExt;
+use schemars::_private::NoSerialize;
 use std::sync::Arc;
 
 // Get credentials from workload identity
@@ -50,6 +52,29 @@ pub async fn create_uami(
     Ok(uami_created)
 }
 
+// Get role definition ID
+pub async fn get_role_definition_id(
+    subscription_id: &str,
+    role_name: &str,
+    credentials: Arc<dyn TokenCredential>,
+) -> Result<String, Box<dyn std::error::Error>> {
+    let role_definition_client = azure_mgmt_authorization::Client::builder(credentials).build()?;
+    // Get role definition for role name
+    let role_definition = role_definition_client
+        .role_definitions_client()
+        .list(subscription_id);
+    let mut role_definition_stream = role_definition.into_stream();
+    while let Some(role_definition_page) = role_definition_stream.next().await {
+        let role_definition_page = role_definition_page?;
+        for item in role_definition_page.value {
+            if item.properties.unwrap().role_name == Some(role_name.to_string()) {
+                return Ok(item.id.unwrap());
+            }
+        }
+    }
+    Err("Role definition not found".into())
+}
+
 // Create Role Assignment for UAMI
 pub async fn create_role_assignment(
     subscription_id: &str,
@@ -58,19 +83,27 @@ pub async fn create_role_assignment(
 ) -> Result<RoleAssignment, Box<dyn std::error::Error>> {
     // TODO(ianstanton) Determine what the role assignment name should be. This is a placeholder.
     let role_assignment_name = uuid::Uuid::new_v4().to_string();
-    let role_assignment_client = azure_mgmt_authorization::Client::builder(credentials).build()?;
+    let role_assignment_client =
+        azure_mgmt_authorization::Client::builder(credentials.clone()).build()?;
     let scope = format!("/subscriptions/{subscription_id}");
 
-    // TODO(ianstanton) Fetch role_definition_id
+    let role_definition = get_role_definition_id(
+        subscription_id,
+        "Storage Blob Data Contributor",
+        credentials,
+    )
+    .await?;
 
     // TODO(ianstanton) Set conditions for Role Assignment. These should allow for read / write
     //  to the instance's directory in the blob
+
+    // TODO(ianstanton) Fetch Storage Account ID
 
     // Set parameters for Role Assignment
     let role_assignment_params = azure_mgmt_authorization::models::RoleAssignmentCreateParameters {
         properties: RoleAssignmentProperties {
             scope: None,
-            role_definition_id: "ba92f5b4-2d11-453d-a403-e96b0029c9fe".to_string(),
+            role_definition_id: role_definition,
             principal_id: uami_id,
             principal_type: None,
             description: None,
@@ -87,7 +120,7 @@ pub async fn create_role_assignment(
     // Create Role Assignment
     let role_assignment_created = role_assignment_client
         .role_assignments_client()
-        .create(scope, role_assignment_name, role_assignment_params)
+        .create(scope, role_assignment_name, role_assignment_params) // Scope should be the Storage Account ID
         .await?;
     Ok(role_assignment_created)
 }
