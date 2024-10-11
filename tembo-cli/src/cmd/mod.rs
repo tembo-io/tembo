@@ -1,6 +1,7 @@
 pub mod apply;
 pub mod context;
 pub mod delete;
+pub mod import;
 pub mod init;
 pub mod login;
 pub mod logs;
