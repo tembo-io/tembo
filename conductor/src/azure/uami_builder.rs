@@ -1,4 +1,5 @@
 use azure_core::auth::TokenCredential;
+use azure_core::error::Error as AzureError;
 use azure_identity::WorkloadIdentityCredential;
 use azure_identity::{AzureCliCredential, TokenCredentialOptions};
 use azure_mgmt_authorization;
@@ -12,7 +13,7 @@ use schemars::_private::NoSerialize;
 use std::sync::Arc;
 
 // Get credentials from workload identity
-pub async fn get_credentials() -> Result<Arc<dyn TokenCredential>, Box<dyn std::error::Error>> {
+pub async fn get_credentials() -> Result<Arc<dyn TokenCredential>, AzureError> {
     let options: TokenCredentialOptions = Default::default();
     let credential = WorkloadIdentityCredential::create(options)?;
     Ok(Arc::new(credential))
@@ -25,7 +26,7 @@ pub async fn create_uami(
     instance_name: String,
     region: String,
     credentials: Arc<dyn TokenCredential>,
-) -> Result<Identity, Box<dyn std::error::Error>> {
+) -> Result<Identity, AzureError> {
     let uami_name = instance_name;
     let msi_client = azure_mgmt_msi::Client::builder(credentials).build()?;
 
@@ -57,7 +58,7 @@ pub async fn get_role_definition_id(
     subscription_id: &str,
     role_name: &str,
     credentials: Arc<dyn TokenCredential>,
-) -> Result<String, Box<dyn std::error::Error>> {
+) -> Result<String, AzureError> {
     let role_definition_client = azure_mgmt_authorization::Client::builder(credentials).build()?;
     let scope = format!("/subscriptions/{subscription_id}");
     // Get role definition for role name
@@ -71,7 +72,11 @@ pub async fn get_role_definition_id(
             }
         }
     }
-    Err("Role definition not found".into())
+    // Return error if not found
+    Err(AzureError::new(
+        azure_core::error::ErrorKind::Other,
+        format!("Role definition {} not found", role_name),
+    ))
 }
 
 // Get storage account ID
@@ -80,7 +85,7 @@ pub async fn get_storage_account_id(
     resource_group: &str,
     storage_account_name: &str,
     credentials: Arc<dyn TokenCredential>,
-) -> Result<String, Box<dyn std::error::Error>> {
+) -> Result<String, AzureError> {
     let storage_client = azure_mgmt_storage::Client::builder(credentials).build()?;
     let storage_account_list = storage_client
         .storage_accounts_client()
@@ -114,7 +119,7 @@ pub async fn create_role_assignment(
     storage_account_name: &str,
     uami_id: String,
     credentials: Arc<dyn TokenCredential>,
-) -> Result<RoleAssignment, Box<dyn std::error::Error>> {
+) -> Result<RoleAssignment, AzureError> {
     let role_assignment_name = uuid::Uuid::new_v4().to_string();
     let role_assignment_client =
         azure_mgmt_authorization::Client::builder(credentials.clone()).build()?;
@@ -174,7 +179,7 @@ pub async fn create_federated_identity_credentials(
     instance_name: String,
     credentials: Arc<dyn TokenCredential>,
     region: String,
-) -> Result<FederatedIdentityCredential, Box<dyn std::error::Error>> {
+) -> Result<FederatedIdentityCredential, AzureError> {
     let federated_identity_client = azure_mgmt_msi::Client::builder(credentials).build()?;
 
     // TODO(ianstanton)
@@ -212,7 +217,7 @@ pub async fn delete_uami(
     resource_group: String,
     instance_name: String,
     credentials: Arc<dyn TokenCredential>,
-) -> Result<(), Box<dyn std::error::Error>> {
+) -> Result<(), AzureError> {
     let msi_client = azure_mgmt_msi::Client::builder(credentials).build()?;
     msi_client
         .user_assigned_identities_client()
