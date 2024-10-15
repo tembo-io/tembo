@@ -90,10 +90,22 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         .unwrap_or_else(|_| "false".to_owned())
         .parse()
         .expect("error parsing IS_AZURE");
-    let azure_storage_account: String = env::var("AZURE_STORAGE_ACCOUNT")
+    let azure_storage_account_name: String = env::var("AZURE_STORAGE_ACCOUNT_NAME")
         .unwrap_or_else(|_| "".to_owned())
         .parse()
-        .expect("error parsing AZURE_STORAGE_ACCOUNT");
+        .expect("error parsing AZURE_STORAGE_ACCOUNT_NAME");
+    let azure_subscription_id: String = env::var("AZURE_SUBSCRIPTION_ID")
+        .unwrap_or_else(|_| "".to_owned())
+        .parse()
+        .expect("error parsing AZURE_SUBSCRIPTION_ID");
+    let azure_resource_group: String = env::var("AZURE_RESOURCE_GROUP")
+        .unwrap_or_else(|_| "".to_owned())
+        .parse()
+        .expect("error parsing AZURE_RESOURCE_GROUP");
+    let azure_region: String = env::var("AZURE_REGION")
+        .unwrap_or_else(|_| "".to_owned())
+        .parse()
+        .expect("error parsing AZURE_REGION");
 
     // Error and exit if CF_TEMPLATE_BUCKET is not set when IS_CLOUD_FORMATION is enabled
     if is_cloud_formation && cf_template_bucket.is_empty() {
@@ -354,7 +366,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     &read_msg,
                     &mut coredb_spec,
                     backup_archive_bucket.clone(),
-                    azure_storage_account.clone(),
+                    azure_storage_account_name.clone(),
                 )
                 .await?;
 
