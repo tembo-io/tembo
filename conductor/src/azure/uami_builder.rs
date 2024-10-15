@@ -59,10 +59,9 @@ pub async fn get_role_definition_id(
     credentials: Arc<dyn TokenCredential>,
 ) -> Result<String, Box<dyn std::error::Error>> {
     let role_definition_client = azure_mgmt_authorization::Client::builder(credentials).build()?;
+    let scope = format!("/subscriptions/{subscription_id}");
     // Get role definition for role name
-    let role_definition = role_definition_client
-        .role_definitions_client()
-        .list(subscription_id);
+    let role_definition = role_definition_client.role_definitions_client().list(scope);
     let mut role_definition_stream = role_definition.into_stream();
     while let Some(role_definition_page) = role_definition_stream.next().await {
         let role_definition_page = role_definition_page?;
