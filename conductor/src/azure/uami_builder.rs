@@ -74,29 +74,68 @@ pub async fn get_role_definition_id(
     Err("Role definition not found".into())
 }
 
+// Get storage account ID
+pub async fn get_storage_account_id(
+    subscription_id: &str,
+    resource_group: &str,
+    storage_account_name: &str,
+    credentials: Arc<dyn TokenCredential>,
+) -> Result<String, Box<dyn std::error::Error>> {
+    let storage_client = azure_mgmt_storage::Client::builder(credentials).build()?;
+    let storage_account_list = storage_client
+        .storage_accounts_client()
+        .list_by_resource_group(resource_group, subscription_id);
+    let mut storage_account_stream = storage_account_list.into_stream();
+    let mut storage_account = None;
+    while let Some(storage_account_page) = storage_account_stream.next().await {
+        let storage_account_page = storage_account_page?;
+        for item in storage_account_page.value {
+            if item.tracked_resource.resource.name == Some(storage_account_name.to_string()) {
+                storage_account = Some(item);
+                break;
+            }
+        }
+        if storage_account.is_some() {
+            break;
+        }
+    }
+    Ok(storage_account
+        .unwrap()
+        .tracked_resource
+        .resource
+        .id
+        .unwrap())
+}
+
 // Create Role Assignment for UAMI
 pub async fn create_role_assignment(
     subscription_id: &str,
+    resource_group: &str,
+    storage_account_name: &str,
     uami_id: String,
     credentials: Arc<dyn TokenCredential>,
 ) -> Result<RoleAssignment, Box<dyn std::error::Error>> {
-    // TODO(ianstanton) Determine what the role assignment name should be. This is a placeholder.
     let role_assignment_name = uuid::Uuid::new_v4().to_string();
     let role_assignment_client =
         azure_mgmt_authorization::Client::builder(credentials.clone()).build()?;
-    let scope = format!("/subscriptions/{subscription_id}");
 
     let role_definition = get_role_definition_id(
         subscription_id,
         "Storage Blob Data Contributor",
-        credentials,
+        credentials.clone(),
     )
     .await?;
 
     // TODO(ianstanton) Set conditions for Role Assignment. These should allow for read / write
     //  to the instance's directory in the blob
 
-    // TODO(ianstanton) Fetch Storage Account ID
+    let storage_account_id = get_storage_account_id(
+        subscription_id,
+        resource_group,
+        storage_account_name,
+        credentials,
+    )
+    .await?;
 
     // Set parameters for Role Assignment
     let role_assignment_params = azure_mgmt_authorization::models::RoleAssignmentCreateParameters {
@@ -116,10 +155,14 @@ pub async fn create_role_assignment(
         },
     };
 
-    // Create Role Assignment
+    // Create Role Assignment. Scope should be storage account ID
     let role_assignment_created = role_assignment_client
         .role_assignments_client()
-        .create(scope, role_assignment_name, role_assignment_params) // Scope should be the Storage Account ID
+        .create(
+            storage_account_id,
+            role_assignment_name,
+            role_assignment_params,
+        )
         .await?;
     Ok(role_assignment_created)
 }
