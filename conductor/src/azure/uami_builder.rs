@@ -1,5 +1,7 @@
+use crate::azure::azure_error;
 use azure_core::auth::TokenCredential;
-use azure_core::error::Error as AzureError;
+use azure_core::error::Error as AzureSDKError;
+use azure_error::AzureError;
 use azure_identity::TokenCredentialOptions;
 use azure_identity::WorkloadIdentityCredential;
 use azure_mgmt_authorization;
@@ -71,10 +73,10 @@ pub async fn get_role_definition_id(
         }
     }
     // Return error if not found
-    Err(AzureError::new(
+    Err(AzureError::from(AzureSDKError::new(
         azure_core::error::ErrorKind::Other,
         format!("Role definition {} not found", role_name),
-    ))
+    )))
 }
 
 // Get storage account ID
@@ -170,25 +172,42 @@ pub async fn create_role_assignment(
     Ok(role_assignment_created)
 }
 
-// Get OIDC Issuer URL from AKS cluster
+// Get OIDC Issuer URL from AKS cluster using rest API. This is necessary because the azure_mgmt_containerservice
+// crate is no longer being built: https://github.com/Azure/azure-sdk-for-rust/pull/1243
 pub async fn get_cluster_issuer(
     subscription_id: &str,
     resource_group: &str,
-    instance_name: &str,
+    cluster_name: &str,
     credentials: Arc<dyn TokenCredential>,
 ) -> Result<String, AzureError> {
-    let hybrid_kubernetes_client =
-        azure_mgmt_hybridkubernetes::Client::builder(credentials).build()?;
-    let cluster = hybrid_kubernetes_client
-        .connected_cluster_client()
-        .get(subscription_id, resource_group, instance_name)
+    // Use REST API to get OIDC Issuer URL from AKS cluster
+    let client = reqwest::Client::new();
+    let url = format!(
+        "https://management.azure.com/subscriptions/{subscription_id}/resourceGroups/{resource_group}/providers/Microsoft.ContainerService/managedClusters/{cluster_name}?api-version=2024-08-01",
+        subscription_id = subscription_id,
+        resource_group = resource_group,
+        cluster_name = cluster_name
+    );
+
+    let scopes: &[&str] = &["https://management.azure.com/.default"];
+
+    let response = client
+        .get(&url)
+        .header(
+            "Authorization",
+            format!(
+                "Bearer {}",
+                credentials.get_token(scopes).await?.token.secret()
+            ),
+        )
+        .send()
         .await?;
-    Ok(cluster
-        .properties
-        .oidc_issuer_profile
-        .unwrap()
-        .issuer_url
-        .unwrap())
+
+    let response_json = response.json::<serde_json::Value>().await?;
+    let issuer_url = response_json["properties"]["oidcIssuerProfile"]["issuerURL"]
+        .as_str()
+        .unwrap();
+    Ok(issuer_url.to_string())
 }
 
 // Create Federated Identity Credentials for the UAMI
@@ -197,14 +216,13 @@ pub async fn create_federated_identity_credentials(
     resource_group: String,
     instance_name: String,
     credentials: Arc<dyn TokenCredential>,
-    region: String,
 ) -> Result<FederatedIdentityCredential, AzureError> {
     let federated_identity_client = azure_mgmt_msi::Client::builder(credentials.clone()).build()?;
     let cluster_issuer = get_cluster_issuer(
         subscription_id,
         &resource_group,
         &instance_name,
-        credentials,
+        credentials.clone(),
     )
     .await?;
 

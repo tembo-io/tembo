@@ -1,5 +1,6 @@
+use crate::azure;
 use aws_sdk_cloudformation::Error as CFError;
-use azure_core::Error as AzureError;
+use azure::azure_error::AzureError;
 use google_cloud_storage::http::Error as GcsError;
 use kube;
 use pgmq::errors::PgmqError;
