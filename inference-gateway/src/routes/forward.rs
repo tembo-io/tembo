@@ -54,7 +54,11 @@ pub async fn forward_request(
 
     // log request duration
     let start = std::time::Instant::now();
-    let resp = client.post(new_url).json(&body).send().await?;
+    let resp = client
+        .post(new_url)
+        .json(&rewrite_request.body)
+        .send()
+        .await?;
     let duration = start.elapsed().as_millis() as i32;
     if resp.status().is_success() {
         let llm_resp = resp.json::<serde_json::Value>().await?;
