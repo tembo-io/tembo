@@ -30,9 +30,9 @@ run-mock-server:
 	docker compose up -d mock-server
 
 unit-test:
-	cargo test
+	cargo test -- --test-threads=1
 
 integration-test: run-mock-server
-	RUST_LOG=${RUST_LOG} MODEL_SERVICE_PORT_MAP=${MODEL_SERVICE_PORT_MAP} cargo test ${TEST_NAME} -- --ignored --nocapture --threads 1
+	RUST_LOG=${RUST_LOG} MODEL_SERVICE_PORT_MAP=${MODEL_SERVICE_PORT_MAP} cargo test ${TEST_NAME} -- --ignored --nocapture --test-threads=1
 
 test-all: unit-test integration-test
