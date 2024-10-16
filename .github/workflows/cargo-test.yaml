@@ -5,12 +5,10 @@ on:
     branches: ["main"]
     paths-ignore:
       - 'tembo-py/**'
-      - 'inference-gateway/**'
   pull_request:
     branches: ["main"]
     paths-ignore:
       - 'tembo-py/**'
-      - 'inference-gateway/**'
 
 jobs:
   find_directories:
@@ -27,7 +25,7 @@ jobs:
         with:
           contains_the_file: Cargo.toml
           changed_relative_to_ref: origin/${{ github.base_ref || 'not-a-branch' }}
-          ignore_dirs: ".coredb examples tembo-cli/temboclient tembo-cli/tembodataclient"
+          ignore_dirs: ".coredb examples tembo-cli/temboclient tembo-cli/tembodataclient inference-gateway/"
 
   lint:
     name: Run linters
