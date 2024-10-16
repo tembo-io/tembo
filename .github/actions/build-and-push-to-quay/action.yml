@@ -1,5 +1,5 @@
-name: 'Build and push to Quay'
-description: 'Builds a container image and pushes it to our Quay organization'
+name: "Build and push to Quay"
+description: "Builds a container image and pushes it to our Quay organization"
 inputs:
   image_name:
     description: 'The name of the image, not including the registry or the tag, for example "postgres"'
@@ -13,9 +13,9 @@ inputs:
     required: false
     default: "quay.io/tembo"
   docker_directory:
-    description: 'The relative path to a directory in which there is a Dockerfile'
+    description: "The relative path to a directory in which there is a Dockerfile"
     required: false
-    default: '.'
+    default: "."
   quay_user:
     required: true
     description: "Quay 'robot user' user name"
@@ -29,11 +29,11 @@ inputs:
     required: true
     description: "Quay 'robot user' access token for Tembo org"
   publish_calver:
-    description: 'Should we tag with calendar versioning?'
+    description: "Should we tag with calendar versioning?"
     required: false
     default: false
   calver_suffix:
-    description: 'Optional suffix to the calendar version'
+    description: "Optional suffix to the calendar version"
     required: false
     default: ""
   publish_latest:
@@ -55,11 +55,13 @@ runs:
     - name: Install TOML parser
       shell: bash
       run: |
-       set -xe
-       wget https://github.com/freshautomations/stoml/releases/download/v0.7.1/stoml_linux_amd64
-       mv stoml_linux_amd64 stoml
-       chmod +x stoml
-       sudo mv stoml /usr/local/bin/
+        set -xe
+        sudo apt-get update
+        sudo apt-get install -y wget
+        wget https://github.com/freshautomations/stoml/releases/download/v0.7.1/stoml_linux_amd64
+        mv stoml_linux_amd64 stoml
+        chmod +x stoml
+        sudo mv stoml /usr/local/bin/
     - name: Create whitespace-separated tags list
       shell: bash
       id: tags

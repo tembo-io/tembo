@@ -1,19 +1,34 @@
-{{- if .Values.inferenceService.podMonitor.enabled -}}
+{{- if .Values.inferenceService.services }}
+  {{- $defaults := .Values.inferenceService.defaults }}
+  {{- $releaseName := default "release-name" .Release.Name }}
+  {{- range $serviceName, $serviceConfig := .Values.inferenceService.services }}
+    {{- $mergedConfig := fromYaml (include "tembo-ai.inferenceService.deepMerge" (list $defaults $serviceConfig)) }}
+    {{- if and (default false $mergedConfig.enabled) (default false $mergedConfig.podMonitor.enabled) }}
+---
 apiVersion: monitoring.coreos.com/v1
 kind: PodMonitor
 metadata:
-  name: {{ include "tembo-ai.fullname" . }}-service
-  namespace: {{ .Release.Namespace }}
+  name: {{ include "tembo-ai.fullname" $ }}-{{ $serviceName }}
+  namespace: {{ include "tembo-ai.namespace" $ }}
   labels:
-    {{- include "tembo-ai.inferenceService.labels" . | nindent 4 }}
+    {{- include "tembo-ai.inferenceService.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $serviceName }}
 spec:
   podMetricsEndpoints:
-    - path: {{ .Values.inferenceService.podMonitor.path }}
-      port: {{ .Values.inferenceService.podMonitor.portName }}
+  - port: {{ $mergedConfig.podMonitor.portName }}
+    path: {{ $mergedConfig.podMonitor.path }}
+    {{- with $mergedConfig.podMonitor.interval }}
+    interval: {{ . }}
+    {{- end }}
+    {{- with $mergedConfig.podMonitor.scrapeTimeout }}
+    scrapeTimeout: {{ . }}
+    {{- end }}
   namespaceSelector:
     matchNames:
-      - {{ .Release.Namespace }}
+      - {{ include "tembo-ai.namespace" $ }}
   selector:
     matchLabels:
-      {{- include "tembo-ai.inferenceService.selectorLabels" . | nindent 6 }}
+      {{- include "tembo-ai.inferenceService.selectorLabels" $ | nindent 6 }}
+    {{- end }}
+  {{- end }}
 {{- end }}
