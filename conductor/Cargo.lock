@@ -752,9 +752,9 @@ dependencies = [
 
 [[package]]
 name = "azure_core"
-version = "0.20.0"
+version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34ce3de4b65b1ee2667c81d1fc692949049502a4cf9c38118d811d6d79a7eaef"
+checksum = "7b552ad43a45a746461ec3d3a51dfb6466b4759209414b439c165eb6a6b7729e"
 dependencies = [
  "async-trait",
  "base64 0.22.1",
@@ -779,9 +779,9 @@ dependencies = [
 
 [[package]]
 name = "azure_identity"
-version = "0.20.0"
+version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72c97790480791ec1ee9b76f5c6499b1d0aac0d4cd1e62010bfc19bb545544c5"
+checksum = "88ddd80344317c40c04b603807b63a5cefa532f1b43522e72f480a988141f744"
 dependencies = [
  "async-lock",
  "async-process",
@@ -800,9 +800,25 @@ dependencies = [
 
 [[package]]
 name = "azure_mgmt_authorization"
-version = "0.20.0"
+version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0996028421d746deea5e44692c84dd79d6d1bd77b40f215cddb5b21a49b3d401"
+checksum = "fbb60abdc00edf3545c0a235fbd3aa26a8dc870676361c4064114de0c4c607b8"
+dependencies = [
+ "azure_core",
+ "bytes",
+ "futures",
+ "log",
+ "once_cell",
+ "serde",
+ "serde_json",
+ "time",
+]
+
+[[package]]
+name = "azure_mgmt_hybridkubernetes"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9f340403dae2cd7aaf60dba87b2404b9bf13561fbadece912018b2f262d60d3f"
 dependencies = [
  "azure_core",
  "bytes",
@@ -816,9 +832,9 @@ dependencies = [
 
 [[package]]
 name = "azure_mgmt_msi"
-version = "0.20.0"
+version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e707e87a141765b64c8f473c926078ea6ea56a3feb98f1541d88fa8a886300e6"
+checksum = "c85adbe25b00edbbdd4034bc917f73d3eb647d5f6872185f6e1dcdf13950c91e"
 dependencies = [
  "azure_core",
  "bytes",
@@ -832,9 +848,9 @@ dependencies = [
 
 [[package]]
 name = "azure_mgmt_storage"
-version = "0.20.0"
+version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f5420e6a1e0434e075f2c8bdf98983ad5688563728ceca5a385af4ec0ded0367"
+checksum = "e9943c26303482bb57afc0ab092d0638e7813ae30a0bb055dca52bf4952d6e4d"
 dependencies = [
  "azure_core",
  "bytes",
@@ -1060,6 +1076,7 @@ dependencies = [
  "azure_core",
  "azure_identity",
  "azure_mgmt_authorization",
+ "azure_mgmt_hybridkubernetes",
  "azure_mgmt_msi",
  "azure_mgmt_storage",
  "base64 0.21.7",
