@@ -815,22 +815,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "azure_mgmt_hybridkubernetes"
-version = "0.21.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9f340403dae2cd7aaf60dba87b2404b9bf13561fbadece912018b2f262d60d3f"
-dependencies = [
- "azure_core",
- "bytes",
- "futures",
- "log",
- "once_cell",
- "serde",
- "serde_json",
- "time",
-]
-
-[[package]]
 name = "azure_mgmt_msi"
 version = "0.21.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1076,7 +1060,6 @@ dependencies = [
  "azure_core",
  "azure_identity",
  "azure_mgmt_authorization",
- "azure_mgmt_hybridkubernetes",
  "azure_mgmt_msi",
  "azure_mgmt_storage",
  "base64 0.21.7",
