@@ -2246,7 +2246,7 @@ spec:
                     description: |-
                       Configure the load balancer to be public or private.
 
-                      **Default**: false.
+                      **Default**: true.
                     type: boolean
                   serviceType:
                     default: LoadBalancer

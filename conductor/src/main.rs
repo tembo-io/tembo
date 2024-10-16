@@ -107,6 +107,10 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         .unwrap_or_else(|_| "".to_owned())
         .parse()
         .expect("error parsing AZURE_REGION");
+    let is_loadbalancer_public: bool = env::var("IS_LOADBALANCER_PUBLIC")
+        .unwrap_or_else(|_| "true".to_owned())
+        .parse()
+        .expect("error parsing IS_LOADBALANCER_PUBLIC");
 
     // Error and exit if CF_TEMPLATE_BUCKET is not set when IS_CLOUD_FORMATION is enabled
     if is_cloud_formation && cf_template_bucket.is_empty() {
@@ -301,6 +305,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     &mut coredb_spec,
                     is_cloud_formation,
                     &client,
+                    is_loadbalancer_public,
                 )
                 .await
                 {
@@ -848,6 +853,7 @@ async fn init_cloud_perms(
     coredb_spec: &mut CoreDBSpec,
     is_cloud_formation: bool,
     _client: &Client,
+    is_loadbalancer_public: bool,
 ) -> Result<(), ConductorError> {
     if !is_cloud_formation {
         return Ok(());
@@ -906,6 +912,12 @@ async fn init_cloud_perms(
 
     coredb_spec.backup = backup;
     coredb_spec.serviceAccountTemplate = service_account_template;
+
+    if is_loadbalancer_public {
+        if let Some(ref mut dedicated_networking) = coredb_spec.dedicated_networking {
+            dedicated_networking.public = true;
+        }
+    }
 
     Ok(())
 }
