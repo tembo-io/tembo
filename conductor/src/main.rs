@@ -3,8 +3,9 @@ use actix_web_opentelemetry::{PrometheusMetricsHandler, RequestTracing};
 use conductor::errors::ConductorError;
 use conductor::monitoring::CustomMetrics;
 use conductor::{
-    cloud::CloudProvider, create_cloudformation, create_gcp_storage_workload_identity_binding,
-    create_namespace, create_or_update, delete, delete_cloudformation,
+    cloud::CloudProvider, create_azure_storage_workload_identity_binding, create_cloudformation,
+    create_gcp_storage_workload_identity_binding, create_namespace, create_or_update, delete,
+    delete_azure_storage_workload_identity_binding, delete_cloudformation,
     delete_gcp_storage_workload_identity_binding, delete_namespace, generate_cron_expression,
     generate_spec, get_coredb_error_without_status, get_one, get_pg_conn, lookup_role_arn,
     restart_coredb, types,
@@ -367,6 +368,9 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     &mut coredb_spec,
                     backup_archive_bucket.clone(),
                     azure_storage_account_name.clone(),
+                    azure_subscription_id.clone(),
+                    azure_resource_group.clone(),
+                    azure_region.clone(),
                 )
                 .await?;
 
@@ -536,7 +540,18 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     .await?;
                 }
 
-                // TODO(ianstanton) Delete Azure storage workload identity binding if Azure
+                if is_azure {
+                    info!(
+                        "{}: Deleting Azure storage workload identity binding",
+                        read_msg.msg_id
+                    );
+                    delete_azure_storage_workload_identity_binding(
+                        &azure_subscription_id,
+                        &azure_resource_group,
+                        &namespace,
+                    )
+                    .await?;
+                }
 
                 let insert_query = sqlx::query!(
                     "INSERT INTO deleted_instances (namespace) VALUES ($1) ON CONFLICT (namespace) DO NOTHING",
@@ -958,12 +973,23 @@ async fn init_azure_storage_workload_identity(
     coredb_spec: &mut CoreDBSpec,
     backup_archive_bucket: String,
     azure_storage_account: String,
+    azure_subscription_id: String,
+    azure_resource_group: String,
+    azure_region: String,
 ) -> Result<(), ConductorError> {
     if !is_azure {
         return Ok(());
     }
 
-    //TODO(ianstanton) Implement Azure Workload Identity
+    create_azure_storage_workload_identity_binding(
+        &azure_subscription_id,
+        &azure_resource_group,
+        &azure_region,
+        &azure_storage_account,
+        &read_msg.message.namespace,
+        &backup_archive_bucket,
+    )
+    .await?;
 
     // Generate Backup spec for CoreDB
     let volume_snapshot = Some(VolumeSnapshot {

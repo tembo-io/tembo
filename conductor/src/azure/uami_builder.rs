@@ -21,13 +21,12 @@ pub async fn get_credentials() -> Result<Arc<dyn TokenCredential>, AzureError> {
 
 // Create User Assigned Managed Identity
 pub async fn create_uami(
-    resource_group: String,
-    subscription_id: String,
-    instance_name: String,
-    region: String,
+    resource_group: &str,
+    subscription_id: &str,
+    uami_name: &str,
+    region: &str,
     credentials: Arc<dyn TokenCredential>,
 ) -> Result<Identity, AzureError> {
-    let uami_name = instance_name;
     let msi_client = azure_mgmt_msi::Client::builder(credentials).build()?;
 
     // Set parameters for User Assigned Managed Identity
@@ -35,7 +34,7 @@ pub async fn create_uami(
         tracked_resource: TrackedResource {
             resource: Default::default(),
             tags: None,
-            location: region,
+            location: region.to_string(),
         },
         properties: None,
     };
@@ -43,12 +42,7 @@ pub async fn create_uami(
     // Create User Assigned Managed Identity
     let uami_created = msi_client
         .user_assigned_identities_client()
-        .create_or_update(
-            subscription_id.clone(),
-            resource_group,
-            uami_name,
-            uami_params,
-        )
+        .create_or_update(subscription_id, resource_group, uami_name, uami_params)
         .await?;
     Ok(uami_created)
 }
@@ -213,10 +207,11 @@ pub async fn get_cluster_issuer(
 // Create Federated Identity Credentials for the UAMI
 pub async fn create_federated_identity_credentials(
     subscription_id: &str,
-    resource_group: String,
-    instance_name: String,
+    resource_group: &str,
+    instance_name: &str,
     credentials: Arc<dyn TokenCredential>,
 ) -> Result<FederatedIdentityCredential, AzureError> {
+    let uami_name = instance_name;
     let federated_identity_client = azure_mgmt_msi::Client::builder(credentials.clone()).build()?;
     let cluster_issuer = get_cluster_issuer(
         subscription_id,
@@ -242,8 +237,8 @@ pub async fn create_federated_identity_credentials(
         .create_or_update(
             subscription_id,
             resource_group,
-            &instance_name,
-            &instance_name,
+            uami_name,
+            instance_name,
             federated_identity_params,
         )
         .await?;
@@ -253,14 +248,14 @@ pub async fn create_federated_identity_credentials(
 // Delete User Assigned Managed Identity
 pub async fn delete_uami(
     subscription_id: &str,
-    resource_group: String,
-    instance_name: String,
+    resource_group: &str,
+    uami_name: &str,
     credentials: Arc<dyn TokenCredential>,
 ) -> Result<(), AzureError> {
     let msi_client = azure_mgmt_msi::Client::builder(credentials).build()?;
     msi_client
         .user_assigned_identities_client()
-        .delete(subscription_id, resource_group, instance_name)
+        .delete(subscription_id, resource_group, uami_name)
         .send()
         .await?;
     Ok(())
