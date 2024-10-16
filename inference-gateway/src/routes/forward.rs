@@ -7,6 +7,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::authorization;
+use crate::config::rewrite_model_request;
 use crate::errors::{AuthError, PlatformError};
 
 pub async fn forward_request(
@@ -45,18 +46,9 @@ pub async fn forward_request(
         return Ok(HttpResponse::BadRequest().body("Embedding generation is not yet supported"));
     }
 
-    let requested_model = body
-        .get("model")
-        .ok_or_else(|| PlatformError::InvalidQuery("missing model in request body".to_string()))?
-        .as_str()
-        .ok_or_else(|| PlatformError::InvalidQuery("missing model in request body".to_string()))?;
+    let rewrite_request = rewrite_model_request(body.clone(), &config)?;
 
-    let mut new_url = config
-        .model_service_map
-        .get(requested_model)
-        .ok_or_else(|| PlatformError::InvalidQuery(format!("model {} not found", requested_model)))?
-        .clone();
-    // let mut new_url = config.llm_service_host_port.clone();
+    let mut new_url = rewrite_request.base_url;
     new_url.set_path(path);
     new_url.set_query(req.uri().query());
 
