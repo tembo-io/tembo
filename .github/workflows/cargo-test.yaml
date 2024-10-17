@@ -63,6 +63,8 @@ jobs:
       - name: Cargo format and clippy
         run: |
           set -xe
+          sudo apt-get update
+          sudo apt-get install -y build-essential
           cd ${{ matrix.path }}
           cargo --version
           cargo fmt --all --check
@@ -88,7 +90,7 @@ jobs:
         run: |
           set -xe
           sudo apt-get update
-          sudo apt-get install -y pkg-config libssl-dev lsb-release wget
+          sudo apt-get install -y pkg-config libssl-dev lsb-release wget build-essential
           sudo sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'
           wget -qO- https://www.postgresql.org/media/keys/ACCC4CF8.asc | sudo tee /etc/apt/trusted.gpg.d/pgdg.asc &>/dev/null
           sudo apt-get update && sudo apt-get install -y postgresql-client
