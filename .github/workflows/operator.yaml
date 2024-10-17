@@ -46,7 +46,7 @@ jobs:
         run: |
           set -xe
           sudo apt-get update
-          sudo apt-get install -y pkg-config libssl-dev git
+          sudo apt-get install -y pkg-config libssl-dev git wget
       - uses: azure/setup-helm@v4
       - uses: extractions/setup-just@v2
       - name: Install kind
