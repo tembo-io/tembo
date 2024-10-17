@@ -1,4 +1,5 @@
 pub mod aws;
+pub mod azure;
 pub mod cloud;
 pub mod errors;
 pub mod extensions;
@@ -19,6 +20,11 @@ use errors::ConductorError;
 use k8s_openapi::api::core::v1::{Namespace, Secret};
 
 use kube::api::{DeleteParams, ListParams, Patch, PatchParams};
+
+use crate::azure::uami_builder::{
+    create_federated_identity_credentials, create_role_assignment, create_uami, delete_uami,
+    get_credentials,
+};
 
 use chrono::{DateTime, SecondsFormat, Utc};
 use kube::{Api, Client, ResourceExt};
@@ -582,6 +588,72 @@ pub async fn delete_gcp_storage_workload_identity_binding(
     gcp_iam_manager
         .remove_service_account_binding(buckets, namespace, service_account_name)
         .await?;
+
+    Ok(())
+}
+
+pub async fn create_azure_storage_workload_identity_binding(
+    azure_subscription_id: &str,
+    azure_resource_group: &str,
+    azure_region: &str,
+    backup_archive_bucket: &str,
+    namespace: &str,
+) -> Result<(), ConductorError> {
+    let credentials = get_credentials().await?;
+
+    // Create UAMI
+    let uami_name = namespace;
+    let uami = create_uami(
+        azure_resource_group,
+        azure_subscription_id,
+        azure_region,
+        uami_name,
+        credentials.clone(),
+    )
+    .await?;
+    info!("Created UAMI: {:?}", uami);
+
+    // Create Role Assignment for UAMI
+    let uami_id = uami.properties.unwrap().principal_id.unwrap();
+    let role_assignment = create_role_assignment(
+        azure_subscription_id,
+        azure_resource_group,
+        backup_archive_bucket,
+        &uami_id,
+        credentials.clone(),
+    )
+    .await?;
+    info!("Created Role Assignment: {:?}", role_assignment);
+
+    // Create Federated Credential for the UAMI
+    let federated_credential = create_federated_identity_credentials(
+        azure_subscription_id,
+        azure_resource_group,
+        namespace,
+        credentials.clone(),
+    )
+    .await?;
+    info!("Created Federated Credential: {:?}", federated_credential);
+
+    Ok(())
+}
+
+pub async fn delete_azure_storage_workload_identity_binding(
+    azure_subscription_id: &str,
+    azure_resource_group: &str,
+    namespace: &str,
+) -> Result<(), ConductorError> {
+    let credentials = get_credentials().await?;
+
+    // Delete UAMI
+    delete_uami(
+        azure_subscription_id,
+        azure_resource_group,
+        namespace,
+        credentials.clone(),
+    )
+    .await?;
+    info!("Deleted UAMI");
 
     Ok(())
 }
