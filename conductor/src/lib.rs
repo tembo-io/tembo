@@ -592,13 +592,11 @@ pub async fn delete_gcp_storage_workload_identity_binding(
     Ok(())
 }
 
-// TODO(ianstanton) Add function for creating Azure Workload Identity Binding
 pub async fn create_azure_storage_workload_identity_binding(
     azure_subscription_id: &str,
     azure_resource_group: &str,
     azure_region: &str,
     backup_archive_bucket: &str,
-    storage_archive_bucket: &str,
     namespace: &str,
 ) -> Result<(), ConductorError> {
     let credentials = get_credentials().await?;
@@ -620,8 +618,8 @@ pub async fn create_azure_storage_workload_identity_binding(
     let role_assignment = create_role_assignment(
         azure_subscription_id,
         azure_resource_group,
-        storage_archive_bucket,
-        uami_id,
+        backup_archive_bucket,
+        &uami_id,
         credentials.clone(),
     )
     .await?;

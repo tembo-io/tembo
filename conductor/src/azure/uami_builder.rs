@@ -111,7 +111,7 @@ pub async fn create_role_assignment(
     subscription_id: &str,
     resource_group: &str,
     storage_account_name: &str,
-    uami_id: String,
+    uami_id: &str,
     credentials: Arc<dyn TokenCredential>,
 ) -> Result<RoleAssignment, AzureError> {
     let role_assignment_name = uuid::Uuid::new_v4().to_string();
@@ -141,7 +141,7 @@ pub async fn create_role_assignment(
         properties: RoleAssignmentProperties {
             scope: None,
             role_definition_id: role_definition,
-            principal_id: uami_id,
+            principal_id: uami_id.to_string(),
             principal_type: None,
             description: None,
             condition: None,
@@ -174,7 +174,6 @@ pub async fn get_cluster_issuer(
     cluster_name: &str,
     credentials: Arc<dyn TokenCredential>,
 ) -> Result<String, AzureError> {
-    // Use REST API to get OIDC Issuer URL from AKS cluster
     let client = reqwest::Client::new();
     let url = format!(
         "https://management.azure.com/subscriptions/{subscription_id}/resourceGroups/{resource_group}/providers/Microsoft.ContainerService/managedClusters/{cluster_name}?api-version=2024-08-01",
@@ -182,7 +181,6 @@ pub async fn get_cluster_issuer(
         resource_group = resource_group,
         cluster_name = cluster_name
     );
-
     let scopes: &[&str] = &["https://management.azure.com/.default"];
 
     let response = client
@@ -215,8 +213,8 @@ pub async fn create_federated_identity_credentials(
     let federated_identity_client = azure_mgmt_msi::Client::builder(credentials.clone()).build()?;
     let cluster_issuer = get_cluster_issuer(
         subscription_id,
-        &resource_group,
-        &instance_name,
+        resource_group,
+        instance_name,
         credentials.clone(),
     )
     .await?;
