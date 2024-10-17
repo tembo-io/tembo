@@ -63,6 +63,8 @@ jobs:
       - name: Cargo format and clippy
         run: |
           set -xe
+          sudo apt-get update
+          sudo apt-get install build-essential
           cd ${{ matrix.path }}
           cargo --version
           cargo fmt --all --check
