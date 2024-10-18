@@ -125,14 +125,13 @@ pub async fn role_assignment_exists(
     )
     .await?;
 
-    let scope = format!("/subscriptions/{subscription_id}");
 
     let role_assignment_list = role_assignment_client
-        .role_assignments_client()
-        .list_for_scope(scope.clone());
-    info!("Fetching role assignments for scope {}", scope);
+        .role_assignments_client().list_for_subscription(subscription_id);
+    info!("Fetching role assignments for subscription {}", subscription_id);
     let mut role_assignment_stream = role_assignment_list.into_stream();
     while let Some(role_assignment_page) = role_assignment_stream.next().await {
+        info!("GOT ROLE ASSIGNMENT LIST");
         let role_assignment_page = role_assignment_page?;
         for item in role_assignment_page.value {
             info!("ROLE ASSIGNMENTS {:?}", item);
