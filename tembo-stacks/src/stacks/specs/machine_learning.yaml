@@ -17,7 +17,7 @@ postgres_config:
   - name: cron.host
     value: /controller/run
   - name: track_io_timing
-    value: 'on'
+    value: "on"
   - name: shared_preload_libraries
     value: vectorize,pg_stat_statements,pgml,pg_cron,pg_later
   - name: vectorize.embedding_service_url
@@ -56,29 +56,29 @@ extensions:
         version: 2.7.1
   - name: pg_cron
     locations:
-    - database: postgres
-      enabled: true
-      version: 1.6.2
+      - database: postgres
+        enabled: true
+        version: 1.6.2
   - name: pgmq
     locations:
-    - database: postgres
-      enabled: true
-      version: 1.4.4
+      - database: postgres
+        enabled: true
+        version: 1.4.4
   - name: vectorize
     locations:
-    - database: postgres
-      enabled: true
-      version: 0.18.2
+      - database: postgres
+        enabled: true
+        version: 0.18.2
   - name: pg_later
     locations:
-    - database: postgres
-      enabled: true
-      version: 0.1.1
+      - database: postgres
+        enabled: true
+        version: 0.1.1
   - name: plpython3u
     locations:
-    - database: postgres
-      enabled: true
-      version: 1.0.0
+      - database: postgres
+        enabled: true
+        version: 1.0.0
   - name: vectorscale
     locations:
       - database: postgres
