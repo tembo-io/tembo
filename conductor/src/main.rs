@@ -993,7 +993,7 @@ async fn init_azure_storage_workload_identity(
         return Ok(());
     }
 
-    create_azure_storage_workload_identity_binding(
+    let uami_client_id = create_azure_storage_workload_identity_binding(
         &azure_subscription_id,
         &azure_resource_group,
         &azure_region,
@@ -1002,6 +1002,20 @@ async fn init_azure_storage_workload_identity(
         &read_msg.message.namespace,
     )
     .await?;
+
+    // Format ServiceAccountTemplate spec in CoreDBSpec
+    use std::collections::BTreeMap;
+    let mut annotations: BTreeMap<String, String> = BTreeMap::new();
+    annotations.insert(
+        "azure.workload.identity/client-id".to_string(),
+        uami_client_id,
+    );
+    let service_account_template = ServiceAccountTemplate {
+        metadata: Some(ObjectMeta {
+            annotations: Some(annotations),
+            ..ObjectMeta::default()
+        }),
+    };
 
     // Generate Backup spec for CoreDB
     let volume_snapshot = Some(VolumeSnapshot {
@@ -1037,6 +1051,7 @@ async fn init_azure_storage_workload_identity(
     };
 
     coredb_spec.backup = backup;
+    coredb_spec.serviceAccountTemplate = service_account_template;
 
     Ok(())
 }

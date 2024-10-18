@@ -599,7 +599,7 @@ pub async fn create_azure_storage_workload_identity_binding(
     _backup_archive_bucket: &str,
     azure_storage_account: &str,
     namespace: &str,
-) -> Result<(), ConductorError> {
+) -> Result<String, ConductorError> {
     let credentials = get_credentials().await?;
 
     // Create UAMI
@@ -613,6 +613,9 @@ pub async fn create_azure_storage_workload_identity_binding(
     )
     .await?;
     info!("Created UAMI: {:?}", uami);
+
+    // Get UAMI Client ID to return and pass to ServiceAccountTemplate
+    let uami_client_id = uami.properties.clone().unwrap().client_id.unwrap();
 
     // Create Role Assignment for UAMI
     let uami_id = uami.properties.clone().unwrap().principal_id.unwrap();
@@ -638,7 +641,7 @@ pub async fn create_azure_storage_workload_identity_binding(
     .await?;
     info!("Created Federated Credential: {:?}", federated_credential);
 
-    Ok(())
+    Ok(uami_client_id)
 }
 
 pub async fn delete_azure_storage_workload_identity_binding(
