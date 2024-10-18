@@ -51,7 +51,7 @@ pub async fn generate_spec(
     let mut spec = spec.clone();
 
     match cloud_provider {
-        CloudProvider::AWS | CloudProvider::GCP => {
+        CloudProvider::AWS | CloudProvider::GCP | CloudProvider::Azure => {
             let prefix = cloud_provider.prefix();
 
             // Format the backups_path with the correct prefix
