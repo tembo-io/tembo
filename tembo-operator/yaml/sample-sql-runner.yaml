@@ -1,0 +1,39 @@
+apiVersion: coredb.io/v1alpha1
+kind: CoreDB
+metadata:
+  name: sample-sql
+spec:
+  appServices:
+    - image: quay.io/tembo/sql-runner:6778cb5
+      name: sqlrunner
+      resources:
+        requests:
+          cpu: 10m
+          memory: 100Mi
+        limits:
+          cpu: 200m
+          memory: 100Mi
+      routing:
+        - port: 3000
+          ingressPath: "/v1/sql"
+          middlewares:
+            - strip-auth-header
+            - strip-path-prefix
+            - replacePathRegex
+      middlewares:
+        - !customRequestHeaders
+          name: strip-auth-header
+          config:
+            Authorization: ""
+        - !stripPrefix
+          name: strip-path-prefix
+          config:
+            - /v1/sql
+        - !replacePathRegex
+          name: map-sql
+          config:
+            regex: ^\/sql\/?
+            replacement: /v1/sql
+      env:
+        - name: CONNECTION_STRING
+          valueFromPlatform: ReadWriteConnection
