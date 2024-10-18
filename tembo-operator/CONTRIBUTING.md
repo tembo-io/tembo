@@ -1,20 +1,23 @@
 # Contributing to the Tembo Kubernetes Operator
+
 Welcome!
 And thank you for your interest in contributing to the Tembo Kubernetes Operator.
 Here are some quick pointers for orientation:
+
 - Check out the project's [README](https://github.com/tembo-io/tembo/blob/main/tembo-operator/README.md) to learn about the less technical aspects.
 - Questions or comments? We'd love to hear from you on our [Tembo Slack Channel](https://join.slack.com/t/tembocommunity/shared_invite/zt-277pu7chi-NHtvHWvLhHwyK0Y5Y6vTPw)!
 
 ## Table of Contents
+
 1. [Prerequisites](#prerequisites)
 2. [Running locally with Kind](#running-locally)
-    1. [Initial setup](#1.-initial-setup)
-    2. [Applying YAML files](#2.-applying-YAML-files)
-    3. [Loading Docker images](#3.-loading-docker-images)
-    4. [Connect via psql](#4.-connect-via-psql)
-    5. [Exec into the pod](#5.-exec-into-the-pod)
+   1. [Initial setup](#1.-initial-setup)
+   2. [Applying YAML files](#2.-applying-YAML-files)
+   3. [Loading Docker images](#3.-loading-docker-images)
+   4. [Connect via psql](#4.-connect-via-psql)
+   5. [Exec into the pod](#5.-exec-into-the-pod)
 3. [Updating the CRD (CustomResourceDefinition)](#updating-the-crd)
-    1. [Making and applying changes](#1.-making-and-applying-changes)
+   1. [Making and applying changes](#1.-making-and-applying-changes)
 4. [Testing](#testing)
 
 ## Prerequisites
@@ -25,6 +28,7 @@ Here are some quick pointers for orientation:
 - [kind](https://github.com/kubernetes-sigs/kind) — Simplifies creation of local Kubernetes clusters using Docker (_**K**ubernetes **IN** **D**ocker_)
 - [kubectl](https://kubernetes.io/docs/tasks/tools/#kubectl) — Kubernetes primary CLI
 - [just](https://github.com/casey/just) — Simplifies running complex, project-specific commands. If you find a new, useful command, consider adding it to the `justfile`
+- [helm](https://helm.sh/) - The package manager for Kubernetes
 
 ## Running locally
 
@@ -35,22 +39,27 @@ If you haven't already, go ahead and clone the tembo repository to your local ma
 ```bash
 git clone https://github.com/tembo-io/tembo.git
 ```
+
 ```bash
 cd tembo/tembo-operator
 ```
 
 From there, initiate a local Kubernetes cluster:
+
 ```bash
 just start-kind
 ```
+
 :bulb: Details on this command, as well as others that invoke `just` can be found within the directory's `justfile`.
 
 :wrench: If you encounter an error, confirm that your Docker engine is running.
 
 Once complete, start the Tembo Operator:
+
 ```bash
 just run
 ```
+
 :bulb: This operation will be running continuously, so we advise opening a new terminal workspace.
 
 ### 2. Applying YAML files
@@ -62,10 +71,13 @@ You can try out any of the sample YAML files, for example by running the followi
 ```bash
 kubectl apply -f yaml/sample-standard.yaml
 ```
+
 After some moments, confirm the newly-made kubernetes pod:
+
 ```bash
 kubectl get pods
 ```
+
 ```text
 NAME                READY   STATUS    RESTARTS   AGE
 sample-standard-1   1/1     Running   0          14s
@@ -104,6 +116,7 @@ Bear this in mind as you define your own names and tags.
 You can confirm that your local Docker registry is running by invoking `docker ps`.
 
 Then you can push the newly-created image and check for it by running the following:
+
 ```bash
 docker push localhost:5000/my-custom-image:15-0.0.1
 ```
@@ -112,7 +125,7 @@ docker push localhost:5000/my-custom-image:15-0.0.1
 docker images
 ```
 
-#### 3.3. Apply custom image and connecting 
+#### 3.3. Apply custom image and connecting
 
 Say, for example you'd like to update the image of the `sample-standard.yaml` file.
 You would begin by replacing the image parameter with the following:
@@ -136,7 +149,7 @@ kubectl apply -f yaml/sample-standard.yaml
 ### 4. Connect via psql
 
 Connecting via psql will require a password, which is linked to your current Kubernetes session.
-Sections `4.1` and `4.2` will illustrate how to respectively reveal the password, if you're work is more sessions-based, and how to save the password for later use. 
+Sections `4.1` and `4.2` will illustrate how to respectively reveal the password, if you're work is more sessions-based, and how to save the password for later use.
 
 #### 4.1. Revealing password
 
@@ -161,6 +174,7 @@ export PGPASSWORD=$(kubectl get secrets/sample-standard-connection --template={{
 ```
 
 Add the following line to /etc/hosts
+
 ```
 127.0.0.1 sample-standard.localhost
 ```

@@ -21,19 +21,11 @@ spec:
             - strip-path-prefix
             - replacePathRegex
       middlewares:
-        - !customRequestHeaders
-          name: strip-auth-header
-          config:
-            Authorization: ""
-        - !stripPrefix
-          name: strip-path-prefix
-          config:
-            - /v1/sql
-        - !replacePathRegex
-          name: map-sql
-          config:
-            regex: ^\/sql\/?
-            replacement: /v1/sql
+        - replacePathRegex:
+            name: map-sql
+            config:
+              regex: ^\/sql\/?
+              replacement: /v1/sql
       env:
         - name: CONNECTION_STRING
           valueFromPlatform: ReadWriteConnection
