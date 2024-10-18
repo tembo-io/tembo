@@ -606,8 +606,8 @@ pub async fn create_azure_storage_workload_identity_binding(
     let uami = create_uami(
         azure_resource_group,
         azure_subscription_id,
-        azure_region,
         uami_name,
+        azure_region,
         credentials.clone(),
     )
     .await?;
