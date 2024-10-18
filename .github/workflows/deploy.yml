@@ -57,7 +57,7 @@ jobs:
         with:
           repository: tembo-io/tembo
           path: ./.tembo
-          ref: 3714d336a0efdfc82234db7ccb708ecf80346e84
+          ref: 9be38d643b2451325dc98807e190b02d50a96db0
       - name: Determine which tags to publish
         id: tags
         run: |
