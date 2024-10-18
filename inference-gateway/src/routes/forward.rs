@@ -7,6 +7,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 use crate::authorization;
+use crate::config::rewrite_model_request;
 use crate::errors::{AuthError, PlatformError};
 
 pub async fn forward_request(
@@ -45,13 +46,19 @@ pub async fn forward_request(
         return Ok(HttpResponse::BadRequest().body("Embedding generation is not yet supported"));
     }
 
-    let mut new_url = config.llm_service_host_port.clone();
+    let rewrite_request = rewrite_model_request(body.clone(), &config)?;
+
+    let mut new_url = rewrite_request.base_url;
     new_url.set_path(path);
     new_url.set_query(req.uri().query());
 
     // log request duration
     let start = std::time::Instant::now();
-    let resp = client.post(new_url).json(&body).send().await?;
+    let resp = client
+        .post(new_url)
+        .json(&rewrite_request.body)
+        .send()
+        .await?;
     let duration = start.elapsed().as_millis() as i32;
     if resp.status().is_success() {
         let llm_resp = resp.json::<serde_json::Value>().await?;
