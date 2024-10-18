@@ -24,7 +24,7 @@ postgres_config:
   - name: shared_preload_libraries
     value: pg_stat_statements,pg_cron
   - name: track_io_timing
-    value: "on"
+    value: 'on'
   - name: wal_level
     value: logical
 trunk_installs:
@@ -50,12 +50,12 @@ extensions:
   - name: pg_cron
     description: pg_cron
     locations:
-      - database: postgres
-        enabled: true
-        version: 1.6.2
+    - database: postgres
+      enabled: true
+      version: 1.6.2
   - name: pg_analytics
     description: pg_analytics
     locations:
-      - database: postgres
-        enabled: true
-        version: 0.2.1
+    - database: postgres
+      enabled: true
+      version: 0.2.1

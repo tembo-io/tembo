@@ -22,9 +22,9 @@ postgres_config:
   - name: track_activity_query_size
     value: 2048
   - name: wal_compression
-    value: "on"
+    value: 'on'
   - name: track_io_timing
-    value: "on"
+    value: 'on'
   - name: log_min_duration_statement # https://www.postgresql.org/docs/15/runtime-config-logging.html
     value: 1000
   - name: pg_stat_statements.track

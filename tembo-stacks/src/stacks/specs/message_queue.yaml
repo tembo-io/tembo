@@ -19,20 +19,20 @@ appServices:
           - headers
     middlewares:
       - !customRequestHeaders
-        name: headers
-        config:
-          Authorization: ""
-          Content-Profile: pgmq
-          Accept-Profile: pgmq
+          name: headers
+          config:
+            Authorization: ""
+            Content-Profile: pgmq
+            Accept-Profile: pgmq
       - !stripPrefix
-        name: strip-prefix
-        config:
-          - /rest/v1
+          name: strip-prefix
+          config:
+            - /rest/v1
       - !replacePathRegex
-        name: map-pgmq
-        config:
-          regex: \/pgmq\/v1\/?
-          replacement: /rpc/
+          name: map-pgmq
+          config:
+            regex: \/pgmq\/v1\/?
+            replacement: /rpc/
     env:
       - name: PGRST_DB_URI
         valueFromPlatform: ReadWriteConnection
@@ -87,30 +87,30 @@ extensions:
         version: 0.0.4
 postgres_metrics:
   pgmq:
-    query: select queue_name, queue_length, oldest_msg_age_sec, newest_msg_age_sec, total_messages, current_database() as datname from pgmq.metrics_all()
-    master: true
-    metrics:
-      - queue_name:
-          usage: LABEL
-          description: Name of the queue
-      - queue_length:
-          usage: GAUGE
-          description: Number of messages in the queue
-      - oldest_msg_age_sec:
-          usage: GAUGE
-          description: Age of the oldest message in the queue, in seconds.
-      - newest_msg_age_sec:
-          usage: GAUGE
-          description: Age of the newest message in the queue, in seconds.
-      - total_messages:
-          usage: GAUGE
-          description: Total number of messages that have passed into the queue.
-      - datname:
-          usage: "LABEL"
-          description: "Name of current database"
-    target_databases:
-      - "*"
-      - "postgres"
+      query: select queue_name, queue_length, oldest_msg_age_sec, newest_msg_age_sec, total_messages, current_database() as datname from pgmq.metrics_all()
+      master: true
+      metrics:
+        - queue_name:
+            usage: LABEL
+            description: Name of the queue
+        - queue_length:
+            usage: GAUGE
+            description: Number of messages in the queue
+        - oldest_msg_age_sec:
+            usage: GAUGE
+            description: Age of the oldest message in the queue, in seconds.
+        - newest_msg_age_sec:
+            usage: GAUGE
+            description: Age of the newest message in the queue, in seconds.
+        - total_messages:
+            usage: GAUGE
+            description: Total number of messages that have passed into the queue.
+        - datname:
+            usage: "LABEL"
+            description: "Name of current database"
+      target_databases:
+        - "*"
+        - "postgres"
 postgres_config_engine: mq
 postgres_config:
   - name: shared_preload_libraries
@@ -124,7 +124,7 @@ postgres_config:
   - name: random_page_cost
     value: 1.1
   - name: autovacuum_naptime
-    value: "20s"
+    value: '20s'
   - name: autovacuum_vacuum_cost_limit
     value: 10000
   - name: autovacuum_vacuum_scale_factor
@@ -134,7 +134,7 @@ postgres_config:
   - name: autovacuum_analyze_scale_factor
     value: 0.05
   - name: track_io_timing
-    value: "on"
+    value: 'on'
   - name: checkpoint_timeout
     value: 10min
   - name: pg_stat_statements.track
