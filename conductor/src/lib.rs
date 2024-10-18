@@ -615,12 +615,14 @@ pub async fn create_azure_storage_workload_identity_binding(
     info!("Created UAMI: {:?}", uami);
 
     // Create Role Assignment for UAMI
-    let uami_id = uami.properties.unwrap().principal_id.unwrap();
+    let uami_id = uami.properties.clone().unwrap().principal_id.unwrap();
+    let uami_principal_id = uami.properties.unwrap().principal_id.unwrap();
     let role_assignment = create_role_assignment(
         azure_subscription_id,
         azure_resource_group,
         azure_storage_account,
         &uami_id,
+        &uami_principal_id,
         credentials.clone(),
     )
     .await?;

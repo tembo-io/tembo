@@ -125,14 +125,22 @@ pub async fn role_assignment_exists(
     )
     .await?;
 
-
     let role_assignment_list = role_assignment_client
-        .role_assignments_client().list_for_subscription(subscription_id);
-    info!("Fetching role assignments for subscription {}", subscription_id);
+        .role_assignments_client()
+        .list_for_subscription(subscription_id);
+    info!(
+        "Fetching role assignments for subscription {}",
+        subscription_id
+    );
     let mut role_assignment_stream = role_assignment_list.into_stream();
     while let Some(role_assignment_page) = role_assignment_stream.next().await {
         info!("GOT ROLE ASSIGNMENT LIST");
         let role_assignment_page = role_assignment_page?;
+        info!(
+            "ROLE ASSIGNMENT LIST LENGTH: {}",
+            role_assignment_page.value.len()
+        );
+
         for item in role_assignment_page.value {
             info!("ROLE ASSIGNMENTS {:?}", item);
             if item.properties.clone().unwrap().role_definition_id == role_definition
@@ -151,6 +159,7 @@ pub async fn create_role_assignment(
     resource_group: &str,
     storage_account_name: &str,
     uami_id: &str,
+    uami_principal_id: &str,
     credentials: Arc<dyn TokenCredential>,
 ) -> Result<RoleAssignment, AzureError> {
     let role_assignment_name = uuid::Uuid::new_v4().to_string();
@@ -177,7 +186,14 @@ pub async fn create_role_assignment(
 
     // Check if role assignment already exists
     info!("Checking if role assignment exists");
-    if role_assignment_exists(subscription_id, &storage_account_id, uami_id, credentials).await? {
+    if role_assignment_exists(
+        subscription_id,
+        &storage_account_id,
+        uami_principal_id,
+        credentials,
+    )
+    .await?
+    {
         info!("Role assignment already exists, skipping creation");
         return Ok(RoleAssignment {
             id: None,
