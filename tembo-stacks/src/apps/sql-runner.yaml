@@ -1,6 +1,6 @@
 name: !sqlrunner
 appServices:
-  - image: quay.io/tembo/sql-runner:6778cb5
+  - image: quay.io/tembo/sql-runner:3bc8bbc
     name: sqlrunner
     resources:
       requests:
@@ -11,7 +11,7 @@ appServices:
         memory: 100Mi
     routing:
       - port: 3000
-        ingressPath: "/v1/sql"
+        ingressPath: "/sql/v1"
         middlewares:
           - strip-auth-header
           - strip-path-prefix
@@ -24,12 +24,12 @@ appServices:
       - !stripPrefix
         name: strip-path-prefix
         config:
-          - /v1/sql
+          - /sql/v1
       - !replacePathRegex
         name: map-sql
         config:
           regex: ^\/sql\/?
-          replacement: /v1/sql
+          replacement: /sql/v1
     env:
       - name: CONNECTION_STRING
         valueFromPlatform: ReadWriteConnection

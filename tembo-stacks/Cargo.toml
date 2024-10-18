@@ -1,7 +1,7 @@
 [package]
 name = "tembo-stacks"
 description = "Tembo Stacks for Postgres"
-version = "0.18.0"
+version = "0.18.1"
 authors = ["tembo.io"]
 edition = "2021"
 license = "Apache-2.0"
