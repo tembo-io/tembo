@@ -117,9 +117,13 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         panic!("CF_TEMPLATE_BUCKET is required when IS_CLOUD_FORMATION is true");
     }
 
-    // Error and exit if both IS_CLOUD_FORMATION and IS_GCP are set to true
-    if is_cloud_formation && is_gcp {
-        panic!("Cannot have both IS_CLOUD_FORMATION and IS_GCP set to true");
+    // Only allow for setting one of IS_CLOUD_FORMATION, IS_GCP, or IS_AZURE to true
+    let cloud_providers = [is_cloud_formation, is_gcp, is_azure]
+        .iter()
+        .filter(|&&x| x)
+        .count();
+    if cloud_providers > 1 {
+        panic!("Only one of IS_CLOUD_FORMATION, IS_GCP, or IS_AZURE can be set to true");
     }
 
     // Error and exit if IS_GCP is true and GCP_PROJECT_ID or GCP_PROJECT_NUMBER are not set
