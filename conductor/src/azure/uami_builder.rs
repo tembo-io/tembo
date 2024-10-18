@@ -107,6 +107,40 @@ pub async fn get_storage_account_id(
         .unwrap())
 }
 
+// Check if role assignment exists
+pub async fn role_assignment_exists(
+    subscription_id: &str,
+    storage_account_id: &str,
+    uami_id: &str,
+    credentials: Arc<dyn TokenCredential>,
+) -> Result<bool, AzureError> {
+    let role_assignment_client =
+        azure_mgmt_authorization::Client::builder(credentials.clone()).build()?;
+
+    let role_definition = get_role_definition_id(
+        subscription_id,
+        "Storage Blob Data Contributor",
+        credentials.clone(),
+    )
+    .await?;
+
+    let role_assignment_list = role_assignment_client
+        .role_assignments_client()
+        .list_for_scope(storage_account_id);
+    let mut role_assignment_stream = role_assignment_list.into_stream();
+    while let Some(role_assignment_page) = role_assignment_stream.next().await {
+        let role_assignment_page = role_assignment_page?;
+        for item in role_assignment_page.value {
+            if item.properties.clone().unwrap().role_definition_id == role_definition
+                && item.properties.unwrap().principal_id == uami_id
+            {
+                return Ok(true);
+            }
+        }
+    }
+    Ok(false)
+}
+
 // Create Role Assignment for UAMI
 pub async fn create_role_assignment(
     subscription_id: &str,
@@ -133,9 +167,19 @@ pub async fn create_role_assignment(
         subscription_id,
         resource_group,
         storage_account_name,
-        credentials,
+        credentials.clone(),
     )
     .await?;
+
+    // Check if role assignment already exists
+    if role_assignment_exists(subscription_id, &storage_account_id, uami_id, credentials).await? {
+        return Ok(RoleAssignment {
+            id: None,
+            name: None,
+            type_: None,
+            properties: None,
+        });
+    }
 
     // Set parameters for Role Assignment
     let role_assignment_params = azure_mgmt_authorization::models::RoleAssignmentCreateParameters {
