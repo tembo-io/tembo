@@ -128,21 +128,10 @@ pub async fn role_assignment_exists(
     let role_assignment_list = role_assignment_client
         .role_assignments_client()
         .list_for_subscription(subscription_id);
-    info!(
-        "Fetching role assignments for subscription {}",
-        subscription_id
-    );
     let mut role_assignment_stream = role_assignment_list.into_stream();
     while let Some(role_assignment_page) = role_assignment_stream.next().await {
-        info!("GOT ROLE ASSIGNMENT LIST");
         let role_assignment_page = role_assignment_page?;
-        info!(
-            "ROLE ASSIGNMENT LIST LENGTH: {}",
-            role_assignment_page.value.len()
-        );
-
         for item in role_assignment_page.value {
-            info!("ROLE ASSIGNMENTS {:?}", item);
             if item.properties.clone().unwrap().role_definition_id == role_definition
                 && item.properties.unwrap().principal_id == uami_id
             {
