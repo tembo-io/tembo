@@ -596,7 +596,8 @@ pub async fn create_azure_storage_workload_identity_binding(
     azure_subscription_id: &str,
     azure_resource_group: &str,
     azure_region: &str,
-    backup_archive_bucket: &str,
+    _backup_archive_bucket: &str,
+    azure_storage_account: &str,
     namespace: &str,
 ) -> Result<(), ConductorError> {
     let credentials = get_credentials().await?;
@@ -618,7 +619,7 @@ pub async fn create_azure_storage_workload_identity_binding(
     let role_assignment = create_role_assignment(
         azure_subscription_id,
         azure_resource_group,
-        backup_archive_bucket,
+        azure_storage_account,
         &uami_id,
         credentials.clone(),
     )
