@@ -10,8 +10,8 @@ use azure_mgmt_msi::models::{
     FederatedIdentityCredential, FederatedIdentityCredentialProperties, Identity, TrackedResource,
 };
 use futures::StreamExt;
-use std::sync::Arc;
 use log::info;
+use std::sync::Arc;
 
 // Get credentials from workload identity
 pub async fn get_credentials() -> Result<Arc<dyn TokenCredential>, AzureError> {
@@ -111,7 +111,7 @@ pub async fn get_storage_account_id(
 // Check if role assignment exists
 pub async fn role_assignment_exists(
     subscription_id: &str,
-    storage_account_id: &str,
+    _storage_account_id: &str,
     uami_id: &str,
     credentials: Arc<dyn TokenCredential>,
 ) -> Result<bool, AzureError> {
@@ -125,14 +125,17 @@ pub async fn role_assignment_exists(
     )
     .await?;
 
+    let scope = format!("/subscriptions/{subscription_id}");
+
     let role_assignment_list = role_assignment_client
         .role_assignments_client()
-        .list_for_scope(storage_account_id);
+        .list_for_scope(scope.clone());
+    info!("Fetching role assignments for scope {}", scope);
     let mut role_assignment_stream = role_assignment_list.into_stream();
     while let Some(role_assignment_page) = role_assignment_stream.next().await {
         let role_assignment_page = role_assignment_page?;
         for item in role_assignment_page.value {
-            println!("ROLE ASSIGNMENTS {:?}", item);
+            info!("ROLE ASSIGNMENTS {:?}", item);
             if item.properties.clone().unwrap().role_definition_id == role_definition
                 && item.properties.unwrap().principal_id == uami_id
             {
