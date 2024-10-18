@@ -11,6 +11,7 @@ use azure_mgmt_msi::models::{
 };
 use futures::StreamExt;
 use std::sync::Arc;
+use log::info;
 
 // Get credentials from workload identity
 pub async fn get_credentials() -> Result<Arc<dyn TokenCredential>, AzureError> {
@@ -131,6 +132,7 @@ pub async fn role_assignment_exists(
     while let Some(role_assignment_page) = role_assignment_stream.next().await {
         let role_assignment_page = role_assignment_page?;
         for item in role_assignment_page.value {
+            println!("ROLE ASSIGNMENTS {:?}", item);
             if item.properties.clone().unwrap().role_definition_id == role_definition
                 && item.properties.unwrap().principal_id == uami_id
             {
@@ -172,7 +174,9 @@ pub async fn create_role_assignment(
     .await?;
 
     // Check if role assignment already exists
+    info!("Checking if role assignment exists");
     if role_assignment_exists(subscription_id, &storage_account_id, uami_id, credentials).await? {
+        info!("Role assignment already exists, skipping creation");
         return Ok(RoleAssignment {
             id: None,
             name: None,
