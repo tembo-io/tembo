@@ -1,6 +1,6 @@
 name: !sqlrunner
 appServices:
-  - image: quay.io/tembo/sql-runner:0581632
+  - image: quay.io/tembo/sql-runner:c62f892
     name: sqlrunner
     resources:
       requests:
