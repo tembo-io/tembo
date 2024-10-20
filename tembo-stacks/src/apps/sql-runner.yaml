@@ -12,24 +12,6 @@ appServices:
     routing:
       - port: 3000
         ingressPath: "/sql/v1"
-        middlewares:
-          - strip-auth-header
-          - strip-path-prefix
-          - replacePathRegex
-    middlewares:
-      - !customRequestHeaders
-        name: strip-auth-header
-        config:
-          Authorization: ""
-      - !stripPrefix
-        name: strip-path-prefix
-        config:
-          - /sql/v1
-      - !replacePathRegex
-        name: map-sql
-        config:
-          regex: ^\/sql\/?
-          replacement: /sql/v1
     env:
       - name: CONNECTION_STRING
         valueFromPlatform: ReadWriteConnection
