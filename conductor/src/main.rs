@@ -91,10 +91,10 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         .unwrap_or_else(|_| "false".to_owned())
         .parse()
         .expect("error parsing IS_AZURE");
-    let azure_storage_account_name: String = env::var("AZURE_STORAGE_ACCOUNT_NAME")
+    let azure_storage_account: String = env::var("AZURE_STORAGE_ACCOUNT")
         .unwrap_or_else(|_| "".to_owned())
         .parse()
-        .expect("error parsing AZURE_STORAGE_ACCOUNT_NAME");
+        .expect("error parsing AZURE_STORAGE_ACCOUNT");
     let azure_subscription_id: String = env::var("AZURE_SUBSCRIPTION_ID")
         .unwrap_or_else(|_| "".to_owned())
         .parse()
@@ -130,6 +130,16 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
     // Error and exit if IS_GCP is true and GCP_PROJECT_ID or GCP_PROJECT_NUMBER are not set
     if is_gcp && (gcp_project_id.is_empty() || gcp_project_number.is_empty()) {
         panic!("GCP_PROJECT_ID and GCP_PROJECT_NUMBER must be set if IS_GCP is true");
+    }
+
+    // Error and exit if IS_AZURE is true and any of the required Azure environment variables are not set
+    if is_azure
+        && (azure_storage_account.is_empty()
+            || azure_subscription_id.is_empty()
+            || azure_resource_group_prefix.is_empty()
+            || azure_region.is_empty())
+    {
+        panic!("AZURE_STORAGE_ACCOUNT, AZURE_SUBSCRIPTION_ID, AZURE_RESOURCE_GROUP_PREFIX, and AZURE_REGION must be set if IS_AZURE is true");
     }
 
     // Connect to pgmq
@@ -377,7 +387,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     &read_msg,
                     &mut coredb_spec,
                     backup_archive_bucket.clone(),
-                    azure_storage_account_name.clone(),
+                    azure_storage_account.clone(),
                     azure_subscription_id.clone(),
                     azure_resource_group_prefix.clone(),
                     azure_region.clone(),
