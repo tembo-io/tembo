@@ -270,7 +270,7 @@ pub async fn create_federated_identity_credentials(
     let cluster_issuer = get_cluster_issuer(
         subscription_id,
         &resource_group,
-        "aks-cdb-plat-eus2-sandbox-aks-data-1", // TODO(ianstanton) do not hard-code cluster_name
+        &format!("aks-{resource_group_prefix}-aks-data-1"),
         credentials.clone(),
     )
     .await?;
