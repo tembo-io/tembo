@@ -99,10 +99,11 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         .unwrap_or_else(|_| "".to_owned())
         .parse()
         .expect("error parsing AZURE_SUBSCRIPTION_ID");
-    let azure_resource_group: String = env::var("AZURE_RESOURCE_GROUP")
+    // This is necessary for working with multiple resource groups. Example format: cdb-plat-eus-dev
+    let azure_resource_group_prefix: String = env::var("AZURE_RESOURCE_GROUP_PREFIX ")
         .unwrap_or_else(|_| "".to_owned())
         .parse()
-        .expect("error parsing AZURE_RESOURCE_GROUP");
+        .expect("error parsing AZURE_RESOURCE_GROUP_PREFIX");
     let azure_region: String = env::var("AZURE_REGION")
         .unwrap_or_else(|_| "".to_owned())
         .parse()
@@ -378,7 +379,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     backup_archive_bucket.clone(),
                     azure_storage_account_name.clone(),
                     azure_subscription_id.clone(),
-                    azure_resource_group.clone(),
+                    azure_resource_group_prefix.clone(),
                     azure_region.clone(),
                 )
                 .await?;
@@ -556,7 +557,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     );
                     delete_azure_storage_workload_identity_binding(
                         &azure_subscription_id,
-                        &azure_resource_group,
+                        &azure_resource_group_prefix,
                         &namespace,
                     )
                     .await?;

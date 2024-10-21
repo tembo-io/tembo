@@ -22,12 +22,13 @@ pub async fn get_credentials() -> Result<Arc<dyn TokenCredential>, AzureError> {
 
 // Create User Assigned Managed Identity
 pub async fn create_uami(
-    resource_group: &str,
+    resource_group_prefix: &str,
     subscription_id: &str,
     uami_name: &str,
     region: &str,
     credentials: Arc<dyn TokenCredential>,
 ) -> Result<Identity, AzureError> {
+    let resource_group = format!("{resource_group_prefix}-storage-rg");
     let msi_client = azure_mgmt_msi::Client::builder(credentials).build()?;
 
     // Set parameters for User Assigned Managed Identity
@@ -77,11 +78,11 @@ pub async fn get_role_definition_id(
 // Get storage account ID
 pub async fn get_storage_account_id(
     subscription_id: &str,
-    _resource_group: &str,
+    resource_group_prefix: &str,
     storage_account_name: &str,
     credentials: Arc<dyn TokenCredential>,
 ) -> Result<String, AzureError> {
-    let resource_group = "cdb-plat-eus-sandbox-storage-rg";
+    let resource_group = format!("{resource_group_prefix}-storage-rg");
     let storage_client = azure_mgmt_storage::Client::builder(credentials).build()?;
     let storage_account_list = storage_client
         .storage_accounts_client()
@@ -145,12 +146,13 @@ pub async fn role_assignment_exists(
 // Create Role Assignment for UAMI
 pub async fn create_role_assignment(
     subscription_id: &str,
-    resource_group: &str,
+    resource_group_prefix: &str,
     storage_account_name: &str,
     uami_id: &str,
     uami_principal_id: &str,
     credentials: Arc<dyn TokenCredential>,
 ) -> Result<RoleAssignment, AzureError> {
+    let resource_group = format!("{resource_group_prefix}-storage-rg");
     let role_assignment_name = uuid::Uuid::new_v4().to_string();
     let role_assignment_client =
         azure_mgmt_authorization::Client::builder(credentials.clone()).build()?;
@@ -167,7 +169,7 @@ pub async fn create_role_assignment(
 
     let storage_account_id = get_storage_account_id(
         subscription_id,
-        resource_group,
+        &resource_group,
         storage_account_name,
         credentials.clone(),
     )
@@ -226,17 +228,14 @@ pub async fn create_role_assignment(
 // crate is no longer being built: https://github.com/Azure/azure-sdk-for-rust/pull/1243
 pub async fn get_cluster_issuer(
     subscription_id: &str,
-    resource_group: &str,
+    resource_group_prefix: &str,
     cluster_name: &str,
     credentials: Arc<dyn TokenCredential>,
 ) -> Result<String, AzureError> {
+    let resource_group = format!("{resource_group_prefix}-aks-rg");
     let client = reqwest::Client::new();
     let url = format!(
-        "https://management.azure.com/subscriptions/{subscription_id}/resourceGroups/{resource_group}/providers/Microsoft.ContainerService/managedClusters/{cluster_name}?api-version=2024-08-01",
-        subscription_id = subscription_id,
-        resource_group = resource_group,
-        cluster_name = cluster_name
-    );
+        "https://management.azure.com/subscriptions/{subscription_id}/resourceGroups/{resource_group}/providers/Microsoft.ContainerService/managedClusters/{cluster_name}?api-version=2024-08-01");
     let scopes: &[&str] = &["https://management.azure.com/.default"];
 
     let response = client
@@ -261,16 +260,17 @@ pub async fn get_cluster_issuer(
 // Create Federated Identity Credentials for the UAMI
 pub async fn create_federated_identity_credentials(
     subscription_id: &str,
-    resource_group: &str,
+    resource_group_prefix: &str,
     instance_name: &str,
     credentials: Arc<dyn TokenCredential>,
 ) -> Result<FederatedIdentityCredential, AzureError> {
+    let resource_group = format!("{resource_group_prefix}-storage-rg");
     let uami_name = instance_name;
     let federated_identity_client = azure_mgmt_msi::Client::builder(credentials.clone()).build()?;
     let cluster_issuer = get_cluster_issuer(
         subscription_id,
-        resource_group,
-        "aks-cdb-plat-eus2-sandbox-aks-data-1",
+        &resource_group,
+        "aks-cdb-plat-eus2-sandbox-aks-data-1", // TODO(ianstanton) do not hard-code cluster_name
         credentials.clone(),
     )
     .await?;
@@ -302,10 +302,11 @@ pub async fn create_federated_identity_credentials(
 // Delete User Assigned Managed Identity
 pub async fn delete_uami(
     subscription_id: &str,
-    resource_group: &str,
+    resource_group_prefix: &str,
     uami_name: &str,
     credentials: Arc<dyn TokenCredential>,
 ) -> Result<(), AzureError> {
+    let resource_group = format!("{resource_group_prefix}-storage-rg");
     let msi_client = azure_mgmt_msi::Client::builder(credentials).build()?;
     msi_client
         .user_assigned_identities_client()

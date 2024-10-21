@@ -594,7 +594,7 @@ pub async fn delete_gcp_storage_workload_identity_binding(
 
 pub async fn create_azure_storage_workload_identity_binding(
     azure_subscription_id: &str,
-    azure_resource_group: &str,
+    azure_resource_group_prefix: &str,
     azure_region: &str,
     _backup_archive_bucket: &str,
     azure_storage_account: &str,
@@ -605,7 +605,7 @@ pub async fn create_azure_storage_workload_identity_binding(
     // Create UAMI
     let uami_name = namespace;
     let uami = create_uami(
-        azure_resource_group,
+        azure_resource_group_prefix,
         azure_subscription_id,
         uami_name,
         azure_region,
@@ -622,7 +622,7 @@ pub async fn create_azure_storage_workload_identity_binding(
     let uami_principal_id = uami.properties.unwrap().principal_id.unwrap();
     let role_assignment = create_role_assignment(
         azure_subscription_id,
-        azure_resource_group,
+        azure_resource_group_prefix,
         azure_storage_account,
         &uami_id,
         &uami_principal_id,
@@ -634,7 +634,7 @@ pub async fn create_azure_storage_workload_identity_binding(
     // Create Federated Credential for the UAMI
     let federated_credential = create_federated_identity_credentials(
         azure_subscription_id,
-        azure_resource_group,
+        azure_resource_group_prefix,
         namespace,
         credentials.clone(),
     )
