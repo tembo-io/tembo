@@ -612,7 +612,6 @@ pub async fn create_azure_storage_workload_identity_binding(
         credentials.clone(),
     )
     .await?;
-    info!("Created UAMI: {:?}", uami);
 
     // Get UAMI Client ID to return and pass to ServiceAccountTemplate
     let uami_client_id = uami.properties.clone().unwrap().client_id.unwrap();
@@ -620,26 +619,25 @@ pub async fn create_azure_storage_workload_identity_binding(
     // Create Role Assignment for UAMI
     let uami_id = uami.properties.clone().unwrap().principal_id.unwrap();
     let uami_principal_id = uami.properties.unwrap().principal_id.unwrap();
-    let role_assignment = create_role_assignment(
+    create_role_assignment(
         azure_subscription_id,
         azure_resource_group_prefix,
         azure_storage_account,
+        &namespace,
         &uami_id,
         &uami_principal_id,
         credentials.clone(),
     )
     .await?;
-    info!("Created Role Assignment: {:?}", role_assignment);
 
     // Create Federated Credential for the UAMI
-    let federated_credential = create_federated_identity_credentials(
+    create_federated_identity_credentials(
         azure_subscription_id,
         azure_resource_group_prefix,
         namespace,
         credentials.clone(),
     )
     .await?;
-    info!("Created Federated Credential: {:?}", federated_credential);
 
     Ok(uami_client_id)
 }

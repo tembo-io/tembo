@@ -46,6 +46,7 @@ pub async fn create_uami(
         .user_assigned_identities_client()
         .create_or_update(subscription_id, resource_group, uami_name, uami_params)
         .await?;
+    info!("Created UAMI for {uami_name}");
     Ok(uami_created)
 }
 
@@ -148,10 +149,11 @@ pub async fn create_role_assignment(
     subscription_id: &str,
     resource_group_prefix: &str,
     storage_account_name: &str,
+    namespace: &str,
     uami_id: &str,
     uami_principal_id: &str,
     credentials: Arc<dyn TokenCredential>,
-) -> Result<RoleAssignment, AzureError> {
+) -> Result<(), AzureError> {
     let resource_group = format!("{resource_group_prefix}-storage-rg");
     let role_assignment_name = uuid::Uuid::new_v4().to_string();
     let role_assignment_client =
@@ -186,12 +188,7 @@ pub async fn create_role_assignment(
     .await?
     {
         info!("Role assignment already exists, skipping creation");
-        return Ok(RoleAssignment {
-            id: None,
-            name: None,
-            type_: None,
-            properties: None,
-        });
+        return Ok(());
     }
 
     // Set parameters for Role Assignment
@@ -213,7 +210,7 @@ pub async fn create_role_assignment(
     };
 
     // Create Role Assignment. Scope should be storage account ID
-    let role_assignment_created = role_assignment_client
+    role_assignment_client
         .role_assignments_client()
         .create(
             storage_account_id,
@@ -221,7 +218,8 @@ pub async fn create_role_assignment(
             role_assignment_params,
         )
         .await?;
-    Ok(role_assignment_created)
+    info!("Created Role Assignment for {namespace}");
+    Ok(())
 }
 
 // Get OIDC Issuer URL from AKS cluster using rest API. This is necessary because the azure_mgmt_containerservice
@@ -263,7 +261,7 @@ pub async fn create_federated_identity_credentials(
     resource_group_prefix: &str,
     instance_name: &str,
     credentials: Arc<dyn TokenCredential>,
-) -> Result<FederatedIdentityCredential, AzureError> {
+) -> Result<(), AzureError> {
     let resource_group = format!("{resource_group_prefix}-storage-rg");
     let uami_name = instance_name;
     let federated_identity_client = azure_mgmt_msi::Client::builder(credentials.clone()).build()?;
@@ -286,7 +284,7 @@ pub async fn create_federated_identity_credentials(
     };
 
     // Create Federated Identity Credentials
-    let federated_identity_created = federated_identity_client
+    federated_identity_client
         .federated_identity_credentials_client()
         .create_or_update(
             subscription_id,
@@ -296,7 +294,8 @@ pub async fn create_federated_identity_credentials(
             federated_identity_params,
         )
         .await?;
-    Ok(federated_identity_created)
+    info!("Created Federated Credential for {instance_name}");
+    Ok(())
 }
 
 // Delete User Assigned Managed Identity
