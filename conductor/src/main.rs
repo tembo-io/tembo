@@ -1012,7 +1012,6 @@ async fn init_azure_storage_workload_identity(
         &azure_subscription_id,
         &azure_resource_group,
         &azure_region,
-        &backup_archive_bucket,
         &azure_storage_account,
         &read_msg.message.namespace,
     )

@@ -596,18 +596,16 @@ pub async fn create_azure_storage_workload_identity_binding(
     azure_subscription_id: &str,
     azure_resource_group_prefix: &str,
     azure_region: &str,
-    _backup_archive_bucket: &str,
     azure_storage_account: &str,
     namespace: &str,
 ) -> Result<String, ConductorError> {
     let credentials = get_credentials().await?;
 
     // Create UAMI
-    let uami_name = namespace;
     let uami = create_uami(
         azure_resource_group_prefix,
         azure_subscription_id,
-        uami_name,
+        namespace,
         azure_region,
         credentials.clone(),
     )
@@ -617,14 +615,12 @@ pub async fn create_azure_storage_workload_identity_binding(
     let uami_client_id = uami.properties.clone().unwrap().client_id.unwrap();
 
     // Create Role Assignment for UAMI
-    let uami_id = uami.properties.clone().unwrap().principal_id.unwrap();
     let uami_principal_id = uami.properties.unwrap().principal_id.unwrap();
     create_role_assignment(
         azure_subscription_id,
         azure_resource_group_prefix,
         azure_storage_account,
         &namespace,
-        &uami_id,
         &uami_principal_id,
         credentials.clone(),
     )
@@ -642,6 +638,8 @@ pub async fn create_azure_storage_workload_identity_binding(
     Ok(uami_client_id)
 }
 
+// TODO(ianstanton) Check to see whether we need to delete the role assignment and federated
+//  credentials
 pub async fn delete_azure_storage_workload_identity_binding(
     azure_subscription_id: &str,
     azure_resource_group: &str,

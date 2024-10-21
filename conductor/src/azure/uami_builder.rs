@@ -150,7 +150,6 @@ pub async fn create_role_assignment(
     resource_group_prefix: &str,
     storage_account_name: &str,
     namespace: &str,
-    uami_id: &str,
     uami_principal_id: &str,
     credentials: Arc<dyn TokenCredential>,
 ) -> Result<(), AzureError> {
@@ -196,7 +195,7 @@ pub async fn create_role_assignment(
         properties: RoleAssignmentProperties {
             scope: None,
             role_definition_id: role_definition,
-            principal_id: uami_id.to_string(),
+            principal_id: uami_principal_id.to_string(),
             principal_type: None,
             description: None,
             condition: None,
@@ -312,5 +311,6 @@ pub async fn delete_uami(
         .delete(subscription_id, resource_group, uami_name)
         .send()
         .await?;
+    info!("Deleted UAMI for {uami_name}");
     Ok(())
 }
