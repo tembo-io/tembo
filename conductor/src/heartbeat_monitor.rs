@@ -11,6 +11,7 @@ fn current_timestamp() -> u64 {
         .as_secs()
 }
 
+#[derive(Clone)]
 pub struct HeartbeatMonitor {
     shared_heartbeat: Arc<AtomicU64>,
     update_interval: Duration,
