@@ -1,6 +1,7 @@
 use actix_web::{web, App, HttpServer};
 use actix_web_opentelemetry::{PrometheusMetricsHandler, RequestTracing};
 use conductor::errors::ConductorError;
+use conductor::heartbeat_monitor;
 use conductor::monitoring::CustomMetrics;
 use conductor::{
     cloud::CloudProvider, create_cloudformation, create_gcp_storage_workload_identity_binding,
@@ -28,6 +29,7 @@ use sqlx::error::Error;
 use sqlx::postgres::PgPoolOptions;
 use std::env;
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
 use std::{thread, time};
 use types::{CRUDevent, Event};
 
@@ -695,6 +697,8 @@ async fn main() -> std::io::Result<()> {
     let status_reporter_enabled = from_env_default("WATCHER_ENABLED", "true");
     let metrics_reported_enabled = from_env_default("METRICS_REPORTER_ENABLED", "false");
 
+    let (heartbeat_monitor, heartbeat_updater) = heartbeat_monitor::start(Duration::from_secs(60));
+
     if conductor_enabled != "false" {
         info!("Starting conductor");
         background_threads_locked.push(tokio::spawn({
@@ -759,7 +763,7 @@ async fn main() -> std::io::Result<()> {
         let custom_metrics_copy = custom_metrics.clone();
         background_threads_locked.push(tokio::spawn(async move {
             let custom_metrics = &custom_metrics_copy;
-            if let Err(err) = run_metrics_reporter().await {
+            if let Err(err) = run_metrics_reporter(heartbeat_updater.clone()).await {
                 custom_metrics
                     .conductor_errors
                     .add(&opentelemetry::Context::current(), 1, &[]);
@@ -783,6 +787,7 @@ async fn main() -> std::io::Result<()> {
         App::new()
             .app_data(web::Data::new(custom_metrics.clone()))
             .app_data(web::Data::new(background_threads.clone()))
+            .app_data(web::Data::new(heartbeat_monitor.clone()))
             .wrap(RequestTracing::new())
             .route(
                 "/metrics",
