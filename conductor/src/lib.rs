@@ -3,6 +3,7 @@ pub mod cloud;
 pub mod errors;
 pub mod extensions;
 pub mod gcp;
+pub mod heartbeat_monitor;
 pub mod metrics;
 pub mod monitoring;
 pub mod routes;
