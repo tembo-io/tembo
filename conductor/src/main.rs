@@ -3,8 +3,9 @@ use actix_web_opentelemetry::{PrometheusMetricsHandler, RequestTracing};
 use conductor::errors::ConductorError;
 use conductor::monitoring::CustomMetrics;
 use conductor::{
-    cloud::CloudProvider, create_cloudformation, create_gcp_storage_workload_identity_binding,
-    create_namespace, create_or_update, delete, delete_cloudformation,
+    cloud::CloudProvider, create_azure_storage_workload_identity_binding, create_cloudformation,
+    create_gcp_storage_workload_identity_binding, create_namespace, create_or_update, delete,
+    delete_azure_storage_workload_identity_binding, delete_cloudformation,
     delete_gcp_storage_workload_identity_binding, delete_namespace, generate_cron_expression,
     generate_spec, get_coredb_error_without_status, get_one, get_pg_conn, lookup_role_arn,
     restart_coredb, types,
@@ -14,7 +15,8 @@ use crate::metrics_reporter::run_metrics_reporter;
 use crate::status_reporter::run_status_reporter;
 use conductor::routes::health::background_threads_running;
 use controller::apis::coredb_types::{
-    Backup, CoreDBSpec, GoogleCredentials, S3Credentials, ServiceAccountTemplate, VolumeSnapshot,
+    AzureCredentials, Backup, CoreDBSpec, GoogleCredentials, S3Credentials, ServiceAccountTemplate,
+    VolumeSnapshot,
 };
 use controller::apis::postgres_parameters::{ConfigValue, PgConfig};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
@@ -85,6 +87,27 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         .unwrap_or_else(|_| "".to_owned())
         .parse()
         .expect("error parsing GCP_PROJECT_NUMBER");
+    let is_azure: bool = env::var("IS_AZURE")
+        .unwrap_or_else(|_| "false".to_owned())
+        .parse()
+        .expect("error parsing IS_AZURE");
+    let azure_storage_account: String = env::var("AZURE_STORAGE_ACCOUNT")
+        .unwrap_or_else(|_| "".to_owned())
+        .parse()
+        .expect("error parsing AZURE_STORAGE_ACCOUNT");
+    let azure_subscription_id: String = env::var("AZURE_SUBSCRIPTION_ID")
+        .unwrap_or_else(|_| "".to_owned())
+        .parse()
+        .expect("error parsing AZURE_SUBSCRIPTION_ID");
+    // This is necessary for working with multiple resource groups. Example format: cdb-plat-eus-dev
+    let azure_resource_group_prefix: String = env::var("AZURE_RESOURCE_GROUP_PREFIX ")
+        .unwrap_or_else(|_| "".to_owned())
+        .parse()
+        .expect("error parsing AZURE_RESOURCE_GROUP_PREFIX");
+    let azure_region: String = env::var("AZURE_REGION")
+        .unwrap_or_else(|_| "".to_owned())
+        .parse()
+        .expect("error parsing AZURE_REGION");
     let is_loadbalancer_public: bool = env::var("IS_LOADBALANCER_PUBLIC")
         .unwrap_or_else(|_| "true".to_owned())
         .parse()
@@ -95,14 +118,28 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         panic!("CF_TEMPLATE_BUCKET is required when IS_CLOUD_FORMATION is true");
     }
 
-    // Error and exit if both IS_CLOUD_FORMATION and IS_GCP are set to true
-    if is_cloud_formation && is_gcp {
-        panic!("Cannot have both IS_CLOUD_FORMATION and IS_GCP set to true");
+    // Only allow for setting one of IS_CLOUD_FORMATION, IS_GCP, or IS_AZURE to true
+    let cloud_providers = [is_cloud_formation, is_gcp, is_azure]
+        .iter()
+        .filter(|&&x| x)
+        .count();
+    if cloud_providers > 1 {
+        panic!("Only one of IS_CLOUD_FORMATION, IS_GCP, or IS_AZURE can be set to true");
     }
 
     // Error and exit if IS_GCP is true and GCP_PROJECT_ID or GCP_PROJECT_NUMBER are not set
     if is_gcp && (gcp_project_id.is_empty() || gcp_project_number.is_empty()) {
         panic!("GCP_PROJECT_ID and GCP_PROJECT_NUMBER must be set if IS_GCP is true");
+    }
+
+    // Error and exit if IS_AZURE is true and any of the required Azure environment variables are not set
+    if is_azure
+        && (azure_storage_account.is_empty()
+            || azure_subscription_id.is_empty()
+            || azure_resource_group_prefix.is_empty()
+            || azure_region.is_empty())
+    {
+        panic!("AZURE_STORAGE_ACCOUNT, AZURE_SUBSCRIPTION_ID, AZURE_RESOURCE_GROUP_PREFIX, and AZURE_REGION must be set if IS_AZURE is true");
     }
 
     // Connect to pgmq
@@ -345,6 +382,18 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                 )
                 .await?;
 
+                init_azure_storage_workload_identity(
+                    is_azure,
+                    &read_msg,
+                    &mut coredb_spec,
+                    backup_archive_bucket.clone(),
+                    azure_storage_account.clone(),
+                    azure_subscription_id.clone(),
+                    azure_resource_group_prefix.clone(),
+                    azure_region.clone(),
+                )
+                .await?;
+
                 info!("{}: Creating namespace", read_msg.msg_id);
                 // create Namespace
                 create_namespace(client.clone(), &namespace, org_id, instance_id).await?;
@@ -506,6 +555,19 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                         &gcp_project_number,
                         &backup_archive_bucket,
                         &storage_archive_bucket,
+                        &namespace,
+                    )
+                    .await?;
+                }
+
+                if is_azure {
+                    info!(
+                        "{}: Deleting Azure storage workload identity binding",
+                        read_msg.msg_id
+                    );
+                    delete_azure_storage_workload_identity_binding(
+                        &azure_subscription_id,
+                        &azure_resource_group_prefix,
                         &namespace,
                     )
                     .await?;
@@ -918,6 +980,7 @@ async fn init_gcp_storage_workload_identity(
         retentionPolicy: Some(String::from("30")),
         schedule: Some(generate_cron_expression(&read_msg.message.namespace)),
         s3_credentials: None,
+        azure_credentials: None,
         endpoint_url: None,
         google_credentials: Some(GoogleCredentials {
             gke_environment: Some(true),
@@ -927,6 +990,82 @@ async fn init_gcp_storage_workload_identity(
     };
 
     coredb_spec.backup = backup;
+
+    Ok(())
+}
+
+async fn init_azure_storage_workload_identity(
+    is_azure: bool,
+    read_msg: &Message<CRUDevent>,
+    coredb_spec: &mut CoreDBSpec,
+    backup_archive_bucket: String,
+    azure_storage_account: String,
+    azure_subscription_id: String,
+    azure_resource_group: String,
+    azure_region: String,
+) -> Result<(), ConductorError> {
+    if !is_azure {
+        return Ok(());
+    }
+
+    let uami_client_id = create_azure_storage_workload_identity_binding(
+        &azure_subscription_id,
+        &azure_resource_group,
+        &azure_region,
+        &azure_storage_account,
+        &read_msg.message.namespace,
+    )
+    .await?;
+
+    // Format ServiceAccountTemplate spec in CoreDBSpec
+    use std::collections::BTreeMap;
+    let mut annotations: BTreeMap<String, String> = BTreeMap::new();
+    annotations.insert(
+        "azure.workload.identity/client-id".to_string(),
+        uami_client_id,
+    );
+    let service_account_template = ServiceAccountTemplate {
+        metadata: Some(ObjectMeta {
+            annotations: Some(annotations),
+            ..ObjectMeta::default()
+        }),
+    };
+
+    // Generate Backup spec for CoreDB
+    let volume_snapshot = Some(VolumeSnapshot {
+        enabled: false,
+        snapshot_class: None,
+    });
+
+    let write_path = read_msg
+        .message
+        .backups_write_path
+        .clone()
+        .unwrap_or("v2".to_string());
+
+    let backup = Backup {
+        destinationPath: Some(format!(
+            "https://{}.blob.core.windows.net/{}/{}",
+            azure_storage_account, backup_archive_bucket, write_path
+        )),
+        encryption: Some(String::from("AES256")),
+        retentionPolicy: Some(String::from("30")),
+        schedule: Some(generate_cron_expression(&read_msg.message.namespace)),
+        s3_credentials: None,
+        azure_credentials: Some(AzureCredentials {
+            connection_string: None,
+            inherit_from_azure_ad: Some(true),
+            storage_account: None,
+            storage_key: None,
+            storage_sas_token: None,
+        }),
+        endpoint_url: None,
+        google_credentials: None,
+        volume_snapshot,
+    };
+
+    coredb_spec.backup = backup;
+    coredb_spec.serviceAccountTemplate = service_account_template;
 
     Ok(())
 }
