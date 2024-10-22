@@ -33,7 +33,7 @@ trunk_installs:
   - name: pg_analytics
     version: 0.2.1
   - name: pg_search
-    version: 0.11.0
+    version: 0.10.3
   - name: pg_cron
     version: 1.6.2
   - name: pgvector
