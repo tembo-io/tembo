@@ -1,4 +1,5 @@
 pub mod aws;
+pub mod azure;
 pub mod cloud;
 pub mod errors;
 pub mod extensions;
@@ -19,6 +20,11 @@ use errors::ConductorError;
 use k8s_openapi::api::core::v1::{Namespace, Secret};
 
 use kube::api::{DeleteParams, ListParams, Patch, PatchParams};
+
+use crate::azure::uami_builder::{
+    create_federated_identity_credentials, create_role_assignment, create_uami, delete_uami,
+    get_credentials,
+};
 
 use chrono::{DateTime, SecondsFormat, Utc};
 use kube::{Api, Client, ResourceExt};
@@ -45,7 +51,7 @@ pub async fn generate_spec(
     let mut spec = spec.clone();
 
     match cloud_provider {
-        CloudProvider::AWS | CloudProvider::GCP => {
+        CloudProvider::AWS | CloudProvider::GCP | CloudProvider::Azure => {
             let prefix = cloud_provider.prefix();
 
             // Format the backups_path with the correct prefix
@@ -582,6 +588,74 @@ pub async fn delete_gcp_storage_workload_identity_binding(
     gcp_iam_manager
         .remove_service_account_binding(buckets, namespace, service_account_name)
         .await?;
+
+    Ok(())
+}
+
+pub async fn create_azure_storage_workload_identity_binding(
+    azure_subscription_id: &str,
+    azure_resource_group_prefix: &str,
+    azure_region: &str,
+    azure_storage_account: &str,
+    namespace: &str,
+) -> Result<String, ConductorError> {
+    let credentials = get_credentials().await?;
+
+    // Create UAMI
+    let uami = create_uami(
+        azure_resource_group_prefix,
+        azure_subscription_id,
+        namespace,
+        azure_region,
+        credentials.clone(),
+    )
+    .await?;
+
+    // Get UAMI Client ID to return and pass to ServiceAccountTemplate
+    let uami_client_id = uami.properties.clone().unwrap().client_id.unwrap();
+
+    // Create Role Assignment for UAMI
+    let uami_principal_id = uami.properties.unwrap().principal_id.unwrap();
+    create_role_assignment(
+        azure_subscription_id,
+        azure_resource_group_prefix,
+        azure_storage_account,
+        &namespace,
+        &uami_principal_id,
+        credentials.clone(),
+    )
+    .await?;
+
+    // Create Federated Credential for the UAMI
+    create_federated_identity_credentials(
+        azure_subscription_id,
+        azure_resource_group_prefix,
+        namespace,
+        credentials.clone(),
+    )
+    .await?;
+
+    Ok(uami_client_id)
+}
+
+// TODO(ianstanton) Check to see whether we need to delete the role assignment and federated
+//  credentials
+pub async fn delete_azure_storage_workload_identity_binding(
+    azure_subscription_id: &str,
+    azure_resource_group: &str,
+    namespace: &str,
+) -> Result<(), ConductorError> {
+    let credentials = get_credentials().await?;
+
+    // Delete UAMI
+    delete_uami(
+        azure_subscription_id,
+        azure_resource_group,
+        namespace,
+        credentials.clone(),
+    )
+    .await?;
+    info!("Deleted UAMI");
 
     Ok(())
 }
