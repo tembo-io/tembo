@@ -3,7 +3,7 @@ namespaceOverride:
 logLevel: info
 replicas: 1
 image:
-  repository: quay.io/tembo/tembo-pod-init 
+  repository: tembo.docker.scarf.sh/tembo/tembo-pod-init 
   tag: "{{ .Chart.AppVersion }}"
   pullPolicy: Always
 

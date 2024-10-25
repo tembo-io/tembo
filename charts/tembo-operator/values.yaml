@@ -31,7 +31,7 @@ controller:
 
   # -- The default image for the controller
   image:
-    repository: quay.io/tembo/tembo-operator
+    repository: tembo.docker.scarf.sh/tembo/tembo-operator
     pullPolicy: Always
     # -- Overrides the image tag whose default is latest
     tag: latest
@@ -127,7 +127,7 @@ pod-init:
 
   # -- The default image for the pod-init deployment
   image:
-    repository: quay.io/tembo/tembo-pod-init
+    repository: tembo.docker.scarf.sh/tembo/tembo-pod-init
     pullPolicy: IfNotPresent
     # -- Overrides the image tag whose default is latest
     tag: latest
