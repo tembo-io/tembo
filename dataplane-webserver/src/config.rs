@@ -15,6 +15,7 @@ impl Default for Config {
                 "PROMETHEUS_URL",
                 "http://monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090",
             ),
+
             prometheus_timeout_ms: match from_env_default("PROMETHEUS_TIMEOUT_MS", "500")
                 .parse::<i32>()
             {
