@@ -171,7 +171,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         let namespace = read_msg.message.namespace.clone();
         info!("{}: Using namespace {}", read_msg.msg_id, &namespace);
 
-        if read_msg.message.event_type != Event::Delete {
+        if !matches!(read_msg.message.event_type, Event::Delete | Event::ScheduleDeletion) {
             let namespace_already_deleted = match sqlx::query!(
                 "SELECT * FROM deleted_instances WHERE namespace = $1;",
                 &namespace
@@ -477,7 +477,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     connection: Some(conn_info),
                 }
             }
-            Event::Delete => {
+            Event::Delete | Event::ScheduleDeletion => {
                 // delete CoreDB
                 info!("{}: Deleting instance {}", read_msg.msg_id, &namespace);
                 delete(client.clone(), &namespace, &namespace).await?;
@@ -506,6 +506,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     .await?;
                 }
 
+                // Adding both instances that enter ScheduleDeletion and Delete Events in deleted_instances
                 let insert_query = sqlx::query!(
                     "INSERT INTO deleted_instances (namespace) VALUES ($1) ON CONFLICT (namespace) DO NOTHING",
                     namespace
@@ -522,12 +523,18 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     ),
                 }
 
+                let report_event = match read_msg.message.event_type {
+                    Event::Delete => Event::Deleted,
+                    Event::ScheduleDeletion => Event::ScheduleDeletionComplete,
+                    _ => unreachable!(),
+                };
+        
                 // report state
                 types::StateToControlPlane {
                     data_plane_id: read_msg.message.data_plane_id,
                     org_id: read_msg.message.org_id,
                     inst_id: read_msg.message.inst_id,
-                    event_type: Event::Deleted,
+                    event_type: report_event,
                     spec: None,
                     status: None,
                     connection: None,

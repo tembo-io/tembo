@@ -33,6 +33,8 @@ pub enum Event {
     Started,
     Restore,
     Restored,
+    ScheduleDeletion,
+    ScheduleDeletionComplete,
 }
 
 /// message returned to control plane
