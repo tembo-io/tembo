@@ -575,19 +575,6 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     )
                     .await?;
                 }
-                
-                if is_azure {
-                    info!(
-                        "{}: Deleting Azure storage workload identity binding",
-                        read_msg.msg_id
-                    );
-                    delete_azure_storage_workload_identity_binding(
-                        &azure_subscription_id,
-                        &azure_resource_group_prefix,
-                        &namespace,
-                    )
-                    .await?;
-                }
 
                 if read_msg.message.event_type == Event::Delete {
                     let insert_query = sqlx::query!(
