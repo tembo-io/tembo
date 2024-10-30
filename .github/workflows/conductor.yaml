@@ -39,7 +39,7 @@ jobs:
         run: |
           set -xe
           sudo apt-get update
-          sudo apt-get install -y pkg-config libssl-dev git
+          sudo apt-get install -y pkg-config libssl-dev git wget build-essential
       - uses: azure/setup-helm@v3
       - uses: extractions/setup-just@v1
       - name: Install kind

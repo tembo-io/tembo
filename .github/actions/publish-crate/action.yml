@@ -1,5 +1,5 @@
-name: 'Publish to crates.io'
-description: 'Publish cratest to crates.io and some other crates.io-related actions, like checking if a version is already published.'
+name: "Publish to crates.io"
+description: "Publish cratest to crates.io and some other crates.io-related actions, like checking if a version is already published."
 inputs:
   working-directory:
     required: false
@@ -30,11 +30,13 @@ runs:
     - name: Install TOML parser
       shell: bash
       run: |
-       set -xe
-       wget https://github.com/freshautomations/stoml/releases/download/v0.7.1/stoml_linux_amd64 &> /dev/null
-       mv stoml_linux_amd64 stoml
-       chmod +x stoml
-       sudo mv stoml /usr/local/bin/
+        set -xe
+        sudo apt-get update
+        sudo apt-get install wget -y
+        wget https://github.com/freshautomations/stoml/releases/download/v0.7.1/stoml_linux_amd64 &> /dev/null
+        mv stoml_linux_amd64 stoml
+        chmod +x stoml
+        sudo mv stoml /usr/local/bin/
     - name: Publish
       shell: bash
       working-directory: ${{ inputs.working-directory }}

@@ -28,6 +28,7 @@ on:
 jobs:
   tests:
     name: Run tests
+
     runs-on:
       - self-hosted
       - dind

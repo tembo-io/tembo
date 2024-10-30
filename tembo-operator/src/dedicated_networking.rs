@@ -399,12 +399,6 @@ async fn reconcile_dedicated_networking_service(
         "cnpg.io/cluster".to_string(),
         serde_json::Value::String(cdb_name.to_string()),
     );
-    if is_public {
-        labels.insert(
-            "public".to_string(),
-            serde_json::Value::String("true".to_string()),
-        );
-    }
 
     let mut service_spec = serde_json::Map::new();
     service_spec.insert(
@@ -427,8 +421,23 @@ async fn reconcile_dedicated_networking_service(
     service_spec.insert("type".to_string(), json!(service_type));
     let ip_allow_list = cdb.spec.ip_allow_list.clone().unwrap_or_else(|| vec![]);
 
-    if service_type == "LoadBalancer" && !ip_allow_list.is_empty() {
-        service_spec.insert("loadBalancerSourceRanges".to_string(), json!(ip_allow_list));
+    // Allow ip_allow_list to allow all entries are in CIDR notation
+    let ip_allow_list_cidr: Vec<String> = ip_allow_list
+        .iter()
+        .map(|ip| {
+            if ip.contains('/') {
+                ip.clone()
+            } else {
+                format!("{}/32", ip)
+            }
+        })
+        .collect();
+
+    if service_type == "LoadBalancer" && !ip_allow_list_cidr.is_empty() {
+        service_spec.insert(
+            "loadBalancerSourceRanges".to_string(),
+            json!(ip_allow_list_cidr),
+        );
     }
 
     let service = json!({

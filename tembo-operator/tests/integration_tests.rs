@@ -2153,16 +2153,6 @@ mod test {
             service.spec.as_ref().unwrap().type_,
             Some("LoadBalancer".to_string())
         );
-        assert_eq!(
-            service
-                .metadata
-                .labels
-                .as_ref()
-                .expect("Labels should be present")
-                .get("public")
-                .expect("Public label should be present"),
-            "true"
-        );
 
         let annotations = service
             .metadata
@@ -2225,16 +2215,6 @@ mod test {
         assert_eq!(
             service.spec.as_ref().unwrap().type_,
             Some("LoadBalancer".to_string())
-        );
-        assert_eq!(
-            service
-                .metadata
-                .labels
-                .as_ref()
-                .expect("Labels should be present")
-                .get("public")
-                .expect("Public label should be present"),
-            "true"
         );
 
         let annotations = service
