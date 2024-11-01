@@ -1066,6 +1066,7 @@ dependencies = [
  "chrono",
  "controller",
  "env_logger",
+ "exponential-backoff",
  "futures",
  "google-cloud-storage",
  "k8s-openapi",
@@ -1470,6 +1471,15 @@ checksum = "0f214dc438f977e6d4e3500aaa277f5ad94ca83fbbd9b1a15713ce2344ccc5a1"
 dependencies = [
  "event-listener 5.3.1",
  "pin-project-lite",
+]
+
+[[package]]
+name = "exponential-backoff"
+version = "2.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6ffb309d235a642598183aeda8925e871e85dd5a433c2c877e69ff0a960f4c02"
+dependencies = [
+ "fastrand 2.1.1",
 ]
 
 [[package]]

@@ -3,22 +3,26 @@ use actix_web_opentelemetry::{PrometheusMetricsHandler, RequestTracing};
 use conductor::errors::ConductorError;
 use conductor::monitoring::CustomMetrics;
 use conductor::{
-    cloud::CloudProvider, create_azure_storage_workload_identity_binding, create_cloudformation,
+    cloud::CloudProvider,
+    create_azure_storage_workload_identity_binding, create_cloudformation,
     create_gcp_storage_workload_identity_binding, create_namespace, create_or_update, delete,
     delete_azure_storage_workload_identity_binding, delete_cloudformation,
     delete_gcp_storage_workload_identity_binding, delete_namespace, generate_cron_expression,
-    generate_spec, get_coredb_error_without_status, get_one, get_pg_conn, lookup_role_arn,
-    restart_coredb, types,
+    generate_spec, get_coredb_error_without_status, get_one, get_pg_conn,
+    health::{handlers, AppState, TaskHealth},
+    lookup_role_arn, restart_coredb,
+    tasks::{config::TaskConfig, runner},
+    types,
 };
 
 use crate::metrics_reporter::run_metrics_reporter;
 use crate::status_reporter::run_status_reporter;
-use conductor::routes::health::background_threads_running;
 use controller::apis::coredb_types::{
     AzureCredentials, Backup, CoreDBSpec, GoogleCredentials, S3Credentials, ServiceAccountTemplate,
     VolumeSnapshot,
 };
 use controller::apis::postgres_parameters::{ConfigValue, PgConfig};
+use futures::future::join_all;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use kube::Client;
 use log::{debug, error, info, warn};
@@ -26,11 +30,10 @@ use opentelemetry::sdk::export::metrics::aggregation;
 use opentelemetry::sdk::metrics::{controllers, processors, selectors};
 use opentelemetry::{global, KeyValue};
 use pgmq::{Message, PGMQueueExt};
-use sqlx::error::Error;
 use sqlx::postgres::PgPoolOptions;
 use std::env;
-use std::sync::{Arc, Mutex};
 use std::{thread, time};
+use tokio::sync::broadcast;
 use types::{CRUDevent, Event};
 
 mod metrics_reporter;
@@ -746,116 +749,195 @@ async fn main() -> std::io::Result<()> {
     let meter = global::meter("actix_web");
     let custom_metrics = CustomMetrics::new(&meter);
 
-    let background_threads: Arc<Mutex<Vec<tokio::task::JoinHandle<()>>>> =
-        Arc::new(Mutex::new(Vec::new()));
+    // let background_threads: Arc<Mutex<Vec<tokio::task::JoinHandle<()>>>> =
+    //     Arc::new(Mutex::new(Vec::new()));
+    //
+    // let mut background_threads_locked = background_threads
+    //     .lock()
+    //     .expect("Failed to remember our background threads");
+    //
+    // let conductor_enabled = from_env_default("CONDUCTOR_ENABLED", "true");
+    // let status_reporter_enabled = from_env_default("WATCHER_ENABLED", "true");
+    // let metrics_reported_enabled = from_env_default("METRICS_REPORTER_ENABLED", "false");
+    //
+    // if conductor_enabled != "false" {
+    //     info!("Starting conductor");
+    //     background_threads_locked.push(tokio::spawn({
+    //         let custom_metrics_copy = custom_metrics.clone();
+    //
+    //         async move {
+    //             loop {
+    //                 match run(custom_metrics_copy.clone()).await {
+    //                     Ok(_) => {}
+    //                     Err(ConductorError::PgmqError(pgmq::errors::PgmqError::DatabaseError(
+    //                         Error::PoolTimedOut,
+    //                     ))) => {
+    //                         custom_metrics_copy.clone().conductor_errors.add(
+    //                             &opentelemetry::Context::current(),
+    //                             1,
+    //                             &[],
+    //                         );
+    //                         panic!("sqlx PoolTimedOut error -- forcing pod restart, error")
+    //                     }
+    //                     Err(err) => {
+    //                         custom_metrics_copy.clone().conductor_errors.add(
+    //                             &opentelemetry::Context::current(),
+    //                             1,
+    //                             &[],
+    //                         );
+    //                         error!("error in conductor: {:?}", err);
+    //                     }
+    //                 }
+    //                 warn!("conductor exited, sleeping for 1 second");
+    //                 thread::sleep(time::Duration::from_secs(1));
+    //             }
+    //         }
+    //     }));
+    // }
+    //
+    // if status_reporter_enabled != "false" {
+    //     info!("Starting status reporter");
+    //     background_threads_locked.push(tokio::spawn({
+    //         let custom_metrics_copy = custom_metrics.clone();
+    //         async move {
+    //             loop {
+    //                 match run_status_reporter(custom_metrics_copy.clone()).await {
+    //                     Ok(_) => {}
+    //                     Err(err) => {
+    //                         custom_metrics_copy.clone().conductor_errors.add(
+    //                             &opentelemetry::Context::current(),
+    //                             1,
+    //                             &[],
+    //                         );
+    //                         error!("error in conductor: {:?}", err);
+    //                     }
+    //                 }
+    //                 warn!("status_reporter exited, sleeping for 1 second");
+    //                 thread::sleep(time::Duration::from_secs(1));
+    //             }
+    //         }
+    //     }));
+    // }
+    //
+    // if metrics_reported_enabled != "false" {
+    //     info!("Starting status reporter");
+    //     let custom_metrics_copy = custom_metrics.clone();
+    //     background_threads_locked.push(tokio::spawn(async move {
+    //         let custom_metrics = &custom_metrics_copy;
+    //         if let Err(err) = run_metrics_reporter().await {
+    //             custom_metrics
+    //                 .conductor_errors
+    //                 .add(&opentelemetry::Context::current(), 1, &[]);
+    //
+    //             error!("error in metrics_reporter: {err}")
+    //         }
+    //
+    //         warn!("metrics_reporter exited, sleeping for 1 second");
+    //         thread::sleep(time::Duration::from_secs(1));
+    //     }));
+    // }
+    //
+    // std::mem::drop(background_threads_locked);
+    //
+    //     let task_health = Arc::new(RwLock::new(HashMap::new()));
+    let (shutdown_tx, _) = broadcast::channel(1);
+    let mut tasks = Vec::new();
 
-    let mut background_threads_locked = background_threads
-        .lock()
-        .expect("Failed to remember our background threads");
+    let config = TaskConfig::default();
 
-    let conductor_enabled = from_env_default("CONDUCTOR_ENABLED", "true");
-    let status_reporter_enabled = from_env_default("WATCHER_ENABLED", "true");
-    let metrics_reported_enabled = from_env_default("METRICS_REPORTER_ENABLED", "false");
+    // Initialize each background tasks conditionally based on environment variables
+    // CONDUCTOR_ENABLED, STATUS_REPORTER_ENABLED, and METRICS_REPORTER_ENABLED
+    if from_env_default("CONDUCTOR_ENABLED", "true") != "false" {
+        task_health
+            .write()
+            .await
+            .insert("conductor".to_string(), TaskHealth::new("conductor"));
 
-    if conductor_enabled != "false" {
-        info!("Starting conductor");
-        background_threads_locked.push(tokio::spawn({
-            let custom_metrics_copy = custom_metrics.clone();
-
-            async move {
-                loop {
-                    match run(custom_metrics_copy.clone()).await {
-                        Ok(_) => {}
-                        Err(ConductorError::PgmqError(pgmq::errors::PgmqError::DatabaseError(
-                            Error::PoolTimedOut,
-                        ))) => {
-                            custom_metrics_copy.clone().conductor_errors.add(
-                                &opentelemetry::Context::current(),
-                                1,
-                                &[],
-                            );
-                            panic!("sqlx PoolTimedOut error -- forcing pod restart, error")
-                        }
-                        Err(err) => {
-                            custom_metrics_copy.clone().conductor_errors.add(
-                                &opentelemetry::Context::current(),
-                                1,
-                                &[],
-                            );
-                            error!("error in conductor: {:?}", err);
-                        }
-                    }
-                    warn!("conductor exited, sleeping for 1 second");
-                    thread::sleep(time::Duration::from_secs(1));
-                }
-            }
-        }));
+        tasks.push(tokio::spawn(runner::run_background_task(
+            "conductor",
+            shutdown_tx.subscribe(),
+            task_health.clone(),
+            custom_metrics.clone(),
+            config.clone(),
+            |metrics| async move { run(metrics).await },
+        )));
     }
 
-    if status_reporter_enabled != "false" {
-        info!("Starting status reporter");
-        background_threads_locked.push(tokio::spawn({
-            let custom_metrics_copy = custom_metrics.clone();
-            async move {
-                loop {
-                    match run_status_reporter(custom_metrics_copy.clone()).await {
-                        Ok(_) => {}
-                        Err(err) => {
-                            custom_metrics_copy.clone().conductor_errors.add(
-                                &opentelemetry::Context::current(),
-                                1,
-                                &[],
-                            );
-                            error!("error in conductor: {:?}", err);
-                        }
-                    }
-                    warn!("status_reporter exited, sleeping for 1 second");
-                    thread::sleep(time::Duration::from_secs(1));
-                }
-            }
-        }));
+    if from_env_default("STATUS_REPORTER_ENABLED", "true") != "false" {
+        task_health.write().await.insert(
+            "status_reporter".to_string(),
+            TaskHealth::new("status_reporter"),
+        );
+
+        tasks.push(tokio::spawn(runner::run_background_task(
+            "status_reporter",
+            shutdown_tx.subscribe(),
+            task_health.clone(),
+            custom_metrics.clone(),
+            config.clone(),
+            |metrics| async move { run_status_reporter(metrics).await },
+        )));
     }
 
-    if metrics_reported_enabled != "false" {
-        info!("Starting status reporter");
-        let custom_metrics_copy = custom_metrics.clone();
-        background_threads_locked.push(tokio::spawn(async move {
-            let custom_metrics = &custom_metrics_copy;
-            if let Err(err) = run_metrics_reporter().await {
-                custom_metrics
-                    .conductor_errors
-                    .add(&opentelemetry::Context::current(), 1, &[]);
+    if from_env_default("METRICS_REPORTER_ENABLED", "false") != "false" {
+        task_health.write().await.insert(
+            "metrics_reporter".to_string(),
+            TaskHealth::new("metrics_reporter"),
+        );
 
-                error!("error in metrics_reporter: {err}")
-            }
-
-            warn!("metrics_reporter exited, sleeping for 1 second");
-            thread::sleep(time::Duration::from_secs(1));
-        }));
+        tasks.push(tokio::spawn(runner::run_background_task(
+            "metrics_reporter",
+            shutdown_tx.subscribe(),
+            task_health.clone(),
+            custom_metrics.clone(),
+            config.clone(),
+            |metrics| async move { run_metrics_reporter().await },
+        )));
     }
 
-    std::mem::drop(background_threads_locked);
+    let app_state = web::Data::new(AppState {
+        task_health: task_health.clone(),
+        shutdown_tx: shutdown_tx.clone(),
+        config,
+    });
 
     let server_port = env::var("PORT")
         .unwrap_or_else(|_| String::from("8080"))
         .parse::<u16>()
         .unwrap_or(8080);
 
-    HttpServer::new(move || {
+    let server = HttpServer::new(move || {
         App::new()
+            .app_data(app_state.clone())
             .app_data(web::Data::new(custom_metrics.clone()))
-            .app_data(web::Data::new(background_threads.clone()))
+            .service(
+                web::scope("/health")
+                    .service(handlers::background_threads_running)
+                    .service(handlers::detailed_health_check),
+            )
             .wrap(RequestTracing::new())
             .route(
                 "/metrics",
                 web::get().to(PrometheusMetricsHandler::new(exporter.clone())),
             )
-            .service(web::scope("/health").service(background_threads_running))
     })
     .workers(1)
     .bind(("0.0.0.0", server_port))?
-    .run()
-    .await
+    .run();
+
+    // Handle actix-web/tokio shutdown
+    tokio::select! {
+        _ = server => {
+            info!("Conductor server stopped");
+        }
+        _ = tokio::signal::ctrl_c() => {
+            info!("Conductor actix-web received shutdown signal");
+            let _ = shutdown_tx.send(());
+            let _ = join_all(tasks).await;
+        }
+    }
+
+    Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]
