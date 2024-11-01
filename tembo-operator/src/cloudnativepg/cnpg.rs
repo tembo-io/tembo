@@ -3499,6 +3499,7 @@ mod tests {
             enable_volume_snapshot: true,
             reconcile_ttl: 30,
             reconcile_timestamp_ttl: 90,
+            volume_snapshot_rentention_period: 40,
         };
 
         // Test with backups enabled and valid path
@@ -3545,6 +3546,7 @@ mod tests {
             enable_volume_snapshot: false,
             reconcile_ttl: 30,
             reconcile_timestamp_ttl: 90,
+            volume_snapshot_rentention_period: 40,
         };
         let (backup, template) = cnpg_backup_configuration(&cdb, &cfg_disabled);
         assert!(backup.is_none());
@@ -3693,6 +3695,7 @@ mod tests {
             enable_volume_snapshot: true,
             reconcile_ttl: 30,
             reconcile_timestamp_ttl: 90,
+            volume_snapshot_rentention_period: 40,
         };
 
         // Test with backups enabled and valid path
@@ -3747,6 +3750,7 @@ mod tests {
             enable_volume_snapshot: false,
             reconcile_ttl: 30,
             reconcile_timestamp_ttl: 90,
+            volume_snapshot_rentention_period: 40,
         };
         let (backup, template) = cnpg_backup_configuration(&cdb, &cfg_disabled);
         assert!(backup.is_none());
