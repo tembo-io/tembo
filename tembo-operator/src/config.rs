@@ -4,7 +4,7 @@ use std::env;
 pub struct Config {
     pub enable_backup: bool,
     pub enable_volume_snapshot: bool,
-    pub volume_snapshot_rentention_period: u64,
+    pub volume_snapshot_retention_period_days: u64,
     pub reconcile_timestamp_ttl: u64,
     pub reconcile_ttl: u64,
 }
@@ -16,8 +16,8 @@ impl Default for Config {
             enable_volume_snapshot: from_env_default("ENABLE_VOLUME_SNAPSHOT", "false")
                 .parse()
                 .unwrap(),
-            volume_snapshot_rentention_period: from_env_default(
-                "VOLUME_SNAPSHOT_RETENTION_PERIOD",
+            volume_snapshot_retention_period_days: from_env_default(
+                "VOLUME_SNAPSHOT_RETENTION_PERIOD_DAYS",
                 "40",
             )
             .parse()
