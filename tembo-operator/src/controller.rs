@@ -12,6 +12,7 @@ use crate::{
             reconcile_pooler,
         },
         placement::cnpg_placement::PlacementConfig,
+        retention::snapshots::cleanup_old_volume_snapshots,
         VOLUME_SNAPSHOT_CLASS_NAME,
     },
     config::Config,
@@ -417,6 +418,29 @@ impl CoreDB {
         patch_cdb_status_merge(&coredbs, &name, patch_status).await?;
 
         reconcile_heartbeat(self, ctx.clone()).await?;
+
+        // Cleanup old volume snapshots that are older than the retention period
+        // set in cfg.volume_snapshot_retention_period
+        // if volumesnapshots is enabled
+        if cfg.enable_volume_snapshot {
+            match cleanup_old_volume_snapshots(
+                self,
+                ctx.clone(),
+                cfg.volume_snapshot_rentention_period,
+            )
+            .await
+            {
+                Ok(_) => {
+                    info!(
+                        "Successfully cleaned up old volume snapshots for instance: {}",
+                        self.name_any()
+                    );
+                }
+                Err(action) => {
+                    return Err(action);
+                }
+            }
+        }
 
         info!("Fully reconciled {}", self.name_any());
         Ok(requeue_normal_with_jitter())
