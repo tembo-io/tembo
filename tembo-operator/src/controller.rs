@@ -425,7 +425,7 @@ impl CoreDB {
         if cfg.enable_volume_snapshot {
             match cleanup_old_volume_snapshots(
                 self,
-                ctx.clone(),
+                client,
                 cfg.volume_snapshot_retention_period_days,
             )
             .await
