@@ -52,25 +52,32 @@ pub async fn cleanup_old_volume_snapshots(
         "Starting cleanup of old volume snapshots for instance: {}", name
     );
 
-    // List only volume snapshot backups
-    let lp = ListParams::default().fields(&format!("spec.method={}", BackupMethod::VolumeSnapshot));
-
-    // List all backups in the namespace
-    let backups = backups_api
-        .list(&lp)
+    // List all backups and filter in memory
+    let all_backups = backups_api
+        .list(&ListParams::default())
         .await
         .map_err(|e| {
-            error!("Failed to list backups in namespace {}: {}", namespace, e);
+            error!(
+                error = %e,
+                namespace = %namespace,
+                "Failed to list backups"
+            );
             Action::requeue(tokio::time::Duration::from_secs(300))
         })?
         .items;
 
+    // Filter to only volume snapshot backups
+    let volume_snapshot_backups: Vec<_> = all_backups
+        .into_iter()
+        .filter(|b| matches!(b.spec.method.as_ref(), Some(BackupMethod::VolumeSnapshot)))
+        .collect();
+
     debug!(
-        backup_count = backups.len(),
+        backup_count = volume_snapshot_backups.len(),
         "Found volume snapshot backups to evaluate for instance: {}", name
     );
 
-    for backup in backups {
+    for backup in volume_snapshot_backups {
         if should_delete_backup(&backup, cutoff_time) {
             delete_backup_and_snapshot(&backups_api, &snapshots_api, &backup, namespace).await?;
         }
