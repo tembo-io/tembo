@@ -42,6 +42,8 @@ azure_mgmt_authorization = "0.21.0"
 azure_mgmt_storage = "0.21.0"
 azure_core = "0.21.0"
 uuid = "1.10.0"
+url = "=2.5.2" #https://github.com/servo/rust-url/issues/992
+idna = "=0.5.0" #https://github.com/servo/rust-url/issues/992
 
 [dependencies.kube]
 features = ["runtime", "client", "derive"]
