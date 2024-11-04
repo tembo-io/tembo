@@ -43,7 +43,7 @@ jobs:
       - uses: azure/setup-helm@v3
       - uses: extractions/setup-just@v1
       - name: Install kind
-        uses: helm/kind-action@v1.7.0
+        uses: helm/kind-action@v1
         with:
           install_only: true
       - uses: dtolnay/rust-toolchain@stable
