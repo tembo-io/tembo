@@ -434,6 +434,7 @@ fn generate_deployment(
 
     let has_instance_id = env_vars.iter().any(|env| env.name == "TEMBO_INSTANCE_ID");
     let has_org_id = env_vars.iter().any(|env| env.name == "TEMBO_ORG_ID");
+    let has_namespace = env_vars.iter().any(|env| env.name == "NAMESPACE");
 
     // Check for tembo.io/instance_id and tembo.io/organization_id annotations
     if has_instance_id.not() {
@@ -458,6 +459,16 @@ fn generate_deployment(
         }
     } else {
         tracing::info!("Not applying TEMBO_ORG_ID to env since it's already present");
+    }
+
+    if has_namespace.not() {
+        env_vars.push(EnvVar {
+            name: "NAMESPACE".to_string(),
+            value: Some(namespace.to_string()),
+            ..EnvVar::default()
+        });
+    } else {
+        tracing::info!("Not applying NAMESPACE to env since it's already present");
     }
 
     // Add the pre-loaded forwarded environment variables
