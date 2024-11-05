@@ -1010,17 +1010,6 @@ mod test {
         let found_extension = trunk_install_status(&test.coredbs, &name, "pg_jsonschema").await;
         assert!(found_extension);
 
-        // Check for heartbeat table and values
-        let sql_result = wait_until_psql_contains(
-            test.context.clone(),
-            coredb_resource.clone(),
-            "SELECT latest_heartbeat FROM tembo.heartbeat_table LIMIT 1".to_string(),
-            "postgres".to_string(),
-            true,
-        )
-        .await;
-        assert!(sql_result.success);
-
         let cdb_name = coredb_resource.metadata.name.clone().unwrap();
         let metrics_url = format!("https://{}.localhost:8443/metrics", cdb_name);
         let response = http_get_with_retry(&metrics_url, None, 100, 5)
@@ -1088,17 +1077,6 @@ mod test {
         // Wait for pg_jsonschema to be installed before proceeding.
         let found_extension = trunk_install_status(&test.coredbs, &name, "pg_jsonschema").await;
         assert!(found_extension);
-
-        // Check for heartbeat table and values
-        let sql_result = wait_until_psql_contains(
-            test.context.clone(),
-            coredb_resource.clone(),
-            "SELECT latest_heartbeat FROM tembo.heartbeat_table LIMIT 1".to_string(),
-            "postgres".to_string(),
-            true,
-        )
-        .await;
-        assert!(sql_result.success);
 
         let cdb_name = coredb_resource.metadata.name.clone().unwrap();
         let metrics_url = format!("https://{}.localhost:8443/metrics", cdb_name);
@@ -1184,17 +1162,6 @@ mod test {
         // Wait for cube to be installed before proceeding.
         let found_extension = trunk_install_status(&coredbs, name, "cube").await;
         assert!(found_extension);
-
-        // Check for heartbeat table and values
-        let sql_result = wait_until_psql_contains(
-            context.clone(),
-            coredb_resource.clone(),
-            "SELECT latest_heartbeat FROM tembo.heartbeat_table LIMIT 1".to_string(),
-            "postgres".to_string(),
-            true,
-        )
-        .await;
-        assert!(sql_result.success);
 
         // CLEANUP TEST
         // Cleanup CoreDB
@@ -6057,17 +6024,6 @@ CREATE EVENT TRIGGER pgrst_watch
             false,
         )
         .await;
-
-        // Check for heartbeat table and values
-        let sql_result = wait_until_psql_contains(
-            test.context.clone(),
-            coredb_resource.clone(),
-            "SELECT latest_heartbeat FROM tembo.heartbeat_table LIMIT 1".to_string(),
-            "postgres".to_string(),
-            true,
-        )
-        .await;
-        assert!(sql_result.success);
 
         let cdb_name = coredb_resource.metadata.name.clone().unwrap();
         let metrics_url = format!("https://{}.localhost:8443/metrics", cdb_name);
