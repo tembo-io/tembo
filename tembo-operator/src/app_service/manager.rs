@@ -336,6 +336,7 @@ fn generate_deployment(
     // ensure hyphen in env var name (cdb name allows hyphen)
     let cdb_name_env = coredb_name.to_uppercase().replace('-', "_");
 
+    let mut env_vars: Vec<EnvVar> = Vec::new();
     // map postgres connection secrets to env vars
     // mapping directly to env vars instead of using a SecretEnvSource
     // so that we can select which secrets to map into appService
@@ -386,9 +387,50 @@ fn generate_deployment(
         },
     ];
 
+    let has_instance_id = env_vars.iter().any(|env| env.name == "TEMBO_INSTANCE_ID");
+    let has_org_id = env_vars.iter().any(|env| env.name == "TEMBO_ORG_ID");
+    let has_namespace = env_vars.iter().any(|env| env.name == "NAMESPACE");
+
+    // Check for tembo.io/instance_id and tembo.io/organization_id annotations
+    if has_instance_id.not() {
+        if let Some(instance_id) = annotations.get("tembo.io/instance_id") {
+            env_vars.push(EnvVar {
+                name: "TEMBO_INSTANCE_ID".to_string(),
+                value: Some(instance_id.clone()),
+                ..EnvVar::default()
+            });
+        }
+    } else {
+        tracing::info!("Not applying TEMBO_INSTANCE_ID to env since it's already present");
+    }
+
+    if has_org_id.not() {
+        if let Some(organization_id) = annotations.get("tembo.io/organization_id") {
+            env_vars.push(EnvVar {
+                name: "TEMBO_ORG_ID".to_string(),
+                value: Some(organization_id.clone()),
+                ..EnvVar::default()
+            });
+        }
+    } else {
+        tracing::info!("Not applying TEMBO_ORG_ID to env since it's already present");
+    }
+
+    if has_namespace.not() {
+        env_vars.push(EnvVar {
+            name: "NAMESPACE".to_string(),
+            value: Some(namespace.to_string()),
+            ..EnvVar::default()
+        });
+    } else {
+        tracing::info!("Not applying NAMESPACE to env since it's already present");
+    }
+
+    // Add the pre-loaded forwarded environment variables
+    env_vars.extend(FORWARDED_ENV_VARS.iter().cloned());
+
     // map the user provided env vars
     // users can map certain secrets to env vars of their choice
-    let mut env_vars: Vec<EnvVar> = Vec::new();
     if let Some(envs) = appsvc.env.clone() {
         for env in envs {
             let evar: Option<EnvVar> = match (env.value, env.value_from_platform) {
@@ -431,37 +473,6 @@ fn generate_deployment(
             }
         }
     }
-
-    let has_instance_id = env_vars.iter().any(|env| env.name == "TEMBO_INSTANCE_ID");
-    let has_org_id = env_vars.iter().any(|env| env.name == "TEMBO_ORG_ID");
-
-    // Check for tembo.io/instance_id and tembo.io/organization_id annotations
-    if has_instance_id.not() {
-        if let Some(instance_id) = annotations.get("tembo.io/instance_id") {
-            env_vars.push(EnvVar {
-                name: "TEMBO_INSTANCE_ID".to_string(),
-                value: Some(instance_id.clone()),
-                ..EnvVar::default()
-            });
-        }
-    } else {
-        tracing::info!("Not applying TEMBO_INSTANCE_ID to env since it's already present");
-    }
-
-    if has_org_id.not() {
-        if let Some(organization_id) = annotations.get("tembo.io/organization_id") {
-            env_vars.push(EnvVar {
-                name: "TEMBO_ORG_ID".to_string(),
-                value: Some(organization_id.clone()),
-                ..EnvVar::default()
-            });
-        }
-    } else {
-        tracing::info!("Not applying TEMBO_ORG_ID to env since it's already present");
-    }
-
-    // Add the pre-loaded forwarded environment variables
-    env_vars.extend(FORWARDED_ENV_VARS.iter().cloned());
 
     // combine the secret env vars and those provided in spec by user
     env_vars.extend(default_app_envs);
