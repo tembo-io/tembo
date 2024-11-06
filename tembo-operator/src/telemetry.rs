@@ -27,7 +27,9 @@ fn resource() -> Resource {
 fn init_tracer() -> sdktrace::Tracer {
     use opentelemetry_otlp::WithExportConfig;
     let endpoint = std::env::var("OPENTELEMETRY_ENDPOINT_URL").expect("Needs an otel collector");
-    let exporter = opentelemetry_otlp::new_exporter().tonic().with_endpoint(endpoint);
+    let exporter = opentelemetry_otlp::new_exporter()
+        .tonic()
+        .with_endpoint(endpoint);
 
     let provider = opentelemetry_otlp::new_pipeline()
         .tracing()

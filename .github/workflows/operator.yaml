@@ -39,11 +39,7 @@ jobs:
         # Go here for a list of versions:
         # https://github.com/kubernetes-sigs/kind/releases
         kube_version:
-<<<<<<< HEAD
-          - "1.28.9"
-=======
           - "1.29.8"
->>>>>>> main
     steps:
       - uses: actions/checkout@v4
       - name: Install system dependencies
