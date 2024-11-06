@@ -24,7 +24,11 @@ use kube::{
     Client, Resource,
 };
 use lazy_static::lazy_static;
-use std::{collections::BTreeMap, ops::Not, sync::Arc, time::Duration};
+use std::{
+    collections::{BTreeMap, HashMap},
+    sync::Arc,
+    time::Duration,
+};
 
 use crate::{
     app_service::ingress::{generate_ingress_tcp_routes, reconcile_ingress_tcp},
@@ -56,6 +60,33 @@ lazy_static! {
         }
         env_vars
     };
+}
+
+struct EnvVarManager {
+    vars: Vec<EnvVar>,
+    // store index of an env var
+    lookup: HashMap<String, usize>,
+}
+
+impl EnvVarManager {
+    fn new() -> Self {
+        Self {
+            vars: Vec::new(),
+            lookup: HashMap::new(),
+        }
+    }
+
+    fn set(&mut self, key: &str, value: EnvVar) {
+        if let Some(&index) = self.lookup.get(key) {
+            // Update existing value
+            self.vars[index] = value;
+        } else {
+            // Add new entry
+            let index = self.vars.len();
+            self.vars.push(value);
+            self.lookup.insert(key.to_string(), index);
+        }
+    }
 }
 
 // private wrapper to hold the AppService Resources
@@ -336,6 +367,8 @@ fn generate_deployment(
     // ensure hyphen in env var name (cdb name allows hyphen)
     let cdb_name_env = coredb_name.to_uppercase().replace('-', "_");
 
+    // let mut env_vars: HashMap<String, EnvVar> = HashMap::new();
+    let mut env_vars = EnvVarManager::new();
     // map postgres connection secrets to env vars
     // mapping directly to env vars instead of using a SecretEnvSource
     // so that we can select which secrets to map into appService
@@ -346,8 +379,9 @@ fn generate_deployment(
     let rw_conn = format!("{}_RW_CONNECTION", cdb_name_env);
     let apps_connection_secret_name = format!("{}-apps", coredb_name);
 
-    // map the secrets we inject to appService containers
-    let default_app_envs = vec![
+    // set the secrets we inject to appService containers
+    env_vars.set(
+        &rw_conn,
         EnvVar {
             name: r_conn,
             value_from: Some(EnvVarSource {
@@ -360,8 +394,11 @@ fn generate_deployment(
             }),
             ..EnvVar::default()
         },
+    );
+    env_vars.set(
+        &ro_conn,
         EnvVar {
-            name: ro_conn,
+            name: ro_conn.clone(),
             value_from: Some(EnvVarSource {
                 secret_key_ref: Some(SecretKeySelector {
                     name: Some(apps_connection_secret_name.clone()),
@@ -372,8 +409,11 @@ fn generate_deployment(
             }),
             ..EnvVar::default()
         },
+    );
+    env_vars.set(
+        &rw_conn,
         EnvVar {
-            name: rw_conn,
+            name: rw_conn.clone(),
             value_from: Some(EnvVarSource {
                 secret_key_ref: Some(SecretKeySelector {
                     name: Some(apps_connection_secret_name.clone()),
@@ -384,11 +424,47 @@ fn generate_deployment(
             }),
             ..EnvVar::default()
         },
-    ];
+    );
 
-    // map the user provided env vars
-    // users can map certain secrets to env vars of their choice
-    let mut env_vars: Vec<EnvVar> = Vec::new();
+    // Check for tembo.io/instance_id and tembo.io/organization_id annotations
+    if let Some(instance_id) = annotations.get("tembo.io/instance_id") {
+        env_vars.set(
+            "TEMBO_INSTANCE_ID",
+            EnvVar {
+                name: "TEMBO_INSTANCE_ID".to_string(),
+                value: Some(instance_id.clone()),
+                ..EnvVar::default()
+            },
+        );
+    }
+
+    if let Some(organization_id) = annotations.get("tembo.io/organization_id") {
+        env_vars.set(
+            "TEMBO_ORG_ID",
+            EnvVar {
+                name: "TEMBO_ORG_ID".to_string(),
+                value: Some(organization_id.clone()),
+                ..EnvVar::default()
+            },
+        );
+    }
+
+    env_vars.set(
+        "NAMESPACE",
+        EnvVar {
+            name: "NAMESPACE".to_string(),
+            value: Some(namespace.to_string()),
+            ..EnvVar::default()
+        },
+    );
+
+    // Add the pre-loaded forwarded environment variables
+    for evar in FORWARDED_ENV_VARS.iter().clone() {
+        env_vars.set(&evar.name, evar.clone());
+    }
+
+    // set any user provided env vars last
+    // including the valueFromX values
     if let Some(envs) = appsvc.env.clone() {
         for env in envs {
             let evar: Option<EnvVar> = match (env.value, env.value_from_platform) {
@@ -427,55 +503,10 @@ fn generate_deployment(
                 }
             };
             if let Some(e) = evar {
-                env_vars.push(e);
+                env_vars.set(&e.name, e.clone());
             }
         }
     }
-
-    let has_instance_id = env_vars.iter().any(|env| env.name == "TEMBO_INSTANCE_ID");
-    let has_org_id = env_vars.iter().any(|env| env.name == "TEMBO_ORG_ID");
-    let has_namespace = env_vars.iter().any(|env| env.name == "NAMESPACE");
-
-    // Check for tembo.io/instance_id and tembo.io/organization_id annotations
-    if has_instance_id.not() {
-        if let Some(instance_id) = annotations.get("tembo.io/instance_id") {
-            env_vars.push(EnvVar {
-                name: "TEMBO_INSTANCE_ID".to_string(),
-                value: Some(instance_id.clone()),
-                ..EnvVar::default()
-            });
-        }
-    } else {
-        tracing::info!("Not applying TEMBO_INSTANCE_ID to env since it's already present");
-    }
-
-    if has_org_id.not() {
-        if let Some(organization_id) = annotations.get("tembo.io/organization_id") {
-            env_vars.push(EnvVar {
-                name: "TEMBO_ORG_ID".to_string(),
-                value: Some(organization_id.clone()),
-                ..EnvVar::default()
-            });
-        }
-    } else {
-        tracing::info!("Not applying TEMBO_ORG_ID to env since it's already present");
-    }
-
-    if has_namespace.not() {
-        env_vars.push(EnvVar {
-            name: "NAMESPACE".to_string(),
-            value: Some(namespace.to_string()),
-            ..EnvVar::default()
-        });
-    } else {
-        tracing::info!("Not applying NAMESPACE to env since it's already present");
-    }
-
-    // Add the pre-loaded forwarded environment variables
-    env_vars.extend(FORWARDED_ENV_VARS.iter().cloned());
-
-    // combine the secret env vars and those provided in spec by user
-    env_vars.extend(default_app_envs);
 
     // Create volume vec and add certs volume from secret
     let mut volumes: Vec<Volume> = Vec::new();
@@ -537,7 +568,7 @@ fn generate_deployment(
         containers: vec![Container {
             args: appsvc.args.clone(),
             command: appsvc.command.clone(),
-            env: Some(env_vars),
+            env: Some(env_vars.vars),
             image: Some(appsvc.image.clone()),
             name: appsvc.name.clone(),
             ports: container_ports,
@@ -1109,6 +1140,7 @@ fn generate_podmonitor(
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::{apis::coredb_types::CoreDB, app_service::manager::generate_appsvc_annotations};
     use std::collections::BTreeMap;
 
@@ -1178,5 +1210,90 @@ mod tests {
 
         // Assert that the generated labels match the expected labels
         assert_eq!(annotataions, expected_annotations);
+    }
+
+    #[test]
+    fn test_env_var_manager() {
+        // Test new manager is empty
+        let mut manager = EnvVarManager::new();
+        assert!(manager.vars.is_empty());
+        assert!(manager.lookup.is_empty());
+
+        // Test setting new variable
+        let var1 = EnvVar {
+            name: "KEY1".to_string(),
+            value: Some("value1".to_string()),
+            ..EnvVar::default()
+        };
+        manager.set("KEY1", var1);
+        assert_eq!(manager.vars.len(), 1);
+        assert_eq!(manager.lookup.len(), 1);
+        assert_eq!(manager.vars[0].value, Some("value1".to_string()));
+        assert_eq!(manager.lookup.get("KEY1"), Some(&0));
+
+        // Test updating existing variable
+        let var2 = EnvVar {
+            name: "KEY1".to_string(),
+            value: Some("value2".to_string()),
+            ..EnvVar::default()
+        };
+        manager.set("KEY1", var2);
+        assert_eq!(manager.vars.len(), 1);
+        assert_eq!(manager.lookup.len(), 1);
+        assert_eq!(manager.vars[0].value, Some("value2".to_string()));
+        assert_eq!(manager.lookup.get("KEY1"), Some(&0));
+
+        // Test multiple variables
+        let var3 = EnvVar {
+            name: "KEY2".to_string(),
+            value: Some("value3".to_string()),
+            ..EnvVar::default()
+        };
+        let var4 = EnvVar {
+            name: "KEY3".to_string(),
+            value: Some("value4".to_string()),
+            ..EnvVar::default()
+        };
+        manager.set("KEY2", var3);
+        manager.set("KEY3", var4);
+
+        assert_eq!(manager.vars.len(), 3);
+        assert_eq!(manager.lookup.len(), 3);
+        assert_eq!(manager.lookup.get("KEY1"), Some(&0));
+        assert_eq!(manager.lookup.get("KEY2"), Some(&1));
+        assert_eq!(manager.lookup.get("KEY3"), Some(&2));
+        assert_eq!(manager.vars[0].value, Some("value2".to_string()));
+        assert_eq!(manager.vars[1].value, Some("value3".to_string()));
+        assert_eq!(manager.vars[2].value, Some("value4".to_string()));
+
+        // Test case sensitivity
+        let var5 = EnvVar {
+            name: "key".to_string(),
+            value: Some("value5".to_string()),
+            ..EnvVar::default()
+        };
+        let var6 = EnvVar {
+            name: "KEY".to_string(),
+            value: Some("value6".to_string()),
+            ..EnvVar::default()
+        };
+        manager.set("key", var5);
+        manager.set("KEY", var6);
+
+        assert_eq!(manager.vars.len(), 5);
+        assert_eq!(manager.lookup.len(), 5);
+        assert_eq!(manager.vars[3].value, Some("value5".to_string()));
+        assert_eq!(manager.vars[4].value, Some("value6".to_string()));
+
+        // Test with None value
+        let var7 = EnvVar {
+            name: "KEY4".to_string(),
+            value: None,
+            ..EnvVar::default()
+        };
+        manager.set("KEY4", var7);
+        assert_eq!(manager.vars.len(), 6);
+        assert_eq!(manager.lookup.len(), 6);
+        assert_eq!(manager.vars[5].value, None);
     }
 }
