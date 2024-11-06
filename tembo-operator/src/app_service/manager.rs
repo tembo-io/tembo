@@ -76,17 +76,15 @@ impl EnvVarManager {
         }
     }
 
-    fn set(&mut self, key: &str, value: EnvVar) -> bool {
+    fn set(&mut self, key: &str, value: EnvVar) {
         if let Some(&index) = self.lookup.get(key) {
             // Update existing value
             self.vars[index] = value;
-            false
         } else {
             // Add new entry
             let index = self.vars.len();
             self.vars.push(value);
             self.lookup.insert(key.to_string(), index);
-            true
         }
     }
 }
@@ -1227,7 +1225,7 @@ mod tests {
             value: Some("value1".to_string()),
             ..EnvVar::default()
         };
-        assert!(manager.set("KEY1", var1));
+        manager.set("KEY1", var1);
         assert_eq!(manager.vars.len(), 1);
         assert_eq!(manager.lookup.len(), 1);
         assert_eq!(manager.vars[0].value, Some("value1".to_string()));
@@ -1239,7 +1237,7 @@ mod tests {
             value: Some("value2".to_string()),
             ..EnvVar::default()
         };
-        assert!(!manager.set("KEY1", var2)); // Should return false for updates
+        manager.set("KEY1", var2);
         assert_eq!(manager.vars.len(), 1);
         assert_eq!(manager.lookup.len(), 1);
         assert_eq!(manager.vars[0].value, Some("value2".to_string()));
@@ -1256,8 +1254,8 @@ mod tests {
             value: Some("value4".to_string()),
             ..EnvVar::default()
         };
-        assert!(manager.set("KEY2", var3));
-        assert!(manager.set("KEY3", var4));
+        manager.set("KEY2", var3);
+        manager.set("KEY3", var4);
 
         assert_eq!(manager.vars.len(), 3);
         assert_eq!(manager.lookup.len(), 3);
@@ -1279,8 +1277,8 @@ mod tests {
             value: Some("value6".to_string()),
             ..EnvVar::default()
         };
-        assert!(manager.set("key", var5));
-        assert!(manager.set("KEY", var6));
+        manager.set("key", var5);
+        manager.set("KEY", var6);
 
         assert_eq!(manager.vars.len(), 5);
         assert_eq!(manager.lookup.len(), 5);
@@ -1293,7 +1291,7 @@ mod tests {
             value: None,
             ..EnvVar::default()
         };
-        assert!(manager.set("KEY4", var7));
+        manager.set("KEY4", var7);
         assert_eq!(manager.vars.len(), 6);
         assert_eq!(manager.lookup.len(), 6);
         assert_eq!(manager.vars[5].value, None);
