@@ -1,7 +1,9 @@
 services:
   postgres:
     restart: always
-    image: quay.io/tembo/timeseries-pg:latest
+    build:
+      dockerfile: docker/Dockerfile.postgres
+      context: .
     ports:
       - 5432:5432
     environment:
@@ -13,7 +15,7 @@ services:
     environment:
       - RUST_LOG=info
       - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/postgres
-      - LLM_SERVICE_HOST_PORT=${LLM_SERVICE_HOST_PORT}
+      - MODEL_SERVICE_PORT_MAP=${MODEL_SERVICE_PORT_MAP}
     ports:
       - 8080:8080
   vllm:

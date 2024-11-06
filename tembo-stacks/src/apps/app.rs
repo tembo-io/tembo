@@ -23,6 +23,8 @@ lazy_static! {
         serde_yaml::from_str(include_str!("embeddings.yaml")).expect("embeddings.yaml not found");
     pub static ref PGANALYZE: App =
         serde_yaml::from_str(include_str!("pganalyze.yaml")).expect("pganalyze.yaml not found");
+    pub static ref SQLRUNNER: App =
+        serde_yaml::from_str(include_str!("sql-runner.yaml")).expect("sql-runner.yaml not found");
 }
 
 // handling merging requirements coming from an App into the final
@@ -54,6 +56,9 @@ pub fn merge_app_reqs(
                     }
                     if let Some(trunks) = ai.trunk_installs {
                         fin_app_trunk_installs.extend(trunks);
+                    }
+                    if let Some(pg_cfg) = ai.postgres_config {
+                        final_pg_configs.extend(pg_cfg);
                     }
                 }
                 AppType::RestAPI(config) => {
@@ -131,6 +136,13 @@ pub fn merge_app_reqs(
                     if let Some(pg_cfg) = pg_analyze.postgres_config {
                         final_pg_configs.extend(pg_cfg);
                     }
+                }
+                AppType::SqlRunner(_) => {
+                    // there is only 1 app_service in the restAPI
+                    let sqlrunner = SQLRUNNER.clone().app_services.unwrap().clone()[0].clone();
+                    user_app_services.push(sqlrunner);
+                    // sqlrunner only has app_service containers
+                    // no extensions or trunk installs
                 }
                 AppType::Custom(custom_app) => {
                     user_app_services.push(custom_app);
@@ -378,7 +390,8 @@ mod tests {
             resources: None,
         };
         let user_embedding_app = AppType::Embeddings(Some(app_config));
-        let user_apps = vec![user_embedding_app];
+        let user_ai_app = AppType::AIProxy(None);
+        let user_apps = vec![user_embedding_app, user_ai_app];
         let stack_apps = vec![AppService {
             name: "embeddings".to_string(),
             env: Some(vec![EnvVar {
@@ -390,12 +403,29 @@ mod tests {
         }];
         let merged_configs: MergedConfigs =
             merge_app_reqs(Some(user_apps), Some(stack_apps), None, None, None).unwrap();
-        let app = merged_configs.app_services.unwrap()[0].clone();
+        let mut found: bool = false;
+        for config in merged_configs.pg_configs.clone().unwrap() {
+            if config.name == "vectorize.tembo_service_url" {
+                assert_eq!(
+                    config.value.to_string(),
+                    "http://${NAMESPACE}-ai-proxy:8080/v1"
+                );
+                found = true;
+            }
+        }
+        assert!(found);
+        // filter for embedding app
+        let embedding_app = merged_configs
+            .app_services
+            .unwrap()
+            .iter()
+            .find(|a| a.name == "embeddings")
+            .unwrap()
+            .clone();
         let mut to_find = 2;
         // 3 embedding app defaults + 1 custom
-        println!("{:?}", app.env.as_ref().unwrap());
-        assert_eq!(app.env.as_ref().unwrap().len(), 4);
-        for e in app.env.unwrap() {
+        assert_eq!(embedding_app.env.as_ref().unwrap().len(), 4);
+        for e in embedding_app.env.unwrap() {
             match e.name.as_str() {
                 // custom env var is found
                 "APP_ENV" => {
@@ -413,7 +443,7 @@ mod tests {
         assert_eq!(to_find, 0);
 
         // validate metrics end up in final_app
-        let metrics = app.metrics.expect("metrics not found");
+        let metrics = embedding_app.metrics.expect("metrics not found");
         assert_eq!(metrics.path, "/metrics".to_string());
         assert_eq!(metrics.port, 3000);
     }

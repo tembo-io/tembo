@@ -1,6 +1,6 @@
 [package]
 name = "temboclient"
-version = "1.0.2"
+version = "1.0.4"
 authors = ["OpenAPI Generator team and contributors"]
 description = "Platform API for Tembo Cloud             </br>             </br>             To find a Tembo Data API, please find it here:             </br>             </br>             [AWS US East 1](https://api.data-1.use1.tembo.io/swagger-ui/)             "
 # Override this license by providing a License Object in the OpenAPI.

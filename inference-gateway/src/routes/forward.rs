@@ -1,7 +1,13 @@
 use actix_web::{web, HttpRequest, HttpResponse};
 use serde::{Deserialize, Serialize};
+use sqlx::postgres::PgPool;
 use sqlx::{self, Pool, Postgres};
+use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 
+use crate::authorization;
+use crate::config::rewrite_model_request;
 use crate::errors::{AuthError, PlatformError};
 
 pub async fn forward_request(
@@ -9,29 +15,50 @@ pub async fn forward_request(
     body: web::Json<serde_json::Value>,
     config: web::Data<crate::config::Config>,
     client: web::Data<reqwest::Client>,
-    dbclient: web::Data<Pool<Postgres>>,
+    dbclient: web::Data<Arc<PgPool>>,
+    cache: web::Data<Arc<RwLock<HashMap<String, bool>>>>,
 ) -> Result<HttpResponse, PlatformError> {
     let headers = req.headers();
     let x_tembo_org = if let Some(header) = headers.get("X-TEMBO-ORG") {
         header.to_str().unwrap()
     } else {
-        return Err(AuthError::Forbidden("Missing request headers".to_string()).into());
+        return Err(
+            AuthError::Forbidden("Missing request header `X-TEMBO-ORG`".to_string()).into(),
+        );
     };
     let x_tembo_inst = if let Some(header) = headers.get("X-TEMBO-INSTANCE") {
         header.to_str().unwrap()
     } else {
-        return Err(AuthError::Forbidden("Missing request headers".to_string()).into());
+        return Err(
+            AuthError::Forbidden("Missing request header `X-TEMBO-INSTANCE`".to_string()).into(),
+        );
     };
 
-    let path = req.uri().path();
+    if config.org_auth_enabled {
+        let is_valid = authorization::auth_org(x_tembo_org, &cache).await;
+        if !is_valid {
+            return Err(AuthError::Forbidden("Organization is not authorized".to_string()).into());
+        }
+    }
 
-    let mut new_url = config.llm_service_host_port.clone();
+    let path = req.uri().path();
+    if path.contains("embeddings") {
+        return Ok(HttpResponse::BadRequest().body("Embedding generation is not yet supported"));
+    }
+
+    let rewrite_request = rewrite_model_request(body.clone(), &config)?;
+
+    let mut new_url = rewrite_request.base_url;
     new_url.set_path(path);
     new_url.set_query(req.uri().query());
 
     // log request duration
     let start = std::time::Instant::now();
-    let resp = client.post(new_url).json(&body).send().await?;
+    let resp = client
+        .post(new_url)
+        .json(&rewrite_request.body)
+        .send()
+        .await?;
     let duration = start.elapsed().as_millis() as i32;
     if resp.status().is_success() {
         let llm_resp = resp.json::<serde_json::Value>().await?;
@@ -64,7 +91,6 @@ pub async fn forward_request(
     }
 }
 
-// Function to insert data into Postgres
 async fn insert_data(
     org: &str,
     isnt: &str,

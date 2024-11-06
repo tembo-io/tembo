@@ -167,7 +167,7 @@ async fn fetch_logs_websocket(
     );
     let mut key = [0u8; 16];
     rand::thread_rng().fill(&mut key);
-    let sec_websocket_key = general_purpose::STANDARD.encode(&key);
+    let sec_websocket_key = general_purpose::STANDARD.encode(key);
 
     let url = Url::parse(&ws_url)?;
     let host = url
@@ -317,10 +317,7 @@ fn beautify_logs(json_data: &str, app_name: Option<String>) -> Result<()> {
                                         &value[1]
                                     ),
                                 };
-                                entries
-                                    .entry(date_time)
-                                    .or_insert_with(Vec::new)
-                                    .push(log_detail);
+                                entries.entry(date_time).or_default().push(log_detail);
                             }
                             _ => eprintln!("Invalid or ambiguous timestamp: {}", unix_timestamp),
                         }
@@ -331,7 +328,7 @@ fn beautify_logs(json_data: &str, app_name: Option<String>) -> Result<()> {
         }
     }
 
-    for (_date_time, logs) in &entries {
+    for logs in entries.values() {
         for log in logs {
             println!("{}", log);
         }
@@ -414,6 +411,11 @@ mod tests {
         let mut cmd = Command::cargo_bin(CARGO_BIN)?;
         cmd.arg("delete");
         let _ = cmd.ok();
+
+        let mut cmd = Command::new("sh");
+        cmd.arg("-c");
+        cmd.arg("docker volume rm $(docker volume ls -q)");
+        cmd.assert().success();
 
         Ok(())
     }

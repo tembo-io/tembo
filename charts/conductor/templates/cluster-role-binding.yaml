@@ -5,7 +5,7 @@ metadata:
 subjects:
 - kind: ServiceAccount
   namespace: {{ .Release.Namespace }}
-  name: {{ include "conductor.fullname" . }}
+  name: {{ include "conductor.serviceAccountName" . }}
 roleRef:
   kind: ClusterRole
   name: {{ include "conductor.fullname" . }}

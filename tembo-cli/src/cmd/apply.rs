@@ -1,5 +1,5 @@
 use anyhow::Context as AnyhowContext;
-use anyhow::Error;
+use anyhow::{Error, Result};
 use clap::Args;
 use colorful::Colorful;
 use controller::apis::postgres_parameters::ConfigValue as ControllerConfigValue;
@@ -13,7 +13,9 @@ use itertools::Itertools;
 use log::info;
 use spinoff::spinners;
 use spinoff::Spinner;
-use sqlx::{migrate::Migrator, PgPool};
+use sqlx::migrate::Migrator;
+use sqlx::postgres::{PgConnectOptions, PgPoolOptions};
+use std::env;
 use std::fmt::Write;
 use std::path::PathBuf;
 use std::{
@@ -107,7 +109,7 @@ pub fn execute(
 
 fn validate_overlay(merge_path: &str) -> Result<(), anyhow::Error> {
     let mut file_path = PathBuf::from(FileUtils::get_current_working_dir());
-    file_path.push(format!("{}", merge_path));
+    file_path.push(merge_path);
 
     let contents = fs::read_to_string(&file_path)?;
     let config: Result<HashMap<String, InstanceSettings>, toml::de::Error> =
@@ -260,22 +262,21 @@ fn docker_apply_instance(
         instance_setting.instance_name.clone(),
         instance_setting.instance_name.clone(),
     )?;
-    let stack: Stack;
 
-    if instance_setting.stack_file.is_some() {
+    let stack: Stack = if instance_setting.stack_file.is_some() {
         let mut file_path = PathBuf::from(FileUtils::get_current_working_dir());
         let stack_file = instance_setting.stack_file.clone().unwrap();
         let cleaned_stack_file = stack_file.trim_matches('"');
-        file_path.push(format!("{}", cleaned_stack_file));
+        file_path.push(cleaned_stack_file);
 
         let config_data = fs::read_to_string(&file_path).expect("File not found in the directory");
-        stack = serde_yaml::from_str(&config_data).expect("Invalid YAML File");
+        serde_yaml::from_str(&config_data).expect("Invalid YAML File")
     } else {
         let stack_type =
             ControllerStackType::from_str(&instance_setting.stack_type.clone().unwrap())
                 .unwrap_or(ControllerStackType::Standard);
-        stack = get_stack(stack_type);
-    }
+        get_stack(stack_type)
+    };
 
     let extensions = merge_options(
         stack.extensions.clone(),
@@ -461,7 +462,17 @@ async fn apply_migrations(
     database_url: String,
     migrations_dir: PathBuf,
 ) -> Result<(), anyhow::Error> {
-    let pool = PgPool::connect(&database_url).await?;
+    // Create connection options
+    let mut options: PgConnectOptions = database_url.parse()?;
+
+    for (key, value) in env::vars() {
+        if key.starts_with("TEMBO_") {
+            let parameter = key.replace("TEMBO_", "tembo.").to_lowercase();
+            options = options.options([(parameter.as_str(), value.as_str())]);
+        }
+    }
+
+    let pool = PgPoolOptions::new().connect_with(options).await?;
 
     for entry in fs::read_dir(&migrations_dir)? {
         let entry = entry?;
@@ -630,9 +641,28 @@ fn create_new_instance(
 
                     Ok(result.instance_id)
                 }
-                Err(error) => {
-                    eprintln!("Error creating instance: {}", error);
-                    Err(error.to_string())
+                Err(e) => {
+                    let error_message = match e {
+                        temboclient::apis::Error::ResponseError(resp_err) => {
+                            let status = resp_err.status;
+                            let content = resp_err.content;
+
+                            if let Ok(json) = serde_json::from_str::<Value>(&content) {
+                                if let Some(error) = json.get("error").and_then(Value::as_str) {
+                                    format!("{}: {}", status, error)
+                                } else {
+                                    format!(
+                                        "HTTP Error {}: Unable to extract error message",
+                                        status
+                                    )
+                                }
+                            } else {
+                                format!("HTTP Error {}: {}", status, content)
+                            }
+                        }
+                        _ => format!("Unexpected error: {:?}", e),
+                    };
+                    Err(error_message)
                 }
             }
         }
@@ -654,7 +684,7 @@ fn get_create_instance(
         )
         .unwrap(),
         instance_name: instance_settings.instance_name.clone(),
-        stack_type: StackType::from_str(&instance_settings.stack_type.as_ref().unwrap()).unwrap(),
+        stack_type: StackType::from_str(instance_settings.stack_type.as_ref().unwrap()).unwrap(),
         storage: Storage::from_str(instance_settings.storage.as_str()).unwrap(),
         replicas: Some(instance_settings.replicas),
         app_services: get_app_services(instance_settings.app_services.clone())?,
@@ -681,6 +711,16 @@ fn get_app_services(
     if let Some(app_services) = maybe_app_services {
         for app_type in app_services.iter() {
             match app_type {
+                tembo_stacks::apps::types::AppType::AIProxy(maybe_app_config) => vec_app_types
+                    .push(temboclient::models::AppType::new(
+                        get_final_app_config(maybe_app_config)?,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                        None,
+                    )),
                 tembo_stacks::apps::types::AppType::RestAPI(maybe_app_config) => vec_app_types
                     .push(temboclient::models::AppType::new(
                         get_final_app_config(maybe_app_config)?,
@@ -689,9 +729,11 @@ fn get_app_services(
                         None,
                         None,
                         None,
+                        None,
                     )),
                 tembo_stacks::apps::types::AppType::HTTP(maybe_app_config) => {
                     vec_app_types.push(temboclient::models::AppType::new(
+                        None,
                         None,
                         get_final_app_config(maybe_app_config)?,
                         None,
@@ -702,6 +744,7 @@ fn get_app_services(
                 }
                 tembo_stacks::apps::types::AppType::MQ(maybe_app_config) => {
                     vec_app_types.push(temboclient::models::AppType::new(
+                        None,
                         None,
                         None,
                         get_final_app_config(maybe_app_config)?,
@@ -715,6 +758,7 @@ fn get_app_services(
                         None,
                         None,
                         None,
+                        None,
                         get_final_app_config(maybe_app_config)?,
                         None,
                         None,
@@ -725,11 +769,12 @@ fn get_app_services(
                         None,
                         None,
                         None,
+                        None,
                         get_final_app_config(maybe_app_config)?,
                         None,
                     )),
                 tembo_stacks::apps::types::AppType::Custom(_) => vec_app_types.push(
-                    temboclient::models::AppType::new(None, None, None, None, None, None),
+                    temboclient::models::AppType::new(None, None, None, None, None, None, None),
                 ),
             }
         }
@@ -893,10 +938,14 @@ fn get_extensions(
                             name);
                         let ext_locations = extension_mismatch.unwrap().locations.clone();
                         if !ext_locations.is_empty() {
-                            if let Some(existing_version) = ext_locations[0].clone().version {
-                                version = existing_version
+                            if ext_locations[0].clone().error.unwrap() == Some(false) {
+                                if let Some(existing_version) = ext_locations[0].clone().version {
+                                    version = existing_version
+                                } else {
+                                    return Err(Error::msg(version_error));
+                                }
                             } else {
-                                return Err(Error::msg(version_error));
+                                return Err(Error::msg("Error adding Extension to your instance."));
                             }
                         } else {
                             return Err(Error::msg(version_error));
@@ -909,8 +958,8 @@ fn get_extensions(
                 vec![ExtensionInstallLocation {
                     database: Some("postgres".to_string()),
                     schema: None,
-                    version: Some(version),
-                    enabled: extension.enabled,
+                    version,
+                    enabled: extension.enabled.unwrap_or(false),
                 }];
 
             vec_extensions.push(Extension {
@@ -936,7 +985,7 @@ fn get_extensions_controller(
                 database: String::new(),
                 schema: None,
                 version: None,
-                enabled: extension.enabled,
+                enabled: extension.enabled.unwrap_or(false),
             });
 
             vec_extensions.push(ControllerExtension {
@@ -956,11 +1005,18 @@ fn get_trunk_installs(
     let mut vec_trunk_installs: Vec<TrunkInstall> = vec![];
 
     if let Some(extensions) = maybe_extensions {
-        for (_, extension) in extensions.into_iter() {
+        for (name, extension) in extensions.into_iter() {
+            let version = Runtime::new()
+                .unwrap()
+                .block_on(get_extension_version(
+                    name.clone(),
+                    extension.clone().version,
+                ))
+                .expect("msg");
             if extension.trunk_project.is_some() {
                 vec_trunk_installs.push(TrunkInstall {
                     name: extension.trunk_project.unwrap(),
-                    version: Some(extension.trunk_project_version),
+                    version,
                 });
             }
         }
@@ -1120,7 +1176,6 @@ pub fn get_rendered_dockerfile(
         _ => &stack.images.pg15,
     };
 
-    // Sorts trunk_installs so the installation order is deterministic, also make sure vector is last
     if let Some(mut installs) = trunk_installs.as_ref().cloned() {
         // Sort by name, but ensure "vector" is always last
         installs.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
@@ -1300,7 +1355,6 @@ async fn get_extension_version(
     if let Some(version) = maybe_version {
         return Ok(Some(version));
     }
-
     let trunk_projects = get_trunk_projects(&name).await?;
 
     // If trunk projects returned is not exactly 1 then skip getting version
@@ -1334,14 +1388,25 @@ async fn get_trunk_projects(name: &String) -> Result<Vec<TrunkProject>, Error> {
 pub fn get_rendered_dockercompose(
     instance_settings: HashMap<String, InstanceSettings>,
 ) -> Result<String, anyhow::Error> {
-    // Include the docker-compose template directly into the binary
     let contents = include_str!("../../tembo/docker-compose.yml.template");
 
     let mut tera = Tera::new("templates/**/*").unwrap();
     let _ = tera.add_raw_template("docker-compose", contents);
     let mut context = Context::new();
 
-    context.insert("instance_settings", &instance_settings);
+    // replace the image for VectorDB
+    let mut updated_instance_settings = instance_settings.clone();
+    for (_key, instance) in updated_instance_settings.iter_mut() {
+        if instance.stack_type == Some("VectorDB".to_string()) {
+            if let Some(app_services) = &mut instance.controller_app_services {
+                if let Some(embeddings) = app_services.get_mut("embeddings") {
+                    embeddings.image = "quay.io/tembo/vector-serve:latest".to_string();
+                }
+            }
+        }
+    }
+
+    context.insert("instance_settings", &updated_instance_settings);
 
     let rendered_dockercompose = tera.render("docker-compose", &context).unwrap();
 
@@ -1468,6 +1533,11 @@ mod tests {
         let mut cmd = Command::cargo_bin(CARGO_BIN)?;
         cmd.arg("delete");
         let _ = cmd.ok();
+
+        let mut cmd = Command::new("sh");
+        cmd.arg("-c");
+        cmd.arg("docker volume rm $(docker volume ls -q)");
+        cmd.assert().success();
 
         Ok(())
     }

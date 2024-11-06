@@ -28,6 +28,7 @@ on:
 jobs:
   tests:
     name: Run tests
+
     runs-on:
       - self-hosted
       - dind
@@ -50,14 +51,17 @@ jobs:
         with:
           toolchain: stable
       - name: install dependencies
-        run: cargo install sqlx-cli --version 0.7.4
+        run: cargo install sqlx-cli --version 0.8.2
       - name: Start Postgres
-        run: |
-          make run-postgres
-          make run-migrations
+        run: make run-postgres
+      - name: unit-test
+        run: SQLX_OFFLINE=true make unit-test
+      - name: integration-test
+        run: SQLX_OFFLINE=true make integration-test
       - name: Check Format and Migrations
         run: make check
-      - name: unit-test
-        run: make unit-test
-      - name: integration-test
-        run: make integration-test
+      - name: Debugging information
+        if: always()
+        run: |
+          docker compose logs postgres
+          docker compose logs mock-server

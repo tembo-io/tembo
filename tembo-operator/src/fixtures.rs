@@ -1,7 +1,7 @@
 //! Helper methods only available for tests
 use crate::{
     apis::coredb_types::{CoreDB, CoreDBSpec, CoreDBStatus},
-    Context, Metrics, COREDB_FINALIZER,
+    Context, COREDB_FINALIZER,
 };
 use assert_json_diff::assert_json_include;
 use futures::pin_mut;
@@ -10,10 +10,19 @@ use k8s_openapi::api::core::v1::{Pod, Secret};
 use kube::{
     api::ObjectList, api::ObjectMeta, client::Body, core::TypeMeta, Client, Resource, ResourceExt,
 };
-use prometheus::Registry;
 use std::sync::Arc;
-use tokio::task::JoinHandle;
-use tower_test::mock::{self, Handle};
+
+/// Scenarios we test for in ApiServerVerifier
+pub enum Scenario {
+    /// Objects without finalizers will get a finalizer applied
+    FinalizerCreation(CoreDB),
+    /// Objects that do not fail will only patch
+    StatusPatch(CoreDB),
+    /// Standard reconciliation flow
+    StandardReconciliation(CoreDB),
+    /// Objects with a deletion timestamp will run the cleanup loop
+    Cleanup(String, CoreDB),
+}
 
 impl CoreDB {
     /// A normal test CoreDB
@@ -39,42 +48,168 @@ impl CoreDB {
         self.status = Some(status);
         self
     }
+
+    /// Modify coredb to set a deletion timestamp
+    pub fn needs_delete(mut self) -> Self {
+        use chrono::prelude::{DateTime, TimeZone, Utc};
+        let now: DateTime<Utc> = Utc.with_ymd_and_hms(2017, 4, 2, 12, 50, 32).unwrap();
+        use k8s_openapi::apimachinery::pkg::apis::meta::v1::Time;
+        self.meta_mut().deletion_timestamp = Some(Time(now));
+        self
+    }
 }
-pub struct ApiServerVerifier(Handle<Request<Body>, Response<Body>>);
+
+// We wrap tower_test::mock::Handle
+type ApiServerHandle = tower_test::mock::Handle<Request<Body>, Response<Body>>;
+pub struct ApiServerVerifier(ApiServerHandle);
+
+pub async fn timeout_after_1s(handle: tokio::task::JoinHandle<()>) {
+    tokio::time::timeout(std::time::Duration::from_secs(1), handle)
+        .await
+        .expect("timeout on mock apiserver")
+        .expect("scenario succeeded")
+}
 
 /// Create a responder + verifier object that deals with the main reconcile scenarios
 ///
 impl ApiServerVerifier {
-    pub fn handle_finalizer_creation(self, coredb_: &CoreDB) -> JoinHandle<()> {
-        let handle = self.0;
-        let coredb = coredb_.clone();
-        tokio::spawn(async move {
-            pin_mut!(handle);
-            let (request, send) = handle.next_request().await.expect("service not called");
-            // We expect a json patch to the specified coredb adding our finalizer
-            assert_eq!(request.method(), http::Method::PATCH);
-            assert_eq!(
-                request.uri().to_string(),
-                format!(
-                    "/apis/coredb.io/v1alpha1/namespaces/testns/coredbs/{}?",
-                    coredb.name_any()
-                )
-            );
-            let expected_patch = serde_json::json!([
-                { "op": "test", "path": "/metadata/finalizers", "value": null },
-                { "op": "add", "path": "/metadata/finalizers", "value": vec![COREDB_FINALIZER] }
-            ]);
-            let req_body = request.into_body().collect_bytes().await.unwrap();
-            let runtime_patch: serde_json::Value =
-                serde_json::from_slice(&req_body).expect("valid coredb from runtime");
-            assert_json_include!(actual: runtime_patch, expected: expected_patch);
+    /// Tests only get to run specific scenarios that has matching handlers
+    ///
+    /// This setup makes it easy to handle multiple requests by chaining handlers together.
+    ///
+    /// NB: If the controller is making more calls than we are handling in the scenario,
+    /// you then typically see a `KubeError(Service(Closed(())))` from the reconciler.
+    ///
+    /// You should await the `JoinHandle` (with a timeout) from this function to ensure that the
+    /// scenario runs to completion (i.e. all expected calls were responded to),
+    /// using the timeout to catch missing api calls to Kubernetes.
 
-            let response = serde_json::to_vec(&coredb.finalized()).unwrap(); // respond as the apiserver would have
-            send.send_response(Response::builder().body(Body::from(response)).unwrap());
+    pub fn run(self, scenario: Scenario) -> tokio::task::JoinHandle<()> {
+        tokio::spawn(async move {
+            match scenario {
+                Scenario::FinalizerCreation(coredb) => {
+                    self.handle_finalizer_creation(coredb)
+                        .await
+                        .expect("finalizer creation failed");
+                }
+                Scenario::StatusPatch(coredb) => {
+                    self.handle_status_patch(&coredb)
+                        .await
+                        .expect("status patch failed");
+                }
+                Scenario::StandardReconciliation(coredb) => {
+                    self.handle_coredb_patch(&coredb)
+                        .await
+                        .expect("coredb patch failed");
+                }
+                Scenario::Cleanup(reason, coredb) => {
+                    self.handle_event_create(reason)
+                        .await
+                        .expect("event creation failed")
+                        .handle_finalizer_removal(coredb)
+                        .await
+                        .expect("finalizer removal failed");
+                }
+            };
         })
     }
 
-    pub fn handle_coredb_patch(self, coredb_: &CoreDB) -> JoinHandle<()> {
+    // chainable scenario handlers
+
+    async fn handle_finalizer_creation(mut self, coredb: CoreDB) -> Result<Self, kube::Error> {
+        let (request, send) = self.0.next_request().await.expect("service not called");
+        // We expect a json patch to the specified document adding our finalizer
+        assert_eq!(request.method(), http::Method::PATCH);
+        assert_eq!(
+            request.uri().to_string(),
+            format!(
+                "/apis/coredb.io/v1alpha1/namespaces/testns/coredbs/{}?",
+                coredb.name_any()
+            )
+        );
+        let expected_patch = serde_json::json!([
+            { "op": "test", "path": "/metadata/finalizers", "value": null },
+            { "op": "add", "path": "/metadata/finalizers", "value": vec![COREDB_FINALIZER] }
+        ]);
+        let req_body = request.into_body().collect_bytes().await.unwrap();
+        let runtime_patch: serde_json::Value =
+            serde_json::from_slice(&req_body).expect("valid coredb from runtime");
+        assert_json_include!(actual: runtime_patch, expected: expected_patch);
+
+        let response = serde_json::to_vec(&coredb.finalized()).unwrap(); // respond as the apiserver would have
+        send.send_response(Response::builder().body(Body::from(response)).unwrap());
+        Ok(self)
+    }
+
+    async fn handle_finalizer_removal(mut self, coredb: CoreDB) -> Result<Self, kube::Error> {
+        let (request, send) = self.0.next_request().await.expect("service not called");
+        // We expect a json patch to the specified document removing our finalizer (at index 0)
+        assert_eq!(request.method(), http::Method::PATCH);
+        assert_eq!(
+            request.uri().to_string(),
+            format!(
+                "/apis/coredb.io/v1/namespaces/default/coredbs/{}?",
+                coredb.name_any()
+            )
+        );
+        let expected_patch = serde_json::json!([
+            { "op": "test", "path": "/metadata/finalizers/0", "value": COREDB_FINALIZER },
+            { "op": "remove", "path": "/metadata/finalizers/0", "path": "/metadata/finalizers/0" }
+        ]);
+        let req_body = request.into_body().collect_bytes().await.unwrap();
+        let runtime_patch: serde_json::Value =
+            serde_json::from_slice(&req_body).expect("valid coredb from runtime");
+        assert_json_include!(actual: runtime_patch, expected: expected_patch);
+
+        let response = serde_json::to_vec(&coredb).unwrap(); // respond as the apiserver would have
+        send.send_response(Response::builder().body(Body::from(response)).unwrap());
+        Ok(self)
+    }
+
+    async fn handle_event_create(mut self, reason: String) -> Result<Self, kube::Error> {
+        let (request, send) = self.0.next_request().await.expect("service not called");
+        assert_eq!(request.method(), http::Method::POST);
+        assert_eq!(
+            request.uri().to_string(),
+            format!("/apis/events.k8s.io/v1/namespaces/default/events?")
+        );
+        // verify the event reason matches the expected
+        let req_body = request.into_body().collect_bytes().await.unwrap();
+        let postdata: serde_json::Value =
+            serde_json::from_slice(&req_body).expect("valid event from runtime");
+        dbg!("postdata for event: {}", postdata.clone());
+        assert_eq!(
+            postdata.get("reason").unwrap().as_str().map(String::from),
+            Some(reason)
+        );
+        // then pass through the body
+        send.send_response(Response::builder().body(Body::from(req_body)).unwrap());
+        Ok(self)
+    }
+
+    pub async fn handle_status_patch(mut self, coredb: &CoreDB) -> Result<Self, kube::Error> {
+        let (request, send) = self.0.next_request().await.expect("service not called");
+        assert_eq!(request.method(), http::Method::PATCH);
+        assert_eq!(
+            request.uri().to_string(),
+            format!(
+                "/apis/coredb.io/v1alpha1/namespaces/testns/coredbs/{}/status?&force=true&fieldManager=cntrlr",
+                coredb.name_any()
+            )
+        );
+        let cdb = coredb.clone();
+        let req_body = request.into_body().collect_bytes().await.unwrap();
+        let json: serde_json::Value =
+            serde_json::from_slice(&req_body).expect("patch_status object is json");
+        let status_json = json.get("status").expect("status object").clone();
+        let status: CoreDBStatus = serde_json::from_value(status_json).expect("valid status");
+
+        let response = serde_json::to_vec(&cdb.with_status(status)).unwrap();
+        send.send_response(Response::builder().body(Body::from(response)).unwrap());
+        Ok(self)
+    }
+
+    pub fn handle_coredb_patch(self, coredb_: &CoreDB) -> tokio::task::JoinHandle<()> {
         let handle = self.0;
         let coredb = coredb_.clone();
         tokio::spawn(async move {
@@ -207,19 +342,15 @@ impl ApiServerVerifier {
 }
 
 impl Context {
-    // Create a test context with a mocked kube client, unregistered metrics and default diagnostics
-    pub fn test() -> (Arc<Self>, ApiServerVerifier, Registry) {
-        let (mock_service, handle) = mock::pair::<Request<Body>, Response<Body>>();
+    // Create a test context with a mocked kube client, locally registered metrics and default diagnostics
+    pub fn test() -> (Arc<Self>, ApiServerVerifier) {
+        let (mock_service, handle) = tower_test::mock::pair::<Request<Body>, Response<Body>>();
         let mock_client = Client::new(mock_service, "default");
-        let registry = Registry::default();
-        (
-            Arc::new(Self {
-                client: mock_client,
-                metrics: Metrics::default().register(&registry).unwrap(),
-                diagnostics: Arc::default(),
-            }),
-            ApiServerVerifier(handle),
-            registry,
-        )
+        let ctx = Self {
+            client: mock_client,
+            metrics: Arc::default(),
+            diagnostics: Arc::default(),
+        };
+        (Arc::new(ctx), ApiServerVerifier(handle))
     }
 }

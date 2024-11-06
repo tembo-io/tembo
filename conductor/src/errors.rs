@@ -1,4 +1,7 @@
+use crate::azure;
 use aws_sdk_cloudformation::Error as CFError;
+use azure::azure_error::AzureError;
+use google_cloud_storage::http::Error as GcsError;
 use kube;
 use pgmq::errors::PgmqError;
 use thiserror::Error;
@@ -48,4 +51,15 @@ pub enum ConductorError {
 
     #[error("Name or Namespace was not for for: {0}")]
     NameOrNamespaceNotFound(String),
+
+    /// Google Cloud Storage error
+    #[error("Google Cloud Storage error: {0}")]
+    GcsError(#[from] GcsError),
+
+    /// Dataplane error
+    #[error("Dataplane not found error: {0}")]
+    DataplaneError(String),
+
+    #[error("Error with Azure SDK {0}")]
+    AzureError(#[from] AzureError),
 }

@@ -12,9 +12,11 @@ use crate::{
             reconcile_pooler,
         },
         placement::cnpg_placement::PlacementConfig,
+        retention::snapshots::cleanup_old_volume_snapshots,
         VOLUME_SNAPSHOT_CLASS_NAME,
     },
     config::Config,
+    dedicated_networking::reconcile_dedicated_networking,
     exec::{ExecCommand, ExecOutput},
     extensions::database_queries::is_not_restarting,
     heartbeat::reconcile_heartbeat,
@@ -69,7 +71,7 @@ pub struct Context {
     /// Diagnostics read by the web server
     pub diagnostics: Arc<RwLock<Diagnostics>>,
     /// Prometheus metrics
-    pub metrics: Metrics,
+    pub metrics: Arc<Metrics>,
 }
 
 pub fn requeue_normal_with_jitter() -> Action {
@@ -82,9 +84,9 @@ pub fn requeue_normal_with_jitter() -> Action {
 #[instrument(skip(ctx, cdb), fields(trace_id))]
 async fn reconcile(cdb: Arc<CoreDB>, ctx: Arc<Context>) -> Result<Action> {
     let trace_id = telemetry::get_trace_id();
-    Span::current().record("trace_id", &field::display(&trace_id));
+    Span::current().record("trace_id", field::display(&trace_id));
     let cfg = Config::default();
-    let _timer = ctx.metrics.count_and_measure();
+    let _timer = ctx.metrics.reconcile.count_and_measure(&trace_id);
     ctx.diagnostics.write().await.last_event = Utc::now();
     let ns = cdb.namespace().unwrap(); // cdb is namespace scoped
     let coredbs: Api<CoreDB> = Api::namespaced(ctx.client.clone(), &ns);
@@ -122,7 +124,7 @@ async fn reconcile(cdb: Arc<CoreDB>, ctx: Arc<Context>) -> Result<Action> {
 
 pub(crate) fn error_policy(cdb: Arc<CoreDB>, error: &Error, ctx: Arc<Context>) -> Action {
     warn!("reconcile failed: {:?}", error);
-    ctx.metrics.reconcile_failure(&cdb, error);
+    ctx.metrics.reconcile.set_failure(&cdb, error);
 
     // Check for 429 error code from Kubernetes API
     match error {
@@ -225,6 +227,7 @@ impl CoreDB {
                     service_name_read_only.as_str(),
                     IntOrString::Int(5432),
                     vec![middleware_name.clone()],
+                    self.spec.replicas < 2 || self.spec.stop,
                 )
                 .await
                 .map_err(|e| {
@@ -247,6 +250,7 @@ impl CoreDB {
                     service_name_read_write.as_str(),
                     IntOrString::Int(5432),
                     vec![middleware_name.clone()],
+                    self.spec.replicas < 1 || self.spec.stop,
                 )
                 .await
                 .map_err(|e| {
@@ -273,30 +277,36 @@ impl CoreDB {
                     // IngressRouteTCP does not have expected errors during reconciliation.
                     Action::requeue(Duration::from_secs(300))
                 })?;
-                // If pooler is enabled, reconcile ingress route tcp for pooler
-                if self.spec.connectionPooler.enabled {
-                    let name_pooler = format!("{}-pooler", self.name_any().as_str());
-                    let prefix_pooler = format!("{}-pooler-", self.name_any().as_str());
-                    reconcile_postgres_ing_route_tcp(
-                        self,
-                        ctx.clone(),
-                        name_pooler.as_str(),
-                        basedomain.as_str(),
-                        ns.as_str(),
-                        prefix_pooler.as_str(),
-                        name_pooler.as_str(),
-                        IntOrString::Int(5432),
-                        vec![middleware_name.clone()],
-                    )
+
+                reconcile_dedicated_networking(self, ctx.clone(), basedomain.as_str())
                     .await
                     .map_err(|e| {
-                        error!("Error reconciling pooler ingress route: {:?}", e);
-                        // For unexpected errors, we should requeue for several minutes at least,
-                        // for expected, "waiting" type of requeuing, those should be shorter, just a few seconds.
-                        // IngressRouteTCP does not have expected errors during reconciliation.
+                        error!("Error reconciling dedicated networking: {:?}", e);
                         Action::requeue(Duration::from_secs(300))
                     })?;
-                }
+
+                let name_pooler = format!("{}-pooler", self.name_any().as_str());
+                let prefix_pooler = format!("{}-pooler-", self.name_any().as_str());
+                reconcile_postgres_ing_route_tcp(
+                    self,
+                    ctx.clone(),
+                    name_pooler.as_str(),
+                    basedomain.as_str(),
+                    ns.as_str(),
+                    prefix_pooler.as_str(),
+                    name_pooler.as_str(),
+                    IntOrString::Int(5432),
+                    vec![middleware_name.clone()],
+                    self.spec.replicas < 1 || self.spec.stop || !self.spec.connectionPooler.enabled,
+                )
+                .await
+                .map_err(|e| {
+                    error!("Error reconciling pooler ingress route: {:?}", e);
+                    // For unexpected errors, we should requeue for several minutes at least,
+                    // for expected, "waiting" type of requeuing, those should be shorter, just a few seconds.
+                    // IngressRouteTCP does not have expected errors during reconciliation.
+                    Action::requeue(Duration::from_secs(300))
+                })?;
             }
             Err(_e) => {
                 warn!(
@@ -407,6 +417,29 @@ impl CoreDB {
         patch_cdb_status_merge(&coredbs, &name, patch_status).await?;
 
         reconcile_heartbeat(self, ctx.clone()).await?;
+
+        // Cleanup old volume snapshots that are older than the retention period
+        // set in cfg.volume_snapshot_retention_period
+        // if volumesnapshots is enabled
+        if cfg.enable_volume_snapshot {
+            match cleanup_old_volume_snapshots(
+                self,
+                client,
+                cfg.volume_snapshot_retention_period_days,
+            )
+            .await
+            {
+                Ok(_) => {
+                    info!(
+                        "Successfully cleaned up old volume snapshots for instance: {}",
+                        self.name_any()
+                    );
+                }
+                Err(action) => {
+                    return Err(action);
+                }
+            }
+        }
 
         info!("Fully reconciled {}", self.name_any());
         Ok(requeue_normal_with_jitter())
@@ -911,15 +944,18 @@ impl Diagnostics {
 pub struct State {
     /// Diagnostics populated by the reconciler
     diagnostics: Arc<RwLock<Diagnostics>>,
-    /// Metrics registry
-    registry: prometheus::Registry,
+    /// Metrics
+    metrics: Arc<Metrics>,
 }
 
 /// State wrapper around the controller outputs for the web server
 impl State {
     /// Metrics getter
-    pub fn metrics(&self) -> Vec<prometheus::proto::MetricFamily> {
-        self.registry.gather()
+    pub fn metrics(&self) -> String {
+        let mut buffer = String::new();
+        let registry = &*self.metrics.registry;
+        prometheus_client::encoding::text::encode(&mut buffer, registry).unwrap();
+        buffer
     }
 
     /// State getter
@@ -928,10 +964,10 @@ impl State {
     }
 
     // Create a Controller Context that can update State
-    pub fn create_context(&self, client: Client) -> Arc<Context> {
+    pub fn to_context(&self, client: Client) -> Arc<Context> {
         Arc::new(Context {
             client,
-            metrics: Metrics::default().register(&self.registry).unwrap(),
+            metrics: self.metrics.clone(),
             diagnostics: self.diagnostics.clone(),
         })
     }
@@ -952,9 +988,10 @@ pub async fn run(state: State) {
         info!("Installation: cargo run --bin crdgen | kubectl apply -f -");
         std::process::exit(1);
     }
+
     Controller::new(coredb, watcherConfig::default().any_semantic())
         .shutdown_on_signal()
-        .run(reconcile, error_policy, state.create_context(client))
+        .run(reconcile, error_policy, state.to_context(client))
         .filter_map(|x| async move { std::result::Result::ok(x) })
         .for_each(|_| futures::future::ready(()))
         .await;
@@ -964,25 +1001,51 @@ pub async fn run(state: State) {
 #[cfg(test)]
 mod test {
     use super::{reconcile, Backup, Context, CoreDB};
-    use crate::apis::coredb_types::VolumeSnapshot;
-    use crate::cloudnativepg::{
-        backups::{BackupCluster, BackupSpec, BackupStatus},
-        VOLUME_SNAPSHOT_CLASS_NAME,
+    use crate::{
+        apis::coredb_types::VolumeSnapshot,
+        cloudnativepg::{
+            backups::{BackupCluster, BackupSpec, BackupStatus},
+            VOLUME_SNAPSHOT_CLASS_NAME,
+        },
+        config::Config,
+        controller::{create_volume_snapshot_patch, is_volume_snapshot_update_needed},
+        fixtures::{timeout_after_1s, Scenario},
     };
-    use crate::config::Config;
-    use crate::controller::{create_volume_snapshot_patch, is_volume_snapshot_update_needed};
     use chrono::{DateTime, NaiveDate, Utc};
     use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
     use std::sync::Arc;
 
     #[tokio::test]
     async fn new_coredbs_without_finalizers_gets_a_finalizer() {
-        let (testctx, fakeserver, _) = Context::test();
+        let (testctx, fakeserver) = Context::test();
         let coredb = CoreDB::test();
-        // verify that coredb gets a finalizer attached during reconcile
-        fakeserver.handle_finalizer_creation(&coredb);
-        let res = reconcile(Arc::new(coredb), testctx).await;
-        assert!(res.is_ok(), "initial creation succeeds in adding finalizer");
+        let mocksrv = fakeserver.run(Scenario::FinalizerCreation(coredb.clone()));
+        reconcile(Arc::new(coredb), testctx)
+            .await
+            .expect("reconciler");
+        timeout_after_1s(mocksrv).await;
+    }
+
+    #[tokio::test]
+    async fn finalized_coredb_causes_status_patch() {
+        let (testctx, fakeserver) = Context::test();
+        let coredb = CoreDB::test().finalized();
+        let mocksrv = fakeserver.run(Scenario::StatusPatch(coredb.clone()));
+        reconcile(Arc::new(coredb), testctx)
+            .await
+            .expect("reconciler");
+        timeout_after_1s(mocksrv).await;
+    }
+
+    #[tokio::test]
+    async fn finalized_coredb_with_delete_timestamp_causes_delete() {
+        let (testctx, fakeserver) = Context::test();
+        let coredb = CoreDB::test().finalized().needs_delete();
+        let mocksrv = fakeserver.run(Scenario::Cleanup("DeleteRequested".into(), coredb.clone()));
+        reconcile(Arc::new(coredb), testctx)
+            .await
+            .expect("reconciler");
+        timeout_after_1s(mocksrv).await;
     }
 
     #[tokio::test]

@@ -966,6 +966,8 @@ spec:
                                       name:
                                         description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
                                         type: string
+                                    required:
+                                    - name
                                     type: object
                                   user:
                                     description: 'user is optional: User is the rados user name, default is admin More info: https://examples.k8s.io/volumes/cephfs/README.md#how-to-use-it'
@@ -988,6 +990,8 @@ spec:
                                       name:
                                         description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
                                         type: string
+                                    required:
+                                    - name
                                     type: object
                                   volumeID:
                                     description: 'volumeID used to identify the volume in cinder. More info: https://examples.k8s.io/mysql-cinder-pd/README.md'
@@ -1028,6 +1032,8 @@ spec:
                                   optional:
                                     description: optional specify whether the ConfigMap or its keys must be defined
                                     type: boolean
+                                required:
+                                - name
                                 type: object
                               csi:
                                 description: csi (Container Storage Interface) represents ephemeral storage that is handled by certain external CSI drivers (Beta feature).
@@ -1044,6 +1050,8 @@ spec:
                                       name:
                                         description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
                                         type: string
+                                    required:
+                                    - name
                                     type: object
                                   readOnly:
                                     description: readOnly specifies a read-only configuration for the volume. Defaults to false (read/write).
@@ -1330,23 +1338,6 @@ spec:
                                           resources:
                                             description: 'resources represents the minimum resources the volume should have. If RecoverVolumeExpansionFailure feature is enabled users are allowed to specify resource requirements that are lower than previous value but must still be higher than capacity recorded in the status field of the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#resources'
                                             properties:
-                                              claims:
-                                                description: |-
-                                                  Claims lists the names of resources, defined in spec.resourceClaims, that are used by this container.
-
-                                                  This is an alpha field and requires enabling the DynamicResourceAllocation feature gate.
-
-                                                  This field is immutable. It can only be set for containers.
-                                                items:
-                                                  description: ResourceClaim references one entry in PodSpec.ResourceClaims.
-                                                  properties:
-                                                    name:
-                                                      description: Name must match the name of one entry in pod.spec.resourceClaims of the Pod where this field is used. It makes that resource available inside a container.
-                                                      type: string
-                                                  required:
-                                                  - name
-                                                  type: object
-                                                type: array
                                               limits:
                                                 additionalProperties:
                                                   description: "Quantity is a fixed-point representation of a number. It provides convenient marshaling/unmarshaling in JSON and YAML, in addition to String() and AsInt64() accessors.\n\nThe serialization format is:\n\n``` <quantity>        ::= <signedNumber><suffix>\n\n\t(Note that <suffix> may be empty, from the \"\" case in <decimalSI>.)\n\n<digit>           ::= 0 | 1 | ... | 9 <digits>          ::= <digit> | <digit><digits> <number>          ::= <digits> | <digits>.<digits> | <digits>. | .<digits> <sign>            ::= \"+\" | \"-\" <signedNumber>    ::= <number> | <sign><number> <suffix>          ::= <binarySI> | <decimalExponent> | <decimalSI> <binarySI>        ::= Ki | Mi | Gi | Ti | Pi | Ei\n\n\t(International System of units; See: http://physics.nist.gov/cuu/Units/binary.html)\n\n<decimalSI>       ::= m | \"\" | k | M | G | T | P | E\n\n\t(Note that 1024 = 1Ki but 1000 = 1k; I didn't choose the capitalization.)\n\n<decimalExponent> ::= \"e\" <signedNumber> | \"E\" <signedNumber> ```\n\nNo matter which of the three exponent forms is used, no quantity may represent a number greater than 2^63-1 in magnitude, nor may it have more than 3 decimal places. Numbers larger or more precise will be capped or rounded up. (E.g.: 0.1m will rounded up to 1m.) This may be extended in the future if we require larger or smaller quantities.\n\nWhen a Quantity is parsed from a string, it will remember the type of suffix it had, and will use the same type again when it is serialized.\n\nBefore serializing, Quantity will be put in \"canonical form\". This means that Exponent/suffix will be adjusted up or down (with a corresponding increase or decrease in Mantissa) such that:\n\n- No precision is lost - No fractional digits will be emitted - The exponent (or suffix) is as large as possible.\n\nThe sign will be omitted unless the number is negative.\n\nExamples:\n\n- 1.5 will be serialized as \"1500m\" - 1.5Gi will be serialized as \"1536Mi\"\n\nNote that the quantity will NEVER be internally represented by a floating point number. That is the whole point of this exercise.\n\nNon-canonical values will still parse as long as they are well formed, but will be re-emitted in their canonical form. (So always use canonical form, or don't diff.)\n\nThis format is intended to make it difficult to use these numbers without writing some sort of special handling code in the hopes that that will cause implementors to also use a fixed point implementation."
@@ -1392,6 +1383,9 @@ spec:
                                             type: object
                                           storageClassName:
                                             description: 'storageClassName is the name of the StorageClass required by the claim. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#class-1'
+                                            type: string
+                                          volumeAttributesClassName:
+                                            description: 'volumeAttributesClassName may be used to set the VolumeAttributesClass used by this claim. If specified, the CSI driver will create or update the volume with the attributes defined in the corresponding VolumeAttributesClass. This has a different purpose than storageClassName, it can be changed after the claim is created. An empty string value means that no VolumeAttributesClass will be applied to the claim but it''s not allowed to reset this field to empty string once it is set. If unspecified and the PersistentVolumeClaim is unbound, the default VolumeAttributesClass will be set by the persistentvolume controller if it exists. If the resource referred to by volumeAttributesClass does not exist, this PersistentVolumeClaim will be set to a Pending state, as reflected by the modifyVolumeStatus field, until such as a resource exists. More info: https://kubernetes.io/docs/concepts/storage/persistent-volumes#volumeattributesclass (Alpha) Using this field requires the VolumeAttributesClass feature gate to be enabled.'
                                             type: string
                                           volumeMode:
                                             description: volumeMode defines what type of volume is required by the claim. Value of Filesystem is implied when not included in claim spec.
@@ -1451,6 +1445,8 @@ spec:
                                       name:
                                         description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
                                         type: string
+                                    required:
+                                    - name
                                     type: object
                                 required:
                                 - driver
@@ -1566,6 +1562,8 @@ spec:
                                       name:
                                         description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
                                         type: string
+                                    required:
+                                    - name
                                     type: object
                                   targetPortal:
                                     description: targetPortal is iSCSI Target Portal. The Portal is either an IP or ip_addr:port if the port is other than default (typically TCP ports 860 and 3260).
@@ -1645,6 +1643,61 @@ spec:
                                     items:
                                       description: Projection that may be projected along with other supported volume types
                                       properties:
+                                        clusterTrustBundle:
+                                          description: |-
+                                            ClusterTrustBundle allows a pod to access the `.spec.trustBundle` field of ClusterTrustBundle objects in an auto-updating file.
+
+                                            Alpha, gated by the ClusterTrustBundleProjection feature gate.
+
+                                            ClusterTrustBundle objects can either be selected by name, or by the combination of signer name and a label selector.
+
+                                            Kubelet performs aggressive normalization of the PEM contents written into the pod filesystem.  Esoteric PEM features such as inter-block comments and block headers are stripped.  Certificates are deduplicated. The ordering of certificates within the file is arbitrary, and Kubelet may change the order over time.
+                                          properties:
+                                            labelSelector:
+                                              description: Select all ClusterTrustBundles that match this label selector.  Only has effect if signerName is set.  Mutually-exclusive with name.  If unset, interpreted as "match nothing".  If set but empty, interpreted as "match everything".
+                                              properties:
+                                                matchExpressions:
+                                                  description: matchExpressions is a list of label selector requirements. The requirements are ANDed.
+                                                  items:
+                                                    description: A label selector requirement is a selector that contains values, a key, and an operator that relates the key and values.
+                                                    properties:
+                                                      key:
+                                                        description: key is the label key that the selector applies to.
+                                                        type: string
+                                                      operator:
+                                                        description: operator represents a key's relationship to a set of values. Valid operators are In, NotIn, Exists and DoesNotExist.
+                                                        type: string
+                                                      values:
+                                                        description: values is an array of string values. If the operator is In or NotIn, the values array must be non-empty. If the operator is Exists or DoesNotExist, the values array must be empty. This array is replaced during a strategic merge patch.
+                                                        items:
+                                                          type: string
+                                                        type: array
+                                                    required:
+                                                    - key
+                                                    - operator
+                                                    type: object
+                                                  type: array
+                                                matchLabels:
+                                                  additionalProperties:
+                                                    type: string
+                                                  description: matchLabels is a map of {key,value} pairs. A single {key,value} in the matchLabels map is equivalent to an element of matchExpressions, whose key field is "key", the operator is "In", and the values array contains only "value". The requirements are ANDed.
+                                                  type: object
+                                              type: object
+                                            name:
+                                              description: Select a single ClusterTrustBundle by object name.  Mutually-exclusive with signerName and labelSelector.
+                                              type: string
+                                            optional:
+                                              description: If true, don't block pod startup if the referenced ClusterTrustBundle(s) aren't available.  If using name, then the named ClusterTrustBundle is allowed not to exist.  If using signerName, then the combination of signerName and labelSelector is allowed to match zero ClusterTrustBundles.
+                                              type: boolean
+                                            path:
+                                              description: Relative path from the volume root to write the bundle.
+                                              type: string
+                                            signerName:
+                                              description: Select all ClusterTrustBundles that match this signer name. Mutually-exclusive with name.  The contents of all selected ClusterTrustBundles will be unified and deduplicated.
+                                              type: string
+                                          required:
+                                          - path
+                                          type: object
                                         configMap:
                                           description: configMap information about the configMap data to project
                                           properties:
@@ -1674,6 +1727,8 @@ spec:
                                             optional:
                                               description: optional specify whether the ConfigMap or its keys must be defined
                                               type: boolean
+                                          required:
+                                          - name
                                           type: object
                                         downwardAPI:
                                           description: downwardAPI information about the downwardAPI data to project
@@ -1751,6 +1806,8 @@ spec:
                                             optional:
                                               description: optional field specify whether the Secret or its key must be defined
                                               type: boolean
+                                          required:
+                                          - name
                                           type: object
                                         serviceAccountToken:
                                           description: serviceAccountToken is information about the serviceAccountToken data to project
@@ -1825,6 +1882,8 @@ spec:
                                       name:
                                         description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
                                         type: string
+                                    required:
+                                    - name
                                     type: object
                                   user:
                                     description: 'user is the rados user name. Default is admin. More info: https://examples.k8s.io/volumes/rbd/README.md#how-to-use-it'
@@ -1854,6 +1913,8 @@ spec:
                                       name:
                                         description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
                                         type: string
+                                    required:
+                                    - name
                                     type: object
                                   sslEnabled:
                                     description: sslEnabled Flag enable/disable SSL communication with Gateway, default false
@@ -1924,6 +1985,8 @@ spec:
                                       name:
                                         description: 'Name of the referent. More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#names'
                                         type: string
+                                    required:
+                                    - name
                                     type: object
                                   volumeName:
                                     description: volumeName is the human-readable name of the StorageOS volume.  Volume names are only unique within a namespace.
@@ -1964,12 +2027,13 @@ spec:
                 type: array
               backup:
                 default:
+                  azureCredentials: null
                   destinationPath: s3://
                   encryption: AES256
                   endpointURL: null
+                  googleCredentials: null
                   retentionPolicy: '30'
-                  s3Credentials:
-                    inheritFromIAMRole: true
+                  s3Credentials: null
                   schedule: 0 0 * * *
                   volumeSnapshot:
                     enabled: false
@@ -1978,6 +2042,71 @@ spec:
 
                   **Default**: disabled
                 properties:
+                  azureCredentials:
+                    description: The Azure credentials to use for backups
+                    nullable: true
+                    properties:
+                      connectionString:
+                        description: The connection string to be used
+                        nullable: true
+                        properties:
+                          key:
+                            description: The key to select
+                            type: string
+                          name:
+                            description: Name of the referent.
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                      inheritFromAzureAD:
+                        description: Use the Azure AD based authentication without providing explicitly the keys.
+                        nullable: true
+                        type: boolean
+                      storageAccount:
+                        description: The storage account where to upload data
+                        nullable: true
+                        properties:
+                          key:
+                            description: The key to select
+                            type: string
+                          name:
+                            description: Name of the referent.
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                      storageKey:
+                        description: The storage account key to be used in conjunction with the storage account name
+                        nullable: true
+                        properties:
+                          key:
+                            description: The key to select
+                            type: string
+                          name:
+                            description: Name of the referent.
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                      storageSasToken:
+                        description: A shared-access-signature to be used in conjunction with the storage account name
+                        nullable: true
+                        properties:
+                          key:
+                            description: The key to select
+                            type: string
+                          name:
+                            description: Name of the referent.
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                    type: object
                   destinationPath:
                     default: s3://
                     description: The S3 bucket path to store backups in
@@ -1992,14 +2121,33 @@ spec:
                     description: The S3 compatible endpoint URL
                     nullable: true
                     type: string
+                  googleCredentials:
+                    description: The Google Cloud credentials to use for backups
+                    nullable: true
+                    properties:
+                      applicationCredentials:
+                        description: The reference to the secret containing the Google Cloud Storage JSON file with the credentials
+                        nullable: true
+                        properties:
+                          key:
+                            type: string
+                          name:
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                      gkeEnvironment:
+                        description: Use the role based authentication without providing explicitly the keys.
+                        nullable: true
+                        type: boolean
+                    type: object
                   retentionPolicy:
                     default: '30'
                     description: The number of days to retain backups for
                     nullable: true
                     type: string
                   s3Credentials:
-                    default:
-                      inheritFromIAMRole: true
                     description: The S3 credentials to use for backups (if not using IAM Role)
                     nullable: true
                     properties:
@@ -2171,6 +2319,42 @@ spec:
                             type: object
                         type: object
                     type: object
+                type: object
+              dedicatedNetworking:
+                description: |-
+                  Configuration for dedicated networking.
+
+                  **Default**: disabled
+                nullable: true
+                properties:
+                  enabled:
+                    default: false
+                    description: |-
+                      Enable dedicated networking for the CoreDB instance.
+
+                      **Default**: false.
+                    type: boolean
+                  includeStandby:
+                    default: false
+                    description: |-
+                      Include a separate load balancer for the standby (replica) server.
+
+                      **Default**: false.
+                    type: boolean
+                  public:
+                    default: false
+                    description: |-
+                      Configure the load balancer to be public or private.
+
+                      **Default**: true.
+                    type: boolean
+                  serviceType:
+                    default: LoadBalancer
+                    description: |-
+                      The type of Kubernetes Service to create (LoadBalancer or ClusterIP).
+
+                      **Default**: LoadBalancer.
+                    type: string
                 type: object
               extensions:
                 default: []
@@ -2390,6 +2574,71 @@ spec:
                   **Default**: disabled
                 nullable: true
                 properties:
+                  azureCredentials:
+                    description: azureCredentials is the Azure credentials to use for restores.
+                    nullable: true
+                    properties:
+                      connectionString:
+                        description: The connection string to be used
+                        nullable: true
+                        properties:
+                          key:
+                            description: The key to select
+                            type: string
+                          name:
+                            description: Name of the referent.
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                      inheritFromAzureAD:
+                        description: Use the Azure AD based authentication without providing explicitly the keys.
+                        nullable: true
+                        type: boolean
+                      storageAccount:
+                        description: The storage account where to upload data
+                        nullable: true
+                        properties:
+                          key:
+                            description: The key to select
+                            type: string
+                          name:
+                            description: Name of the referent.
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                      storageKey:
+                        description: The storage account key to be used in conjunction with the storage account name
+                        nullable: true
+                        properties:
+                          key:
+                            description: The key to select
+                            type: string
+                          name:
+                            description: Name of the referent.
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                      storageSasToken:
+                        description: A shared-access-signature to be used in conjunction with the storage account name
+                        nullable: true
+                        properties:
+                          key:
+                            description: The key to select
+                            type: string
+                          name:
+                            description: Name of the referent.
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                    type: object
                   backupsPath:
                     description: |-
                       The object storage path and bucket name of the instance you wish to restore from.  This maps to the `Backup` `destinationPath` field for the original instance.
@@ -2401,12 +2650,33 @@ spec:
                     description: endpointURL is the S3 compatible endpoint URL
                     nullable: true
                     type: string
+                  googleCredentials:
+                    description: googleCredentials is the Google Cloud credentials to use for restores.
+                    nullable: true
+                    properties:
+                      applicationCredentials:
+                        description: The reference to the secret containing the Google Cloud Storage JSON file with the credentials
+                        nullable: true
+                        properties:
+                          key:
+                            type: string
+                          name:
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                      gkeEnvironment:
+                        description: Use the role based authentication without providing explicitly the keys.
+                        nullable: true
+                        type: boolean
+                    type: object
                   recoveryTargetTime:
                     description: recovery_target_time is the time base target for point-in-time recovery.
                     nullable: true
                     type: string
                   s3Credentials:
-                    description: s3Credentials is the S3 credentials to use for backups.
+                    description: s3Credentials is the S3 credentials to use for restores.
                     nullable: true
                     properties:
                       accessKeyId:

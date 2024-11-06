@@ -5,6 +5,7 @@ use crate::{
         kubernetes_queries::{add_trunk_install_to_status, remove_trunk_installs_from_status},
         types::{TrunkInstall, TrunkInstallStatus},
     },
+    trunk::get_latest_trunk_project_version,
     Context,
 };
 use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
@@ -129,26 +130,27 @@ pub fn find_trunk_installs_to_pod<'a>(cdb: &'a CoreDB, pod_name: &str) -> Vec<&'
         cdb.name_any()
     );
 
+    let pod_name = pod_name.to_owned();
     let mut trunk_installs_to_install = Vec::new();
 
     // Get extensions in spec.trunk_install that are not in status.trunk_install
-    for ext in cdb.spec.trunk_installs.iter() {
-        if !cdb
+    for ext in &cdb.spec.trunk_installs {
+        // All TrunkInstallStatus in CDB spec
+        let trunk_install_statuses = cdb
             .status
-            .clone()
-            .unwrap_or_default()
-            .trunk_installs
-            .unwrap_or_default()
-            .iter()
-            .any(|ext_status| {
-                ext.name == ext_status.name
-                    && ext_status
-                        .installed_to_pods
-                        .clone()
-                        .unwrap_or_default()
-                        .contains(&pod_name.to_string())
-            })
-        {
+            .as_ref()
+            .and_then(|status| status.trunk_installs.as_deref())
+            .unwrap_or_default();
+
+        if !trunk_install_statuses.iter().any(|ext_status| {
+            ext.name == ext_status.name
+                && !ext_status.error
+                && ext_status
+                    .installed_to_pods
+                    .as_deref()
+                    .unwrap_or_default()
+                    .contains(&pod_name)
+        }) {
             trunk_installs_to_install.push(ext);
         }
     }
@@ -300,18 +302,29 @@ async fn execute_extension_install_command(
     // Handle the case where version is None
     let version = match &ext.version {
         None => {
-            error!(
-                "Installing extension {} into {}: missing version",
+            warn!(
+                "Version for extension {} not specified in {}, will fetch latest version",
                 ext.name, coredb_name
             );
-            return Ok(TrunkInstallStatus {
-                name: ext.name.clone(),
-                version: None,
-                error: true,
-                loading: false,
-                error_message: Some("Missing version".to_string()),
-                installed_to_pods: Some(vec![pod_name.to_string()]),
-            });
+
+            match get_latest_trunk_project_version(&ext.name).await {
+                Ok(latest_version) => latest_version,
+                Err(_) => {
+                    error!(
+                        "Failed to get latest version for extension {} in {}",
+                        ext.name, coredb_name
+                    );
+
+                    return Ok(TrunkInstallStatus {
+                        name: ext.name.clone(),
+                        version: None,
+                        error: true,
+                        loading: false,
+                        error_message: Some("Missing version".to_string()),
+                        installed_to_pods: Some(vec![pod_name.to_string()]),
+                    });
+                }
+            }
         }
         Some(version) => version.clone(),
     };

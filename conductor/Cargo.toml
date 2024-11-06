@@ -14,33 +14,42 @@ chrono = { version = "0.4", features = ["serde"] }
 controller = { path = "../tembo-operator", package = "controller" }
 env_logger = "0.11"
 futures = "0.3"
-k8s-openapi = { version = "0.22.0", features = ["v1_28", "schemars"] }
+k8s-openapi = { version = "0.23.0", features = ["v1_29", "latest"] }
 log = "0.4"
-pgmq = "0.16.1"
+pgmq = "0.28.2"
 schemars = "0.8"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 thiserror = "1.0"
-tokio = { version = "1.28.0", features = ["full"] }
+tokio = { version = "1.41", features = ["full"] }
 actix-web = "4.3.0"
-actix-web-opentelemetry = { version = "0.18.0", features = [
+actix-web-opentelemetry = { version = "0.19.0", features = [
   "metrics-prometheus",
 ] }
-opentelemetry = { version = "0.20", features = ["metrics"] }
-opentelemetry_sdk = { version = "0.20", features = [
+opentelemetry = { version = "0.26", features = ["metrics"] }
+opentelemetry_sdk = { version = "0.26", features = [
   "metrics",
   "rt-tokio-current-thread",
 ] }
-opentelemetry-prometheus = "0.13" #otel-prometheus needs to support the same version as otel and otel_sdk
+opentelemetry-prometheus = "0.17" #otel-prometheus needs to support the same version as otel and otel_sdk
 prometheus = "0.13"
-sqlx = "0.6.3"
+sqlx = { version = "0.7", features = ["runtime-tokio-native-tls", "postgres"] }
 anyhow = "1.0"
 serde_yaml = "0.9.34"
 reqwest = { version = "0.12", features = ["json"] }
+google-cloud-storage = "0.22.1"
+azure_identity = "0.21.0"
+azure_mgmt_msi = "0.21.0"
+azure_mgmt_authorization = "0.21.0"
+azure_mgmt_storage = "0.21.0"
+azure_core = "0.21.0"
+uuid = "1.10.0"
+url = "=2.5.2" #https://github.com/servo/rust-url/issues/992
+idna = "=0.5.0" #https://github.com/servo/rust-url/issues/992
 
 [dependencies.kube]
 features = ["runtime", "client", "derive"]
-version = "0.91.0"
+version = "0.96.0"
 
 
 [dev-dependencies]

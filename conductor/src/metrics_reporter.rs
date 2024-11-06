@@ -1,10 +1,11 @@
-use std::{env, time::Duration};
-
 use anyhow::{bail, Context, Result};
+use conductor::metrics::dataplane_metrics::split_data_plane_metrics;
 use conductor::metrics::{dataplane_metrics::DataPlaneMetrics, prometheus::Metrics};
-use log::info;
+use log::{error, info};
 use pgmq::PGMQueueExt;
 use serde::Deserialize;
+use std::time::Instant;
+use std::{env, time::Duration};
 use tokio::time::interval;
 
 const METRICS_FILE: &str = include_str!("../metrics.yml");
@@ -14,6 +15,7 @@ use crate::from_env_default;
 #[derive(Debug, Deserialize)]
 pub struct MetricQuery {
     name: String,
+    server: ServerType,
     query: String,
 }
 
@@ -27,7 +29,7 @@ fn load_metric_queries() -> Result<MetricQueries> {
 }
 
 pub async fn run_metrics_reporter() -> Result<()> {
-    let client = Client::new();
+    let client = Client::new().await;
 
     let MetricQueries { metrics } = load_metric_queries()?;
     info!("metrics_reporter: loaded {} metrics", metrics.len());
@@ -40,66 +42,142 @@ pub async fn run_metrics_reporter() -> Result<()> {
         env::var("METRICS_EVENTS_QUEUE").expect("METRICS_EVENTS_QUEUE must be set");
 
     queue.init().await?;
-    queue.create(&metrics_events_queue).await?;
+    queue.create_partitioned(&metrics_events_queue).await?;
 
-    let mut sync_interval = interval(Duration::from_secs(60));
+    let polling_interval_seconds = 60;
+    let number_of_metrics = metrics.len();
+    let timeout_ms = (polling_interval_seconds * 1000) / number_of_metrics as u64;
+    if timeout_ms < 1000 {
+        panic!("Configuration error: too many metrics, currently up to 60 metrics are supported.");
+    }
+
+    let mut sync_interval = interval(Duration::from_secs(polling_interval_seconds));
 
     loop {
         sync_interval.tick().await;
 
+        let now = Instant::now();
         for metric in &metrics {
-            let metrics = client.query(&metric.query).await?;
+            info!("Querying '{}' from {}", metric.name, metric.server);
 
-            info!("Successfully queried '{}' from Prometheus", metric.name);
+            let metrics = match client
+                .query(&metric.query, &metric.server, timeout_ms)
+                .await
+            {
+                Ok(metrics) => metrics,
+                Err(e) => {
+                    error!(
+                        "Failed to query `{}` from {}. Skipping! {}",
+                        metric.name, metric.server, e
+                    );
+                    continue;
+                }
+            };
 
-            let data_plane_metrics =
-                DataPlaneMetrics::from_query_result(&metric.name, metrics.data.result);
+            let num_metrics = metrics.data.result.len();
+            info!(
+                "Successfully queried `{}`, num_metrics: `{}` from {}",
+                metric.name, num_metrics, metric.server
+            );
 
-            // Send to PGMQ
-            queue
-                .send(&metrics_events_queue, &data_plane_metrics)
-                .await?;
+            let data_plane_metrics = DataPlaneMetrics {
+                name: metric.name.clone(),
+                result: metrics.data.result,
+            };
 
-            info!("Saved metric to PGMQ");
+            let batch_size = 1000;
+            let metrics_to_send = split_data_plane_metrics(data_plane_metrics, batch_size);
+            let batches = metrics_to_send.len();
+
+            info!(
+                "Split metrics into {} chunks, each with {} results",
+                batches, batch_size
+            );
+
+            let mut i = 1;
+            for data_plane_metrics in &metrics_to_send {
+                queue
+                    .send(&metrics_events_queue, data_plane_metrics)
+                    .await?;
+                info!("Enqueued batch {}/{} to PGMQ", i, batches);
+                i += 1;
+            }
+            info!("Processed metric in {:?}", now.elapsed());
         }
     }
 }
 
 struct Client {
-    query_url: String,
+    prometheus_url: String,
+    loki_url: String,
     client: reqwest::Client,
 }
 
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "lowercase")]
+enum ServerType {
+    Prometheus,
+    Loki,
+}
+
+impl std::fmt::Display for ServerType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ServerType::Prometheus => write!(f, "Prometheus"),
+            ServerType::Loki => write!(f, "Loki"),
+        }
+    }
+}
+
 impl Client {
-    pub fn new() -> Self {
+    pub async fn new() -> Self {
         let prometheus_url = from_env_default(
             "PROMETHEUS_URL",
-            "http://monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090",
+            "http://monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090/api/v1/query",
         );
-        let query_url = format!("{prometheus_url}/api/v1/query");
+        let loki_url = from_env_default(
+            "LOKI_URL",
+            "http://loki-gateway.monitoring.svc.cluster.local/loki/api/v1/query",
+        );
 
-        info!("metrics_reporter will use '{query_url}'");
+        info!("metrics_reporter will use '{prometheus_url}' for Prometheus");
+        info!("metrics_reporter will use '{loki_url}' for Loki");
 
         Self {
-            query_url,
+            prometheus_url,
+            loki_url,
             client: reqwest::Client::new(),
         }
     }
 
-    pub async fn query(&self, query: &str) -> Result<Metrics> {
-        let response = self
+    pub async fn query(
+        &self,
+        query: &str,
+        server_type: &ServerType,
+        timeout_ms: u64,
+    ) -> Result<Metrics> {
+        let query_url = match server_type {
+            ServerType::Prometheus => &self.prometheus_url,
+            ServerType::Loki => &self.loki_url,
+        };
+
+        let mut request = self
             .client
-            .get(&self.query_url)
+            .get(query_url)
             .query(&[("query", query)])
-            .send()
-            .await?;
+            .timeout(Duration::from_millis(timeout_ms));
+
+        if matches!(server_type, ServerType::Loki) {
+            request = request.header("X-Scope-OrgID", "internal");
+        }
+
+        let response = request.send().await?;
 
         if response.status().is_success() {
             response.json().await.map_err(Into::into)
         } else {
             let error_msg = response.text().await?;
-
-            bail!("Failed to query Prometheus: {error_msg}")
+            bail!("Failed to query {}: {error_msg}", server_type)
         }
     }
 }

@@ -1,12 +1,16 @@
 DATABASE_URL:=postgresql://postgres:postgres@localhost:5432/postgres
-LLM_SERVICE_HOST_PORT=http://localhost:8000
+MODEL_SERVICE_PORT_MAP=facebook/opt-125m=http://localhost:8000
 RUST_LOG=debug
 SQLX_OFFLINE:=true
+ORG_AUTH_ENABLED:=false
 
 fmt:
 	cargo sqlx prepare --database-url ${DATABASE_URL}
 	cargo fmt --all
 	cargo clippy
+
+prepare:
+	cargo sqlx prepare
 
 check:
 	cargo fmt --all --check
@@ -14,7 +18,7 @@ check:
 	cargo sqlx prepare --check
 
 run:
-	LLM_SERVICE_HOST_PORT=${LLM_SERVICE_HOST_PORT} RUST_LOG=${RUST_LOG} cargo run
+	MODEL_SERVICE_PORT_MAP=${MODEL_SERVICE_PORT_MAP} RUST_LOG=${RUST_LOG} ORG_AUTH_ENABLED=${ORG_AUTH_ENABLED} cargo run
 
 run-migrations:
 	sqlx migrate run --database-url ${DATABASE_URL}
@@ -26,9 +30,9 @@ run-mock-server:
 	docker compose up -d mock-server
 
 unit-test:
-	cargo test
+	cargo test -- --test-threads=1
 
 integration-test: run-mock-server
-	RUST_LOG=${RUST_LOG} LLM_SERVICE_HOST_PORT=${LLM_SERVICE_HOST_PORT} cargo test -- --ignored
+	RUST_LOG=${RUST_LOG} MODEL_SERVICE_PORT_MAP=${MODEL_SERVICE_PORT_MAP} cargo test ${TEST_NAME} -- --ignored --nocapture --test-threads=1
 
 test-all: unit-test integration-test

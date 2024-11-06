@@ -32,7 +32,7 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
     cmd.assert().success();
 
     let charset = "abcdefghijklmnopqrstuvwxyz";
-    let instance_name = format!("e2e-{}", generate(10, charset));
+    let instance_name = format!("e2e-cli-{}", generate(10, charset));
 
     setup_env(&instance_name)?;
 
@@ -47,10 +47,20 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
     // tembo apply
     let mut cmd = Command::cargo_bin(CARGO_BIN).unwrap();
     cmd.arg("apply");
-    cmd.assert().success();
+
+    let output = cmd.output()?;
+    assert!(output.status.success(), "`tembo apply` did not succeed");
+
+    if output
+        .stdout
+        .windows(b"Error creating instance".len())
+        .any(|window| window == b"Error creating instance")
+    {
+        println!("Output: {}", String::from_utf8_lossy(&output.stdout));
+        panic!("Error: Instance creation failed");
+    }
 
     let env = get_current_context()?;
-    println!("{:?}", env);
     let profile = env.clone().selected_profile.unwrap();
     let config = Configuration {
         base_path: profile.get_tembo_host(),
@@ -125,6 +135,12 @@ fn setup_env(instance_name: &String) -> Result<(), Box<dyn Error>> {
         "tembo.toml".to_string(),
         "instance_name = \"minimal\"",
         &format!("instance_name = \"{instance_name}\""),
+    )?;
+
+    replace_vars_in_file(
+        "tembo.toml".to_string(),
+        "[minimal]",
+        &format!("[{instance_name}]"),
     )?;
 
     Ok(())

@@ -1,4 +1,4 @@
-FROM quay.io/tembo/rust:1.76-slim-bookworm as builder
+FROM quay.io/tembo/rust:1.79-slim as builder
 
 RUN apt-get update && \
     apt-get install -y pkg-config libssl-dev && apt-get clean && \
@@ -10,6 +10,7 @@ WORKDIR /build
 ENV SQLX_OFFLINE=true
 
 COPY sqlx-data.json .
+COPY .sqlx/ .sqlx/
 COPY Cargo.toml .
 COPY Cargo.lock .
 COPY ./src ./src

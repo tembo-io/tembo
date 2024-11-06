@@ -1,7 +1,7 @@
 use crate::apis::coredb_types::CoreDB;
 use crate::{
     apis::coredb_types::{
-        Backup, ConnectionPooler, PgBouncer, S3Credentials, ServiceAccountTemplate, VolumeSnapshot,
+        Backup, ConnectionPooler, PgBouncer, ServiceAccountTemplate, VolumeSnapshot,
     },
     cloudnativepg::clusters::ClusterAffinity,
     cloudnativepg::poolers::{PoolerPgbouncerPoolMode, PoolerTemplateSpecContainersResources},
@@ -19,11 +19,11 @@ use utoipa::ToSchema;
 #[derive(Clone, Debug, Default, Serialize, Deserialize, JsonSchema, PartialEq, ToSchema)]
 pub struct ImagePerPgVersion {
     #[serde(rename = "14")]
-    pub pg14: String,
+    pub pg14: Option<String>,
     #[serde(rename = "15")]
-    pub pg15: String,
+    pub pg15: Option<String>,
     #[serde(rename = "16")]
-    pub pg16: String,
+    pub pg16: Option<String>,
 }
 
 pub fn default_replicas() -> i32 {
@@ -46,6 +46,10 @@ pub fn default_resources() -> ResourceRequirements {
     }
 }
 
+pub fn default_service_type() -> String {
+    "LoadBalancer".to_string()
+}
+
 pub fn default_postgres_exporter_enabled() -> bool {
     false
 }
@@ -64,16 +68,16 @@ pub fn default_repository() -> String {
 
 pub fn default_images() -> ImagePerPgVersion {
     ImagePerPgVersion {
-        pg14: "standard-cnpg:14-a0a5ab5".to_string(),
-        pg15: "standard-cnpg:15-a0a5ab5".to_string(),
-        pg16: "standard-cnpg:16-a0a5ab5".to_string(),
+        pg14: Some("standard-cnpg:14-a0a5ab5".to_string()),
+        pg15: Some("standard-cnpg:15-a0a5ab5".to_string()),
+        pg16: Some("standard-cnpg:16-a0a5ab5".to_string()),
     }
 }
 
 pub fn default_image_uri() -> String {
     let repo = default_repository();
     let image = default_images();
-    let image_for_pg_15 = image.pg15;
+    let image_for_pg_15 = image.pg15.expect("Expected default image to support Pg 15");
     format!("{}/{}", repo, image_for_pg_15)
 }
 
@@ -159,7 +163,6 @@ pub fn default_backup() -> Backup {
         encryption: default_encryption(),
         retentionPolicy: default_retention_policy(),
         schedule: default_backup_schedule(),
-        s3_credentials: default_s3_credentials(),
         volume_snapshot: default_volume_snapshot(),
         ..Default::default()
     }
@@ -224,13 +227,6 @@ pub fn default_pgbouncer() -> PgBouncer {
         parameters: Some(default_pooler_parameters()),
         resources: Some(default_pooler_resources()),
     }
-}
-
-pub fn default_s3_credentials() -> Option<S3Credentials> {
-    Some(S3Credentials {
-        inherit_from_iam_role: Some(true),
-        ..Default::default()
-    })
 }
 
 pub fn default_volume_snapshot() -> Option<VolumeSnapshot> {

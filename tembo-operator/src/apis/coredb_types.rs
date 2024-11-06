@@ -160,6 +160,114 @@ pub struct S3CredentialsSessionToken {
     pub name: String,
 }
 
+/// GoogleCredentials is the type for the credentials to be used to upload files to Google Cloud Storage.
+/// It can be provided in two alternative ways:
+/// * The secret containing the Google Cloud Storage JSON file with the credentials (applicationCredentials)
+/// * inheriting the role from the pod (GKE) environment by setting gkeEnvironment to true
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+pub struct GoogleCredentials {
+    /// The reference to the secret containing the Google Cloud Storage JSON file with the credentials
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "applicationCredentials"
+    )]
+    pub application_credentials: Option<GoogleCredentialsApplicationCredentials>,
+
+    /// Use the role based authentication without providing explicitly the keys.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "gkeEnvironment"
+    )]
+    pub gke_environment: Option<bool>,
+}
+
+/// GoogleCredentialsApplicationCredentials is the type for the reference to the secret containing the Google Cloud Storage JSON file with the credentials
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+pub struct GoogleCredentialsApplicationCredentials {
+    pub key: String,
+    pub name: String,
+}
+
+/// AzureCredentials is the type for the credentials to be used to upload files to Azure Blob Storage.
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+pub struct AzureCredentials {
+    /// The connection string to be used
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "connectionString"
+    )]
+    pub connection_string: Option<AzureCredentialsConnectionString>,
+    /// Use the Azure AD based authentication without providing explicitly the keys.
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "inheritFromAzureAD"
+    )]
+    pub inherit_from_azure_ad: Option<bool>,
+    /// The storage account where to upload data
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "storageAccount"
+    )]
+    pub storage_account: Option<AzureCredentialsStorageAccount>,
+    /// The storage account key to be used in conjunction with the storage account name
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "storageKey"
+    )]
+    pub storage_key: Option<AzureCredentialsStorageKey>,
+    /// A shared-access-signature to be used in conjunction with the storage account name
+    #[serde(
+        default,
+        skip_serializing_if = "Option::is_none",
+        rename = "storageSasToken"
+    )]
+    pub storage_sas_token: Option<AzureCredentialsStorageSasToken>,
+}
+
+/// The connection string to be used for Azure Blob Storage backups
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+pub struct AzureCredentialsConnectionString {
+    /// The key to select
+    pub key: String,
+    /// Name of the referent.
+    pub name: String,
+}
+
+/// The storage account for Azure Blob Storage backups
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+pub struct AzureCredentialsStorageAccount {
+    /// The key to select
+    pub key: String,
+    /// Name of the referent.
+    pub name: String,
+}
+
+/// The storage account key to be used in conjunction with the storage account name for Azure Blob
+/// Storage backups
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+pub struct AzureCredentialsStorageKey {
+    /// The key to select
+    pub key: String,
+    /// Name of the referent.
+    pub name: String,
+}
+
+/// A shared-access-signature to be used in conjunction with the storage account name for Azure Blob
+/// Storage backups
+#[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
+pub struct AzureCredentialsStorageSasToken {
+    /// The key to select
+    pub key: String,
+    /// Name of the referent.
+    pub name: String,
+}
+
 /// VolumeSnapshots is the type for the configuration of the volume snapshots
 /// to be used for backups instead of object storage
 #[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema, PartialEq)]
@@ -227,8 +335,16 @@ pub struct Backup {
     pub endpoint_url: Option<String>,
 
     /// The S3 credentials to use for backups (if not using IAM Role)
-    #[serde(default = "defaults::default_s3_credentials", rename = "s3Credentials")]
+    #[serde(rename = "s3Credentials")]
     pub s3_credentials: Option<S3Credentials>,
+
+    /// The Google Cloud credentials to use for backups
+    #[serde(rename = "googleCredentials")]
+    pub google_credentials: Option<GoogleCredentials>,
+
+    /// The Azure credentials to use for backups
+    #[serde(rename = "azureCredentials")]
+    pub azure_credentials: Option<AzureCredentials>,
 
     /// Enable using Volume Snapshots for backups instead of Object Storage
     #[serde(
@@ -286,9 +402,17 @@ pub struct Restore {
     #[serde(default, rename = "endpointURL")]
     pub endpoint_url: Option<String>,
 
-    /// s3Credentials is the S3 credentials to use for backups.
+    /// s3Credentials is the S3 credentials to use for restores.
     #[serde(rename = "s3Credentials")]
     pub s3_credentials: Option<S3Credentials>,
+
+    /// googleCredentials is the Google Cloud credentials to use for restores.
+    #[serde(rename = "googleCredentials")]
+    pub google_credentials: Option<GoogleCredentials>,
+
+    /// azureCredentials is the Azure credentials to use for restores.
+    #[serde(rename = "azureCredentials")]
+    pub azure_credentials: Option<AzureCredentials>,
 
     /// volumeSnapshot is a boolean to enable restoring from a Volume Snapshot
     #[serde(rename = "volumeSnapshot")]
@@ -365,6 +489,40 @@ pub struct PgBouncer {
     pub resources: Option<PoolerTemplateSpecContainersResources>,
 }
 
+#[derive(Deserialize, Serialize, Clone, Debug, JsonSchema, Default)]
+#[allow(non_snake_case)]
+pub struct DedicatedNetworking {
+    /// Enable dedicated networking for the CoreDB instance.
+    ///
+    /// **Default**: false.
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// Include a separate load balancer for the standby (replica) server.
+    ///
+    /// **Default**: false.
+    #[serde(default, rename = "includeStandby")]
+    pub include_standby: bool,
+
+    /// Configure the load balancer to be public or private.
+    ///
+    /// **Default**: true.
+    #[serde(default)]
+    pub public: bool,
+
+    /// The type of Kubernetes Service to create (LoadBalancer or ClusterIP).
+    ///
+    /// **Default**: LoadBalancer.
+    #[serde(default = "defaults::default_service_type")]
+    pub serviceType: String,
+}
+
+impl DedicatedNetworking {
+    pub fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+}
+
 /// Generate the Kubernetes wrapper struct `CoreDB` from our Spec and Status struct
 ///
 /// This provides a hook for generating the CRD yaml (in crdgen.rs)
@@ -439,6 +597,12 @@ pub struct CoreDBSpec {
     /// This is no longer used and will be removed in a future release.
     #[serde(default = "defaults::default_postgres_exporter_image")]
     pub postgresExporterImage: String,
+
+    /// Configuration for dedicated networking.
+    ///
+    /// **Default**: disabled
+    #[serde(default, rename = "dedicatedNetworking")]
+    pub dedicated_networking: Option<DedicatedNetworking>,
 
     /// The port to expose the Postgres service on.
     ///

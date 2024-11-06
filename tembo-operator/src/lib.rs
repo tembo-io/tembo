@@ -5,6 +5,7 @@ pub mod apis;
 
 pub mod app_service;
 pub mod configmap;
+pub mod dedicated_networking;
 pub mod extensions;
 pub mod postgres_exporter;
 /// Log and trace integrations

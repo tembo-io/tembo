@@ -27,7 +27,7 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "conductor.fullname" . }}
+      serviceAccountName: {{ include "conductor.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -45,11 +45,15 @@ spec:
             value: "false"
           - name: METRICS_REPORTER_ENABLED
             value: "true"
-          - name: METRICS_EVENTS_QUEUE
-            value: metrics_events
           - name: RUST_LOG
             value: {{ .Values.logLevel }}
           {{- if .Values.env }}{{ .Values.env | default list | toYaml | nindent 10 }}{{- end }}
+          {{- with (index .Values ).extraEnv }}
+          {{- range . }}
+          - name: {{ .name }}
+            value: {{ tpl (.value | quote) $ }}
+          {{- end }}
+          {{- end }}
           securityContext:
             {{- toYaml .Values.securityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"

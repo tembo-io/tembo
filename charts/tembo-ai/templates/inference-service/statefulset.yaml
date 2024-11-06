@@ -1,112 +1,126 @@
+{{- if .Values.inferenceService.services }}
+  {{- $defaults := .Values.inferenceService.defaults }}
+  {{- range $serviceName, $serviceConfig := .Values.inferenceService.services }}
+    {{- $mergedConfig := fromYaml (include "tembo-ai.inferenceService.deepMerge" (list $defaults $serviceConfig)) }}
+    {{- if (default false $mergedConfig.enabled) }}
+---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: {{ include "tembo-ai.fullname" . }}-inference-service
+  name: {{ include "tembo-ai.fullname" $ }}-{{ $serviceName }}
+  namespace: {{ include "tembo-ai.namespace" $ }}
   labels:
-    {{- include "tembo-ai.inferenceService.labels" . | nindent 4 }}
+    {{- include "tembo-ai.inferenceService.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $serviceName }}
 spec:
-  replicas: {{ .Values.inferenceService.replicaCount }}
+  replicas: {{ $mergedConfig.replicaCount }}
   selector:
     matchLabels:
-      {{- include "tembo-ai.inferenceService.selectorLabels" . | nindent 6 }}
-  serviceName: {{ include "tembo-ai.fullname" . }}-inference-service
+      {{- include "tembo-ai.inferenceService.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/component: {{ $serviceName }}
+  serviceName: {{ include "tembo-ai.fullname" $ }}-{{ $serviceName }}-inference-service
   template:
     metadata:
-      {{- with .Values.inferenceService.podAnnotations }}
+      {{- with $mergedConfig.podAnnotations }}
       annotations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        {{- include "tembo-ai.inferenceService.selectorLabels" . | nindent 8 }}
+        {{- include "tembo-ai.inferenceService.selectorLabels" $ | nindent 8 }}
+        app.kubernetes.io/component: {{ $serviceName }}
     spec:
-      {{- with .Values.inferenceService.imagePullSecrets }}
+      {{- with $mergedConfig.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "tembo-ai.inferenceService.serviceAccountName" . }}
+      serviceAccountName: {{ include "tembo-ai.inferenceService.serviceAccountName" $ }}-{{ $serviceName }}
       securityContext:
-        {{- toYaml .Values.inferenceService.podSecurityContext | nindent 8 }}
+        {{- toYaml $mergedConfig.podSecurityContext | nindent 8 }}
       containers:
         - name: inference-service
           securityContext:
-            {{- toYaml .Values.inferenceService.securityContext | nindent 12 }}
-          image: "{{ .Values.inferenceService.image.repository }}:{{ .Values.inferenceService.image.tag | default .Chart.AppVersion }}"
-          imagePullPolicy: {{ .Values.inferenceService.image.pullPolicy }}
+            {{- toYaml $mergedConfig.securityContext | nindent 12 }}
+          image: "{{ $mergedConfig.image.repository }}:{{ $mergedConfig.image.tag }}"
+          imagePullPolicy: {{ $mergedConfig.image.pullPolicy }}
           ports:
             - name: http
-              containerPort: {{ .Values.inferenceService.service.port }}
+              containerPort: {{ $mergedConfig.service.port }}
               protocol: TCP
-          {{- if and .Values.inferenceService.podMonitor.enabled (ne .Values.inferenceService.podMonitor.port "http") }}
-            - name: {{ .Values.inferenceService.podMonitor.portName }}
-              containerPort: {{ .Values.inferenceService.podMonitor.containerPort }}
+          {{- if and $mergedConfig.podMonitor.enabled (ne $mergedConfig.podMonitor.portName "http") }}
+            - name: {{ $mergedConfig.podMonitor.portName }}
+              containerPort: {{ $mergedConfig.podMonitor.containerPort }}
               protocol: TCP
           {{- end }}
-          {{- if .Values.inferenceService.livenessProbe.enabled }}
+          {{- if $mergedConfig.livenessProbe.enabled }}
           livenessProbe:
             httpGet:
-              path: {{ .Values.inferenceService.livenessProbe.path }}
-              port: {{ .Values.inferenceService.livenessProbe.port }}
+              path: {{ $mergedConfig.livenessProbe.path }}
+              port: {{ $mergedConfig.livenessProbe.port }}
           {{- end }}
-          {{- if .Values.inferenceService.readinessProbe.enabled }}
+          {{- if $mergedConfig.readinessProbe.enabled }}
           readinessProbe:
             httpGet:
-              path: {{ .Values.inferenceService.readinessProbe.path }}
-              port: {{ .Values.inferenceService.readinessProbe.port }}
+              path: {{ $mergedConfig.readinessProbe.path }}
+              port: {{ $mergedConfig.readinessProbe.port }}
           {{- end }}
-          {{- if .Values.inferenceService.startupProbe.enabled }}
+          {{- if $mergedConfig.startupProbe.enabled }}
           startupProbe:
             httpGet:
-              path: {{ .Values.inferenceService.startupProbe.path }}
-              port: {{ .Values.inferenceService.startupProbe.port }}
-            failureThreshold: {{ .Values.inferenceService.startupProbe.failureThreshold }}
-            periodSeconds: {{ .Values.inferenceService.startupProbe.periodSeconds }}
+              path: {{ $mergedConfig.startupProbe.path }}
+              port: {{ $mergedConfig.startupProbe.port }}
+            failureThreshold: {{ $mergedConfig.startupProbe.failureThreshold }}
+            periodSeconds: {{ $mergedConfig.startupProbe.periodSeconds }}
           {{- end }}
           resources:
-            {{- toYaml .Values.inferenceService.resources | nindent 12 }}
-          {{- with .Values.inferenceService.args }}
+            {{- toYaml $mergedConfig.resources | nindent 12 }}
+          {{- with $mergedConfig.args }}
           args:
-            {{- toYaml . | nindent 10 }}
+            {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- with .Values.inferenceService.command }}
+          {{- with $mergedConfig.command }}
           command:
-            {{- toYaml . | nindent 10 }}
+            {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- with .Values.inferenceService.env }}
+          {{- with $mergedConfig.env }}
           env:
-            {{- toYaml . | nindent 10 }}
+            {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- if .Values.inferenceService.persistence.enabled }}
+          {{- if $mergedConfig.persistence.enabled }}
           volumeMounts:
             - name: models
-              mountPath: {{ .Values.inferenceService.persistence.mountPath }}
+              mountPath: {{ $mergedConfig.persistence.mountPath }}
           {{- end }}
-      {{- with .Values.inferenceService.nodeSelector }}
+      {{- with $mergedConfig.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.inferenceService.affinity }}
+      {{- with $mergedConfig.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      {{- with .Values.inferenceService.tolerations }}
+      {{- with $mergedConfig.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+  {{- if $mergedConfig.persistence.enabled }}
   volumeClaimTemplates:
-    {{- if .Values.inferenceService.persistence.enabled }}
     - apiVersion: v1
       kind: PersistentVolumeClaim
       metadata:
         name: models
         labels:
-          {{- include "tembo-ai.inferenceService.labels" . | nindent 8 }}
+          {{- include "tembo-ai.inferenceService.labels" $ | nindent 10 }}
+          app.kubernetes.io/component: {{ $serviceName }}
       spec:
         accessModes:
-          - {{ .Values.inferenceService.persistence.accessMode }}
+          - {{ $mergedConfig.persistence.accessMode }}
         resources:
           requests:
-            storage: {{ .Values.inferenceService.persistence.size }}
-        {{- if .Values.inferenceService.persistence.storageClass }}
-        storageClassName: {{ .Values.inferenceService.persistence.storageClass }}
+            storage: {{ $mergedConfig.persistence.size }}
+        {{- if $mergedConfig.persistence.storageClass }}
+        storageClassName: {{ $mergedConfig.persistence.storageClass }}
         {{- end }}
+  {{- end }}
     {{- end }}
+  {{- end }}
+{{- end }}

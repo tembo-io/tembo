@@ -7,5 +7,6 @@ pub mod cnpg_utils;
 pub mod hibernate;
 pub(crate) mod placement;
 pub mod poolers;
+pub mod retention;
 mod scheduledbackups;
 pub const VOLUME_SNAPSHOT_CLASS_NAME: &str = "cnpg-snapshot-class";

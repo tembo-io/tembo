@@ -1,12 +1,16 @@
 pub use crate::{
     apis::coredb_types::CoreDB,
+    cloudnativepg::backups::Backup,
     cloudnativepg::clusters::{Cluster, ClusterStatusConditionsStatus},
+    cloudnativepg::poolers::Pooler,
+    cloudnativepg::scheduledbackups::ScheduledBackup,
     controller,
     extensions::database_queries::is_not_restarting,
     patch_cdb_status_merge, requeue_normal_with_jitter, Context, RESTARTED_AT,
 };
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::Time;
 use kube::{
-    api::{Patch, PatchParams},
+    api::{DeleteParams, ListParams, Patch, PatchParams},
     runtime::controller::Action,
     Api, ResourceExt,
 };
@@ -123,7 +127,7 @@ pub(crate) async fn update_coredb_status(
     .await
 }
 
-// patch_cluster_merge takes a CoreDB, Cluster and serde_json::Value and patch merges the Cluster with the new spec
+// patch_cluster_merge takes a CoreDB, context and serde_json::Value and patch merges the Cluster with the new spec
 #[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any(), patch = %patch))]
 pub async fn patch_cluster_merge(
     cdb: &CoreDB,
@@ -147,6 +151,65 @@ pub async fn patch_cluster_merge(
         });
 
     Ok(())
+}
+
+// patch_scheduled_backup_merge takes a CoreDB, context and serde_json::Value and patch merges the ScheduledBackup with the new spec
+#[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any(), patch = %patch))]
+pub async fn patch_scheduled_backup_merge(
+    cdb: &CoreDB,
+    ctx: &Arc<Context>,
+    backup_name: &str,
+    patch: serde_json::Value,
+) -> Result<(), Action> {
+    let name = cdb.name_any();
+    let namespace = cdb.metadata.namespace.as_ref().ok_or_else(|| {
+        error!("Namespace is empty for instance: {}.", name);
+        Action::requeue(Duration::from_secs(300))
+    })?;
+
+    let scheduled_backup_api: Api<ScheduledBackup> = Api::namespaced(ctx.client.clone(), namespace);
+    let pp = PatchParams::apply("patch_merge");
+    let _ = scheduled_backup_api
+        .patch(backup_name, &pp, &Patch::Merge(&patch))
+        .await
+        .map_err(|e| {
+            error!("Error patching cluster: {}", e);
+            Action::requeue(Duration::from_secs(300))
+        });
+
+    Ok(())
+}
+
+// patch_pooler_merge takes a CoreDB, context and serde_json::Value and patch merges the Pooler with the new spec
+#[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any(), patch = %patch))]
+pub async fn patch_pooler_merge(
+    cdb: &CoreDB,
+    ctx: &Arc<Context>,
+    patch: serde_json::Value,
+) -> Result<(), Action> {
+    let name = cdb.name_any() + "-pooler";
+    let namespace = cdb.metadata.namespace.as_ref().ok_or_else(|| {
+        error!("Namespace is empty for instance: {}.", name);
+        Action::requeue(Duration::from_secs(300))
+    })?;
+
+    let pooler_api: Api<Pooler> = Api::namespaced(ctx.client.clone(), namespace);
+    let pp = PatchParams::apply("patch_merge");
+    let _ = pooler_api
+        .patch(&name, &pp, &Patch::Merge(&patch))
+        .await
+        .map_err(|e| {
+            error!("Error patching cluster: {}", e);
+            Action::requeue(Duration::from_secs(300))
+        });
+
+    Ok(())
+}
+
+// get_pooler_instances takes a CoreDB and returns an Option<i32> based if the CoreDB is hibernated
+#[instrument(skip(cdb), fields(trace_id, instance_name = %cdb.name_any()))]
+pub fn get_pooler_instances(cdb: &CoreDB) -> Option<i32> {
+    Some(if cdb.spec.stop { 0 } else { 1 })
 }
 
 // cdb: the CoreDB object
@@ -187,7 +250,7 @@ pub(crate) fn update_restarted_at(
     restart_annotation_updated
 }
 
-// patch_cluster is a async function that takes a CNPG cluster and patch applys it with the new spec
+// patch_cluster is a async function that takes a CNPG cluster and patch applies it with the new spec
 #[instrument(skip(cdb, ctx, cluster) fields(trace_id, instance_name = %cdb.name_any()))]
 pub(crate) async fn patch_cluster(
     cluster: &Cluster,
@@ -254,6 +317,61 @@ pub(crate) async fn is_image_updated(
 
                 // Update Cluster with patch
                 patch_cluster_merge(cdb, &ctx, patch).await?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+// remove_stalled_backups function takes a CoreDB, Conext and removed any stalled
+// backups. A backup is considered stalled if it's older than 6 hours and does not have a status set.
+// If a status is missing this means that the backup was never started nor will it ever start.
+#[instrument(skip(cdb, ctx), fields(trace_id, instance_name = %cdb.name_any()))]
+pub(crate) async fn removed_stalled_backups(
+    cdb: &CoreDB,
+    ctx: &Arc<Context>,
+) -> Result<(), Action> {
+    let name = cdb.name_any();
+    let namespace = cdb.metadata.namespace.as_ref().ok_or_else(|| {
+        error!("Namespace is empty for instance: {}.", name);
+        Action::requeue(Duration::from_secs(300))
+    })?;
+
+    let backup_api: Api<Backup> = Api::namespaced(ctx.client.clone(), namespace);
+
+    // List all backups for the cluster
+    let lp = ListParams {
+        label_selector: Some(format!("cnpg.io/cluster={}", name.as_str())),
+        ..ListParams::default()
+    };
+    let backups = backup_api.list(&lp).await.map_err(|e| {
+        error!("Error listing backups: {}", e);
+        Action::requeue(Duration::from_secs(300))
+    })?;
+
+    let stalled_time = Time(chrono::Utc::now() - chrono::Duration::hours(6));
+
+    // Filter backups that do not have a status set and are older than 24 hours
+    for backup in &backups.items {
+        if backup.status.is_none() {
+            if let Some(creation_time) = backup.metadata.creation_timestamp.as_ref() {
+                if creation_time < &stalled_time {
+                    info!("Deleting stalled backup: {}", backup.name_any());
+                    match backup_api
+                        .delete(&backup.name_any(), &DeleteParams::default())
+                        .await
+                    {
+                        Ok(_) => {
+                            info!("Successfully deleted stalled backup: {}", backup.name_any())
+                        }
+                        Err(e) => error!(
+                            "Failed to delete stalled backup {}: {}",
+                            backup.name_any(),
+                            e
+                        ),
+                    }
+                }
             }
         }
     }
