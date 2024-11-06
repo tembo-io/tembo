@@ -53,7 +53,6 @@ use crate::{
     postgres_exporter::reconcile_metrics_configmap,
     trunk::{extensions_that_require_load, reconcile_trunk_configmap},
 };
-use k8s_openapi::api::core::v1::Secret;
 use rand::Rng;
 use serde::Serialize;
 use serde_json::json;
@@ -72,7 +71,7 @@ pub struct Context {
     /// Diagnostics read by the web server
     pub diagnostics: Arc<RwLock<Diagnostics>>,
     /// Prometheus metrics
-    pub metrics: Metrics,
+    pub metrics: Arc<Metrics>,
 }
 
 pub fn requeue_normal_with_jitter() -> Action {
@@ -87,7 +86,7 @@ async fn reconcile(cdb: Arc<CoreDB>, ctx: Arc<Context>) -> Result<Action> {
     let trace_id = telemetry::get_trace_id();
     Span::current().record("trace_id", field::display(&trace_id));
     let cfg = Config::default();
-    let _timer = ctx.metrics.count_and_measure();
+    let _timer = ctx.metrics.reconcile.count_and_measure(&trace_id);
     ctx.diagnostics.write().await.last_event = Utc::now();
     let ns = cdb.namespace().unwrap(); // cdb is namespace scoped
     let coredbs: Api<CoreDB> = Api::namespaced(ctx.client.clone(), &ns);
@@ -125,7 +124,7 @@ async fn reconcile(cdb: Arc<CoreDB>, ctx: Arc<Context>) -> Result<Action> {
 
 pub(crate) fn error_policy(cdb: Arc<CoreDB>, error: &Error, ctx: Arc<Context>) -> Action {
     warn!("reconcile failed: {:?}", error);
-    ctx.metrics.reconcile_failure(&cdb, error);
+    ctx.metrics.reconcile.set_failure(&cdb, error);
 
     // Check for 429 error code from Kubernetes API
     match error {
@@ -945,15 +944,18 @@ impl Diagnostics {
 pub struct State {
     /// Diagnostics populated by the reconciler
     diagnostics: Arc<RwLock<Diagnostics>>,
-    /// Metrics registry
-    registry: prometheus::Registry,
+    /// Metrics
+    metrics: Arc<Metrics>,
 }
 
 /// State wrapper around the controller outputs for the web server
 impl State {
     /// Metrics getter
-    pub fn metrics(&self) -> Vec<prometheus::proto::MetricFamily> {
-        self.registry.gather()
+    pub fn metrics(&self) -> String {
+        let mut buffer = String::new();
+        let registry = &*self.metrics.registry;
+        prometheus_client::encoding::text::encode(&mut buffer, registry).unwrap();
+        buffer
     }
 
     /// State getter
@@ -962,10 +964,10 @@ impl State {
     }
 
     // Create a Controller Context that can update State
-    pub fn create_context(&self, client: Client) -> Arc<Context> {
+    pub fn to_context(&self, client: Client) -> Arc<Context> {
         Arc::new(Context {
             client,
-            metrics: Metrics::default().register(&self.registry).unwrap(),
+            metrics: self.metrics.clone(),
             diagnostics: self.diagnostics.clone(),
         })
     }
@@ -987,12 +989,9 @@ pub async fn run(state: State) {
         std::process::exit(1);
     }
 
-    let secret_api = Api::<Secret>::all(client.clone());
-
     Controller::new(coredb, watcherConfig::default().any_semantic())
-        .owns(secret_api, watcherConfig::default().any_semantic())
         .shutdown_on_signal()
-        .run(reconcile, error_policy, state.create_context(client))
+        .run(reconcile, error_policy, state.to_context(client))
         .filter_map(|x| async move { std::result::Result::ok(x) })
         .for_each(|_| futures::future::ready(()))
         .await;
@@ -1002,25 +1001,51 @@ pub async fn run(state: State) {
 #[cfg(test)]
 mod test {
     use super::{reconcile, Backup, Context, CoreDB};
-    use crate::apis::coredb_types::VolumeSnapshot;
-    use crate::cloudnativepg::{
-        backups::{BackupCluster, BackupSpec, BackupStatus},
-        VOLUME_SNAPSHOT_CLASS_NAME,
+    use crate::{
+        apis::coredb_types::VolumeSnapshot,
+        cloudnativepg::{
+            backups::{BackupCluster, BackupSpec, BackupStatus},
+            VOLUME_SNAPSHOT_CLASS_NAME,
+        },
+        config::Config,
+        controller::{create_volume_snapshot_patch, is_volume_snapshot_update_needed},
+        fixtures::{timeout_after_1s, Scenario},
     };
-    use crate::config::Config;
-    use crate::controller::{create_volume_snapshot_patch, is_volume_snapshot_update_needed};
     use chrono::{DateTime, NaiveDate, Utc};
     use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
     use std::sync::Arc;
 
     #[tokio::test]
     async fn new_coredbs_without_finalizers_gets_a_finalizer() {
-        let (testctx, fakeserver, _) = Context::test();
+        let (testctx, fakeserver) = Context::test();
         let coredb = CoreDB::test();
-        // verify that coredb gets a finalizer attached during reconcile
-        fakeserver.handle_finalizer_creation(&coredb);
-        let res = reconcile(Arc::new(coredb), testctx).await;
-        assert!(res.is_ok(), "initial creation succeeds in adding finalizer");
+        let mocksrv = fakeserver.run(Scenario::FinalizerCreation(coredb.clone()));
+        reconcile(Arc::new(coredb), testctx)
+            .await
+            .expect("reconciler");
+        timeout_after_1s(mocksrv).await;
+    }
+
+    #[tokio::test]
+    async fn finalized_coredb_causes_status_patch() {
+        let (testctx, fakeserver) = Context::test();
+        let coredb = CoreDB::test().finalized();
+        let mocksrv = fakeserver.run(Scenario::StatusPatch(coredb.clone()));
+        reconcile(Arc::new(coredb), testctx)
+            .await
+            .expect("reconciler");
+        timeout_after_1s(mocksrv).await;
+    }
+
+    #[tokio::test]
+    async fn finalized_coredb_with_delete_timestamp_causes_delete() {
+        let (testctx, fakeserver) = Context::test();
+        let coredb = CoreDB::test().finalized().needs_delete();
+        let mocksrv = fakeserver.run(Scenario::Cleanup("DeleteRequested".into(), coredb.clone()));
+        reconcile(Arc::new(coredb), testctx)
+            .await
+            .expect("reconciler");
+        timeout_after_1s(mocksrv).await;
     }
 
     #[tokio::test]
@@ -1237,11 +1262,11 @@ mod test {
 
     // Test the error_policy function, we need to mock the ctx and cdb to mimic a 429 error code
     use crate::{error_policy, Error};
+    use bytes::Bytes;
     use futures::pin_mut;
     use http::{Request, Response, StatusCode};
-    use hyper::Body;
     use k8s_openapi::api::core::v1::Pod;
-    use kube::{api::Api, Client};
+    use kube::{api::Api, client::Body, Client};
     use serde_json::json;
     use tower_test::mock;
 
@@ -1264,21 +1289,21 @@ mod test {
             pin_mut!(handle);
             if let Some((_request, send)) = handle.next_request().await {
                 // We don't check the specifics of the request here, focusing on the response
+                let response_body = json!({
+                    "kind": "Status",
+                    "apiVersion": "v1",
+                    "metadata": {},
+                    "status": "Failure",
+                    "message": "Too Many Requests",
+                    "reason": "TooManyRequests",
+                    "code": 429
+                })
+                .to_string();
+
                 send.send_response(
                     Response::builder()
                         .status(StatusCode::TOO_MANY_REQUESTS)
-                        .body(Body::from(
-                            json!({
-                                "kind": "Status",
-                                "apiVersion": "v1",
-                                "metadata": {},
-                                "status": "Failure",
-                                "message": "Too Many Requests",
-                                "reason": "TooManyRequests",
-                                "code": 429
-                            })
-                            .to_string(),
-                        ))
+                        .body(Body::from(Bytes::from(response_body)))
                         .unwrap(),
                 );
             }
@@ -1327,21 +1352,21 @@ mod test {
         let spawned = tokio::spawn(async move {
             pin_mut!(handle);
             if let Some((_request, send)) = handle.next_request().await {
+                let response_body = json!({
+                    "kind": "Status",
+                    "apiVersion": "v1",
+                    "metadata": {},
+                    "status": "Failure",
+                    "message": "Not Found",
+                    "reason": "NotFound",
+                    "code": 404
+                })
+                .to_string();
+
                 send.send_response(
                     Response::builder()
                         .status(StatusCode::NOT_FOUND)
-                        .body(Body::from(
-                            json!({
-                                "kind": "Status",
-                                "apiVersion": "v1",
-                                "metadata": {},
-                                "status": "Failure",
-                                "message": "Not Found",
-                                "reason": "NotFound",
-                                "code": 404
-                            })
-                            .to_string(),
-                        ))
+                        .body(Body::from(Bytes::from(response_body)))
                         .unwrap(),
                 );
             }

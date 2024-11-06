@@ -71,6 +71,10 @@ jobs:
           set -xe
           export KUBE_VERSION=${{ matrix.kube_version }}
           just start-kind
+      - name: Pre-load docker images into cluster
+        run: |
+          set -xe
+          just run-load-images
       - name: Run functional / integration tests
         run: |
           set -xe
