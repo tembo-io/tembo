@@ -24,7 +24,12 @@ use kube::{
     Client, Resource,
 };
 use lazy_static::lazy_static;
-use std::{collections::BTreeMap, ops::Not, sync::Arc, time::Duration};
+use std::{
+    collections::{BTreeMap, HashMap},
+    ops::Not,
+    sync::Arc,
+    time::Duration,
+};
 
 use crate::{
     app_service::ingress::{generate_ingress_tcp_routes, reconcile_ingress_tcp},
@@ -336,7 +341,7 @@ fn generate_deployment(
     // ensure hyphen in env var name (cdb name allows hyphen)
     let cdb_name_env = coredb_name.to_uppercase().replace('-', "_");
 
-    let mut env_vars: Vec<EnvVar> = Vec::new();
+    let mut env_vars: HashMap<String, EnvVar> = HashMap::new();
     // map postgres connection secrets to env vars
     // mapping directly to env vars instead of using a SecretEnvSource
     // so that we can select which secrets to map into appService
@@ -347,8 +352,9 @@ fn generate_deployment(
     let rw_conn = format!("{}_RW_CONNECTION", cdb_name_env);
     let apps_connection_secret_name = format!("{}-apps", coredb_name);
 
-    // map the secrets we inject to appService containers
-    let default_app_envs = vec![
+    // set the secrets we inject to appService containers
+    env_vars.insert(
+        r_conn.clone(),
         EnvVar {
             name: r_conn,
             value_from: Some(EnvVarSource {
@@ -361,6 +367,9 @@ fn generate_deployment(
             }),
             ..EnvVar::default()
         },
+    );
+    env_vars.insert(
+        ro_conn.clone(),
         EnvVar {
             name: ro_conn,
             value_from: Some(EnvVarSource {
@@ -373,6 +382,9 @@ fn generate_deployment(
             }),
             ..EnvVar::default()
         },
+    );
+    env_vars.insert(
+        rw_conn.clone(),
         EnvVar {
             name: rw_conn,
             value_from: Some(EnvVarSource {
@@ -385,52 +397,47 @@ fn generate_deployment(
             }),
             ..EnvVar::default()
         },
-    ];
-
-    let has_instance_id = env_vars.iter().any(|env| env.name == "TEMBO_INSTANCE_ID");
-    let has_org_id = env_vars.iter().any(|env| env.name == "TEMBO_ORG_ID");
-    let has_namespace = env_vars.iter().any(|env| env.name == "NAMESPACE");
+    );
 
     // Check for tembo.io/instance_id and tembo.io/organization_id annotations
-    if has_instance_id.not() {
-        if let Some(instance_id) = annotations.get("tembo.io/instance_id") {
-            env_vars.push(EnvVar {
+    if let Some(instance_id) = annotations.get("tembo.io/instance_id") {
+        env_vars.insert(
+            "TEMBO_INSTANCE_ID".to_string(),
+            EnvVar {
                 name: "TEMBO_INSTANCE_ID".to_string(),
                 value: Some(instance_id.clone()),
                 ..EnvVar::default()
-            });
-        }
-    } else {
-        tracing::info!("Not applying TEMBO_INSTANCE_ID to env since it's already present");
+            },
+        );
     }
 
-    if has_org_id.not() {
-        if let Some(organization_id) = annotations.get("tembo.io/organization_id") {
-            env_vars.push(EnvVar {
+    if let Some(organization_id) = annotations.get("tembo.io/organization_id") {
+        env_vars.insert(
+            "TEMBO_ORG_ID".to_string(),
+            EnvVar {
                 name: "TEMBO_ORG_ID".to_string(),
                 value: Some(organization_id.clone()),
                 ..EnvVar::default()
-            });
-        }
-    } else {
-        tracing::info!("Not applying TEMBO_ORG_ID to env since it's already present");
+            },
+        );
     }
 
-    if has_namespace.not() {
-        env_vars.push(EnvVar {
+    env_vars.insert(
+        "NAMESPACE".to_string(),
+        EnvVar {
             name: "NAMESPACE".to_string(),
             value: Some(namespace.to_string()),
             ..EnvVar::default()
-        });
-    } else {
-        tracing::info!("Not applying NAMESPACE to env since it's already present");
-    }
+        },
+    );
 
     // Add the pre-loaded forwarded environment variables
-    env_vars.extend(FORWARDED_ENV_VARS.iter().cloned());
+    for evar in FORWARDED_ENV_VARS.iter().clone() {
+        env_vars.insert(evar.name.clone(), evar.clone());
+    }
 
-    // map the user provided env vars
-    // users can map certain secrets to env vars of their choice
+    // set any user provided env vars last
+    // including the valueFromX values
     if let Some(envs) = appsvc.env.clone() {
         for env in envs {
             let evar: Option<EnvVar> = match (env.value, env.value_from_platform) {
@@ -469,13 +476,12 @@ fn generate_deployment(
                 }
             };
             if let Some(e) = evar {
-                env_vars.push(e);
+                env_vars.insert(e.name.clone(), e);
             }
         }
     }
 
-    // combine the secret env vars and those provided in spec by user
-    env_vars.extend(default_app_envs);
+    let env_vars_vec = env_vars.values().cloned().collect::<Vec<EnvVar>>();
 
     // Create volume vec and add certs volume from secret
     let mut volumes: Vec<Volume> = Vec::new();
@@ -537,7 +543,7 @@ fn generate_deployment(
         containers: vec![Container {
             args: appsvc.args.clone(),
             command: appsvc.command.clone(),
-            env: Some(env_vars),
+            env: Some(env_vars_vec),
             image: Some(appsvc.image.clone()),
             name: appsvc.name.clone(),
             ports: container_ports,
