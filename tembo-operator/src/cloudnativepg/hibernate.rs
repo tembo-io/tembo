@@ -145,9 +145,14 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
         }
     }
 
-    // Stop CNPG reconciles for hibernated instances
-    let stop_cnpg_reconcilation = cdb.spec.stop && is_cluster_hibernated(&cluster);
-    let stop_cnpg_reconcilation_value = if stop_cnpg_reconcilation {
+    // Stop CNPG reconciliation for hibernated instances.
+    // We should not stop CNPG reconciliation until hibernation is fully completed,
+    // as the instance may not finish hibernating otherwise.
+    //
+    // Disabling reconciliation for stopped instances is important because, as the number
+    // of stopped instances grows, reconciliation performance is significantly impacted
+    let stop_cnpg_reconciliation = cdb.spec.stop && is_cluster_hibernated(&cluster);
+    let stop_cnpg_reconciliation_value = if stop_cnpg_reconciliation {
         "disabled"
     } else {
         "enabled"
@@ -161,7 +166,7 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
         "metadata": {
             "annotations": {
                 "cnpg.io/hibernation": hibernation_value,
-                "cnpg.io/reconcilationLoop": stop_cnpg_reconcilation_value,
+                "cnpg.io/reconciliationLoop": stop_cnpg_reconciliation_value,
             }
         }
     });
@@ -362,4 +367,102 @@ fn is_cluster_hibernated(cluster: &Cluster) -> bool {
             // If we did not find a cnpg.io/hibernation annotation, likely the cluster has never been hibernated
             false,
         )
+}
+
+#[cfg(test)]
+mod tests {
+    use kube::api::ObjectMeta;
+
+    use crate::cloudnativepg::{
+        clusters::{
+            Cluster, ClusterSpec, ClusterStatus, ClusterStatusConditions,
+            ClusterStatusConditionsStatus,
+        },
+        hibernate::is_cluster_hibernated,
+    };
+
+    #[test]
+    fn test_is_cluster_hibernated() {
+        // Not hibernated yet: still in progress
+        assert_eq!(is_cluster_hibernated(&hibernation_in_progress()), false);
+        // Not hibernated: unrelated condition
+        assert_eq!(is_cluster_hibernated(&backed_up_cluster()), false);
+        // Hibernated: "type" is "cnpg.io/hibernation" and "status" is "True"
+        assert!(is_cluster_hibernated(&hibernation_completed()));
+    }
+
+    fn hibernation_in_progress() -> Cluster {
+        Cluster {
+            metadata: ObjectMeta {
+                name: Some("test-cluster".to_string()),
+                namespace: Some("test".to_string()),
+                ..ObjectMeta::default()
+            },
+            spec: ClusterSpec {
+                ..Default::default()
+            },
+            status: Some(ClusterStatus {
+                instances: Some(1),
+                conditions: Some(vec![ClusterStatusConditions {
+                    last_transition_time: "2024-11-11T19:33:58Z".into(),
+                    message: "Hibernation is in progress".into(),
+                    observed_generation: None,
+                    reason: "DeletingPods".into(),
+                    status: ClusterStatusConditionsStatus::False,
+                    r#type: "cnpg.io/hibernation".into(),
+                }]),
+                ..ClusterStatus::default()
+            }),
+        }
+    }
+
+    fn hibernation_completed() -> Cluster {
+        Cluster {
+            metadata: ObjectMeta {
+                name: Some("test-cluster".to_string()),
+                namespace: Some("test".to_string()),
+                ..ObjectMeta::default()
+            },
+            spec: ClusterSpec {
+                ..Default::default()
+            },
+            status: Some(ClusterStatus {
+                instances: Some(1),
+                conditions: Some(vec![ClusterStatusConditions {
+                    last_transition_time: "2024-11-11T19:33:58Z".into(),
+                    message: "Cluster has been hibernated".into(),
+                    observed_generation: None,
+                    reason: "Hibernated".into(),
+                    status: ClusterStatusConditionsStatus::True,
+                    r#type: "cnpg.io/hibernation".into(),
+                }]),
+                ..ClusterStatus::default()
+            }),
+        }
+    }
+
+    fn backed_up_cluster() -> Cluster {
+        Cluster {
+            metadata: ObjectMeta {
+                name: Some("test-cluster".to_string()),
+                namespace: Some("test".to_string()),
+                ..ObjectMeta::default()
+            },
+            spec: ClusterSpec {
+                ..Default::default()
+            },
+            status: Some(ClusterStatus {
+                instances: Some(1),
+                conditions: Some(vec![ClusterStatusConditions {
+                    last_transition_time: "2024-11-11T19:33:58Z".into(),
+                    message: "Backup was successful".into(),
+                    observed_generation: None,
+                    reason: "LastBackupSucceeded".into(),
+                    status: ClusterStatusConditionsStatus::True,
+                    r#type: "LastBackupSucceeded".into(),
+                }]),
+                ..ClusterStatus::default()
+            }),
+        }
+    }
 }
