@@ -1,4 +1,5 @@
 use crate::apis::coredb_types::CoreDB;
+use crate::cloudnativepg::clusters::{ClusterStatusConditions, ClusterStatusConditionsStatus};
 use crate::cloudnativepg::cnpg::{get_cluster, get_pooler, get_scheduled_backups};
 use crate::cloudnativepg::poolers::Pooler;
 use crate::cloudnativepg::scheduledbackups::ScheduledBackup;
@@ -20,6 +21,8 @@ use crate::cloudnativepg::cnpg_utils::{
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, error, info, warn};
+
+use super::clusters::Cluster;
 
 /// Resolves hibernation in the Cluster and related services of the CoreDB
 ///
@@ -142,18 +145,26 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
         }
     }
 
-    // Build the hibernation patch we want to apply to disable the CNPG cluster.
+    // Stop CNPG reconciles for hibernated instances
+    let stop_cnpg_reconcilation = cdb.spec.stop && is_cluster_hibernated(&cluster);
+    let stop_cnpg_reconcilation_value = if stop_cnpg_reconcilation {
+        "disabled"
+    } else {
+        "enabled"
+    };
 
     let cluster_annotations = cluster.metadata.annotations.unwrap_or_default();
     let hibernation_value = if cdb.spec.stop { "on" } else { "off" };
+
+    // Build the hibernation patch we want to apply to disable the CNPG cluster.
     let patch_hibernation_annotation = json!({
         "metadata": {
             "annotations": {
-                "cnpg.io/hibernation": hibernation_value
+                "cnpg.io/hibernation": hibernation_value,
+                "cnpg.io/reconcilationLoop": stop_cnpg_reconcilation_value,
             }
         }
     });
-
     // Update ScheduledBackup if it exists
     if let Err(action) = update_scheduled_backups(&scheduled_backups, cdb, ctx).await {
         warn!(
@@ -332,4 +343,23 @@ async fn update_scheduled_backups(
     }
 
     Ok(())
+}
+
+fn is_cluster_hibernated(cluster: &Cluster) -> bool {
+    fn get_hibernation_condition(cluster: &Cluster) -> Option<&ClusterStatusConditions> {
+        cluster
+            .status
+            .as_ref()?
+            .conditions
+            .as_ref()?
+            .iter()
+            .find(|condition| condition.r#type == "cnpg.io/hibernation")
+    }
+
+    get_hibernation_condition(cluster)
+        .map(|condition| condition.status == ClusterStatusConditionsStatus::True)
+        .unwrap_or(
+            // If we did not find a cnpg.io/hibernation annotation, likely the cluster has never been hibernated
+            false,
+        )
 }
