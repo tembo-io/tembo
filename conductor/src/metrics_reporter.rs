@@ -1,4 +1,5 @@
 use anyhow::{bail, Context, Result};
+use conductor::heartbeat_monitor::HeartbeatUpdater;
 use conductor::metrics::dataplane_metrics::split_data_plane_metrics;
 use conductor::metrics::{dataplane_metrics::DataPlaneMetrics, prometheus::Metrics};
 use log::{error, info};
@@ -28,7 +29,7 @@ fn load_metric_queries() -> Result<MetricQueries> {
     serde_yaml::from_str(METRICS_FILE).map_err(Into::into)
 }
 
-pub async fn run_metrics_reporter() -> Result<()> {
+pub async fn run_metrics_reporter(hearbeat_updater: HeartbeatUpdater) -> Result<()> {
     let client = Client::new().await;
 
     let MetricQueries { metrics } = load_metric_queries()?;
@@ -55,6 +56,7 @@ pub async fn run_metrics_reporter() -> Result<()> {
 
     loop {
         sync_interval.tick().await;
+        hearbeat_updater.update_heartbeat();
 
         let now = Instant::now();
         for metric in &metrics {
