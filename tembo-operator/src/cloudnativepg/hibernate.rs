@@ -188,6 +188,16 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
         return Err(action);
     }
 
+    patch_cluster_merge(cdb, ctx, patch_hibernation_annotation).await?;
+    info!(
+        "Toggled hibernation annotation of {} to '{}'",
+        name, hibernation_value
+    );
+    info!(
+        "Toggled CNPG reconcilation annotation of {} to '{}'",
+        name, stop_cnpg_reconciliation_value
+    );
+
     // Check the annotation we are about to match was already there
     if let Some(current_hibernation_setting) = cluster_annotations.get("cnpg.io/hibernation") {
         if current_hibernation_setting == hibernation_value {
@@ -206,11 +216,6 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
             return Ok(());
         }
     }
-    patch_cluster_merge(cdb, ctx, patch_hibernation_annotation).await?;
-    info!(
-        "Toggled hibernation annotation of {} to '{}'",
-        name, hibernation_value
-    );
 
     let mut status = cdb.status.clone().unwrap_or_default();
     status.running = !cdb.spec.stop;
