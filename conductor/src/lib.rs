@@ -145,15 +145,6 @@ pub fn get_org_inst_id(coredb: &CoreDB) -> Result<types::OrgInstId, Box<Conducto
     })
 }
 
-pub async fn get_all(client: Client, namespace: &str) -> Vec<CoreDB> {
-    let coredb_api: Api<CoreDB> = Api::namespaced(client, namespace);
-    let pg_list = coredb_api
-        .list(&ListParams::default())
-        .await
-        .expect("could not get CoreDBs");
-    pg_list.items
-}
-
 pub async fn get_one(client: Client, namespace: &str) -> Result<CoreDB, ConductorError> {
     let coredb_api: Api<CoreDB> = Api::namespaced(client, namespace);
     let pg_instance = coredb_api.get(namespace).await?;
@@ -620,7 +611,7 @@ pub async fn create_azure_storage_workload_identity_binding(
         azure_subscription_id,
         azure_resource_group_prefix,
         azure_storage_account,
-        &namespace,
+        namespace,
         &uami_principal_id,
         credentials.clone(),
     )
