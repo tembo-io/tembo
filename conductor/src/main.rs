@@ -30,7 +30,7 @@ use sqlx::error::Error;
 use sqlx::postgres::PgPoolOptions;
 use std::env;
 use std::sync::{Arc, Mutex};
-use std::{thread, time};
+use std::time;
 use types::{CRUDevent, Event};
 
 mod metrics_reporter;
@@ -202,7 +202,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
             }
             None => {
                 debug!("no messages in queue");
-                thread::sleep(time::Duration::from_secs(1));
+                tokio::time::sleep(time::Duration::from_secs(1)).await;
                 continue;
             }
         };
@@ -296,8 +296,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     );
                     let _archived = queue
                         .archive(&control_plane_events_queue, read_msg.msg_id)
-                        .await
-                        .expect("error archiving message from queue");
+                        .await?;
                     metrics
                         .conductor_errors
                         .add(&opentelemetry::Context::current(), 1, &[]);
@@ -670,8 +669,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         // archive message from queue
         let archived = queue
             .archive(&control_plane_events_queue, read_msg.msg_id)
-            .await
-            .expect("error archiving message from queue");
+            .await?;
 
         metrics
             .conductor_completed
@@ -786,7 +784,7 @@ async fn main() -> std::io::Result<()> {
                         }
                     }
                     warn!("conductor exited, sleeping for 1 second");
-                    thread::sleep(time::Duration::from_secs(1));
+                    tokio::time::sleep(time::Duration::from_secs(1)).await;
                 }
             }
         }));
@@ -810,7 +808,7 @@ async fn main() -> std::io::Result<()> {
                         }
                     }
                     warn!("status_reporter exited, sleeping for 1 second");
-                    thread::sleep(time::Duration::from_secs(1));
+                    tokio::time::sleep(time::Duration::from_secs(1)).await;
                 }
             }
         }));
@@ -830,7 +828,7 @@ async fn main() -> std::io::Result<()> {
             }
 
             warn!("metrics_reporter exited, sleeping for 1 second");
-            thread::sleep(time::Duration::from_secs(1));
+            tokio::time::sleep(time::Duration::from_secs(1)).await;
         }));
     }
 
