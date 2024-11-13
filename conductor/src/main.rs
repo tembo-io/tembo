@@ -772,7 +772,8 @@ async fn main() -> std::io::Result<()> {
                                 1,
                                 &[],
                             );
-                            panic!("sqlx PoolTimedOut error -- forcing pod restart, error")
+                            error!("sqlx PoolTimedOut error in conductor. ending loop");
+                            break;
                         }
                         Err(err) => {
                             custom_metrics_copy.clone().conductor_errors.add(
