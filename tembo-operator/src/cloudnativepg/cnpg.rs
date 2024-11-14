@@ -1047,12 +1047,30 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
             None
         }
     };
+    // If we can't find the existing primary pod, returns a requeue
+    let primary_pod_cnpg = cdb
+        .primary_pod_cnpg_ready_or_not(ctx.client.clone())
+        .await?;
 
     // Check if the CoreDB status is running: false, return requeue
     if let Some(status) = current_status {
         if !status.running {
             info!("CoreDB status.running is false, requeuing 10 seconds");
             return Err(Action::requeue(Duration::from_secs(10)));
+        }
+    }
+    // Don't exec into the pod if it's not Ready yet
+    match is_pod_ready(&primary_pod_cnpg) {
+        Ok(true) => {
+            // Pod is ready, continuing
+        }
+        Ok(false) => {
+            info!("In reconcile_cnpg: Pod is not ready, requeuing 10 seconds");
+            return Err(Action::requeue(Duration::from_secs(10)));
+        }
+        Err(err) => {
+            error!("Failed to determine if pod is ready: {err}");
+            return Err(Action::requeue(Duration::from_secs(30)));
         }
     }
 
@@ -1088,10 +1106,7 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
                     // Check if current_shared_preload_libraries and new_libs are the same
                     if current_shared_preload_libraries != new_libs {
                         let mut libs_that_are_installed: Vec<String> = vec![];
-                        // If we can't find the existing primary pod, returns a requeue
-                        let primary_pod_cnpg = cdb
-                            .primary_pod_cnpg_ready_or_not(ctx.client.clone())
-                            .await?;
+
                         // Check if the file is already installed
                         let command = vec![
                             "/bin/sh".to_string(),
@@ -2426,6 +2441,24 @@ pub(crate) async fn get_pooler(cdb: &CoreDB, ctx: Arc<Context>) -> Option<Pooler
             None
         }
     }
+}
+
+/// Returns `true` if this pod is ready, returns `false` if it's not ready or currently unknown
+fn is_pod_ready(pod: &Pod) -> Result<bool, Box<dyn std::error::Error>> {
+    let status = pod.status.as_ref().ok_or("Pod has no status information")?;
+    if let Some(conditions) = &status.conditions {
+        for condition in conditions {
+            if condition.type_ == "Ready" {
+                return Ok(condition.status == "True");
+            }
+        }
+    }
+
+    Err(format!(
+        "Did not find a Ready condition in pod {:?}",
+        pod.metadata.name
+    )
+    .into())
 }
 
 #[cfg(test)]
