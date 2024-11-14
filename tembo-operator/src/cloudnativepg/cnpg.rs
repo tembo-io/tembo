@@ -1047,6 +1047,15 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
             None
         }
     };
+    // If we can't find the existing primary pod, returns a requeue
+    let primary_pod_cnpg = cdb
+        .primary_pod_cnpg(ctx.client.clone())
+        .await
+        .map_err(|_| {
+            let name = cdb.metadata.name.as_deref().unwrap_or("unknown");
+            error!("Failed to find Ready primary pod for {name}");
+            Action::requeue(Duration::from_secs(30))
+        })?;
 
     // Check if the CoreDB status is running: false, return requeue
     if let Some(status) = current_status {
@@ -1088,10 +1097,7 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
                     // Check if current_shared_preload_libraries and new_libs are the same
                     if current_shared_preload_libraries != new_libs {
                         let mut libs_that_are_installed: Vec<String> = vec![];
-                        // If we can't find the existing primary pod, returns a requeue
-                        let primary_pod_cnpg = cdb
-                            .primary_pod_cnpg_ready_or_not(ctx.client.clone())
-                            .await?;
+
                         // Check if the file is already installed
                         let command = vec![
                             "/bin/sh".to_string(),
