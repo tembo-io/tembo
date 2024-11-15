@@ -120,10 +120,10 @@ mod tests {
     #[test]
     fn test_add_condition() {
         let condition = Condition {
-            title: "test".to_string(),
-            description: Some("test condition".to_string()),
-            expression: "resource.type == \"storage.googleapis.com/Bucket\") || (resource.type == \"storage.googleapis.com/Object\"".to_string(),
-        };
+        title: "test".to_string(),
+        description: Some("test condition".to_string()),
+        expression: r#"(resource.type == "storage.googleapis.com/Bucket") || (resource.type == "storage.googleapis.com/Object" && ((resource.name.startsWith("projects/_/buckets/test-bucket/objects/v2/")) || (resource.name.startsWith("projects/_/buckets/test-bucket/objects/v2/test-instance") && request.auth.claims["storage.googleapis.com"].permission in ["storage.objects.create", "storage.objects.delete", "storage.objects.update"])))"#.to_string(),
+    };
         let binding = IamBindingBuilder::new()
             .role("admin")
             .add_member("user1@example.com")
@@ -137,10 +137,10 @@ mod tests {
     #[test]
     fn test_build_with_all_options() {
         let condition = Condition {
-            title: "test".to_string(),
-            description: Some("test condition".to_string()),
-            expression: "resource.type == \"storage.googleapis.com/Bucket\") || (resource.type == \"storage.googleapis.com/Object\"".to_string(),
-        };
+        title: "test".to_string(),
+        description: Some("test condition".to_string()),
+        expression: r#"(resource.type == "storage.googleapis.com/Bucket") || (resource.type == "storage.googleapis.com/Object" && ((resource.name.startsWith("projects/_/buckets/test-bucket/objects/v2/")) || (resource.name.startsWith("projects/_/buckets/test-bucket/objects/v2/test-instance") && request.auth.claims["storage.googleapis.com"].permission in ["storage.objects.create", "storage.objects.delete", "storage.objects.update"])))"#.to_string(),
+    };
         let binding = IamBindingBuilder::new()
             .role("admin")
             .add_member("user1@example.com")
