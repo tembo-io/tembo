@@ -267,13 +267,14 @@ impl BucketIamManager {
     /// # Returns
     ///
     /// Returns a `Condition` instance for the specified bucket.
+
     fn create_bucket_condition(&self, bucket_name: &str, instance_name: &str) -> Condition {
         Condition {
             title: "allow-bucket-and-path".to_string(),
             description: Some("Conductor managed storage bucket IAM policy condition".to_string()),
             expression: format!(
-                r#"(resource.type == "storage.googleapis.com/Bucket") || (resource.type == "storage.googleapis.com/Object" && resource.name.startsWith("projects/_/buckets/{}/objects/{}/{}"))"#,
-                bucket_name, BUCKET_PATH_PREFIX, instance_name
+                r#"(resource.type == "storage.googleapis.com/Bucket") || (resource.type == "storage.googleapis.com/Object" && ((resource.name.startsWith("projects/_/buckets/{}/objects/{}/" )) || (resource.name.startsWith("projects/_/buckets/{}/objects/{}/{}") && request.auth.claims["storage.googleapis.com"].permission in ["storage.objects.create", "storage.objects.delete", "storage.objects.update"])))"#,
+                bucket_name, BUCKET_PATH_PREFIX, bucket_name, BUCKET_PATH_PREFIX, instance_name
             ),
         }
     }
