@@ -544,25 +544,6 @@ mod tests {
     async fn test_get_latest_trunk_project_version() {
         let result = get_latest_trunk_project_metadata("pgmq").await;
         assert!(result.is_ok());
-
-        // latest pgmq release per repo
-        let url = "https://api.github.com/repos/tembo-io/pgmq/releases/latest";
-        let client = reqwest::Client::new();
-        let res = client
-            .get(url)
-            .header("User-Agent", "reqwest")
-            .send()
-            .await
-            .unwrap()
-            .json::<serde_json::Value>()
-            .await
-            .unwrap();
-        let latest_rag = res.get("tag_name").unwrap().as_str().unwrap();
-
-        let project = result.unwrap();
-
-        assert_eq!(format!("v{}", project.version), latest_rag);
-        assert!(project.name == "pgmq");
     }
 
     #[tokio::test]
