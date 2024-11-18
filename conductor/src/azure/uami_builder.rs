@@ -5,7 +5,7 @@ use azure_error::AzureError;
 use azure_identity::TokenCredentialOptions;
 use azure_identity::WorkloadIdentityCredential;
 use azure_mgmt_authorization;
-use azure_mgmt_authorization::models::RoleAssignmentProperties;
+use azure_mgmt_authorization::models::{RoleAssignment, RoleAssignmentProperties};
 use azure_mgmt_msi::models::{
     FederatedIdentityCredential, FederatedIdentityCredentialProperties, Identity, TrackedResource,
 };

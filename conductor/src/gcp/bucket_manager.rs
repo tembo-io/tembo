@@ -112,36 +112,24 @@ impl BucketIamManager {
     /// * `condition` - The condition for the binding.
     fn update_or_create_binding(&self, policy: &mut Policy, member: &str, condition: Condition) {
         let role = self.get_storage_role();
-
-        // First, remove any bindings with the same role but different conditions
-        policy
-            .bindings
-            .retain(|b| b.role != role || b.condition.as_ref() == Some(&condition));
-
-        // Then find and update matching binding or create new one
         if let Some(binding) = self.find_matching_binding(policy, &condition) {
-            // Update existing binding
             if !binding.members.contains(&member.to_string()) {
                 binding.members.push(member.to_string());
-                info!("Updated {} to existing binding", member);
+                info!("Added {} to existing binding.", member);
             } else {
                 warn!(
-                    "Member {} already exists in the binding, no changes made",
+                    "Member {} already exists in the binding. No changes made.",
                     member
                 );
             }
         } else {
-            // Create new binding
             let new_binding = self.create_new_binding(member.to_string(), condition);
             policy.bindings.push(new_binding);
             info!(
-                "Created new binding for {} with role {} and condition",
+                "Created new binding for {} with role {} and condition.",
                 member, role
             );
         }
-
-        // Clean up any empty bindings
-        policy.bindings.retain(|b| !b.members.is_empty());
     }
 
     /// Finds a matching binding in the policy based on the role and condition.

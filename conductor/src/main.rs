@@ -993,7 +993,6 @@ async fn init_gcp_storage_workload_identity(
     Ok(())
 }
 
-#[allow(clippy::too_many_arguments)]
 async fn init_azure_storage_workload_identity(
     is_azure: bool,
     read_msg: &Message<CRUDevent>,
