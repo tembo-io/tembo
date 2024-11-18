@@ -1512,7 +1512,7 @@ mod tests {
         for (_key, instance_setting) in instance_settings.iter() {
             let stack_file = instance_setting.stack_file.clone().unwrap();
             let cleaned_stack_file = stack_file.trim_matches('"');
-            test_dir.push(format!("{}", cleaned_stack_file));
+            test_dir.push(cleaned_stack_file.to_string());
 
             let config_data =
                 fs::read_to_string(&test_dir).expect("File not found in the directory");
