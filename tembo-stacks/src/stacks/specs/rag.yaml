@@ -27,8 +27,6 @@ appServices:
       requests:
         cpu: 10m
         memory: 150Mi
-    routing:
-    - port: 8080
     storage:
       volumeMounts:
       - mountPath: /etc/nginx/conf.d
