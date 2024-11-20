@@ -2,6 +2,16 @@ name: !ai-proxy
 appServices:
   - image: quay.io/tembo/ai-proxy:2024.06.03
     name: ai-proxy
+    routing:
+      - port: 8080
+        ingressPath: /ai
+        middlewares:
+          - strip-ai-path-prefix
+    middlewares:
+      - !stripPrefix
+          name: strip-ai-path-prefix
+          config:
+            - /ai
     resources:
       limits:
         cpu: 100m
