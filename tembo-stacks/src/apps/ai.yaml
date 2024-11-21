@@ -2,6 +2,16 @@ name: !ai-proxy
 appServices:
   - image: quay.io/tembo/ai-proxy:2024.06.03
     name: ai-proxy
+    routing:
+      - port: 8080
+        ingressPath: /ai
+        middlewares:
+          - strip-ai-path-prefix
+    middlewares:
+      - !stripPrefix
+          name: strip-ai-path-prefix
+          config:
+            - /ai
     resources:
       limits:
         cpu: 100m
@@ -9,8 +19,6 @@ appServices:
       requests:
         cpu: 10m
         memory: 150Mi
-    routing:
-    - port: 8080
     storage:
       volumeMounts:
       - mountPath: /etc/nginx/conf.d
@@ -26,11 +34,11 @@ trunk_installs:
   - name: pg_cron
     version: 1.6.2
   - name: pgmq
-    version: 1.3.3
+    version: 1.4.2
   - name: pgvector
-    version: 0.7.3
+    version: 0.7.4
   - name: vectorize
-    version: 0.17.0
+    version: 0.18.2
 extensions:
   - name: pg_cron
     locations:
@@ -41,17 +49,17 @@ extensions:
     locations:
       - database: postgres
         enabled: true
-        version: 1.3.3
+        version: 1.4.2
   - name: vector
     locations:
       - database: postgres
         enabled: true
-        version: 0.7.3
+        version: 0.7.4
   - name: vectorize
     locations:
       - database: postgres
         enabled: true
-        version: 0.17.0
+        version: 0.18.2
 postgres_config:
   - name: cron.host
     value: /controller/run

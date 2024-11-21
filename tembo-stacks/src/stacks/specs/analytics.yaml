@@ -1,0 +1,61 @@
+name: Analytics
+description: A Postgres instance equipped ParadeDB's pg_analytics extension.
+repository: "quay.io/tembo"
+organization: tembo
+images:
+  14: "standard-cnpg:14-5120dd1"
+  15: "standard-cnpg:15-5120dd1"
+  16: "standard-cnpg:16-5120dd1"
+stack_version: 0.1.0
+postgres_config_engine: olap
+postgres_config:
+  - name: autovacuum_vacuum_scale_factor
+    value: 0.05
+  - name: autovacuum_vacuum_insert_scale_factor
+    value: 0.05
+  - name: checkpoint_completion_target
+    value: 0.95
+  - name: checkpoint_timeout
+    value: 30min
+  - name: cron.host
+    value: /controller/run
+  - name: pg_stat_statements.track
+    value: top
+  - name: shared_preload_libraries
+    value: pg_stat_statements,pg_cron
+  - name: track_io_timing
+    value: 'on'
+  - name: wal_level
+    value: logical
+trunk_installs:
+  - name: pg_stat_statements
+    version: 1.10.0
+  - name: pg_partman
+    version: 5.0.1
+  - name: pg_cron
+    version: 1.6.2
+  - name: pg_analytics
+    version: 0.2.1
+extensions:
+  - name: pg_stat_statements
+    locations:
+      - database: postgres
+        enabled: true
+        version: 1.10.0
+  - name: pg_partman
+    locations:
+      - database: postgres
+        enabled: true
+        version: 5.0.1
+  - name: pg_cron
+    description: pg_cron
+    locations:
+    - database: postgres
+      enabled: true
+      version: 1.6.2
+  - name: pg_analytics
+    description: pg_analytics
+    locations:
+    - database: postgres
+      enabled: true
+      version: 0.2.1

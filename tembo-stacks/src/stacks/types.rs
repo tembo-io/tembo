@@ -1,5 +1,6 @@
 use crate::stacks::config_engines::{
-    mq_config_engine, olap_config_engine, standard_config_engine, ConfigEngine,
+    mq_config_engine, olap_config_engine, paradedb_config_engine, standard_config_engine,
+    ConfigEngine,
 };
 use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 use schemars::JsonSchema;
@@ -28,6 +29,7 @@ use utoipa::ToSchema;
     strum_macros::Display,
 )]
 pub enum StackType {
+    Analytics,
     API,
     DataWarehouse,
     Geospatial,
@@ -37,6 +39,7 @@ pub enum StackType {
     OLAP,
     #[default]
     OLTP,
+    ParadeDB,
     RAG,
     Standard,
     Timeseries,
@@ -48,6 +51,7 @@ impl std::str::FromStr for StackType {
 
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
+            "Analytics" => Ok(StackType::Analytics),
             "API" => Ok(StackType::API),
             "DataWarehouse" => Ok(StackType::DataWarehouse),
             "Geospatial" => Ok(StackType::Geospatial),
@@ -56,6 +60,7 @@ impl std::str::FromStr for StackType {
             "MongoAlternative" => Ok(StackType::MongoAlternative),
             "OLAP" => Ok(StackType::OLAP),
             "OLTP" => Ok(StackType::OLTP),
+            "ParadeDB" => Ok(StackType::ParadeDB),
             "RAG" => Ok(StackType::RAG),
             "Standard" => Ok(StackType::Standard),
             "Timeseries" => Ok(StackType::Timeseries),
@@ -68,6 +73,7 @@ impl std::str::FromStr for StackType {
 impl StackType {
     pub fn as_str(&self) -> &str {
         match self {
+            StackType::Analytics => "Analytics",
             StackType::API => "API",
             StackType::DataWarehouse => "DataWarehouse",
             StackType::Geospatial => "Geospatial",
@@ -76,6 +82,7 @@ impl StackType {
             StackType::MongoAlternative => "MongoAlternative",
             StackType::OLAP => "OLAP",
             StackType::OLTP => "OLTP",
+            StackType::ParadeDB => "ParadeDB",
             StackType::RAG => "RAG",
             StackType::Standard => "Standard",
             StackType::Timeseries => "Timeseries",
@@ -138,7 +145,7 @@ impl Stack {
             image: format!(
                 "{repo}/{image}",
                 repo = self.repository,
-                image = self.images.pg16.clone()
+                image = self.images.pg16.as_ref().unwrap()
             ),
             extensions: self.extensions.unwrap_or_default(),
             trunk_installs: self.trunk_installs.unwrap_or_default(),
@@ -174,6 +181,7 @@ impl Stack {
             Some(ConfigEngine::Standard) => Some(standard_config_engine(self)),
             Some(ConfigEngine::OLAP) => Some(olap_config_engine(self)),
             Some(ConfigEngine::MQ) => Some(mq_config_engine(self)),
+            Some(ConfigEngine::ParadeDB) => Some(paradedb_config_engine(self)),
             None => Some(standard_config_engine(self)),
         }
     }
@@ -291,6 +299,9 @@ mod tests {
     fn test_all_stack_deserialization() {
         for stack in StackType::iter() {
             match stack {
+                StackType::Analytics => {
+                    get_stack(StackType::Analytics);
+                }
                 StackType::API => {
                     get_stack(StackType::API);
                 }
@@ -314,6 +325,9 @@ mod tests {
                 }
                 StackType::OLTP => {
                     get_stack(StackType::OLTP);
+                }
+                StackType::ParadeDB => {
+                    get_stack(StackType::ParadeDB);
                 }
                 StackType::RAG => {
                     get_stack(StackType::RAG);

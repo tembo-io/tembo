@@ -490,6 +490,69 @@ mod test {
         }
     }
 
+    async fn service_exists(
+        context: Arc<Context>,
+        namespace: &str,
+        service_name: &str,
+        inverse: bool,
+    ) -> Option<Service> {
+        println!(
+            "Checking for service existence: {}, inverse: {}",
+            service_name, inverse
+        );
+        let services: Api<Service> = Api::namespaced(context.client.clone(), namespace);
+
+        const TIMEOUT_SECONDS_SERVICE_CHECK: u64 = 300;
+        let start_time = std::time::Instant::now();
+
+        loop {
+            match services.get(service_name).await {
+                Ok(service) => {
+                    if inverse {
+                        println!("Service {} should not exist, but it does", service_name);
+                        return Some(service);
+                    } else {
+                        println!("Service {} exists", service_name);
+                        return Some(service);
+                    }
+                }
+                Err(_) => {
+                    if inverse {
+                        return None;
+                    } else {
+                        println!("Service {} not found, retrying...", service_name);
+                    }
+                }
+            }
+
+            if start_time.elapsed() > Duration::from_secs(TIMEOUT_SECONDS_SERVICE_CHECK) {
+                println!(
+                    "Failed to find service {} after waiting {} seconds",
+                    service_name, TIMEOUT_SECONDS_SERVICE_CHECK
+                );
+
+                if let Ok(service_list) = services.list(&ListParams::default()).await {
+                    println!("Services in namespace {}:", namespace);
+                    for service in service_list.items {
+                        println!(
+                            "Service: {}, Labels: {:?}",
+                            service.metadata.name.unwrap_or_default(),
+                            service.metadata.labels.unwrap_or_default()
+                        );
+                    }
+                } else {
+                    println!("Failed to list services in namespace {}", namespace);
+                }
+
+                break;
+            }
+
+            tokio::time::sleep(Duration::from_secs(5)).await;
+        }
+
+        None
+    }
+
     // Create namespace for the test to run in
     async fn create_namespace(client: Client, name: &str) -> Result<String, Error> {
         let ns_api: Api<Namespace> = Api::all(client);
@@ -1261,7 +1324,7 @@ mod test {
         // Assert no tables found
         let result =
             psql_with_retry(context.clone(), coredb_resource.clone(), "\\dt".to_string()).await;
-        println!("psql out: {}", result.stdout.clone().unwrap());
+        // println!("psql out: {}", result.stdout.clone().unwrap());
         assert!(!result.stdout.clone().unwrap().contains("customers"));
 
         let result = psql_with_retry(
@@ -1278,13 +1341,13 @@ mod test {
             .to_string(),
         )
         .await;
-        println!("{}", result.stdout.clone().unwrap());
+        // println!("{}", result.stdout.clone().unwrap());
         assert!(result.stdout.clone().unwrap().contains("CREATE TABLE"));
 
         // Assert table 'customers' exists
         let result =
             psql_with_retry(context.clone(), coredb_resource.clone(), "\\dt".to_string()).await;
-        println!("{}", result.stdout.clone().unwrap());
+        // println!("{}", result.stdout.clone().unwrap());
         assert!(result.stdout.clone().unwrap().contains("customers"));
 
         let result = wait_until_psql_contains(
@@ -1296,14 +1359,15 @@ mod test {
         )
         .await;
 
-        println!("{}", result.stdout.clone().unwrap());
+        // println!("{}", result.stdout.clone().unwrap());
         assert!(result.stdout.clone().unwrap().contains("aggs_for_vecs"));
 
         // Check for metrics and availability
         let metric_name = format!("cnpg_collector_up{{cluster=\"{}\"}} 1", name);
         match wait_for_metric(pods.clone(), pod_name.to_string(), &metric_name).await {
-            Ok(result_stdout) => {
-                println!("Metric found: {}", result_stdout);
+            Ok(_result_stdout) => {
+                println!("Metric found for: {}", pod_name);
+                // println!("Metrics: {}", result_stdout);
             }
             Err(e) => {
                 panic!("Failed to find metric: {}", e);
@@ -1312,8 +1376,9 @@ mod test {
 
         // Look for the custom metric
         match wait_for_metric(pods.clone(), pod_name.to_string(), &test_metric_decr).await {
-            Ok(result_stdout) => {
-                println!("Metric found: {}", result_stdout);
+            Ok(_result_stdout) => {
+                println!("Metric found for: {}", pod_name);
+                // println!("Metrics: {}", result_stdout);
             }
             Err(e) => {
                 panic!("Failed to find metric: {}", e);
@@ -1837,14 +1902,15 @@ mod test {
 
     #[tokio::test]
     #[ignore]
-    async fn functional_test_ingress_route_tcp() {
+    async fn test_networking() {
         // Initialize the Kubernetes client
         let client = kube_client().await;
+        let state = State::default();
 
         // Configurations
         let mut rng = rand::thread_rng();
-        let suffix = rng.gen_range(0..100000);
-        let name = &format!("test-ingress-route-tcp-{}", suffix.clone());
+        let suffix = rng.gen_range(1000..10000);
+        let name = &format!("test-dedicated-networking-{}", suffix.clone());
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
             Err(e) => {
@@ -1872,7 +1938,7 @@ mod test {
                 "replicas": replicas,
             }
         });
-        let params = PatchParams::apply("functional-test-ingress-route-tcp");
+        let params = PatchParams::apply("functional-test-networking");
         let patch = Patch::Apply(&coredb_json);
         let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
 
@@ -1940,7 +2006,7 @@ mod test {
                 "extra_domains_rw": ["any-given-domain.com", "another-domain.com"]
             }
         });
-        let params = PatchParams::apply("functional-test-ingress-route-tcp");
+        let params = PatchParams::apply("functional-test-networking");
         let patch = Patch::Merge(&coredb_json);
         let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
 
@@ -1982,7 +2048,7 @@ mod test {
                 "extra_domains_rw": ["new-domain.com"]
             }
         });
-        let params = PatchParams::apply("functional-test-ingress-route-tcp");
+        let params = PatchParams::apply("functional-test-networking");
         let patch = Patch::Merge(&coredb_json);
         let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
 
@@ -2023,7 +2089,7 @@ mod test {
                 "extra_domains_rw": [],
             }
         });
-        let params = PatchParams::apply("functional-test-ingress-route-tcp").force();
+        let params = PatchParams::apply("functional-test-networking").force();
         let patch = Patch::Apply(&coredb_json);
         let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
 
@@ -2042,7 +2108,210 @@ mod test {
         // Should be deleted
         assert!(ing_route_tcp.is_err());
 
-        // Cleanup CoreDB resource
+        // Enable Dedicated Networking Test
+        let context = state.create_context(client.clone());
+
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "dedicatedNetworking": {
+                    "enabled": true,
+                    "includeStandby": true,
+                    "public": true,
+                    "serviceType": "LoadBalancer"
+                }
+            }
+        });
+        let params = PatchParams::apply("functional-test-dedicated-networking");
+        let patch = Patch::Apply(&coredb_json);
+        let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        let service_dedicated = service_exists(
+            context.clone(),
+            &namespace,
+            &format!("{}-dedicated", name),
+            false,
+        )
+        .await;
+        let service_dedicated_ro = service_exists(
+            context.clone(),
+            &namespace,
+            &format!("{}-dedicated-ro", name),
+            false,
+        )
+        .await;
+
+        assert!(service_dedicated.is_some());
+        assert!(service_dedicated_ro.is_some());
+
+        let service = service_dedicated.unwrap();
+        assert_eq!(
+            service.spec.as_ref().unwrap().type_,
+            Some("LoadBalancer".to_string())
+        );
+
+        let annotations = service
+            .metadata
+            .annotations
+            .as_ref()
+            .expect("Annotations should be present");
+        let basedomain = std::env::var("DATA_PLANE_BASEDOMAIN").unwrap();
+        let expected_hostname = format!("dedicated.{}.{}", namespace, basedomain);
+
+        assert_eq!(
+            annotations
+                .get("external-dns.alpha.kubernetes.io/hostname")
+                .expect("Hostname annotation should be present"),
+            &expected_hostname
+        );
+
+        assert_eq!(
+            annotations
+                .get("service.beta.kubernetes.io/aws-load-balancer-internal")
+                .expect("AWS LB internal annotation should be present"),
+            &serde_json::Value::String("false".to_string())
+        );
+
+        assert_eq!(
+            annotations
+                .get("service.beta.kubernetes.io/aws-load-balancer-scheme")
+                .expect("AWS LB scheme annotation should be present"),
+            &serde_json::Value::String("internet-facing".to_string())
+        );
+
+        assert_eq!(
+            annotations
+                .get("service.beta.kubernetes.io/aws-load-balancer-nlb-target-type")
+                .expect("AWS LB NLB target type annotation should be present"),
+            &serde_json::Value::String("ip".to_string())
+        );
+
+        assert_eq!(
+            annotations
+                .get("service.beta.kubernetes.io/aws-load-balancer-type")
+                .expect("AWS LB type annotation should be present"),
+            &serde_json::Value::String("nlb-ip".to_string())
+        );
+
+        assert_eq!(
+            annotations
+                .get("service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol")
+                .expect("AWS LB healthcheck protocol annotation should be present"),
+            &serde_json::Value::String("TCP".to_string())
+        );
+
+        assert_eq!(
+            annotations
+                .get("service.beta.kubernetes.io/aws-load-balancer-healthcheck-port")
+                .expect("AWS LB healthcheck port annotation should be present"),
+            &serde_json::Value::String("5432".to_string())
+        );
+
+        let service = service_dedicated_ro.unwrap();
+        assert_eq!(
+            service.spec.as_ref().unwrap().type_,
+            Some("LoadBalancer".to_string())
+        );
+
+        let annotations = service
+            .metadata
+            .annotations
+            .as_ref()
+            .expect("Annotations should be present");
+        let basedomain = std::env::var("DATA_PLANE_BASEDOMAIN").unwrap();
+        let expected_hostname = format!("dedicated-ro.{}.{}", namespace, basedomain);
+
+        assert_eq!(
+            annotations
+                .get("external-dns.alpha.kubernetes.io/hostname")
+                .expect("Hostname annotation should be present"),
+            &expected_hostname
+        );
+
+        assert_eq!(
+            annotations
+                .get("service.beta.kubernetes.io/aws-load-balancer-internal")
+                .expect("AWS LB internal annotation should be present"),
+            &serde_json::Value::String("false".to_string())
+        );
+
+        assert_eq!(
+            annotations
+                .get("service.beta.kubernetes.io/aws-load-balancer-scheme")
+                .expect("AWS LB scheme annotation should be present"),
+            &serde_json::Value::String("internet-facing".to_string())
+        );
+
+        assert_eq!(
+            annotations
+                .get("service.beta.kubernetes.io/aws-load-balancer-nlb-target-type")
+                .expect("AWS LB NLB target type annotation should be present"),
+            &serde_json::Value::String("ip".to_string())
+        );
+
+        assert_eq!(
+            annotations
+                .get("service.beta.kubernetes.io/aws-load-balancer-type")
+                .expect("AWS LB type annotation should be present"),
+            &serde_json::Value::String("nlb-ip".to_string())
+        );
+
+        assert_eq!(
+            annotations
+                .get("service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol")
+                .expect("AWS LB healthcheck protocol annotation should be present"),
+            &serde_json::Value::String("TCP".to_string())
+        );
+
+        assert_eq!(
+            annotations
+                .get("service.beta.kubernetes.io/aws-load-balancer-healthcheck-port")
+                .expect("AWS LB healthcheck port annotation should be present"),
+            &serde_json::Value::String("5432".to_string())
+        );
+
+        // Disable dedicated networking
+        let coredb_json = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "dedicatedNetworking": {
+                    "enabled": false,
+                }
+            }
+        });
+        let patch = Patch::Apply(&coredb_json);
+        let _coredb_resource = coredbs.patch(name, &params, &patch).await.unwrap();
+
+        tokio::time::sleep(Duration::from_secs(10)).await;
+
+        let service_deleted = service_exists(
+            context.clone(),
+            &namespace,
+            &format!("{}-dedicated", name),
+            true,
+        )
+        .await
+        .is_none();
+        let service_ro_deleted = service_exists(
+            context.clone(),
+            &namespace,
+            &format!("{}-dedicated-ro", name),
+            true,
+        )
+        .await
+        .is_none();
+
+        assert!(service_deleted);
+        assert!(service_ro_deleted);
+
         coredbs.delete(name, &Default::default()).await.unwrap();
         println!("Waiting for CoreDB to be deleted: {}", &name);
         let _assert_coredb_deleted = tokio::time::timeout(

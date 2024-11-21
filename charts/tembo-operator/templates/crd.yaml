@@ -1930,8 +1930,9 @@ spec:
                   retentionPolicy: '30'
                   schedule: 0 0 * * *
                   endpointURL: null
-                  s3Credentials:
-                    inheritFromIAMRole: true
+                  s3Credentials: null
+                  googleCredentials: null
+                  azureCredentials: null
                   volumeSnapshot:
                     enabled: false
                 description: |-
@@ -1939,6 +1940,71 @@ spec:
 
                   **Default**: disabled
                 properties:
+                  azureCredentials:
+                    description: The Azure credentials to use for backups
+                    nullable: true
+                    properties:
+                      connectionString:
+                        description: The connection string to be used
+                        nullable: true
+                        properties:
+                          key:
+                            description: The key to select
+                            type: string
+                          name:
+                            description: Name of the referent.
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                      inheritFromAzureAD:
+                        description: Use the Azure AD based authentication without providing explicitly the keys.
+                        nullable: true
+                        type: boolean
+                      storageAccount:
+                        description: The storage account where to upload data
+                        nullable: true
+                        properties:
+                          key:
+                            description: The key to select
+                            type: string
+                          name:
+                            description: Name of the referent.
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                      storageKey:
+                        description: The storage account key to be used in conjunction with the storage account name
+                        nullable: true
+                        properties:
+                          key:
+                            description: The key to select
+                            type: string
+                          name:
+                            description: Name of the referent.
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                      storageSasToken:
+                        description: A shared-access-signature to be used in conjunction with the storage account name
+                        nullable: true
+                        properties:
+                          key:
+                            description: The key to select
+                            type: string
+                          name:
+                            description: Name of the referent.
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                    type: object
                   destinationPath:
                     default: s3://
                     description: The S3 bucket path to store backups in
@@ -1953,14 +2019,33 @@ spec:
                     description: The S3 compatable endpoint URL
                     nullable: true
                     type: string
+                  googleCredentials:
+                    description: The Google Cloud credentials to use for backups
+                    nullable: true
+                    properties:
+                      applicationCredentials:
+                        description: The reference to the secret containing the Google Cloud Storage JSON file with the credentials
+                        nullable: true
+                        properties:
+                          key:
+                            type: string
+                          name:
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                      gkeEnvironment:
+                        description: Use the role based authentication without providing explicitly the keys.
+                        nullable: true
+                        type: boolean
+                    type: object
                   retentionPolicy:
                     default: '30'
                     description: The number of days to retain backups for
                     nullable: true
                     type: string
                   s3Credentials:
-                    default:
-                      inheritFromIAMRole: true
                     description: The S3 credentials to use for backups (if not using IAM Role)
                     nullable: true
                     properties:
@@ -2134,6 +2219,42 @@ spec:
                             type: object
                         type: object
                     type: object
+                type: object
+              dedicatedNetworking:
+                description: |-
+                  Configuration for dedicated networking.
+
+                  **Default**: disabled
+                nullable: true
+                properties:
+                  enabled:
+                    default: false
+                    description: |-
+                      Enable dedicated networking for the CoreDB instance.
+
+                      **Default**: false.
+                    type: boolean
+                  includeStandby:
+                    default: false
+                    description: |-
+                      Include a separate load balancer for the standby (replica) server.
+
+                      **Default**: false.
+                    type: boolean
+                  public:
+                    default: false
+                    description: |-
+                      Configure the load balancer to be public or private.
+
+                      **Default**: true.
+                    type: boolean
+                  serviceType:
+                    default: LoadBalancer
+                    description: |-
+                      The type of Kubernetes Service to create (LoadBalancer or ClusterIP).
+
+                      **Default**: LoadBalancer.
+                    type: string
                 type: object
               extensions:
                 default: []
@@ -2336,6 +2457,71 @@ spec:
                   **Default**: disabled
                 nullable: true
                 properties:
+                  azureCredentials:
+                    description: azureCredentials is the Azure credentials to use for restores.
+                    nullable: true
+                    properties:
+                      connectionString:
+                        description: The connection string to be used
+                        nullable: true
+                        properties:
+                          key:
+                            description: The key to select
+                            type: string
+                          name:
+                            description: Name of the referent.
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                      inheritFromAzureAD:
+                        description: Use the Azure AD based authentication without providing explicitly the keys.
+                        nullable: true
+                        type: boolean
+                      storageAccount:
+                        description: The storage account where to upload data
+                        nullable: true
+                        properties:
+                          key:
+                            description: The key to select
+                            type: string
+                          name:
+                            description: Name of the referent.
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                      storageKey:
+                        description: The storage account key to be used in conjunction with the storage account name
+                        nullable: true
+                        properties:
+                          key:
+                            description: The key to select
+                            type: string
+                          name:
+                            description: Name of the referent.
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                      storageSasToken:
+                        description: A shared-access-signature to be used in conjunction with the storage account name
+                        nullable: true
+                        properties:
+                          key:
+                            description: The key to select
+                            type: string
+                          name:
+                            description: Name of the referent.
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                    type: object
                   backupsPath:
                     description: |-
                       The object storage path and bucket name of the instance you wish to restore from.  This maps to the `Backup` `destinationPath` field for the original instance.
@@ -2344,15 +2530,36 @@ spec:
                     nullable: true
                     type: string
                   endpointURL:
-                    description: endpointURL is the S3 compatable endpoint URL
+                    description: endpointURL is the S3 compatible endpoint URL
                     nullable: true
                     type: string
+                  googleCredentials:
+                    description: googleCredentials is the Google Cloud credentials to use for restores.
+                    nullable: true
+                    properties:
+                      applicationCredentials:
+                        description: The reference to the secret containing the Google Cloud Storage JSON file with the credentials
+                        nullable: true
+                        properties:
+                          key:
+                            type: string
+                          name:
+                            type: string
+                        required:
+                        - key
+                        - name
+                        type: object
+                      gkeEnvironment:
+                        description: Use the role based authentication without providing explicitly the keys.
+                        nullable: true
+                        type: boolean
+                    type: object
                   recoveryTargetTime:
                     description: recovery_target_time is the time base target for point-in-time recovery.
                     nullable: true
                     type: string
                   s3Credentials:
-                    description: s3Credentials is the S3 credentials to use for backups.
+                    description: s3Credentials is the S3 credentials to use for restores.
                     nullable: true
                     properties:
                       accessKeyId:

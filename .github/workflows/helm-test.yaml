@@ -2,9 +2,9 @@ name: Lint/Test Helm charts
 
 on:
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
     paths:
-      - 'charts/**'
+      - "charts/**"
 
 jobs:
   find_directories:
@@ -20,7 +20,7 @@ jobs:
         with:
           repository: tembo-io/tembo
           path: ./.tembo
-          ref: 84664df742ce9774a3029e08111940f9f1fb345e
+          ref: 9be38d643b2451325dc98807e190b02d50a96db0
       - name: Find directories with Chart.yaml that changed
         id: find_directories
         uses: ./.tembo/.github/actions/find-changed-directories
@@ -43,7 +43,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          path: 'code'
+          path: "code"
 
       - name: Fetch main branch
         run: |

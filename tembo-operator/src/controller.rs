@@ -12,9 +12,11 @@ use crate::{
             reconcile_pooler,
         },
         placement::cnpg_placement::PlacementConfig,
+        retention::snapshots::cleanup_old_volume_snapshots,
         VOLUME_SNAPSHOT_CLASS_NAME,
     },
     config::Config,
+    dedicated_networking::reconcile_dedicated_networking,
     exec::{ExecCommand, ExecOutput},
     extensions::database_queries::is_not_restarting,
     heartbeat::reconcile_heartbeat,
@@ -277,6 +279,13 @@ impl CoreDB {
                     Action::requeue(Duration::from_secs(300))
                 })?;
 
+                reconcile_dedicated_networking(self, ctx.clone(), basedomain.as_str())
+                    .await
+                    .map_err(|e| {
+                        error!("Error reconciling dedicated networking: {:?}", e);
+                        Action::requeue(Duration::from_secs(300))
+                    })?;
+
                 let name_pooler = format!("{}-pooler", self.name_any().as_str());
                 let prefix_pooler = format!("{}-pooler-", self.name_any().as_str());
                 reconcile_postgres_ing_route_tcp(
@@ -409,6 +418,29 @@ impl CoreDB {
         patch_cdb_status_merge(&coredbs, &name, patch_status).await?;
 
         reconcile_heartbeat(self, ctx.clone()).await?;
+
+        // Cleanup old volume snapshots that are older than the retention period
+        // set in cfg.volume_snapshot_retention_period
+        // if volumesnapshots is enabled
+        if cfg.enable_volume_snapshot {
+            match cleanup_old_volume_snapshots(
+                self,
+                client,
+                cfg.volume_snapshot_retention_period_days,
+            )
+            .await
+            {
+                Ok(_) => {
+                    info!(
+                        "Successfully cleaned up old volume snapshots for instance: {}",
+                        self.name_any()
+                    );
+                }
+                Err(action) => {
+                    return Err(action);
+                }
+            }
+        }
 
         info!("Fully reconciled {}", self.name_any());
         Ok(requeue_normal_with_jitter())

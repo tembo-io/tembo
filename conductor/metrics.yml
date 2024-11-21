@@ -2,21 +2,23 @@ metrics:
 - name: is_standby
   server: prometheus
   query: |
-    sum by (instance_id, pod) (
+    sum by (instance_id, pod, label_cnpg_io_instance_role) (
       label_replace(
-        cnpg_pg_replication_in_recovery{} * on(namespace) group_left(label_tembo_io_instance_id)
-        kube_namespace_labels{label_tembo_io_instance_id!=""},
+        cnpg_pg_replication_in_recovery{} 
+        * on(namespace) group_left(label_tembo_io_instance_id) kube_namespace_labels{label_tembo_io_instance_id!=""}
+        * on(pod) group_left(label_cnpg_io_instance_role) kube_pod_labels{label_cnpg_io_instance_role="replica"},
         "instance_id", "$1", "label_tembo_io_instance_id", "(.*)"
       )
     )
 - name: primary_available
   server: prometheus
   query: |
-    sum by (instance_id, pod) (
+    sum by (instance_id, pod, label_cnpg_io_instance_role) (
       label_replace(
-        kube_pod_container_status_ready{container="postgres"} * on(namespace) group_left(label_tembo_io_instance_id)
-        kube_namespace_labels{label_tembo_io_instance_id!=""} unless on(namespace, pod)
-        (cnpg_pg_replication_in_recovery{} == 1),
+        kube_pod_container_status_ready{container="postgres"} 
+        * on(namespace) group_left(label_tembo_io_instance_id) kube_namespace_labels{label_tembo_io_instance_id!=""}
+        * on(pod) group_left(label_cnpg_io_instance_role) kube_pod_labels{label_cnpg_io_instance_role="primary"}
+        unless on(namespace, pod) (cnpg_pg_replication_in_recovery{} == 1),
         "instance_id", "$1", "label_tembo_io_instance_id", "(.*)"
       )
     )

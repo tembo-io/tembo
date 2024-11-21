@@ -1,3 +1,3 @@
-FROM  vllm/vllm-openai:v0.5.4
+FROM  vllm/vllm-openai:v0.6.3
 
 ENTRYPOINT ["python3", "-m", "vllm.entrypoints.openai.api_server"]

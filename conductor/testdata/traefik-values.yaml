@@ -1,5 +1,7 @@
 image:
-  tag: v3.0.0-beta2
+  tag: v3.0.3-tembo.1
+  registry: quay.io/tembo
+  repository: traefik
 logs:
   general:
     level: DEBUG
@@ -15,22 +17,38 @@ additionalArguments:
   - "--api.debug=true"
 ports:
   postgresql:
-    expose: true
+    expose:
+      default: true
     port: 5432
     exposedPort: 5432
     nodePort: 32432
     protocol: TCP
-  web:
-    expose: true
-    port: 8080
-    exposedPort: 8080
-    nodePort: 32430
+  # web:
+  #   expose: true
+  #   port: 8080
+  #   exposedPort: 8080
+  #   nodePort: 32430
+  #   protocol: TCP
+  websecure:
+    expose:
+      default: true
+    port: 8443
+    exposedPort: 8443
+    nodePort: 32443
     protocol: TCP
   traefik:
-    expose: true
+    expose:
+      default: true
     port: 9000
     exposedPort: 9000
     nodePort: 32431
     protocol: TCP
 deployment:
   replicas: 1
+resources:
+  requests:
+    cpu: "200m"
+    memory: "100Mi"
+  limits:
+    cpu: "400m"
+    memory: "300Mi"

@@ -52,10 +52,9 @@ Tembo Cloud is a dev-first, fully-extensible, fully-managed, secure, and scalabl
 
 Deploy a free-forever hobby Postgres database and install any of more than 200 extensions at [https://cloud.tembo.io](https://cloud.tembo.io).
 
-## Tembo Self Hosted (Alpha)
+## Tembo Self Hosted (GA)
+Tembo Self Hosted is a self-hosted version of the Tembo Platform that runs in your own Kubernetes cluster. It allows you to benefit from the same features as Tembo Cloud, but with the added control and security of running the software in your own environment.
 
-Tembo Self-Hosted is a self-hosted version of the Tembo Platform that runs in your own Kubernetes cluster. It allows you to benefit from the same features as Tembo Cloud, but with the added control and security of running the software in your own environment.
-
-Tembo Self-Hosted is made up of the same components as Tembo Cloud, but packaged and distributed in a way that allows for easy installation and management. Instead of running in separate Kubernetes clusters, the components run in a single Kubernetes cluster. This keeps your total cost of ownership low and makes for a simple and easy-to-manage deployment.
+Tembo Self Hosted is made up of the same components as Tembo Cloud, but packaged and distributed in a way that allows for easy installation and management. Instead of running in separate Kubernetes clusters, the components run in a single Kubernetes cluster. This keeps your total cost of ownership low and makes for a simple and easy-to-manage deployment.
 
 If you're interested in using Tembo Self Hosted, [reach out for a license](https://calendly.com/ian-tembo).

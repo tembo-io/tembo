@@ -16,7 +16,7 @@ env_logger = "0.10.0"
 futures = "0.3.28"
 k8s-openapi = { version = "0.18.0", features = ["v1_25", "schemars"] }
 log = "0.4.17"
-pgmq = "0.28.2"
+pgmq = "0.29.2"
 schemars = "0.8.12"
 serde = { version = "1.0.160", features = ["derive"] }
 serde_json = "1.0.96"
@@ -31,10 +31,19 @@ opentelemetry = { version = "0.18", features = [
   "rt-tokio-current-thread",
 ] }
 opentelemetry-prometheus = "0.11"
-sqlx = { version = "0.7", features = ["runtime-tokio-native-tls", "postgres"] }
+sqlx = { version = "0.8", features = ["runtime-tokio-native-tls", "postgres"] }
 anyhow = "1.0.82"
 serde_yaml = "0.9.34"
 reqwest = { version = "0.12.3", features = ["json"] }
+google-cloud-storage = "0.22.1"
+azure_identity = "0.21.0"
+azure_mgmt_msi = "0.21.0"
+azure_mgmt_authorization = "0.21.0"
+azure_mgmt_storage = "0.21.0"
+azure_core = "0.21.0"
+uuid = "1.10.0"
+url = "=2.5.2" #https://github.com/servo/rust-url/issues/992
+idna = "=0.5.0" #https://github.com/servo/rust-url/issues/992
 
 [dependencies.kube]
 features = ["runtime", "client", "derive"]

@@ -1,0 +1,17 @@
+name: !sqlrunner
+appServices:
+  - image: quay.io/tembo/sql-runner:c62f892
+    name: sqlrunner
+    resources:
+      requests:
+        cpu: 10m
+        memory: 100Mi
+      limits:
+        cpu: 200m
+        memory: 100Mi
+    routing:
+      - port: 3000
+        ingressPath: "/sql/v1"
+    env:
+      - name: CONNECTION_STRING
+        valueFromPlatform: ReadWriteConnection
