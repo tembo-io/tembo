@@ -13,6 +13,7 @@ mod cli;
 mod cmd;
 mod tui;
 
+//Testing
 #[derive(Parser)]
 #[clap(name = "tembo", author = crate_authors!("\n"), version = crate_version!(), long_about = None)]
 struct App {
