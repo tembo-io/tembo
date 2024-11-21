@@ -12,6 +12,9 @@ externalSecrets:
   parameterStore:
     name: "secret-store-parameter-store"
     kind: ClusterSecretStore
+  # remoteRef:
+  #   key: ~
+  #   secretKey: ~
   secretName: ~
   secretRegex: ~
 
