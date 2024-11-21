@@ -100,7 +100,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         .parse()
         .expect("error parsing AZURE_SUBSCRIPTION_ID");
     // This is necessary for working with multiple resource groups. Example format: cdb-plat-eus-dev
-    let azure_resource_group_prefix: String = env::var("AZURE_RESOURCE_GROUP_PREFIX ")
+    let azure_resource_group_prefix: String = env::var("AZURE_RESOURCE_GROUP_PREFIX")
         .unwrap_or_else(|_| "".to_owned())
         .parse()
         .expect("error parsing AZURE_RESOURCE_GROUP_PREFIX");
