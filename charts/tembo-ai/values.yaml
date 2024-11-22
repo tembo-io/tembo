@@ -1,6 +1,6 @@
 inferenceGateway:
   image:
-    repository: quay.io/tembo/inference-gateway
+    repository: tembo.docker.scarf.sh/tembo/inference-gateway
     pullPolicy: IfNotPresent
     tag: latest
   resources:
@@ -89,7 +89,7 @@ inferenceGateway:
 inferenceService:
   defaults:
     image:
-      repository: quay.io/tembo/inference
+      repository: tembo.docker.scarf.sh/tembo/inference
       pullPolicy: IfNotPresent
       tag: latest
     resources:
