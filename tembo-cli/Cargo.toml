@@ -100,3 +100,6 @@ openssl = { version = "0.10", features = ["vendored"] }
 assert_cmd = "2.0.8"
 predicates = "2.1.5"
 rstest = "0.18"
+
+[env]
+RUST_TEST_THREADS = "1"
