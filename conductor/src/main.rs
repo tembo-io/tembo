@@ -133,13 +133,14 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
     }
 
     // Error and exit if IS_AZURE is true and any of the required Azure environment variables are not set
-    if is_azure
-        && (azure_storage_account.is_empty()
-            || azure_subscription_id.is_empty()
-            || azure_resource_group_prefix.is_empty()
-            || azure_region.is_empty())
-    {
-        panic!("AZURE_STORAGE_ACCOUNT, AZURE_SUBSCRIPTION_ID, AZURE_RESOURCE_GROUP_PREFIX, and AZURE_REGION must be set if IS_AZURE is true");
+    if let Err(err) = validate_azure_environment(
+        is_azure,
+        &azure_storage_account,
+        &azure_subscription_id,
+        &azure_resource_group_prefix,
+        &azure_region,
+    ) {
+        panic!("{}", err);
     }
 
     // Connect to pgmq
@@ -183,6 +184,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
     let cloud_provider = CloudProvider::builder()
         .gcp(is_gcp)
         .aws(is_cloud_formation)
+        .azure(is_azure)
         .build();
 
     loop {
@@ -1072,4 +1074,73 @@ async fn init_azure_storage_workload_identity(
 
 fn from_env_default(key: &str, default: &str) -> String {
     env::var(key).unwrap_or_else(|_| default.to_owned())
+}
+
+/// Validates that all required Azure environment variables are set when IS_AZURE is true.
+/// Returns Ok(()) if all variables are present and non-empty, or an error message listing missing variables.
+fn validate_azure_environment(
+    is_azure: bool,
+    azure_storage_account: &str,
+    azure_subscription_id: &str,
+    azure_resource_group_prefix: &str,
+    azure_region: &str,
+) -> Result<(), String> {
+    if !is_azure {
+        return Ok(());
+    }
+
+    let required_vars = [
+        ("AZURE_STORAGE_ACCOUNT", azure_storage_account),
+        ("AZURE_SUBSCRIPTION_ID", azure_subscription_id),
+        ("AZURE_RESOURCE_GROUP_PREFIX", azure_resource_group_prefix),
+        ("AZURE_REGION", azure_region),
+    ];
+
+    let missing_vars: Vec<&str> = required_vars
+        .iter()
+        .filter(|(_, value)| value.is_empty())
+        .map(|(name, _)| *name)
+        .collect();
+
+    if missing_vars.is_empty() {
+        Ok(())
+    } else {
+        Err(format!(
+            "The following required Azure environment variables are empty: {}",
+            missing_vars.join(", ")
+        ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_azure_validation() {
+        // Test when Azure is disabled
+        assert!(validate_azure_environment(false, "", "", "", "").is_ok());
+
+        // Test when Azure is enabled and all variables are present
+        assert!(validate_azure_environment(
+            true,
+            "storage_account",
+            "subscription_id",
+            "resource_group",
+            "region"
+        )
+        .is_ok());
+
+        // Test when Azure is enabled and variables are missing
+        let err =
+            validate_azure_environment(true, "", "subscription_id", "resource_group", "region")
+                .unwrap_err();
+        assert!(err.contains("AZURE_STORAGE_ACCOUNT"));
+
+        // Test multiple missing variables
+        let err = validate_azure_environment(true, "", "", "resource_group", "").unwrap_err();
+        assert!(err.contains("AZURE_STORAGE_ACCOUNT"));
+        assert!(err.contains("AZURE_SUBSCRIPTION_ID"));
+        assert!(err.contains("AZURE_REGION"));
+    }
 }
