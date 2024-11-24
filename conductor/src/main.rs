@@ -901,12 +901,12 @@ async fn init_cloud_perms(
         }),
     };
 
-    // TODO: disable volumesnapshots for now until we can make them work with CNPG
-    // Enable VolumeSnapshots for all instances being created
-    let volume_snapshot = Some(VolumeSnapshot {
-        enabled: false,
-        snapshot_class: None,
-    });
+    // TODO: disable volumesnapshots for now until we can figure out how to not crash the
+    // snapshot-controller due to the amount of snapshots being created/managed
+    // let volume_snapshot = Some(VolumeSnapshot {
+    //     enabled: false,
+    //     snapshot_class: None,
+    // });
 
     let write_path = read_msg
         .message
@@ -922,7 +922,9 @@ async fn init_cloud_perms(
             inherit_from_iam_role: Some(true),
             ..Default::default()
         }),
-        volume_snapshot,
+        // disable volumesnapshots for now until we can figure out how to not crash the
+        // snapshot-controller due to the amount of snapshots being created/managed
+        // volume_snapshot,
         ..Default::default()
     };
 

@@ -419,6 +419,18 @@ async fn reconcile_dedicated_networking_service(
     );
     service_spec.insert("sessionAffinity".to_string(), json!("None"));
     service_spec.insert("type".to_string(), json!(service_type));
+
+    // This variable should be reworked.
+    // For now lets just suppress the warning.
+    // warning: redundant closure
+    //    --> src/dedicated_networking.rs:422:71
+    //     |
+    // 422 |     let ip_allow_list = cdb.spec.ip_allow_list.clone().unwrap_or_else(|| vec![]);
+    //     |                                                                       ^^^^^^^^^ help: replace the closure with `Vec::new`: `std::vec::Vec::new`
+    //     |
+    //     = help: for further information visit https://rust-lang.github.io/rust-clippy/master/index.html#redundant_closure
+    //     = note: `#[warn(clippy::redundant_closure)]` on by default
+    #[allow(clippy::redundant_closure)]
     let ip_allow_list = cdb.spec.ip_allow_list.clone().unwrap_or_else(|| vec![]);
 
     // Allow ip_allow_list to allow all entries are in CIDR notation

@@ -389,9 +389,9 @@ mod tests {
     #[test]
     fn test_is_cluster_hibernated() {
         // Not hibernated yet: still in progress
-        assert_eq!(is_cluster_hibernated(&hibernation_in_progress()), false);
+        assert!(!is_cluster_hibernated(&hibernation_in_progress()));
         // Not hibernated: unrelated condition
-        assert_eq!(is_cluster_hibernated(&backed_up_cluster()), false);
+        assert!(!is_cluster_hibernated(&backed_up_cluster()));
         // Hibernated: "type" is "cnpg.io/hibernation" and "status" is "True"
         assert!(is_cluster_hibernated(&hibernation_completed()));
     }
