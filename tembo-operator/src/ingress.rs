@@ -196,7 +196,7 @@ async fn apply_ingress_route_tcp(
     Ok(())
 }
 
-async fn delete_ingress_route_tcp(
+pub async fn delete_ingress_route_tcp(
     ingress_route_tcp_api: Api<IngressRouteTCP>,
     namespace: &str,
     ingress_route_tcp_name: &String,

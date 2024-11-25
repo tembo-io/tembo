@@ -3,6 +3,7 @@ use crate::cloudnativepg::clusters::{ClusterStatusConditions, ClusterStatusCondi
 use crate::cloudnativepg::cnpg::{get_cluster, get_pooler, get_scheduled_backups};
 use crate::cloudnativepg::poolers::Pooler;
 use crate::cloudnativepg::scheduledbackups::ScheduledBackup;
+use crate::ingress::delete_ingress_route_tcp;
 use crate::Error;
 
 use crate::{patch_cdb_status_merge, requeue_normal_with_jitter, Context};
@@ -143,6 +144,22 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
                 return Err(requeue_normal_with_jitter());
             }
         }
+    }
+
+    // Delete the IngressRouteTCP route for hibernated instances
+    if let Err(err) = delete_ingress_route_tcp(
+        Api::namespaced(client, &namespace),
+        &namespace,
+        &format!("{}-ro-0", cdb.name_any().as_str()),
+    )
+    .await
+    {
+        warn!(
+            "Error deleting ingress route for {}: {}",
+            cdb.name_any(),
+            err
+        );
+        return Err(Action::requeue(Duration::from_secs(300)));
     }
 
     // Stop CNPG reconciliation for hibernated instances.
