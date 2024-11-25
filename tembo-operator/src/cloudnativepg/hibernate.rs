@@ -148,12 +148,10 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
 
     // Remove IngressRouteTCP route for stopped instances
     let ingress_route_tcp_name = format!("{}-ro-0", cdb.name_any().as_str());
-    if let Err(err) = delete_ingress_route_tcp(
-        Api::namespaced(client, &namespace),
-        &namespace,
-        &ingress_route_tcp_name,
-    )
-    .await
+    let ingress_route_tcp_api = Api::namespaced(ctx.client.clone(), &namespace);
+
+    if let Err(err) =
+        delete_ingress_route_tcp(ingress_route_tcp_api, &namespace, &ingress_route_tcp_name).await
     {
         warn!(
             "Error deleting ingress route for {}: {}",
