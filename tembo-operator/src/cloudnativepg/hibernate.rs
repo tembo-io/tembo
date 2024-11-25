@@ -146,11 +146,12 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
         }
     }
 
-    // Delete the IngressRouteTCP route for hibernated instances
+    // Remove IngressRouteTCP route for stopped instances
+    let ingress_route_tcp_name = format!("{}-ro-0", cdb.name_any().as_str());
     if let Err(err) = delete_ingress_route_tcp(
         Api::namespaced(client, &namespace),
         &namespace,
-        &format!("{}-ro-0", cdb.name_any().as_str()),
+        &ingress_route_tcp_name,
     )
     .await
     {
