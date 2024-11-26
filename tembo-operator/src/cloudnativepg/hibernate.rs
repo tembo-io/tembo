@@ -176,7 +176,7 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
         return Err(Action::requeue(Duration::from_secs(300)));
     }
 
-    let prefix_pooler = format!("{}-poller-0", cdb.name_any().as_str());
+    let prefix_pooler = format!("{}-pooler-0", cdb.name_any().as_str());
     if let Err(err) =
         delete_ingress_route_tcp(ingress_route_tcp_api.clone(), &namespace, &prefix_pooler).await
     {
@@ -188,16 +188,19 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
         return Err(Action::requeue(Duration::from_secs(300)));
     }
 
-    let prefix_extra = format!("extra-{}-rw", cdb.name_any().as_str());
-    if let Err(err) =
-        delete_ingress_route_tcp(ingress_route_tcp_api.clone(), &namespace, &prefix_extra).await
-    {
-        warn!(
-            "Error deleting extra postgres ingress route for {}: {}",
-            cdb.name_any(),
-            err
-        );
-        return Err(Action::requeue(Duration::from_secs(300)));
+    let extra_domain_names = cdb.spec.extra_domains_rw.clone().unwrap_or_default();
+    if !extra_domain_names.is_empty() {
+        let prefix_extra = format!("extra-{}-rw", cdb.name_any().as_str());
+        if let Err(err) =
+            delete_ingress_route_tcp(ingress_route_tcp_api.clone(), &namespace, &prefix_extra).await
+        {
+            warn!(
+                "Error deleting extra postgres ingress route for {}: {}",
+                cdb.name_any(),
+                err
+            );
+            return Err(Action::requeue(Duration::from_secs(300)));
+        }
     }
 
     // Stop CNPG reconciliation for hibernated instances.
