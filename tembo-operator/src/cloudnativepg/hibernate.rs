@@ -147,14 +147,41 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
     }
 
     // Remove IngressRouteTCP route for stopped instances
-    let ingress_route_tcp_name = format!("{}-ro-0", cdb.name_any().as_str());
     let ingress_route_tcp_api = Api::namespaced(ctx.client.clone(), &namespace);
-
+    let prefix_read_only = format!("{}-ro-0", cdb.name_any().as_str());
     if let Err(err) =
-        delete_ingress_route_tcp(ingress_route_tcp_api, &namespace, &ingress_route_tcp_name).await
+        delete_ingress_route_tcp(ingress_route_tcp_api.clone(), &namespace, &prefix_read_only).await
     {
         warn!(
             "Error deleting ingress route for {}: {}",
+            cdb.name_any(),
+            err
+        );
+        return Err(Action::requeue(Duration::from_secs(300)));
+    }
+
+    let prefix_read_write = format!("{}-rw-0", cdb.name_any().as_str());
+    if let Err(err) = delete_ingress_route_tcp(
+        ingress_route_tcp_api.clone(),
+        &namespace,
+        &prefix_read_write,
+    )
+    .await
+    {
+        warn!(
+            "Error deleting extra ingress route for {}: {}",
+            cdb.name_any(),
+            err
+        );
+        return Err(Action::requeue(Duration::from_secs(300)));
+    }
+
+    let prefix_pooler = format!("{}-poller-0", cdb.name_any().as_str());
+    if let Err(err) =
+        delete_ingress_route_tcp(ingress_route_tcp_api.clone(), &namespace, &prefix_pooler).await
+    {
+        warn!(
+            "Error deleting pooler ingress route for {}: {}",
             cdb.name_any(),
             err
         );
