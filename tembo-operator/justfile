@@ -3,7 +3,7 @@ ORG := "localhost:5001"
 VERSION := `git rev-parse HEAD`
 SEMVER_VERSION := `grep version Cargo.toml | awk -F"\"" '{print $2}' | head -n 1`
 NAMESPACE := "default"
-KUBE_VERSION := env_var_or_default('KUBE_VERSION', '1.25.8')
+KUBE_VERSION := env_var_or_default('KUBE_VERSION', '1.29.8')
 STORAGE_CLASS_NAME := "standard"
 
 default:
