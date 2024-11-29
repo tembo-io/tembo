@@ -19,7 +19,6 @@ use crate::{
     dedicated_networking::reconcile_dedicated_networking,
     exec::{ExecCommand, ExecOutput},
     extensions::database_queries::is_not_restarting,
-    heartbeat::reconcile_heartbeat,
     ingress::reconcile_postgres_ing_route_tcp,
     postgres_certificates::reconcile_certificates,
     psql::{PsqlCommand, PsqlOutput},
@@ -416,8 +415,6 @@ impl CoreDB {
         });
 
         patch_cdb_status_merge(&coredbs, &name, patch_status).await?;
-
-        reconcile_heartbeat(self, ctx.clone()).await?;
 
         // Cleanup old volume snapshots that are older than the retention period
         // set in cfg.volume_snapshot_retention_period
