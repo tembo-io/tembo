@@ -27,10 +27,14 @@ pub fn execute() -> Result<(), anyhow::Error> {
         }
     }
 
+    let current_version = env!("CARGO_PKG_VERSION");
+    let context_text = CONTEXT_DEFAULT_TEXT.replace("_VERSION_", &current_version);
+    let credentials_text = CREDENTIALS_DEFAULT_TEXT.replace("_VERSION_", &current_version);
+
     match FileUtils::create_file(
         "context".to_string(),
         tembo_context_file_path(),
-        CONTEXT_DEFAULT_TEXT.to_string(),
+        context_text.to_string(),
         false,
     ) {
         Ok(t) => t,
@@ -42,7 +46,7 @@ pub fn execute() -> Result<(), anyhow::Error> {
     match FileUtils::create_file(
         "credentials".to_string(),
         tembo_credentials_file_path(),
-        CREDENTIALS_DEFAULT_TEXT.to_string(),
+        credentials_text.to_string(),
         false,
     ) {
         Ok(t) => t,

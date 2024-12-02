@@ -1,6 +1,6 @@
 use crate::cmd::delete::DeleteCommand;
 use crate::cmd::validate::ValidateCommand;
-use crate::cmd::{apply, context, delete, init, login, logs, top, validate};
+use crate::cmd::{apply, context, delete, init, login, logs, top, validate, update};
 use clap::{crate_authors, crate_version, Args, Parser, Subcommand};
 use cmd::apply::ApplyCommand;
 use cmd::context::{ContextCommand, ContextSubCommand};
@@ -8,6 +8,7 @@ use cmd::init::InitCommand;
 use cmd::login::LoginCommand;
 use cmd::logs::LogsCommand;
 use cmd::top::TopCommand;
+use cmd::update::UpdateCommand;
 
 mod cli;
 mod cmd;
@@ -37,6 +38,7 @@ enum SubCommands {
     Logs(LogsCommand),
     Login(LoginCommand),
     Top(TopCommand),
+    Update(UpdateCommand),
 }
 
 #[derive(Args)]
@@ -86,6 +88,9 @@ fn main() -> Result<(), anyhow::Error> {
         }
         SubCommands::Top(_top_cmd) => {
             top::execute(app.global_opts.verbose, _top_cmd)?;
+        }
+        SubCommands::Update(_update_cmd) => {
+            update::execute(app.global_opts.verbose)?;
         }
     }
 

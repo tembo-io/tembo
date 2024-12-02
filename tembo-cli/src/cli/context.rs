@@ -8,7 +8,7 @@ use serde::Serialize;
 
 use crate::tui;
 
-pub const CONTEXT_EXAMPLE_TEXT: &str = "version = \"1.0\"
+pub const CONTEXT_EXAMPLE_TEXT: &str = "version = \"_VERSION_\"
 
 [[environment]]
 name = 'local'
@@ -21,7 +21,7 @@ org_id = 'ORG_ID'
 profile = 'prod'
 set = true";
 
-pub const CREDENTIALS_EXAMPLE_TEXT: &str = "version = \"1.0\"
+pub const CREDENTIALS_EXAMPLE_TEXT: &str = "version = \"_VERSION_\"
     
 [[profile]]
 name = 'prod'

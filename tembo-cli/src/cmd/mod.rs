@@ -6,3 +6,4 @@ pub mod login;
 pub mod logs;
 pub mod top;
 pub mod validate;
+pub mod update;
