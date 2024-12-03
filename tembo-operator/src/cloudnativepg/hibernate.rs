@@ -3,6 +3,7 @@ use crate::cloudnativepg::clusters::{ClusterStatusConditions, ClusterStatusCondi
 use crate::cloudnativepg::cnpg::{get_cluster, get_pooler, get_scheduled_backups};
 use crate::cloudnativepg::poolers::Pooler;
 use crate::cloudnativepg::scheduledbackups::ScheduledBackup;
+use crate::ingress::delete_ingress_route_tcp;
 use crate::Error;
 
 use crate::{patch_cdb_status_merge, requeue_normal_with_jitter, Context};
@@ -142,6 +143,63 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
                 debug!("Caught error {}", e);
                 return Err(requeue_normal_with_jitter());
             }
+        }
+    }
+
+    // Remove IngressRouteTCP route for stopped instances
+    let ingress_route_tcp_api = Api::namespaced(ctx.client.clone(), &namespace);
+    let prefix_read_only = format!("{}-ro-0", cdb.name_any().as_str());
+    if let Err(err) =
+        delete_ingress_route_tcp(ingress_route_tcp_api.clone(), &namespace, &prefix_read_only).await
+    {
+        warn!(
+            "Error deleting postgres ingress route for {}: {}",
+            cdb.name_any(),
+            err
+        );
+        return Err(Action::requeue(Duration::from_secs(300)));
+    }
+
+    let prefix_read_write = format!("{}-rw-0", cdb.name_any().as_str());
+    if let Err(err) = delete_ingress_route_tcp(
+        ingress_route_tcp_api.clone(),
+        &namespace,
+        &prefix_read_write,
+    )
+    .await
+    {
+        warn!(
+            "Error deleting postgres ingress route for {}: {}",
+            cdb.name_any(),
+            err
+        );
+        return Err(Action::requeue(Duration::from_secs(300)));
+    }
+
+    let prefix_pooler = format!("{}-pooler-0", cdb.name_any().as_str());
+    if let Err(err) =
+        delete_ingress_route_tcp(ingress_route_tcp_api.clone(), &namespace, &prefix_pooler).await
+    {
+        warn!(
+            "Error deleting postgres ingress route for {}: {}",
+            cdb.name_any(),
+            err
+        );
+        return Err(Action::requeue(Duration::from_secs(300)));
+    }
+
+    let extra_domain_names = cdb.spec.extra_domains_rw.clone().unwrap_or_default();
+    if !extra_domain_names.is_empty() {
+        let prefix_extra = format!("extra-{}-rw", cdb.name_any().as_str());
+        if let Err(err) =
+            delete_ingress_route_tcp(ingress_route_tcp_api.clone(), &namespace, &prefix_extra).await
+        {
+            warn!(
+                "Error deleting extra postgres ingress route for {}: {}",
+                cdb.name_any(),
+                err
+            );
+            return Err(Action::requeue(Duration::from_secs(300)));
         }
     }
 
