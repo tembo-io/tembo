@@ -246,10 +246,18 @@ pub async fn get_cluster_issuer(
         .send()
         .await?;
 
+    info!("RESPONSE:\n{:?}", response);
+
     let response_json = response.json::<serde_json::Value>().await?;
+
+    info!("RESPONSE JSON:\n{:?}", response_json);
+
     let issuer_url = response_json["properties"]["oidcIssuerProfile"]["issuerURL"]
         .as_str()
-        .unwrap();
+        .ok_or(AzureError::from(AzureSDKError::new(
+            azure_core::error::ErrorKind::Other,
+            "Issuer URL not found in response".to_string(),
+        )))?;
     Ok(issuer_url.to_string())
 }
 
