@@ -83,7 +83,6 @@ pub async fn get_storage_account_id(
     storage_account_name: &str,
     credentials: Arc<dyn TokenCredential>,
 ) -> Result<String, AzureError> {
-    let resource_group = format!("{resource_group}");
     let storage_client = azure_mgmt_storage::Client::builder(credentials).build()?;
     let storage_account_list = storage_client
         .storage_accounts_client()
