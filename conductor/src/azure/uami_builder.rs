@@ -79,11 +79,10 @@ pub async fn get_role_definition_id(
 // Get storage account ID
 pub async fn get_storage_account_id(
     subscription_id: &str,
-    resource_group_prefix: &str,
+    resource_group: &str,
     storage_account_name: &str,
     credentials: Arc<dyn TokenCredential>,
 ) -> Result<String, AzureError> {
-    let resource_group = format!("{resource_group_prefix}-instances");
     let storage_client = azure_mgmt_storage::Client::builder(credentials).build()?;
     let storage_account_list = storage_client
         .storage_accounts_client()
@@ -250,7 +249,10 @@ pub async fn get_cluster_issuer(
     let response_json = response.json::<serde_json::Value>().await?;
     let issuer_url = response_json["properties"]["oidcIssuerProfile"]["issuerURL"]
         .as_str()
-        .unwrap();
+        .ok_or(AzureError::from(AzureSDKError::new(
+            azure_core::error::ErrorKind::Other,
+            "Issuer URL not found in response".to_string(),
+        )))?;
     Ok(issuer_url.to_string())
 }
 
@@ -266,7 +268,7 @@ pub async fn create_federated_identity_credentials(
     let federated_identity_client = azure_mgmt_msi::Client::builder(credentials.clone()).build()?;
     let cluster_issuer = get_cluster_issuer(
         subscription_id,
-        &resource_group,
+        &resource_group_prefix,
         &format!("aks-{resource_group_prefix}"),
         credentials.clone(),
     )
