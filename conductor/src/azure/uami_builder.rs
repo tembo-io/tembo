@@ -186,10 +186,11 @@ pub async fn create_role_assignment(
     )
     .await?
     {
-        info!("Role assignment already exists, skipping creation");
+        info!("Role assignment already exists for {namespace}, skipping creation");
         return Ok(());
     }
 
+    info!("Role assignment does not exist for {namespace}, creating");
     // Set parameters for Role Assignment
     let role_assignment_params = azure_mgmt_authorization::models::RoleAssignmentCreateParameters {
         properties: RoleAssignmentProperties {
