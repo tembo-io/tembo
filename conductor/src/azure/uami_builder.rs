@@ -5,6 +5,7 @@ use azure_error::AzureError;
 use azure_identity::TokenCredentialOptions;
 use azure_identity::WorkloadIdentityCredential;
 use azure_mgmt_authorization;
+use azure_mgmt_authorization::models::role_assignment_properties::PrincipalType;
 use azure_mgmt_authorization::models::RoleAssignmentProperties;
 use azure_mgmt_msi::models::{
     FederatedIdentityCredential, FederatedIdentityCredentialProperties, Identity, TrackedResource,
@@ -196,7 +197,7 @@ pub async fn create_role_assignment(
             scope: None,
             role_definition_id: role_definition,
             principal_id: uami_principal_id.to_string(),
-            principal_type: None,
+            principal_type: Some(PrincipalType::ServicePrincipal),
             description: None,
             condition: None,
             condition_version: None,
