@@ -5,6 +5,7 @@ use azure_error::AzureError;
 use azure_identity::TokenCredentialOptions;
 use azure_identity::WorkloadIdentityCredential;
 use azure_mgmt_authorization;
+use azure_mgmt_authorization::models::role_assignment_properties::PrincipalType;
 use azure_mgmt_authorization::models::RoleAssignmentProperties;
 use azure_mgmt_msi::models::{
     FederatedIdentityCredential, FederatedIdentityCredentialProperties, Identity, TrackedResource,
@@ -79,11 +80,10 @@ pub async fn get_role_definition_id(
 // Get storage account ID
 pub async fn get_storage_account_id(
     subscription_id: &str,
-    resource_group_prefix: &str,
+    resource_group: &str,
     storage_account_name: &str,
     credentials: Arc<dyn TokenCredential>,
 ) -> Result<String, AzureError> {
-    let resource_group = format!("{resource_group_prefix}-instances");
     let storage_client = azure_mgmt_storage::Client::builder(credentials).build()?;
     let storage_account_list = storage_client
         .storage_accounts_client()
@@ -186,17 +186,18 @@ pub async fn create_role_assignment(
     )
     .await?
     {
-        info!("Role assignment already exists, skipping creation");
+        info!("Role assignment already exists for {namespace}, skipping creation");
         return Ok(());
     }
 
+    info!("Role assignment does not exist for {namespace}, creating");
     // Set parameters for Role Assignment
     let role_assignment_params = azure_mgmt_authorization::models::RoleAssignmentCreateParameters {
         properties: RoleAssignmentProperties {
             scope: None,
             role_definition_id: role_definition,
             principal_id: uami_principal_id.to_string(),
-            principal_type: None,
+            principal_type: Some(PrincipalType::ServicePrincipal),
             description: None,
             condition: None,
             condition_version: None,
@@ -250,7 +251,10 @@ pub async fn get_cluster_issuer(
     let response_json = response.json::<serde_json::Value>().await?;
     let issuer_url = response_json["properties"]["oidcIssuerProfile"]["issuerURL"]
         .as_str()
-        .unwrap();
+        .ok_or(AzureError::from(AzureSDKError::new(
+            azure_core::error::ErrorKind::Other,
+            "Issuer URL not found in response".to_string(),
+        )))?;
     Ok(issuer_url.to_string())
 }
 
@@ -266,7 +270,7 @@ pub async fn create_federated_identity_credentials(
     let federated_identity_client = azure_mgmt_msi::Client::builder(credentials.clone()).build()?;
     let cluster_issuer = get_cluster_issuer(
         subscription_id,
-        &resource_group,
+        &resource_group_prefix,
         &format!("aks-{resource_group_prefix}"),
         credentials.clone(),
     )
