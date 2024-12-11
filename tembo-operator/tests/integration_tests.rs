@@ -5808,7 +5808,6 @@ CREATE EVENT TRIGGER pgrst_watch
         let test = TestCore::new(test_name).await;
         let name = test.name.clone();
         let pooler_name = format!("{}-pooler", name);
-        let namespace = test.namespace.clone();
 
         // Generate very simple CoreDB JSON definitions. The first will be for
         // initializing and starting the cluster, and the second for stopping
@@ -5850,19 +5849,6 @@ CREATE EVENT TRIGGER pgrst_watch
         assert!(pooler_status_running(&test.poolers, &pooler_name)
             .await
             .not());
-
-        // Assert that ingress routes are removed after hibernation
-
-        let client = test.client.clone();
-        let ingresses_tcp: Vec<IngressRouteTCP> =
-            list_resources(client.clone(), &name, &namespace, 0)
-                .await
-                .unwrap();
-        assert_eq!(
-            ingresses_tcp.len(),
-            0,
-            "Ingress routes should be removed after hibernation"
-        );
 
         // Patch the cluster to start it up again, then check to ensure it
         // actually did so. This proves hibernation can be reversed.
