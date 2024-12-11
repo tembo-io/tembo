@@ -5851,8 +5851,7 @@ CREATE EVENT TRIGGER pgrst_watch
             .await
             .not());
 
-        // Assert that ingress routes are removed after hibernation
-
+        // Assert that IngressRouteTCPs are removed after hibernation
         let client = test.client.clone();
         let ingresses_tcp: Vec<IngressRouteTCP> =
             list_resources(client.clone(), &name, &namespace, 0)
@@ -5861,7 +5860,19 @@ CREATE EVENT TRIGGER pgrst_watch
         assert_eq!(
             ingresses_tcp.len(),
             0,
-            "Ingress routes should be removed after hibernation"
+            "IngressRouteTCPs should be removed after hibernation"
+        );
+
+        // Assert that IngressRoutes are removed after hibernation
+        let client = test.client.clone();
+        let ingress_routes: Vec<IngressRoute> =
+            list_resources(client.clone(), &name, &namespace, 0)
+                .await
+                .unwrap();
+        assert_eq!(
+            ingress_routes.len(),
+            0,
+            "IngressRoutes should be removed after hibernation"
         );
 
         // Patch the cluster to start it up again, then check to ensure it
