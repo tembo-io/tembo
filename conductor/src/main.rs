@@ -411,7 +411,8 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     &mut coredb_spec,
                 );
 
-                // If azure, use azure_storage_account. Else None
+                // If cloud provider is Azure, we need to pass the storage account name to generate_spec
+                // so that the storage account URL can be generated for Azure restore scenarios
                 let azure_storage_account = match cloud_provider {
                     CloudProvider::Azure => Some(azure_storage_account.as_str()),
                     _ => None,

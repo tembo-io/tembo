@@ -54,6 +54,8 @@ pub async fn generate_spec(
     match cloud_provider {
         CloudProvider::AWS | CloudProvider::GCP | CloudProvider::Azure => {
             let prefix = cloud_provider.prefix();
+
+            // Generate the storage_account_url for Azure restore scenarios
             let storage_account_url = cloud_provider.storage_account_url(azure_storage_account);
 
             // Format the backups_path with the correct prefix
@@ -61,10 +63,12 @@ pub async fn generate_spec(
                 if let Some(backups_path) = &mut restore.backups_path {
                     let clean_path = remove_known_prefixes(backups_path);
                     if clean_path.starts_with(backups_bucket) {
-                        // If the path already includes the bucket, just add the prefix
+                        // If the path already includes the bucket, just add the prefix. The
+                        // storage_account_url is specific to Azure and will be empty for AWS and GCP
                         *backups_path = format!("{}{}{}", prefix, storage_account_url, clean_path);
                     } else {
-                        // If the path doesn't include the bucket, add both prefix and bucket
+                        // If the path doesn't include the bucket, add both prefix and bucket. The
+                        // storage_account_url is specific to Azure and will be empty for AWS and GCP
                         *backups_path = format!(
                             "{}{}{}/{}",
                             prefix, storage_account_url, backups_bucket, clean_path
@@ -904,7 +908,6 @@ mod tests {
         );
     }
 
-    // These should fail until we include the azure storage account in the backups path
     #[tokio::test]
     async fn test_generate_spec_with_non_matching_azure_bucket() {
         let spec = CoreDBSpec {

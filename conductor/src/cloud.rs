@@ -68,7 +68,7 @@ impl CloudProvider {
         }
     }
 
-    // If azure, generate storage_account_url
+    // If azure, generate storage_account_url for Azure restore scenarios
     pub fn storage_account_url(&self, azure_storage_account: Option<&str>) -> String {
         match self {
             CloudProvider::Azure => format!(
