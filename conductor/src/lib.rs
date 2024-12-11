@@ -892,4 +892,63 @@ mod tests {
             expected_backups_path
         );
     }
+
+    // These should fail until we include the azure storage account in the backups path
+    #[tokio::test]
+    async fn test_generate_spec_with_non_matching_azure_bucket() {
+        let spec = CoreDBSpec {
+            restore: Some(Restore {
+                backups_path: Some("https://v2/test-instance".to_string()),
+                ..Restore::default()
+            }),
+            ..CoreDBSpec::default()
+        };
+        let cloud_provider = CloudProvider::Azure;
+        let result = generate_spec(
+            "org-id",
+            "entity-name",
+            "instance-id",
+            "azure_data_1_eus1",
+            "namespace",
+            "my-blob",
+            &spec,
+            &cloud_provider,
+        )
+            .await
+            .expect("Failed to generate spec");
+        let expected_backups_path = "https://eusdevsg.blob.core.windows.net/my-blob/v2/test-instance";
+        assert_eq!(
+            result["spec"]["restore"]["backupsPath"].as_str().unwrap(),
+            expected_backups_path
+        );
+    }
+
+    #[tokio::test]
+    async fn test_generate_spec_with_azure_bucket() {
+        let spec = CoreDBSpec {
+            restore: Some(Restore {
+                backups_path: Some("https://my-blob/v2/test-instance".to_string()),
+                ..Restore::default()
+            }),
+            ..CoreDBSpec::default()
+        };
+        let cloud_provider = CloudProvider::Azure;
+        let result = generate_spec(
+            "org-id",
+            "entity-name",
+            "instance-id",
+            "azure_data_1_eus1",
+            "namespace",
+            "my-blob",
+            &spec,
+            &cloud_provider,
+        )
+            .await
+            .expect("Failed to generate spec");
+        let expected_backups_path = "https://eusdevsg.blob.core.windows.net/my-blob/v2/test-instance";
+        assert_eq!(
+            result["spec"]["restore"]["backupsPath"].as_str().unwrap(),
+            expected_backups_path
+        );
+    }
 }
