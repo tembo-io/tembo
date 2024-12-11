@@ -914,9 +914,10 @@ mod tests {
             &spec,
             &cloud_provider,
         )
-            .await
-            .expect("Failed to generate spec");
-        let expected_backups_path = "https://eusdevsg.blob.core.windows.net/my-blob/v2/test-instance";
+        .await
+        .expect("Failed to generate spec");
+        let expected_backups_path =
+            "https://eusdevsg.blob.core.windows.net/my-blob/v2/test-instance";
         assert_eq!(
             result["spec"]["restore"]["backupsPath"].as_str().unwrap(),
             expected_backups_path
@@ -943,9 +944,10 @@ mod tests {
             &spec,
             &cloud_provider,
         )
-            .await
-            .expect("Failed to generate spec");
-        let expected_backups_path = "https://eusdevsg.blob.core.windows.net/my-blob/v2/test-instance";
+        .await
+        .expect("Failed to generate spec");
+        let expected_backups_path =
+            "https://eusdevsg.blob.core.windows.net/my-blob/v2/test-instance";
         assert_eq!(
             result["spec"]["restore"]["backupsPath"].as_str().unwrap(),
             expected_backups_path
