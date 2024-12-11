@@ -12,8 +12,15 @@ externalSecrets:
   parameterStore:
     name: "secret-store-parameter-store"
     kind: ClusterSecretStore
+  # Use remoteRef to fetch secrets from a remote store (e.g. Azure Key Vault/Google Secret Manager)
+  # This isn't compatible with the secretRegex field, please choose one or the other.
+  # remoteRef:
+  #   key: ~
+  #   secretKey: ~
   secretName: ~
-  secretRegex: ~
+  # Use secretRegex to fetch secrets from AWS Parameter Store (SSM)
+  # This isn't compatible with the remoteRef field, please choose one or the other.
+  # secretRegex: ~
 
 serviceMonitors:
   coredb:

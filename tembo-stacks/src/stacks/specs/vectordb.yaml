@@ -3,12 +3,13 @@ description: A Tembo Postgres Stack configured to support vector data types, sto
 repository: "quay.io/tembo"
 organization: tembo
 images:
-  14: "standard-cnpg:14-5120dd1"
-  15: "standard-cnpg:15-5120dd1"
-  16: "standard-cnpg:16-5120dd1"
+  14: "standard-cnpg:14-30219f2"
+  15: "standard-cnpg:15-30219f2"
+  16: "standard-cnpg:16-30219f2"
+  17: "standard-cnpg:17-30219f2"
 stack_version: 0.1.0
 appServices:
-  - image: 387894460527.dkr.ecr.us-east-1.amazonaws.com/tembo-io/vector-serve:0e8078d
+  - image: 387894460527.dkr.ecr.us-east-1.amazonaws.com/tembo-io/vector-serve:df68795
     name: embeddings
     metrics:
       path: /metrics
@@ -65,9 +66,9 @@ trunk_installs:
   - name: pgmq
     version: 1.4.4
   - name: vectorize
-    version: 0.18.3
+    version: 0.19.1
   - name: pgvector
-    version: 0.7.4
+    version: 0.8.0
   - name: pg_stat_statements
     version: 1.10.0
   - name: vectorscale
@@ -77,7 +78,7 @@ extensions:
     locations:
       - database: postgres
         enabled: true
-        version: 0.7.4
+        version: 0.8.0
   - name: pg_cron
     locations:
     - database: postgres
@@ -92,7 +93,7 @@ extensions:
     locations:
     - database: postgres
       enabled: true
-      version: 0.18.3
+      version: 0.19.1
   - name: pg_stat_statements
     locations:
       - database: postgres

@@ -95,11 +95,11 @@ pub enum Target {
 
 impl Profile {
     pub fn get_tembo_data_host(&self) -> String {
-        return self.tembo_data_host.trim_end_matches('/').to_string();
+        self.tembo_data_host.trim_end_matches('/').to_string()
     }
 
     pub fn get_tembo_host(&self) -> String {
-        return self.tembo_host.trim_end_matches('/').to_string();
+        self.tembo_host.trim_end_matches('/').to_string()
     }
 }
 

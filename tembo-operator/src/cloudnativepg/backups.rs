@@ -53,6 +53,15 @@ pub enum BackupMethod {
     VolumeSnapshot,
 }
 
+impl std::fmt::Display for BackupMethod {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BackupMethod::BarmanObjectStore => write!(f, "barmanObjectStore"),
+            BackupMethod::VolumeSnapshot => write!(f, "volumeSnapshot"),
+        }
+    }
+}
+
 /// Configuration parameters to control the online/hot backup with volume snapshots Overrides the default settings specified in the cluster '.backup.volumeSnapshot.onlineConfiguration' stanza
 #[derive(Serialize, Deserialize, Clone, Debug, Default, JsonSchema)]
 pub struct BackupOnlineConfiguration {

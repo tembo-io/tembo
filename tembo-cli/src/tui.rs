@@ -8,7 +8,7 @@ pub enum TemboCliLog<'a> {
     Default(String),
 }
 
-impl<'a> fmt::Display for TemboCliLog<'a> {
+impl fmt::Display for TemboCliLog<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             TemboCliLog::Gradient(gradient) => write!(f, "{}", gradient),

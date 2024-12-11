@@ -30,7 +30,7 @@ use sqlx::error::Error;
 use sqlx::postgres::PgPoolOptions;
 use std::env;
 use std::sync::{Arc, Mutex};
-use std::{thread, time};
+use std::time;
 use types::{CRUDevent, Event};
 
 mod metrics_reporter;
@@ -100,7 +100,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         .parse()
         .expect("error parsing AZURE_SUBSCRIPTION_ID");
     // This is necessary for working with multiple resource groups. Example format: cdb-plat-eus-dev
-    let azure_resource_group_prefix: String = env::var("AZURE_RESOURCE_GROUP_PREFIX ")
+    let azure_resource_group_prefix: String = env::var("AZURE_RESOURCE_GROUP_PREFIX")
         .unwrap_or_else(|_| "".to_owned())
         .parse()
         .expect("error parsing AZURE_RESOURCE_GROUP_PREFIX");
@@ -133,13 +133,14 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
     }
 
     // Error and exit if IS_AZURE is true and any of the required Azure environment variables are not set
-    if is_azure
-        && (azure_storage_account.is_empty()
-            || azure_subscription_id.is_empty()
-            || azure_resource_group_prefix.is_empty()
-            || azure_region.is_empty())
-    {
-        panic!("AZURE_STORAGE_ACCOUNT, AZURE_SUBSCRIPTION_ID, AZURE_RESOURCE_GROUP_PREFIX, and AZURE_REGION must be set if IS_AZURE is true");
+    if let Err(err) = validate_azure_environment(
+        is_azure,
+        &azure_storage_account,
+        &azure_subscription_id,
+        &azure_resource_group_prefix,
+        &azure_region,
+    ) {
+        panic!("{}", err);
     }
 
     // Connect to pgmq
@@ -183,11 +184,12 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
     let cloud_provider = CloudProvider::builder()
         .gcp(is_gcp)
         .aws(is_cloud_formation)
+        .azure(is_azure)
         .build();
 
     loop {
         // Read from queue (check for new message)
-        // messages that dont fit a CRUDevent will error
+        // messages that don't fit a CRUDevent will error
         // set visibility timeout to 90 seconds
         let read_msg = queue
             .read::<CRUDevent>(&control_plane_events_queue, 90_i32)
@@ -202,7 +204,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
             }
             None => {
                 debug!("no messages in queue");
-                thread::sleep(time::Duration::from_secs(1));
+                tokio::time::sleep(time::Duration::from_secs(1)).await;
                 continue;
             }
         };
@@ -299,8 +301,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     );
                     let _archived = queue
                         .archive(&control_plane_events_queue, read_msg.msg_id)
-                        .await
-                        .expect("error archiving message from queue");
+                        .await?;
                     metrics
                         .conductor_errors
                         .add(&opentelemetry::Context::current(), 1, &[]);
@@ -413,6 +414,13 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     &mut coredb_spec,
                 );
 
+                // If cloud provider is Azure, we need to pass the storage account name to generate_spec
+                // so that the storage account URL can be generated for Azure restore scenarios
+                let azure_storage_account = match cloud_provider {
+                    CloudProvider::Azure => Some(azure_storage_account.as_str()),
+                    _ => None,
+                };
+
                 let spec = generate_spec(
                     org_id,
                     &stack_type,
@@ -420,6 +428,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     &read_msg.message.data_plane_id,
                     &namespace,
                     &backup_archive_bucket,
+                    azure_storage_account,
                     &coredb_spec,
                     &cloud_provider,
                 )
@@ -681,8 +690,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         // archive message from queue
         let archived = queue
             .archive(&control_plane_events_queue, read_msg.msg_id)
-            .await
-            .expect("error archiving message from queue");
+            .await?;
 
         metrics
             .conductor_completed
@@ -785,7 +793,8 @@ async fn main() -> std::io::Result<()> {
                                 1,
                                 &[],
                             );
-                            panic!("sqlx PoolTimedOut error -- forcing pod restart, error")
+                            error!("sqlx PoolTimedOut error in conductor. ending loop");
+                            break;
                         }
                         Err(err) => {
                             custom_metrics_copy.clone().conductor_errors.add(
@@ -797,7 +806,7 @@ async fn main() -> std::io::Result<()> {
                         }
                     }
                     warn!("conductor exited, sleeping for 1 second");
-                    thread::sleep(time::Duration::from_secs(1));
+                    tokio::time::sleep(time::Duration::from_secs(1)).await;
                 }
             }
         }));
@@ -821,7 +830,7 @@ async fn main() -> std::io::Result<()> {
                         }
                     }
                     warn!("status_reporter exited, sleeping for 1 second");
-                    thread::sleep(time::Duration::from_secs(1));
+                    tokio::time::sleep(time::Duration::from_secs(1)).await;
                 }
             }
         }));
@@ -841,7 +850,7 @@ async fn main() -> std::io::Result<()> {
             }
 
             warn!("metrics_reporter exited, sleeping for 1 second");
-            thread::sleep(time::Duration::from_secs(1));
+            tokio::time::sleep(time::Duration::from_secs(1)).await;
         }));
     }
 
@@ -1005,6 +1014,7 @@ async fn init_gcp_storage_workload_identity(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn init_azure_storage_workload_identity(
     is_azure: bool,
     read_msg: &Message<CRUDevent>,
@@ -1083,4 +1093,73 @@ async fn init_azure_storage_workload_identity(
 
 fn from_env_default(key: &str, default: &str) -> String {
     env::var(key).unwrap_or_else(|_| default.to_owned())
+}
+
+/// Validates that all required Azure environment variables are set when IS_AZURE is true.
+/// Returns Ok(()) if all variables are present and non-empty, or an error message listing missing variables.
+fn validate_azure_environment(
+    is_azure: bool,
+    azure_storage_account: &str,
+    azure_subscription_id: &str,
+    azure_resource_group_prefix: &str,
+    azure_region: &str,
+) -> Result<(), String> {
+    if !is_azure {
+        return Ok(());
+    }
+
+    let required_vars = [
+        ("AZURE_STORAGE_ACCOUNT", azure_storage_account),
+        ("AZURE_SUBSCRIPTION_ID", azure_subscription_id),
+        ("AZURE_RESOURCE_GROUP_PREFIX", azure_resource_group_prefix),
+        ("AZURE_REGION", azure_region),
+    ];
+
+    let missing_vars: Vec<&str> = required_vars
+        .iter()
+        .filter(|(_, value)| value.is_empty())
+        .map(|(name, _)| *name)
+        .collect();
+
+    if missing_vars.is_empty() {
+        Ok(())
+    } else {
+        Err(format!(
+            "The following required Azure environment variables are empty: {}",
+            missing_vars.join(", ")
+        ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_azure_validation() {
+        // Test when Azure is disabled
+        assert!(validate_azure_environment(false, "", "", "", "").is_ok());
+
+        // Test when Azure is enabled and all variables are present
+        assert!(validate_azure_environment(
+            true,
+            "storage_account",
+            "subscription_id",
+            "resource_group",
+            "region"
+        )
+        .is_ok());
+
+        // Test when Azure is enabled and variables are missing
+        let err =
+            validate_azure_environment(true, "", "subscription_id", "resource_group", "region")
+                .unwrap_err();
+        assert!(err.contains("AZURE_STORAGE_ACCOUNT"));
+
+        // Test multiple missing variables
+        let err = validate_azure_environment(true, "", "", "resource_group", "").unwrap_err();
+        assert!(err.contains("AZURE_STORAGE_ACCOUNT"));
+        assert!(err.contains("AZURE_SUBSCRIPTION_ID"));
+        assert!(err.contains("AZURE_REGION"));
+    }
 }

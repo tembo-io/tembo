@@ -55,6 +55,12 @@ app.kubernetes.io/name: {{ include "conductor.name" . }}-watcher
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end }}
 
+{{- define "conductor.podLabels" -}}
+{{- if .Values.podLabels }}
+{{ toYaml .Values.podLabels }}
+{{- end }}
+{{- end }}
+
 {{- define "conductor.watcherLabels" -}}
 helm.sh/chart: {{ include "conductor.chart" . }}
 {{ include "conductor.watcherSelectorLabels" . }}

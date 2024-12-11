@@ -676,7 +676,7 @@ fn create_new_instance(
 fn get_create_instance(
     instance_settings: &InstanceSettings,
 ) -> Result<CreateInstance, anyhow::Error> {
-    return Ok(CreateInstance {
+    Ok(CreateInstance {
         cpu: Cpu::from_str(instance_settings.cpu.as_str()).unwrap(),
         memory: Memory::from_str(instance_settings.memory.as_str()).unwrap(),
         environment: temboclient::models::Environment::from_str(
@@ -700,7 +700,7 @@ fn get_create_instance(
         ))),
         postgres_configs: Some(Some(get_postgres_config_cloud(instance_settings)?)),
         pg_version: Some(instance_settings.pg_version.into()),
-    });
+    })
 }
 
 fn get_app_services(
@@ -820,7 +820,7 @@ fn get_patch_instance(
     instance: &Instance,
     instance_settings: &InstanceSettings,
 ) -> Result<PatchInstance, anyhow::Error> {
-    return Ok(PatchInstance {
+    Ok(PatchInstance {
         cpu: Some(Some(Cpu::from_str(instance_settings.cpu.as_str()).unwrap())),
         memory: Some(Some(
             Memory::from_str(instance_settings.memory.as_str()).unwrap(),
@@ -845,7 +845,7 @@ fn get_patch_instance(
             instance_settings.extensions.clone(),
         ))),
         postgres_configs: Some(Some(get_postgres_config_cloud(instance_settings)?)),
-    });
+    })
 }
 
 fn get_postgres_config_cloud(
@@ -1512,7 +1512,7 @@ mod tests {
         for (_key, instance_setting) in instance_settings.iter() {
             let stack_file = instance_setting.stack_file.clone().unwrap();
             let cleaned_stack_file = stack_file.trim_matches('"');
-            test_dir.push(format!("{}", cleaned_stack_file));
+            test_dir.push(cleaned_stack_file);
 
             let config_data =
                 fs::read_to_string(&test_dir).expect("File not found in the directory");

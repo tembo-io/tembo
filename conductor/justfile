@@ -18,7 +18,7 @@ install-operator:
 
 install-kube-prometheus-stack:
 	kubectl create namespace monitoring || true
-	helm upgrade --install --namespace=monitoring monitoring prometheus-community/kube-prometheus-stack
+	helm upgrade --install --version 44.4.1 --namespace=monitoring monitoring prometheus-community/kube-prometheus-stack
 
 install-cert-manager:
   helm upgrade --install \
