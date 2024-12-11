@@ -45,6 +45,7 @@ pub async fn generate_spec(
     data_plane_id: &str,
     namespace: &str,
     backups_bucket: &str,
+    azure_storage_account: Option<&str>,
     spec: &CoreDBSpec,
     cloud_provider: &CloudProvider,
 ) -> Result<Value, ConductorError> {
@@ -53,6 +54,7 @@ pub async fn generate_spec(
     match cloud_provider {
         CloudProvider::AWS | CloudProvider::GCP | CloudProvider::Azure => {
             let prefix = cloud_provider.prefix();
+            let storage_account_url = cloud_provider.storage_account_url(azure_storage_account);
 
             // Format the backups_path with the correct prefix
             if let Some(restore) = &mut spec.restore {
@@ -60,10 +62,13 @@ pub async fn generate_spec(
                     let clean_path = remove_known_prefixes(backups_path);
                     if clean_path.starts_with(backups_bucket) {
                         // If the path already includes the bucket, just add the prefix
-                        *backups_path = format!("{}{}", prefix, clean_path);
+                        *backups_path = format!("{}{}{}", prefix, storage_account_url, clean_path);
                     } else {
                         // If the path doesn't include the bucket, add both prefix and bucket
-                        *backups_path = format!("{}{}/{}", prefix, backups_bucket, clean_path);
+                        *backups_path = format!(
+                            "{}{}{}/{}",
+                            prefix, storage_account_url, backups_bucket, clean_path
+                        );
                     }
                 }
             }
@@ -745,6 +750,7 @@ mod tests {
             "aws_data_1_use1",
             "namespace",
             "my-bucket",
+            None,
             &spec,
             &cloud_provider,
         )
@@ -776,6 +782,7 @@ mod tests {
             "aws_data_1_use1",
             "namespace",
             "my-bucket",
+            None,
             &spec,
             &cloud_provider,
         )
@@ -805,6 +812,7 @@ mod tests {
             "aws_data_1_use1",
             "namespace",
             "my-bucket",
+            None,
             &spec,
             &cloud_provider,
         )
@@ -827,6 +835,7 @@ mod tests {
             "aws_data_1_use1",
             "namespace",
             "my-bucket",
+            None,
             &spec,
             &cloud_provider,
         )
@@ -852,6 +861,7 @@ mod tests {
             "gcp_data_1_usc1",
             "namespace",
             "my-bucket",
+            None,
             &spec,
             &cloud_provider,
         )
@@ -881,6 +891,7 @@ mod tests {
             "gcp_data_1_usc1",
             "namespace",
             "my-bucket",
+            None,
             &spec,
             &cloud_provider,
         )
@@ -911,6 +922,7 @@ mod tests {
             "azure_data_1_eus1",
             "namespace",
             "my-blob",
+            Some("eusdevsg"),
             &spec,
             &cloud_provider,
         )
@@ -941,6 +953,7 @@ mod tests {
             "azure_data_1_eus1",
             "namespace",
             "my-blob",
+            Some("eusdevsg"),
             &spec,
             &cloud_provider,
         )

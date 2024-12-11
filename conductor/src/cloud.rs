@@ -68,6 +68,17 @@ impl CloudProvider {
         }
     }
 
+    // If azure, generate storage_account_url
+    pub fn storage_account_url(&self, azure_storage_account: Option<&str>) -> String {
+        match self {
+            CloudProvider::Azure => format!(
+                "{}.blob.core.windows.net/",
+                azure_storage_account.unwrap_or("")
+            ),
+            _ => "".to_string(),
+        }
+    }
+
     pub fn builder() -> CloudProviderBuilder {
         CloudProviderBuilder::new()
     }
