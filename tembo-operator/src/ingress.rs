@@ -13,6 +13,7 @@ use kube::{
 use regex::Regex;
 use std::sync::Arc;
 
+use crate::ingress_route_crd::IngressRoute;
 use crate::{
     apis::coredb_types::CoreDB,
     errors::OperatorError,
@@ -196,7 +197,48 @@ async fn apply_ingress_route_tcp(
     Ok(())
 }
 
-async fn delete_ingress_route_tcp(
+pub async fn delete_ingress_route(
+    ingress_route_api: Api<IngressRoute>,
+    namespace: &str,
+    ingress_route_name: &String,
+) -> Result<(), OperatorError> {
+    // Check if the resource exists
+    if ingress_route_api
+        .get(&ingress_route_name.clone())
+        .await
+        .is_ok()
+    {
+        // If it exists, proceed with the deletion
+        let delete_parameters = DeleteParams::default();
+        match ingress_route_api
+            .delete(&ingress_route_name.clone(), &delete_parameters)
+            .await
+        {
+            Ok(_) => {
+                info!(
+                    "Deleted IngressRoute {}.{}",
+                    ingress_route_name.clone(),
+                    namespace
+                );
+            }
+            Err(e) => {
+                error!(
+                    "Failed to delete IngressRoute {}.{}: {}",
+                    ingress_route_name, namespace, e
+                );
+                return Err(OperatorError::IngressRouteError);
+            }
+        }
+    } else {
+        debug!(
+            "IngressRoute {}.{} was not found. Assuming it's already deleted.",
+            ingress_route_name, namespace
+        );
+    }
+    Ok(())
+}
+
+pub async fn delete_ingress_route_tcp(
     ingress_route_tcp_api: Api<IngressRouteTCP>,
     namespace: &str,
     ingress_route_tcp_name: &String,
