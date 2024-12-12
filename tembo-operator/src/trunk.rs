@@ -585,19 +585,19 @@ mod tests {
 
     #[tokio::test]
     async fn test_get_trunk_project_metadata_for_extension_version() {
-        // Find metadata on citext with extension version 1.6
+        // Find metadata on amcheck with extension version 1.3
         let result =
-            get_trunk_project_metadata_for_version("citext", super::Version::Extension("1.6"))
+            get_trunk_project_metadata_for_version("amcheck", super::Version::Extension("1.3"))
                 .await;
 
         let trunk_project = result.unwrap();
 
-        assert!(trunk_project.version == "1.6.0");
-        assert!(trunk_project.name == "citext");
+        assert!(trunk_project.version == "1.3.0");
+        assert!(trunk_project.name == "amcheck");
 
         assert!(get_trunk_project_metadata_for_version(
-            "citext",
-            super::Version::Extension("1.6.0"),
+            "amcheck",
+            super::Version::Extension("1.3.0"),
         )
         .await
         .is_err())
