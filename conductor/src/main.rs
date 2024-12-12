@@ -214,10 +214,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         let namespace = read_msg.message.namespace.clone();
         info!("{}: Using namespace {}", read_msg.msg_id, &namespace);
 
-        if !matches!(
-            read_msg.message.event_type,
-            Event::Delete | Event::ScheduleDeletion
-        ) {
+        if read_msg.message.event_type != Event::Delete {
             let namespace_already_deleted = match sqlx::query!(
                 "SELECT * FROM deleted_instances WHERE namespace = $1;",
                 &namespace
@@ -552,40 +549,40 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                 info!("{}: Deleting namespace {}", read_msg.msg_id, &namespace);
                 delete_namespace(client.clone(), &namespace).await?;
 
-                if is_cloud_formation {
-                    info!("{}: Deleting cloudformation stack", read_msg.msg_id);
-                    delete_cloudformation(aws_region.clone(), &namespace).await?;
-                }
-
-                if is_gcp {
-                    info!(
-                        "{}: Deleting GCP storage workload identity binding",
-                        read_msg.msg_id
-                    );
-                    delete_gcp_storage_workload_identity_binding(
-                        &gcp_project_id,
-                        &gcp_project_number,
-                        &backup_archive_bucket,
-                        &storage_archive_bucket,
-                        &namespace,
-                    )
-                    .await?;
-                }
-
-                if is_azure {
-                    info!(
-                        "{}: Deleting Azure storage workload identity binding",
-                        read_msg.msg_id
-                    );
-                    delete_azure_storage_workload_identity_binding(
-                        &azure_subscription_id,
-                        &azure_resource_group_prefix,
-                        &namespace,
-                    )
-                    .await?;
-                }
-
                 if read_msg.message.event_type == Event::Delete {
+                    if is_cloud_formation {
+                        info!("{}: Deleting cloudformation stack", read_msg.msg_id);
+                        delete_cloudformation(aws_region.clone(), &namespace).await?;
+                    }
+
+                    if is_gcp {
+                        info!(
+                            "{}: Deleting GCP storage workload identity binding",
+                            read_msg.msg_id
+                        );
+                        delete_gcp_storage_workload_identity_binding(
+                            &gcp_project_id,
+                            &gcp_project_number,
+                            &backup_archive_bucket,
+                            &storage_archive_bucket,
+                            &namespace,
+                        )
+                        .await?;
+                    }
+
+                    if is_azure {
+                        info!(
+                            "{}: Deleting Azure storage workload identity binding",
+                            read_msg.msg_id
+                        );
+                        delete_azure_storage_workload_identity_binding(
+                            &azure_subscription_id,
+                            &azure_resource_group_prefix,
+                            &namespace,
+                        )
+                        .await?;
+                    }
+
                     let insert_query = sqlx::query!(
                         "INSERT INTO deleted_instances (namespace) VALUES ($1) ON CONFLICT (namespace) DO NOTHING",
                         namespace
