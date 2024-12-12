@@ -697,6 +697,7 @@ mod test {
         client: Client,
         cdb_name: &str,
         namespace: &str,
+        list_params: &ListParams,
         num_expected: usize,
     ) -> Result<Vec<R>, errors::OperatorError>
     where
@@ -709,12 +710,11 @@ mod test {
         R::DynamicType: Default,
     {
         let api: Api<R> = Api::namespaced(client, namespace);
-        let lp = ListParams::default();
         let retry = 15;
         let mut passed_retry = false;
         let mut resource_list: Vec<R> = Vec::new();
         for _ in 0..retry {
-            let resources = api.list(&lp).await?;
+            let resources = api.list(&list_params).await?;
             if resources.items.len() == num_expected {
                 resource_list.extend(resources.items);
                 passed_retry = true;
@@ -3916,16 +3916,20 @@ mod test {
         let _coredb_resource = coredbs.patch(cdb_name, &params, &patch).await.unwrap();
 
         // assert we created three Deployments, with the names we provided
+        let default_params = ListParams::default();
         let deployment_items: Vec<Deployment> =
-            list_resources(client.clone(), cdb_name, &namespace, 3)
+            list_resources(client.clone(), cdb_name, &namespace, &default_params, 3)
                 .await
                 .unwrap();
         // three AppService deployments. the postgres exporter is disabled
         assert!(deployment_items.len() == 3);
 
-        let service_items: Vec<Service> = list_resources(client.clone(), cdb_name, &namespace, 2)
-            .await
-            .unwrap();
+        let cdb_params =
+            ListParams::default().labels(format!("coredb.io/name={}", cdb_name).as_str());
+        let service_items: Vec<Service> =
+            list_resources(client.clone(), cdb_name, &namespace, &cdb_params, 2)
+                .await
+                .unwrap();
         // two AppService Services, because two of the AppServices expose ports
         assert!(service_items.len() == 2);
 
@@ -4019,7 +4023,7 @@ mod test {
         assert!(found);
 
         let ingresses: Result<Vec<IngressRoute>, errors::OperatorError> =
-            list_resources(client.clone(), cdb_name, &namespace, 1).await;
+            list_resources(client.clone(), cdb_name, &namespace, &cdb_params, 1).await;
         let ingress = ingresses.unwrap();
         assert_eq!(ingress.len(), 1);
         let ingress_route = ingress[0].clone();
@@ -4039,8 +4043,10 @@ mod test {
 
         // Check for IngressRouteTCP
         let ing_name = format!("{cdb_name}-ferretdb");
+        let ing_params =
+            ListParams::default().labels(format!("coredb.io/name={}", ing_name).as_str());
         let ingresses_tcp: Result<Vec<IngressRouteTCP>, errors::OperatorError> =
-            list_resources(client.clone(), &ing_name, &namespace, 1).await;
+            list_resources(client.clone(), &ing_name, &namespace, &ing_params, 1).await;
         let ingress_tcp = ingresses_tcp.unwrap();
         assert_eq!(ingress_tcp.len(), 1);
         let ingress_route_tcp = ingress_tcp[0].clone();
@@ -4146,7 +4152,7 @@ mod test {
         coredbs.patch(cdb_name, &params, &patch).await.unwrap();
 
         let deployment_items: Vec<Deployment> =
-            list_resources(client.clone(), cdb_name, &namespace, 1)
+            list_resources(client.clone(), cdb_name, &namespace, &default_params, 1)
                 .await
                 .unwrap();
         assert!(deployment_items.len() == 1);
@@ -4157,9 +4163,10 @@ mod test {
         );
 
         // should still be just one Service
-        let service_items: Vec<Service> = list_resources(client.clone(), cdb_name, &namespace, 1)
-            .await
-            .unwrap();
+        let service_items: Vec<Service> =
+            list_resources(client.clone(), cdb_name, &namespace, &cdb_params, 1)
+                .await
+                .unwrap();
         // One appService Services
         assert!(service_items.len() == 1);
 
@@ -4350,26 +4357,28 @@ CREATE EVENT TRIGGER pgrst_watch
         let patch = Patch::Apply(&coredb_json);
         coredbs.patch(cdb_name, &params, &patch).await.unwrap();
         let deployment_items: Vec<Deployment> =
-            list_resources(client.clone(), cdb_name, &namespace, 0)
+            list_resources(client.clone(), cdb_name, &namespace, &default_params, 0)
                 .await
                 .unwrap();
         assert!(deployment_items.is_empty());
 
-        let service_items: Vec<Service> = list_resources(client.clone(), cdb_name, &namespace, 0)
-            .await
-            .unwrap();
+        let service_items: Vec<Service> =
+            list_resources(client.clone(), cdb_name, &namespace, &cdb_params, 0)
+                .await
+                .unwrap();
         assert!(service_items.is_empty());
         // should be no Services
 
         // ingress must be gone
-        let ingresses: Vec<IngressRoute> = list_resources(client.clone(), cdb_name, &namespace, 0)
-            .await
-            .unwrap();
+        let ingresses: Vec<IngressRoute> =
+            list_resources(client.clone(), cdb_name, &namespace, &default_params, 0)
+                .await
+                .unwrap();
         assert_eq!(ingresses.len(), 0);
 
         // Assert IngressRouteTCP is gone
         let ingresses_tcp: Vec<IngressRouteTCP> =
-            list_resources(client.clone(), cdb_name, &namespace, 0)
+            list_resources(client.clone(), cdb_name, &namespace, &default_params, 0)
                 .await
                 .unwrap();
         assert_eq!(ingresses_tcp.len(), 0);
@@ -5810,6 +5819,7 @@ CREATE EVENT TRIGGER pgrst_watch
         let name = test.name.clone();
         let pooler_name = format!("{}-pooler", name);
         let namespace = test.namespace.clone();
+        let default_params = ListParams::default();
 
         // Generate very simple CoreDB JSON definitions. The first will be for
         // initializing and starting the cluster, and the second for stopping
@@ -5855,7 +5865,7 @@ CREATE EVENT TRIGGER pgrst_watch
         // Assert that IngressRouteTCPs are removed after hibernation
         let client = test.client.clone();
         let ingresses_tcp: Vec<IngressRouteTCP> =
-            list_resources(client.clone(), &name, &namespace, 0)
+            list_resources(client.clone(), &name, &namespace, &default_params, 0)
                 .await
                 .unwrap();
         assert_eq!(
@@ -5867,7 +5877,7 @@ CREATE EVENT TRIGGER pgrst_watch
         // Assert that IngressRoutes are removed after hibernation
         let client = test.client.clone();
         let ingress_routes: Vec<IngressRoute> =
-            list_resources(client.clone(), &name, &namespace, 0)
+            list_resources(client.clone(), &name, &namespace, &default_params, 0)
                 .await
                 .unwrap();
         assert_eq!(
@@ -5887,7 +5897,7 @@ CREATE EVENT TRIGGER pgrst_watch
 
         // Assert there are 2 IngressRouteTCPs created after starting. 1 for postgres and 1 for the pooler
         let ingress_tcps: Vec<IngressRouteTCP> =
-            list_resources(client.clone(), &name, &namespace, 2)
+            list_resources(client.clone(), &name, &namespace, &default_params, 2)
                 .await
                 .unwrap();
         assert_eq!(
@@ -5898,7 +5908,7 @@ CREATE EVENT TRIGGER pgrst_watch
 
         // Assert there is 1 IngressRoute created after starting. This is the IngressRoute for metrics
         let ingress_routes: Vec<IngressRoute> =
-            list_resources(client.clone(), &name, &namespace, 1)
+            list_resources(client.clone(), &name, &namespace, &default_params, 1)
                 .await
                 .unwrap();
         assert_eq!(
@@ -5918,6 +5928,7 @@ CREATE EVENT TRIGGER pgrst_watch
         let name = test.name.clone();
         let pooler_name = format!("{}-pooler", name);
         let namespace = test.namespace.clone();
+        let default_params = ListParams::default();
 
         // Generate very simple CoreDB JSON definitions. The first will be for
         // initializing and starting the cluster with an app service, and the second for stopping
@@ -6009,7 +6020,7 @@ CREATE EVENT TRIGGER pgrst_watch
         // Assert that IngressRouteTCPs are removed after hibernation
         let client = test.client.clone();
         let ingresses_tcp: Vec<IngressRouteTCP> =
-            list_resources(client.clone(), &name, &namespace, 0)
+            list_resources(client.clone(), &name, &namespace, &default_params, 0)
                 .await
                 .unwrap();
         assert_eq!(
@@ -6021,7 +6032,7 @@ CREATE EVENT TRIGGER pgrst_watch
         // Assert that IngressRoutes are removed after hibernation
         let client = test.client.clone();
         let ingress_routes: Vec<IngressRoute> =
-            list_resources(client.clone(), &name, &namespace, 0)
+            list_resources(client.clone(), &name, &namespace, &default_params, 0)
                 .await
                 .unwrap();
         assert_eq!(
@@ -6045,7 +6056,7 @@ CREATE EVENT TRIGGER pgrst_watch
 
         // Assert there are 2 IngressRouteTCPs created after starting. 1 for postgres and 1 for the pooler
         let ingress_tcps: Vec<IngressRouteTCP> =
-            list_resources(client.clone(), &name, &namespace, 2)
+            list_resources(client.clone(), &name, &namespace, &default_params, 2)
                 .await
                 .unwrap();
         assert_eq!(
@@ -6056,7 +6067,7 @@ CREATE EVENT TRIGGER pgrst_watch
 
         // Assert there are 2 IngressRoutes created after starting. 1 for metrics and 1 for the app service
         let ingress_routes: Vec<IngressRoute> =
-            list_resources(client.clone(), &name, &namespace, 2)
+            list_resources(client.clone(), &name, &namespace, &default_params, 2)
                 .await
                 .unwrap();
         assert_eq!(
