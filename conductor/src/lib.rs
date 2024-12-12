@@ -45,6 +45,7 @@ pub async fn generate_spec(
     data_plane_id: &str,
     namespace: &str,
     backups_bucket: &str,
+    azure_storage_account: Option<&str>,
     spec: &CoreDBSpec,
     cloud_provider: &CloudProvider,
 ) -> Result<Value, ConductorError> {
@@ -54,16 +55,24 @@ pub async fn generate_spec(
         CloudProvider::AWS | CloudProvider::GCP | CloudProvider::Azure => {
             let prefix = cloud_provider.prefix();
 
+            // Generate the storage_account_url for Azure restore scenarios
+            let storage_account_url = cloud_provider.storage_account_url(azure_storage_account);
+
             // Format the backups_path with the correct prefix
             if let Some(restore) = &mut spec.restore {
                 if let Some(backups_path) = &mut restore.backups_path {
                     let clean_path = remove_known_prefixes(backups_path);
                     if clean_path.starts_with(backups_bucket) {
-                        // If the path already includes the bucket, just add the prefix
-                        *backups_path = format!("{}{}", prefix, clean_path);
+                        // If the path already includes the bucket, just add the prefix. The
+                        // storage_account_url is specific to Azure and will be empty for AWS and GCP
+                        *backups_path = format!("{}{}{}", prefix, storage_account_url, clean_path);
                     } else {
-                        // If the path doesn't include the bucket, add both prefix and bucket
-                        *backups_path = format!("{}{}/{}", prefix, backups_bucket, clean_path);
+                        // If the path doesn't include the bucket, add both prefix and bucket. The
+                        // storage_account_url is specific to Azure and will be empty for AWS and GCP
+                        *backups_path = format!(
+                            "{}{}{}/{}",
+                            prefix, storage_account_url, backups_bucket, clean_path
+                        );
                     }
                 }
             }
@@ -745,6 +754,7 @@ mod tests {
             "aws_data_1_use1",
             "namespace",
             "my-bucket",
+            None,
             &spec,
             &cloud_provider,
         )
@@ -776,6 +786,7 @@ mod tests {
             "aws_data_1_use1",
             "namespace",
             "my-bucket",
+            None,
             &spec,
             &cloud_provider,
         )
@@ -805,6 +816,7 @@ mod tests {
             "aws_data_1_use1",
             "namespace",
             "my-bucket",
+            None,
             &spec,
             &cloud_provider,
         )
@@ -827,6 +839,7 @@ mod tests {
             "aws_data_1_use1",
             "namespace",
             "my-bucket",
+            None,
             &spec,
             &cloud_provider,
         )
@@ -852,6 +865,7 @@ mod tests {
             "gcp_data_1_usc1",
             "namespace",
             "my-bucket",
+            None,
             &spec,
             &cloud_provider,
         )
@@ -881,12 +895,75 @@ mod tests {
             "gcp_data_1_usc1",
             "namespace",
             "my-bucket",
+            None,
             &spec,
             &cloud_provider,
         )
         .await
         .expect("Failed to generate spec");
         let expected_backups_path = "gs://my-bucket/v2/test-instance";
+        assert_eq!(
+            result["spec"]["restore"]["backupsPath"].as_str().unwrap(),
+            expected_backups_path
+        );
+    }
+
+    #[tokio::test]
+    async fn test_generate_spec_with_non_matching_azure_bucket() {
+        let spec = CoreDBSpec {
+            restore: Some(Restore {
+                backups_path: Some("https://v2/test-instance".to_string()),
+                ..Restore::default()
+            }),
+            ..CoreDBSpec::default()
+        };
+        let cloud_provider = CloudProvider::Azure;
+        let result = generate_spec(
+            "org-id",
+            "entity-name",
+            "instance-id",
+            "azure_data_1_eus1",
+            "namespace",
+            "my-blob",
+            Some("eusdevsg"),
+            &spec,
+            &cloud_provider,
+        )
+        .await
+        .expect("Failed to generate spec");
+        let expected_backups_path =
+            "https://eusdevsg.blob.core.windows.net/my-blob/v2/test-instance";
+        assert_eq!(
+            result["spec"]["restore"]["backupsPath"].as_str().unwrap(),
+            expected_backups_path
+        );
+    }
+
+    #[tokio::test]
+    async fn test_generate_spec_with_azure_bucket() {
+        let spec = CoreDBSpec {
+            restore: Some(Restore {
+                backups_path: Some("https://my-blob/v2/test-instance".to_string()),
+                ..Restore::default()
+            }),
+            ..CoreDBSpec::default()
+        };
+        let cloud_provider = CloudProvider::Azure;
+        let result = generate_spec(
+            "org-id",
+            "entity-name",
+            "instance-id",
+            "azure_data_1_eus1",
+            "namespace",
+            "my-blob",
+            Some("eusdevsg"),
+            &spec,
+            &cloud_provider,
+        )
+        .await
+        .expect("Failed to generate spec");
+        let expected_backups_path =
+            "https://eusdevsg.blob.core.windows.net/my-blob/v2/test-instance";
         assert_eq!(
             result["spec"]["restore"]["backupsPath"].as_str().unwrap(),
             expected_backups_path

@@ -3,9 +3,10 @@ description: Postgres for Search and Analytics
 repository: "quay.io/tembo"
 organization: tembo
 images:
-  14: "standard-cnpg:14-5120dd1"
-  15: "standard-cnpg:15-5120dd1"
-  16: "standard-cnpg:16-5120dd1"
+  14: "standard-cnpg:14-30219f2"
+  15: "standard-cnpg:15-30219f2"
+  16: "standard-cnpg:16-30219f2"
+  17: "standard-cnpg:17-30219f2"
 stack_version: 0.1.0
 postgres_config_engine: paradedb
 postgres_config:
@@ -24,7 +25,7 @@ postgres_config:
   - name: shared_preload_libraries
     value: pg_stat_statements,pg_search,pg_analytics,pg_cron
   - name: track_io_timing
-    value: 'on'
+    value: "on"
   - name: wal_level
     value: logical
 trunk_installs:
@@ -33,7 +34,7 @@ trunk_installs:
   - name: pg_analytics
     version: 0.2.1
   - name: pg_search
-    version: 0.11.1
+    version: 0.13.0
   - name: pg_cron
     version: 1.6.2
   - name: pgvector
@@ -50,7 +51,7 @@ extensions:
     locations:
       - database: postgres
         enabled: true
-        version: 0.11.1
+        version: 0.13.0
   - name: vector
     locations:
       - database: postgres
@@ -58,17 +59,17 @@ extensions:
         version: 0.7.4
   - name: pg_cron
     locations:
-    - database: postgres
-      enabled: true
-      version: 1.6.2
+      - database: postgres
+        enabled: true
+        version: 1.6.2
   - name: pg_analytics
     description: pg_analytics
     locations:
-    - database: postgres
-      enabled: true
-      version: 0.2.1
+      - database: postgres
+        enabled: true
+        version: 0.2.1
   - name: pg_ivm
     locations:
-    - database: postgres
-      enabled: true
-      version: 1.9
+      - database: postgres
+        enabled: true
+        version: 1.9
