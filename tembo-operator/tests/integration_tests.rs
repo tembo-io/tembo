@@ -5328,8 +5328,19 @@ CREATE EVENT TRIGGER pgrst_watch
 
         // Check for pooler service
         let pooler_services: Api<Service> = Api::namespaced(client.clone(), &namespace);
-        let _pooler_service = pooler_services.get(&pooler_name).await.unwrap();
-        println!("Found pooler service: {}", pooler_name);
+        for _ in 0..12 {
+            match pooler_services.get(&pooler_name).await {
+                Ok(_) => {
+                    println!("Found pooler service: {}", pooler_name);
+                    break;
+                }
+                Err(_) => {
+                    println!("Waiting for pooler service to be created: {}", pooler_name);
+                    tokio::time::sleep(Duration::from_secs(5)).await;
+                    continue;
+                }
+            }
+        }
 
         // Check for pooler secret
         let pooler_secrets: Api<Secret> = Api::namespaced(client.clone(), &namespace);
@@ -5360,11 +5371,23 @@ CREATE EVENT TRIGGER pgrst_watch
         // Check for pooler IngressRouteTCP
         let pooler_ingressroutetcps: Api<IngressRouteTCP> =
             Api::namespaced(client.clone(), &namespace);
-        let _pooler_ingressroutetcp = pooler_ingressroutetcps
-            .get(format!("{pooler_name}-0").as_str())
-            .await
-            .unwrap();
-        println!("Found pooler IngressRouteTCP: {pooler_name}-0");
+        let ingressroute_name = format!("{pooler_name}-0");
+        for _ in 0..12 {
+            match pooler_ingressroutetcps.get(&ingressroute_name).await {
+                Ok(_) => {
+                    println!("Found pooler IngressRouteTCP: {}", ingressroute_name);
+                    break;
+                }
+                Err(_) => {
+                    println!(
+                        "Waiting for pooler IngressRouteTCP to be created: {}",
+                        ingressroute_name
+                    );
+                    tokio::time::sleep(Duration::from_secs(5)).await;
+                    continue;
+                }
+            }
+        }
 
         // Query the database to make sure the pgbouncer role was created
         let _pgb_query = wait_until_psql_contains(
