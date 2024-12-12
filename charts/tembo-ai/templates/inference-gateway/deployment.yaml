@@ -5,6 +5,9 @@ metadata:
   labels:
     {{- include "tembo-ai.inferenceGateway.labels" . | nindent 4 }}
 spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
   selector:
     matchLabels:
       {{- include "tembo-ai.inferenceGateway.selectorLabels" . | nindent 6 }}
