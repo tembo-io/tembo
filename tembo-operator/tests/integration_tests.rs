@@ -709,7 +709,7 @@ mod test {
         R::DynamicType: Default,
     {
         let api: Api<R> = Api::namespaced(client, namespace);
-        let lp = ListParams::default().labels(format!("coredb.io/name={}", cdb_name).as_str());
+        let lp = ListParams::default();
         let retry = 15;
         let mut passed_retry = false;
         let mut resource_list: Vec<R> = Vec::new();
@@ -721,10 +721,11 @@ mod test {
                 break;
             } else {
                 println!(
-                    "ns:{}.cdb:{} Found {}, expected {}",
+                    "ns:{}.cdb:{} Found {} {}, expected {}",
                     namespace,
                     cdb_name,
                     resources.items.len(),
+                    std::any::type_name::<R>(),
                     num_expected
                 );
             }
@@ -5883,6 +5884,28 @@ CREATE EVENT TRIGGER pgrst_watch
         let _ = test.set_cluster_def(&cluster_start).await;
         assert!(status_running(&test.coredbs, &name).await);
         assert!(pooler_status_running(&test.poolers, &pooler_name).await);
+
+        // Assert that IngressRouteTCPs are created after starting
+        let ingress_tcps: Vec<IngressRouteTCP> =
+            list_resources(client.clone(), &name, &namespace, 2)
+                .await
+                .unwrap();
+        assert_eq!(
+            ingress_tcps.len(),
+            2,
+            "IngressRouteTCPs should be created after starting"
+        );
+
+        // Assert that IngressRoutes are created after starting
+        let ingress_routes: Vec<IngressRoute> =
+            list_resources(client.clone(), &name, &namespace, 1)
+                .await
+                .unwrap();
+        assert_eq!(
+            ingress_routes.len(),
+            1,
+            "IngressRoutes should be created after starting"
+        );
 
         test.teardown().await;
     }
