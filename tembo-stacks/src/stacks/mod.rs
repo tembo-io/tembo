@@ -28,8 +28,6 @@ lazy_static! {
         serde_yaml::from_str(include_str!("specs/oltp.yaml")).expect("oltp.yaml not found");
     pub static ref PARADEDB: Stack =
         serde_yaml::from_str(include_str!("specs/paradedb.yaml")).expect("paradedb.yaml not found");
-    pub static ref RAG: Stack =
-        serde_yaml::from_str(include_str!("specs/rag.yaml")).expect("rag.yaml not found");
     pub static ref STANDARD: Stack =
         serde_yaml::from_str(include_str!("specs/standard.yaml")).expect("standard.yaml not found");
     pub static ref TIMESERIES: Stack = serde_yaml::from_str(include_str!("specs/timeseries.yaml"))
@@ -50,7 +48,6 @@ pub fn get_stack(entity: StackType) -> Stack {
         StackType::OLAP => OLAP.clone(),
         StackType::OLTP => OLTP.clone(),
         StackType::ParadeDB => PARADEDB.clone(),
-        StackType::RAG => RAG.clone(),
         StackType::Standard => STANDARD.clone(),
         StackType::Timeseries => TIMESERIES.clone(),
         StackType::VectorDB => VECTOR_DB.clone(),
