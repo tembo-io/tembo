@@ -3849,7 +3849,7 @@ mod test {
                         }
                     },
                     {
-                        "name": "ferretdb",
+                        "name": "fdb-api",
                         "image": "ghcr.io/ferretdb/ferretdb",
                         "routing": [
                             {
@@ -3936,7 +3936,7 @@ mod test {
         let app_0 = deployment_items[0].clone();
         let app_1 = deployment_items[1].clone();
         let app_2 = deployment_items[2].clone();
-        assert_eq!(app_0.metadata.name.unwrap(), format!("{cdb_name}-ferretdb"));
+        assert_eq!(app_0.metadata.name.unwrap(), format!("{cdb_name}-fdb-api"));
         assert_eq!(
             app_1.metadata.name.unwrap(),
             format!("{cdb_name}-postgrest")
@@ -4042,7 +4042,7 @@ mod test {
         );
 
         // Check for IngressRouteTCP
-        let ing_name = format!("{cdb_name}-ferretdb");
+        let ing_name = format!("{cdb_name}-fdb-api");
         let ing_params =
             ListParams::default().labels(format!("coredb.io/name={}", ing_name).as_str());
         let ingresses_tcp: Result<Vec<IngressRouteTCP>, errors::OperatorError> =
