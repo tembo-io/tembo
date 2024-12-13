@@ -3,7 +3,6 @@ use crate::cloudnativepg::clusters::{ClusterStatusConditions, ClusterStatusCondi
 use crate::cloudnativepg::cnpg::{get_cluster, get_pooler, get_scheduled_backups};
 use crate::cloudnativepg::poolers::Pooler;
 use crate::cloudnativepg::scheduledbackups::ScheduledBackup;
-use crate::ingress::{delete_ingress_route, delete_ingress_route_tcp};
 use crate::Error;
 
 use crate::{patch_cdb_status_merge, requeue_normal_with_jitter, Context};
@@ -14,16 +13,16 @@ use serde_json::json;
 
 use k8s_openapi::api::apps::v1::Deployment;
 
-use super::clusters::Cluster;
 use crate::app_service::manager::get_appservice_deployment_objects;
 use crate::cloudnativepg::cnpg_utils::{
     get_pooler_instances, patch_cluster_merge, patch_pooler_merge, patch_scheduled_backup_merge,
     removed_stalled_backups,
 };
-use crate::ingress_route_crd::IngressRoute;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, error, info, warn};
+
+use super::clusters::Cluster;
 
 /// Resolves hibernation in the Cluster and related services of the CoreDB
 ///
@@ -143,90 +142,6 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
                 debug!("Caught error {}", e);
                 return Err(requeue_normal_with_jitter());
             }
-        }
-    }
-
-    // Remove IngressRoutes for stopped instances
-    let ingress_route_api: Api<IngressRoute> = Api::namespaced(ctx.client.clone(), &namespace);
-    if let Err(err) = delete_ingress_route(ingress_route_api.clone(), &namespace, &name).await {
-        warn!(
-            "Error deleting app service IngressRoute for {}: {}",
-            cdb.name_any(),
-            err
-        );
-        return Err(Action::requeue(Duration::from_secs(300)));
-    }
-
-    let metrics_ing_route_name = format!("{}-metrics", cdb.name_any().as_str());
-    if let Err(err) = delete_ingress_route(
-        ingress_route_api.clone(),
-        &namespace,
-        &metrics_ing_route_name,
-    )
-    .await
-    {
-        warn!(
-            "Error deleting metrics IngressRoute for {}: {}",
-            cdb.name_any(),
-            err
-        );
-        return Err(Action::requeue(Duration::from_secs(300)));
-    }
-
-    // Remove IngressRouteTCP route for stopped instances
-    let ingress_route_tcp_api = Api::namespaced(ctx.client.clone(), &namespace);
-    let prefix_read_only = format!("{}-ro-0", cdb.name_any().as_str());
-    if let Err(err) =
-        delete_ingress_route_tcp(ingress_route_tcp_api.clone(), &namespace, &prefix_read_only).await
-    {
-        warn!(
-            "Error deleting postgres IngressRouteTCP for {}: {}",
-            cdb.name_any(),
-            err
-        );
-        return Err(Action::requeue(Duration::from_secs(300)));
-    }
-
-    let prefix_read_write = format!("{}-rw-0", cdb.name_any().as_str());
-    if let Err(err) = delete_ingress_route_tcp(
-        ingress_route_tcp_api.clone(),
-        &namespace,
-        &prefix_read_write,
-    )
-    .await
-    {
-        warn!(
-            "Error deleting postgres IngressRouteTCP for {}: {}",
-            cdb.name_any(),
-            err
-        );
-        return Err(Action::requeue(Duration::from_secs(300)));
-    }
-
-    let prefix_pooler = format!("{}-pooler-0", cdb.name_any().as_str());
-    if let Err(err) =
-        delete_ingress_route_tcp(ingress_route_tcp_api.clone(), &namespace, &prefix_pooler).await
-    {
-        warn!(
-            "Error deleting postgres IngressRouteTCP for {}: {}",
-            cdb.name_any(),
-            err
-        );
-        return Err(Action::requeue(Duration::from_secs(300)));
-    }
-
-    let extra_domain_names = cdb.spec.extra_domains_rw.clone().unwrap_or_default();
-    if !extra_domain_names.is_empty() {
-        let prefix_extra = format!("extra-{}-rw", cdb.name_any().as_str());
-        if let Err(err) =
-            delete_ingress_route_tcp(ingress_route_tcp_api.clone(), &namespace, &prefix_extra).await
-        {
-            warn!(
-                "Error deleting extra postgres IngressRouteTCP for {}: {}",
-                cdb.name_any(),
-                err
-            );
-            return Err(Action::requeue(Duration::from_secs(300)));
         }
     }
 
