@@ -2323,7 +2323,7 @@ spec:
                 nullable: true
                 type: array
               image:
-                default: quay.io/tembo/standard-cnpg:15-a0a5ab5
+                default: quay.io/tembo/standard-cnpg:15-30219f2
                 description: |-
                   The Postgres image to use for the CoreDB instance deployment. This should be a valid Postgres image that is compatible with the [https://tembo.io](https://tembo.io) platform. For more information please visit our [tembo-images](https://github.com/tembo-io/tembo-images) repository.
 

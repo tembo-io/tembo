@@ -72,7 +72,7 @@ pub fn default_images() -> ImagePerPgVersion {
         pg14: Some("standard-cnpg:14-30219f2".to_string()),
         pg15: Some("standard-cnpg:15-30219f2".to_string()),
         pg16: Some("standard-cnpg:16-30219f2".to_string()),
-        pg17: Some("standard-cnpg:17-30219f2".to_string())
+        pg17: Some("standard-cnpg:17-30219f2".to_string()),
     }
 }
 
