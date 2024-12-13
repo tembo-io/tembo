@@ -208,7 +208,19 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
         delete_ingress_route_tcp(ingress_route_tcp_api.clone(), &namespace, &prefix_pooler).await
     {
         warn!(
-            "Error deleting postgres IngressRouteTCP for {}: {}",
+            "Error deleting pooler IngressRouteTCP for {}: {}",
+            cdb.name_any(),
+            err
+        );
+        return Err(Action::requeue(Duration::from_secs(300)));
+    }
+
+    let ferret_ing = format!("{}-fdb-api", cdb.name_any().as_str());
+    if let Err(err) =
+        delete_ingress_route_tcp(ingress_route_tcp_api.clone(), &namespace, &ferret_ing).await
+    {
+        warn!(
+            "Error deleting ferretdb IngressRouteTCP for {}: {}",
             cdb.name_any(),
             err
         );
