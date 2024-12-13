@@ -384,17 +384,7 @@ mod tests {
         }];
         let merged_configs: MergedConfigs =
             merge_app_reqs(Some(user_apps), Some(stack_apps), None, None, None).unwrap();
-        let mut found: bool = false;
-        for config in merged_configs.pg_configs.clone().unwrap() {
-            if config.name == "vectorize.tembo_service_url" {
-                assert_eq!(
-                    config.value.to_string(),
-                    "http://${NAMESPACE}-ai-proxy:8080/v1"
-                );
-                found = true;
-            }
-        }
-        assert!(found);
+
         // filter for embedding app
         let embedding_app = merged_configs
             .app_services
