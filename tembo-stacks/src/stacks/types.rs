@@ -40,7 +40,6 @@ pub enum StackType {
     #[default]
     OLTP,
     ParadeDB,
-    RAG,
     Standard,
     Timeseries,
     VectorDB,
@@ -61,7 +60,6 @@ impl std::str::FromStr for StackType {
             "OLAP" => Ok(StackType::OLAP),
             "OLTP" => Ok(StackType::OLTP),
             "ParadeDB" => Ok(StackType::ParadeDB),
-            "RAG" => Ok(StackType::RAG),
             "Standard" => Ok(StackType::Standard),
             "Timeseries" => Ok(StackType::Timeseries),
             "VectorDB" => Ok(StackType::VectorDB),
@@ -83,7 +81,6 @@ impl StackType {
             StackType::OLAP => "OLAP",
             StackType::OLTP => "OLTP",
             StackType::ParadeDB => "ParadeDB",
-            StackType::RAG => "RAG",
             StackType::Standard => "Standard",
             StackType::Timeseries => "Timeseries",
             StackType::VectorDB => "VectorDB",
@@ -328,9 +325,6 @@ mod tests {
                 }
                 StackType::ParadeDB => {
                     get_stack(StackType::ParadeDB);
-                }
-                StackType::RAG => {
-                    get_stack(StackType::RAG);
                 }
                 StackType::Standard => {
                     get_stack(StackType::Standard);

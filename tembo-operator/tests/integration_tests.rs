@@ -3849,7 +3849,7 @@ mod test {
                         }
                     },
                     {
-                        "name": "ferretdb",
+                        "name": "fdb-api",
                         "image": "ghcr.io/ferretdb/ferretdb",
                         "routing": [
                             {
@@ -3936,7 +3936,7 @@ mod test {
         let app_0 = deployment_items[0].clone();
         let app_1 = deployment_items[1].clone();
         let app_2 = deployment_items[2].clone();
-        assert_eq!(app_0.metadata.name.unwrap(), format!("{cdb_name}-ferretdb"));
+        assert_eq!(app_0.metadata.name.unwrap(), format!("{cdb_name}-fdb-api"));
         assert_eq!(
             app_1.metadata.name.unwrap(),
             format!("{cdb_name}-postgrest")
@@ -4042,7 +4042,7 @@ mod test {
         );
 
         // Check for IngressRouteTCP
-        let ing_name = format!("{cdb_name}-ferretdb");
+        let ing_name = format!("{cdb_name}-fdb-api");
         let ing_params =
             ListParams::default().labels(format!("coredb.io/name={}", ing_name).as_str());
         let ingresses_tcp: Result<Vec<IngressRouteTCP>, errors::OperatorError> =
@@ -5982,6 +5982,65 @@ CREATE EVENT TRIGGER pgrst_watch
                                 "memory": "256Mi"
                             }
                         }
+                    },
+                                        {
+                        "name": "fdb-api",
+                        "image": "ghcr.io/ferretdb/ferretdb",
+                        "routing": [
+                            {
+                                "port": 27018,
+                                "ingressPath": "/ferretdb/v1",
+                                "entryPoints": [
+                                    "ferretdb"
+                                ],
+                                "ingressType": "tcp"
+                            }
+                        ],
+                        "env": [
+                            {
+                                "name": "FERRETDB_POSTGRESQL_URL",
+                                "valueFromPlatform": "ReadWriteConnection"
+                            },
+                            {
+                                "name": "FERRETDB_LOG_LEVEL",
+                                "value": "debug"
+                            },
+                            {
+                                "name": "FERRETDB_STATE_DIR",
+                                "value": "-"
+                            },
+                            {
+                                "name": "FERRETDB_LISTEN_TLS_CERT_FILE",
+                                "value": "/certs/tls.crt"
+                            },
+                        ],
+                        "storage": {
+                            "volumes": [
+                                {
+                                    "name": "ferretdb-data",
+                                    "ephemeral": {
+                                        "volumeClaimTemplate": {
+                                            "spec": {
+                                                "accessModes": [
+                                                    "ReadWriteOnce"
+                                                ],
+                                                "resources": {
+                                                    "requests": {
+                                                        "storage": "1Gi"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ],
+                            "volumeMounts": [
+                                {
+                                    "name": "ferretdb-data",
+                                    "mountPath": "/state"
+                                }
+                            ]
+                        },
                     }
                 ]
             }
@@ -5998,10 +6057,10 @@ CREATE EVENT TRIGGER pgrst_watch
         assert!(status_running(&test.coredbs, &name).await);
         assert!(pooler_status_running(&test.poolers, &pooler_name).await);
 
-        // Assert there are 3 pods running: 1 for postgres, 1 for the pooler, and 1 for the app service
+        // Assert there are 4 pods running: postgres, pooler, postgrest and ferretdb
         let pods: Api<Pod> = Api::namespaced(test.client.clone(), &namespace);
         let pods_list = pods.list(&Default::default()).await.unwrap();
-        assert_eq!(pods_list.items.len(), 3);
+        assert_eq!(pods_list.items.len(), 4);
 
         // Stop the cluster and check to make sure it's not running to ensure
         // hibernate is doing its job.
@@ -6050,18 +6109,19 @@ CREATE EVENT TRIGGER pgrst_watch
         assert!(status_running(&test.coredbs, &name).await);
         assert!(pooler_status_running(&test.poolers, &pooler_name).await);
 
-        // Assert there are 3 pods running: 1 for postgres, 1 for the pooler, and 1 for the app service
+        // Assert there are 4 pods running: postgres, pooler, postgrest and ferretdb
         let pods_list = pods.list(&Default::default()).await.unwrap();
-        assert_eq!(pods_list.items.len(), 3);
+        assert_eq!(pods_list.items.len(), 4);
 
-        // Assert there are 2 IngressRouteTCPs created after starting. 1 for postgres and 1 for the pooler
+        // Assert there are 3 IngressRouteTCPs created after starting. One for postgres, pooler and
+        // ferretdb
         let ingress_tcps: Vec<IngressRouteTCP> =
-            list_resources(client.clone(), &name, &namespace, &default_params, 2)
+            list_resources(client.clone(), &name, &namespace, &default_params, 3)
                 .await
                 .unwrap();
         assert_eq!(
             ingress_tcps.len(),
-            2,
+            3,
             "IngressRouteTCPs should be created after starting"
         );
 
