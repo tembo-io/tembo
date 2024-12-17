@@ -1,4 +1,4 @@
-FROM quay.io/tembo/rust:1.79-slim as builder
+FROM quay.io/tembo/rust:1.81-bookworm as builder
 
 RUN apt-get update && \
     apt-get install -y pkg-config libssl-dev && apt-get clean && \
