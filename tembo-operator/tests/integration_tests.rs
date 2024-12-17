@@ -6077,16 +6077,14 @@ CREATE EVENT TRIGGER pgrst_watch
         assert_eq!(pods_list.items.len(), 0);
 
         // Assert that IngressRouteTCPs are removed after hibernation
-        // TODO(ianstanton) Typically there should be 0 here, but we're creating one for postgrest
-        //  due to a bug. This should be updated to 0 after the bug is fixed.
         let client = test.client.clone();
         let ingresses_tcp: Vec<IngressRouteTCP> =
-            list_resources(client.clone(), &name, &namespace, &default_params, 1)
+            list_resources(client.clone(), &name, &namespace, &default_params, 0)
                 .await
                 .unwrap();
         assert_eq!(
             ingresses_tcp.len(),
-            1,
+            0,
             "IngressRouteTCPs should be removed after hibernation"
         );
 
@@ -6115,17 +6113,15 @@ CREATE EVENT TRIGGER pgrst_watch
         let pods_list = pods.list(&Default::default()).await.unwrap();
         assert_eq!(pods_list.items.len(), 4);
 
-        // Assert there are 4 IngressRouteTCPs created after starting. One for postgres, pooler,
-        // ferretdb and postgrest
-        // TODO(ianstanton) postgrest's IngressRouteTCP is being created due to a bug. This should
-        //  check for 3 IngressRouteTCPs after the bug is fixed.
+        // Assert there are 3 IngressRouteTCPs created after starting. One for postgres, pooler,
+        // ferretdb
         let ingress_tcps: Vec<IngressRouteTCP> =
-            list_resources(client.clone(), &name, &namespace, &default_params, 4)
+            list_resources(client.clone(), &name, &namespace, &default_params, 3)
                 .await
                 .unwrap();
         assert_eq!(
             ingress_tcps.len(),
-            4,
+            3,
             "IngressRouteTCPs should be created after starting"
         );
 
