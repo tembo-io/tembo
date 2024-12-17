@@ -36,6 +36,15 @@ use tracing::{debug, error, info, warn};
 ///
 /// Returns a normal, jittered requeue when the instance is stopped.
 pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> Result<(), Action> {
+    // We should check if the instance needs to be stopped first before running through this
+    if !cdb.spec.stop {
+        debug!(
+            "Skipping hibernation reconciliation for CoreDB instance {}",
+            cdb.name_any()
+        );
+        return Ok(());
+    }
+
     info!(
         "Reconciling hibernation for CoreDB instance {}",
         cdb.name_any()
