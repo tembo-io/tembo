@@ -714,7 +714,7 @@ mod test {
         let mut passed_retry = false;
         let mut resource_list: Vec<R> = Vec::new();
         for _ in 0..retry {
-            let resources = api.list(&list_params).await?;
+            let resources = api.list(list_params).await?;
             if resources.items.len() == num_expected {
                 resource_list.extend(resources.items);
                 passed_retry = true;
@@ -6176,6 +6176,7 @@ CREATE EVENT TRIGGER pgrst_watch
                 "name": cdb_name
             },
             "spec": {
+                "stop": false,
                 "appServices": [
                     {
                         "name": "dummy-exporter",
@@ -6205,6 +6206,51 @@ CREATE EVENT TRIGGER pgrst_watch
         let podmon = get_resource::<PodMonitor>(client.clone(), &namespace, &pmon_name, 50, true)
             .await
             .unwrap();
+        let pmon_spec = podmon.spec.pod_metrics_endpoints.unwrap();
+        assert_eq!(pmon_spec.len(), 1);
+
+        // pause instance to make sure we remove the PodMonitor
+        let paused_app = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": cdb_name
+            },
+            "spec": {
+                "stop": true,
+                "appServices": [
+                    {
+                        "name": "dummy-exporter",
+                        "image": "prom/blackbox-exporter",
+                        "routing": [
+                            {
+                                "port": 9115,
+                                "ingressPath": "/metrics",
+                                "ingressType": "http"
+                            }
+                        ],
+                        "metrics": {
+                            "path": "/metrics",
+                            "port": 9115
+                        }
+                    },
+                ]
+            }
+        });
+        let params = PatchParams::apply("tembo-integration-test");
+        let patch = Patch::Apply(&paused_app);
+        let _coredb_resource = coredbs.patch(cdb_name, &params, &patch).await.unwrap();
+        let podmon =
+            get_resource::<PodMonitor>(client.clone(), &namespace, &pmon_name, 50, false).await;
+        assert!(podmon.is_err());
+
+        // renable it, assert it exists again
+        let patch = Patch::Apply(&full_app);
+        let _coredb_resource = coredbs.patch(cdb_name, &params, &patch).await.unwrap();
+        let podmon = get_resource::<PodMonitor>(client.clone(), &namespace, &pmon_name, 50, true)
+            .await
+            .unwrap();
+
         let pmon_spec = podmon.spec.pod_metrics_endpoints.unwrap();
         assert_eq!(pmon_spec.len(), 1);
 
