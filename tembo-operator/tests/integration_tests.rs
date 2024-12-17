@@ -4369,19 +4369,19 @@ CREATE EVENT TRIGGER pgrst_watch
         assert!(service_items.is_empty());
         // should be no Services
 
-        // ingress must be gone
+        // There should be 1 IngressRoute left (metrics)
         let ingresses: Vec<IngressRoute> =
-            list_resources(client.clone(), cdb_name, &namespace, &default_params, 0)
+            list_resources(client.clone(), cdb_name, &namespace, &default_params, 1)
                 .await
                 .unwrap();
-        assert_eq!(ingresses.len(), 0);
+        assert_eq!(ingresses.len(), 1);
 
-        // Assert IngressRouteTCP is gone
+        // There should be 1 IngressRouteTCP left (postgres)
         let ingresses_tcp: Vec<IngressRouteTCP> =
-            list_resources(client.clone(), cdb_name, &namespace, &default_params, 0)
+            list_resources(client.clone(), cdb_name, &namespace, &default_params, 1)
                 .await
                 .unwrap();
-        assert_eq!(ingresses_tcp.len(), 0);
+        assert_eq!(ingresses_tcp.len(), 1);
 
         // CLEANUP TEST
         // Cleanup CoreDB
