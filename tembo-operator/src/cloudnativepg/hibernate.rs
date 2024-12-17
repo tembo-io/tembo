@@ -146,99 +146,104 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
         }
     }
 
-    // Remove IngressRoutes for stopped instances
-    let ingress_route_api: Api<IngressRoute> = Api::namespaced(ctx.client.clone(), &namespace);
-    if let Err(err) = delete_ingress_route(ingress_route_api.clone(), &namespace, &name).await {
-        warn!(
-            "Error deleting app service IngressRoute for {}: {}",
-            cdb.name_any(),
-            err
-        );
-        return Err(Action::requeue(Duration::from_secs(300)));
-    }
-
-    let metrics_ing_route_name = format!("{}-metrics", cdb.name_any().as_str());
-    if let Err(err) = delete_ingress_route(
-        ingress_route_api.clone(),
-        &namespace,
-        &metrics_ing_route_name,
-    )
-    .await
-    {
-        warn!(
-            "Error deleting metrics IngressRoute for {}: {}",
-            cdb.name_any(),
-            err
-        );
-        return Err(Action::requeue(Duration::from_secs(300)));
-    }
-
-    // Remove IngressRouteTCP route for stopped instances
-    let ingress_route_tcp_api = Api::namespaced(ctx.client.clone(), &namespace);
-    let prefix_read_only = format!("{}-ro-0", cdb.name_any().as_str());
-    if let Err(err) =
-        delete_ingress_route_tcp(ingress_route_tcp_api.clone(), &namespace, &prefix_read_only).await
-    {
-        warn!(
-            "Error deleting postgres IngressRouteTCP for {}: {}",
-            cdb.name_any(),
-            err
-        );
-        return Err(Action::requeue(Duration::from_secs(300)));
-    }
-
-    let prefix_read_write = format!("{}-rw-0", cdb.name_any().as_str());
-    if let Err(err) = delete_ingress_route_tcp(
-        ingress_route_tcp_api.clone(),
-        &namespace,
-        &prefix_read_write,
-    )
-    .await
-    {
-        warn!(
-            "Error deleting postgres IngressRouteTCP for {}: {}",
-            cdb.name_any(),
-            err
-        );
-        return Err(Action::requeue(Duration::from_secs(300)));
-    }
-
-    let prefix_pooler = format!("{}-pooler-0", cdb.name_any().as_str());
-    if let Err(err) =
-        delete_ingress_route_tcp(ingress_route_tcp_api.clone(), &namespace, &prefix_pooler).await
-    {
-        warn!(
-            "Error deleting pooler IngressRouteTCP for {}: {}",
-            cdb.name_any(),
-            err
-        );
-        return Err(Action::requeue(Duration::from_secs(300)));
-    }
-
-    let ferret_ing = format!("{}-fdb-api", cdb.name_any().as_str());
-    if let Err(err) =
-        delete_ingress_route_tcp(ingress_route_tcp_api.clone(), &namespace, &ferret_ing).await
-    {
-        warn!(
-            "Error deleting ferretdb IngressRouteTCP for {}: {}",
-            cdb.name_any(),
-            err
-        );
-        return Err(Action::requeue(Duration::from_secs(300)));
-    }
-
-    let extra_domain_names = cdb.spec.extra_domains_rw.clone().unwrap_or_default();
-    if !extra_domain_names.is_empty() {
-        let prefix_extra = format!("extra-{}-rw", cdb.name_any().as_str());
-        if let Err(err) =
-            delete_ingress_route_tcp(ingress_route_tcp_api.clone(), &namespace, &prefix_extra).await
-        {
+    if cdb.spec.stop {
+        // Remove IngressRoutes for stopped instances
+        let ingress_route_api: Api<IngressRoute> = Api::namespaced(ctx.client.clone(), &namespace);
+        if let Err(err) = delete_ingress_route(ingress_route_api.clone(), &namespace, &name).await {
             warn!(
-                "Error deleting extra postgres IngressRouteTCP for {}: {}",
+                "Error deleting app service IngressRoute for {}: {}",
                 cdb.name_any(),
                 err
             );
             return Err(Action::requeue(Duration::from_secs(300)));
+        }
+
+        let metrics_ing_route_name = format!("{}-metrics", cdb.name_any().as_str());
+        if let Err(err) = delete_ingress_route(
+            ingress_route_api.clone(),
+            &namespace,
+            &metrics_ing_route_name,
+        )
+        .await
+        {
+            warn!(
+                "Error deleting metrics IngressRoute for {}: {}",
+                cdb.name_any(),
+                err
+            );
+            return Err(Action::requeue(Duration::from_secs(300)));
+        }
+
+        // Remove IngressRouteTCP route for stopped instances
+        let ingress_route_tcp_api = Api::namespaced(ctx.client.clone(), &namespace);
+        let prefix_read_only = format!("{}-ro-0", cdb.name_any().as_str());
+        if let Err(err) =
+            delete_ingress_route_tcp(ingress_route_tcp_api.clone(), &namespace, &prefix_read_only)
+                .await
+        {
+            warn!(
+                "Error deleting postgres IngressRouteTCP for {}: {}",
+                cdb.name_any(),
+                err
+            );
+            return Err(Action::requeue(Duration::from_secs(300)));
+        }
+
+        let prefix_read_write = format!("{}-rw-0", cdb.name_any().as_str());
+        if let Err(err) = delete_ingress_route_tcp(
+            ingress_route_tcp_api.clone(),
+            &namespace,
+            &prefix_read_write,
+        )
+        .await
+        {
+            warn!(
+                "Error deleting postgres IngressRouteTCP for {}: {}",
+                cdb.name_any(),
+                err
+            );
+            return Err(Action::requeue(Duration::from_secs(300)));
+        }
+
+        let prefix_pooler = format!("{}-pooler-0", cdb.name_any().as_str());
+        if let Err(err) =
+            delete_ingress_route_tcp(ingress_route_tcp_api.clone(), &namespace, &prefix_pooler)
+                .await
+        {
+            warn!(
+                "Error deleting pooler IngressRouteTCP for {}: {}",
+                cdb.name_any(),
+                err
+            );
+            return Err(Action::requeue(Duration::from_secs(300)));
+        }
+
+        let ferret_ing = format!("{}-fdb-api", cdb.name_any().as_str());
+        if let Err(err) =
+            delete_ingress_route_tcp(ingress_route_tcp_api.clone(), &namespace, &ferret_ing).await
+        {
+            warn!(
+                "Error deleting ferretdb IngressRouteTCP for {}: {}",
+                cdb.name_any(),
+                err
+            );
+            return Err(Action::requeue(Duration::from_secs(300)));
+        }
+
+        let extra_domain_names = cdb.spec.extra_domains_rw.clone().unwrap_or_default();
+        if !extra_domain_names.is_empty() {
+            let prefix_extra = format!("extra-{}-rw", cdb.name_any().as_str());
+            if let Err(err) =
+                delete_ingress_route_tcp(ingress_route_tcp_api.clone(), &namespace, &prefix_extra)
+                    .await
+            {
+                warn!(
+                    "Error deleting extra postgres IngressRouteTCP for {}: {}",
+                    cdb.name_any(),
+                    err
+                );
+                return Err(Action::requeue(Duration::from_secs(300)));
+            }
         }
     }
 
