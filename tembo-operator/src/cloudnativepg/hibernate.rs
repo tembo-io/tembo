@@ -192,13 +192,20 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
     let hibernation_value = if cdb.spec.stop { "on" } else { "off" };
 
     // Build the hibernation patch we want to apply to disable the CNPG cluster.
+    // This will also disable the PodMonitor for the cluster.
     let patch_hibernation_annotation = json!({
         "metadata": {
             "annotations": {
                 "cnpg.io/hibernation": hibernation_value,
                 "cnpg.io/reconciliationLoop": stop_cnpg_reconciliation_value,
             }
+        },
+        "spec": {
+            "monitoring": {
+                "enablePodMonitor": !cdb.spec.stop,
+            }
         }
+
     });
     // Update ScheduledBackup if it exists
     if let Err(action) = update_scheduled_backups(&scheduled_backups, cdb, ctx).await {
@@ -217,22 +224,6 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
         );
         return Err(action);
     }
-
-    // Patch the CNPG Cluster resource to disable monitoring when hiberated
-    let patch_cluster_monitoring = json!({
-        "spec": {
-            "monitoring": {
-                "enablePodMonitor": !cdb.spec.stop,
-            }
-        }
-    });
-    if let Err(action) = patch_cluster_merge(cdb, ctx, patch_cluster_monitoring).await {
-        warn!(
-            "Error updating cluster for {}. Requeuing...",
-            cdb.name_any()
-        );
-        return Err(action);
-    };
 
     patch_cluster_merge(cdb, ctx, patch_hibernation_annotation).await?;
     info!(
