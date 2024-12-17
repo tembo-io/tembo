@@ -24,6 +24,8 @@ pub struct ImagePerPgVersion {
     pub pg15: Option<String>,
     #[serde(rename = "16")]
     pub pg16: Option<String>,
+    #[serde(rename = "17")]
+    pub pg17: Option<String>,
 }
 
 pub fn default_replicas() -> i32 {
@@ -67,9 +69,10 @@ pub fn default_repository() -> String {
 
 pub fn default_images() -> ImagePerPgVersion {
     ImagePerPgVersion {
-        pg14: Some("standard-cnpg:14-a0a5ab5".to_string()),
-        pg15: Some("standard-cnpg:15-a0a5ab5".to_string()),
-        pg16: Some("standard-cnpg:16-a0a5ab5".to_string()),
+        pg14: Some("standard-cnpg:14-30219f2".to_string()),
+        pg15: Some("standard-cnpg:15-30219f2".to_string()),
+        pg16: Some("standard-cnpg:16-30219f2".to_string()),
+        pg17: Some("standard-cnpg:17-30219f2".to_string()),
     }
 }
 
