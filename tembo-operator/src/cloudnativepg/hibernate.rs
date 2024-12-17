@@ -77,7 +77,7 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
     let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
 
     // Patch all AppService deployments to match the hibernation state
-    delete_appservice_deployments(ctx, &namespace, &name, cdb).await?;
+    patch_appservice_deployments(ctx, &namespace, &name, cdb).await?;
 
     if cdb.spec.stop {
         // Remove IngressRoutes for stopped instances
@@ -277,7 +277,32 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
     Ok(())
 }
 
-async fn delete_appservice_deployments(
+/// Patches AppService deployments in a Kubernetes cluster by updating their replica count based on the CoreDB specification.
+///
+/// This function performs the following operations:
+/// * Updates the replica count to 0 if CoreDB is stopped, or 1 if it's running
+/// * Deletes associated PodMonitor resources when scaling down to 0 replicas
+/// * Applies patches to all relevant deployments in the specified namespace
+///
+/// # Arguments
+///
+/// * `ctx` - A shared reference to the Context containing the Kubernetes client
+/// * `namespace` - The Kubernetes namespace where the deployments exist
+/// * `name` - The name identifier for the cluster
+/// * `cdb` - Reference to the CoreDB specification containing the stop status
+///
+/// # Returns
+///
+/// * `Ok(())` if all patches were successfully applied
+/// * `Err(Action)` if any operation fails, triggering a requeue with jitter
+///
+/// # Errors
+///
+/// This function will return an error in the following situations:
+/// * Failed to retrieve deployment list
+/// * Failed to delete PodMonitor when scaling down
+/// * Failed to apply deployment patches
+async fn patch_appservice_deployments(
     ctx: &Arc<Context>,
     namespace: &str,
     name: &str,
