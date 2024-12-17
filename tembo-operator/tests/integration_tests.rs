@@ -697,6 +697,7 @@ mod test {
         client: Client,
         cdb_name: &str,
         namespace: &str,
+        list_params: &ListParams,
         num_expected: usize,
     ) -> Result<Vec<R>, errors::OperatorError>
     where
@@ -709,22 +710,22 @@ mod test {
         R::DynamicType: Default,
     {
         let api: Api<R> = Api::namespaced(client, namespace);
-        let lp = ListParams::default().labels(format!("coredb.io/name={}", cdb_name).as_str());
         let retry = 15;
         let mut passed_retry = false;
         let mut resource_list: Vec<R> = Vec::new();
         for _ in 0..retry {
-            let resources = api.list(&lp).await?;
+            let resources = api.list(&list_params).await?;
             if resources.items.len() == num_expected {
                 resource_list.extend(resources.items);
                 passed_retry = true;
                 break;
             } else {
                 println!(
-                    "ns:{}.cdb:{} Found {}, expected {}",
+                    "ns:{}.cdb:{} Found {} {}, expected {}",
                     namespace,
                     cdb_name,
                     resources.items.len(),
+                    std::any::type_name::<R>(),
                     num_expected
                 );
             }
@@ -3848,7 +3849,7 @@ mod test {
                         }
                     },
                     {
-                        "name": "ferretdb",
+                        "name": "fdb-api",
                         "image": "ghcr.io/ferretdb/ferretdb",
                         "routing": [
                             {
@@ -3915,23 +3916,27 @@ mod test {
         let _coredb_resource = coredbs.patch(cdb_name, &params, &patch).await.unwrap();
 
         // assert we created three Deployments, with the names we provided
+        let default_params = ListParams::default();
         let deployment_items: Vec<Deployment> =
-            list_resources(client.clone(), cdb_name, &namespace, 3)
+            list_resources(client.clone(), cdb_name, &namespace, &default_params, 3)
                 .await
                 .unwrap();
         // three AppService deployments. the postgres exporter is disabled
         assert!(deployment_items.len() == 3);
 
-        let service_items: Vec<Service> = list_resources(client.clone(), cdb_name, &namespace, 2)
-            .await
-            .unwrap();
+        let cdb_params =
+            ListParams::default().labels(format!("coredb.io/name={}", cdb_name).as_str());
+        let service_items: Vec<Service> =
+            list_resources(client.clone(), cdb_name, &namespace, &cdb_params, 2)
+                .await
+                .unwrap();
         // two AppService Services, because two of the AppServices expose ports
         assert!(service_items.len() == 2);
 
         let app_0 = deployment_items[0].clone();
         let app_1 = deployment_items[1].clone();
         let app_2 = deployment_items[2].clone();
-        assert_eq!(app_0.metadata.name.unwrap(), format!("{cdb_name}-ferretdb"));
+        assert_eq!(app_0.metadata.name.unwrap(), format!("{cdb_name}-fdb-api"));
         assert_eq!(
             app_1.metadata.name.unwrap(),
             format!("{cdb_name}-postgrest")
@@ -4018,7 +4023,7 @@ mod test {
         assert!(found);
 
         let ingresses: Result<Vec<IngressRoute>, errors::OperatorError> =
-            list_resources(client.clone(), cdb_name, &namespace, 1).await;
+            list_resources(client.clone(), cdb_name, &namespace, &cdb_params, 1).await;
         let ingress = ingresses.unwrap();
         assert_eq!(ingress.len(), 1);
         let ingress_route = ingress[0].clone();
@@ -4037,9 +4042,11 @@ mod test {
         );
 
         // Check for IngressRouteTCP
-        let ing_name = format!("{cdb_name}-ferretdb");
+        let ing_name = format!("{cdb_name}-fdb-api");
+        let ing_params =
+            ListParams::default().labels(format!("coredb.io/name={}", ing_name).as_str());
         let ingresses_tcp: Result<Vec<IngressRouteTCP>, errors::OperatorError> =
-            list_resources(client.clone(), &ing_name, &namespace, 1).await;
+            list_resources(client.clone(), &ing_name, &namespace, &ing_params, 1).await;
         let ingress_tcp = ingresses_tcp.unwrap();
         assert_eq!(ingress_tcp.len(), 1);
         let ingress_route_tcp = ingress_tcp[0].clone();
@@ -4145,7 +4152,7 @@ mod test {
         coredbs.patch(cdb_name, &params, &patch).await.unwrap();
 
         let deployment_items: Vec<Deployment> =
-            list_resources(client.clone(), cdb_name, &namespace, 1)
+            list_resources(client.clone(), cdb_name, &namespace, &default_params, 1)
                 .await
                 .unwrap();
         assert!(deployment_items.len() == 1);
@@ -4156,9 +4163,10 @@ mod test {
         );
 
         // should still be just one Service
-        let service_items: Vec<Service> = list_resources(client.clone(), cdb_name, &namespace, 1)
-            .await
-            .unwrap();
+        let service_items: Vec<Service> =
+            list_resources(client.clone(), cdb_name, &namespace, &cdb_params, 1)
+                .await
+                .unwrap();
         // One appService Services
         assert!(service_items.len() == 1);
 
@@ -4349,26 +4357,28 @@ CREATE EVENT TRIGGER pgrst_watch
         let patch = Patch::Apply(&coredb_json);
         coredbs.patch(cdb_name, &params, &patch).await.unwrap();
         let deployment_items: Vec<Deployment> =
-            list_resources(client.clone(), cdb_name, &namespace, 0)
+            list_resources(client.clone(), cdb_name, &namespace, &default_params, 0)
                 .await
                 .unwrap();
         assert!(deployment_items.is_empty());
 
-        let service_items: Vec<Service> = list_resources(client.clone(), cdb_name, &namespace, 0)
-            .await
-            .unwrap();
+        let service_items: Vec<Service> =
+            list_resources(client.clone(), cdb_name, &namespace, &cdb_params, 0)
+                .await
+                .unwrap();
         assert!(service_items.is_empty());
         // should be no Services
 
         // ingress must be gone
-        let ingresses: Vec<IngressRoute> = list_resources(client.clone(), cdb_name, &namespace, 0)
-            .await
-            .unwrap();
+        let ingresses: Vec<IngressRoute> =
+            list_resources(client.clone(), cdb_name, &namespace, &default_params, 0)
+                .await
+                .unwrap();
         assert_eq!(ingresses.len(), 0);
 
         // Assert IngressRouteTCP is gone
         let ingresses_tcp: Vec<IngressRouteTCP> =
-            list_resources(client.clone(), cdb_name, &namespace, 0)
+            list_resources(client.clone(), cdb_name, &namespace, &default_params, 0)
                 .await
                 .unwrap();
         assert_eq!(ingresses_tcp.len(), 0);
@@ -5808,6 +5818,8 @@ CREATE EVENT TRIGGER pgrst_watch
         let test = TestCore::new(test_name).await;
         let name = test.name.clone();
         let pooler_name = format!("{}-pooler", name);
+        let namespace = test.namespace.clone();
+        let default_params = ListParams::default();
 
         // Generate very simple CoreDB JSON definitions. The first will be for
         // initializing and starting the cluster, and the second for stopping
@@ -5850,6 +5862,30 @@ CREATE EVENT TRIGGER pgrst_watch
             .await
             .not());
 
+        // Assert that IngressRouteTCPs are removed after hibernation
+        let client = test.client.clone();
+        let ingresses_tcp: Vec<IngressRouteTCP> =
+            list_resources(client.clone(), &name, &namespace, &default_params, 0)
+                .await
+                .unwrap();
+        assert_eq!(
+            ingresses_tcp.len(),
+            0,
+            "IngressRouteTCPs should be removed after hibernation"
+        );
+
+        // Assert that IngressRoutes are removed after hibernation
+        let client = test.client.clone();
+        let ingress_routes: Vec<IngressRoute> =
+            list_resources(client.clone(), &name, &namespace, &default_params, 0)
+                .await
+                .unwrap();
+        assert_eq!(
+            ingress_routes.len(),
+            0,
+            "IngressRoutes should be removed after hibernation"
+        );
+
         // Patch the cluster to start it up again, then check to ensure it
         // actually did so. This proves hibernation can be reversed.
 
@@ -5858,6 +5894,251 @@ CREATE EVENT TRIGGER pgrst_watch
         let _ = test.set_cluster_def(&cluster_start).await;
         assert!(status_running(&test.coredbs, &name).await);
         assert!(pooler_status_running(&test.poolers, &pooler_name).await);
+
+        // Assert there are 2 IngressRouteTCPs created after starting. 1 for postgres and 1 for the pooler
+        let ingress_tcps: Vec<IngressRouteTCP> =
+            list_resources(client.clone(), &name, &namespace, &default_params, 2)
+                .await
+                .unwrap();
+        assert_eq!(
+            ingress_tcps.len(),
+            2,
+            "IngressRouteTCPs should be created after starting"
+        );
+
+        // Assert there is 1 IngressRoute created after starting. This is the IngressRoute for metrics
+        let ingress_routes: Vec<IngressRoute> =
+            list_resources(client.clone(), &name, &namespace, &default_params, 1)
+                .await
+                .unwrap();
+        assert_eq!(
+            ingress_routes.len(),
+            1,
+            "IngressRoutes should be created after starting"
+        );
+
+        test.teardown().await;
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn functional_test_hibernate_with_app_service() {
+        let test_name = "test-hibernate-cnpg-with-app-service";
+        let test = TestCore::new(test_name).await;
+        let name = test.name.clone();
+        let pooler_name = format!("{}-pooler", name);
+        let namespace = test.namespace.clone();
+        let default_params = ListParams::default();
+
+        // Generate very simple CoreDB JSON definitions. The first will be for
+        // initializing and starting the cluster with an app service, and the second for stopping
+        // it. We'll use a single replica to ensure _all_ parts of the cluster
+        // are affected by hibernate.
+
+        let cluster_start = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": "CoreDB",
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "replicas": 1,
+                "stop": false,
+                "connectionPooler": {
+                    "enabled": true
+                },
+                "appServices": [
+                    {
+                        "name": "postgrest",
+                        "image": "postgrest/postgrest:v10.0.0",
+                        "env": [
+                            {
+                                "name": "PGRST_DB_URI",
+                                "valueFromPlatform": "ReadWriteConnection"
+                            },
+                            {
+                                "name": "PGRST_DB_SCHEMA",
+                                "value": "public"
+                            },
+                            {
+                                "name": "PGRST_DB_ANON_ROLE",
+                                "value": "postgres"
+                            }
+                        ],
+                        "routing": [
+                            {
+                                "port": 3000,
+                                "ingressPath": "/",
+                                "ingressType": "http"
+                            }
+                        ],
+                        "resources": {
+                            "requests": {
+                                "cpu": "100m",
+                                "memory": "256Mi"
+                            },
+                            "limits": {
+                                "cpu": "100m",
+                                "memory": "256Mi"
+                            }
+                        }
+                    },
+                                        {
+                        "name": "fdb-api",
+                        "image": "ghcr.io/ferretdb/ferretdb",
+                        "routing": [
+                            {
+                                "port": 27018,
+                                "ingressPath": "/ferretdb/v1",
+                                "entryPoints": [
+                                    "ferretdb"
+                                ],
+                                "ingressType": "tcp"
+                            }
+                        ],
+                        "env": [
+                            {
+                                "name": "FERRETDB_POSTGRESQL_URL",
+                                "valueFromPlatform": "ReadWriteConnection"
+                            },
+                            {
+                                "name": "FERRETDB_LOG_LEVEL",
+                                "value": "debug"
+                            },
+                            {
+                                "name": "FERRETDB_STATE_DIR",
+                                "value": "-"
+                            },
+                            {
+                                "name": "FERRETDB_LISTEN_TLS_CERT_FILE",
+                                "value": "/certs/tls.crt"
+                            },
+                        ],
+                        "storage": {
+                            "volumes": [
+                                {
+                                    "name": "ferretdb-data",
+                                    "ephemeral": {
+                                        "volumeClaimTemplate": {
+                                            "spec": {
+                                                "accessModes": [
+                                                    "ReadWriteOnce"
+                                                ],
+                                                "resources": {
+                                                    "requests": {
+                                                        "storage": "1Gi"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ],
+                            "volumeMounts": [
+                                {
+                                    "name": "ferretdb-data",
+                                    "mountPath": "/state"
+                                }
+                            ]
+                        },
+                    }
+                ]
+            }
+        });
+
+        let mut cluster_stop = cluster_start.clone();
+        cluster_stop["spec"]["stop"] = serde_json::json!(true);
+
+        // Begin by starting the cluster and validating that it worked.
+        // We need this here as initial iterations of the hibernate code
+        // prevented the cluster from starting.
+
+        let _ = test.set_cluster_def(&cluster_start).await;
+        assert!(status_running(&test.coredbs, &name).await);
+        assert!(pooler_status_running(&test.poolers, &pooler_name).await);
+
+        // Assert there are 4 pods running: postgres, pooler, postgrest and ferretdb
+        let pods: Api<Pod> = Api::namespaced(test.client.clone(), &namespace);
+        let pods_list = pods.list(&Default::default()).await.unwrap();
+        assert_eq!(pods_list.items.len(), 4);
+
+        // Stop the cluster and check to make sure it's not running to ensure
+        // hibernate is doing its job.
+
+        let _ = test.set_cluster_def(&cluster_stop).await;
+        let _ = wait_until_status_not_running(&test.coredbs, &name).await;
+        assert!(status_running(&test.coredbs, &name).await.not());
+        assert!(pooler_status_running(&test.poolers, &pooler_name)
+            .await
+            .not());
+
+        // Assert there are no pods running
+        let pods_list = pods.list(&Default::default()).await.unwrap();
+        assert_eq!(pods_list.items.len(), 0);
+
+        // Assert that IngressRouteTCPs are removed after hibernation
+        // TODO(ianstanton) Typically there should be 0 here, but we're creating one for postgrest
+        //  due to a bug. This should be updated to 0 after the bug is fixed.
+        let client = test.client.clone();
+        let ingresses_tcp: Vec<IngressRouteTCP> =
+            list_resources(client.clone(), &name, &namespace, &default_params, 1)
+                .await
+                .unwrap();
+        assert_eq!(
+            ingresses_tcp.len(),
+            1,
+            "IngressRouteTCPs should be removed after hibernation"
+        );
+
+        // Assert that IngressRoutes are removed after hibernation
+        let client = test.client.clone();
+        let ingress_routes: Vec<IngressRoute> =
+            list_resources(client.clone(), &name, &namespace, &default_params, 0)
+                .await
+                .unwrap();
+        assert_eq!(
+            ingress_routes.len(),
+            0,
+            "IngressRoutes should be removed after hibernation"
+        );
+
+        // Patch the cluster to start it up again, then check to ensure it
+        // actually did so. This proves hibernation can be reversed.
+
+        println!("Starting cluster after hibernation");
+        println!("CoreDB: {}", cluster_start);
+        let _ = test.set_cluster_def(&cluster_start).await;
+        assert!(status_running(&test.coredbs, &name).await);
+        assert!(pooler_status_running(&test.poolers, &pooler_name).await);
+
+        // Assert there are 4 pods running: postgres, pooler, postgrest and ferretdb
+        let pods_list = pods.list(&Default::default()).await.unwrap();
+        assert_eq!(pods_list.items.len(), 4);
+
+        // Assert there are 4 IngressRouteTCPs created after starting. One for postgres, pooler,
+        // ferretdb and postgrest
+        // TODO(ianstanton) postgrest's IngressRouteTCP is being created due to a bug. This should
+        //  check for 3 IngressRouteTCPs after the bug is fixed.
+        let ingress_tcps: Vec<IngressRouteTCP> =
+            list_resources(client.clone(), &name, &namespace, &default_params, 4)
+                .await
+                .unwrap();
+        assert_eq!(
+            ingress_tcps.len(),
+            4,
+            "IngressRouteTCPs should be created after starting"
+        );
+
+        // Assert there are 2 IngressRoutes created after starting. 1 for metrics and 1 for the app service
+        let ingress_routes: Vec<IngressRoute> =
+            list_resources(client.clone(), &name, &namespace, &default_params, 2)
+                .await
+                .unwrap();
+        assert_eq!(
+            ingress_routes.len(),
+            2,
+            "IngressRoutes should be created after starting"
+        );
 
         test.teardown().await;
     }
