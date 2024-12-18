@@ -55,6 +55,7 @@ mod test {
         time::Duration,
     };
 
+    use serial_test::serial;
     use tokio::{io::AsyncReadExt, time::timeout};
 
     const API_VERSION: &str = "coredb.io/v1alpha1";
@@ -955,6 +956,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_basic_cnpg() {
         let test_name = "test-basic-cnpg";
@@ -1036,6 +1038,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_basic_cnpg_assuming_latest_version() {
         let test_name = "test-basic-cnpg";
@@ -1115,6 +1118,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_basic_cnpg_pg16() {
         // Initialize the Kubernetes client
@@ -1219,6 +1223,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_cnpg_metrics_create() {
         // Initialize the Kubernetes client
@@ -1494,6 +1499,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_cnpg_pgparams() {
         // Initialize the Kubernetes client
@@ -1717,6 +1723,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_skip_reconciliation() {
         // Initialize the Kubernetes client
@@ -1798,6 +1805,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_delete_namespace() {
         // Initialize the Kubernetes client
@@ -1902,6 +1910,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn test_networking() {
         // Initialize the Kubernetes client
@@ -2333,6 +2342,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_ha_basic_cnpg() {
         // Initialize the Kubernetes client
@@ -2419,6 +2429,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_ha_upgrade_cnpg() {
         // Initialize the Kubernetes client
@@ -2587,6 +2598,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_shared_preload_libraries() {
         // Initialize the Kubernetes client
@@ -2718,6 +2730,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_ext_with_load() {
         // Initialize the Kubernetes client
@@ -3079,6 +3092,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_ha_two_replicas() {
         // Initialize the Kubernetes client
@@ -3236,6 +3250,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_ha_verify_extensions_ha_later() {
         // Initialize the Kubernetes client
@@ -3461,6 +3476,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_ha_shared_preload_libraries() {
         // Initialize the Kubernetes client
@@ -3750,6 +3766,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_app_service() {
         // Initialize the Kubernetes client
@@ -4405,6 +4422,7 @@ CREATE EVENT TRIGGER pgrst_watch
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn restarts_postgres_correctly() {
         async fn wait_til_status_is_filled(coredbs: &Api<CoreDB>, name: &str) {
@@ -4613,6 +4631,7 @@ CREATE EVENT TRIGGER pgrst_watch
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_status_configs() {
         async fn runtime_cfg(coredbs: &Api<CoreDB>, name: &str) -> Option<Vec<PgConfig>> {
@@ -4846,6 +4865,7 @@ CREATE EVENT TRIGGER pgrst_watch
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_backup_and_restore() {
         // Initialize the Kubernetes client
@@ -5266,6 +5286,7 @@ CREATE EVENT TRIGGER pgrst_watch
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_pooler() {
         // Initialize the Kubernetes client
@@ -5338,8 +5359,19 @@ CREATE EVENT TRIGGER pgrst_watch
 
         // Check for pooler service
         let pooler_services: Api<Service> = Api::namespaced(client.clone(), &namespace);
-        let _pooler_service = pooler_services.get(&pooler_name).await.unwrap();
-        println!("Found pooler service: {}", pooler_name);
+        for _ in 0..12 {
+            match pooler_services.get(&pooler_name).await {
+                Ok(_) => {
+                    println!("Found pooler service: {}", pooler_name);
+                    break;
+                }
+                Err(_) => {
+                    println!("Waiting for pooler service to be created: {}", pooler_name);
+                    tokio::time::sleep(Duration::from_secs(5)).await;
+                    continue;
+                }
+            }
+        }
 
         // Check for pooler secret
         let pooler_secrets: Api<Secret> = Api::namespaced(client.clone(), &namespace);
@@ -5370,11 +5402,23 @@ CREATE EVENT TRIGGER pgrst_watch
         // Check for pooler IngressRouteTCP
         let pooler_ingressroutetcps: Api<IngressRouteTCP> =
             Api::namespaced(client.clone(), &namespace);
-        let _pooler_ingressroutetcp = pooler_ingressroutetcps
-            .get(format!("{pooler_name}-0").as_str())
-            .await
-            .unwrap();
-        println!("Found pooler IngressRouteTCP: {pooler_name}-0");
+        let ingressroute_name = format!("{pooler_name}-0");
+        for _ in 0..12 {
+            match pooler_ingressroutetcps.get(&ingressroute_name).await {
+                Ok(_) => {
+                    println!("Found pooler IngressRouteTCP: {}", ingressroute_name);
+                    break;
+                }
+                Err(_) => {
+                    println!(
+                        "Waiting for pooler IngressRouteTCP to be created: {}",
+                        ingressroute_name
+                    );
+                    tokio::time::sleep(Duration::from_secs(5)).await;
+                    continue;
+                }
+            }
+        }
 
         // Query the database to make sure the pgbouncer role was created
         let _pgb_query = wait_until_psql_contains(
@@ -5452,6 +5496,7 @@ CREATE EVENT TRIGGER pgrst_watch
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_restart_and_update_replicas() {
         // Initialize the Kubernetes client
@@ -5602,6 +5647,7 @@ CREATE EVENT TRIGGER pgrst_watch
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_cnpg_update_image_and_params() {
         // Initialize the Kubernetes client
@@ -5807,6 +5853,7 @@ CREATE EVENT TRIGGER pgrst_watch
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     /// Test the hibernation system
     /// Ensure that the cluster performs the following:
@@ -5921,6 +5968,7 @@ CREATE EVENT TRIGGER pgrst_watch
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_hibernate_with_app_service() {
         let test_name = "test-hibernate-cnpg-with-app-service";
@@ -6186,6 +6234,7 @@ CREATE EVENT TRIGGER pgrst_watch
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_app_service_podmonitor() {
         // Validates PodMonitor resource created and destroyed properly
@@ -6378,6 +6427,7 @@ CREATE EVENT TRIGGER pgrst_watch
     /// There used to be an issue figuring out the Trunk project version of one of the built-in Postgres language extensions (e.g. plpython, pltcl, plperl)
     /// given its extension version. This test should replicate that scenario.
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_basic_cnpg_plpython() {
         let test_name = "test-basic-cnpg-plpython";

@@ -41,6 +41,7 @@ fn convert_exec_pod_affinity_term(
             .map(convert_affinity_term_namespace_selector),
         namespaces: term.namespaces.clone(),
         topology_key: term.topology_key.clone(),
+        ..Default::default()
     }
 }
 
@@ -59,6 +60,7 @@ fn convert_required_pod_affinity_term(
             .map(convert_affinity_exec_namespace_selector),
         namespaces: term.namespaces.clone(),
         topology_key: term.topology_key.clone(),
+        ..Default::default()
     }
 }
 

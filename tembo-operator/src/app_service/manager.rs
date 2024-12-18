@@ -386,7 +386,7 @@ fn generate_deployment(
             name: r_conn,
             value_from: Some(EnvVarSource {
                 secret_key_ref: Some(SecretKeySelector {
-                    name: Some(apps_connection_secret_name.clone()),
+                    name: apps_connection_secret_name.clone(),
                     key: "r_uri".to_string(),
                     ..SecretKeySelector::default()
                 }),
@@ -401,7 +401,7 @@ fn generate_deployment(
             name: ro_conn.clone(),
             value_from: Some(EnvVarSource {
                 secret_key_ref: Some(SecretKeySelector {
-                    name: Some(apps_connection_secret_name.clone()),
+                    name: apps_connection_secret_name.clone(),
                     key: "ro_uri".to_string(),
                     ..SecretKeySelector::default()
                 }),
@@ -416,7 +416,7 @@ fn generate_deployment(
             name: rw_conn.clone(),
             value_from: Some(EnvVarSource {
                 secret_key_ref: Some(SecretKeySelector {
-                    name: Some(apps_connection_secret_name.clone()),
+                    name: apps_connection_secret_name.clone(),
                     key: "rw_uri".to_string(),
                     ..SecretKeySelector::default()
                 }),
@@ -484,7 +484,7 @@ fn generate_deployment(
                         name: env.name,
                         value_from: Some(EnvVarSource {
                             secret_key_ref: Some(SecretKeySelector {
-                                name: Some(apps_connection_secret_name.clone()),
+                                name: apps_connection_secret_name.clone(),
                                 key: secret_key.to_string(),
                                 ..SecretKeySelector::default()
                             }),

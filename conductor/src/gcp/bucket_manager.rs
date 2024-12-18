@@ -267,7 +267,6 @@ impl BucketIamManager {
     /// # Returns
     ///
     /// Returns a `Condition` instance for the specified bucket.
-
     fn create_bucket_condition(&self, bucket_name: &str, instance_name: &str) -> Condition {
         Condition {
             title: "allow-bucket-and-path".to_string(),

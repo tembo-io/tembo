@@ -270,7 +270,7 @@ pub async fn create_federated_identity_credentials(
     let federated_identity_client = azure_mgmt_msi::Client::builder(credentials.clone()).build()?;
     let cluster_issuer = get_cluster_issuer(
         subscription_id,
-        &resource_group_prefix,
+        resource_group_prefix,
         &format!("aks-{resource_group_prefix}"),
         credentials.clone(),
     )

@@ -29,23 +29,22 @@ telemetry = ["tonic", "opentelemetry-otlp"]
 actix-web = "4.3.1"
 futures = "0.3.28"
 tokio = { version = "1.28.2", features = ["macros", "rt-multi-thread"] }
-k8s-openapi = { version = "0.18.0", features = [
-  "v1_25",
+k8s-openapi = { version = "0.23.0", features = [
+  "v1_29",
   "schemars",
 ], default-features = false }
 schemars = { version = "0.8.12", features = ["chrono"] }
 serde = { version = "1.0.180", features = ["derive"] }
 serde_json = "1.0.104"
 serde_yaml = "0.9.25"
-prometheus = "0.13.3"
+prometheus-client = "0.22"
 chrono = { version = "0.4.26", features = ["serde"] }
-tracing = "0.1.37"
-tracing-subscriber = { version = "0.3.17", features = ["json", "env-filter"] }
-tracing-opentelemetry = "0.19.0"
-opentelemetry = { version = "0.19.0", features = ["trace", "rt-tokio"] }
-opentelemetry-otlp = { version = "0.12.0", features = [
-  "tokio",
-], optional = true }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3.19", features = ["json", "env-filter"] }
+tracing-opentelemetry = "0.27.0"
+opentelemetry = { version = "0.26.0", features = ["trace"] }
+opentelemetry-otlp = { version = "0.26.0", optional = true }
+opentelemetry_sdk = { version = "0.26.0", features = ["rt-tokio"] }
 tonic = { version = "0.8.0", optional = true } # 0.9 blocked on opentelemetry-otlp release
 thiserror = "1.0.44"
 passwords = "3.1.13"
@@ -59,11 +58,12 @@ rand = "0.8.5"
 reqwest = { version = "0.11.20", features = ["json", "trust-dns"] }
 utoipa = "3.5.0"
 strum = { version = "0.26.2", features = ["derive"] }
+serial_test = "3"
 
 [dev-dependencies]
 assert-json-diff = "2.0.2"
-http = "0.2.9"
-hyper = "0.14.27"
+http = "1"
+hyper = "1"
 rand = "0.8.5"
 tower-test = "0.4.0"
 futures-util = "0.3"
@@ -71,4 +71,4 @@ regex = "1"
 
 [dependencies.kube]
 features = ["runtime", "client", "derive", "ws"]
-version = "0.84.0"
+version = "0.97.0"

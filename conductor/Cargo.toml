@@ -14,28 +14,27 @@ chrono = { version = "0.4.24", features = ["serde"] }
 controller = { path = "../tembo-operator", package = "controller" }
 env_logger = "0.10.0"
 futures = "0.3.28"
-k8s-openapi = { version = "0.18.0", features = ["v1_25", "schemars"] }
+k8s-openapi = { version = "0.23.0", features = ["v1_29", "schemars"] }
 log = "0.4.17"
 pgmq = "0.29.2"
 schemars = "0.8.12"
 serde = { version = "1.0.160", features = ["derive"] }
 serde_json = "1.0.96"
 thiserror = "1.0.40"
-tokio = { version = "1.28.0", features = ["full"] }
+tokio = { version = "1.42.0", features = ["full"] }
 actix-web = "4.3.0"
-actix-web-opentelemetry = { version = "0.13.0", features = [
+actix-web-opentelemetry = { version = "0.19.0", features = [
   "metrics-prometheus",
 ] }
-opentelemetry = { version = "0.18", features = [
-  "metrics",
-  "rt-tokio-current-thread",
-] }
-opentelemetry-prometheus = "0.11"
+opentelemetry = { version = "0.27", features = ["metrics"] }
+opentelemetry-prometheus = "0.27"
+opentelemetry_sdk = { version = "0.27", features = ["metrics", "rt-tokio"] }
+prometheus = "0.13"
 sqlx = { version = "0.8", features = ["runtime-tokio-native-tls", "postgres"] }
 anyhow = "1.0.82"
 serde_yaml = "0.9.34"
 reqwest = { version = "0.12.3", features = ["json"] }
-google-cloud-storage = "0.22.1"
+google-cloud-storage = "0.23"
 azure_identity = "0.21.0"
 azure_mgmt_msi = "0.21.0"
 azure_mgmt_authorization = "0.21.0"
@@ -47,7 +46,7 @@ idna = "=0.5.0" #https://github.com/servo/rust-url/issues/992
 
 [dependencies.kube]
 features = ["runtime", "client", "derive"]
-version = "0.84.0"
+version = "0.97.0"
 
 
 [dev-dependencies]
