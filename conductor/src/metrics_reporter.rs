@@ -182,6 +182,7 @@ impl Client {
     }
 }
 
+#[cfg(test)]
 mod tests {
     use super::load_metric_queries;
 
