@@ -52,7 +52,7 @@ appServices:
         memory: 100Mi
 trunk_installs:
   - name: pgmq
-    version: 1.4.4
+    version: 1.5.0
   - name: pg_partman
     version: 5.0.1
   - name: parquet_s3_fdw
@@ -64,13 +64,13 @@ extensions:
     locations:
       - database: postgres
         enabled: true
-        version: 1.4.4
+        version: 1.5.0
       - database: app
         enabled: true
-        version: 1.4.4
+        version: 1.5.0
       - database: template1
         enabled: true
-        version: 1.4.4
+        version: 1.5.0
   - name: pg_partman
     locations:
       - database: postgres
