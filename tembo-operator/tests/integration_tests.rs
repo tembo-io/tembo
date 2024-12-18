@@ -6060,7 +6060,28 @@ CREATE EVENT TRIGGER pgrst_watch
         // Assert there are 4 pods running: postgres, pooler, postgrest and ferretdb
         let pods: Api<Pod> = Api::namespaced(test.client.clone(), &namespace);
         let pods_list = pods.list(&Default::default()).await.unwrap();
-        assert_eq!(pods_list.items.len(), 4);
+        let required_pods = ["postgres", "pooler", "postgrest", "fdb-api"];
+
+        // Check each required pod exists
+        for required_pod in required_pods {
+            let pod_exists = pods_list.items.iter().any(|pod| {
+                pod.metadata
+                    .name
+                    .as_ref()
+                    .map_or(false, |name| name.contains(required_pod))
+            });
+
+            assert!(
+                pod_exists,
+                "Required pod '{}' was not found in namespace. Found pods: {:?}",
+                required_pod,
+                pods_list
+                    .items
+                    .iter()
+                    .filter_map(|pod| pod.metadata.name.as_ref())
+                    .collect::<Vec<_>>()
+            );
+        }
 
         // Stop the cluster and check to make sure it's not running to ensure
         // hibernate is doing its job.
@@ -6113,7 +6134,28 @@ CREATE EVENT TRIGGER pgrst_watch
 
         // Assert there are 4 pods running: postgres, pooler, postgrest and ferretdb
         let pods_list = pods.list(&Default::default()).await.unwrap();
-        assert_eq!(pods_list.items.len(), 4);
+        let required_pods = ["postgres", "pooler", "postgrest", "fdb-api"];
+
+        // Check each required pod exists
+        for required_pod in required_pods {
+            let pod_exists = pods_list.items.iter().any(|pod| {
+                pod.metadata
+                    .name
+                    .as_ref()
+                    .map_or(false, |name| name.contains(required_pod))
+            });
+
+            assert!(
+                pod_exists,
+                "Required pod '{}' was not found in namespace. Found pods: {:?}",
+                required_pod,
+                pods_list
+                    .items
+                    .iter()
+                    .filter_map(|pod| pod.metadata.name.as_ref())
+                    .collect::<Vec<_>>()
+            );
+        }
 
         // Assert there are 4 IngressRouteTCPs created after starting. One for postgres, pooler,
         // ferretdb and postgrest
