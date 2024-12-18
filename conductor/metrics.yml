@@ -40,7 +40,7 @@ metrics:
 - name: storage_usage_pct
   server: prometheus
   query: |
-    sum by (instance_id, pod) (
+    100 * sum by (instance_id, pod) (
       label_replace(
         kubelet_volume_stats_used_bytes * on(namespace) group_left(label_tembo_io_instance_id)
         kube_namespace_labels{label_tembo_io_instance_id!=""},
