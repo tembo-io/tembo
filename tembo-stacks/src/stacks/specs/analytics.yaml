@@ -3,9 +3,9 @@ description: A Postgres instance optimized for analytics workloads.
 repository: "quay.io/tembo"
 organization: tembo
 images:
-  14: "dw-cnpg:14-30219f2"
-  15: "dw-cnpg:15-30219f2"
-  16: "dw-cnpg:16-30219f2"
+  14: "standard-cnpg:14-30219f2"
+  15: "standard-cnpg:15-30219f2"
+  16: "standard-cnpg:16-30219f2"
 stack_version: 0.1.0
 postgres_config_engine: olap
 postgres_config:
