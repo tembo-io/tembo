@@ -1010,29 +1010,37 @@ pub async fn reconcile_app_services(
         for appsvc in appsvcs.iter() {
             let app_name = appsvc.name.clone();
 
-            match reconcile_ingress_tcp(
-                client.clone(),
-                &coredb_name,
-                &ns,
-                oref.clone(),
-                desired_tcp_routes.clone(),
-                // TODO: fill with actual MiddlewareTCPs when it is supported
-                // first supported MiddlewareTCP will be for custom domains
-                vec![],
-                desired_entry_points_tcp.clone(),
-                &app_name,
-            )
-            .await
-            {
-                Ok(_) => {
-                    debug!("Updated/applied IngressRouteTCP for {}.{}", ns, coredb_name,);
-                }
-                Err(e) => {
-                    error!(
-                        "Failed to update/apply IngressRouteTCP {}.{}: {}",
-                        ns, coredb_name, e
-                    );
-                    has_errors = true;
+            // Only reconcile IngressRouteTCP if the AppService has a TCP route
+            if appsvc.routing.is_some() {
+                for route in appsvc.routing.as_ref().unwrap() {
+                    if route.ingress_type == Some(IngressType::tcp) {
+                        match reconcile_ingress_tcp(
+                            client.clone(),
+                            &coredb_name,
+                            &ns,
+                            oref.clone(),
+                            desired_tcp_routes.clone(),
+                            vec![],
+                            desired_entry_points_tcp.clone(),
+                            &app_name,
+                        )
+                        .await
+                        {
+                            Ok(_) => {
+                                debug!(
+                                    "Updated/applied IngressRouteTCP for {}.{}",
+                                    ns, coredb_name,
+                                );
+                            }
+                            Err(e) => {
+                                error!(
+                                    "Failed to update/apply IngressRouteTCP {}.{}: {}",
+                                    ns, coredb_name, e
+                                );
+                                has_errors = true;
+                            }
+                        }
+                    }
                 }
             }
         }
