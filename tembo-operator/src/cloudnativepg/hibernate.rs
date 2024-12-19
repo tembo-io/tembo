@@ -193,7 +193,7 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
         "enabled"
     };
 
-    let cluster_annotations = cluster.metadata.annotations.unwrap_or_default();
+    let cluster_annotations = cluster.metadata.annotations.clone().unwrap_or_default();
     let hibernation_value = if cdb.spec.stop { "on" } else { "off" };
 
     // Build the hibernation patch we want to apply to disable the CNPG cluster.
@@ -228,6 +228,10 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
         );
         return Err(action);
     }
+
+    // If CNPG is already hibernated then there maybe a dangling PodMonitor still present
+    // This will not get cleaned up if already hibernated.  We need to remove it manually
+    cleanup_hibernated_podmonitor(ctx, namespace, name.clone(), cdb, &cluster).await?;
 
     patch_cluster_merge(cdb, ctx, patch_hibernation_annotation).await?;
     info!(
@@ -399,6 +403,57 @@ async fn patch_appservice_deployments(
         }
     }
 
+    Ok(())
+}
+
+/// Cleans up any dangling PodMonitor resources for a hibernated CloudNativePostgreSQL cluster.
+///
+/// When a CNPG cluster is hibernated, there might be leftover PodMonitor resources that
+/// need manual cleanup. This function handles that cleanup process.
+///
+/// # Arguments
+///
+/// * `client` - Kubernetes client for API operations
+/// * `namespace` - Namespace where the cluster and PodMonitor reside
+/// * `name` - Name of the cluster and associated PodMonitor
+/// * `cdb` - Reference to the CloudNativePostgreSQL resource
+/// * `cluster` - Reference to the Cluster resource
+///
+/// # Returns
+///
+/// * `Ok(())` if the cleanup was successful or if no action was needed
+/// * `Err(Error)` if there was an error during cleanup that requires requeuing
+///
+/// # Errors
+///
+/// Returns an error if the PodMonitor deletion fails for reasons other than the resource not existing.
+async fn cleanup_hibernated_podmonitor(
+    ctx: &Arc<Context>,
+    namespace: String,
+    name: String,
+    cdb: &CoreDB,
+    cluster: &Cluster,
+) -> Result<(), Action> {
+    if cdb.spec.stop && is_cluster_hibernated(cluster) {
+        let client = ctx.client.clone();
+        let podmonitor_api: Api<podmon::PodMonitor> = Api::namespaced(client, &namespace);
+        match podmonitor_api.delete(&name, &DeleteParams::default()).await {
+            Ok(_) => {
+                info!("Deleted PodMonitor for hibernated cluster {}", name);
+            }
+            Err(kube::Error::Api(api_err)) if api_err.code == 404 => {
+                debug!("No PodMonitor found for hibernated cluster {}", name);
+            }
+            Err(e) => {
+                warn!(
+                    "Could not delete PodMonitor for hibernated cluster {}; retrying",
+                    name
+                );
+                debug!("Caught error {}", e);
+                return Err(requeue_normal_with_jitter());
+            }
+        }
+    }
     Ok(())
 }
 
