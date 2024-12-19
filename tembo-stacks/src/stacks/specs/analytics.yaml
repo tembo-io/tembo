@@ -39,7 +39,7 @@ trunk_installs:
   - name: pg_cron
     version: 1.6.2
   - name: pg_later
-    version: 0.1.1
+    version: 0.3.0
   - name: pg_analytics
     version: 0.2.1
   - name: pg_parquet
