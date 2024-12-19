@@ -3,7 +3,7 @@ entries:
   conductor:
   - apiVersion: v2
     appVersion: 0.1.0
-    created: "2024-12-13T17:20:54.531398448Z"
+    created: "2024-12-19T21:46:24.290067606Z"
     description: A Helm chart for Kubernetes
     digest: c0e78344adeacb95fcef5f9e8e53f7b43d053468b212d458cd411f78e6477fa2
     name: conductor
@@ -13,7 +13,7 @@ entries:
     version: 0.7.1
   - apiVersion: v2
     appVersion: 0.1.0
-    created: "2024-12-13T17:20:54.530361957Z"
+    created: "2024-12-19T21:46:24.289015508Z"
     description: A Helm chart for Kubernetes
     digest: 1c024979a08979d6d0f402e559e0afdcd6be3519e1bc2fda2dbca7adbe7e982d
     name: conductor
@@ -23,7 +23,7 @@ entries:
     version: 0.7.0
   - apiVersion: v2
     appVersion: 0.1.0
-    created: "2024-12-13T17:20:54.528793012Z"
+    created: "2024-12-19T21:46:24.287900881Z"
     description: A Helm chart for Kubernetes
     digest: 945581dc99ec334e1bc448f2a8d9aaf8f293b8b04720f9bc113fe6811b1ede48
     name: conductor
@@ -33,7 +33,7 @@ entries:
     version: 0.6.0
   - apiVersion: v2
     appVersion: 0.1.0
-    created: "2024-12-13T17:20:54.527785306Z"
+    created: "2024-12-19T21:46:24.286297752Z"
     description: A Helm chart for Kubernetes
     digest: c3154213f3a48578066dbf9e9cb409e808d3d9fad6e7431c4d741fbba3fe76da
     name: conductor
@@ -43,7 +43,7 @@ entries:
     version: 0.5.2
   - apiVersion: v2
     appVersion: 0.1.0
-    created: "2024-12-13T17:20:54.526761308Z"
+    created: "2024-12-19T21:46:24.285319212Z"
     description: A Helm chart for Kubernetes
     digest: d29b0bb382348d738c90d3448c9899e9cf1529050cc891e7d1f509bd08933f8a
     name: conductor
@@ -53,7 +53,7 @@ entries:
     version: 0.5.1
   - apiVersion: v2
     appVersion: 0.1.0
-    created: "2024-12-13T17:20:54.525645899Z"
+    created: "2024-12-19T21:46:24.284176042Z"
     description: A Helm chart for Kubernetes
     digest: dbedb8619cfbea8bf32d43f65f70e3ee87ea62bb01469a10f022c7d047ead5ba
     name: conductor
@@ -63,7 +63,7 @@ entries:
     version: 0.5.0
   - apiVersion: v2
     appVersion: 0.1.0
-    created: "2024-12-13T17:20:54.523904472Z"
+    created: "2024-12-19T21:46:24.282540646Z"
     description: A Helm chart for Kubernetes
     digest: 34d4ef9c620bb7c556d7a11c9d54ef0273ba8ee7527ae2164caa7c88b39f16c7
     name: conductor
@@ -73,7 +73,7 @@ entries:
     version: 0.4.0
   - apiVersion: v2
     appVersion: 0.1.0
-    created: "2024-12-13T17:20:54.522884312Z"
+    created: "2024-12-19T21:46:24.28154809Z"
     description: A Helm chart for Kubernetes
     digest: c60afe9cf99a08e96a8f024559acb5a69be18536c74c0fe7aa574f788fae3240
     name: conductor
@@ -83,7 +83,7 @@ entries:
     version: 0.3.2
   - apiVersion: v2
     appVersion: 0.1.0
-    created: "2024-12-13T17:20:54.520976693Z"
+    created: "2024-12-19T21:46:24.280396884Z"
     description: A Helm chart for Kubernetes
     digest: f388948fe3848962d3129f133296afd680946ab1bc4006a4912607165b814ae0
     name: conductor
@@ -93,7 +93,7 @@ entries:
     version: 0.3.1
   - apiVersion: v2
     appVersion: 0.1.0
-    created: "2024-12-13T17:20:54.519961532Z"
+    created: "2024-12-19T21:46:24.278779871Z"
     description: A Helm chart for Kubernetes
     digest: d750c3652584036f3f1bf43c1baed2252e98a4cc1672e31ed259754d2b3514cb
     name: conductor
@@ -104,7 +104,7 @@ entries:
   tembo:
   - apiVersion: v2
     appVersion: 1.0.0
-    created: "2024-12-13T17:20:54.812086395Z"
+    created: "2024-12-19T21:46:24.595938554Z"
     dependencies:
     - condition: global.certManagerEnabled
       name: cert-manager
@@ -132,7 +132,7 @@ entries:
     version: 24.3.3
   - apiVersion: v2
     appVersion: 1.0.0
-    created: "2024-12-13T17:20:54.749664801Z"
+    created: "2024-12-19T21:46:24.527528996Z"
     dependencies:
     - condition: global.certManagerEnabled
       name: cert-manager
@@ -160,7 +160,7 @@ entries:
     version: 24.3.2
   - apiVersion: v2
     appVersion: 1.0.0
-    created: "2024-12-13T17:20:54.690868183Z"
+    created: "2024-12-19T21:46:24.4690973Z"
     dependencies:
     - condition: global.certManagerEnabled
       name: cert-manager
@@ -188,7 +188,7 @@ entries:
     version: 24.3.1
   - apiVersion: v2
     appVersion: 1.0.0
-    created: "2024-12-13T17:20:54.632120795Z"
+    created: "2024-12-19T21:46:24.400660506Z"
     dependencies:
     - condition: global.temboEnabled
       name: tembo
@@ -212,7 +212,7 @@ entries:
     version: 24.3.0
   - apiVersion: v2
     appVersion: 1.0.0
-    created: "2024-12-13T17:20:54.577715738Z"
+    created: "2024-12-19T21:46:24.335071985Z"
     dependencies:
     - condition: global.temboEnabled
       name: tembo
@@ -232,14 +232,14 @@ entries:
     version: 24.2.0
   tembo-operator:
   - apiVersion: v2
-    created: "2024-12-13T17:20:54.982919932Z"
+    created: "2024-12-19T21:46:24.749505499Z"
     dependencies:
     - condition: cloudnative-pg.enabled
       name: cloudnative-pg
       repository: https://cloudnative-pg.github.io/charts
-      version: 0.21.6
+      version: 0.22.1
     description: Helm chart to deploy the tembo-operator
-    digest: 15689b7615637a25bb1f59887c1adaeed4e3fda156e423e16810246a36f25252
+    digest: 8fceb67a87fbb2ee81f05993caba9e0d2dc2c44ce5430afecac1295b211796fa
     home: https://tembo.io
     icon: https://cloud.tembo.io/images/TemboElephant.png
     keywords:
@@ -258,7 +258,7 @@ entries:
     - https://tembo-io.github.io/tembo/tembo-operator-0.8.0.tgz
     version: 0.8.0
   - apiVersion: v2
-    created: "2024-12-13T17:20:54.976347762Z"
+    created: "2024-12-19T21:46:24.742418268Z"
     dependencies:
     - condition: cloudnative-pg.enabled
       name: cloudnative-pg
@@ -284,7 +284,7 @@ entries:
     - https://tembo-io.github.io/tembo/tembo-operator-0.7.4.tgz
     version: 0.7.4
   - apiVersion: v2
-    created: "2024-12-13T17:20:54.96845842Z"
+    created: "2024-12-19T21:46:24.7359324Z"
     dependencies:
     - condition: cloudnative-pg.enabled
       name: cloudnative-pg
@@ -310,7 +310,7 @@ entries:
     - https://tembo-io.github.io/tembo/tembo-operator-0.7.3.tgz
     version: 0.7.3
   - apiVersion: v2
-    created: "2024-12-13T17:20:54.95731485Z"
+    created: "2024-12-19T21:46:24.728537627Z"
     dependencies:
     - condition: cloudnative-pg.enabled
       name: cloudnative-pg
@@ -336,7 +336,7 @@ entries:
     - https://tembo-io.github.io/tembo/tembo-operator-0.7.2.tgz
     version: 0.7.2
   - apiVersion: v2
-    created: "2024-12-13T17:20:54.950664975Z"
+    created: "2024-12-19T21:46:24.722179235Z"
     dependencies:
     - condition: cloudnative-pg.enabled
       name: cloudnative-pg
@@ -362,7 +362,7 @@ entries:
     - https://tembo-io.github.io/tembo/tembo-operator-0.7.1.tgz
     version: 0.7.1
   - apiVersion: v2
-    created: "2024-12-13T17:20:54.942941596Z"
+    created: "2024-12-19T21:46:24.716188066Z"
     dependencies:
     - condition: cloudnative-pg.enabled
       name: cloudnative-pg
@@ -388,7 +388,7 @@ entries:
     - https://tembo-io.github.io/tembo/tembo-operator-0.7.0.tgz
     version: 0.7.0
   - apiVersion: v2
-    created: "2024-12-13T17:20:54.932537655Z"
+    created: "2024-12-19T21:46:24.710187224Z"
     dependencies:
     - condition: cloudnative-pg.enabled
       name: cloudnative-pg
@@ -414,7 +414,7 @@ entries:
     - https://tembo-io.github.io/tembo/tembo-operator-0.6.3.tgz
     version: 0.6.3
   - apiVersion: v2
-    created: "2024-12-13T17:20:54.925668306Z"
+    created: "2024-12-19T21:46:24.703833891Z"
     dependencies:
     - condition: cloudnative-pg.enabled
       name: cloudnative-pg
@@ -440,7 +440,7 @@ entries:
     - https://tembo-io.github.io/tembo/tembo-operator-0.6.2.tgz
     version: 0.6.2
   - apiVersion: v2
-    created: "2024-12-13T17:20:54.920355527Z"
+    created: "2024-12-19T21:46:24.697697631Z"
     dependencies:
     - condition: cloudnative-pg.enabled
       name: cloudnative-pg
@@ -466,7 +466,7 @@ entries:
     - https://tembo-io.github.io/tembo/tembo-operator-0.6.1.tgz
     version: 0.6.1
   - apiVersion: v2
-    created: "2024-12-13T17:20:54.911268384Z"
+    created: "2024-12-19T21:46:24.691124729Z"
     dependencies:
     - condition: cloudnative-pg.enabled
       name: cloudnative-pg
@@ -492,7 +492,7 @@ entries:
     - https://tembo-io.github.io/tembo/tembo-operator-0.6.0.tgz
     version: 0.6.0
   - apiVersion: v2
-    created: "2024-12-13T17:20:54.902517467Z"
+    created: "2024-12-19T21:46:24.684883971Z"
     dependencies:
     - condition: cloudnative-pg.enabled
       name: cloudnative-pg
@@ -518,7 +518,7 @@ entries:
     - https://tembo-io.github.io/tembo/tembo-operator-0.5.3.tgz
     version: 0.5.3
   - apiVersion: v2
-    created: "2024-12-13T17:20:54.896253578Z"
+    created: "2024-12-19T21:46:24.678662644Z"
     dependencies:
     - condition: cloudnative-pg.enabled
       name: cloudnative-pg
@@ -544,7 +544,7 @@ entries:
     - https://tembo-io.github.io/tembo/tembo-operator-0.5.2.tgz
     version: 0.5.2
   - apiVersion: v2
-    created: "2024-12-13T17:20:54.889755719Z"
+    created: "2024-12-19T21:46:24.671941618Z"
     dependencies:
     - condition: cloudnative-pg.enabled
       name: cloudnative-pg
@@ -570,7 +570,7 @@ entries:
     - https://tembo-io.github.io/tembo/tembo-operator-0.5.1.tgz
     version: 0.5.1
   - apiVersion: v2
-    created: "2024-12-13T17:20:54.883206048Z"
+    created: "2024-12-19T21:46:24.665518317Z"
     dependencies:
     - condition: cloudnative-pg.enabled
       name: cloudnative-pg
@@ -596,7 +596,7 @@ entries:
     - https://tembo-io.github.io/tembo/tembo-operator-0.5.0.tgz
     version: 0.5.0
   - apiVersion: v2
-    created: "2024-12-13T17:20:54.877127512Z"
+    created: "2024-12-19T21:46:24.658635157Z"
     dependencies:
     - condition: cloudnative-pg.enabled
       name: cloudnative-pg
@@ -622,7 +622,7 @@ entries:
     - https://tembo-io.github.io/tembo/tembo-operator-0.4.1.tgz
     version: 0.4.1
   - apiVersion: v2
-    created: "2024-12-13T17:20:54.870039702Z"
+    created: "2024-12-19T21:46:24.651622743Z"
     dependencies:
     - condition: cloudnative-pg.enabled
       name: cloudnative-pg
@@ -648,7 +648,7 @@ entries:
     - https://tembo-io.github.io/tembo/tembo-operator-0.4.0.tgz
     version: 0.4.0
   - apiVersion: v2
-    created: "2024-12-13T17:20:54.863050297Z"
+    created: "2024-12-19T21:46:24.646398798Z"
     dependencies:
     - condition: cloudnative-pg.enabled
       name: cloudnative-pg
@@ -674,7 +674,7 @@ entries:
     - https://tembo-io.github.io/tembo/tembo-operator-0.3.1.tgz
     version: 0.3.1
   - apiVersion: v2
-    created: "2024-12-13T17:20:54.856221151Z"
+    created: "2024-12-19T21:46:24.639475327Z"
     dependencies:
     - condition: cloudnative-pg.enabled
       name: cloudnative-pg
@@ -700,7 +700,7 @@ entries:
     - https://tembo-io.github.io/tembo/tembo-operator-0.3.0.tgz
     version: 0.3.0
   - apiVersion: v2
-    created: "2024-12-13T17:20:54.849553325Z"
+    created: "2024-12-19T21:46:24.633131687Z"
     dependencies:
     - condition: cloudnative-pg.enabled
       name: cloudnative-pg
@@ -726,7 +726,7 @@ entries:
     - https://tembo-io.github.io/tembo/tembo-operator-0.2.6.tgz
     version: 0.2.6
   - apiVersion: v2
-    created: "2024-12-13T17:20:54.843920761Z"
+    created: "2024-12-19T21:46:24.628504344Z"
     dependencies:
     - condition: cloudnative-pg.enabled
       name: cloudnative-pg
@@ -752,7 +752,7 @@ entries:
     - https://tembo-io.github.io/tembo/tembo-operator-0.2.5.tgz
     version: 0.2.5
   - apiVersion: v2
-    created: "2024-12-13T17:20:54.838211345Z"
+    created: "2024-12-19T21:46:24.622674177Z"
     dependencies:
     - condition: cloudnative-pg.enabled
       name: cloudnative-pg
@@ -778,7 +778,7 @@ entries:
     - https://tembo-io.github.io/tembo/tembo-operator-0.2.4.tgz
     version: 0.2.4
   - apiVersion: v2
-    created: "2024-12-13T17:20:54.832750928Z"
+    created: "2024-12-19T21:46:24.616947297Z"
     dependencies:
     - condition: cloudnative-pg.enabled
       name: cloudnative-pg
@@ -804,7 +804,7 @@ entries:
     - https://tembo-io.github.io/tembo/tembo-operator-0.2.3.tgz
     version: 0.2.3
   - apiVersion: v2
-    created: "2024-12-13T17:20:54.827424022Z"
+    created: "2024-12-19T21:46:24.611486145Z"
     dependencies:
     - condition: cloudnative-pg.enabled
       name: cloudnative-pg
@@ -830,7 +830,7 @@ entries:
     - https://tembo-io.github.io/tembo/tembo-operator-0.2.2.tgz
     version: 0.2.2
   - apiVersion: v2
-    created: "2024-12-13T17:20:54.822149715Z"
+    created: "2024-12-19T21:46:24.606238866Z"
     dependencies:
     - condition: cloudnative-pg.enabled
       name: cloudnative-pg
@@ -856,7 +856,7 @@ entries:
     - https://tembo-io.github.io/tembo/tembo-operator-0.2.1.tgz
     version: 0.2.1
   - apiVersion: v2
-    created: "2024-12-13T17:20:54.817007517Z"
+    created: "2024-12-19T21:46:24.601129006Z"
     dependencies:
     - condition: cloudnative-pg.enabled
       name: cloudnative-pg
@@ -881,4 +881,4 @@ entries:
     urls:
     - https://tembo-io.github.io/tembo/tembo-operator-0.2.0.tgz
     version: 0.2.0
-generated: "2024-12-13T17:20:54.518856262Z"
+generated: "2024-12-19T21:46:24.27763034Z"
