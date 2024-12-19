@@ -335,13 +335,11 @@ async fn patch_appservice_deployments(
     };
 
     for deployment in deployment_list {
-        let spec = match deployment.spec {
-            Some(spec) => spec,
-            None => continue,
+        let Some(spec) = deployment.spec else {
+            continue;
         };
-        let dep_name = match deployment.metadata.name {
-            Some(dep_name) => dep_name,
-            None => continue,
+        let Some(dep_name) = deployment.metadata.name else {
+            continue;
         };
 
         if Some(replicas) == spec.replicas {
