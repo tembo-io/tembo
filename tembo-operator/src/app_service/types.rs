@@ -147,6 +147,7 @@ pub fn default_resources() -> ResourceRequirements {
     ResourceRequirements {
         limits: Some(limits),
         requests: Some(requests),
+        claims: None,
     }
 }
 

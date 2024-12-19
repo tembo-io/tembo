@@ -1,64 +1,102 @@
 use crate::{apis::coredb_types::CoreDB, Error};
 use kube::ResourceExt;
-use prometheus::{histogram_opts, opts, HistogramVec, IntCounter, IntCounterVec, Registry};
+use opentelemetry::trace::TraceId;
+use prometheus_client::{
+    encoding::EncodeLabelSet,
+    metrics::{counter::Counter, exemplar::HistogramWithExemplars, family::Family},
+    registry::{Registry, Unit},
+};
+use std::sync::Arc;
 use tokio::time::Instant;
 
 #[derive(Clone)]
 pub struct Metrics {
-    pub reconciliations: IntCounter,
-    pub failures: IntCounterVec,
-    pub reconcile_duration: HistogramVec,
+    pub reconcile: ReconcileMetrics,
+    pub registry: Arc<Registry>,
 }
 
 impl Default for Metrics {
     fn default() -> Self {
-        let reconcile_duration = HistogramVec::new(
-            histogram_opts!(
-                "cdb_controller_reconcile_duration_seconds",
-                "The duration of reconcile to complete in seconds"
-            )
-            .buckets(vec![0.01, 0.1, 0.25, 0.5, 1., 5., 15., 60.]),
-            &[],
-        )
-        .unwrap();
-        let failures = IntCounterVec::new(
-            opts!(
-                "cbd_controller_reconciliation_errors_total",
-                "reconciliation errors",
-            ),
-            &["instance", "error"],
-        )
-        .unwrap();
-        let reconciliations =
-            IntCounter::new("cdb_controller_reconciliations_total", "reconciliations").unwrap();
-        Metrics {
-            reconciliations,
-            failures,
-            reconcile_duration,
+        let mut registry = Registry::with_prefix("coredb_ctrl_reconcile");
+        let reconcile = ReconcileMetrics::default().register(&mut registry);
+        Self {
+            registry: Arc::new(registry),
+            reconcile,
         }
     }
 }
 
-impl Metrics {
+#[derive(Clone, Hash, PartialEq, Eq, EncodeLabelSet, Debug, Default)]
+pub struct TraceLabel {
+    pub trace_id: String,
+}
+impl TryFrom<&TraceId> for TraceLabel {
+    type Error = anyhow::Error;
+
+    fn try_from(id: &TraceId) -> Result<TraceLabel, Self::Error> {
+        if std::matches!(id, &TraceId::INVALID) {
+            anyhow::bail!("invalid trace id")
+        } else {
+            let trace_id = id.to_string();
+            Ok(Self { trace_id })
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct ReconcileMetrics {
+    pub runs: Family<(), Counter>,
+    pub failures: Family<ErrorLabels, Counter>,
+    pub duration: HistogramWithExemplars<TraceLabel>,
+}
+
+impl Default for ReconcileMetrics {
+    fn default() -> Self {
+        Self {
+            runs: Family::<(), Counter>::default(),
+            failures: Family::<ErrorLabels, Counter>::default(),
+            duration: HistogramWithExemplars::new(
+                [0.01, 0.1, 0.25, 0.5, 1., 5., 15., 60.].into_iter(),
+            ),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Hash, PartialEq, Eq, EncodeLabelSet)]
+pub struct ErrorLabels {
+    pub instance: String,
+    pub error: String,
+}
+
+impl ReconcileMetrics {
     /// Register API metrics to start tracking them.
-    pub fn register(self, registry: &Registry) -> Result<Self, prometheus::Error> {
-        registry.register(Box::new(self.reconcile_duration.clone()))?;
-        registry.register(Box::new(self.failures.clone()))?;
-        registry.register(Box::new(self.reconciliations.clone()))?;
-        Ok(self)
+    pub fn register(self, r: &mut Registry) -> Self {
+        r.register_with_unit(
+            "duration",
+            "reconcile duration",
+            Unit::Seconds,
+            self.duration.clone(),
+        );
+        r.register("failures", "reconciliation errors", self.failures.clone());
+        r.register("runs", "reconciliations", self.runs.clone());
+        self
     }
 
-    pub fn reconcile_failure(&self, cdb: &CoreDB, e: &Error) {
+    pub fn set_failure(&self, doc: &CoreDB, e: &Error) {
         self.failures
-            .with_label_values(&[cdb.name_any().as_ref(), e.metric_label().as_ref()])
-            .inc()
+            .get_or_create(&ErrorLabels {
+                instance: doc.name_any(),
+                error: e.metric_label(),
+            })
+            .inc();
     }
 
-    pub fn count_and_measure(&self) -> ReconcileMeasurer {
-        self.reconciliations.inc();
+    pub fn count_and_measure(&self, trace_id: &TraceId) -> ReconcileMeasurer {
+        self.runs.get_or_create(&()).inc();
         ReconcileMeasurer {
             start: Instant::now(),
-            metric: self.reconcile_duration.clone(),
+            labels: trace_id.try_into().ok(),
+            metric: self.duration.clone(),
         }
     }
 }
@@ -68,13 +106,15 @@ impl Metrics {
 /// Relies on Drop to calculate duration and register the observation in the histogram
 pub struct ReconcileMeasurer {
     start: Instant,
-    metric: HistogramVec,
+    labels: Option<TraceLabel>,
+    metric: HistogramWithExemplars<TraceLabel>,
 }
 
 impl Drop for ReconcileMeasurer {
     fn drop(&mut self) {
         #[allow(clippy::cast_precision_loss)]
         let duration = self.start.elapsed().as_millis() as f64 / 1000.0;
-        self.metric.with_label_values(&[]).observe(duration);
+        let labels = self.labels.take();
+        self.metric.observe(duration, labels);
     }
 }

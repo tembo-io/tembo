@@ -1,6 +1,6 @@
 # This does not build on ARM laptops, even with the --platform flag.
 
-FROM --platform=linux/amd64 quay.io/tembo/muslrust:1.77.0-stable AS builder
+FROM quay.io/tembo/muslrust:1.82.0-stable AS builder
 
 WORKDIR /build
 
@@ -8,7 +8,7 @@ COPY . .
 
 RUN cargo build --release --target=x86_64-unknown-linux-musl
 
-FROM --platform=linux/amd64 quay.io/tembo/alpine:3.18.2
+FROM quay.io/tembo/alpine:3.21.0
 
 RUN adduser -D nonroot
 

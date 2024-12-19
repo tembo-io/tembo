@@ -79,7 +79,7 @@ jobs:
           # Start the operator in the background
           cargo run > operator-output.txt 2>&1 &
           # Run the tests
-          cargo test -- --ignored --nocapture
+          cargo test -- --ignored
       - name: Debugging information
         if: always()
         run: |
