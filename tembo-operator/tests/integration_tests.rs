@@ -6062,6 +6062,19 @@ CREATE EVENT TRIGGER pgrst_watch
         let pods_list = pods.list(&Default::default()).await.unwrap();
         assert_eq!(pods_list.items.len(), 4);
 
+        // Assert there are 3 IngressRouteTCPs created after starting. One for postgres, pooler,
+        // ferretdb
+        let client = test.client.clone();
+        let ingresses_tcp: Vec<IngressRouteTCP> =
+            list_resources(client.clone(), &name, &namespace, &default_params, 3)
+                .await
+                .unwrap();
+        assert_eq!(
+            ingresses_tcp.len(),
+            3,
+            "IngressRouteTCPs should be created after starting"
+        );
+
         // Stop the cluster and check to make sure it's not running to ensure
         // hibernate is doing its job.
 
