@@ -1,12 +1,11 @@
 name: Analytics
-description: A Postgres instance equipped ParadeDB's pg_analytics extension.
+description: A Postgres instance optimized for analytics workloads.
 repository: "quay.io/tembo"
 organization: tembo
 images:
   14: "standard-cnpg:14-30219f2"
   15: "standard-cnpg:15-30219f2"
   16: "standard-cnpg:16-30219f2"
-  17: "standard-cnpg:17-30219f2"
 stack_version: 0.1.0
 postgres_config_engine: olap
 postgres_config:
@@ -23,21 +22,43 @@ postgres_config:
   - name: pg_stat_statements.track
     value: top
   - name: shared_preload_libraries
-    value: pg_stat_statements,pg_cron
+    value: pg_stat_statements, pg_cron, pg_later, pg_parquet
   - name: track_io_timing
     value: 'on'
   - name: wal_level
     value: logical
+  - name: pglater.host
+    value: postgresql:///postgres?host=/controller/run
 trunk_installs:
+  - name: hydra_columnar
+    version: 1.1.1
   - name: pg_stat_statements
     version: 1.10.0
   - name: pg_partman
     version: 5.0.1
   - name: pg_cron
     version: 1.6.2
+  - name: pg_later
+    version: 0.3.0
   - name: pg_analytics
     version: 0.2.1
+  - name: pg_parquet
+    version: 0.2.0
+  - name: postgres_fdw
+    version: 1.1.0
+  - name: wrappers
+    version: 0.4.2
 extensions:
+  - name: columnar
+    locations:
+      - database: postgres
+        enabled: true
+        version: "11.1-10"
+  - name: pg_later
+    locations:
+      - database: postgres
+        enabled: true
+        version: 0.1.1
   - name: pg_stat_statements
     locations:
       - database: postgres
@@ -54,9 +75,27 @@ extensions:
     - database: postgres
       enabled: true
       version: 1.6.2
+  - name: postgres_fdw
+    description: postgres_fdw
+    locations:
+      - database: postgres
+        enabled: true
+        version: "1.1"
+  - name: wrappers
+    description: wrappers
+    locations:
+      - database: postgres
+        enabled: true
+        version: 0.4.2
   - name: pg_analytics
     description: pg_analytics
     locations:
     - database: postgres
       enabled: true
       version: 0.2.1
+  - name: pg_parquet
+    description: pg_parquet
+    locations:
+    - database: postgres
+      enabled: true
+      version: 0.2.0
