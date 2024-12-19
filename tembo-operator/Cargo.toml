@@ -1,7 +1,7 @@
 [package]
 name = "controller"
 description = "Tembo Operator for Postgres"
-version = "0.52.1"
+version = "0.53.0"
 edition = "2021"
 default-run = "controller"
 license = "Apache-2.0"
@@ -68,6 +68,7 @@ rand = "0.8.5"
 tower-test = "0.4.0"
 futures-util = "0.3"
 regex = "1"
+serial_test = "3"
 
 [dependencies.kube]
 features = ["runtime", "client", "derive", "ws"]
