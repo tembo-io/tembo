@@ -3,10 +3,10 @@ description: A Postgres instance equipped with configuration and extensions for 
 repository: "quay.io/tembo"
 organization: tembo
 images:
-  14: "standard-cnpg:14-30219f2"
-  15: "standard-cnpg:15-30219f2"
-  16: "standard-cnpg:16-30219f2"
-  17: "standard-cnpg:17-30219f2"
+  14: "standard-cnpg:14-35b0240"
+  15: "standard-cnpg:15-35b0240"
+  16: "standard-cnpg:16-35b0240"
+  17: "standard-cnpg:17-35b0240"
 stack_version: 0.1.0
 postgres_config_engine: olap
 postgres_config:
