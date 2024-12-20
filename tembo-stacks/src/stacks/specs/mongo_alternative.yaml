@@ -53,13 +53,13 @@ appServices:
         memory: 256Mi
 trunk_installs:
   - name: pg_stat_statements
-    version: 1.10.0
+    version: 1.11.0
 extensions:
   - name: pg_stat_statements
     locations:
       - database: postgres
         enabled: true
-        version: 1.10.0
+        version: 1.11.0
 postgres_config_engine: standard
 postgres_config:
   - name: autovacuum_vacuum_cost_limit

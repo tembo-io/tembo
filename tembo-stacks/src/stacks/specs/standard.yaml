@@ -36,10 +36,10 @@ postgres_config:
     value: 1.1
 trunk_installs:
   - name: pg_stat_statements
-    version: 1.10.0
+    version: 1.11.0
 extensions:
   - name: pg_stat_statements
     locations:
       - database: postgres
         enabled: true
-        version: 1.10.0
+        version: 1.11.0
