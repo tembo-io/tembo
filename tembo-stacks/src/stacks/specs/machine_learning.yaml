@@ -26,39 +26,39 @@ postgres_config:
     value: postgresql:///postgres?host=/controller/run
 trunk_installs:
   - name: pgvector
-    version: 0.7.4
+    version: 0.8.0
   - name: postgresml
-    version: 2.7.1
+    version: 2.9.3
   - name: pg_cron
-    version: 1.6.2
+    version: 1.6.3
   - name: pgmq
     version: 1.5.0
   - name: vectorize
-    version: 0.18.2
+    version: 0.20.0
   - name: pg_later
-    version: 0.1.0
+    version: 0.3.0
   - name: plpython3u
     version: 1.0.0
   - name: vectorscale
-    version: 0.3.0
+    version: 0.5.1
 extensions:
   # trunk project pg_vector
   - name: vector
     locations:
       - database: postgres
         enabled: true
-        version: 0.7.4
+        version: 0.8.0
   # trunk project postgresml
   - name: pgml
     locations:
       - database: postgres
         enabled: true
-        version: 2.7.1
+        version: 2.9.3
   - name: pg_cron
     locations:
     - database: postgres
       enabled: true
-      version: 1.6.2
+      version: 1.6.3
   - name: pgmq
     locations:
     - database: postgres
@@ -68,12 +68,12 @@ extensions:
     locations:
     - database: postgres
       enabled: true
-      version: 0.18.2
+      version: 0.20.0
   - name: pg_later
     locations:
     - database: postgres
       enabled: true
-      version: 0.1.1
+      version: 0.3.0
   - name: plpython3u
     locations:
     - database: postgres
@@ -83,4 +83,4 @@ extensions:
     locations:
       - database: postgres
         enabled: true
-        version: 0.3.0
+        version: 0.5.1
