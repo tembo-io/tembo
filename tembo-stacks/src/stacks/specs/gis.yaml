@@ -36,15 +36,17 @@ trunk_installs:
   - name: fuzzystrmatch
     version: 1.2.0
   - name: pg_stat_statements
-    version: 1.10.0
+    version: 1.11.0
+  - name: postgis
+    version: 3.5.0
 extensions:
   - name: pg_stat_statements
     locations:
       - database: postgres
         enabled: true
-        version: 1.10.0
+        version: 1.11.0
   - name: postgis
     locations:
       - database: postgres
         enabled: true
-        version: 3.4.0
+        version: 3.5.0
