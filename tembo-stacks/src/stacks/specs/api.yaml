@@ -58,13 +58,13 @@ appServices:
         value: postgres
 trunk_installs:
   - name: pg_graphql
-    version: 1.4.4
+    version: 1.5.9
 extensions:
   - name: pg_graphql
     locations:
       - database: postgres
         enabled: true
-        version: 1.4.4
+        version: 1.5.9
 postgres_config_engine: standard
 postgres_config:
   - name: autovacuum_vacuum_cost_limit
