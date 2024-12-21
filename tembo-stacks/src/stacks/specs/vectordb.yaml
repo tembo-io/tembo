@@ -66,11 +66,11 @@ trunk_installs:
   - name: pgmq
     version: 1.5.0
   - name: vectorize
-    version: 0.19.1
+    version: 0.20.0
   - name: pgvector
     version: 0.8.0
   - name: pg_stat_statements
-    version: 1.10.0
+    version: 1.11.0
   - name: vectorscale
     version: 0.3.0
 extensions:
@@ -93,12 +93,12 @@ extensions:
     locations:
     - database: postgres
       enabled: true
-      version: 0.19.1
+      version: 0.20.0
   - name: pg_stat_statements
     locations:
       - database: postgres
         enabled: true
-        version: 1.10.0
+        version: 1.11.0
   - name: vectorscale
     locations:
       - database: postgres
