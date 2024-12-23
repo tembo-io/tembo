@@ -186,6 +186,8 @@ AND
 (
     (
         !(ActionMatches{{'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write'}})
+        AND
+        !(ActionMatches{{'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/add/action'}})
     )
     OR
     (
