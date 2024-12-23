@@ -177,14 +177,22 @@ pub async fn create_role_assignment(
     )
     OR 
     (
-        @Resource[Microsoft.Storage/storageAccounts/blobServices/containers:name] StringEquals '{}'
+        @Resource[Microsoft.Storage/storageAccounts/blobServices/containers:name] StringEquals '{azure_backup_container}'
         AND
-        @Resource[Microsoft.Storage/storageAccounts/blobServices/containers/blobs:path] StringLike '{}/*'
+        @Resource[Microsoft.Storage/storageAccounts/blobServices/containers/blobs:path] StringLike '{namespace}/*'
     )
 )
-    ",
-        azure_backup_container,
-        namespace
+AND
+(
+    (
+        !ActionMatches{{'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write'}}
+    )
+    OR
+    (
+        @Resource[Microsoft.Storage/storageAccounts/blobServices/containers:name] StringEquals '{azure_backup_container}'
+    )
+)
+    "
     ));
 
     let storage_account_id = get_storage_account_id(
