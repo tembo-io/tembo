@@ -150,6 +150,7 @@ pub async fn create_role_assignment(
     subscription_id: &str,
     resource_group_prefix: &str,
     storage_account_name: &str,
+    azure_backup_container: &str,
     namespace: &str,
     uami_principal_id: &str,
     credentials: Arc<dyn TokenCredential>,
@@ -166,7 +167,7 @@ pub async fn create_role_assignment(
     )
     .await?;
 
-    // TODO(ianstanton) Set conditions for Role Assignment. These should allow for read / write
+    // Set conditions for Role Assignment. These should allow for read / write
     //  to the instance's directory in the blob
     let blob_conditions = Some(format!(
         "\
@@ -176,11 +177,13 @@ pub async fn create_role_assignment(
     )
     OR 
     (
-        @Resource[Microsoft.Storage/storageAccounts/blobServices/containers:name]
-        StringEquals '{}'
+        @Resource[Microsoft.Storage/storageAccounts/blobServices/containers:name] StringEquals '{}'
+        AND
+        @Resource[Microsoft.Storage/storageAccounts/blobServices/containers/blobs:path] StringLike '{}/*'
     )
 )
     ",
+        azure_backup_container,
         namespace
     ));
 
