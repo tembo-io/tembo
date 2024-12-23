@@ -185,7 +185,7 @@ pub async fn create_role_assignment(
 AND
 (
     (
-        !ActionMatches{{'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write'}}
+        !(ActionMatches{{'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write'}})
     )
     OR
     (
