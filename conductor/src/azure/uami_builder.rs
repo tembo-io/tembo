@@ -12,6 +12,7 @@ use azure_mgmt_msi::models::{
 };
 use futures::StreamExt;
 use log::info;
+use std::fmt::format;
 use std::sync::Arc;
 
 // Get credentials from workload identity
@@ -167,6 +168,21 @@ pub async fn create_role_assignment(
 
     // TODO(ianstanton) Set conditions for Role Assignment. These should allow for read / write
     //  to the instance's directory in the blob
+    let blob_conditions = Some(format!(
+        "\
+(
+    (
+        !(ActionMatches{{'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read'}})
+    )
+    OR 
+    (
+        @Resource[Microsoft.Storage/storageAccounts/blobServices/containers:name]
+        StringEquals '{}'
+    )
+)
+    ",
+        namespace
+    ));
 
     let storage_account_id = get_storage_account_id(
         subscription_id,
@@ -199,8 +215,8 @@ pub async fn create_role_assignment(
             principal_id: uami_principal_id.to_string(),
             principal_type: Some(PrincipalType::ServicePrincipal),
             description: None,
-            condition: None,
-            condition_version: None,
+            condition: blob_conditions,
+            condition_version: Some("2.0".to_string()),
             created_on: None,
             updated_on: None,
             created_by: None,
