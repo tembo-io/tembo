@@ -176,12 +176,12 @@ pub async fn create_role_assignment(
         !(ActionMatches{{'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/write'}})
         AND
         !(ActionMatches{{'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/add/action'}})
+        AND
+        !(ActionMatches{{'Microsoft.Storage/storageAccounts/blobServices/containers/blobs/read'}})
     )
     OR
     (
         @Resource[Microsoft.Storage/storageAccounts/blobServices/containers:name] StringEquals '{azure_backup_container}'
-        AND
-        @Resource[Microsoft.Storage/storageAccounts/blobServices/containers/blobs:path] StringLike '{namespace}/*'
     )
 )
     "
