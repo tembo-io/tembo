@@ -180,6 +180,8 @@ pub async fn create_role_assignment(
     OR
     (
         @Resource[Microsoft.Storage/storageAccounts/blobServices/containers:name] StringEquals '{azure_backup_container}'
+        AND
+        @Resource[Microsoft.Storage/storageAccounts/blobServices/containers/blobs:path] StringLike '{namespace}/*'
     )
 )
     "
