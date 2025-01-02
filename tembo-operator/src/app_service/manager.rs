@@ -479,6 +479,8 @@ fn generate_deployment(
                     let secret_key = match e {
                         EnvVarRef::ReadOnlyConnection => "ro_uri",
                         EnvVarRef::ReadWriteConnection => "rw_uri",
+                        EnvVarRef::EncodedReadOnlyConnection => "encoded_ro_uri",
+                        EnvVarRef::EncodedReadWriteConnection => "encoded_rw_uri",
                     };
                     Some(EnvVar {
                         name: env.name,

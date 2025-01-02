@@ -645,6 +645,8 @@ spec:
                             enum:
                             - ReadOnlyConnection
                             - ReadWriteConnection
+                            - EncodedReadOnlyConnection
+                            - EncodedReadWriteConnection
                             nullable: true
                             type: string
                         required:
