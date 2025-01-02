@@ -3,7 +3,7 @@ name: tembo-operator
 description: "Helm chart to deploy the tembo-operator"
 type: application
 icon: https://cloud.tembo.io/images/TemboElephant.png
-version: 0.8.0
+version: 0.9.0
 home: https://tembo.io
 sources:
   - https://github.com/tembo-io/tembo
