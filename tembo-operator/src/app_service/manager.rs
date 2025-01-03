@@ -465,6 +465,7 @@ fn generate_deployment(
 
     // set any user provided env vars last
     // including the valueFromX values
+    let encoded_connection_secret_name = format!("{}-connection", coredb_name);
     if let Some(envs) = appsvc.env.clone() {
         for env in envs {
             let evar: Option<EnvVar> = match (env.value, env.value_from_platform) {
@@ -482,11 +483,18 @@ fn generate_deployment(
                         EnvVarRef::EncodedReadOnlyConnection => "encoded_ro_uri",
                         EnvVarRef::EncodedReadWriteConnection => "encoded_rw_uri",
                     };
+                    let secret_name = match e {
+                        EnvVarRef::EncodedReadOnlyConnection
+                        | EnvVarRef::EncodedReadWriteConnection => {
+                            encoded_connection_secret_name.clone()
+                        }
+                        _ => apps_connection_secret_name.clone(),
+                    };
                     Some(EnvVar {
                         name: env.name,
                         value_from: Some(EnvVarSource {
                             secret_key_ref: Some(SecretKeySelector {
-                                name: Some(apps_connection_secret_name.clone()),
+                                name: Some(secret_name),
                                 key: secret_key.to_string(),
                                 ..SecretKeySelector::default()
                             }),
