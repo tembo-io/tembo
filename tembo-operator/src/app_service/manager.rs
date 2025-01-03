@@ -1056,6 +1056,7 @@ pub async fn prepare_apps_connection_secret(client: Client, cdb: &CoreDB) -> Res
     labels.insert("app".to_owned(), "coredb".to_string());
     labels.insert("coredb.io/name".to_owned(), cdb.name_any());
     labels.insert("coredb.io/owner".to_owned(), "tembo-operator".to_string());
+    labels.insert("coredb.io/secret".to_owned(), "apps".to_string());
 
     let secrets_api: Api<Secret> = Api::namespaced(client.clone(), &namespace);
 
