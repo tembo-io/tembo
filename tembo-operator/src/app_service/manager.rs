@@ -465,7 +465,6 @@ fn generate_deployment(
 
     // set any user provided env vars last
     // including the valueFromX values
-    let encoded_connection_secret_name = format!("{}-connection", coredb_name);
     if let Some(envs) = appsvc.env.clone() {
         for env in envs {
             let evar: Option<EnvVar> = match (env.value, env.value_from_platform) {
@@ -483,18 +482,11 @@ fn generate_deployment(
                         EnvVarRef::EncodedReadOnlyConnection => "encoded_ro_uri",
                         EnvVarRef::EncodedReadWriteConnection => "encoded_rw_uri",
                     };
-                    let secret_name = match e {
-                        EnvVarRef::EncodedReadOnlyConnection
-                        | EnvVarRef::EncodedReadWriteConnection => {
-                            encoded_connection_secret_name.clone()
-                        }
-                        _ => apps_connection_secret_name.clone(),
-                    };
                     Some(EnvVar {
                         name: env.name,
                         value_from: Some(EnvVarSource {
                             secret_key_ref: Some(SecretKeySelector {
-                                name: Some(secret_name),
+                                name: Some(apps_connection_secret_name.clone()),
                                 key: secret_key.to_string(),
                                 ..SecretKeySelector::default()
                             }),
@@ -1059,6 +1051,12 @@ pub async fn prepare_apps_connection_secret(client: Client, cdb: &CoreDB) -> Res
     let secret_name = format!("{}-connection", cdb_name);
     let new_secret_name = format!("{}-apps", cdb_name);
 
+    // Add labels to the secret to identify who is the owner
+    let mut labels: BTreeMap<String, String> = BTreeMap::new();
+    labels.insert("app".to_owned(), "coredb".to_string());
+    labels.insert("coredb.io/name".to_owned(), cdb.name_any());
+    labels.insert("coredb.io/owner".to_owned(), "tembo-operator".to_string());
+
     let secrets_api: Api<Secret> = Api::namespaced(client.clone(), &namespace);
 
     // Fetch the original secret
@@ -1069,7 +1067,7 @@ pub async fn prepare_apps_connection_secret(client: Client, cdb: &CoreDB) -> Res
     let mut new_secret_data = BTreeMap::new();
     for (key, value) in original_secret_data {
         match key.as_str() {
-            "r_uri" | "ro_uri" | "rw_uri" => {
+            "r_uri" | "ro_uri" | "rw_uri" | "encoded_ro_uri" | "encoded_rw_uri" => {
                 let new_value = format!("{}?application_name=tembo-apps", value);
                 new_secret_data.insert(key, new_value);
             }
@@ -1089,6 +1087,7 @@ pub async fn prepare_apps_connection_secret(client: Client, cdb: &CoreDB) -> Res
         metadata: kube::api::ObjectMeta {
             name: Some(new_secret_name.to_string()),
             namespace: Some(namespace.to_string()),
+            labels: Some(labels.clone()),
             ..Default::default()
         },
         ..Default::default()
