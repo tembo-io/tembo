@@ -29,17 +29,10 @@ pub async fn reconcile_secret(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Act
     let oref = cdb.controller_owner_ref(&()).unwrap();
     labels.insert("app".to_owned(), "coredb".to_string());
     labels.insert("coredb.io/name".to_owned(), cdb.name_any());
-    labels.insert("coredb.io/owner".to_owned(), "tembo-operator".to_string());
-    labels.insert("coredb.io/secret".to_owned(), "connection".to_string());
 
     // check for existing secret
-    let lp = ListParams::default().labels(
-        format!(
-            "app=coredb,coredb.io/name={},coredb.io/owner=tembo-operator,coredb.io/secret=connection",
-            cdb.name_any()
-        )
-        .as_str(),
-    );
+    let lp = ListParams::default()
+        .labels(format!("app=coredb,coredb.io/name={}", cdb.name_any()).as_str());
     let secrets = match secret_api.list(&lp).await {
         Ok(secrets) => secrets,
         Err(e) => {

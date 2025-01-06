@@ -1051,13 +1051,6 @@ pub async fn prepare_apps_connection_secret(client: Client, cdb: &CoreDB) -> Res
     let secret_name = format!("{}-connection", cdb_name);
     let new_secret_name = format!("{}-apps", cdb_name);
 
-    // Add labels to the secret to identify who is the owner
-    let mut labels: BTreeMap<String, String> = BTreeMap::new();
-    labels.insert("app".to_owned(), "coredb".to_string());
-    labels.insert("coredb.io/name".to_owned(), cdb.name_any());
-    labels.insert("coredb.io/owner".to_owned(), "tembo-operator".to_string());
-    labels.insert("coredb.io/secret".to_owned(), "apps".to_string());
-
     let secrets_api: Api<Secret> = Api::namespaced(client.clone(), &namespace);
 
     // Fetch the original secret
@@ -1088,7 +1081,6 @@ pub async fn prepare_apps_connection_secret(client: Client, cdb: &CoreDB) -> Res
         metadata: kube::api::ObjectMeta {
             name: Some(new_secret_name.to_string()),
             namespace: Some(namespace.to_string()),
-            labels: Some(labels.clone()),
             ..Default::default()
         },
         ..Default::default()
