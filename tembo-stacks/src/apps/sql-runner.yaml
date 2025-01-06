@@ -14,4 +14,4 @@ appServices:
         ingressPath: "/sql/v1"
     env:
       - name: CONNECTION_STRING
-        valueFromPlatform: EncodedReadWriteConnection
+        valueFromPlatform: ReadWriteConnection

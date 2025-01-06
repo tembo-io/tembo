@@ -174,8 +174,6 @@ pub struct EnvVar {
 pub enum EnvVarRef {
     ReadOnlyConnection,
     ReadWriteConnection,
-    EncodedReadOnlyConnection,
-    EncodedReadWriteConnection,
 }
 
 /// Routing is used if there is a routing port, then a service is created using

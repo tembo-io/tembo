@@ -156,25 +156,6 @@ fn secret_data(cdb: &CoreDB, ns: &str, password: String) -> BTreeMap<String, Byt
         data.insert("pooler_uri".to_owned(), b64_pooler_uri);
     }
 
-    // URL encode the password for the encoded URIs
-    let encoded_password = utf8_percent_encode(&password, NON_ALPHANUMERIC).to_string();
-
-    // Add encoded read-write URI
-    let encoded_rwuri = format!(
-        "postgresql://{}:{}@{}:{}",
-        &user, &encoded_password, &rw_host, &port
-    );
-    let b64_encoded_rwuri = b64_encode(&encoded_rwuri);
-    data.insert("encoded_rw_uri".to_owned(), b64_encoded_rwuri);
-
-    // Add encoded read-only URI
-    let encoded_rouri = format!(
-        "postgresql://{}:{}@{}:{}",
-        &user, &encoded_password, &ro_host, &port
-    );
-    let b64_encoded_rouri = b64_encode(&encoded_rouri);
-    data.insert("encoded_ro_uri".to_owned(), b64_encoded_rouri);
-
     data
 }
 
@@ -304,27 +285,4 @@ fn generate_password() -> String {
         strict: true,
     };
     pg.generate_one().unwrap()
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::apis::coredb_types::{CoreDB, CoreDBSpec};
-
-    #[test]
-    fn test_secret_data_url_encoding() {
-        let cdb = CoreDB::new("test-db", CoreDBSpec::default());
-
-        let password = "TestingPasswd12345@#".to_string();
-        let data = secret_data(&cdb, "default", password);
-
-        let encoded_rw = data.get("encoded_rw_uri").unwrap();
-        // The string is already a URL, just need to convert bytes to string
-        let decoded_rw = String::from_utf8(encoded_rw.0.clone()).unwrap();
-        assert!(decoded_rw.contains("TestingPasswd12345%40%23"));
-
-        let encoded_ro = data.get("encoded_ro_uri").unwrap();
-        let decoded_ro = String::from_utf8(encoded_ro.0.clone()).unwrap();
-        assert!(decoded_ro.contains("TestingPasswd12345%40%23"));
-    }
 }
