@@ -521,13 +521,13 @@ checksum = "d3fd119d74b830634cea2a0f58bbd0d54540518a14397557951e79340abc28c0"
 
 [[package]]
 name = "controller"
-version = "0.54.0"
+version = "0.53.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f81c9095c603ebc607b88064941f3f6eb580d9c25d88afa6dbda694fcc5cedc9"
+checksum = "b3096e7d6c06c0c4f2dd5d584a6253f23630dd1255121050503f08d6e679ad72"
 dependencies = [
  "actix-web",
  "anyhow",
- "base64 0.22.1",
+ "base64 0.21.7",
  "chrono",
  "futures",
  "itertools",
@@ -536,7 +536,6 @@ dependencies = [
  "lazy_static",
  "opentelemetry",
  "passwords",
- "percent-encoding",
  "prometheus",
  "rand",
  "regex",
@@ -2472,7 +2471,7 @@ dependencies = [
 
 [[package]]
 name = "tembo-stacks"
-version = "0.23.4"
+version = "0.23.5"
 dependencies = [
  "anyhow",
  "clap",
