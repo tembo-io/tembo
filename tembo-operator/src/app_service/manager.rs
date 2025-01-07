@@ -479,8 +479,6 @@ fn generate_deployment(
                     let secret_key = match e {
                         EnvVarRef::ReadOnlyConnection => "ro_uri",
                         EnvVarRef::ReadWriteConnection => "rw_uri",
-                        EnvVarRef::EncodedReadOnlyConnection => "encoded_ro_uri",
-                        EnvVarRef::EncodedReadWriteConnection => "encoded_rw_uri",
                     };
                     Some(EnvVar {
                         name: env.name,
@@ -1061,7 +1059,7 @@ pub async fn prepare_apps_connection_secret(client: Client, cdb: &CoreDB) -> Res
     let mut new_secret_data = BTreeMap::new();
     for (key, value) in original_secret_data {
         match key.as_str() {
-            "r_uri" | "ro_uri" | "rw_uri" | "encoded_ro_uri" | "encoded_rw_uri" => {
+            "r_uri" | "ro_uri" | "rw_uri" => {
                 let new_value = format!("{}?application_name=tembo-apps", value);
                 new_secret_data.insert(key, new_value);
             }
