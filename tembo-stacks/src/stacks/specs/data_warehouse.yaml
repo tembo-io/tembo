@@ -31,21 +31,21 @@ postgres_config:
     value: postgresql:///postgres?host=/controller/run
 trunk_installs:
   - name: pg_stat_statements
-    version: 1.10.0
+    version: 1.11.0
   - name: hydra_columnar
     version: 1.1.1
   - name: pg_later
-    version: 0.1.1
+    version: 0.3.0
   - name: pg_partman
-    version: 5.0.1
+    version: 5.2.4
   - name: pg_cron
-    version: 1.6.2
+    version: 1.6.4
   - name: postgres_fdw
     version: 1.1.0
   - name: wrappers
-    version: 0.4.2
+    version: 0.4.3
   - name: multicorn
-    version: 2.5.0
+    version: 3.0.0
   - name: pg_tier 
     version: 0.0.5
 extensions:
@@ -53,7 +53,7 @@ extensions:
     locations:
       - database: postgres
         enabled: true
-        version: 1.10.0
+        version: 1.11.0
   - name: columnar
     locations:
       - database: postgres
@@ -63,18 +63,18 @@ extensions:
     locations:
       - database: postgres
         enabled: true
-        version: 0.1.1
+        version: 0.3.0
   - name: pg_partman
     locations:
       - database: postgres
         enabled: true
-        version: 4.7.4
+        version: 5.2.4
   - name: pg_cron
     description: pg_cron
     locations:
       - database: postgres
         enabled: true
-        version: 1.6.2
+        version: 1.6.4
   - name: postgres_fdw
     description: postgres_fdw
     locations:
@@ -86,13 +86,13 @@ extensions:
     locations:
       - database: postgres
         enabled: true
-        version: 0.4.2
+        version: 0.4.3
   - name: multicorn
     description: multicorn
     locations:
       - database: postgres
         enabled: true
-        version: 2.5.0
+        version: 3.0.0
   - name: pg_tier 
     description: pg_tier 
     locations:
