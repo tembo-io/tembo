@@ -30,15 +30,15 @@ postgres_config:
     value: logical
 trunk_installs:
   - name: pg_stat_statements
-    version: 1.10.0
+    version: 1.11.0
   - name: pg_analytics
-    version: 0.2.1
+    version: 0.2.3
   - name: pg_search
-    version: 0.13.2
+    version: 0.14.0
   - name: pg_cron
-    version: 1.6.2
+    version: 1.6.4
   - name: pgvector
-    version: 0.7.4
+    version: 0.8.0
   - name: pg_ivm
     version: 1.9.0
 extensions:
@@ -46,7 +46,7 @@ extensions:
     locations:
       - database: postgres
         enabled: true
-        version: 1.10.0
+        version: 1.11.0
   - name: pg_search
     locations:
       - database: postgres
@@ -61,13 +61,13 @@ extensions:
     locations:
       - database: postgres
         enabled: true
-        version: 1.6.2
+        version: 1.6.4
   - name: pg_analytics
     description: pg_analytics
     locations:
       - database: postgres
         enabled: true
-        version: 0.2.1
+        version: 0.2.3
   - name: pg_ivm
     locations:
       - database: postgres
