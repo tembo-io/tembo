@@ -31,9 +31,9 @@ const TLS_MIN_VERSION: &str = "TLSv1.2";
 /// mainly used for the [https://tembo.io](https://tembo.io) platform to allow
 /// for the deployment of pre-configured Postgres instances.
 ///
-/// Standard, OLAP and the MessageQueue stacks are some of the common stacks configured
+/// Standard, Analytics and the MessageQueue stacks are some of the common stacks configured
 ///
-/// **Example**: Deploy a OLAP stack
+/// **Example**: Deploy a Analytics stack
 ///
 /// ```yaml
 /// apiVersion: coredb.io/v1alpha1
@@ -42,7 +42,7 @@ const TLS_MIN_VERSION: &str = "TLSv1.2";
 ///   name: test-db
 /// spec:
 /// stack:
-///   name: OLAP
+///   name: Analytics
 ///   postgres_config:
 ///     - name: checkpoint_timeout
 ///       value: "30min"
