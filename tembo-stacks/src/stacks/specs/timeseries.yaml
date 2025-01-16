@@ -6,7 +6,6 @@ images:
   14: "standard-cnpg:14-35b0240"
   15: "standard-cnpg:15-35b0240"
   16: "standard-cnpg:16-35b0240"
-  17: "standard-cnpg:17-35b0240"
 stack_version: 0.1.0
 postgres_config_engine: olap
 postgres_config:
@@ -30,17 +29,17 @@ postgres_config:
     value: logical
 trunk_installs:
   - name: pg_timeseries
-    version: 0.1.6
+    version: 0.1.7
   - name: hydra_columnar
     version: 1.1.1
   - name: pg_cron
-    version: 1.6.2
+    version: 1.6.4
   - name: tembo_ivm
     version: 1.9.1
   - name: pg_partman
-    version: 5.0.1
+    version: 5.2.4
   - name: pg_stat_statements
-    version: 1.10.0
+    version: 1.11.0
   - name: parquet_s3_fdw
     version: 1.1.0
   - name: pg_tier
@@ -55,13 +54,13 @@ extensions:
     locations:
       - database: postgres
         enabled: true
-        version: 5.0.1
+        version: 5.2.4
   - name: pg_cron
     description: pg_cron
     locations:
       - database: postgres
         enabled: true
-        version: 1.6.2
+        version: 1.6.4
   - name: pg_ivm
     description: pg_ivm
     locations:
@@ -77,7 +76,7 @@ extensions:
     locations:
       - database: postgres
         enabled: true
-        version: 1.10.0
+        version: 1.11.0
   - name: parquet_s3_fdw
     locations:
       - database: postgres
