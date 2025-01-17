@@ -1,6 +1,6 @@
 name: !pganalyze
 appServices:
-  - image: quay.io/pganalyze/collector:v0.55.0
+  - image: quay.io/pganalyze/collector:v0.64.1
     name: pganalyze
     env:
       - name: DB_URL
