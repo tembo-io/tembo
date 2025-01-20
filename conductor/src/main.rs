@@ -30,7 +30,7 @@ use sqlx::error::Error;
 use sqlx::postgres::PgPoolOptions;
 use std::env;
 use std::sync::{Arc, Mutex};
-use std::time;
+use std::time::Duration;
 use types::{CRUDevent, Event};
 
 mod metrics_reporter;
@@ -191,9 +191,25 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         // Read from queue (check for new message)
         // messages that don't fit a CRUDevent will error
         // set visibility timeout to 90 seconds
-        let read_msg = queue
-            .read::<CRUDevent>(&control_plane_events_queue, 90_i32)
-            .await?;
+
+        let timeout = tokio::time::timeout(Duration::from_secs(60), async {
+            queue.read(&control_plane_events_queue, 90).await
+        });
+
+        let read_msg = match timeout.await {
+            Ok(pgmq_result) => match pgmq_result {
+                Ok(read_msg) => read_msg,
+                Err(err) => {
+                    error!("Failed to read from PGMQ: {err}");
+                    continue;
+                }
+            },
+            Err(_timed_out) => {
+                info!("Timed out reading from PGMQ, will try again");
+                continue;
+            }
+        };
+
         let read_msg: Message<CRUDevent> = match read_msg {
             Some(message) => {
                 info!(
@@ -204,7 +220,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
             }
             None => {
                 debug!("no messages in queue");
-                tokio::time::sleep(time::Duration::from_secs(1)).await;
+                tokio::time::sleep(Duration::from_secs(1)).await;
                 continue;
             }
         };
@@ -795,7 +811,7 @@ async fn main() -> std::io::Result<()> {
                         }
                     }
                     warn!("conductor exited, sleeping for 1 second");
-                    tokio::time::sleep(time::Duration::from_secs(1)).await;
+                    tokio::time::sleep(Duration::from_secs(1)).await;
                 }
             }
         }));
@@ -819,7 +835,7 @@ async fn main() -> std::io::Result<()> {
                         }
                     }
                     warn!("status_reporter exited, sleeping for 1 second");
-                    tokio::time::sleep(time::Duration::from_secs(1)).await;
+                    tokio::time::sleep(Duration::from_secs(1)).await;
                 }
             }
         }));
@@ -839,7 +855,7 @@ async fn main() -> std::io::Result<()> {
             }
 
             warn!("metrics_reporter exited, sleeping for 1 second");
-            tokio::time::sleep(time::Duration::from_secs(1)).await;
+            tokio::time::sleep(Duration::from_secs(1)).await;
         }));
     }
 
