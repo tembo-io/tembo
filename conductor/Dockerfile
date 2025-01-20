@@ -19,7 +19,7 @@ COPY metrics.yml .
 
 RUN cargo install --path . 
 
-FROM quay.io/tembo/debian:12.5-slim
+FROM quay.io/tembo/debian:12.9-slim
 RUN set -eux; \
     apt-get update; \
     apt-get upgrade -y; \
