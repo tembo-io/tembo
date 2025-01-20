@@ -58,10 +58,9 @@ jobs:
       - name: Build and push
         uses: docker/build-push-action@v5
         with:
-          context: conductor
+          context: .
+          file: conductor/Dockerfile.console
           push: ${{ github.event_name != 'pull_request' }}
-          build-args: |
-            FEATURES=console
           tags: ${{ steps.meta.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max 
