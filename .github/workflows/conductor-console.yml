@@ -1,0 +1,67 @@
+name: Build Conductor Console
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - "conductor/**"
+      - ".github/workflows/conductor-console.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "conductor/**"
+      - ".github/workflows/conductor-console.yml"
+
+jobs:
+  build_conductor_console:
+    name: Build conductor with console feature
+    runs-on:
+      - self-hosted
+      - dind
+      - large-8x8
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Quay.io
+        uses: docker/login-action@v3
+        with:
+          registry: quay.io
+          username: ${{ secrets.QUAY_USER_TEMBO }}
+          password: ${{ secrets.QUAY_PASSWORD_TEMBO }}
+
+      - name: Extract metadata
+        id: meta
+        run: |
+          BRANCH_NAME=$(git rev-parse --abbrev-ref HEAD)
+          SHORT_SHA=$(git rev-parse --short HEAD)
+          VERSION=$(cd conductor && cargo pkgid | cut -d# -f2 | cut -d: -f2)
+          
+          # Set the tags based on branch and version
+          TAGS="quay.io/tembo/conductor-console:$SHORT_SHA"
+          if [ "$BRANCH_NAME" = "main" ]; then
+            TAGS="$TAGS,quay.io/tembo/conductor-console:latest"
+            if [ ! -z "$VERSION" ]; then
+              TAGS="$TAGS,quay.io/tembo/conductor-console:$VERSION"
+            fi
+            # Add CalVer tag for main branch
+            CALVER=$(date +'%Y.%m.%d')
+            TAGS="$TAGS,quay.io/tembo/conductor-console:$CALVER"
+          fi
+          echo "tags=${TAGS}" >> $GITHUB_OUTPUT
+
+      - name: Build and push
+        uses: docker/build-push-action@v5
+        with:
+          context: conductor
+          push: ${{ github.event_name != 'pull_request' }}
+          build-args: |
+            FEATURES=console
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max 

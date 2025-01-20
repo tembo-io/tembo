@@ -6,6 +6,9 @@ publish = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+console = ["console-subscriber", "tokio/tracing"]
+
 [dependencies]
 aws-config = "0.55.1"
 aws-sdk-cloudformation = "0.26.0"
@@ -21,7 +24,8 @@ schemars = "0.8.12"
 serde = { version = "1.0.160", features = ["derive"] }
 serde_json = "1.0.96"
 thiserror = "1.0.40"
-tokio = { version = "1.28.0", features = ["full"] }
+tokio = { version = "1.43.0", features = ["full"] }
+console-subscriber = { version = "0.4", optional = true }
 actix-web = "4.3.0"
 actix-web-opentelemetry = { version = "0.13.0", features = [
   "metrics-prometheus",
@@ -35,7 +39,7 @@ sqlx = { version = "0.8", features = ["runtime-tokio-native-tls", "postgres"] }
 anyhow = "1.0.82"
 serde_yaml = "0.9.34"
 reqwest = { version = "0.12.3", features = ["json"] }
-google-cloud-storage = "0.22.1"
+google-cloud-storage = "0.23"
 azure_identity = "0.21.0"
 azure_mgmt_msi = "0.21.0"
 azure_mgmt_authorization = "0.21.0"

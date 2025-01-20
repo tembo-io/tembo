@@ -1,4 +1,4 @@
-FROM quay.io/tembo/rust:1.81-bookworm as builder
+FROM quay.io/tembo/rust:1.84-bookworm as builder
 
 RUN apt-get update && \
     apt-get install -y pkg-config libssl-dev && apt-get clean && \
@@ -17,7 +17,10 @@ COPY ./src ./src
 COPY ./migrations ./migrations
 COPY metrics.yml .
 
-RUN cargo install --path .
+# Add build argument for features
+ARG FEATURES=""
+# Modify cargo install to use the features argument if provided
+RUN cargo install --path . $([ ! -z "${FEATURES}" ] && echo "--features=${FEATURES}")
 
 FROM quay.io/tembo/debian:12.5-slim
 RUN set -eux; \
