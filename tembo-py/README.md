@@ -5,7 +5,6 @@ The official Python client for Tembo.io
 ## Table of Contents
 
 - [Installation](#installation)
-- [Interacting with RAG](#interacting-with-rag)
 - [Adding Custom Prompts](#adding-custom-prompts)
 
 ## Installation
@@ -14,33 +13,6 @@ The [tembo-py library](https://pypi.org/project/tembo-py/) is hosted on pypi.org
 
 ```bash
 pip install tembo-py
-```
-
-## Interacting with RAG
-
-Interacting with the RAG Stack requires processing documents in chunks and loading them in to Postgres.
-The `tembo-py` client is designed for this type of work, which is outlined in detail within the [RAG Stack official documentation](https://tembo.io/docs/tembo-stacks/rag#build-a-support-agent-with-tembo-rag).
-
-```python
-from tembo_py.rag import TemboRAG
-
-rag = TemboRAG(
-    project_name="tembo_support",
-    chat_model="gpt-3.5-turbo",
-    connection_string="postgresql://postgres:<your-password>@<your-TemboHost>:5432/postgres"
-)
-
-chunks = rag.prepare_from_directory("./tembo_docs") # File path to your loadable data
-
-rag.load_documents(chunks)
-```
-
-Now that the table is loaded into Postgres, you can run the following:
-
-```python
-rag.init_rag(
-    transformer="sentence-transformers/all-MiniLM-L12-v2"
-)
 ```
 
 ## Adding Custom Prompts

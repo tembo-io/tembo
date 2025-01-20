@@ -30,12 +30,10 @@ use utoipa::ToSchema;
 )]
 pub enum StackType {
     Analytics,
-    DataWarehouse,
     Geospatial,
     MachineLearning,
     MessageQueue,
     MongoAlternative,
-    OLAP,
     #[default]
     OLTP,
     ParadeDB,
@@ -50,12 +48,10 @@ impl std::str::FromStr for StackType {
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
             "Analytics" => Ok(StackType::Analytics),
-            "DataWarehouse" => Ok(StackType::DataWarehouse),
             "Geospatial" => Ok(StackType::Geospatial),
             "MachineLearning" => Ok(StackType::MachineLearning),
             "MessageQueue" => Ok(StackType::MessageQueue),
             "MongoAlternative" => Ok(StackType::MongoAlternative),
-            "OLAP" => Ok(StackType::OLAP),
             "OLTP" => Ok(StackType::OLTP),
             "ParadeDB" => Ok(StackType::ParadeDB),
             "Standard" => Ok(StackType::Standard),
@@ -70,12 +66,10 @@ impl StackType {
     pub fn as_str(&self) -> &str {
         match self {
             StackType::Analytics => "Analytics",
-            StackType::DataWarehouse => "DataWarehouse",
             StackType::Geospatial => "Geospatial",
             StackType::MachineLearning => "MachineLearning",
             StackType::MessageQueue => "MessageQueue",
             StackType::MongoAlternative => "MongoAlternative",
-            StackType::OLAP => "OLAP",
             StackType::OLTP => "OLTP",
             StackType::ParadeDB => "ParadeDB",
             StackType::Standard => "Standard",
@@ -296,9 +290,6 @@ mod tests {
                 StackType::Analytics => {
                     get_stack(StackType::Analytics);
                 }
-                StackType::DataWarehouse => {
-                    get_stack(StackType::DataWarehouse);
-                }
                 StackType::Geospatial => {
                     get_stack(StackType::Geospatial);
                 }
@@ -310,9 +301,6 @@ mod tests {
                 }
                 StackType::MongoAlternative => {
                     get_stack(StackType::MongoAlternative);
-                }
-                StackType::OLAP => {
-                    get_stack(StackType::OLAP);
                 }
                 StackType::OLTP => {
                     get_stack(StackType::OLTP);
