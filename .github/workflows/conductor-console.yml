@@ -43,15 +43,15 @@ jobs:
           VERSION=$(cd conductor && cargo pkgid | cut -d# -f2 | cut -d: -f2)
           
           # Set the tags based on branch and version
-          TAGS="quay.io/tembo/conductor-console:$SHORT_SHA"
+          TAGS="quay.io/tembo/conductor:console-$SHORT_SHA"
           if [ "$BRANCH_NAME" = "main" ]; then
-            TAGS="$TAGS,quay.io/tembo/conductor-console:latest"
+            TAGS="$TAGS,quay.io/tembo/conductor:console-latest"
             if [ ! -z "$VERSION" ]; then
-              TAGS="$TAGS,quay.io/tembo/conductor-console:$VERSION"
+              TAGS="$TAGS,quay.io/tembo/conductor:console-$VERSION"
             fi
             # Add CalVer tag for main branch
             CALVER=$(date +'%Y.%m.%d')
-            TAGS="$TAGS,quay.io/tembo/conductor-console:$CALVER"
+            TAGS="$TAGS,quay.io/tembo/conductor:console-$CALVER"
           fi
           echo "tags=${TAGS}" >> $GITHUB_OUTPUT
 
