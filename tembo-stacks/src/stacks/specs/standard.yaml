@@ -3,10 +3,10 @@ description: A balanced Postgres instance optimized for OLTP workloads.
 repository: "quay.io/tembo"
 organization: tembo
 images:
-  14: "standard-cnpg:14-35b0240"
-  15: "standard-cnpg:15-35b0240"
-  16: "standard-cnpg:16-35b0240"
-  17: "standard-cnpg:17-35b0240"
+  14: "standard-cnpg:14-f9c2075"
+  15: "standard-cnpg:15-f9c2075"
+  16: "standard-cnpg:16-f9c2075"
+  17: "standard-cnpg:17-f9c2075"
 stack_version: 0.1.0
 postgres_config_engine: standard
 postgres_config:

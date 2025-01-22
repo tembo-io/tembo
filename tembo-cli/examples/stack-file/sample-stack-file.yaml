@@ -3,9 +3,9 @@ description: A fake stack, we are testing locally
 repository: "quay.io/tembo"
 organization: tembo
 images:
-  14: "standard-cnpg:14-ed6e9e9"
-  15: "standard-cnpg:15-ed6e9e9"
-  16: "standard-cnpg:16-ed6e9e9"
+  14: "standard-cnpg:14-f9c2075"
+  15: "standard-cnpg:15-f9c2075"
+  16: "standard-cnpg:16-f9c2075"
 stack_version: 0.1.0
 compute_templates:
   - cpu: 0.25
