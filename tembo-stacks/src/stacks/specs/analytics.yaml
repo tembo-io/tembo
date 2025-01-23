@@ -3,9 +3,9 @@ description: A Postgres instance optimized for analytics workloads.
 repository: "quay.io/tembo"
 organization: tembo
 images:
-  14: "standard-cnpg:14-f9c2075"
-  15: "standard-cnpg:15-f9c2075"
-  16: "standard-cnpg:16-f9c2075"
+  14: "standard-cnpg:14-7ae38e9"
+  15: "standard-cnpg:15-7ae38e9"
+  16: "standard-cnpg:16-7ae38e9"
 stack_version: 0.1.0
 postgres_config_engine: olap
 postgres_config:
@@ -48,6 +48,12 @@ trunk_installs:
     version: 1.1.0
   - name: wrappers
     version: 0.4.3
+  - name: multicorn
+    version: 2.5.0
+  - name: pg_tier
+    version: 0.0.5
+  - name: pg_duckdb
+    version: 0.2.0
 extensions:
   - name: columnar
     locations:
