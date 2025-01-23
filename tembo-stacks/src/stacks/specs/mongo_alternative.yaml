@@ -10,7 +10,7 @@ images:
 stack_version: 0.1.0
 appServices:
   - name: fdb-api
-    image: ghcr.io/ferretdb/ferretdb
+    image: ghcr.io/ferretdb/ferretdb:1.24.0
     routing:
       - port: 27018
         ingressPath: /ferretdb/v1
