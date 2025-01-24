@@ -22,14 +22,14 @@ appServices:
           subPath: state
 trunk_installs:
   - name: auto_explain
-    version: 15.3.0
+    version: 17.2.0
 extensions:
   - name: auto_explain
     description: "Log execution plans of slow queries"
     locations:
       - database: postgres
         enabled: true
-        version: 15.3.0
+        version: 17.2.0
 postgres_config:
   - name: auto_explain.log_format
     value: json
