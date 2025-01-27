@@ -3,9 +3,9 @@ description: A Postgres instance equipped with machine learning extensions and o
 repository: "quay.io/tembo"
 organization: tembo
 images:
-  15: "ml-cnpg:15-8eb6833"
-  16: "ml-cnpg:16-8eb6833"
-  17: "ml-cnpg:17-8eb6833"
+  15: "ml-cnpg:15-f40d2ee"
+  16: "ml-cnpg:16-f40d2ee"
+  17: "ml-cnpg:17-f40d2ee"
 stack_version: 0.4.0
 compute_constraints:
   min:

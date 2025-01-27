@@ -3,9 +3,9 @@ description: A Postgres instance equipped with configuration and extensions for 
 repository: "quay.io/tembo"
 organization: tembo
 images:
-  14: "dw-cnpg:14-35b0240"
-  15: "dw-cnpg:15-35b0240"
-  16: "dw-cnpg:16-35b0240" 
+  14: "dw-cnpg:14-f40d2ee"
+  15: "dw-cnpg:15-f40d2ee"
+  16: "dw-cnpg:16-f40d2ee"
 stack_version: 0.1.0
 postgres_config_engine: olap
 postgres_config:
@@ -46,7 +46,7 @@ trunk_installs:
     version: 0.4.2
   - name: multicorn
     version: 2.5.0
-  - name: pg_tier 
+  - name: pg_tier
     version: 0.0.5
 extensions:
   - name: pg_stat_statements
@@ -93,8 +93,8 @@ extensions:
       - database: postgres
         enabled: true
         version: 2.5.0
-  - name: pg_tier 
-    description: pg_tier 
+  - name: pg_tier
+    description: pg_tier
     locations:
       - database: postgres
         enabled: true
