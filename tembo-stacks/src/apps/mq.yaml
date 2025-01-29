@@ -1,6 +1,6 @@
 name: !mq-api
 appServices:
-  - image: postgrest/postgrest:v10.0.0
+  - image: postgrest/postgrest:v12.2.5
     name: mq-api
     routing:
       - port: 3000
