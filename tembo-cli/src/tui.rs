@@ -163,7 +163,7 @@ pub mod colors {
 
     #[allow(dead_code)]
     #[allow(clippy::needless_lifetimes)]
-    pub fn gradient_p<'a>(log: &'a str) -> TemboCliLog {
+    pub fn gradient_p<'a>(log: &'a str) -> TemboCliLog<'a> {
         let term_program = std::env::var("TERM_PROGRAM").unwrap_or_default();
         // aTerminal only supports 8 bit colors so gradients won't work
         if term_program == "Apple_Terminal" {

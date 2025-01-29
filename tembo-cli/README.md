@@ -10,14 +10,14 @@ managing, and running Postgres.
 
 Using homebrew
 
-```
+``` sh
 brew tap tembo-io/tembo
 brew install tembo-cli
 ```
 
 Using cargo
 
-```
+``` sh
 cargo install tembo-cli
 ```
 
@@ -30,13 +30,15 @@ Discover a wide range of commands and subcommands, along with their respective o
 
 Clone this repo and run:
 
-`cargo install --path .`
+``` sh
+cargo install --path .
+```
 
 If the install path is in your shell path, you can then run `tembo help` and other `tembo` commands.
 
 You can run this command to use the local code for any tembo command during development:
 
-```
+``` sh
 alias tembo='cargo run --'
 ```
 
@@ -58,7 +60,7 @@ openapi-generator generate -i https://api.data-1.use1.tembo.io/api-docs/openapi.
 
 * Go to `tembodataclient/src/lib.rs` & add following line at the top to disable clippy for the generated code
 
-```
+``` rs
 #![allow(clippy::all)]
 ```
 
@@ -74,13 +76,13 @@ openapi-generator generate -i https://api.tembo.io/api-docs/openapi.json  -g rus
 
 * Go to `temboclient/src/lib.rs` & add following line at the top to disable clippy for the generated code
 
-```
+``` rs
 #![allow(clippy::all)]
 ```
 
 * Create `temboclient/src/models/impls.rs` file & add following code to it:
 
-```
+```rs
 use std::str::FromStr;
 
 use super::{Cpu, Environment, Memory, StackType, Storage};
@@ -154,15 +156,16 @@ impl FromStr for StackType {
 
     fn from_str(input: &str) -> core::result::Result<StackType, Self::Err> {
         match input {
-            "Standard" => Ok(StackType::Standard),
-            "MessageQueue" => Ok(StackType::MessageQueue),
-            "MachineLearning" => Ok(StackType::MachineLearning),
-            "OLAP" => Ok(StackType::Olap),
-            "VectorDB" => Ok(StackType::VectorDb),
-            "OLTP" => Ok(StackType::Oltp),
-            "DataWarehouse" => Ok(StackType::DataWarehouse),
+            "Analytics" => Ok(StackType::Analytics),
             "Geospatial" => Ok(StackType::Geospatial),
+            "MachineLearning" => Ok(StackType::MachineLearning),
+            "MessageQueue" => Ok(StackType::MessageQueue),
+            "MongoAlternative" => Ok(StackType::MongoAlternative),
+            "OLTP" => Ok(StackType::OLTP),
+            "ParadeDB" => Ok(StackType::ParadeDB),
+            "Standard" => Ok(StackType::Standard),
             "Timeseries" => Ok(StackType::Timeseries),
+            "VectorDB" => Ok(StackType::VectorDB),
             _ => Err(()),
         }
     }
@@ -171,7 +174,7 @@ impl FromStr for StackType {
 
 * Add following line towards the end of `temboclient/src/models/mod.rs`
 
-```
+``` rs
 pub mod impls;
 ```
 
