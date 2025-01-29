@@ -15,10 +15,8 @@ A tembo stack is a pre-built, use case specific Postgres deployment which enable
 |Name|Replacement for|
 |----|---------------|
 |[OLTP](./src/stacks/specs/oltp.yaml)| Amazon RDS |
-|[OLAP](./src/stacks/specs/olap.yaml)| Snowflake, Bigquery |
 |[Machine Learning](./src/stacks/specs/machine_learning.yaml)| MindsDB |
 |[Message Queue](./src/stacks/specs/message_queue.yaml)| Amazon SQS, RabbitMQ, Redis |
-|[Data Warehouse](./src/stacks/specs/data_warehouse.yaml)| Snowflake, Bigquery |
 |[Mongo Alternative on Postgres](./src/stacks/specs/mongo_alternative.yaml)| MongoDB |
 |[Geospatial](./src/stacks/specs/gis.yaml)| ESRI, Oracle |
 |[Vector DB](./src/stacks/specs/vectordb.yaml)| Pinecone, Weaviate |

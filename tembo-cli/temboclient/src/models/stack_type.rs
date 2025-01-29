@@ -17,22 +17,16 @@ pub enum StackType {
     MessageQueue,
     #[serde(rename = "MachineLearning")]
     MachineLearning,
-    #[serde(rename = "OLAP")]
-    Olap,
     #[serde(rename = "OLTP")]
     Oltp,
     #[serde(rename = "Analytics")]
     Analytics,
     #[serde(rename = "VectorDB")]
     VectorDb,
-    #[serde(rename = "DataWarehouse")]
-    DataWarehouse,
     #[serde(rename = "Geospatial")]
     Geospatial,
     #[serde(rename = "MongoAlternative")]
     MongoAlternative,
-    #[serde(rename = "RAG")]
-    Rag,
     #[serde(rename = "Timeseries")]
     Timeseries,
     #[serde(rename = "ParadeDB")]
@@ -45,14 +39,11 @@ impl ToString for StackType {
             Self::Standard => String::from("Standard"),
             Self::MessageQueue => String::from("MessageQueue"),
             Self::MachineLearning => String::from("MachineLearning"),
-            Self::Olap => String::from("OLAP"),
             Self::Oltp => String::from("OLTP"),
             Self::Analytics => String::from("Analytics"),
             Self::VectorDb => String::from("VectorDB"),
-            Self::DataWarehouse => String::from("DataWarehouse"),
             Self::Geospatial => String::from("Geospatial"),
             Self::MongoAlternative => String::from("MongoAlternative"),
-            Self::Rag => String::from("RAG"),
             Self::Timeseries => String::from("Timeseries"),
             Self::ParadeDB => String::from("ParadeDB"),
         }

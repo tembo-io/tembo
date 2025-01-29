@@ -102,13 +102,9 @@ pub fn execute(verbose: bool) -> Result<(), anyhow::Error> {
 
 fn validate_support(config: &HashMap<String, InstanceSettings>) -> Result<(), anyhow::Error> {
     for settings in config.values() {
-        validate_stack_support(settings, 14, "OLAP")?;
         validate_stack_support(settings, 14, "VectorDB")?;
-        validate_stack_support(settings, 16, "DataWarehouse")?;
         validate_stack_support(settings, 16, "MachineLearning")?;
         validate_stack_support(settings, 16, "MessageQueue")?;
-        validate_stack_support(settings, 16, "OLAP")?;
-        validate_stack_support(settings, 16, "RAG")?;
         validate_stack_support(settings, 16, "VectorDB")?;
     }
     Ok(())
@@ -354,8 +350,6 @@ mod tests {
     #[case("Standard", true)]
     #[case("VectorDB", true)]
     #[case("OLTP", true)]
-    #[case("OLAP", true)]
-    #[case("datawarehouse", false)]
     fn test_validate_stack_type(#[case] stack_type: &str, #[case] is_valid: bool) {
         let result = validate_stack_type(stack_type, "test_section", false);
         assert_eq!(result.is_ok(), is_valid);
