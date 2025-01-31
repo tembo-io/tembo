@@ -18,6 +18,7 @@ inferenceGateway:
     enabled: true
     path: /ready
     port: http
+  replicaCount: 1
   autoscaling:
     enabled: true
     minReplicas: 1

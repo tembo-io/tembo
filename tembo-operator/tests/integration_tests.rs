@@ -55,6 +55,7 @@ mod test {
         time::Duration,
     };
 
+    use serial_test::serial;
     use tokio::{io::AsyncReadExt, time::timeout};
 
     const API_VERSION: &str = "coredb.io/v1alpha1";
@@ -697,6 +698,7 @@ mod test {
         client: Client,
         cdb_name: &str,
         namespace: &str,
+        list_params: &ListParams,
         num_expected: usize,
     ) -> Result<Vec<R>, errors::OperatorError>
     where
@@ -709,22 +711,22 @@ mod test {
         R::DynamicType: Default,
     {
         let api: Api<R> = Api::namespaced(client, namespace);
-        let lp = ListParams::default().labels(format!("coredb.io/name={}", cdb_name).as_str());
         let retry = 15;
         let mut passed_retry = false;
         let mut resource_list: Vec<R> = Vec::new();
         for _ in 0..retry {
-            let resources = api.list(&lp).await?;
+            let resources = api.list(list_params).await?;
             if resources.items.len() == num_expected {
                 resource_list.extend(resources.items);
                 passed_retry = true;
                 break;
             } else {
                 println!(
-                    "ns:{}.cdb:{} Found {}, expected {}",
+                    "ns:{}.cdb:{} Found {} {}, expected {}",
                     namespace,
                     cdb_name,
                     resources.items.len(),
+                    std::any::type_name::<R>(),
                     num_expected
                 );
             }
@@ -954,6 +956,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_basic_cnpg() {
         let test_name = "test-basic-cnpg";
@@ -1035,6 +1038,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_basic_cnpg_assuming_latest_version() {
         let test_name = "test-basic-cnpg";
@@ -1114,6 +1118,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_basic_cnpg_pg16() {
         // Initialize the Kubernetes client
@@ -1218,6 +1223,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_cnpg_metrics_create() {
         // Initialize the Kubernetes client
@@ -1493,6 +1499,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_cnpg_pgparams() {
         // Initialize the Kubernetes client
@@ -1716,6 +1723,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_skip_reconciliation() {
         // Initialize the Kubernetes client
@@ -1797,6 +1805,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_delete_namespace() {
         // Initialize the Kubernetes client
@@ -1901,6 +1910,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn test_networking() {
         // Initialize the Kubernetes client
@@ -2332,6 +2342,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_ha_basic_cnpg() {
         // Initialize the Kubernetes client
@@ -2418,6 +2429,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_ha_upgrade_cnpg() {
         // Initialize the Kubernetes client
@@ -2586,6 +2598,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_shared_preload_libraries() {
         // Initialize the Kubernetes client
@@ -2717,6 +2730,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_ext_with_load() {
         // Initialize the Kubernetes client
@@ -3078,6 +3092,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_ha_two_replicas() {
         // Initialize the Kubernetes client
@@ -3235,6 +3250,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_ha_verify_extensions_ha_later() {
         // Initialize the Kubernetes client
@@ -3460,6 +3476,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_ha_shared_preload_libraries() {
         // Initialize the Kubernetes client
@@ -3749,6 +3766,7 @@ mod test {
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_app_service() {
         // Initialize the Kubernetes client
@@ -3848,7 +3866,7 @@ mod test {
                         }
                     },
                     {
-                        "name": "ferretdb",
+                        "name": "fdb-api",
                         "image": "ghcr.io/ferretdb/ferretdb",
                         "routing": [
                             {
@@ -3915,23 +3933,27 @@ mod test {
         let _coredb_resource = coredbs.patch(cdb_name, &params, &patch).await.unwrap();
 
         // assert we created three Deployments, with the names we provided
+        let default_params = ListParams::default();
         let deployment_items: Vec<Deployment> =
-            list_resources(client.clone(), cdb_name, &namespace, 3)
+            list_resources(client.clone(), cdb_name, &namespace, &default_params, 3)
                 .await
                 .unwrap();
         // three AppService deployments. the postgres exporter is disabled
         assert!(deployment_items.len() == 3);
 
-        let service_items: Vec<Service> = list_resources(client.clone(), cdb_name, &namespace, 2)
-            .await
-            .unwrap();
+        let cdb_params =
+            ListParams::default().labels(format!("coredb.io/name={}", cdb_name).as_str());
+        let service_items: Vec<Service> =
+            list_resources(client.clone(), cdb_name, &namespace, &cdb_params, 2)
+                .await
+                .unwrap();
         // two AppService Services, because two of the AppServices expose ports
         assert!(service_items.len() == 2);
 
         let app_0 = deployment_items[0].clone();
         let app_1 = deployment_items[1].clone();
         let app_2 = deployment_items[2].clone();
-        assert_eq!(app_0.metadata.name.unwrap(), format!("{cdb_name}-ferretdb"));
+        assert_eq!(app_0.metadata.name.unwrap(), format!("{cdb_name}-fdb-api"));
         assert_eq!(
             app_1.metadata.name.unwrap(),
             format!("{cdb_name}-postgrest")
@@ -4018,7 +4040,7 @@ mod test {
         assert!(found);
 
         let ingresses: Result<Vec<IngressRoute>, errors::OperatorError> =
-            list_resources(client.clone(), cdb_name, &namespace, 1).await;
+            list_resources(client.clone(), cdb_name, &namespace, &cdb_params, 1).await;
         let ingress = ingresses.unwrap();
         assert_eq!(ingress.len(), 1);
         let ingress_route = ingress[0].clone();
@@ -4037,9 +4059,11 @@ mod test {
         );
 
         // Check for IngressRouteTCP
-        let ing_name = format!("{cdb_name}-ferretdb");
+        let ing_name = format!("{cdb_name}-fdb-api");
+        let ing_params =
+            ListParams::default().labels(format!("coredb.io/name={}", ing_name).as_str());
         let ingresses_tcp: Result<Vec<IngressRouteTCP>, errors::OperatorError> =
-            list_resources(client.clone(), &ing_name, &namespace, 1).await;
+            list_resources(client.clone(), &ing_name, &namespace, &ing_params, 1).await;
         let ingress_tcp = ingresses_tcp.unwrap();
         assert_eq!(ingress_tcp.len(), 1);
         let ingress_route_tcp = ingress_tcp[0].clone();
@@ -4145,7 +4169,7 @@ mod test {
         coredbs.patch(cdb_name, &params, &patch).await.unwrap();
 
         let deployment_items: Vec<Deployment> =
-            list_resources(client.clone(), cdb_name, &namespace, 1)
+            list_resources(client.clone(), cdb_name, &namespace, &default_params, 1)
                 .await
                 .unwrap();
         assert!(deployment_items.len() == 1);
@@ -4156,9 +4180,10 @@ mod test {
         );
 
         // should still be just one Service
-        let service_items: Vec<Service> = list_resources(client.clone(), cdb_name, &namespace, 1)
-            .await
-            .unwrap();
+        let service_items: Vec<Service> =
+            list_resources(client.clone(), cdb_name, &namespace, &cdb_params, 1)
+                .await
+                .unwrap();
         // One appService Services
         assert!(service_items.len() == 1);
 
@@ -4349,29 +4374,31 @@ CREATE EVENT TRIGGER pgrst_watch
         let patch = Patch::Apply(&coredb_json);
         coredbs.patch(cdb_name, &params, &patch).await.unwrap();
         let deployment_items: Vec<Deployment> =
-            list_resources(client.clone(), cdb_name, &namespace, 0)
+            list_resources(client.clone(), cdb_name, &namespace, &default_params, 0)
                 .await
                 .unwrap();
         assert!(deployment_items.is_empty());
 
-        let service_items: Vec<Service> = list_resources(client.clone(), cdb_name, &namespace, 0)
-            .await
-            .unwrap();
+        let service_items: Vec<Service> =
+            list_resources(client.clone(), cdb_name, &namespace, &cdb_params, 0)
+                .await
+                .unwrap();
         assert!(service_items.is_empty());
         // should be no Services
 
-        // ingress must be gone
-        let ingresses: Vec<IngressRoute> = list_resources(client.clone(), cdb_name, &namespace, 0)
-            .await
-            .unwrap();
-        assert_eq!(ingresses.len(), 0);
-
-        // Assert IngressRouteTCP is gone
-        let ingresses_tcp: Vec<IngressRouteTCP> =
-            list_resources(client.clone(), cdb_name, &namespace, 0)
+        // There should be 1 IngressRoute left (metrics)
+        let ingresses: Vec<IngressRoute> =
+            list_resources(client.clone(), cdb_name, &namespace, &default_params, 1)
                 .await
                 .unwrap();
-        assert_eq!(ingresses_tcp.len(), 0);
+        assert_eq!(ingresses.len(), 1);
+
+        // There should be 1 IngressRouteTCP left (postgres)
+        let ingresses_tcp: Vec<IngressRouteTCP> =
+            list_resources(client.clone(), cdb_name, &namespace, &default_params, 1)
+                .await
+                .unwrap();
+        assert_eq!(ingresses_tcp.len(), 1);
 
         // CLEANUP TEST
         // Cleanup CoreDB
@@ -4395,6 +4422,7 @@ CREATE EVENT TRIGGER pgrst_watch
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn restarts_postgres_correctly() {
         async fn wait_til_status_is_filled(coredbs: &Api<CoreDB>, name: &str) {
@@ -4603,6 +4631,7 @@ CREATE EVENT TRIGGER pgrst_watch
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_status_configs() {
         async fn runtime_cfg(coredbs: &Api<CoreDB>, name: &str) -> Option<Vec<PgConfig>> {
@@ -4836,6 +4865,7 @@ CREATE EVENT TRIGGER pgrst_watch
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_backup_and_restore() {
         // Initialize the Kubernetes client
@@ -5256,6 +5286,7 @@ CREATE EVENT TRIGGER pgrst_watch
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_pooler() {
         // Initialize the Kubernetes client
@@ -5328,8 +5359,19 @@ CREATE EVENT TRIGGER pgrst_watch
 
         // Check for pooler service
         let pooler_services: Api<Service> = Api::namespaced(client.clone(), &namespace);
-        let _pooler_service = pooler_services.get(&pooler_name).await.unwrap();
-        println!("Found pooler service: {}", pooler_name);
+        for _ in 0..12 {
+            match pooler_services.get(&pooler_name).await {
+                Ok(_) => {
+                    println!("Found pooler service: {}", pooler_name);
+                    break;
+                }
+                Err(_) => {
+                    println!("Waiting for pooler service to be created: {}", pooler_name);
+                    tokio::time::sleep(Duration::from_secs(5)).await;
+                    continue;
+                }
+            }
+        }
 
         // Check for pooler secret
         let pooler_secrets: Api<Secret> = Api::namespaced(client.clone(), &namespace);
@@ -5360,11 +5402,23 @@ CREATE EVENT TRIGGER pgrst_watch
         // Check for pooler IngressRouteTCP
         let pooler_ingressroutetcps: Api<IngressRouteTCP> =
             Api::namespaced(client.clone(), &namespace);
-        let _pooler_ingressroutetcp = pooler_ingressroutetcps
-            .get(format!("{pooler_name}-0").as_str())
-            .await
-            .unwrap();
-        println!("Found pooler IngressRouteTCP: {pooler_name}-0");
+        let ingressroute_name = format!("{pooler_name}-0");
+        for _ in 0..12 {
+            match pooler_ingressroutetcps.get(&ingressroute_name).await {
+                Ok(_) => {
+                    println!("Found pooler IngressRouteTCP: {}", ingressroute_name);
+                    break;
+                }
+                Err(_) => {
+                    println!(
+                        "Waiting for pooler IngressRouteTCP to be created: {}",
+                        ingressroute_name
+                    );
+                    tokio::time::sleep(Duration::from_secs(5)).await;
+                    continue;
+                }
+            }
+        }
 
         // Query the database to make sure the pgbouncer role was created
         let _pgb_query = wait_until_psql_contains(
@@ -5442,6 +5496,7 @@ CREATE EVENT TRIGGER pgrst_watch
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_restart_and_update_replicas() {
         // Initialize the Kubernetes client
@@ -5592,6 +5647,7 @@ CREATE EVENT TRIGGER pgrst_watch
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_cnpg_update_image_and_params() {
         // Initialize the Kubernetes client
@@ -5797,6 +5853,7 @@ CREATE EVENT TRIGGER pgrst_watch
     }
 
     #[tokio::test]
+    #[serial]
     #[ignore]
     /// Test the hibernation system
     /// Ensure that the cluster performs the following:
@@ -5808,6 +5865,8 @@ CREATE EVENT TRIGGER pgrst_watch
         let test = TestCore::new(test_name).await;
         let name = test.name.clone();
         let pooler_name = format!("{}-pooler", name);
+        let namespace = test.namespace.clone();
+        let default_params = ListParams::default();
 
         // Generate very simple CoreDB JSON definitions. The first will be for
         // initializing and starting the cluster, and the second for stopping
@@ -5850,6 +5909,30 @@ CREATE EVENT TRIGGER pgrst_watch
             .await
             .not());
 
+        // Assert that IngressRouteTCPs are removed after hibernation
+        let client = test.client.clone();
+        let ingresses_tcp: Vec<IngressRouteTCP> =
+            list_resources(client.clone(), &name, &namespace, &default_params, 0)
+                .await
+                .unwrap();
+        assert_eq!(
+            ingresses_tcp.len(),
+            0,
+            "IngressRouteTCPs should be removed after hibernation"
+        );
+
+        // Assert that IngressRoutes are removed after hibernation
+        let client = test.client.clone();
+        let ingress_routes: Vec<IngressRoute> =
+            list_resources(client.clone(), &name, &namespace, &default_params, 0)
+                .await
+                .unwrap();
+        assert_eq!(
+            ingress_routes.len(),
+            0,
+            "IngressRoutes should be removed after hibernation"
+        );
+
         // Patch the cluster to start it up again, then check to ensure it
         // actually did so. This proves hibernation can be reversed.
 
@@ -5859,10 +5942,308 @@ CREATE EVENT TRIGGER pgrst_watch
         assert!(status_running(&test.coredbs, &name).await);
         assert!(pooler_status_running(&test.poolers, &pooler_name).await);
 
+        // Assert there are 2 IngressRouteTCPs created after starting. 1 for postgres and 1 for the pooler
+        let ingress_tcps: Vec<IngressRouteTCP> =
+            list_resources(client.clone(), &name, &namespace, &default_params, 2)
+                .await
+                .unwrap();
+        assert_eq!(
+            ingress_tcps.len(),
+            2,
+            "IngressRouteTCPs should be created after starting"
+        );
+
+        // Assert there is 1 IngressRoute created after starting. This is the IngressRoute for metrics
+        let ingress_routes: Vec<IngressRoute> =
+            list_resources(client.clone(), &name, &namespace, &default_params, 1)
+                .await
+                .unwrap();
+        assert_eq!(
+            ingress_routes.len(),
+            1,
+            "IngressRoutes should be created after starting"
+        );
+
         test.teardown().await;
     }
 
     #[tokio::test]
+    #[serial]
+    #[ignore]
+    async fn functional_test_hibernate_with_app_service() {
+        let test_name = "test-hibernate-cnpg-with-app-service";
+        let test = TestCore::new(test_name).await;
+        let name = test.name.clone();
+        let pooler_name = format!("{}-pooler", name);
+        let namespace = test.namespace.clone();
+        let default_params = ListParams::default();
+
+        // Generate very simple CoreDB JSON definitions. The first will be for
+        // initializing and starting the cluster with an app service, and the second for stopping
+        // it. We'll use a single replica to ensure _all_ parts of the cluster
+        // are affected by hibernate.
+
+        let cluster_start = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": "CoreDB",
+            "metadata": {
+                "name": name
+            },
+            "spec": {
+                "replicas": 1,
+                "stop": false,
+                "connectionPooler": {
+                    "enabled": true
+                },
+                "appServices": [
+                    {
+                        "name": "postgrest",
+                        "image": "postgrest/postgrest:v10.0.0",
+                        "env": [
+                            {
+                                "name": "PGRST_DB_URI",
+                                "valueFromPlatform": "ReadWriteConnection"
+                            },
+                            {
+                                "name": "PGRST_DB_SCHEMA",
+                                "value": "public"
+                            },
+                            {
+                                "name": "PGRST_DB_ANON_ROLE",
+                                "value": "postgres"
+                            }
+                        ],
+                        "routing": [
+                            {
+                                "port": 3000,
+                                "ingressPath": "/",
+                                "ingressType": "http"
+                            }
+                        ],
+                        "resources": {
+                            "requests": {
+                                "cpu": "100m",
+                                "memory": "256Mi"
+                            },
+                            "limits": {
+                                "cpu": "100m",
+                                "memory": "256Mi"
+                            }
+                        }
+                    },
+                                        {
+                        "name": "fdb-api",
+                        "image": "ghcr.io/ferretdb/ferretdb",
+                        "routing": [
+                            {
+                                "port": 27018,
+                                "ingressPath": "/ferretdb/v1",
+                                "entryPoints": [
+                                    "ferretdb"
+                                ],
+                                "ingressType": "tcp"
+                            }
+                        ],
+                        "env": [
+                            {
+                                "name": "FERRETDB_POSTGRESQL_URL",
+                                "valueFromPlatform": "ReadWriteConnection"
+                            },
+                            {
+                                "name": "FERRETDB_LOG_LEVEL",
+                                "value": "debug"
+                            },
+                            {
+                                "name": "FERRETDB_STATE_DIR",
+                                "value": "-"
+                            },
+                            {
+                                "name": "FERRETDB_LISTEN_TLS_CERT_FILE",
+                                "value": "/certs/tls.crt"
+                            },
+                        ],
+                        "storage": {
+                            "volumes": [
+                                {
+                                    "name": "ferretdb-data",
+                                    "ephemeral": {
+                                        "volumeClaimTemplate": {
+                                            "spec": {
+                                                "accessModes": [
+                                                    "ReadWriteOnce"
+                                                ],
+                                                "resources": {
+                                                    "requests": {
+                                                        "storage": "1Gi"
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            ],
+                            "volumeMounts": [
+                                {
+                                    "name": "ferretdb-data",
+                                    "mountPath": "/state"
+                                }
+                            ]
+                        },
+                    }
+                ]
+            }
+        });
+
+        let mut cluster_stop = cluster_start.clone();
+        cluster_stop["spec"]["stop"] = serde_json::json!(true);
+
+        // Begin by starting the cluster and validating that it worked.
+        // We need this here as initial iterations of the hibernate code
+        // prevented the cluster from starting.
+
+        let _ = test.set_cluster_def(&cluster_start).await;
+        assert!(status_running(&test.coredbs, &name).await);
+        assert!(pooler_status_running(&test.poolers, &pooler_name).await);
+
+        // Assert there are 4 pods running: postgres, pooler, postgrest and ferretdb
+        let pods: Api<Pod> = Api::namespaced(test.client.clone(), &namespace);
+        let pods_list = pods.list(&Default::default()).await.unwrap();
+        let required_pods = ["postgres", "pooler", "postgrest", "fdb-api"];
+
+        // Check each required pod exists
+        for required_pod in required_pods {
+            let pod_exists = pods_list.items.iter().any(|pod| {
+                pod.metadata
+                    .name
+                    .as_ref()
+                    .map_or(false, |name| name.contains(required_pod))
+            });
+
+            assert!(
+                pod_exists,
+                "Required pod '{}' was not found in namespace. Found pods: {:?}",
+                required_pod,
+                pods_list
+                    .items
+                    .iter()
+                    .filter_map(|pod| pod.metadata.name.as_ref())
+                    .collect::<Vec<_>>()
+            );
+        }
+
+        // Assert there are 3 IngressRouteTCPs created after starting. One for postgres, pooler,
+        // ferretdb
+        let client = test.client.clone();
+        let ingresses_tcp: Vec<IngressRouteTCP> =
+            list_resources(client.clone(), &name, &namespace, &default_params, 3)
+                .await
+                .unwrap();
+        assert_eq!(
+            ingresses_tcp.len(),
+            3,
+            "IngressRouteTCPs should be created after starting"
+        );
+
+        // Stop the cluster and check to make sure it's not running to ensure
+        // hibernate is doing its job.
+
+        let _ = test.set_cluster_def(&cluster_stop).await;
+        let _ = wait_until_status_not_running(&test.coredbs, &name).await;
+        assert!(status_running(&test.coredbs, &name).await.not());
+        assert!(pooler_status_running(&test.poolers, &pooler_name)
+            .await
+            .not());
+
+        // Assert there are no pods running
+        let pods_list = pods.list(&Default::default()).await.unwrap();
+        assert_eq!(pods_list.items.len(), 0);
+
+        // Assert that IngressRouteTCPs are removed after hibernation
+        let client = test.client.clone();
+        let ingresses_tcp: Vec<IngressRouteTCP> =
+            list_resources(client.clone(), &name, &namespace, &default_params, 0)
+                .await
+                .unwrap();
+        assert_eq!(
+            ingresses_tcp.len(),
+            0,
+            "IngressRouteTCPs should be removed after hibernation"
+        );
+
+        // Assert that IngressRoutes are removed after hibernation
+        let client = test.client.clone();
+        let ingress_routes: Vec<IngressRoute> =
+            list_resources(client.clone(), &name, &namespace, &default_params, 0)
+                .await
+                .unwrap();
+        assert_eq!(
+            ingress_routes.len(),
+            0,
+            "IngressRoutes should be removed after hibernation"
+        );
+
+        // Patch the cluster to start it up again, then check to ensure it
+        // actually did so. This proves hibernation can be reversed.
+
+        println!("Starting cluster after hibernation");
+        println!("CoreDB: {}", cluster_start);
+        let _ = test.set_cluster_def(&cluster_start).await;
+        assert!(status_running(&test.coredbs, &name).await);
+        assert!(pooler_status_running(&test.poolers, &pooler_name).await);
+
+        // Assert there are 4 pods running: postgres, pooler, postgrest and ferretdb
+        let pods_list = pods.list(&Default::default()).await.unwrap();
+        let required_pods = ["postgres", "pooler", "postgrest", "fdb-api"];
+
+        // Check each required pod exists
+        for required_pod in required_pods {
+            let pod_exists = pods_list.items.iter().any(|pod| {
+                pod.metadata
+                    .name
+                    .as_ref()
+                    .map_or(false, |name| name.contains(required_pod))
+            });
+
+            assert!(
+                pod_exists,
+                "Required pod '{}' was not found in namespace. Found pods: {:?}",
+                required_pod,
+                pods_list
+                    .items
+                    .iter()
+                    .filter_map(|pod| pod.metadata.name.as_ref())
+                    .collect::<Vec<_>>()
+            );
+        }
+
+        // Assert there are 3 IngressRouteTCPs created after starting. One for postgres, pooler,
+        // ferretdb
+        let ingress_tcps: Vec<IngressRouteTCP> =
+            list_resources(client.clone(), &name, &namespace, &default_params, 3)
+                .await
+                .unwrap();
+        assert_eq!(
+            ingress_tcps.len(),
+            3,
+            "IngressRouteTCPs should be created after starting"
+        );
+
+        // Assert there are 2 IngressRoutes created after starting. 1 for metrics and 1 for the app service
+        let ingress_routes: Vec<IngressRoute> =
+            list_resources(client.clone(), &name, &namespace, &default_params, 2)
+                .await
+                .unwrap();
+        assert_eq!(
+            ingress_routes.len(),
+            2,
+            "IngressRoutes should be created after starting"
+        );
+
+        test.teardown().await;
+    }
+
+    #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_app_service_podmonitor() {
         // Validates PodMonitor resource created and destroyed properly
@@ -5895,6 +6276,7 @@ CREATE EVENT TRIGGER pgrst_watch
                 "name": cdb_name
             },
             "spec": {
+                "stop": false,
                 "appServices": [
                     {
                         "name": "dummy-exporter",
@@ -5924,6 +6306,51 @@ CREATE EVENT TRIGGER pgrst_watch
         let podmon = get_resource::<PodMonitor>(client.clone(), &namespace, &pmon_name, 50, true)
             .await
             .unwrap();
+        let pmon_spec = podmon.spec.pod_metrics_endpoints.unwrap();
+        assert_eq!(pmon_spec.len(), 1);
+
+        // pause instance to make sure we remove the PodMonitor
+        let paused_app = serde_json::json!({
+            "apiVersion": API_VERSION,
+            "kind": kind,
+            "metadata": {
+                "name": cdb_name
+            },
+            "spec": {
+                "stop": true,
+                "appServices": [
+                    {
+                        "name": "dummy-exporter",
+                        "image": "prom/blackbox-exporter",
+                        "routing": [
+                            {
+                                "port": 9115,
+                                "ingressPath": "/metrics",
+                                "ingressType": "http"
+                            }
+                        ],
+                        "metrics": {
+                            "path": "/metrics",
+                            "port": 9115
+                        }
+                    },
+                ]
+            }
+        });
+        let params = PatchParams::apply("tembo-integration-test");
+        let patch = Patch::Apply(&paused_app);
+        let _coredb_resource = coredbs.patch(cdb_name, &params, &patch).await.unwrap();
+        let podmon =
+            get_resource::<PodMonitor>(client.clone(), &namespace, &pmon_name, 50, false).await;
+        assert!(podmon.is_err());
+
+        // renable it, assert it exists again
+        let patch = Patch::Apply(&full_app);
+        let _coredb_resource = coredbs.patch(cdb_name, &params, &patch).await.unwrap();
+        let podmon = get_resource::<PodMonitor>(client.clone(), &namespace, &pmon_name, 50, true)
+            .await
+            .unwrap();
+
         let pmon_spec = podmon.spec.pod_metrics_endpoints.unwrap();
         assert_eq!(pmon_spec.len(), 1);
 
@@ -6009,6 +6436,7 @@ CREATE EVENT TRIGGER pgrst_watch
     /// There used to be an issue figuring out the Trunk project version of one of the built-in Postgres language extensions (e.g. plpython, pltcl, plperl)
     /// given its extension version. This test should replicate that scenario.
     #[tokio::test]
+    #[serial]
     #[ignore]
     async fn functional_test_basic_cnpg_plpython() {
         let test_name = "test-basic-cnpg-plpython";

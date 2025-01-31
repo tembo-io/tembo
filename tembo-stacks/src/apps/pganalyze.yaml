@@ -1,6 +1,6 @@
 name: !pganalyze
 appServices:
-  - image: quay.io/pganalyze/collector:v0.55.0
+  - image: quay.io/pganalyze/collector:v0.64.1
     name: pganalyze
     env:
       - name: DB_URL
@@ -22,14 +22,14 @@ appServices:
           subPath: state
 trunk_installs:
   - name: auto_explain
-    version: 15.3.0
+    version: 17.2.0
 extensions:
   - name: auto_explain
     description: "Log execution plans of slow queries"
     locations:
       - database: postgres
         enabled: true
-        version: 15.3.0
+        version: 17.2.0
 postgres_config:
   - name: auto_explain.log_format
     value: json

@@ -3,26 +3,28 @@ use crate::cloudnativepg::clusters::{ClusterStatusConditions, ClusterStatusCondi
 use crate::cloudnativepg::cnpg::{get_cluster, get_pooler, get_scheduled_backups};
 use crate::cloudnativepg::poolers::Pooler;
 use crate::cloudnativepg::scheduledbackups::ScheduledBackup;
+use crate::ingress::{delete_ingress_route, delete_ingress_route_tcp};
+use crate::prometheus::podmonitor_crd as podmon;
 use crate::Error;
 
 use crate::{patch_cdb_status_merge, requeue_normal_with_jitter, Context};
-use kube::api::{Patch, PatchParams};
+use kube::api::{DeleteParams, Patch, PatchParams};
 use kube::runtime::controller::Action;
 use kube::{Api, ResourceExt};
 use serde_json::json;
 
 use k8s_openapi::api::apps::v1::Deployment;
 
+use super::clusters::Cluster;
 use crate::app_service::manager::get_appservice_deployment_objects;
 use crate::cloudnativepg::cnpg_utils::{
     get_pooler_instances, patch_cluster_merge, patch_pooler_merge, patch_scheduled_backup_merge,
     removed_stalled_backups,
 };
+use crate::ingress_route_crd::IngressRoute;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, error, info, warn};
-
-use super::clusters::Cluster;
 
 /// Resolves hibernation in the Cluster and related services of the CoreDB
 ///
@@ -73,74 +75,107 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
 
     let client = ctx.client.clone();
     let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
-    let deployment_api: Api<Deployment> = Api::namespaced(client.clone(), &namespace);
-    let ps = PatchParams::apply("patch_merge").force();
 
-    // Along with the CNPG cluster itself, we also need to stop each of the
-    // associated app services. We can do this by retrieving a list of depolyments
-    // in the cluster and setting their replica count to 0 so they spin down.
-    // Conversely, setting it back to 1 if the cluster is started should reverse
-    // the process.
+    // Patch all AppService deployments to match the hibernation state
+    patch_appservice_deployments(ctx, &namespace, &name, cdb).await?;
 
-    let replicas = if cdb.spec.stop { 0 } else { 1 };
-    let replica_patch = json!({
-        "apiVersion": "apps/v1",
-        "kind": "Deployment",
-        "spec": {
-            "replicas": replicas,
-        }
-    });
-
-    let deployment_list = match get_appservice_deployment_objects(&client, &namespace, &name).await
-    {
-        Ok(deployments) => deployments,
-        Err(e) => {
+    if cdb.spec.stop {
+        // Remove IngressRoutes for stopped instances
+        let ingress_route_api: Api<IngressRoute> = Api::namespaced(ctx.client.clone(), &namespace);
+        if let Err(err) = delete_ingress_route(ingress_route_api.clone(), &namespace, &name).await {
             warn!(
-                "Could not retrieve deployment list for cluster {}; retrying",
-                name
+                "Error deleting app service IngressRoute for {}: {}",
+                cdb.name_any(),
+                err
             );
-            debug!("Caught error {}", e);
-            return Err(requeue_normal_with_jitter());
-        }
-    };
-
-    // We just need to patch any deployment that has a mismatched replica count.
-    // If we're stopped, the deployment should have 0 replicas, or 1 otherwise.
-    // We may need to rethink this logic in the future if we ever have deployments
-    // that require allow more than 1 active replica.
-
-    for deployment in deployment_list {
-        let spec = match deployment.spec {
-            Some(spec) => spec,
-            None => continue,
-        };
-        let dep_name = match deployment.metadata.name {
-            Some(dep_name) => dep_name,
-            None => continue,
-        };
-
-        if Some(replicas) == spec.replicas {
-            continue;
+            return Err(Action::requeue(Duration::from_secs(300)));
         }
 
-        match deployment_api
-            .patch(&dep_name, &ps, &Patch::Apply(&replica_patch))
-            .await
-            .map_err(Error::KubeError)
+        let metrics_ing_route_name = format!("{}-metrics", cdb.name_any().as_str());
+        if let Err(err) = delete_ingress_route(
+            ingress_route_api.clone(),
+            &namespace,
+            &metrics_ing_route_name,
+        )
+        .await
         {
-            Ok(_) => {
-                debug!(
-                    "ns: {}, patched AppService Deployment: {}",
-                    &namespace, dep_name
-                );
-            }
-            Err(e) => {
+            warn!(
+                "Error deleting metrics IngressRoute for {}: {}",
+                cdb.name_any(),
+                err
+            );
+            return Err(Action::requeue(Duration::from_secs(300)));
+        }
+
+        // Remove IngressRouteTCP route for stopped instances
+        let ingress_route_tcp_api = Api::namespaced(ctx.client.clone(), &namespace);
+        let prefix_read_only = format!("{}-ro-0", cdb.name_any().as_str());
+        if let Err(err) =
+            delete_ingress_route_tcp(ingress_route_tcp_api.clone(), &namespace, &prefix_read_only)
+                .await
+        {
+            warn!(
+                "Error deleting postgres IngressRouteTCP for {}: {}",
+                cdb.name_any(),
+                err
+            );
+            return Err(Action::requeue(Duration::from_secs(300)));
+        }
+
+        let prefix_read_write = format!("{}-rw-0", cdb.name_any().as_str());
+        if let Err(err) = delete_ingress_route_tcp(
+            ingress_route_tcp_api.clone(),
+            &namespace,
+            &prefix_read_write,
+        )
+        .await
+        {
+            warn!(
+                "Error deleting postgres IngressRouteTCP for {}: {}",
+                cdb.name_any(),
+                err
+            );
+            return Err(Action::requeue(Duration::from_secs(300)));
+        }
+
+        let prefix_pooler = format!("{}-pooler-0", cdb.name_any().as_str());
+        if let Err(err) =
+            delete_ingress_route_tcp(ingress_route_tcp_api.clone(), &namespace, &prefix_pooler)
+                .await
+        {
+            warn!(
+                "Error deleting pooler IngressRouteTCP for {}: {}",
+                cdb.name_any(),
+                err
+            );
+            return Err(Action::requeue(Duration::from_secs(300)));
+        }
+
+        let ferret_ing = format!("{}-fdb-api", cdb.name_any().as_str());
+        if let Err(err) =
+            delete_ingress_route_tcp(ingress_route_tcp_api.clone(), &namespace, &ferret_ing).await
+        {
+            warn!(
+                "Error deleting ferretdb IngressRouteTCP for {}: {}",
+                cdb.name_any(),
+                err
+            );
+            return Err(Action::requeue(Duration::from_secs(300)));
+        }
+
+        let extra_domain_names = cdb.spec.extra_domains_rw.clone().unwrap_or_default();
+        if !extra_domain_names.is_empty() {
+            let prefix_extra = format!("extra-{}-rw", cdb.name_any().as_str());
+            if let Err(err) =
+                delete_ingress_route_tcp(ingress_route_tcp_api.clone(), &namespace, &prefix_extra)
+                    .await
+            {
                 warn!(
-                    "Could not patch deployment {} for cluster {}; retrying",
-                    dep_name, name
+                    "Error deleting extra postgres IngressRouteTCP for {}: {}",
+                    cdb.name_any(),
+                    err
                 );
-                debug!("Caught error {}", e);
-                return Err(requeue_normal_with_jitter());
+                return Err(Action::requeue(Duration::from_secs(300)));
             }
         }
     }
@@ -158,15 +193,21 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
         "enabled"
     };
 
-    let cluster_annotations = cluster.metadata.annotations.unwrap_or_default();
+    let cluster_annotations = cluster.metadata.annotations.clone().unwrap_or_default();
     let hibernation_value = if cdb.spec.stop { "on" } else { "off" };
 
     // Build the hibernation patch we want to apply to disable the CNPG cluster.
+    // This will also disable the PodMonitor for the cluster.
     let patch_hibernation_annotation = json!({
         "metadata": {
             "annotations": {
                 "cnpg.io/hibernation": hibernation_value,
                 "cnpg.io/reconciliationLoop": stop_cnpg_reconciliation_value,
+            }
+        },
+        "spec": {
+            "monitoring": {
+                "enablePodMonitor": !cdb.spec.stop,
             }
         }
     });
@@ -187,6 +228,10 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
         );
         return Err(action);
     }
+
+    // If CNPG is already hibernated then there maybe a dangling PodMonitor still present
+    // This will not get cleaned up if already hibernated.  We need to remove it manually
+    cleanup_hibernated_podmonitor(ctx, namespace, name.clone(), cdb, &cluster).await?;
 
     patch_cluster_merge(cdb, ctx, patch_hibernation_annotation).await?;
     info!(
@@ -231,6 +276,183 @@ pub async fn reconcile_cluster_hibernation(cdb: &CoreDB, ctx: &Arc<Context>) -> 
     if cdb.spec.stop {
         info!("Fully reconciled stopped instance {}", name);
         return Err(requeue_normal_with_jitter());
+    }
+    Ok(())
+}
+
+/// Patches AppService deployments in a Kubernetes cluster by updating their replica count based on the CoreDB specification.
+///
+/// This function performs the following operations:
+/// * Updates the replica count to 0 if CoreDB is stopped, or 1 if it's running
+/// * Deletes associated PodMonitor resources when scaling down to 0 replicas
+/// * Applies patches to all relevant deployments in the specified namespace
+///
+/// # Arguments
+///
+/// * `ctx` - A shared reference to the Context containing the Kubernetes client
+/// * `namespace` - The Kubernetes namespace where the deployments exist
+/// * `name` - The name identifier for the cluster
+/// * `cdb` - Reference to the CoreDB specification containing the stop status
+///
+/// # Returns
+///
+/// * `Ok(())` if all patches were successfully applied
+/// * `Err(Action)` if any operation fails, triggering a requeue with jitter
+///
+/// # Errors
+///
+/// This function will return an error in the following situations:
+/// * Failed to retrieve deployment list
+/// * Failed to delete PodMonitor when scaling down
+/// * Failed to apply deployment patches
+async fn patch_appservice_deployments(
+    ctx: &Arc<Context>,
+    namespace: &str,
+    name: &str,
+    cdb: &CoreDB,
+) -> Result<(), Action> {
+    let client = ctx.client.clone();
+    let deployment_api: Api<Deployment> = Api::namespaced(client.clone(), namespace);
+    let podmonitor_api: Api<podmon::PodMonitor> = Api::namespaced(client.clone(), namespace);
+    let ps = PatchParams::apply("patch_merge").force();
+
+    let replicas = if cdb.spec.stop { 0 } else { 1 };
+    let replica_patch = json!({
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "spec": {
+            "replicas": replicas,
+        }
+    });
+
+    let deployment_list = match get_appservice_deployment_objects(&client, namespace, name).await {
+        Ok(deployments) => deployments,
+        Err(e) => {
+            warn!(
+                "Could not retrieve deployment list for cluster {}; retrying",
+                name
+            );
+            debug!("Caught error {}", e);
+            return Err(requeue_normal_with_jitter());
+        }
+    };
+
+    for deployment in deployment_list {
+        let Some(spec) = deployment.spec else {
+            continue;
+        };
+        let Some(dep_name) = deployment.metadata.name else {
+            continue;
+        };
+
+        if Some(replicas) == spec.replicas {
+            continue;
+        }
+
+        // Each appService deployment will have a corresponding PodMonitor
+        // We need to delete the PodMonitor when scaling down
+        if replicas == 0 {
+            // When scaling down, try to delete the PodMonitor if it exists
+            match podmonitor_api
+                .delete(&dep_name, &DeleteParams::default())
+                .await
+            {
+                Ok(_) => {
+                    debug!(
+                        "ns: {}, deleted PodMonitor for Deployment: {}",
+                        &namespace, dep_name
+                    );
+                }
+                Err(kube::Error::Api(api_err)) if api_err.code == 404 => {
+                    // PodMonitor doesn't exist, that's fine
+                    debug!(
+                        "ns: {}, no PodMonitor found for Deployment: {}",
+                        &namespace, dep_name
+                    );
+                }
+                Err(e) => {
+                    warn!(
+                        "Could not delete PodMonitor for deployment {} in cluster {}; retrying",
+                        dep_name, name
+                    );
+                    debug!("Caught error {}", e);
+                    return Err(requeue_normal_with_jitter());
+                }
+            }
+        }
+
+        match deployment_api
+            .patch(&dep_name, &ps, &Patch::Apply(&replica_patch))
+            .await
+            .map_err(Error::KubeError)
+        {
+            Ok(_) => {
+                debug!(
+                    "ns: {}, patched AppService Deployment: {}",
+                    &namespace, dep_name
+                );
+            }
+            Err(e) => {
+                warn!(
+                    "Could not patch deployment {} for cluster {}; retrying",
+                    dep_name, name
+                );
+                debug!("Caught error {}", e);
+                return Err(requeue_normal_with_jitter());
+            }
+        }
+    }
+
+    Ok(())
+}
+
+/// Cleans up any dangling PodMonitor resources for a hibernated CloudNativePostgreSQL cluster.
+///
+/// When a CNPG cluster is hibernated, there might be leftover PodMonitor resources that
+/// need manual cleanup. This function handles that cleanup process.
+///
+/// # Arguments
+///
+/// * `client` - Kubernetes client for API operations
+/// * `namespace` - Namespace where the cluster and PodMonitor reside
+/// * `name` - Name of the cluster and associated PodMonitor
+/// * `cdb` - Reference to the CloudNativePostgreSQL resource
+/// * `cluster` - Reference to the Cluster resource
+///
+/// # Returns
+///
+/// * `Ok(())` if the cleanup was successful or if no action was needed
+/// * `Err(Error)` if there was an error during cleanup that requires requeuing
+///
+/// # Errors
+///
+/// Returns an error if the PodMonitor deletion fails for reasons other than the resource not existing.
+async fn cleanup_hibernated_podmonitor(
+    ctx: &Arc<Context>,
+    namespace: String,
+    name: String,
+    cdb: &CoreDB,
+    cluster: &Cluster,
+) -> Result<(), Action> {
+    if cdb.spec.stop && is_cluster_hibernated(cluster) {
+        let client = ctx.client.clone();
+        let podmonitor_api: Api<podmon::PodMonitor> = Api::namespaced(client, &namespace);
+        match podmonitor_api.delete(&name, &DeleteParams::default()).await {
+            Ok(_) => {
+                info!("Deleted PodMonitor for hibernated cluster {}", name);
+            }
+            Err(kube::Error::Api(api_err)) if api_err.code == 404 => {
+                debug!("No PodMonitor found for hibernated cluster {}", name);
+            }
+            Err(e) => {
+                warn!(
+                    "Could not delete PodMonitor for hibernated cluster {}; retrying",
+                    name
+                );
+                debug!("Caught error {}", e);
+                return Err(requeue_normal_with_jitter());
+            }
+        }
     }
     Ok(())
 }
@@ -389,9 +611,9 @@ mod tests {
     #[test]
     fn test_is_cluster_hibernated() {
         // Not hibernated yet: still in progress
-        assert_eq!(is_cluster_hibernated(&hibernation_in_progress()), false);
+        assert!(!is_cluster_hibernated(&hibernation_in_progress()));
         // Not hibernated: unrelated condition
-        assert_eq!(is_cluster_hibernated(&backed_up_cluster()), false);
+        assert!(!is_cluster_hibernated(&backed_up_cluster()));
         // Hibernated: "type" is "cnpg.io/hibernation" and "status" is "True"
         assert!(is_cluster_hibernated(&hibernation_completed()));
     }

@@ -3,9 +3,10 @@ description: Postgres for geospatial workloads.
 repository: "quay.io/tembo"
 organization: tembo
 images:
-  14: "geo-cnpg:14-5120dd1"
-  15: "geo-cnpg:15-5120dd1"
-  16: "geo-cnpg:16-5120dd1"
+  14: "geo-cnpg:14-f40d2ee"
+  15: "geo-cnpg:15-f40d2ee"
+  16: "geo-cnpg:16-f40d2ee"
+  17: "geo-cnpg:17-f40d2ee"
 stack_version: 0.1.0
 postgres_config_engine: standard
 postgres_config:
@@ -35,15 +36,16 @@ trunk_installs:
   - name: fuzzystrmatch
     version: 1.2.0
   - name: pg_stat_statements
-    version: 1.10.0
+    version: 1.11.0
+  # postgis included in geo-cnpg image, no need to install again
 extensions:
   - name: pg_stat_statements
     locations:
       - database: postgres
         enabled: true
-        version: 1.10.0
+        version: 1.11.0
   - name: postgis
     locations:
       - database: postgres
         enabled: true
-        version: 3.4.0
+        version: 3.5.0

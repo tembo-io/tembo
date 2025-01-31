@@ -189,7 +189,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
 
     loop {
         // Read from queue (check for new message)
-        // messages that dont fit a CRUDevent will error
+        // messages that don't fit a CRUDevent will error
         // set visibility timeout to 90 seconds
         let read_msg = queue
             .read::<CRUDevent>(&control_plane_events_queue, 90_i32)
@@ -411,6 +411,13 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     &mut coredb_spec,
                 );
 
+                // If cloud provider is Azure, we need to pass the storage account name to generate_spec
+                // so that the storage account URL can be generated for Azure restore scenarios
+                let azure_storage_account = match cloud_provider {
+                    CloudProvider::Azure => Some(azure_storage_account.as_str()),
+                    _ => None,
+                };
+
                 let spec = generate_spec(
                     org_id,
                     &stack_type,
@@ -418,6 +425,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     &read_msg.message.data_plane_id,
                     &namespace,
                     &backup_archive_bucket,
+                    azure_storage_account,
                     &coredb_spec,
                     &cloud_provider,
                 )
@@ -1015,6 +1023,7 @@ async fn init_azure_storage_workload_identity(
         &azure_resource_group,
         &azure_region,
         &azure_storage_account,
+        &backup_archive_bucket,
         &read_msg.message.namespace,
     )
     .await?;
