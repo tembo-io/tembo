@@ -1,6 +1,8 @@
 name: !embeddings
 appServices:
-  - image: 387894460527.dkr.ecr.us-east-1.amazonaws.com/tembo-io/vector-serve:df68795
+  # Use the latest commit sha from the last successful build of the main
+  # branch of https://github.com/tembo-io/pg_vectorize/actions/workflows/build-vector-serve.yml
+  - image: 387894460527.dkr.ecr.us-east-1.amazonaws.com/tembo-io/vector-serve:78fb934
     name: embeddings
     metrics:
       path: /metrics
@@ -55,41 +57,41 @@ appServices:
         initialDelaySeconds: 10
 trunk_installs:
   - name: pg_cron
-    version: 1.6.2
+    version: 1.6.4
   - name: pgmq
-    version: 1.4.2
+    version: 1.5.0
   - name: pgvector
-    version: 0.7.4
+    version: 0.8.0
   - name: vectorize
-    version: 0.18.2
+    version: 0.20.0
   - name: vectorscale
-    version: 0.3.0
+    version: 0.5.1
 extensions:
   - name: pg_cron
     locations:
       - database: postgres
         enabled: true
-        version: 1.6.2
+        version: 1.6.4
   - name: pgmq
     locations:
       - database: postgres
         enabled: true
-        version: 1.4.2
+        version: 1.5.0
   - name: vector
     locations:
       - database: postgres
         enabled: true
-        version: 0.7.4
+        version: 0.8.0
   - name: vectorize
     locations:
       - database: postgres
         enabled: true
-        version: 0.18.2
+        version: 0.20.0
   - name: vectorscale
     locations:
       - database: postgres
         enabled: true
-        version: 0.3.0
+        version: 0.5.1
 postgres_config:
   - name: cron.host
     value: /controller/run

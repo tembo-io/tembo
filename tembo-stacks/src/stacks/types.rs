@@ -30,7 +30,6 @@ use utoipa::ToSchema;
 )]
 pub enum StackType {
     Analytics,
-    API,
     DataWarehouse,
     Geospatial,
     MachineLearning,
@@ -40,7 +39,6 @@ pub enum StackType {
     #[default]
     OLTP,
     ParadeDB,
-    RAG,
     Standard,
     Timeseries,
     VectorDB,
@@ -52,7 +50,6 @@ impl std::str::FromStr for StackType {
     fn from_str(value: &str) -> Result<Self, Self::Err> {
         match value {
             "Analytics" => Ok(StackType::Analytics),
-            "API" => Ok(StackType::API),
             "DataWarehouse" => Ok(StackType::DataWarehouse),
             "Geospatial" => Ok(StackType::Geospatial),
             "MachineLearning" => Ok(StackType::MachineLearning),
@@ -61,7 +58,6 @@ impl std::str::FromStr for StackType {
             "OLAP" => Ok(StackType::OLAP),
             "OLTP" => Ok(StackType::OLTP),
             "ParadeDB" => Ok(StackType::ParadeDB),
-            "RAG" => Ok(StackType::RAG),
             "Standard" => Ok(StackType::Standard),
             "Timeseries" => Ok(StackType::Timeseries),
             "VectorDB" => Ok(StackType::VectorDB),
@@ -74,7 +70,6 @@ impl StackType {
     pub fn as_str(&self) -> &str {
         match self {
             StackType::Analytics => "Analytics",
-            StackType::API => "API",
             StackType::DataWarehouse => "DataWarehouse",
             StackType::Geospatial => "Geospatial",
             StackType::MachineLearning => "MachineLearning",
@@ -83,7 +78,6 @@ impl StackType {
             StackType::OLAP => "OLAP",
             StackType::OLTP => "OLTP",
             StackType::ParadeDB => "ParadeDB",
-            StackType::RAG => "RAG",
             StackType::Standard => "Standard",
             StackType::Timeseries => "Timeseries",
             StackType::VectorDB => "VectorDB",
@@ -302,9 +296,6 @@ mod tests {
                 StackType::Analytics => {
                     get_stack(StackType::Analytics);
                 }
-                StackType::API => {
-                    get_stack(StackType::API);
-                }
                 StackType::DataWarehouse => {
                     get_stack(StackType::DataWarehouse);
                 }
@@ -328,9 +319,6 @@ mod tests {
                 }
                 StackType::ParadeDB => {
                     get_stack(StackType::ParadeDB);
-                }
-                StackType::RAG => {
-                    get_stack(StackType::RAG);
                 }
                 StackType::Standard => {
                     get_stack(StackType::Standard);

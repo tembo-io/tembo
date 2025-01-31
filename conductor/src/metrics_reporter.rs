@@ -181,3 +181,13 @@ impl Client {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::load_metric_queries;
+
+    #[test]
+    fn deserializes_metrics_yaml() {
+        load_metric_queries().unwrap();
+    }
+}

@@ -16,7 +16,7 @@ env_logger = "0.10.0"
 futures = "0.3.28"
 k8s-openapi = { version = "0.18.0", features = ["v1_25", "schemars"] }
 log = "0.4.17"
-pgmq = "0.29.2"
+pgmq = "=0.29.2"
 schemars = "0.8.12"
 serde = { version = "1.0.160", features = ["derive"] }
 serde_json = "1.0.96"

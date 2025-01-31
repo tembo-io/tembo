@@ -456,7 +456,6 @@ pub async fn reconcile_ingress_tcp(
         }
     }
 
-    let ingress = generate_ingress_tcp(&name, ns, oref, desired_routes.clone(), entry_points_tcp);
     if desired_routes.is_empty() {
         // we don't need an IngressRouteTCP when there are no routes
         let lp = ListParams::default().labels("component=appService");
@@ -488,18 +487,34 @@ pub async fn reconcile_ingress_tcp(
         }
         return Ok(());
     }
-    match apply_ingress_route_tcp(ingress_api, &name, &ingress).await {
-        Ok(_) => {
-            debug!("Updated/applied IngressRouteTCP for {}.{}", ns, &name,);
-            Ok(())
+
+    // Only create IngressRouteTCP if there are routes for apps that need them. Check if the app
+    // name is in the desired_routes.
+    if desired_routes.iter().any(|r| {
+        r.services
+            .as_ref()
+            .unwrap_or(&vec![])
+            .iter()
+            .any(|s| s.name == name)
+    }) {
+        let ingress_tcp =
+            generate_ingress_tcp(&name, ns, oref, desired_routes.clone(), entry_points_tcp);
+        match apply_ingress_route_tcp(ingress_api, &name, &ingress_tcp).await {
+            Ok(_) => {
+                debug!("Updated/applied IngressRouteTCP for {}.{}", ns, &name,);
+                Ok(())
+            }
+            Err(e) => {
+                error!(
+                    "Failed to update/apply IngressRouteTCP {}.{}: {}",
+                    ns, &name, e
+                );
+                Err(e)
+            }
         }
-        Err(e) => {
-            error!(
-                "Failed to update/apply IngressRouteTCP {}.{}: {}",
-                ns, &name, e
-            );
-            Err(e)
-        }
+    } else {
+        debug!("No IngressRouteTCP routes match the app name: {}", app_name);
+        Ok(())
     }
 }
 

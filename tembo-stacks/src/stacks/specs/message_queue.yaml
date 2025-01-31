@@ -3,9 +3,10 @@ description: A Tembo Postgres Stack optimized for Message Queue workloads.
 repository: "quay.io/tembo"
 organization: tembo
 images:
-  14: "standard-cnpg:14-5120dd1"
-  15: "standard-cnpg:15-5120dd1"
-  16: "standard-cnpg:16-5120dd1"
+  14: "standard-cnpg:14-f40d2ee"
+  15: "standard-cnpg:15-f40d2ee"
+  16: "standard-cnpg:16-f40d2ee"
+  17: "standard-cnpg:17-f40d2ee"
 stack_version: 0.3.0
 appServices:
   - name: mq-api
@@ -51,9 +52,9 @@ appServices:
         memory: 100Mi
 trunk_installs:
   - name: pgmq
-    version: 1.4.4
+    version: 1.5.0
   - name: pg_partman
-    version: 5.0.1
+    version: 5.2.4
   - name: parquet_s3_fdw
     version: 1.1.0
   - name: pg_tier
@@ -63,18 +64,18 @@ extensions:
     locations:
       - database: postgres
         enabled: true
-        version: 1.4.4
+        version: 1.5.0
       - database: app
         enabled: true
-        version: 1.4.4
+        version: 1.5.0
       - database: template1
         enabled: true
-        version: 1.4.4
+        version: 1.5.0
   - name: pg_partman
     locations:
       - database: postgres
         enabled: true
-        version: 5.0.1
+        version: 5.2.4
   - name: parquet_s3_fdw
     locations:
       - database: postgres

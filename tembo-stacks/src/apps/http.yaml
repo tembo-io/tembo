@@ -1,6 +1,6 @@
 name: !http
 appServices:
-  - image: postgrest/postgrest:v10.0.0
+  - image: postgrest/postgrest:v12.2.5
     name: http
     resources:
       requests:
@@ -49,10 +49,10 @@ appServices:
         value: postgres
 trunk_installs:
   - name: pg_graphql
-    version: 1.4.4
+    version: 1.5.9
 extensions:
   - name: pg_graphql
     locations:
       - database: postgres
         enabled: true
-        version: 1.4.4
+        version: 1.5.9

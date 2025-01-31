@@ -1,6 +1,8 @@
 name: !sqlrunner
 appServices:
-  - image: quay.io/tembo/sql-runner:c62f892
+  # Use latest commit SHA in the main branch of
+  # https://github.com/tembo-io/sql-runner.
+  - image: quay.io/tembo/sql-runner:f522d49
     name: sqlrunner
     resources:
       requests:

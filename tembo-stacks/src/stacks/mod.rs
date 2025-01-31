@@ -8,8 +8,6 @@ use lazy_static::lazy_static;
 lazy_static! {
     pub static ref ANALYTICS: Stack = serde_yaml::from_str(include_str!("specs/analytics.yaml"))
         .expect("analytics.yaml not found");
-    pub static ref API: Stack =
-        serde_yaml::from_str(include_str!("specs/api.yaml")).expect("api.yaml not found");
     pub static ref DATAWAREHOUSE: Stack =
         serde_yaml::from_str(include_str!("specs/data_warehouse.yaml"))
             .expect("data_warehouse.yaml not found");
@@ -28,8 +26,6 @@ lazy_static! {
         serde_yaml::from_str(include_str!("specs/oltp.yaml")).expect("oltp.yaml not found");
     pub static ref PARADEDB: Stack =
         serde_yaml::from_str(include_str!("specs/paradedb.yaml")).expect("paradedb.yaml not found");
-    pub static ref RAG: Stack =
-        serde_yaml::from_str(include_str!("specs/rag.yaml")).expect("rag.yaml not found");
     pub static ref STANDARD: Stack =
         serde_yaml::from_str(include_str!("specs/standard.yaml")).expect("standard.yaml not found");
     pub static ref TIMESERIES: Stack = serde_yaml::from_str(include_str!("specs/timeseries.yaml"))
@@ -41,7 +37,6 @@ lazy_static! {
 pub fn get_stack(entity: StackType) -> Stack {
     match entity {
         StackType::Analytics => ANALYTICS.clone(),
-        StackType::API => API.clone(),
         StackType::DataWarehouse => DATAWAREHOUSE.clone(),
         StackType::Geospatial => GEOSPATIAL.clone(),
         StackType::MachineLearning => ML.clone(),
@@ -50,7 +45,6 @@ pub fn get_stack(entity: StackType) -> Stack {
         StackType::OLAP => OLAP.clone(),
         StackType::OLTP => OLTP.clone(),
         StackType::ParadeDB => PARADEDB.clone(),
-        StackType::RAG => RAG.clone(),
         StackType::Standard => STANDARD.clone(),
         StackType::Timeseries => TIMESERIES.clone(),
         StackType::VectorDB => VECTOR_DB.clone(),

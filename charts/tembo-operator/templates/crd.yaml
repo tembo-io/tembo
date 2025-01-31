@@ -27,7 +27,9 @@ spec:
             description: |-
               Generate the Kubernetes wrapper struct `CoreDB` from our Spec and Status struct
 
-              This provides a hook for generating the CRD yaml (in crdgen.rs) CoreDBSpec represents the specification for a CoreDB instance. It defines various configuration options for deploying and managing the database. with the tembo-controller
+              This provides a hook for generating the CRD yaml (in crdgen.rs)
+
+              CoreDBSpec represents the specification for a CoreDB instance. It defines various configuration options for deploying and managing the database. with the tembo-controller
 
               # Basic CoreDB Configuration
 
@@ -2323,7 +2325,7 @@ spec:
                 nullable: true
                 type: array
               image:
-                default: quay.io/tembo/standard-cnpg:15-a0a5ab5
+                default: quay.io/tembo/standard-cnpg:15-30219f2
                 description: |-
                   The Postgres image to use for the CoreDB instance deployment. This should be a valid Postgres image that is compatible with the [https://tembo.io](https://tembo.io) platform. For more information please visit our [tembo-images](https://github.com/tembo-io/tembo-images) repository.
 

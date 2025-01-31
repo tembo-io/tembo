@@ -3,10 +3,11 @@ description: A Postgres instance equipped with configuration and extensions for 
 repository: "quay.io/tembo"
 organization: tembo
 images:
-  # duckdb is installed into pg16, but not pg14 or pg15 (not compatible)
-  14: "standard-cnpg:14-5120dd1"
-  15: "standard-cnpg:15-5120dd1"
-  16: "analytics-cnpg:16-5120dd1"
+  # duckdb is installed into pg16, but not pg14 or pg15 (not compatible). Might be compatible with pg17
+  14: "standard-cnpg:14-f40d2ee"
+  15: "standard-cnpg:15-f40d2ee"
+  16: "analytics-cnpg:16-35b0240"
+  17: "standard-cnpg:17-f40d2ee"
 stack_version: 0.1.0
 postgres_config_engine: olap
 postgres_config:

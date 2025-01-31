@@ -3,9 +3,10 @@ description: A Postgres instance equipped with machine learning extensions and o
 repository: "quay.io/tembo"
 organization: tembo
 images:
-  15: "ml-cnpg:15-5120dd1"
-  16: "ml-cnpg:16-5120dd1"
-stack_version: 0.3.0
+  15: "ml-cnpg:15-f40d2ee"
+  16: "ml-cnpg:16-f40d2ee"
+  17: "ml-cnpg:17-f40d2ee"
+stack_version: 0.4.0
 compute_constraints:
   min:
     cpu: 2
@@ -26,54 +27,54 @@ postgres_config:
     value: postgresql:///postgres?host=/controller/run
 trunk_installs:
   - name: pgvector
-    version: 0.7.4
+    version: 0.8.0
   - name: postgresml
-    version: 2.7.1
+    version: 2.10.0
   - name: pg_cron
-    version: 1.6.2
+    version: 1.6.4
   - name: pgmq
-    version: 1.4.4
+    version: 1.5.0
   - name: vectorize
-    version: 0.18.2
+    version: 0.20.0
   - name: pg_later
-    version: 0.1.0
+    version: 0.3.0
   - name: plpython3u
     version: 1.0.0
   - name: vectorscale
-    version: 0.3.0
+    version: 0.5.1
 extensions:
   # trunk project pg_vector
   - name: vector
     locations:
       - database: postgres
         enabled: true
-        version: 0.7.4
+        version: 0.8.0
   # trunk project postgresml
   - name: pgml
     locations:
       - database: postgres
         enabled: true
-        version: 2.7.1
+        version: 2.10.0
   - name: pg_cron
     locations:
     - database: postgres
       enabled: true
-      version: 1.6.2
+      version: 1.6.4
   - name: pgmq
     locations:
     - database: postgres
       enabled: true
-      version: 1.4.4
+      version: 1.5.0
   - name: vectorize
     locations:
     - database: postgres
       enabled: true
-      version: 0.18.2
+      version: 0.20.0
   - name: pg_later
     locations:
     - database: postgres
       enabled: true
-      version: 0.1.1
+      version: 0.3.0
   - name: plpython3u
     locations:
     - database: postgres
@@ -83,4 +84,4 @@ extensions:
     locations:
       - database: postgres
         enabled: true
-        version: 0.3.0
+        version: 0.5.1
