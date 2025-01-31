@@ -13,13 +13,13 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Instance {
-    #[serde(
-        rename = "app_services",
-        default,
-        with = "::serde_with::rust::double_option",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub app_services: Option<Option<Vec<models::AppType>>>,
+    // #[serde(
+    //     rename = "app_services",
+    //     default,
+    //     with = "::serde_with::rust::double_option",
+    //     skip_serializing_if = "Option::is_none"
+    // )]
+    // pub app_services: Option<Option<Vec<models::AppType>>>,
     #[serde(rename = "autoscaling")]
     pub autoscaling: Box<models::Autoscaling>,
     #[serde(
@@ -176,7 +176,6 @@ impl Instance {
         storage: models::Storage,
     ) -> Instance {
         Instance {
-            app_services: None,
             autoscaling: Box::new(autoscaling),
             connection_info: None,
             connection_pooler: None,
