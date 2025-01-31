@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct VolumeMount {
     #[serde(rename = "mount_path")]
-    pub mount_path: String,
+    pub mount_path: Option<String>,
     #[serde(
         rename = "mount_propagation",
         default,
@@ -50,7 +50,7 @@ pub struct VolumeMount {
 impl VolumeMount {
     pub fn new(mount_path: String, name: String) -> VolumeMount {
         VolumeMount {
-            mount_path,
+            mount_path: Some(mount_path),
             mount_propagation: None,
             name,
             read_only: None,
