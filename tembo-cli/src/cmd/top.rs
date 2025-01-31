@@ -4,6 +4,9 @@ use crate::cmd::apply::get_instance_settings;
 use anyhow::anyhow;
 use anyhow::{Context, Result};
 use clap::Args;
+use tembo_api_client::apis::configuration::Configuration;
+use tembo_api_client::apis::instance_api::get_all;
+use tembo_api_client::apis::instance_api::get_instance;
 use crossterm::{
     execute,
     terminal::{Clear, ClearType},
@@ -13,9 +16,6 @@ use reqwest::header::HeaderMap;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{stdout, Write};
-use temboclient::apis::configuration::Configuration;
-use temboclient::apis::instance_api::get_all;
-use temboclient::apis::instance_api::get_instance;
 use tokio::runtime::Runtime;
 use tokio::time::Duration;
 

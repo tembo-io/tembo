@@ -22,6 +22,7 @@ cargo install tembo-cli
 ```
 
 ### Commands
+
 Discover a wide range of commands and subcommands, along with their respective options, by exploring our comprehensive [Command Reference](https://tembo.io/docs/development/cli/command-reference).
 
 ## Developing Tembo CLI
@@ -56,7 +57,7 @@ Delete the contents of the directory first and then run following command to re-
 openapi-generator generate -i https://api.data-1.use1.tembo.io/api-docs/openapi.json  -g rust -o . --additional-properties=packageName=tembodataclient
 ```
 
-* Go to `tembodataclient/src/lib.rs` & add following line at the top to disable clippy for the generated code
+- Go to `tembodataclient/src/lib.rs` & add following line at the top to disable clippy for the generated code
 
 ```
 #![allow(clippy::all)]
@@ -64,21 +65,21 @@ openapi-generator generate -i https://api.data-1.use1.tembo.io/api-docs/openapi.
 
 #### Control plane API client
 
-Go to `temboclient` directory in your terminal.
+Go to `tembo_api_client` directory in your terminal.
 
 Delete the contents of the directory first and then run following command to re-generate the rust client code for the API.
 
 ```bash
-openapi-generator generate -i https://api.tembo.io/api-docs/openapi.json  -g rust -o . --additional-properties=packageName=temboclient
+openapi-generator generate -i https://api.tembo.io/api-docs/openapi.json  -g rust -o . --additional-properties=packageName=tembo_api_client
 ```
 
-* Go to `temboclient/src/lib.rs` & add following line at the top to disable clippy for the generated code
+- Go to `tembo_api_client/src/lib.rs` & add following line at the top to disable clippy for the generated code
 
 ```
 #![allow(clippy::all)]
 ```
 
-* Create `temboclient/src/models/impls.rs` file & add following code to it:
+- Create `tembo_api_client/src/models/impls.rs` file & add following code to it:
 
 ```
 use std::str::FromStr;
@@ -169,7 +170,7 @@ impl FromStr for StackType {
 }
 ```
 
-* Add following line towards the end of `temboclient/src/models/mod.rs`
+- Add following line towards the end of `tembo_api_client/src/models/mod.rs`
 
 ```
 pub mod impls;

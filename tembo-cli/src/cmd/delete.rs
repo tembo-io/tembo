@@ -4,7 +4,7 @@ use crate::tui;
 use crate::tui::confirmation;
 use clap::Args;
 use core::result::Result::Ok;
-use temboclient::apis::{configuration::Configuration, instance_api::delete_instance};
+use tembo_api_client::apis::{configuration::Configuration, instance_api::delete_instance};
 use tokio::runtime::Runtime;
 
 use super::apply::{get_instance_id, get_instance_settings};

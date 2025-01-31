@@ -31,11 +31,11 @@ use tembo_stacks::apps::types::MergedConfigs;
 use tembo_stacks::stacks::get_stack;
 use tembo_stacks::stacks::types::Stack;
 use tembo_stacks::stacks::types::StackType as ControllerStackType;
-use temboclient::apis::instance_api::patch_instance;
-use temboclient::models::ExtensionStatus;
-use temboclient::models::Instance;
-use temboclient::models::PatchInstance;
-use temboclient::{
+use tembo_api_client::apis::instance_api::patch_instance;
+use tembo_api_client::models::ExtensionStatus;
+use tembo_api_client::models::Instance;
+use tembo_api_client::models::PatchInstance;
+use tembo_api_client::{
     apis::{
         configuration::Configuration,
         instance_api::{create_instance, get_all, get_instance},
@@ -643,7 +643,7 @@ fn create_new_instance(
                 }
                 Err(e) => {
                     let error_message = match e {
-                        temboclient::apis::Error::ResponseError(resp_err) => {
+                        tembo_api_client::apis::Error::ResponseError(resp_err) => {
                             let status = resp_err.status;
                             let content = resp_err.content;
 
@@ -679,7 +679,7 @@ fn get_create_instance(
     Ok(CreateInstance {
         cpu: Cpu::from_str(instance_settings.cpu.as_str()).unwrap(),
         memory: Memory::from_str(instance_settings.memory.as_str()).unwrap(),
-        environment: temboclient::models::Environment::from_str(
+        environment: tembo_api_client::models::Environment::from_str(
             instance_settings.environment.as_str(),
         )
         .unwrap(),
@@ -705,14 +705,14 @@ fn get_create_instance(
 
 fn get_app_services(
     maybe_app_services: Option<Vec<tembo_stacks::apps::types::AppType>>,
-) -> Result<Option<Option<Vec<temboclient::models::AppType>>>, anyhow::Error> {
-    let mut vec_app_types: Vec<temboclient::models::AppType> = vec![];
+) -> Result<Option<Option<Vec<tembo_api_client::models::AppType>>>, anyhow::Error> {
+    let mut vec_app_types: Vec<tembo_api_client::models::AppType> = vec![];
 
     if let Some(app_services) = maybe_app_services {
         for app_type in app_services.iter() {
             match app_type {
                 tembo_stacks::apps::types::AppType::AIProxy(maybe_app_config) => vec_app_types
-                    .push(temboclient::models::AppType::new(
+                    .push(tembo_api_client::models::AppType::new(
                         get_final_app_config(maybe_app_config)?,
                         None,
                         None,
@@ -722,7 +722,7 @@ fn get_app_services(
                         None,
                     )),
                 tembo_stacks::apps::types::AppType::RestAPI(maybe_app_config) => vec_app_types
-                    .push(temboclient::models::AppType::new(
+                    .push(tembo_api_client::models::AppType::new(
                         get_final_app_config(maybe_app_config)?,
                         None,
                         None,
@@ -732,7 +732,7 @@ fn get_app_services(
                         None,
                     )),
                 tembo_stacks::apps::types::AppType::HTTP(maybe_app_config) => {
-                    vec_app_types.push(temboclient::models::AppType::new(
+                    vec_app_types.push(tembo_api_client::models::AppType::new(
                         None,
                         None,
                         get_final_app_config(maybe_app_config)?,
@@ -743,7 +743,7 @@ fn get_app_services(
                     ))
                 }
                 tembo_stacks::apps::types::AppType::MQ(maybe_app_config) => {
-                    vec_app_types.push(temboclient::models::AppType::new(
+                    vec_app_types.push(tembo_api_client::models::AppType::new(
                         None,
                         None,
                         None,
@@ -754,7 +754,7 @@ fn get_app_services(
                     ))
                 }
                 tembo_stacks::apps::types::AppType::Embeddings(maybe_app_config) => vec_app_types
-                    .push(temboclient::models::AppType::new(
+                    .push(tembo_api_client::models::AppType::new(
                         None,
                         None,
                         None,
@@ -764,7 +764,7 @@ fn get_app_services(
                         None,
                     )),
                 tembo_stacks::apps::types::AppType::PgAnalyze(maybe_app_config) => vec_app_types
-                    .push(temboclient::models::AppType::new(
+                    .push(tembo_api_client::models::AppType::new(
                         None,
                         None,
                         None,
@@ -774,7 +774,7 @@ fn get_app_services(
                         None,
                     )),
                 tembo_stacks::apps::types::AppType::Custom(_) => vec_app_types.push(
-                    temboclient::models::AppType::new(None, None, None, None, None, None, None),
+                    tembo_api_client::models::AppType::new(None, None, None, None, None, None, None),
                 ),
             }
         }
@@ -785,13 +785,13 @@ fn get_app_services(
 
 fn get_final_app_config(
     maybe_app_config: &Option<tembo_stacks::apps::types::AppConfig>,
-) -> Result<Option<temboclient::models::AppConfig>, anyhow::Error> {
-    let mut final_env_vars: Vec<temboclient::models::EnvVar> = vec![];
+) -> Result<Option<tembo_api_client::models::AppConfig>, anyhow::Error> {
+    let mut final_env_vars: Vec<tembo_api_client::models::EnvVar> = vec![];
 
     if let Some(a_config) = maybe_app_config {
         if let Some(env_vars) = a_config.env.clone() {
             for env_var in env_vars {
-                final_env_vars.push(temboclient::models::EnvVar {
+                final_env_vars.push(tembo_api_client::models::EnvVar {
                     name: env_var.name,
                     value: Some(env_var.value),
                     value_from_platform: None,
@@ -804,13 +804,13 @@ fn get_final_app_config(
         // TODO: Find a better way to handle this.
         // It is done so that other app_types are skipped in the request
         // We use #[serde(skip_serializing_if = "Option::is_none")] to skip app_types
-        final_env_vars.push(temboclient::models::EnvVar {
+        final_env_vars.push(tembo_api_client::models::EnvVar {
             name: "test".to_string(),
             value: Some(Some("test".to_string())),
             value_from_platform: None,
         });
     }
-    Ok(Some(temboclient::models::AppConfig {
+    Ok(Some(tembo_api_client::models::AppConfig {
         env: Some(Some(final_env_vars.clone())),
         resources: None,
     }))
@@ -826,7 +826,7 @@ fn get_patch_instance(
             Memory::from_str(instance_settings.memory.as_str()).unwrap(),
         )),
         environment: Some(Some(
-            temboclient::models::Environment::from_str(instance_settings.environment.as_str())
+            tembo_api_client::models::Environment::from_str(instance_settings.environment.as_str())
                 .unwrap(),
         )),
         storage: Some(Some(

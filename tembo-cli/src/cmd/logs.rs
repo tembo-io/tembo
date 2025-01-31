@@ -12,7 +12,7 @@ use reqwest::header::HeaderMap;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::process::{Command, Output};
-use temboclient::apis::configuration::Configuration;
+use tembo_api_client::apis::configuration::Configuration;
 use tokio_tungstenite::tungstenite::protocol::Message;
 use tungstenite::http::header::{
     HeaderName as TungsteniteHeaderName, HeaderValue as TungsteniteHeaderValue,

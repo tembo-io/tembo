@@ -177,7 +177,7 @@ pub fn validate_config(
 }
 
 fn validate_environment(env: &str, section: &str, verbose: bool) -> Result<(), anyhow::Error> {
-    match temboclient::models::Environment::from_str(env) {
+    match tembo_api_client::models::Environment::from_str(env) {
         std::result::Result::Ok(_) => {
             if verbose {
                 white_confirmation(&format!(
@@ -195,7 +195,7 @@ fn validate_environment(env: &str, section: &str, verbose: bool) -> Result<(), a
 }
 
 fn validate_cpu(cpu: &str, section: &str, verbose: bool) -> Result<(), anyhow::Error> {
-    match temboclient::models::Cpu::from_str(cpu) {
+    match tembo_api_client::models::Cpu::from_str(cpu) {
         std::result::Result::Ok(_) => {
             if verbose {
                 info(&format!("Cpu '{}' in section '{}' is valid", cpu, section));
@@ -210,7 +210,7 @@ fn validate_cpu(cpu: &str, section: &str, verbose: bool) -> Result<(), anyhow::E
 }
 
 fn validate_memory(memory: &str, section: &str, verbose: bool) -> Result<(), anyhow::Error> {
-    match temboclient::models::Memory::from_str(memory) {
+    match tembo_api_client::models::Memory::from_str(memory) {
         std::result::Result::Ok(_) => {
             if verbose {
                 info(&format!(
@@ -228,7 +228,7 @@ fn validate_memory(memory: &str, section: &str, verbose: bool) -> Result<(), any
 }
 
 fn validate_storage(storage: &str, section: &str, verbose: bool) -> Result<(), anyhow::Error> {
-    match temboclient::models::Storage::from_str(storage) {
+    match tembo_api_client::models::Storage::from_str(storage) {
         std::result::Result::Ok(_) => {
             if verbose {
                 info(&format!(
@@ -275,7 +275,7 @@ fn validate_stack_type(
     section: &str,
     verbose: bool,
 ) -> Result<(), anyhow::Error> {
-    match temboclient::models::StackType::from_str(stack_types) {
+    match tembo_api_client::models::StackType::from_str(stack_types) {
         std::result::Result::Ok(_) => {
             if verbose {
                 info(&format!(
