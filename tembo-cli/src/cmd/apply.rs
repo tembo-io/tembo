@@ -25,12 +25,6 @@ use std::{
     thread::sleep,
     time::Duration,
 };
-use tembo_stacks::apps::app::merge_app_reqs;
-use tembo_stacks::apps::app::merge_options;
-use tembo_stacks::apps::types::MergedConfigs;
-use tembo_stacks::stacks::get_stack;
-use tembo_stacks::stacks::types::Stack;
-use tembo_stacks::stacks::types::StackType as ControllerStackType;
 use tembo_api_client::apis::instance_api::patch_instance;
 use tembo_api_client::models::ExtensionStatus;
 use tembo_api_client::models::Instance;
@@ -45,6 +39,12 @@ use tembo_api_client::{
         StackType, State, Storage, TrunkInstall,
     },
 };
+use tembo_stacks::apps::app::merge_app_reqs;
+use tembo_stacks::apps::app::merge_options;
+use tembo_stacks::apps::types::MergedConfigs;
+use tembo_stacks::stacks::get_stack;
+use tembo_stacks::stacks::types::Stack;
+use tembo_stacks::stacks::types::StackType as ControllerStackType;
 use tembodataclient::apis::secrets_api::get_secret_v1;
 use tokio::runtime::Runtime;
 use toml::Value;
@@ -700,6 +700,12 @@ fn get_create_instance(
         ))),
         postgres_configs: Some(Some(get_postgres_config_cloud(instance_settings)?)),
         pg_version: Some(instance_settings.pg_version.into()),
+        autoscaling: None,
+        dedicated_networking: None,
+        experimental: None,
+        provider_id: None,
+        region_id: None,
+        spot: None,
     })
 }
 
@@ -773,9 +779,11 @@ fn get_app_services(
                         get_final_app_config(maybe_app_config)?,
                         None,
                     )),
-                tembo_stacks::apps::types::AppType::Custom(_) => vec_app_types.push(
-                    tembo_api_client::models::AppType::new(None, None, None, None, None, None, None),
-                ),
+                tembo_stacks::apps::types::AppType::Custom(_) => {
+                    vec_app_types.push(tembo_api_client::models::AppType::new(
+                        None, None, None, None, None, None, None,
+                    ))
+                }
             }
         }
     }
@@ -845,6 +853,11 @@ fn get_patch_instance(
             instance_settings.extensions.clone(),
         ))),
         postgres_configs: Some(Some(get_postgres_config_cloud(instance_settings)?)),
+        autoscaling: None,
+        dedicated_networking: None,
+        experimental: None,
+        spot: None,
+        instance_name: None,
     })
 }
 
@@ -958,7 +971,7 @@ fn get_extensions(
                 vec![ExtensionInstallLocation {
                     database: Some("postgres".to_string()),
                     schema: None,
-                    version,
+                    version: Some(version),
                     enabled: extension.enabled.unwrap_or(false),
                 }];
 
@@ -1016,7 +1029,7 @@ fn get_trunk_installs(
             if extension.trunk_project.is_some() {
                 vec_trunk_installs.push(TrunkInstall {
                     name: extension.trunk_project.unwrap(),
-                    version,
+                    version: Some(version),
                 });
             }
         }
