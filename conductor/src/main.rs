@@ -739,6 +739,10 @@ async fn requeue_short(
 #[allow(clippy::await_holding_lock)]
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    // Initialize the tokio-console subscriber only when we enable the feature
+    #[cfg(feature = "console")]
+    console_subscriber::init();
+
     env_logger::init();
 
     let controller = controllers::basic(
