@@ -70,7 +70,6 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
 
     for attempt in 1..=5 {
         let maybe_instance = get_instance(&instance_name, &config, &env).await?;
-        println!("MAYBE INSTANCE: {:?}", maybe_instance);
         if let Some(instance) = maybe_instance {
             println!("Instance is {:?}", instance.state);
             if instance.state == State::Up {
