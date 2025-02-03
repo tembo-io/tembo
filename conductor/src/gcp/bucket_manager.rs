@@ -12,7 +12,7 @@ const GCP_STORAGE_ROLE: &str = "projects/{}/roles/TemboInstanceGCSRole";
 /// This struct provides methods to add and remove service account bindings
 /// to/from GCP storage bucket IAM policies.
 pub struct BucketIamManager {
-    gtembo_api_client: GcpStorageClient,
+    gcp_client: GcpStorageClient,
 }
 
 impl BucketIamManager {
@@ -20,9 +20,9 @@ impl BucketIamManager {
     ///
     /// # Arguments
     ///
-    /// * `gtembo_api_client` - An instance of `GcpStorageClient` used for interacting with GCP storage.
-    pub fn new(gtembo_api_client: GcpStorageClient) -> Self {
-        Self { gtembo_api_client }
+    /// * `gcp_client` - An instance of `GcpStorageClient` used for interacting with GCP storage.
+    pub fn new(gcp_client: GcpStorageClient) -> Self {
+        Self { gcp_client }
     }
 
     /// Adds a service account binding to the specified buckets' IAM policies.
@@ -49,7 +49,7 @@ impl BucketIamManager {
 
         for bucket_name in buckets {
             let condition = self.create_bucket_condition(bucket_name, instance_name);
-            let mut policy = self.gtembo_api_client.get_iam_policy(bucket_name).await?;
+            let mut policy = self.gcp_client.get_iam_policy(bucket_name).await?;
 
             if self.binding_exists(&policy, &member, &condition) {
                 info!("Binding already exists for {} in bucket {} with the correct role and condition. No changes needed.", member, bucket_name);
@@ -63,10 +63,7 @@ impl BucketIamManager {
             // for more information see: https://cloud.google.com/iam/docs/policies#versions
             policy.version = 3;
 
-            let updated_policy = self
-                .gtembo_api_client
-                .set_iam_policy(bucket_name, &policy)
-                .await?;
+            let updated_policy = self.gcp_client.set_iam_policy(bucket_name, &policy).await?;
             results.insert(bucket_name.to_string(), updated_policy);
             info!(
                 "Successfully added binding for {} to bucket {}",
@@ -83,7 +80,7 @@ impl BucketIamManager {
     ///
     /// Returns the GCP_STORAGE_ROLE as a String with the project ID filled in.
     fn get_storage_role(&self) -> String {
-        GCP_STORAGE_ROLE.replace("{}", self.gtembo_api_client.get_project_id())
+        GCP_STORAGE_ROLE.replace("{}", self.gcp_client.get_project_id())
     }
 
     /// Checks if a binding with the specified member and condition already exists in the policy.
@@ -200,7 +197,7 @@ impl BucketIamManager {
         let mut results = HashMap::new();
 
         for bucket_name in buckets {
-            let mut policy = self.gtembo_api_client.get_iam_policy(bucket_name).await?;
+            let mut policy = self.gcp_client.get_iam_policy(bucket_name).await?;
 
             let initial_binding_count = policy.bindings.len();
             let mut removed = false;
@@ -235,10 +232,7 @@ impl BucketIamManager {
                 );
             }
 
-            let updated_policy = self
-                .gtembo_api_client
-                .set_iam_policy(bucket_name, &policy)
-                .await?;
+            let updated_policy = self.gcp_client.set_iam_policy(bucket_name, &policy).await?;
             results.insert(bucket_name.to_string(), updated_policy);
         }
 
@@ -256,8 +250,8 @@ impl BucketIamManager {
     ///
     /// Returns a formatted string representing the member.
     fn create_member_string(&self, namespace: &str, service_account: &str) -> String {
-        let project_id = self.gtembo_api_client.get_project_id();
-        let project_number = self.gtembo_api_client.get_project_number();
+        let project_id = self.gcp_client.get_project_id();
+        let project_number = self.gcp_client.get_project_number();
         format!(
             "principal://iam.googleapis.com/projects/{}/locations/global/workloadIdentityPools/{}.svc.id.goog/subject/ns/{}/sa/{}",
             project_number, project_id, namespace, service_account
