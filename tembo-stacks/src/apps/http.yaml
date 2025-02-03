@@ -1,6 +1,6 @@
 name: !http
 appServices:
-  - image: postgrest/postgrest:v12.2.5
+  - image: postgrest/postgrest:v12.2.7
     name: http
     resources:
       requests:
