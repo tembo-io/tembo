@@ -55,3 +55,23 @@ impl Default for StackType {
         Self::Standard
     }
 }
+
+impl std::str::FromStr for StackType {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "Standard" => Ok(Self::Standard),
+            "MessageQueue" => Ok(Self::MessageQueue),
+            "MachineLearning" => Ok(Self::MachineLearning),
+            "OLTP" => Ok(Self::Oltp),
+            "Analytics" => Ok(Self::Analytics),
+            "VectorDB" => Ok(Self::VectorDb),
+            "Geospatial" => Ok(Self::Geospatial),
+            "MongoAlternative" => Ok(Self::MongoAlternative),
+            "Timeseries" => Ok(Self::Timeseries),
+            "ParadeDB" => Ok(Self::ParadeDB),
+            _ => Err(format!("Invalid StackType: {}", s)),
+        }
+    }
+}
