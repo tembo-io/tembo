@@ -13,9 +13,9 @@ use reqwest::header::HeaderMap;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::io::{stdout, Write};
-use temboclient::apis::configuration::Configuration;
-use temboclient::apis::instance_api::get_all;
-use temboclient::apis::instance_api::get_instance;
+use tembo_api_client::apis::configuration::Configuration;
+use tembo_api_client::apis::instance_api::get_all;
+use tembo_api_client::apis::instance_api::get_instance;
 use tokio::runtime::Runtime;
 use tokio::time::Duration;
 

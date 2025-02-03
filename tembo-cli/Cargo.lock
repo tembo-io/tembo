@@ -4341,6 +4341,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "tembo-api-client"
+version = "1.0.4"
+dependencies = [
+ "reqwest",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "serde_with",
+ "url",
+ "uuid",
+]
+
+[[package]]
 name = "tembo-cli"
 version = "0.21.1"
 dependencies = [
@@ -4388,8 +4401,8 @@ dependencies = [
  "spinoff",
  "sqlx",
  "sqlx-cli",
+ "tembo-api-client",
  "tembo-stacks",
- "temboclient",
  "tembodataclient",
  "tera",
  "test-case",
@@ -4423,19 +4436,6 @@ dependencies = [
  "strum_macros",
  "tracing",
  "utoipa",
-]
-
-[[package]]
-name = "temboclient"
-version = "1.0.4"
-dependencies = [
- "reqwest",
- "serde",
- "serde_derive",
- "serde_json",
- "serde_with",
- "url",
- "uuid",
 ]
 
 [[package]]

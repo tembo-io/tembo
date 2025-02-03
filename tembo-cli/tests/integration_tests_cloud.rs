@@ -10,9 +10,9 @@ use tembo::cli::context::{
     get_current_context, tembo_context_file_path, tembo_credentials_file_path, Environment,
     CONTEXT_EXAMPLE_TEXT, CREDENTIALS_EXAMPLE_TEXT,
 };
-use temboclient::apis::configuration::Configuration;
-use temboclient::apis::instance_api::get_all;
-use temboclient::models::{Instance, State};
+use tembo_api_client::apis::configuration::Configuration;
+use tembo_api_client::apis::instance_api::get_all;
+use tembo_api_client::models::{Instance, State};
 
 const CARGO_BIN: &str = "tembo";
 
@@ -192,7 +192,6 @@ pub async fn get_instance(
     env: &Environment,
 ) -> Result<Option<Instance>, anyhow::Error> {
     let v = get_all(config, env.org_id.clone().unwrap().as_str()).await;
-
     println!("OrgID: {}", env.org_id.clone().unwrap().as_str());
 
     match v {

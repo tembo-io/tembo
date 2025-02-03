@@ -1,4 +1,4 @@
-[minimal]
+[e2e-cli-fhnbcutzie]
 environment = "prod"
 instance_name = "minimal"
 pg_version = 15
