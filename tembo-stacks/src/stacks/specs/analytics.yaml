@@ -41,7 +41,7 @@ trunk_installs:
   - name: pg_later
     version: 0.3.0
   - name: pg_analytics
-    version: 0.2.3
+    version: 0.3.1
   - name: pg_parquet
     version: 0.2.0
   - name: postgres_fdw
@@ -98,7 +98,7 @@ extensions:
     locations:
     - database: postgres
       enabled: true
-      version: 0.2.3
+      version: 0.3.1
   - name: pg_parquet
     description: pg_parquet
     locations:

@@ -1,6 +1,6 @@
 use assert_cmd::Command;
 use random_string::generate;
-use std::env;
+use std::env::{self, VarError};
 use std::error::Error;
 use std::fs::File;
 use std::io::{Read, Write};
@@ -97,8 +97,6 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
     let maybe_instance = get_instance(&instance_name, &config, &env).await?;
     if let Some(instance) = maybe_instance {
         assert_eq!(instance.state, State::Deleting, "Instance isn't Deleting")
-    } else {
-        assert!(true, "Instance isn't Deleting")
     }
 
     replace_vars_in_file(
@@ -110,25 +108,43 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn setup_env(instance_name: &String) -> Result<(), Box<dyn Error>> {
-    replace_vars_in_file(tembo_context_file_path(), "ORG_ID", &env::var("ORG_ID")?)?;
+fn get_var(name: &str, default: &str) -> Result<String, Box<dyn Error>> {
+    match env::var(name) {
+        Ok(str) => Ok(str),
+        Err(e) => match e {
+            VarError::NotUnicode(_) => Err(format!("Invalid environment variable {name}").into()),
+            VarError::NotPresent => match default {
+                "" => Err(format!("Missing environment variable {name}").into()),
+                s => Ok(s.to_string()),
+            },
+        },
+    }
+}
 
+fn setup_env(instance_name: &String) -> Result<(), Box<dyn Error>> {
+    replace_vars_in_file(
+        tembo_context_file_path(),
+        "ORG_ID",
+        &get_var("ORG_ID", "org_2YW4TYIMI1LeOqJTXIyvkHOHCUo")?,
+    )?;
+
+    // Use https://cloud.cdb-dev.com/generate-jwt to create token.
     replace_vars_in_file(
         tembo_credentials_file_path(),
         "ACCESS_TOKEN",
-        &env::var("ACCESS_TOKEN")?,
+        &get_var("ACCESS_TOKEN", "")?,
     )?;
 
     replace_vars_in_file(
         tembo_credentials_file_path(),
         "https://api.tembo.io",
-        &env::var("TEMBO_HOST")?,
+        &get_var("TEMBO_HOST", "https://api.cdb-dev.com")?,
     )?;
 
     replace_vars_in_file(
         tembo_credentials_file_path(),
         "https://api.data-1.use1.tembo.io",
-        &env::var("TEMBO_DATA_HOST")?,
+        &get_var("TEMBO_DATA_HOST", "https://api.data-1.use1.cdb-dev.com")?,
     )?;
 
     replace_vars_in_file(
@@ -157,7 +173,7 @@ fn replace_vars_in_file(
     drop(src);
     let new_data = data.replace(word_from, word_to);
     let mut dst = File::create(&file_path)?;
-    dst.write(new_data.as_bytes())?;
+    dst.write_all(new_data.as_bytes())?;
     drop(dst);
 
     Ok(())

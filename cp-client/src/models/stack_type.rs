@@ -14,8 +14,20 @@ use serde::{Deserialize, Serialize};
 ///
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, Serialize, Deserialize)]
 pub enum StackType {
+    #[serde(rename = "Standard")]
+    Standard,
+    #[serde(rename = "MessageQueue")]
+    MessageQueue,
+    #[serde(rename = "MachineLearning")]
+    MachineLearning,
+    #[serde(rename = "OLAP")]
+    Olap,
+    #[serde(rename = "OLTP")]
+    Oltp,
     #[serde(rename = "Analytics")]
     Analytics,
+    #[serde(rename = "VectorDB")]
+    VectorDb,
     #[serde(rename = "DataWarehouse")]
     DataWarehouse,
     #[serde(rename = "Geospatial")]
@@ -26,14 +38,8 @@ pub enum StackType {
     MessageQueue,
     #[serde(rename = "MongoAlternative")]
     MongoAlternative,
-    #[serde(rename = "OLAP")]
-    Olap,
-    #[serde(rename = "OLTP")]
-    Oltp,
-    #[serde(rename = "ParadeDB")]
-    ParadeDb,
-    #[serde(rename = "Standard")]
-    Standard,
+    #[serde(rename = "RAG")]
+    Rag,
     #[serde(rename = "Timeseries")]
     Timeseries,
     #[serde(rename = "VectorDB")]
@@ -46,11 +52,9 @@ impl ToString for StackType {
             Self::Standard => String::from("Standard"),
             Self::MessageQueue => String::from("MessageQueue"),
             Self::MachineLearning => String::from("MachineLearning"),
-            Self::Olap => String::from("OLAP"),
             Self::Oltp => String::from("OLTP"),
             Self::Analytics => String::from("Analytics"),
             Self::VectorDb => String::from("VectorDB"),
-            Self::DataWarehouse => String::from("DataWarehouse"),
             Self::Geospatial => String::from("Geospatial"),
             Self::MongoAlternative => String::from("MongoAlternative"),
             Self::Timeseries => String::from("Timeseries"),

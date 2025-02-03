@@ -30,9 +30,6 @@ fn help() -> Result<(), anyhow::Error> {
 #[test_case(14, "Standard")]
 #[test_case(15, "Standard")]
 #[test_case(16, "Standard")]
-#[test_case(14, "DataWarehouse")]
-#[test_case(15, "DataWarehouse")]
-#[test_case(16, "DataWarehouse")]
 #[test_case(14, "Geospatial")]
 #[test_case(15, "Geospatial")]
 #[test_case(16, "Geospatial")]
@@ -45,15 +42,9 @@ fn help() -> Result<(), anyhow::Error> {
 #[test_case(14, "MongoAlternative")]
 #[test_case(15, "MongoAlternative")]
 #[test_case(16, "MongoAlternative")]
-#[test_case(14, "OLAP")]
-#[test_case(15, "OLAP")]
-#[test_case(16, "OLAP")]
 #[test_case(14, "OLTP")]
 #[test_case(15, "OLTP")]
 #[test_case(16, "OLTP")]
-#[test_case(14, "RAG")]
-#[test_case(15, "RAG")]
-#[test_case(16, "RAG")]
 #[test_case(14, "VectorDB")]
 #[test_case(15, "VectorDB")]
 #[test_case(16, "VectorDB")]
@@ -231,8 +222,8 @@ async fn migrations() -> Result<(), anyhow::Error> {
 }
 
 #[tokio::test]
-async fn data_warehouse() -> Result<(), anyhow::Error> {
-    let instance_name = "data-warehouse";
+async fn analytics() -> Result<(), anyhow::Error> {
+    let instance_name = "analytics";
 
     let root_dir = env!("CARGO_MANIFEST_DIR");
     let test_dir = PathBuf::from(root_dir).join("examples").join(instance_name);
