@@ -200,8 +200,6 @@ pub async fn get_instance(
                 .iter()
                 .find(|instance| instance.instance_name == instance_name);
 
-            println!("MAYBE INSTANCE: {:?}", maybe_instance);
-
             if let Some(instance) = maybe_instance {
                 return Ok(Some(instance.clone()));
             }
