@@ -70,6 +70,7 @@ async fn minimal_cloud() -> Result<(), Box<dyn Error>> {
 
     for attempt in 1..=5 {
         let maybe_instance = get_instance(&instance_name, &config, &env).await?;
+        println!("MAYBE INSTANCE: {:?}", maybe_instance);
         if let Some(instance) = maybe_instance {
             println!("Instance is {:?}", instance.state);
             if instance.state == State::Up {
@@ -192,7 +193,6 @@ pub async fn get_instance(
     env: &Environment,
 ) -> Result<Option<Instance>, anyhow::Error> {
     let v = get_all(config, env.org_id.clone().unwrap().as_str()).await;
-
     println!("OrgID: {}", env.org_id.clone().unwrap().as_str());
 
     match v {
@@ -200,6 +200,8 @@ pub async fn get_instance(
             let maybe_instance = result
                 .iter()
                 .find(|instance| instance.instance_name == instance_name);
+
+            println!("MAYBE INSTANCE: {:?}", maybe_instance);
 
             if let Some(instance) = maybe_instance {
                 return Ok(Some(instance.clone()));

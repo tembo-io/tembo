@@ -1,5 +1,5 @@
-[minimal]
+[e2e-cli-fhnbcutzie]
 environment = "prod"
-instance_name = "minimal"
+instance_name = "e2e-cli-fhnbcutzie"
 pg_version = 15
 stack_type = "Standard"
