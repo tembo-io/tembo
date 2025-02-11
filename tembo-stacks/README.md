@@ -53,3 +53,4 @@ Then apply the generated spec to a Kubernetes cluster:
 ```bash
 kubectl apply -f my-resource-VectorDB-coredb.json
 ```
+
