@@ -10,9 +10,6 @@
 
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct AppType {
-    #[serde(rename = "ai_proxy", deserialize_with = "Option::deserialize")]
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub ai_proxy: Option<Box<crate::models::AppConfig>>,
     #[serde(rename = "restapi", deserialize_with = "Option::deserialize")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub restapi: Option<Box<crate::models::AppConfig>>,
@@ -38,7 +35,6 @@ pub struct AppType {
 
 impl AppType {
     pub fn new(
-        ai_proxy: Option<crate::models::AppConfig>,
         restapi: Option<crate::models::AppConfig>,
         http: Option<crate::models::AppConfig>,
         mq_api: Option<crate::models::AppConfig>,
@@ -48,11 +44,6 @@ impl AppType {
         custom: Option<crate::models::AppService>,
     ) -> AppType {
         AppType {
-            ai_proxy: if let Some(x) = ai_proxy {
-                Some(Box::new(x))
-            } else {
-                None
-            },
             restapi: if let Some(x) = restapi {
                 Some(Box::new(x))
             } else {
