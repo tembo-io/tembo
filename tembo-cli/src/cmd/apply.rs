@@ -726,12 +726,10 @@ fn get_app_services(
                         None,
                         None,
                         None,
-                        None,
                     )),
                 tembo_stacks::apps::types::AppType::RestAPI(maybe_app_config) => vec_app_types
                     .push(tembo_api_client::models::AppType::new(
                         get_final_app_config(maybe_app_config)?,
-                        None,
                         None,
                         None,
                         None,
@@ -748,7 +746,6 @@ fn get_app_services(
                         None,
                         None,
                         None,
-                        None,
                     ))
                 }
                 tembo_stacks::apps::types::AppType::MQ(maybe_app_config) => {
@@ -757,7 +754,6 @@ fn get_app_services(
                         None,
                         None,
                         get_final_app_config(maybe_app_config)?,
-                        None,
                         None,
                         None,
                         None,
@@ -772,7 +768,6 @@ fn get_app_services(
                         get_final_app_config(maybe_app_config)?,
                         None,
                         None,
-                        None,
                     )),
                 tembo_stacks::apps::types::AppType::PgAnalyze(maybe_app_config) => vec_app_types
                     .push(tembo_api_client::models::AppType::new(
@@ -783,11 +778,10 @@ fn get_app_services(
                         None,
                         get_final_app_config(maybe_app_config)?,
                         None,
-                        None,
                     )),
                 tembo_stacks::apps::types::AppType::Custom(_) => {
                     vec_app_types.push(tembo_api_client::models::AppType::new(
-                        None, None, None, None, None, None, None, None,
+                        None, None, None, None, None, None, None,
                     ))
                 }
             }
