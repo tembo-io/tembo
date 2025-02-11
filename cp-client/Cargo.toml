@@ -1,6 +1,6 @@
 [package]
 name = "tembo-api-client"
-version = "1.0.7"
+version = "1.0.8"
 authors = ["OpenAPI Generator team and contributors"]
 description = "API client for Tembo Cloud's Platform API (api.tembo.io)"
 # Override this license by providing a License Object in the OpenAPI.
