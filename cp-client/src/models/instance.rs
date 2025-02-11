@@ -13,13 +13,13 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Instance {
-    // #[serde(
-    //     rename = "app_services",
-    //     default,
-    //     with = "::serde_with::rust::double_option",
-    //     skip_serializing_if = "Option::is_none"
-    // )]
-    // pub app_services: Option<Option<Vec<models::AppType>>>,
+    #[serde(
+        rename = "app_services",
+        default,
+        with = "::serde_with::rust::double_option",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub app_services: Option<Option<Vec<models::AppType>>>,
     #[serde(rename = "autoscaling")]
     pub autoscaling: Box<models::Autoscaling>,
     #[serde(
@@ -152,63 +152,4 @@ pub struct Instance {
         skip_serializing_if = "Option::is_none"
     )]
     pub trunk_installs: Option<Option<Vec<models::TrunkInstallStatus>>>,
-}
-
-impl Instance {
-    pub fn new(
-        autoscaling: models::Autoscaling,
-        cpu: models::Cpu,
-        dataplane_index: String,
-        environment: models::Environment,
-        instance_id: String,
-        instance_name: String,
-        memory: models::Memory,
-        namespace: String,
-        organization_id: String,
-        organization_name: String,
-        postgres_version: i32,
-        provider_id: String,
-        region_id: String,
-        region_name: String,
-        replicas: i32,
-        stack_type: models::StackType,
-        state: models::State,
-        storage: models::Storage,
-    ) -> Instance {
-        Instance {
-            autoscaling: Box::new(autoscaling),
-            connection_info: None,
-            connection_pooler: None,
-            cpu,
-            created_at: None,
-            dataplane_index,
-            dedicated_networking: None,
-            environment,
-            extensions: None,
-            extra_domains_rw: None,
-            first_recoverability_time: None,
-            image: None,
-            instance_id,
-            instance_name,
-            ip_allow_list: None,
-            last_updated_at: None,
-            last_wal_archive_status: None,
-            memory,
-            namespace,
-            organization_id,
-            organization_name,
-            postgres_configs: None,
-            postgres_version,
-            provider_id,
-            region_id,
-            region_name,
-            replicas,
-            runtime_config: None,
-            spot: None,
-            stack_type,
-            state,
-            storage,
-            trunk_installs: None,
-        }
-    }
 }
