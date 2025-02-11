@@ -28,6 +28,9 @@ pub struct AppType {
     #[serde(rename = "pganalyze", deserialize_with = "Option::deserialize")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pganalyze: Option<Box<crate::models::AppConfig>>,
+    #[serde(rename = "sqlrunner", deserialize_with = "Option::deserialize")]
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub sqlrunner: Option<Box<crate::models::AppConfig>>,
     #[serde(rename = "custom")]
     #[serde(skip_serializing_if = "Option::is_none")]
     pub custom: Option<Box<crate::models::AppService>>,
@@ -41,6 +44,7 @@ impl AppType {
         mq_api: Option<crate::models::AppConfig>,
         embeddings: Option<crate::models::AppConfig>,
         pganalyze: Option<crate::models::AppConfig>,
+        sqlrunner: Option<crate::models::AppConfig>,
         custom: Option<crate::models::AppService>,
     ) -> AppType {
         AppType {
@@ -70,6 +74,11 @@ impl AppType {
                 None
             },
             pganalyze: if let Some(x) = pganalyze {
+                Some(Box::new(x))
+            } else {
+                None
+            },
+            sqlrunner: if let Some(x) = sqlrunner {
                 Some(Box::new(x))
             } else {
                 None
