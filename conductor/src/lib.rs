@@ -48,6 +48,7 @@ pub async fn generate_spec(
     azure_storage_account: Option<&str>,
     spec: &CoreDBSpec,
     cloud_provider: &CloudProvider,
+    storage_class_name: &str,
 ) -> Result<Value, ConductorError> {
     let mut spec = spec.clone();
 
@@ -75,6 +76,11 @@ pub async fn generate_spec(
                         );
                     }
                 }
+            }
+
+            // Set the storageClass to the value of storage_class_name if not empty
+            if !storage_class_name.is_empty() {
+                spec.storage_class = Some(storage_class_name.to_string());
             }
         }
         CloudProvider::Unknown => {
@@ -759,6 +765,7 @@ mod tests {
             None,
             &spec,
             &cloud_provider,
+            "",
         )
         .await
         .expect("Failed to generate spec");
@@ -791,6 +798,7 @@ mod tests {
             None,
             &spec,
             &cloud_provider,
+            "",
         )
         .await
         .expect("Failed to generate spec");
@@ -821,6 +829,7 @@ mod tests {
             None,
             &spec,
             &cloud_provider,
+            "",
         )
         .await
         .expect("Failed to generate spec");
@@ -844,6 +853,7 @@ mod tests {
             None,
             &spec,
             &cloud_provider,
+            "",
         )
         .await
         .expect("Failed to generate spec");
@@ -870,6 +880,7 @@ mod tests {
             None,
             &spec,
             &cloud_provider,
+            "",
         )
         .await
         .expect("Failed to generate spec");
@@ -900,6 +911,7 @@ mod tests {
             None,
             &spec,
             &cloud_provider,
+            "",
         )
         .await
         .expect("Failed to generate spec");
@@ -930,6 +942,7 @@ mod tests {
             Some("eusdevsg"),
             &spec,
             &cloud_provider,
+            "tembo-csi",
         )
         .await
         .expect("Failed to generate spec");
@@ -961,6 +974,7 @@ mod tests {
             Some("eusdevsg"),
             &spec,
             &cloud_provider,
+            "tembo-csi",
         )
         .await
         .expect("Failed to generate spec");
@@ -969,6 +983,58 @@ mod tests {
         assert_eq!(
             result["spec"]["restore"]["backupsPath"].as_str().unwrap(),
             expected_backups_path
+        );
+    }
+
+    #[tokio::test]
+    async fn test_generate_spec_storage_class_for_azure() {
+        // Test Azure cloud provider
+        let spec = CoreDBSpec::default();
+        let cloud_provider = CloudProvider::Azure;
+
+        let result = generate_spec(
+            "org-id",
+            "entity-name",
+            "instance-id",
+            "azure_data_1_eus1",
+            "namespace",
+            "my-blob",
+            Some("eusdevsg"),
+            &spec,
+            &cloud_provider,
+            "tembo-csi",
+        )
+        .await
+        .expect("Failed to generate spec");
+
+        // Verify Azure storage class is set correctly
+        assert_eq!(
+            result["spec"]["storageClass"].as_str().unwrap(),
+            "tembo-csi",
+            "Azure storage class should be set to tembo-csi"
+        );
+
+        // Test non-Azure cloud provider (AWS)
+        let cloud_provider = CloudProvider::AWS;
+        let result = generate_spec(
+            "org-id",
+            "entity-name",
+            "instance-id",
+            "aws_data_1_use1",
+            "namespace",
+            "my-bucket",
+            None,
+            &spec,
+            &cloud_provider,
+            "",
+        )
+        .await
+        .expect("Failed to generate spec");
+
+        // Verify non-Azure storage class remains unchanged
+        assert!(
+            result["spec"]["storageClass"].is_null(),
+            "Non-Azure storage class should remain unchanged"
         );
     }
 }

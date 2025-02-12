@@ -12,7 +12,6 @@ use azure_mgmt_msi::models::{
 };
 use futures::StreamExt;
 use log::info;
-use std::fmt::format;
 use std::sync::Arc;
 
 // Get credentials from workload identity
@@ -289,7 +288,7 @@ pub async fn create_federated_identity_credentials(
     let federated_identity_client = azure_mgmt_msi::Client::builder(credentials.clone()).build()?;
     let cluster_issuer = get_cluster_issuer(
         subscription_id,
-        &resource_group_prefix,
+        resource_group_prefix,
         &format!("aks-{resource_group_prefix}"),
         credentials.clone(),
     )

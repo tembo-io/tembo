@@ -42,6 +42,7 @@ impl CloudProviderBuilder {
     }
 }
 
+#[derive(PartialEq)]
 pub enum CloudProvider {
     AWS,
     Azure,

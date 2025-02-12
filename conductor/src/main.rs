@@ -112,6 +112,10 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         .unwrap_or_else(|_| "true".to_owned())
         .parse()
         .expect("error parsing IS_LOADBALANCER_PUBLIC");
+    let storage_class_name: String = env::var("STORAGE_CLASS_NAME")
+        .unwrap_or_else(|_| "".to_owned())
+        .parse()
+        .expect("error parsing STORAGE_CLASS_NAME");
 
     // Error and exit if CF_TEMPLATE_BUCKET is not set when IS_CLOUD_FORMATION is enabled
     if is_cloud_formation && cf_template_bucket.is_empty() {
@@ -428,6 +432,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     azure_storage_account,
                     &coredb_spec,
                     &cloud_provider,
+                    &storage_class_name,
                 )
                 .await?;
 
