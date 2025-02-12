@@ -1,6 +1,6 @@
 name: !restapi
 appServices:
-  - image: postgrest/postgrest:v12.2.7
+  - image: postgrest/postgrest:v12.2.8
     name: restapi
     resources:
       requests:

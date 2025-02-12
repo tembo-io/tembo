@@ -46,7 +46,7 @@ pub struct StorageConfig {
 ///  
 ///   appServices:
 ///     - name: postgrest
-///       image: postgrest/postgrest:v10.0.0
+///       image: postgrest/postgrest:v12.2.8
 ///       routing:
 ///       # only expose /rest/v1 and /graphql/v1
 ///         - port: 3000
