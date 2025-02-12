@@ -982,7 +982,7 @@ mod tests {
         // Test Azure cloud provider
         let spec = CoreDBSpec::default();
         let cloud_provider = CloudProvider::Azure;
-        
+
         let result = generate_spec(
             "org-id",
             "entity-name",
