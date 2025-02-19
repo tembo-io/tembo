@@ -24,7 +24,7 @@ services:
       - "traefik.tcp.services.instance-1.loadbalancer.server.port=5432"
 
   instance-1-postgrest:
-    image: postgrest/postgrest:v10.0.0
+    image: postgrest/postgrest:v12.2.8
     environment:
       PGRST_DB_URI: "postgresql://postgres:postgres@instance-1:5432/postgres"
       PGRST_DB_SCHEMA: "public, graphql"

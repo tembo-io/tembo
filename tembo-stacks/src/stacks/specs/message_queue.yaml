@@ -10,7 +10,7 @@ images:
 stack_version: 0.3.0
 appServices:
   - name: mq-api
-    image: postgrest/postgrest:v12.2.7
+    image: postgrest/postgrest:v12.2.8
     routing:
       - port: 3000
         ingressPath: /pgmq/v1
