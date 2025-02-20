@@ -3818,7 +3818,7 @@ mod test {
                 "appServices": [
                     {
                         "name": "postgrest",
-                        "image": "postgrest/postgrest:v10.0.0",
+                        "image": "postgrest/postgrest:v12.2.8",
                         "env": [
                             {
                                 "name": "PGRST_DB_URI",
@@ -4138,7 +4138,7 @@ mod test {
                 "appServices": [
                     {
                         "name": "postgrest",
-                        "image": "postgrest/postgrest:v10.0.0",
+                        "image": "postgrest/postgrest:v12.2.8",
                         "env": [
                             {
                                 "name": "PGRST_DB_URI",
@@ -4203,14 +4203,16 @@ mod test {
             .await
             .unwrap();
         let body: ApiResponse = response.json().await.unwrap();
-        assert_eq!(body.info.title, "PostgREST API");
+        assert_eq!(body.info.title, "standard public schema");
 
         // add an auth header and request will fail (have not configured server side JWT)
-        let headers: BTreeMap<String, String> =
-            [(String::from("Authrization"), String::from("Bearer SomeKey"))]
-                .iter()
-                .cloned()
-                .collect();
+        let headers: BTreeMap<String, String> = [(
+            String::from("Authorization"),
+            String::from("Bearer SomeKey"),
+        )]
+        .iter()
+        .cloned()
+        .collect();
         let response = http_get_with_retry(&postgres_url, Some(headers.clone()), 1, 0).await;
         assert!(response.is_err());
 
@@ -4244,7 +4246,7 @@ mod test {
                 "appServices": [
                     {
                         "name": "postgrest",
-                        "image": "postgrest/postgrest:v10.0.0",
+                        "image": "postgrest/postgrest:v12.2.8",
                         "env": [
                             {
                                 "name": "PGRST_DB_URI",
@@ -4317,11 +4319,12 @@ mod test {
         let cdb = coredbs.patch(cdb_name, &params, &patch).await.unwrap();
         // same request with auth header will now succeed
         // add some retries to give change a chance to apply
+        let headers: BTreeMap<String, String> = BTreeMap::new();
         let response = http_get_with_retry(&postgres_url, Some(headers.clone()), 30, 5)
             .await
             .unwrap();
         let body: ApiResponse = response.json().await.unwrap();
-        assert_eq!(body.info.title, "PostgREST API");
+        assert_eq!(body.info.title, "standard public schema");
 
         let trigger = "
         CREATE OR REPLACE FUNCTION pgrst_watch() RETURNS event_trigger
@@ -5998,7 +6001,7 @@ CREATE EVENT TRIGGER pgrst_watch
                 "appServices": [
                     {
                         "name": "postgrest",
-                        "image": "postgrest/postgrest:v10.0.0",
+                        "image": "postgrest/postgrest:v12.2.8",
                         "env": [
                             {
                                 "name": "PGRST_DB_URI",
