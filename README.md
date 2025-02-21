@@ -36,7 +36,6 @@ Postgres is the best OSS database in the world, with millions of active deployme
 * [pgmq](https://github.com/tembo-io/pgmq) - a message queue built with Rust, available as a Postgres extension and Rust crate
 * [pg_vectorize](https://github.com/tembo-io/pg_vectorize) - automate vector search workflow, and SQL access to 100+ OSS sentence transformer models
 * [pg_later](https://github.com/tembo-io/pg_later) - a Postgres extension for completely asynchronous query execution
-* [pg_tier](https://github.com/tembo-io/pg_tier) - a Postgres Extension to enable data tiering to AWS S3
 * [pg_timeseries](https://github.com/tembo-io/pg_timeseries) - a Postgres Extension to provide simple and focused time-series tables
 * [pg_auto_dw](https://github.com/tembo-io/pg_auto_dw) - An auto data warehouse extension for Postgres
 
