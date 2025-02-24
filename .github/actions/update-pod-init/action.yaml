@@ -50,4 +50,4 @@ runs:
       git add --all
       # debugging
       git diff HEAD
-      git diff --staged --quiet && echo "No changes to commit" || (git commit -m "Update from tembo-io/tembo-pod-init: ${{ inputs.version }}" && git push origin ${{ inputs.branch }})
+      git diff --staged --quiet && echo "No changes to commit" || (git commit -m "Update from tembo-io/tembo-pod-init@${{ inputs.version }}" && git push origin ${{ inputs.branch }})
