@@ -197,5 +197,5 @@ jobs:
           git add --all
           # debugging
           git diff HEAD
-          git commit -m "Update from tembo-io/tembo: ${{needs.gh_release.outputs.version}}"
+          git commit -m "Update from ${{ github.repository }}@${{ needs.gh_release.outputs.version }}"
           git push origin main
