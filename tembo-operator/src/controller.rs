@@ -387,7 +387,9 @@ impl CoreDB {
         let (trunk_installs, extensions) =
             reconcile_extensions(self, ctx.clone(), &coredbs, &name).await?;
 
-        let recovery_time = self.get_recovery_time(ctx.clone(), cfg.enable_volume_snapshot).await?;
+        let recovery_time = self
+            .get_recovery_time(ctx.clone(), cfg.enable_volume_snapshot)
+            .await?;
         let last_archiver_status = reconcile_last_archive_status(self, ctx.clone()).await?;
 
         let current_config_values = get_current_config_values(self, ctx.clone()).await?;
@@ -835,8 +837,7 @@ impl CoreDB {
         // Create label selector with both cluster name and scheduled backup name
         let label_selector = format!(
             "cnpg.io/cluster={},cnpg.io/scheduled-backup={}",
-            cluster_name,
-            scheduled_backup_name
+            cluster_name, scheduled_backup_name
         );
 
         let lp = ListParams::default().labels(&label_selector);
