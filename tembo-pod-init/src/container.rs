@@ -63,7 +63,7 @@ pub async fn create_init_container(
         command: Some(vec![
             "/bin/bash".to_string(),
             "-c".to_string(),
-            "if [ -d /var/lib/postgresql/data/tembo ]; then if [ -z \"$(ls -A /var/lib/postgresql/data/tembo)\" ]; then cp -Rp /tmp/pg_sharedir/. /var/lib/postgresql/data/tembo; fi; else mkdir -p /var/lib/postgresql/data/tembo && cp -Rp /tmp/pg_sharedir/. /var/lib/postgresql/data/tembo; fi".to_string(),
+            "mkdir -p /var/lib/postgresql/data/tembo; if [ -d /tmp/pg_sharedir ] && [ -z \"$(ls -A /var/lib/postgresql/data/tembo)\" ]; then cp -Rp /tmp/pg_sharedir/. /var/lib/postgresql/data/tembo; fi".to_string(),
             "if [-d /var/lib/postgresql/data/lost+found ]; then rmdir /var/lib/postgresql/data/lost+found; fi".to_string(),
         ]),
         security_context: Some(security_context),
@@ -79,7 +79,7 @@ pub fn add_volume_mounts(container: &mut Container, volume_mount: VolumeMount) {
     if container
         .volume_mounts
         .as_ref()
-        .map_or(false, |volume_mounts| {
+        .is_some_and(|volume_mounts| {
             volume_mounts
                 .iter()
                 .any(|v| v.name == volume_mount.name && v.mount_path == volume_mount.mount_path)
