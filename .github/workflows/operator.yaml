@@ -73,26 +73,12 @@ jobs:
           cargo run --bin crdgen > ../charts/tembo-operator/templates/crd.yaml
           git diff --exit-code ../charts/tembo-operator/templates/crd.yaml
 
-      # Start Rust build while setting up K3d
-      - name: Build Rust application
-        run: |
-          cargo build --release &
-          RUST_BUILD_PID=$!
-          echo "RUST_BUILD_PID=$RUST_BUILD_PID" >> $GITHUB_ENV
-
       # Set up K3d cluster using the action
       - uses: nolar/setup-k3d-k3s@v1
         with:
           version: ${{ matrix.kube_version }}
           k3d-name: test
           k3d-args: "--no-lb --no-rollback --registry-create reg --k3s-arg --disable=traefik,servicelb,metrics-server@server:*"
-
-     # Wait for Rust build to complete
-      - name: Wait for Rust build
-        run: |
-          if [ -n "$RUST_BUILD_PID" ]; then
-            wait $RUST_BUILD_PID || { echo "Rust build failed"; exit 1; }
-          fi
 
    # Setup cluster components
       - name: Set up cluster components
