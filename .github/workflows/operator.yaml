@@ -81,17 +81,11 @@ jobs:
           echo "RUST_BUILD_PID=$RUST_BUILD_PID" >> $GITHUB_ENV
 
       # Set up K3d cluster using the action
-      - uses: AbsaOSS/k3d-action@v2
+      - uses: nolar/setup-k3d-k3s@v1
         with:
-          cluster-name: "tembo-test-cluster"
-          args: >-
-            --agents 2
-            --image docker.io/rancher/k3s:v${{ matrix.kube_version }}
-            --port "80:80@loadbalancer"
-            --port "443:443@loadbalancer"
-            --k3s-arg "--disable=traefik@server:0"
-            --k3s-arg "--disable=metrics-server@server:0"
-            --registry-create registry:0.0.0.0:5001
+          version: ${{ matrix.kube_version }}
+          k3d-name: test
+          k3d-args: "--no-lb --no-rollback --registry-create reg --k3s-arg --disable=traefik,servicelb,metrics-server@server:*"
 
      # Wait for Rust build to complete
       - name: Wait for Rust build
@@ -160,7 +154,3 @@ jobs:
             kubectl -n $ns get coredb -o yaml
             kubectl -n $ns get clusters -o yaml
           done
-
-      - name: Clean up K3d cluster
-        if: always()
-        run: k3d cluster delete tembo-test-cluster
