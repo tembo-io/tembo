@@ -30,9 +30,7 @@ jobs:
   lint:
     name: Run linters
     runs-on:
-      - self-hosted
-      - dind
-      - small
+      - ubuntu-latest
     needs:
       - find_directories
     strategy:
