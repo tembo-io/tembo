@@ -84,6 +84,7 @@ jobs:
       - name: Set up cluster components
         run: |
           set -xe
+          just update-helm-repos
 
           # Install required components
           just enable-cnpg-default-namespace
