@@ -84,22 +84,7 @@ jobs:
       - name: Set up cluster components
         run: |
           set -xe
-          just update-helm-repos
-
-          # Install required components
-          just enable-cnpg-default-namespace
-          just install-calico
-          just install-reflector
-          just install-kube-prometheus-stack
-          just install-tempo
-          just install-traefik
-          just install-minio
-          just install-operator
-          just install-crd
-          just annotate
-
-          # Wait for all pods to be ready
-          kubectl wait pods --for=condition=Ready --timeout=300s --all --all-namespaces
+          just setup-cluster
 
       - name: Run functional tests
         run: |
