@@ -37,7 +37,7 @@ jobs:
         # Go here for a list of versions:
         # https://github.com/kubernetes-sigs/kind/releases
         kube_version:
-          - "1.31.6"
+          - "1.31.5"
     steps:
       - uses: actions/checkout@v4
       - name: Install system dependencies
@@ -47,56 +47,120 @@ jobs:
           sudo apt-get install -y pkg-config libssl-dev git wget build-essential
       - uses: azure/setup-helm@v4
       - uses: extractions/setup-just@v2
-      - name: Install kind
-        uses: helm/kind-action@v1
-        with:
-          install_only: true
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable
+
+      # Cache Helm repositories and charts
+      - name: Cache Helm repositories and charts
+        id: cache-helm
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cache/helm
+            ~/.helm
+          key: helm-cache-${{ runner.os }}-${{ hashFiles('tembo-operator/testdata/*.yaml') }}
+
       - uses: Swatinem/rust-cache@v2
         with:
           prefix-key: "tembo-operator-functional-test"
           workspaces: |
             tembo-operator
+
       - name: Check CRD is updated in the charts directory
         run: |
           set -xe
           cargo run --bin crdgen > ../charts/tembo-operator/templates/crd.yaml
           git diff --exit-code ../charts/tembo-operator/templates/crd.yaml
-      - name: Setup local test cluster
+
+      # Start Rust build while setting up K3d
+      - name: Build Rust application
+        run: |
+          cargo build --release &
+          RUST_BUILD_PID=$!
+          echo "RUST_BUILD_PID=$RUST_BUILD_PID" >> $GITHUB_ENV
+
+      # Set up K3d cluster using the action
+      - uses: AbsaOSS/k3d-action@v2
+        with:
+          cluster-name: "tembo-test-cluster"
+          args: >-
+            --agents 2
+            --image docker.io/rancher/k3s:v${{ matrix.kube_version }}
+            --port "80:80@loadbalancer"
+            --port "443:443@loadbalancer"
+            --k3s-arg "--disable=traefik@server:0"
+            --k3s-arg "--disable=metrics-server@server:0"
+            --registry-create registry:0.0.0.0:5001
+
+     # Wait for Rust build to complete
+      - name: Wait for Rust build
+        run: |
+          if [ -n "$RUST_BUILD_PID" ]; then
+            wait $RUST_BUILD_PID || { echo "Rust build failed"; exit 1; }
+          fi
+
+   # Setup cluster components
+      - name: Set up cluster components
         run: |
           set -xe
-          export KUBE_VERSION=${{ matrix.kube_version }}
-          just start-kind
-      - name: Run functional / integration tests
+
+          # Install required components
+          just enable-cnpg-default-namespace
+          just install-calico
+          just install-reflector
+          just install-kube-prometheus-stack
+          just install-tempo
+          just install-traefik
+          just install-minio
+          just install-operator
+          just install-crd
+          just annotate
+
+          # Wait for all pods to be ready
+          kubectl wait pods --for=condition=Ready --timeout=300s --all --all-namespaces
+
+      - name: Run functional tests
         run: |
           set -xe
           export DATA_PLANE_BASEDOMAIN=localhost
           export USE_SHARED_CA=1
-          # Start the operator in the background
-          cargo run > operator-output.txt 2>&1 &
-          # Run the tests
-          cargo test -- --ignored --nocapture
+          export RUST_LOG=info
+
+          # Start the operator using the built binary
+          ./target/release/controller > operator-output.txt 2>&1 &
+          OPERATOR_PID=$!
+
+          # Wait for operator to be ready
+          sleep 15
+
+          # Run the tests with timeout to prevent hanging
+          timeout 50m cargo test -- --ignored --nocapture
+          TEST_EXIT=$?
+
+          # Kill the operator
+          kill $OPERATOR_PID || true
+
+          exit $TEST_EXIT
+
       - name: Debugging information
         if: always()
         run: |
           set +e
           set -x
-          echo "=========="
+          echo "========== Operator Output =========="
           cat operator-output.txt
-          echo "=========="
-          # Get list of namespaces that start with 'test-coredb-'
-          namespaces=$(kubectl get ns -o jsonpath='{.items[*].metadata.name}' | tr ' ' '\n' | grep '^test-coredb-')
-
-          for ns in $namespaces; do
-              echo "==== Namespace: $ns ===="
-              kubectl -n $ns get pods $ns-1 -o yaml
-              echo "=============================="
-              kubectl -n $ns get svc -o yaml
-              echo "=============================="
-              kubectl -n $ns get coredb $ns -o yaml
-              echo "=============================="
-              kubectl -n $ns get clusters $ns -o yaml
-              echo "=============================="
+          echo "========== Kubernetes Resources =========="
+          kubectl get pods -A
+          for ns in $(kubectl get ns -o jsonpath='{.items[*].metadata.name}' | tr ' ' '\n' | grep '^test-coredb-'); do
+            echo "==== Namespace: $ns ===="
+            kubectl -n $ns get pods -o wide
+            kubectl -n $ns describe pods
+            kubectl -n $ns get events --sort-by='.lastTimestamp'
+            kubectl -n $ns get coredb -o yaml
+            kubectl -n $ns get clusters -o yaml
           done
+
+      - name: Clean up K3d cluster
+        if: always()
+        run: k3d cluster delete tembo-test-cluster
