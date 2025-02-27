@@ -6118,7 +6118,8 @@ CREATE EVENT TRIGGER pgrst_watch
             let pod_exists = pods_list.items.iter().any(|pod| {
                 pod.metadata
                     .name
-                    .as_ref().is_some_and(|name| name.contains(required_pod))
+                    .as_ref()
+                    .is_some_and(|name| name.contains(required_pod))
             });
 
             assert!(
@@ -6202,7 +6203,8 @@ CREATE EVENT TRIGGER pgrst_watch
             let pod_exists = pods_list.items.iter().any(|pod| {
                 pod.metadata
                     .name
-                    .as_ref().is_some_and(|name| name.contains(required_pod))
+                    .as_ref()
+                    .is_some_and(|name| name.contains(required_pod))
             });
 
             assert!(
