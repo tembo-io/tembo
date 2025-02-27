@@ -37,7 +37,7 @@ jobs:
         # Go here for a list of versions:
         # https://github.com/kubernetes-sigs/kind/releases
         kube_version:
-          - "1.31.5"
+          - "1.31.6-k3s1"
     steps:
       - uses: actions/checkout@v4
       - name: Install system dependencies
