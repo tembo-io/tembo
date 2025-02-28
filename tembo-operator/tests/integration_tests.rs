@@ -101,10 +101,10 @@ mod test {
         async fn new(test_name: &str) -> Self {
             let client = kube_client().await;
             let state = State::default();
-            let context = state.create_context(client.clone());
+            let context = state.to_context(client.clone()).await;
 
-            let mut rng = rand::thread_rng();
-            let suffix = rng.gen_range(0..100000);
+            let mut rng = rand::rng();
+            let suffix = rng.random_range(0..100000);
             let name = format!("{}-{}", test_name, suffix);
             let namespace = match create_namespace(client.clone(), &name).await {
                 Ok(namespace) => namespace,
@@ -1124,11 +1124,11 @@ mod test {
         // Initialize the Kubernetes client
         let client = kube_client().await;
         let state = State::default();
-        let context = state.create_context(client.clone());
+        let context = state.to_context(client.clone()).await;
 
         // Configurations
-        let mut rng = rand::thread_rng();
-        let suffix = rng.gen_range(0..100000);
+        let mut rng = rand::rng();
+        let suffix = rng.random_range(0..100000);
         let name = &format!("test-basic-cnpg-{}", suffix);
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
@@ -1229,11 +1229,11 @@ mod test {
         // Initialize the Kubernetes client
         let client = kube_client().await;
         let state = State::default();
-        let context = state.create_context(client.clone());
+        let context = state.to_context(client.clone()).await;
 
         // Configurations
-        let mut rng = rand::thread_rng();
-        let suffix = rng.gen_range(0..100000);
+        let mut rng = rand::rng();
+        let suffix = rng.random_range(0..100000);
         let name = &format!("test-cnpg-metrics-create-{}", suffix);
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
@@ -1250,7 +1250,7 @@ mod test {
 
         // Apply a basic configuration of CoreDB
         println!("Creating CoreDB resource {}", name);
-        let test_metric_decr = format!("coredb_integration_test_{}", rng.gen_range(0..100000));
+        let test_metric_decr = format!("coredb_integration_test_{}", rng.random_range(0..100000));
         let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
         let coredb_json = serde_json::json!({
             "apiVersion": API_VERSION,
@@ -1505,11 +1505,11 @@ mod test {
         // Initialize the Kubernetes client
         let client = kube_client().await;
         let state = State::default();
-        let context = state.create_context(client.clone());
+        let context = state.to_context(client.clone()).await;
 
         // Configurations
-        let mut rng = rand::thread_rng();
-        let suffix = rng.gen_range(0..100000);
+        let mut rng = rand::rng();
+        let suffix = rng.random_range(0..100000);
         let name = &format!("test-cnpg-pgparams-{}", suffix);
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
@@ -1729,11 +1729,11 @@ mod test {
         // Initialize the Kubernetes client
         let client = kube_client().await;
         let state = State::default();
-        let _context = state.create_context(client.clone());
+        let _context = state.to_context(client.clone()).await;
 
         // Configurations
-        let mut rng = rand::thread_rng();
-        let suffix = rng.gen_range(0..100000);
+        let mut rng = rand::rng();
+        let suffix = rng.random_range(0..100000);
         let name = &format!("test-skip-reconciliation-{}", suffix);
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
@@ -1811,11 +1811,11 @@ mod test {
         // Initialize the Kubernetes client
         let client = kube_client().await;
         let state = State::default();
-        let _context = state.create_context(client.clone());
+        let _context = state.to_context(client.clone()).await;
 
         // Configurations
-        let mut rng = rand::thread_rng();
-        let suffix = rng.gen_range(0..100000);
+        let mut rng = rand::rng();
+        let suffix = rng.random_range(0..100000);
         let name = &format!("test-delete-namespace-{}", suffix);
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
@@ -1918,8 +1918,8 @@ mod test {
         let state = State::default();
 
         // Configurations
-        let mut rng = rand::thread_rng();
-        let suffix = rng.gen_range(1000..10000);
+        let mut rng = rand::rng();
+        let suffix = rng.random_range(1000..10000);
         let name = &format!("test-dedicated-networking-{}", suffix.clone());
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
@@ -2119,7 +2119,7 @@ mod test {
         assert!(ing_route_tcp.is_err());
 
         // Enable Dedicated Networking Test
-        let context = state.create_context(client.clone());
+        let context = state.to_context(client.clone()).await;
 
         let coredb_json = serde_json::json!({
             "apiVersion": API_VERSION,
@@ -2348,11 +2348,11 @@ mod test {
         // Initialize the Kubernetes client
         let client = kube_client().await;
         let state = State::default();
-        let context = state.create_context(client.clone());
+        let context = state.to_context(client.clone()).await;
 
         // Configurations
-        let mut rng = rand::thread_rng();
-        let suffix = rng.gen_range(0..100000);
+        let mut rng = rand::rng();
+        let suffix = rng.random_range(0..100000);
         let name = &format!("test-ha-basic-cnpg-{}", suffix);
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
@@ -2435,11 +2435,11 @@ mod test {
         // Initialize the Kubernetes client
         let client = kube_client().await;
         let state = State::default();
-        let context = state.create_context(client.clone());
+        let context = state.to_context(client.clone()).await;
 
         // Configurations
-        let mut rng = rand::thread_rng();
-        let suffix = rng.gen_range(0..100000);
+        let mut rng = rand::rng();
+        let suffix = rng.random_range(0..100000);
         let name = &format!("test-ha-upgrade-cnpg-{}", suffix);
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
@@ -2604,11 +2604,11 @@ mod test {
         // Initialize the Kubernetes client
         let client = kube_client().await;
         let state = State::default();
-        let context = state.create_context(client.clone());
+        let context = state.to_context(client.clone()).await;
 
         // Configurations
-        let mut rng = rand::thread_rng();
-        let suffix = rng.gen_range(0..100000);
+        let mut rng = rand::rng();
+        let suffix = rng.random_range(0..100000);
         let name = &format!("test-requires-load-{}", suffix);
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
@@ -2736,11 +2736,11 @@ mod test {
         // Initialize the Kubernetes client
         let client = kube_client().await;
         let state = State::default();
-        let context = state.create_context(client.clone());
+        let context = state.to_context(client.clone()).await;
 
         // Configurations
-        let mut rng = rand::thread_rng();
-        let suffix = rng.gen_range(0..100000);
+        let mut rng = rand::rng();
+        let suffix = rng.random_range(0..100000);
         let name = &format!("test-ext-with-load-{}", suffix);
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
@@ -3098,11 +3098,11 @@ mod test {
         // Initialize the Kubernetes client
         let client = kube_client().await;
         let state = State::default();
-        let context = state.create_context(client.clone());
+        let context = state.to_context(client.clone()).await;
 
         // Configurations
-        let mut rng = rand::thread_rng();
-        let suffix = rng.gen_range(0..100000);
+        let mut rng = rand::rng();
+        let suffix = rng.random_range(0..100000);
         let name = &format!("test-ha-two-replicas-{}", suffix);
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
@@ -3256,11 +3256,11 @@ mod test {
         // Initialize the Kubernetes client
         let client = kube_client().await;
         let state = State::default();
-        let context = state.create_context(client.clone());
+        let context = state.to_context(client.clone()).await;
 
         // Configurations
-        let mut rng = rand::thread_rng();
-        let suffix = rng.gen_range(0..100000);
+        let mut rng = rand::rng();
+        let suffix = rng.random_range(0..100000);
         let name = &format!("test-ha-verify-extension-{}", suffix);
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
@@ -3482,11 +3482,11 @@ mod test {
         // Initialize the Kubernetes client
         let client = kube_client().await;
         let state = State::default();
-        let context = state.create_context(client.clone());
+        let context = state.to_context(client.clone()).await;
 
         // Configurations
-        let mut rng = rand::thread_rng();
-        let suffix = rng.gen_range(0..100000);
+        let mut rng = rand::rng();
+        let suffix = rng.random_range(0..100000);
         let name = &format!("test-ha-requires-load-{}", suffix);
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
@@ -3773,8 +3773,8 @@ mod test {
         let client = kube_client().await;
 
         // Configurations
-        let mut rng = rand::thread_rng();
-        let suffix = rng.gen_range(0..100000);
+        let mut rng = rand::rng();
+        let suffix = rng.random_range(0..100000);
         let cdb_name = &format!("test-app-service-{}", suffix);
         let namespace = match create_namespace(client.clone(), cdb_name).await {
             Ok(namespace) => namespace,
@@ -4341,7 +4341,7 @@ CREATE EVENT TRIGGER pgrst_watch
 ";
         //
         let state = State::default();
-        let context = state.create_context(client.clone());
+        let context = state.to_context(client.clone()).await;
         // hard sleep to give operator time to apply change
         // tokio::time::sleep(Duration::from_secs(5)).await;
         let result = psql_with_retry(context.clone(), cdb.clone(), trigger.to_string()).await;
@@ -4481,11 +4481,11 @@ CREATE EVENT TRIGGER pgrst_watch
         // Initialize the Kubernetes client
         let client = kube_client().await;
         let state = State::default();
-        let context = state.create_context(client.clone());
+        let context = state.to_context(client.clone()).await;
 
         let name = {
-            let mut rng = rand::thread_rng();
-            let suffix = rng.gen_range(0..100000);
+            let mut rng = rand::rng();
+            let suffix = rng.random_range(0..100000);
 
             format!("test-restart-postgres-{}", suffix)
         };
@@ -4654,11 +4654,11 @@ CREATE EVENT TRIGGER pgrst_watch
         // Initialize the Kubernetes client
         let client = kube_client().await;
         let state = State::default();
-        let _context = state.create_context(client.clone());
+        let _context = state.to_context(client.clone()).await;
 
         // Configurations
-        let mut rng = rand::thread_rng();
-        let suffix = rng.gen_range(0..100000);
+        let mut rng = rand::rng();
+        let suffix = rng.random_range(0..100000);
         let name = &format!("test-status-configs-{}", suffix);
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
@@ -4874,11 +4874,11 @@ CREATE EVENT TRIGGER pgrst_watch
         // Initialize the Kubernetes client
         let client = kube_client().await;
         let state = State::default();
-        let context = state.create_context(client.clone());
+        let context = state.to_context(client.clone()).await;
 
         // Configurations
-        let mut rng = rand::thread_rng();
-        let suffix = rng.gen_range(0..100000);
+        let mut rng = rand::rng();
+        let suffix = rng.random_range(0..100000);
         let name = &format!("test-backup-restore-{}", suffix);
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
@@ -5057,7 +5057,7 @@ CREATE EVENT TRIGGER pgrst_watch
         assert!(last_archiver_state.is_some());
 
         // If the backup is complete, we can now restore to a new instance in a new namespace
-        let suffix = rng.gen_range(0..100000);
+        let suffix = rng.random_range(0..100000);
         let restore_name = &format!("test-coredb-restore-{}", suffix);
         let restore_namespace = match create_namespace(client.clone(), restore_name).await {
             Ok(restore_namespace) => restore_namespace,
@@ -5295,11 +5295,11 @@ CREATE EVENT TRIGGER pgrst_watch
         // Initialize the Kubernetes client
         let client = kube_client().await;
         let state = State::default();
-        let context = state.create_context(client.clone());
+        let context = state.to_context(client.clone()).await;
 
         // Configurations
-        let mut rng = rand::thread_rng();
-        let suffix = rng.gen_range(0..100000);
+        let mut rng = rand::rng();
+        let suffix = rng.random_range(0..100000);
         let name = &format!("test-pooler-{}", suffix);
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
@@ -5505,11 +5505,11 @@ CREATE EVENT TRIGGER pgrst_watch
         // Initialize the Kubernetes client
         let client = kube_client().await;
         let state = State::default();
-        let context = state.create_context(client.clone());
+        let context = state.to_context(client.clone()).await;
 
         // Configurations
-        let mut rng = rand::thread_rng();
-        let suffix = rng.gen_range(0..100000);
+        let mut rng = rand::rng();
+        let suffix = rng.random_range(0..100000);
         let name = &format!("test-restart-{}", suffix);
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
@@ -5656,11 +5656,11 @@ CREATE EVENT TRIGGER pgrst_watch
         // Initialize the Kubernetes client
         let client = kube_client().await;
         let state = State::default();
-        let context = state.create_context(client.clone());
+        let context = state.to_context(client.clone()).await;
 
         // Configurations
-        let mut rng = rand::thread_rng();
-        let suffix = rng.gen_range(0..100000);
+        let mut rng = rand::rng();
+        let suffix = rng.random_range(0..100000);
         let name = &format!("test-cnpg-upimage-{}", suffix);
         let namespace = match create_namespace(client.clone(), name).await {
             Ok(namespace) => namespace,
@@ -6255,8 +6255,8 @@ CREATE EVENT TRIGGER pgrst_watch
 
         // Initialize the Kubernetes client
         let client = kube_client().await;
-        let mut rng = rand::thread_rng();
-        let suffix = rng.gen_range(0..100000);
+        let mut rng = rand::rng();
+        let suffix = rng.random_range(0..100000);
         let cdb_name = &format!("test-app-service-podmon-{}", suffix);
         let namespace = match create_namespace(client.clone(), cdb_name).await {
             Ok(namespace) => namespace,

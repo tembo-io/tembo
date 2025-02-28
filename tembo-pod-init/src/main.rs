@@ -1,12 +1,17 @@
-use actix_web::{dev::ServerHandle, web, App, HttpServer};
+use actix_web::{dev::ServerHandle, middleware::Logger, web, App, HttpServer};
 use kube::Client;
 use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 use opentelemetry::global;
+use opentelemetry_sdk::{runtime, trace::{self, Sampler}, propagation::TraceContextPropagator};
+use opentelemetry_otlp::WithExportConfig;
 use parking_lot::Mutex;
 use std::sync::Arc;
 use tembo_pod_init::{config::Config, health::*, mutate::mutate, watcher::NamespaceWatcher};
-use tembo_telemetry::{TelemetryConfig, TelemetryInit};
 use tracing::*;
+use tracing_actix_web::{TracingLogger, DefaultRootSpanBuilder};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Registry};
+use tracing_opentelemetry::OpenTelemetryLayer;
+use uuid::Uuid;
 
 const TRACER_NAME: &str = "tembo.io/tembo-pod-init";
 
@@ -15,19 +20,11 @@ const TRACER_NAME: &str = "tembo.io/tembo-pod-init";
 async fn main() -> std::io::Result<()> {
     let config = Config::default();
 
-    // Initialize logging
-    let otlp_endpoint_url = &config.opentelemetry_endpoint_url;
-    let telemetry_config = TelemetryConfig {
-        app_name: "tembo-pod-init".to_string(),
-        env: std::env::var("ENV").unwrap_or_else(|_| "production".to_string()),
-        endpoint_url: otlp_endpoint_url.clone(),
-        tracer_id: Some(TRACER_NAME.to_string()),
-    };
-
-    let _ = TelemetryInit::init(&telemetry_config).await;
+    // Initialize logging and tracing
+    init_telemetry(&config.opentelemetry_endpoint_url).await;
 
     // Set trace_id for logging
-    let trace_id = telemetry_config.get_trace_id();
+    let trace_id = Uuid::new_v4().to_string();
     Span::current().record("trace_id", &field::display(&trace_id));
 
     let stop_handle = web::Data::new(StopHandle::default());
@@ -60,7 +57,7 @@ async fn main() -> std::io::Result<()> {
         let kube_data = web::Data::new(Arc::new(kube_client.clone()));
         let namespace_watcher_data = web::Data::new(namespaces.clone());
         let stop_handle = stop_handle.clone();
-        let tc = web::Data::new(telemetry_config.clone());
+        let trace_id_data = web::Data::new(trace_id.clone());
         move || {
             {
                 App::new()
@@ -68,12 +65,11 @@ async fn main() -> std::io::Result<()> {
                     .app_data(kube_data.clone())
                     .app_data(namespace_watcher_data.clone())
                     .app_data(stop_handle.clone())
-                    .app_data(tc.clone())
+                    .app_data(trace_id_data.clone())
                     .wrap(
-                        tembo_telemetry::get_tracing_logger()
+                        TracingLogger::<DefaultRootSpanBuilder>::new()
                             .exclude("/health/liveness")
                             .exclude("/health/readiness")
-                            .build(),
                     )
                     .service(liveness)
                     .service(readiness)
@@ -98,6 +94,58 @@ async fn main() -> std::io::Result<()> {
     global::shutdown_tracer_provider();
 
     Ok(())
+}
+
+async fn init_telemetry(otlp_endpoint_url: &Option<String>) {
+    // Set up global propagator
+    global::set_text_map_propagator(TraceContextPropagator::new());
+
+
+    // Create a new OpenTelemetry pipeline
+    let tracer = if let Some(endpoint) = otlp_endpoint_url {
+        let tracer = opentelemetry_otlp::new_pipeline()
+            .tracing()
+            .with_exporter(
+                opentelemetry_otlp::new_exporter()
+                    .tonic()
+                    .with_endpoint(endpoint)
+            )
+            .with_trace_config(
+                trace::config()
+                    .with_sampler(Sampler::AlwaysOn)
+                    .with_id_generator(trace::RandomIdGenerator::default())
+            )
+            .install_batch(runtime::Tokio)
+            .expect("Failed to create OpenTelemetry tracer");
+
+        Some(tracer)
+    } else {
+        None
+    };
+
+    // Create a tracing layer with the configured tracer
+    let telemetry_layer = match tracer {
+        Some(tracer) => Some(OpenTelemetryLayer::new(tracer)),
+        None => None,
+    };
+
+    // Get log level from environment or use default
+    let env_filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new("info"));
+
+    // Create and register the subscriber
+    let subscriber = Registry::default()
+        .with(env_filter)
+        .with(tracing_subscriber::fmt::layer().json());
+
+    // Conditionally add the OpenTelemetry layer
+    if let Some(layer) = telemetry_layer {
+        subscriber.with(layer).init();
+    } else {
+        subscriber.init();
+    }
+
+    info!("Telemetry initialized");
 }
 
 #[derive(Default)]

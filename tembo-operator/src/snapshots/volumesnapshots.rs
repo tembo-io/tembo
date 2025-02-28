@@ -457,14 +457,16 @@ async fn lookup_volume_snapshot(cdb: &CoreDB, client: &Client) -> Result<VolumeS
         .filter(|vs| {
             vs.status
                 .as_ref()
-                .map_or(false, |s| s.ready_to_use.unwrap_or(false))
+                .and_then(|s| s.ready_to_use)
+                .unwrap_or(false)
         })
         .filter(|vs| {
             vs.metadata
                 .annotations
                 .as_ref()
                 .and_then(|ann| ann.get("cnpg.io/instanceRole"))
-                .map_or(false, |role| role == "primary")
+                .map(|role| role == "primary")
+                .unwrap_or(false)
         })
         .collect();
 
@@ -608,7 +610,7 @@ mod tests {
             volumeSnapshot:
               enabled: true
               snapshotClass: "csi-vsc"
-          image: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e 
+          image: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e
           port: 5432
           replicas: 1
           resources:
@@ -682,7 +684,7 @@ mod tests {
             volumeSnapshot:
               enabled: true
               snapshotClass: "csi-vsc"
-          image: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e 
+          image: quay.io/tembo/tembo-pg-cnpg:15.3.0-5-48d489e
           port: 5432
           replicas: 1
           resources:
