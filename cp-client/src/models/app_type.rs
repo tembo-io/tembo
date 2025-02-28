@@ -12,24 +12,31 @@
 pub struct AppType {
     #[serde(rename = "restapi", deserialize_with = "Option::deserialize")]
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub restapi: Option<Box<crate::models::AppConfig>>,
     #[serde(rename = "http", deserialize_with = "Option::deserialize")]
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub http: Option<Box<crate::models::AppConfig>>,
     #[serde(rename = "mq-api", deserialize_with = "Option::deserialize")]
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub mq_api: Option<Box<crate::models::AppConfig>>,
     #[serde(rename = "embeddings", deserialize_with = "Option::deserialize")]
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub embeddings: Option<Box<crate::models::AppConfig>>,
     #[serde(rename = "pganalyze", deserialize_with = "Option::deserialize")]
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub pganalyze: Option<Box<crate::models::AppConfig>>,
     #[serde(rename = "sqlrunner", deserialize_with = "Option::deserialize")]
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub sqlrunner: Option<Box<crate::models::AppConfig>>,
     #[serde(rename = "custom")]
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
     pub custom: Option<Box<crate::models::AppService>>,
 }
 

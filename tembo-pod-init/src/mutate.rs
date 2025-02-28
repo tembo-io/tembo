@@ -146,6 +146,7 @@ async fn mutate(
         if spec
             .init_containers
             .as_ref().is_some_and(|init_containers| {
+
                 init_containers
                     .iter()
                     .any(|c| c.name == config.init_container_name)
