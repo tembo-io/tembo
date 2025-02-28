@@ -56,6 +56,7 @@ pub async fn create_init_container(
     };
 
     // Create the initContainer
+    let script = include_str!("init-dirs.sh");
     Container {
         name: config.init_container_name.to_string(),
         image: Some(image),
@@ -63,8 +64,7 @@ pub async fn create_init_container(
         command: Some(vec![
             "/bin/bash".to_string(),
             "-c".to_string(),
-            "mkdir -p /var/lib/postgresql/data/tembo; if [ -d /tmp/pg_sharedir ] && [ -z \"$(ls -A /var/lib/postgresql/data/tembo)\" ]; then cp -Rp /tmp/pg_sharedir/. /var/lib/postgresql/data/tembo; fi".to_string(),
-            "if [-d /var/lib/postgresql/data/lost+found ]; then rmdir /var/lib/postgresql/data/lost+found; fi".to_string(),
+            script.to_string(),
         ]),
         security_context: Some(security_context),
         volume_mounts: Some(volume_mounts),
