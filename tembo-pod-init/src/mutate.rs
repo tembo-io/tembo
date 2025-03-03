@@ -102,9 +102,8 @@ async fn mutate(
     if !pod
         .metadata
         .annotations
-        .as_ref().is_some_and(|annotations| {
-            annotations.contains_key(&config.pod_annotation)
-        })
+        .as_ref()
+        .is_some_and(|annotations| annotations.contains_key(&config.pod_annotation))
     {
         return match ar.request {
             Some(request) => HttpResponse::Ok().json(AdmissionReview {
@@ -145,8 +144,8 @@ async fn mutate(
         // Check to make sure we don't add the initContainer more than once
         if spec
             .init_containers
-            .as_ref().is_some_and(|init_containers| {
-
+            .as_ref()
+            .is_some_and(|init_containers| {
                 init_containers
                     .iter()
                     .any(|c| c.name == config.init_container_name)
