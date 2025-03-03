@@ -3,7 +3,7 @@
 # Only copy sharedir if it is empty.
 sharedir="$(pg_config --sharedir)"
 mkdir -p "${sharedir}"
-if [ -d /tmp/pg_sharedir ] && [ -z "${sharedir}" ]; then
+if [ -d /tmp/pg_sharedir ] && [ -z "$(ls -A "${sharedir}")" ]; then
     cp -Rp /tmp/pg_sharedir/. "${sharedir}";
 fi
 
