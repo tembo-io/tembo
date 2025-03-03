@@ -1,10 +1,10 @@
 # vim: set ft=make :
 NAME := "tembo-pod-init"
 #VERSION := `git rev-parse HEAD`
-CERT_MANAGER_VERSION := "v1.12.3"
+CERT_MANAGER_VERSION := "v1.17.1"
 SEMVER_VERSION := `grep version Cargo.toml | awk -F"\"" '{print $2}' | head -n 1`
 NAMESPACE := "default"
-KUBE_VERSION := "1.26"
+KUBE_VERSION := "1.31"
 RUST_LOG := "debug"
 ENV := "development"
 
@@ -57,7 +57,7 @@ update-helm-repos:
 
 install-operator:
   kubectl apply -f ../charts/tembo-operator/templates/crd.yaml
-  helm upgrade --install --create-namespace --namespace=coredb-operator --values=./testdata/operator-values.yaml tembo-operator ../charts/tembo-operator 
+  helm upgrade --install --create-namespace --namespace=coredb-operator --values=./testdata/operator-values.yaml tembo-operator ../charts/tembo-operator
 
 # delete kind
 delete-kind:
@@ -68,9 +68,9 @@ start-kind:
 	kind delete cluster || true
 	scripts/start-kind-with-registry.sh
 	just update-helm-repos
+	just install-kube-prometheus-stack
 	just cert-manager
 	just install-reloader
-	just install-kube-prometheus-stack
 	just install-tempo
 	just install-cnpg
 	just enable-cnpg-default-namespace
@@ -82,7 +82,7 @@ run:
 
 # run cargo watch
 watch:
-  RUST_LOG={{RUST_LOG}} ENV={{ENV}} cargo watch -x 'run'
+	TLS_CERT="./certs/tls.crt" TLS_KEY="./certs/tls.key" RUST_LOG={{RUST_LOG}} ENV={{ENV}} cargo watch -x 'run'
 
 # format with nightly rustfmt
 fmt:

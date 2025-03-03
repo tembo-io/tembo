@@ -317,7 +317,7 @@ impl<'de> Deserialize<'de> for KeyValue {
     {
         struct KeyValueVisitor;
 
-        impl<'de> Visitor<'de> for KeyValueVisitor {
+        impl Visitor<'_> for KeyValueVisitor {
             type Value = KeyValue;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
@@ -587,6 +587,7 @@ mod pg_param_tests {
                 assert_eq!(set.len(), 1);
                 assert!(set.contains("a"));
             }
+
             ConfigValue::Single(_) => panic!("expected multiple values"),
         }
 

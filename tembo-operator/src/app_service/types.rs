@@ -43,7 +43,7 @@ pub struct StorageConfig {
 ///       locations:
 ///       - database: postgres
 ///         enabled: true
-///  
+///
 ///   appServices:
 ///     - name: postgrest
 ///       image: postgrest/postgrest:v12.2.8
@@ -147,6 +147,7 @@ pub fn default_resources() -> ResourceRequirements {
     ResourceRequirements {
         limits: Some(limits),
         requests: Some(requests),
+        claims: None,
     }
 }
 

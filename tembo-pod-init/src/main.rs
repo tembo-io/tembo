@@ -1,33 +1,32 @@
-use actix_web::{dev::ServerHandle, web, App, HttpServer};
+use actix_web::{dev::ServerHandle, middleware::Logger, web, App, HttpServer};
 use kube::Client;
 use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
 use opentelemetry::global;
+use opentelemetry_otlp::{SpanExporter, WithExportConfig};
+use opentelemetry_sdk::{
+    metrics::SdkMeterProvider,
+    propagation::TraceContextPropagator,
+    runtime,
+    trace as sdktrace,
+};
 use parking_lot::Mutex;
 use std::sync::Arc;
-use tembo_pod_init::{config::Config, health::*, mutate::mutate, watcher::NamespaceWatcher};
-use tembo_telemetry::{TelemetryConfig, TelemetryInit};
+use tembo_pod_init::{config::Config, health::*, mutate::mutate, watcher::NamespaceWatcher, metrics};
 use tracing::*;
-
-const TRACER_NAME: &str = "tembo.io/tembo-pod-init";
+use tracing_actix_web::{DefaultRootSpanBuilder, TracingLogger};
+use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Registry};
+use uuid::Uuid;
 
 #[instrument(fields(trace_id))]
-#[actix_web::main]
+#[tokio::main]
 async fn main() -> std::io::Result<()> {
     let config = Config::default();
 
-    // Initialize logging
-    let otlp_endpoint_url = &config.opentelemetry_endpoint_url;
-    let telemetry_config = TelemetryConfig {
-        app_name: "tembo-pod-init".to_string(),
-        env: std::env::var("ENV").unwrap_or_else(|_| "production".to_string()),
-        endpoint_url: otlp_endpoint_url.clone(),
-        tracer_id: Some(TRACER_NAME.to_string()),
-    };
-
-    let _ = TelemetryInit::init(&telemetry_config).await;
+    // Initialize logging and tracing
+    init_telemetry(&config.opentelemetry_endpoint_url);
 
     // Set trace_id for logging
-    let trace_id = telemetry_config.get_trace_id();
+    let trace_id = Uuid::new_v4().to_string();
     Span::current().record("trace_id", field::display(&trace_id));
 
     let stop_handle = web::Data::new(StopHandle::default());
@@ -60,7 +59,7 @@ async fn main() -> std::io::Result<()> {
         let kube_data = web::Data::new(Arc::new(kube_client.clone()));
         let namespace_watcher_data = web::Data::new(namespaces.clone());
         let stop_handle = stop_handle.clone();
-        let tc = web::Data::new(telemetry_config.clone());
+        let trace_id_data = web::Data::new(trace_id.clone());
         move || {
             {
                 App::new()
@@ -68,16 +67,18 @@ async fn main() -> std::io::Result<()> {
                     .app_data(kube_data.clone())
                     .app_data(namespace_watcher_data.clone())
                     .app_data(stop_handle.clone())
-                    .app_data(tc.clone())
+                    .app_data(trace_id_data.clone())
+                    .wrap(TracingLogger::<DefaultRootSpanBuilder>::new())
                     .wrap(
-                        tembo_telemetry::get_tracing_logger()
+                        Logger::new("%a \"%r\" %s %b \"%{Referer}i\" \"%{User-Agent}i\" %T")
                             .exclude("/health/liveness")
                             .exclude("/health/readiness")
-                            .build(),
+                            .exclude("/metrics"),
                     )
                     .service(liveness)
                     .service(readiness)
                     .service(mutate)
+                    .service(metrics::metrics)
             }
         }
     })
@@ -100,7 +101,81 @@ async fn main() -> std::io::Result<()> {
     Ok(())
 }
 
-#[derive(Default)]
+fn init_telemetry(otlp_endpoint_url: &Option<String>) {
+    // Set up global propagator for distributed tracing context
+    global::set_text_map_propagator(TraceContextPropagator::new());
+
+    // Create a standard JSON logger for stdout
+    let fmt_layer = tracing_subscriber::fmt::layer()
+        .with_writer(std::io::stdout)
+        .json();
+
+    // Get log level from environment or use default
+    let env_filter = EnvFilter::try_from_default_env()
+        .unwrap_or_else(|_| EnvFilter::new("info"));
+
+    // Set up Prometheus metrics
+    let registry = prometheus::Registry::new();
+
+    // Create the exporter without automatic resource metrics
+    let exporter = opentelemetry_prometheus::exporter()
+        .with_registry(registry.clone())
+        .without_target_info() // This disables the target_info metric
+        .build()
+        .unwrap();
+
+    let provider = SdkMeterProvider::builder()
+        .with_reader(exporter)
+        .build();
+    global::set_meter_provider(provider);
+
+    // Store registry in our global static
+    *metrics::REGISTRY.lock().unwrap() = registry;
+
+    // Initialize custom metrics
+    metrics::init_metrics();
+
+    // Initialize tracing only if endpoint is configured
+    if let Some(endpoint) = otlp_endpoint_url {
+        // Set up the tracer provider with OTLP exporter
+        let tracer_provider = init_tracer_provider(endpoint);
+        global::set_tracer_provider(tracer_provider);
+
+        // Create a tracing layer with the configured tracer
+        let telemetry_layer = tracing_opentelemetry::layer();
+
+        // Register layers
+        Registry::default()
+            .with(env_filter)
+            .with(fmt_layer)
+            .with(telemetry_layer)
+            .init();
+
+        info!("Telemetry initialized with OpenTelemetry tracing to {}", endpoint);
+    } else {
+        // Just set up standard logging without OpenTelemetry
+        Registry::default()
+            .with(env_filter)
+            .with(fmt_layer)
+            .init();
+
+        info!("Telemetry initialized with local logging only");
+    }
+}
+
+fn init_tracer_provider(endpoint: &str) -> sdktrace::TracerProvider {
+    let exporter = SpanExporter::builder()
+        .with_tonic()
+        .with_endpoint(endpoint)
+        .build()
+        .unwrap();
+
+    sdktrace::TracerProvider::builder()
+        .with_resource(tembo_pod_init::metrics::BUILD_RESOURCE.clone())
+        .with_batch_exporter(exporter, runtime::Tokio)
+        .build()
+}
+
 struct StopHandle {
     inner: Mutex<Option<ServerHandle>>,
 }
@@ -109,6 +184,14 @@ impl StopHandle {
     // Set the ServerHandle to stop
     pub(crate) fn register(&self, handle: ServerHandle) {
         *self.inner.lock() = Some(handle);
+    }
+}
+
+impl Default for StopHandle {
+    fn default() -> Self {
+        Self {
+            inner: Mutex::new(None),
+        }
     }
 }
 

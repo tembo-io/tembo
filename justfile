@@ -3,8 +3,8 @@ DATABASE_URL := 'postgres://postgres:postgres@cp-pgmq-pg:5432'
 CONDUCTOR_DATABASE_URL := 'postgresql://postgres:postgres@0.0.0.0:5431/postgres'
 CLERK_SECRET_KEY := 'clerk-tembo-dev-secret-key'
 RUST_LOG := 'info'
-KUBE_VERSION := '1.25'
-CERT_MANAGER_VERSION := '1.13.2'
+KUBE_VERSION := '1.31'
+CERT_MANAGER_VERSION := '1.17.1'
 
 watch-operator:
     docker container rm kind-control-plane --force || true

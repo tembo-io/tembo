@@ -1,4 +1,4 @@
-FROM quay.io/tembo/rust:1.84-bookworm as builder
+FROM quay.io/tembo/rust:1.85-bookworm as builder
 
 COPY tembo-operator ./tembo-operator
 WORKDIR /tembo-pod-init
