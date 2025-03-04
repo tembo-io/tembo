@@ -3,14 +3,14 @@ description: A Tembo Postgres Stack optimized for Message Queue workloads.
 repository: "quay.io/tembo"
 organization: tembo
 images:
-  14: "standard-cnpg:14-f40d2ee"
-  15: "standard-cnpg:15-f40d2ee"
-  16: "standard-cnpg:16-f40d2ee"
-  17: "standard-cnpg:17-f40d2ee"
+  14: "standard-cnpg:14-ee80907"
+  15: "standard-cnpg:15-ee80907"
+  16: "standard-cnpg:16-ee80907"
+  17: "standard-cnpg:17-ee80907"
 stack_version: 0.3.0
 appServices:
   - name: mq-api
-    image: postgrest/postgrest:v12.2.7
+    image: postgrest/postgrest:v12.2.8
     routing:
       - port: 3000
         ingressPath: /pgmq/v1
@@ -55,10 +55,6 @@ trunk_installs:
     version: 1.5.0
   - name: pg_partman
     version: 5.2.4
-  - name: parquet_s3_fdw
-    version: 1.1.0
-  - name: pg_tier
-    version: 0.0.4
 extensions:
   - name: pgmq
     locations:
@@ -76,16 +72,6 @@ extensions:
       - database: postgres
         enabled: true
         version: 5.2.4
-  - name: parquet_s3_fdw
-    locations:
-      - database: postgres
-        enabled: true
-        version: 1.1.0
-  - name: pg_tier
-    locations:
-      - database: postgres
-        enabled: true
-        version: 0.0.4
 postgres_metrics:
   pgmq:
       query: select queue_name, queue_length, oldest_msg_age_sec, newest_msg_age_sec, total_messages, current_database() as datname from pgmq.metrics_all()

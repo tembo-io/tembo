@@ -1,7 +1,7 @@
 alertmanager:
   enabled: false
 grafana:
-  enabled: true
+  enabled: false
   env:
   datasources:
     datasources.yaml:

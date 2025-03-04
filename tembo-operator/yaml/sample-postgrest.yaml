@@ -14,7 +14,7 @@ spec:
   
   appServices:
     - name: postgrest
-      image: postgrest/postgrest:v10.0.0
+      image: postgrest/postgrest:latest
       routing:
         # only expose /rest/v1 and /graphql/v1
         - port: 3000

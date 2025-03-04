@@ -3,10 +3,10 @@ description: Document-facing workloads on Postgres.
 repository: "quay.io/tembo"
 organization: tembo
 images:
-  14: "standard-cnpg:14-f40d2ee"
-  15: "standard-cnpg:15-f40d2ee"
-  16: "standard-cnpg:16-f40d2ee"
-  17: "standard-cnpg:17-f40d2ee"
+  14: "standard-cnpg:14-ee80907"
+  15: "standard-cnpg:15-ee80907"
+  16: "standard-cnpg:16-ee80907"
+  17: "standard-cnpg:17-ee80907"
 stack_version: 0.1.0
 appServices:
   - name: fdb-api

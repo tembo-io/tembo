@@ -26,7 +26,7 @@ async fn mutate(
 ) -> impl Responder {
     // Set trace_id for logging
     let trace_id = tc.get_trace_id();
-    Span::current().record("trace_id", &field::display(&trace_id));
+    Span::current().record("trace_id", field::display(&trace_id));
 
     // Extract the AdmissionRequest from the AdmissionReview
     let admission_request: AdmissionRequest<Pod> = body.clone().request.unwrap();
@@ -105,9 +105,7 @@ async fn mutate(
         .metadata
         .annotations
         .as_ref()
-        .map_or(false, |annotations| {
-            annotations.contains_key(&config.pod_annotation)
-        })
+        .is_some_and(|annotations| annotations.contains_key(&config.pod_annotation))
     {
         return match ar.request {
             Some(request) => HttpResponse::Ok().json(AdmissionReview {
@@ -149,7 +147,7 @@ async fn mutate(
         if spec
             .init_containers
             .as_ref()
-            .map_or(false, |init_containers| {
+            .is_some_and(|init_containers| {
                 init_containers
                     .iter()
                     .any(|c| c.name == config.init_container_name)

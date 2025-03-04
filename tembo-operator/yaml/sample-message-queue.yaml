@@ -39,10 +39,6 @@ spec:
       version: 1.1.0
     - name: pg_partman
       version: 4.7.3
-    - name: parquet_s3_fdw
-      version: 1.1.0
-    - name: pg_tier
-      version: 0.0.3
   extensions:
     - name: pgmq
       locations:
@@ -54,16 +50,6 @@ spec:
         - database: postgres
           enabled: true
           version: 4.7.3
-    - name: parquet_s3_fdw
-      locations:
-        - database: postgres
-          enabled: true
-          version: 1.1.0
-    - name: pg_tier
-      locations:
-        - database: postgres
-          enabled: true
-          version: 0.0.3
   metrics:
     enabled: true
     image: quay.io/prometheuscommunity/postgres-exporter:v0.12.0
@@ -106,7 +92,7 @@ spec:
       value: "2GB"
   appServices:
     - name: postgrest
-      image: postgrest/postgrest:v10.0.0
+      image: postgrest/postgrest:latest
       routing:
         - port: 3000
           ingressPath: /pgmq/v1

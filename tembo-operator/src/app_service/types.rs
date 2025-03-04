@@ -25,9 +25,9 @@ pub struct StorageConfig {
 /// AppService significantly extends the functionality of your Tembo Postgres
 /// instance by running tools and software built by the Postgres open source community.
 ///
-/// **Example**: This will configure and install a Postgrest container along side
+/// **Example**: This will configure and install a PostgREST container along side
 /// the Postgres instance, install pg_graphql extension, and configure the
-/// ingress routing to expose the Postgrest service.
+/// ingress routing to expose the PostgREST service.
 ///
 /// ```yaml
 /// apiVersion: coredb.io/v1alpha1
@@ -46,7 +46,7 @@ pub struct StorageConfig {
 ///  
 ///   appServices:
 ///     - name: postgrest
-///       image: postgrest/postgrest:v10.0.0
+///       image: postgrest/postgrest:v12.2.8
 ///       routing:
 ///       # only expose /rest/v1 and /graphql/v1
 ///         - port: 3000

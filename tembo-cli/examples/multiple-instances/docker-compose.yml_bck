@@ -20,7 +20,7 @@ services:
 
 
   instance-2-restapi:
-    image: postgrest/postgrest:v10.0.0
+    image: postgrest/postgrest:latest
     
     environment:
       PGRST_DB_URI: "postgresql://postgres:postgres@instance-2:5432/postgres"

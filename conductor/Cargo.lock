@@ -1102,7 +1102,7 @@ checksum = "373e9fafaa20882876db20562275ff58d50e0caa2590077fe7ce7bef90211d0d"
 
 [[package]]
 name = "controller"
-version = "0.54.3"
+version = "0.54.4"
 dependencies = [
  "actix-web",
  "anyhow",
