@@ -615,7 +615,7 @@ mod test {
             while let Some(status) = stream.next().await {
                 match status {
                     Ok(WatchEvent::Modified(cdb)) => {
-                        let running_status = cdb.status.as_ref().map_or(false, |s| s.running);
+                        let running_status = cdb.status.as_ref().is_some_and(|s| s.running);
                         if !running_status {
                             println!("status.running is now false!");
                             return Ok(());
@@ -750,8 +750,8 @@ mod test {
         for attempt in 1..=max_retries {
             match coredbs.get(name).await {
                 Ok(coredb) => {
-                    let has_extension_without_error = coredb.status.as_ref().map_or(false, |s| {
-                        s.trunk_installs.as_ref().map_or(false, |installs| {
+                    let has_extension_without_error = coredb.status.as_ref().is_some_and(|s| {
+                        s.trunk_installs.as_ref().is_some_and(|installs| {
                             installs
                                 .iter()
                                 .any(|install| install.name == extension && !install.error)
@@ -803,8 +803,8 @@ mod test {
             match coredbs.get(name).await {
                 Ok(coredb) => {
                     // Check if the extension is enabled in the status
-                    let has_extension = coredb.status.as_ref().map_or(false, |s| {
-                        s.extensions.as_ref().map_or(false, |extensions| {
+                    let has_extension = coredb.status.as_ref().is_some_and(|s| {
+                        s.extensions.as_ref().is_some_and(|extensions| {
                             extensions.iter().any(|ext| {
                                 ext.name == extension
                                     && ext.locations.iter().any(|loc| {
@@ -1152,7 +1152,7 @@ mod test {
             },
             "spec": {
                 "replicas": 1,
-                "image": "quay.io/tembo/standard-cnpg:16-a0a5ab5",
+                "image": "quay.io/tembo/standard-cnpg:16-30219f2",
                 "extensions": [{
                         "name": "cube",
                         "description": "fake description",
@@ -3867,7 +3867,7 @@ mod test {
                     },
                     {
                         "name": "fdb-api",
-                        "image": "ghcr.io/ferretdb/ferretdb",
+                        "image": "ghcr.io/ferretdb/ferretdb:1.24.0",
                         "routing": [
                             {
                                 "port": 27018,
@@ -4813,7 +4813,7 @@ CREATE EVENT TRIGGER pgrst_watch
         for attempt in 1..=max_retries {
             let coredb = coredbs.get(name).await.expect("Failed to get CoreDB");
 
-            if coredb.status.as_ref().map_or(false, |s| s.running) {
+            if coredb.status.as_ref().is_some_and(|s| s.running) {
                 println!("CoreDB {} is running", name);
                 return true;
             } else {
@@ -5713,7 +5713,7 @@ CREATE EVENT TRIGGER pgrst_watch
                 "name": name
             },
             "spec": {
-                "image": "quay.io/tembo/standard-cnpg:15-120cc24",
+                "image": "quay.io/tembo/standard-cnpg:15-30219f2",
                 "replicas": replicas,
                 "trunk_installs": [
                     {
@@ -5832,7 +5832,7 @@ CREATE EVENT TRIGGER pgrst_watch
         let cluster_api: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
         let cluster = cluster_api.get(name).await.unwrap();
         let image = cluster.spec.image.clone();
-        assert_eq!(image, "quay.io/tembo/standard-cnpg:15-120cc24");
+        assert_eq!(image, "quay.io/tembo/standard-cnpg:15-30219f2");
 
         // CLEANUP TEST
         // Cleanup CoreDB
@@ -6119,7 +6119,7 @@ CREATE EVENT TRIGGER pgrst_watch
                 pod.metadata
                     .name
                     .as_ref()
-                    .map_or(false, |name| name.contains(required_pod))
+                    .is_some_and(|name| name.contains(required_pod))
             });
 
             assert!(
@@ -6204,7 +6204,7 @@ CREATE EVENT TRIGGER pgrst_watch
                 pod.metadata
                     .name
                     .as_ref()
-                    .map_or(false, |name| name.contains(required_pod))
+                    .is_some_and(|name| name.contains(required_pod))
             });
 
             assert!(
