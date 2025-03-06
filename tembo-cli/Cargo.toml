@@ -54,7 +54,7 @@ dateparser = "0.2.0"
 log = "0.4.20"
 tera = "1.18.1"
 curl = "0.4.44"
-tembo-api-client = { version = "1.0.4", path = "../cp-client" }
+tembo-api-client = { version = "1.1.0", path = "../cp-client" }
 tembodataclient = { version = "0.0.2", path = "tembodataclient" }
 tokio = { version = "1.26.0", features = [
     "rt",

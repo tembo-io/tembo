@@ -387,7 +387,9 @@ impl CoreDB {
         let (trunk_installs, extensions) =
             reconcile_extensions(self, ctx.clone(), &coredbs, &name).await?;
 
-        let recovery_time = self.get_recovery_time(ctx.clone()).await?;
+        let recovery_time = self
+            .get_recovery_time(ctx.clone(), cfg.enable_volume_snapshot)
+            .await?;
         let last_archiver_status = reconcile_last_archive_status(self, ctx.clone()).await?;
 
         let current_config_values = get_current_config_values(self, ctx.clone()).await?;
@@ -812,6 +814,7 @@ impl CoreDB {
     pub async fn get_recovery_time(
         &self,
         context: Arc<Context>,
+        enable_volume_snapshot: bool,
     ) -> Result<Option<DateTime<Utc>>, Action> {
         let client = context.client.clone();
         let namespace = self.metadata.namespace.as_ref().ok_or_else(|| {
@@ -823,7 +826,21 @@ impl CoreDB {
         })?;
         let cluster_name = self.name_any();
         let backup: Api<Backup> = Api::namespaced(client, namespace);
-        let lp = ListParams::default().labels(&format!("cnpg.io/cluster={}", cluster_name));
+
+        // Determine the scheduled backup label suffix based on enable_volume_snapshot
+        let scheduled_backup_name = if enable_volume_snapshot {
+            format!("{}-snap", cluster_name)
+        } else {
+            cluster_name.clone()
+        };
+
+        // Create label selector with both cluster name and scheduled backup name
+        let label_selector = format!(
+            "cnpg.io/cluster={},cnpg.io/scheduled-backup={}",
+            cluster_name, scheduled_backup_name
+        );
+
+        let lp = ListParams::default().labels(&label_selector);
         let backup_list = backup.list(&lp).await.map_err(|e| {
             error!("Error getting backups: {:?}", e);
             Action::requeue(Duration::from_secs(300))

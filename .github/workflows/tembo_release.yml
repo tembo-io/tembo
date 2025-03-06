@@ -51,12 +51,12 @@ jobs:
             executable: tembo
           - target: x86_64-unknown-linux-musl
             asset_name: x86_64-linux
-            os: ubuntu-20.04
+            os: ubuntu-latest
             container: quay.io/tembo/muslrust:1.82.0-stable
             executable: tembo
           - target: aarch64-unknown-linux-musl
             asset_name: aarch64-linux
-            os: ubuntu-20.04
+            os: ubuntu-latest
             container: messense/rust-musl-cross:aarch64-musl
             executable: tembo
           - target: x86_64-pc-windows-msvc

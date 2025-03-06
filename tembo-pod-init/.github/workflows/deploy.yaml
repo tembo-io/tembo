@@ -54,7 +54,7 @@ jobs:
   argocd_update:
     name: ArgoCD update automation
     if: ${{ github.ref == 'refs/heads/main' }}
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     strategy:
       # fail-fast means to cancel all jobs if one fails
       fail-fast: false

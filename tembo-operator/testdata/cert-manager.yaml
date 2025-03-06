@@ -1,4 +1,5 @@
-installCRDs: true
+crds:
+  enabled: true
 resources:
   requests:
     cpu: 10m

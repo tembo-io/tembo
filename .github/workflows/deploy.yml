@@ -12,7 +12,7 @@ on:
 jobs:
   find_directories:
     name: Find directories with Dockerfiles
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     outputs:
       build_images: ${{ steps.find_directories.outputs.build_matrix }}
       short_sha: ${{ steps.versions.outputs.SHORT_SHA }}

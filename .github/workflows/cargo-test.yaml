@@ -13,7 +13,7 @@ on:
 jobs:
   find_directories:
     name: Find changed Cargo projects
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     outputs:
       directories: ${{ steps.find_directories.outputs.build_matrix }}
     steps:
@@ -30,9 +30,7 @@ jobs:
   lint:
     name: Run linters
     runs-on:
-      - self-hosted
-      - dind
-      - small
+      - ubuntu-latest
     needs:
       - find_directories
     strategy:
@@ -73,9 +71,7 @@ jobs:
   test:
     name: Run tests
     runs-on:
-      - self-hosted
-      - dind
-      - large-8x8
+      - operator-runner-8x32
     needs:
       - find_directories
     strategy:

@@ -28,7 +28,7 @@ async fn main() -> std::io::Result<()> {
 
     // Set trace_id for logging
     let trace_id = telemetry_config.get_trace_id();
-    Span::current().record("trace_id", &field::display(&trace_id));
+    Span::current().record("trace_id", field::display(&trace_id));
 
     let stop_handle = web::Data::new(StopHandle::default());
 
