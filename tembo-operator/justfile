@@ -3,7 +3,7 @@ ORG := "localhost:5001"
 VERSION := `git rev-parse HEAD`
 SEMVER_VERSION := `grep version Cargo.toml | awk -F"\"" '{print $2}' | head -n 1`
 NAMESPACE := "default"
-KUBE_VERSION := env_var_or_default('KUBE_VERSION', '1.29.8')
+KUBE_VERSION := env_var_or_default('KUBE_VERSION', '1.31.6')
 STORAGE_CLASS_NAME := "standard"
 
 default:
@@ -29,7 +29,7 @@ install-kube-prometheus-stack:
 	helm upgrade --install --namespace=monitoring --values=./testdata/prometheus-stack.yaml monitoring prometheus-community/kube-prometheus-stack
 
 install-cert-manager:
-	helm upgrade --install cert-manager jetstack/cert-manager --namespace cert-manager --create-namespace --set installCRDs=true
+	helm upgrade --install cert-manager jetstack/cert-manager --namespace cert-manager --create-namespace --set crds.enabled=true
 	kubectl apply -f ./testdata/local-postgres-issuer.yaml
 
 install-tempo:
@@ -47,12 +47,13 @@ install-minio:
 	&& kubectl wait pods --for=condition=Ready --timeout=300s --all --all-namespaces \
 	&& kubectl apply -f ./testdata/minio-secret.yaml \
 	&& kubectl apply -f ./testdata/minio-bucket-job.yaml \
-	&& kubectl -n minio wait --for=condition=complete job/minio-create-backup-bucket --timeout=300s\
+	&& kubectl -n minio wait --for=condition=complete job/minio-create-backup-bucket --timeout=300s \
 	&& kubectl -n minio delete job/minio-create-backup-bucket
 
 install-reflector:
 	helm upgrade --install \
 		reflector emberstack/reflector \
+		--version 7.1.288 \
 	  --namespace reflector \
 		--create-namespace
 
@@ -94,6 +95,20 @@ delete-kind:
 start-kind:
 	kind delete cluster || true
 	kind create cluster --image=kindest/node:v{{KUBE_VERSION}} --config testdata/kind-config.yaml
+	just update-helm-repos
+	just enable-cnpg-default-namespace
+	just install-calico
+	just install-reflector
+	just install-kube-prometheus-stack
+	just install-tempo
+	just install-traefik
+	just install-minio
+	just install-operator
+	just install-crd
+	just annotate {{STORAGE_CLASS_NAME}}
+	kubectl wait pods --for=condition=Ready --timeout=300s --all --all-namespaces
+
+setup-cluster:
 	just update-helm-repos
 	just enable-cnpg-default-namespace
 	just install-calico
