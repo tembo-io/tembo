@@ -1137,7 +1137,7 @@ async fn init_custom_s3_backup_configuration(
             name: "custom-s3-creds".to_string(),
         }),
         secret_access_key: Some(S3CredentialsSecretAccessKey {
-            key: "ACCESS_SECRET_KEY".to_string(),
+            key: "SECRET_ACCESS_KEY".to_string(),
             name: "custom-s3-creds".to_string(),
         }),
         region: None,
