@@ -71,7 +71,9 @@ jobs:
   test:
     name: Run tests
     runs-on:
-      - operator-runner-8x32
+      - self-hosted
+      - dind
+      - large-8x8
     needs:
       - find_directories
     strategy:

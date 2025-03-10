@@ -49,7 +49,7 @@ mod tests {
         let query_url = Url::parse_with_params(url, &query_params)
             .expect("Failed to format query parameters")
             .to_string();
-        return query_url.trim_start_matches("http://localhost").to_string();
+        query_url.trim_start_matches("http://localhost").to_string()
     }
 
     fn format_prometheus_instant_query(url: &str, query: &str) -> String {
