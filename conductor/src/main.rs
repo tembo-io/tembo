@@ -15,8 +15,8 @@ use crate::metrics_reporter::run_metrics_reporter;
 use crate::status_reporter::run_status_reporter;
 use conductor::routes::health::background_threads_running;
 use controller::apis::coredb_types::{
-    AzureCredentials, Backup, CoreDBSpec, GoogleCredentials, S3Credentials, ServiceAccountTemplate,
-    VolumeSnapshot,
+    AzureCredentials, Backup, CoreDBSpec, GoogleCredentials, S3Credentials,
+    S3CredentialsAccessKeyId, S3CredentialsSecretAccessKey, ServiceAccountTemplate, VolumeSnapshot,
 };
 use controller::apis::postgres_parameters::{ConfigValue, PgConfig};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
@@ -116,19 +116,42 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         .unwrap_or_else(|_| "".to_owned())
         .parse()
         .expect("error parsing STORAGE_CLASS_NAME");
+    let is_custom_s3_backup: bool = env::var("IS_CUSTOM_S3_BACKUP")
+        .unwrap_or_else(|_| "false".to_owned())
+        .parse()
+        .expect("error parsing IS_CUSTOM_S3_BACKUP");
+
+    // Custom S3 backup configuration
+    let s3_bucket: String = env::var("CUSTOM_S3_BUCKET")
+        .unwrap_or_else(|_| "".to_owned())
+        .parse()
+        .expect("error parsing CUSTOM_S3_BUCKET");
+    let s3_endpoint: String = env::var("CUSTOM_S3_ENDPOINT")
+        .unwrap_or_else(|_| "".to_owned())
+        .parse()
+        .expect("error parsing CUSTOM_S3_ENDPOINT");
+    let s3_access_key = env::var("CUSTOM_S3_ACCESS_KEY")
+        .unwrap_or_else(|_| "".to_owned())
+        .parse()
+        .expect("error parsing CUSTOM_S3_ACCESS_KEY");
+    let s3_secret_key = env::var("CUSTOM_S3_SECRET_KEY")
+        .unwrap_or_else(|_| "".to_owned())
+        .parse()
+        .expect("error parsing CUSTOM_S3_SECRET_KEY");
 
     // Error and exit if CF_TEMPLATE_BUCKET is not set when IS_CLOUD_FORMATION is enabled
     if is_cloud_formation && cf_template_bucket.is_empty() {
         panic!("CF_TEMPLATE_BUCKET is required when IS_CLOUD_FORMATION is true");
     }
 
-    // Only allow for setting one of IS_CLOUD_FORMATION, IS_GCP, or IS_AZURE to true
-    let cloud_providers = [is_cloud_formation, is_gcp, is_azure]
+    // Only allow for setting one of IS_CLOUD_FORMATION, IS_GCP, IS_AZURE, or IS_CUSTOM_S3_BACKUP to true
+    let cloud_providers = [is_cloud_formation, is_gcp, is_azure, is_custom_s3_backup]
         .iter()
         .filter(|&&x| x)
         .count();
+
     if cloud_providers > 1 {
-        panic!("Only one of IS_CLOUD_FORMATION, IS_GCP, or IS_AZURE can be set to true");
+        panic!("Only one of IS_CLOUD_FORMATION, IS_GCP, IS_AZURE, or IS_CUSTOM_S3_BACKUP can be set to true");
     }
 
     // Error and exit if IS_GCP is true and GCP_PROJECT_ID or GCP_PROJECT_NUMBER are not set
@@ -396,6 +419,17 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     azure_subscription_id.clone(),
                     azure_resource_group_prefix.clone(),
                     azure_region.clone(),
+                )
+                .await?;
+
+                init_custom_s3_backup_configuration(
+                    is_custom_s3_backup,
+                    &read_msg,
+                    &mut coredb_spec,
+                    s3_bucket.clone(),
+                    s3_endpoint.clone(),
+                    s3_access_key.clone(),
+                    s3_secret_key.clone(),
                 )
                 .await?;
 
@@ -1082,6 +1116,58 @@ async fn init_azure_storage_workload_identity(
 
     coredb_spec.backup = backup;
     coredb_spec.serviceAccountTemplate = service_account_template;
+
+    Ok(())
+}
+
+async fn init_custom_s3_backup_configuration(
+    is_custom_s3_backup: bool,
+    read_msg: &Message<CRUDevent>,
+    coredb_spec: &mut CoreDBSpec,
+    s3_bucket: String,
+    s3_endpoint: String,
+    s3_access_key: String,
+    s3_secret_key: String,
+) -> Result<(), ConductorError> {
+    if !is_custom_s3_backup {
+        return Ok(());
+    }
+
+    let write_path = read_msg
+        .message
+        .backups_write_path
+        .clone()
+        .unwrap_or(format!("v2/{}", read_msg.message.namespace));
+
+    // Construct the full S3 destination path
+    let full_destination = format!("s3://{}/{}", s3_bucket, write_path);
+
+    // Create S3 credentials configuration
+    let s3_credentials = Some(S3Credentials {
+        access_key_id: Some(S3CredentialsAccessKeyId(s3_access_key)),
+        secret_access_key: Some(S3CredentialsSecretAccessKey(s3_secret_key)),
+        region: None,
+        inherit_from_iam_role: Some(false),
+        session_token: None,
+    });
+
+    // Create the backup configuration with default values for encryption and retention
+    let backup = Backup {
+        destinationPath: Some(full_destination),
+        encryption: Some(String::from("AES256")),
+        retentionPolicy: Some(String::from("30")),
+        schedule: Some(generate_cron_expression(&read_msg.message.namespace)),
+        s3_credentials,
+        azure_credentials: None,
+        endpoint_url: Some(s3_endpoint),
+        google_credentials: None,
+        volume_snapshot: Some(VolumeSnapshot {
+            enabled: false,
+            snapshot_class: None,
+        }),
+    };
+
+    coredb_spec.backup = backup;
 
     Ok(())
 }
