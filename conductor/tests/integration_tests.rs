@@ -82,11 +82,11 @@ mod test {
         let _ = queue.create(&myqueue).await;
 
         // Configurations
-        let mut rng = rand::thread_rng();
+        let mut rng = rand::rng();
         let org_name = "coredb-test-org-1234".to_owned();
         // Use the max allowed org name length
         assert_eq!(org_name.len(), 20);
-        let dbname = format!("test-coredb-{}", rng.gen_range(10000000..99999999));
+        let dbname = format!("test-coredb-{}", rng.random_range(10000000..99999999));
         // Use the max allowed instance name length
         assert_eq!(dbname.len(), 20);
         let namespace = format!("org-{}-inst-{}", org_name, dbname);
@@ -171,7 +171,7 @@ mod test {
 
         let client = kube_client().await;
         let state = State::default();
-        let context = state.create_context(client.clone());
+        let context = state.to_context(client.clone());
 
         let pods: Api<Pod> = Api::namespaced(client.clone(), &namespace);
 
@@ -286,13 +286,16 @@ mod test {
 
         pod_ready_and_running(pods.clone(), pod_name.clone()).await;
 
+        // Await the context once
+        let context_value = context.await;
+
         // Get the last time the pod was started
         // using SELECT pg_postmaster_start_time();
         let start_time = match coredb_resource
             .psql(
                 "SELECT pg_postmaster_start_time();".to_string(),
                 "postgres".to_string(),
-                context.clone(),
+                context_value.clone(),
             )
             .await
         {
@@ -365,7 +368,7 @@ mod test {
             .psql(
                 "SELECT pg_postmaster_start_time();".to_string(),
                 "postgres".to_string(),
-                context.clone(),
+                context_value.clone(),
             )
             .await
             .unwrap();

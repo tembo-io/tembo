@@ -14,10 +14,14 @@ metadata:
 webhooks:
   - name: {{ printf "%s.%s.svc" $fullname $namespace }}
     clientConfig:
+      {{- if (index .Values "pod-init").webhookConfig.useUrl }}
+      url: {{ (index .Values "pod-init").webhookConfig.url | quote }}
+      {{- else }}
       service:
         name: {{ $fullname }}
         namespace: {{ $namespace }}
         path: "/mutate"
+      {{- end }}
     rules:
       - operations: ["CREATE", "UPDATE"]
         apiGroups: [""]
@@ -30,10 +34,14 @@ webhooks:
         {{- toYaml (index (index .Values "pod-init") "namespaceSelector" "matchLabels") | nindent 8 }}
   - name: {{ printf "%s.%s.svc.cluster.local" $fullname $namespace }}
     clientConfig:
+      {{- if (index .Values "pod-init").webhookConfig.useUrl }}
+      url: {{ (index .Values "pod-init").webhookConfig.url | quote }}
+      {{- else }}
       service:
         name: {{ $fullname }}
         namespace: {{ $namespace }}
         path: "/mutate"
+      {{- end }}
     rules:
       - operations: ["CREATE", "UPDATE"]
         apiGroups: [""]

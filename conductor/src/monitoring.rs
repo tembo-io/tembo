@@ -13,19 +13,19 @@ impl CustomMetrics {
         let conductor_total = meter
             .u64_counter("conductor_total")
             .with_description("Total number of dequeues in conductor")
-            .init();
+            .build();
         let conductor_requeues = meter
             .u64_counter("conductor_requeues")
             .with_description("Number of requeues in conductor")
-            .init();
+            .build();
         let conductor_errors = meter
             .u64_counter("conductor_errors")
             .with_description("Number of errors in conductor")
-            .init();
+            .build();
         let conductor_completed = meter
             .u64_counter("conductor_completed")
             .with_description("Number of messages sucessfully processed in conductor")
-            .init();
+            .build();
         Self {
             conductor_total,
             conductor_requeues,

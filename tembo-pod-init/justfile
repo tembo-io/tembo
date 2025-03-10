@@ -1,21 +1,20 @@
 # vim: set ft=make :
 NAME := "tembo-pod-init"
 #VERSION := `git rev-parse HEAD`
-CERT_MANAGER_VERSION := "v1.12.3"
+CERT_MANAGER_VERSION := "v1.17.1"
 SEMVER_VERSION := `grep version Cargo.toml | awk -F"\"" '{print $2}' | head -n 1`
 NAMESPACE := "default"
-KUBE_VERSION := "1.26"
-RUST_LOG := "debug"
+STORAGE_CLASS_NAME := "standard"
+KUBE_VERSION := "1.31.6"
+RUST_LOG := "info"
 ENV := "development"
 
 default:
   @just --list --unsorted --color=always | rg -v "    default"
 
-# install cert-manager
-cert-manager:
-  kubectl apply -f https://github.com/cert-manager/cert-manager/releases/download/{{CERT_MANAGER_VERSION}}/cert-manager.yaml
-  sleep 7
-  kubectl wait pods --for=condition=Ready --timeout=300s --all --all-namespaces
+install-cert-manager:
+	helm upgrade --install cert-manager jetstack/cert-manager --namespace cert-manager --create-namespace --set crds.enabled=true
+	kubectl apply -f ../tembo-operator/testdata/local-postgres-issuer.yaml
 
 install-reloader:
 	kubectl create namespace reloader || true
@@ -25,22 +24,17 @@ install-kube-prometheus-stack:
 	kubectl create namespace monitoring || true
 	helm upgrade --install --namespace=monitoring monitoring prometheus-community/kube-prometheus-stack
 
-
-install-tembo-pod-init:
-	kubectl create namespace tembo-pod-init || true
-	helm upgrade --install --namespace=tembo-pod-init --values=./testdata/pod-init.yaml tembo-pod-init ../charts/tembo-pod-init
-
-install-cnpg:
-	helm upgrade --install cnpg \
-	 --namespace cnpg-system \
-	 --create-namespace \
-		--values=./testdata/cnpg.yaml \
-	 cnpg/cloudnative-pg
-
 install-tempo:
 	helm upgrade --install \
 		tempo grafana/tempo \
 	 --namespace monitoring
+
+install-calico:
+	helm upgrade --install --create-namespace --namespace=tigera-operator --version=3.26.1 --values=../tembo-operator/testdata/calico.yaml calico projectcalico/tigera-operator
+
+install-traefik:
+	kubectl create namespace traefik || true
+	helm upgrade --install --namespace=traefik --version=28.3.0 --values=../tembo-operator/testdata/traefik-values.yaml traefik traefik/traefik
 
 enable-cnpg-default-namespace:
 	kubectl label namespace default "tembo-pod-init.tembo.io/watch"="true"
@@ -55,9 +49,23 @@ update-helm-repos:
 	helm repo add stakater https://stakater.github.io/stakater-charts
 	helm repo update
 
-install-operator:
-  kubectl apply -f ../charts/tembo-operator/templates/crd.yaml
-  helm upgrade --install --create-namespace --namespace=coredb-operator --values=./testdata/operator-values.yaml tembo-operator ../charts/tembo-operator 
+# generate and install crd into the cluster
+generate-crd:
+	cd ../tembo-operator/ && cargo run --bin crdgen > ../charts/tembo-operator/templates/crd.yaml
+
+install-crd: generate-crd
+	helm template -s templates/crd.yaml ../charts/tembo-operator|kubectl apply -f -
+
+install-webhook WEBHOOK_URL:
+	helm template tembo-operator-test \
+		--namespace tembo-system \
+		-s templates/mutatingwebhook-pod-init.yaml \
+		../charts/tembo-operator \
+		--set pod-init.webhookConfig.useUrl=true \
+		--set pod-init.webhookConfig.url={{WEBHOOK_URL}}/mutate | kubectl apply -f -
+
+install-cnpg:
+	helm upgrade --install --create-namespace --namespace=tembo-system --values=./testdata/operator-values.yaml tembo ../charts/tembo-operator
 
 # delete kind
 delete-kind:
@@ -66,15 +74,28 @@ delete-kind:
 # start kind
 start-kind:
 	kind delete cluster || true
-	scripts/start-kind-with-registry.sh
+	kind create cluster --image=kindest/node:v{{KUBE_VERSION}} --config ./testdata/kind-config.yaml
 	just update-helm-repos
-	just cert-manager
-	just install-reloader
-	just install-kube-prometheus-stack
-	just install-tempo
-	just install-cnpg
 	just enable-cnpg-default-namespace
+	just install-calico
+	just install-kube-prometheus-stack
+	just install-cert-manager
+	just install-reloader
+	just install-traefik
+	just install-cnpg
+	just install-crd
+	just annotate {{STORAGE_CLASS_NAME}}
 	kubectl wait pods --for=condition=Ready --timeout=300s --all --all-namespaces
+	just run-operator
+
+# annotate namespace to allow for tests
+annotate STORAGE_CLASS_NAME:
+	kubectl label namespace {{NAMESPACE}} safe-to-run-coredb-tests=true
+	kubectl create namespace cnpg-test || true
+	kubectl label namespace cnpg-test safe-to-run-coredb-tests=true
+	kubectl label namespace cnpg-test "tembo-pod-init.tembo.io/watch"="true"
+	kubectl delete pods -n tembo-pod-init --all
+	kubectl patch storageclass {{STORAGE_CLASS_NAME}} -p '{"allowVolumeExpansion": true}'
 
 # run
 run:
@@ -82,7 +103,10 @@ run:
 
 # run cargo watch
 watch:
-  RUST_LOG={{RUST_LOG}} ENV={{ENV}} cargo watch -x 'run'
+	TLS_CERT="./certs/tls.crt" TLS_KEY="./certs/tls.key" RUST_LOG={{RUST_LOG}} ENV={{ENV}} cargo watch -x 'run'
+
+run-operator:
+	cd ../tembo-operator/ && USE_SHARED_CA=1 DATA_PLANE_BASEDOMAIN=localhost ENABLE_BACKUP=false RUST_LOG=info,kube=info,controller=info cargo run
 
 # format with nightly rustfmt
 fmt:
