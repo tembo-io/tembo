@@ -21,12 +21,8 @@ async fn prometheus_response(response: Response) -> HttpResponse {
 
     match status_code.as_u16() {
         200 => HttpResponse::Ok().json(json_response),
-        400 => {
-            HttpResponse::BadRequest().json("Prometheus reported the query is malformed")
-        }
-        504 | 503 => {
-            HttpResponse::GatewayTimeout().json("Prometheus timeout")
-        }
+        400 => HttpResponse::BadRequest().json("Prometheus reported the query is malformed"),
+        504 | 503 => HttpResponse::GatewayTimeout().json("Prometheus timeout"),
         422 => {
             if json_response["error"]
                 .to_string()
@@ -39,8 +35,10 @@ async fn prometheus_response(response: Response) -> HttpResponse {
         }
         _ => {
             error!("{:?}: {:?}", status_code, &json_response);
-            HttpResponse::InternalServerError()
-                .json(format!("Unexpected response from Prometheus: {}", status_code))
+            HttpResponse::InternalServerError().json(format!(
+                "Unexpected response from Prometheus: {}",
+                status_code
+            ))
         }
     }
 }
