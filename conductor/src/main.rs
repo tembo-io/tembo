@@ -130,11 +130,11 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         .unwrap_or_else(|_| "".to_owned())
         .parse()
         .expect("error parsing CUSTOM_S3_ENDPOINT");
-    let s3_access_key = env::var("CUSTOM_S3_ACCESS_KEY")
+    let s3_access_key: String = env::var("CUSTOM_S3_ACCESS_KEY")
         .unwrap_or_else(|_| "".to_owned())
         .parse()
         .expect("error parsing CUSTOM_S3_ACCESS_KEY");
-    let s3_secret_key = env::var("CUSTOM_S3_SECRET_KEY")
+    let s3_secret_key: String = env::var("CUSTOM_S3_SECRET_KEY")
         .unwrap_or_else(|_| "".to_owned())
         .parse()
         .expect("error parsing CUSTOM_S3_SECRET_KEY");
@@ -1144,8 +1144,8 @@ async fn init_custom_s3_backup_configuration(
 
     // Create S3 credentials configuration
     let s3_credentials = Some(S3Credentials {
-        access_key_id: Some(S3CredentialsAccessKeyId(s3_access_key)),
-        secret_access_key: Some(S3CredentialsSecretAccessKey(s3_secret_key)),
+        access_key_id: Some(S3CredentialsAccessKeyId { key: "ACCESS_KEY_ID".to_string(), name: s3_access_key }),
+        secret_access_key: Some(S3CredentialsSecretAccessKey { key: "ACCESS_SECRET_KEY".to_string(), name: s3_secret_key }),
         region: None,
         inherit_from_iam_role: Some(false),
         session_token: None,
