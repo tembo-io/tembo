@@ -1144,8 +1144,14 @@ async fn init_custom_s3_backup_configuration(
 
     // Create S3 credentials configuration
     let s3_credentials = Some(S3Credentials {
-        access_key_id: Some(S3CredentialsAccessKeyId { key: "ACCESS_KEY_ID".to_string(), name: s3_access_key }),
-        secret_access_key: Some(S3CredentialsSecretAccessKey { key: "ACCESS_SECRET_KEY".to_string(), name: s3_secret_key }),
+        access_key_id: Some(S3CredentialsAccessKeyId {
+            key: "ACCESS_KEY_ID".to_string(),
+            name: s3_access_key,
+        }),
+        secret_access_key: Some(S3CredentialsSecretAccessKey {
+            key: "ACCESS_SECRET_KEY".to_string(),
+            name: s3_secret_key,
+        }),
         region: None,
         inherit_from_iam_role: Some(false),
         session_token: None,
