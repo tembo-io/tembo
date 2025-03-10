@@ -49,7 +49,6 @@ jobs:
       - uses: azure/setup-helm@v4
 
       - uses: extractions/setup-just@v2
-
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: stable

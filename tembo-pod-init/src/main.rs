@@ -1,42 +1,44 @@
-use actix_web::{dev::ServerHandle, web, App, HttpServer};
+use actix_web::{dev::ServerHandle, middleware::Logger, web, App, HttpServer};
 use kube::Client;
-use openssl::ssl::{SslAcceptor, SslFiletype, SslMethod};
+use openssl::ssl::{SslAcceptor, SslAcceptorBuilder, SslFiletype, SslMethod};
 use opentelemetry::global;
 use parking_lot::Mutex;
 use std::sync::Arc;
-use tembo_pod_init::{config::Config, health::*, mutate::mutate, watcher::NamespaceWatcher};
-use tembo_telemetry::{TelemetryConfig, TelemetryInit};
+use tembo_pod_init::{
+    config::Config, health::*, metrics, mutate::mutate, telemetry, watcher::NamespaceWatcher,
+};
 use tracing::*;
+use tracing_actix_web::{DefaultRootSpanBuilder, TracingLogger};
+use uuid::Uuid;
 
-const TRACER_NAME: &str = "tembo.io/tembo-pod-init";
+async fn setup_kubernetes_client() -> Result<Client, kube::Error> {
+    Client::try_default().await
+}
 
 #[instrument(fields(trace_id))]
-#[actix_web::main]
+#[tokio::main]
 async fn main() -> std::io::Result<()> {
     let config = Config::default();
 
-    // Initialize logging
-    let otlp_endpoint_url = &config.opentelemetry_endpoint_url;
-    let telemetry_config = TelemetryConfig {
-        app_name: "tembo-pod-init".to_string(),
-        env: std::env::var("ENV").unwrap_or_else(|_| "production".to_string()),
-        endpoint_url: otlp_endpoint_url.clone(),
-        tracer_id: Some(TRACER_NAME.to_string()),
-    };
-
-    let _ = TelemetryInit::init(&telemetry_config).await;
+    // Initialize logging and tracing
+    let telemetry = telemetry::Telemetry::default();
+    telemetry.init(&config.opentelemetry_endpoint_url);
 
     // Set trace_id for logging
-    let trace_id = telemetry_config.get_trace_id();
+    let trace_id = Uuid::new_v4().to_string();
     Span::current().record("trace_id", field::display(&trace_id));
 
     let stop_handle = web::Data::new(StopHandle::default());
 
     // Setup Kubernetes Client
-    let kube_client = match Client::try_default().await {
+    let kube_client = match setup_kubernetes_client().await {
         Ok(client) => client,
         Err(e) => {
-            panic!("Failed to create Kubernetes client: {}", e);
+            error!("Failed to create Kubernetes client: {}", e);
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::Other,
+                format!("Failed to create Kubernetes client: {}", e),
+            ));
         }
     };
 
@@ -46,13 +48,13 @@ async fn main() -> std::io::Result<()> {
     tokio::spawn(watch_namespaces(watcher));
 
     // Load the TLS certificate and key
-    let mut tls_config = SslAcceptor::mozilla_intermediate(SslMethod::tls()).unwrap();
-    tls_config
-        .set_private_key_file(config.tls_key.clone(), SslFiletype::PEM)
-        .unwrap();
-    tls_config
-        .set_certificate_chain_file(config.tls_cert.clone())
-        .unwrap();
+    let tls_config = match setup_tls_config(&config) {
+        Ok(config) => config,
+        Err(e) => {
+            error!("Failed to set up TLS configuration: {}", e);
+            return Err(e);
+        }
+    };
     let server_bind_address = format!("{}:{}", config.server_host, config.server_port);
 
     let server = HttpServer::new({
@@ -60,7 +62,7 @@ async fn main() -> std::io::Result<()> {
         let kube_data = web::Data::new(Arc::new(kube_client.clone()));
         let namespace_watcher_data = web::Data::new(namespaces.clone());
         let stop_handle = stop_handle.clone();
-        let tc = web::Data::new(telemetry_config.clone());
+        let trace_id_data = web::Data::new(trace_id.clone());
         move || {
             {
                 App::new()
@@ -68,16 +70,18 @@ async fn main() -> std::io::Result<()> {
                     .app_data(kube_data.clone())
                     .app_data(namespace_watcher_data.clone())
                     .app_data(stop_handle.clone())
-                    .app_data(tc.clone())
+                    .app_data(trace_id_data.clone())
+                    .wrap(TracingLogger::<DefaultRootSpanBuilder>::new())
                     .wrap(
-                        tembo_telemetry::get_tracing_logger()
+                        Logger::new("%a \"%r\" %s %b \"%{Referer}i\" \"%{User-Agent}i\" %T")
                             .exclude("/health/liveness")
                             .exclude("/health/readiness")
-                            .build(),
+                            .exclude("/metrics"),
                     )
                     .service(liveness)
                     .service(readiness)
                     .service(mutate)
+                    .service(metrics::metrics)
             }
         }
     })
@@ -114,15 +118,46 @@ impl StopHandle {
 
 #[instrument(skip(watcher))]
 async fn watch_namespaces(watcher: NamespaceWatcher) {
+    const RETRY_DELAY: std::time::Duration = std::time::Duration::from_secs(5);
+    const MAX_CONSECUTIVE_ERRORS: usize = 10;
+
+    let mut consecutive_errors = 0;
+
     loop {
         match watcher.watch().await {
             Ok(_) => {
                 info!("Namespace watcher finished, restarting.");
+                consecutive_errors = 0; // Reset error counter on success
             }
             Err(e) => {
-                error!("Namespace watcher failed, restarting: {}", e);
-                tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+                consecutive_errors += 1;
+                error!(
+                    "Namespace watcher failed (attempt {}/{}), restarting: {}",
+                    consecutive_errors, MAX_CONSECUTIVE_ERRORS, e
+                );
+
+                if consecutive_errors >= MAX_CONSECUTIVE_ERRORS {
+                    error!("Too many consecutive errors in namespace watcher, giving up");
+                    break;
+                }
+
+                tokio::time::sleep(RETRY_DELAY).await;
             }
         }
     }
+}
+
+fn setup_tls_config(config: &Config) -> Result<SslAcceptorBuilder, std::io::Error> {
+    let mut tls_config = SslAcceptor::mozilla_intermediate(SslMethod::tls())
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+
+    tls_config
+        .set_private_key_file(&config.tls_key, SslFiletype::PEM)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+
+    tls_config
+        .set_certificate_chain_file(&config.tls_cert)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+
+    Ok(tls_config)
 }

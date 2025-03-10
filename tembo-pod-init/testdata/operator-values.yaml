@@ -1,12 +1,5 @@
-image:
-  # This to get tests of conductor to use
-  # new version of operator.
-  # Delete this after merge.
-  tag: latest
-env:
-  - name: ENABLE_INITIAL_BACKUP
-    value: "false"
-  - name: RUST_LOG
-    value: debug,kube=debug,controller=debug
-  - name: OPENTELEMETRY_ENDPOINT_URL
-    value: http://tempo.monitoring.svc.cluster.local:4317
+controller:
+  enabled: false
+
+pod-init:
+  enabled: false

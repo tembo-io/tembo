@@ -10,7 +10,6 @@ use kube::{
     Api, Resource, ResourceExt,
 };
 use passwords::PasswordGenerator;
-use percent_encoding::{utf8_percent_encode, NON_ALPHANUMERIC};
 use std::{collections::BTreeMap, sync::Arc};
 use tokio::time::Duration;
 use tracing::{debug, error};

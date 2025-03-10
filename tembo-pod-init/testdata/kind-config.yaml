@@ -1,0 +1,17 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+networking:
+  disableDefaultCNI: true
+  podSubnet: 192.168.0.0/16
+nodes:
+  - role: control-plane
+  - role: worker
+    extraPortMappings:
+      - containerPort: 32432
+        hostPort: 5432
+        listenAddress: "127.0.0.1"
+        protocol: TCP
+      - containerPort: 32431
+        hostPort: 9000
+        listenAddress: "127.0.0.1"
+        protocol: TCP

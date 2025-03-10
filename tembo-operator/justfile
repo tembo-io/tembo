@@ -114,7 +114,6 @@ setup-cluster:
 	just install-calico
 	just install-reflector
 	just install-kube-prometheus-stack
-	just install-tempo
 	just install-traefik
 	just install-minio
 	just install-operator

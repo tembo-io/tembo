@@ -473,8 +473,7 @@ pub async fn create_cloudformation(
             cf_template_bucket,
             aws_region,
         )
-        .await
-        .map_err(ConductorError::from)?;
+        .await?;
     Ok(())
 
     // We will need to setup a requeuing system at somepoint to query for status
@@ -493,8 +492,7 @@ pub async fn delete_cloudformation(
     let stack_name = format!("{}-cf", namespace);
     aws_config_state
         .delete_cloudformation_stack(&stack_name)
-        .await
-        .map_err(ConductorError::from)?;
+        .await?;
     Ok(())
 }
 
@@ -526,8 +524,7 @@ async fn get_stack_outputs(
     // "cloudformation is not done yet" and return a more specific error
     let (role_name, role_arn) = aws_config_state
         .lookup_cloudformation_stack(&stack_name)
-        .await
-        .map_err(ConductorError::from)?;
+        .await?;
     let stack_outputs = StackOutputs {
         role_name,
         role_arn,
