@@ -130,14 +130,6 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         .unwrap_or_else(|_| "".to_owned())
         .parse()
         .expect("error parsing CUSTOM_S3_ENDPOINT");
-    let s3_access_key: String = env::var("CUSTOM_S3_ACCESS_KEY")
-        .unwrap_or_else(|_| "".to_owned())
-        .parse()
-        .expect("error parsing CUSTOM_S3_ACCESS_KEY");
-    let s3_secret_key: String = env::var("CUSTOM_S3_SECRET_KEY")
-        .unwrap_or_else(|_| "".to_owned())
-        .parse()
-        .expect("error parsing CUSTOM_S3_SECRET_KEY");
 
     // Error and exit if CF_TEMPLATE_BUCKET is not set when IS_CLOUD_FORMATION is enabled
     if is_cloud_formation && cf_template_bucket.is_empty() {
@@ -428,8 +420,6 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     &mut coredb_spec,
                     s3_bucket.clone(),
                     s3_endpoint.clone(),
-                    s3_access_key.clone(),
-                    s3_secret_key.clone(),
                 )
                 .await?;
 
@@ -1126,8 +1116,6 @@ async fn init_custom_s3_backup_configuration(
     coredb_spec: &mut CoreDBSpec,
     s3_bucket: String,
     s3_endpoint: String,
-    s3_access_key: String,
-    s3_secret_key: String,
 ) -> Result<(), ConductorError> {
     if !is_custom_s3_backup {
         return Ok(());
@@ -1146,11 +1134,11 @@ async fn init_custom_s3_backup_configuration(
     let s3_credentials = Some(S3Credentials {
         access_key_id: Some(S3CredentialsAccessKeyId {
             key: "ACCESS_KEY_ID".to_string(),
-            name: s3_access_key,
+            name: "custom-s3-creds".to_string(),
         }),
         secret_access_key: Some(S3CredentialsSecretAccessKey {
             key: "ACCESS_SECRET_KEY".to_string(),
-            name: s3_secret_key,
+            name: "custom-s3-creds".to_string(),
         }),
         region: None,
         inherit_from_iam_role: Some(false),
