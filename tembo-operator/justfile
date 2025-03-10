@@ -53,7 +53,6 @@ install-minio:
 install-reflector:
 	helm upgrade --install \
 		reflector emberstack/reflector \
-		--version 7.1.288 \
 	  --namespace reflector \
 		--create-namespace
 

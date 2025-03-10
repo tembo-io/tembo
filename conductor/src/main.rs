@@ -749,7 +749,7 @@ async fn main() -> std::io::Result<()> {
     global::set_meter_provider(provider);
 
     // Get a meter from the global provider
-    let meter = global::meter("actix_web");
+    let meter = global::meter("conductor");
     let custom_metrics = CustomMetrics::new(&meter);
 
     let background_threads: Arc<Mutex<Vec<tokio::task::JoinHandle<()>>>> =

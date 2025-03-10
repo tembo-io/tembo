@@ -11,7 +11,7 @@ pub struct CustomMetrics {
 impl CustomMetrics {
     pub fn new(meter: &Meter) -> Self {
         let conductor_total = meter
-            .u64_counter("conductor_total")
+            .u64_counter("conductor")
             .with_description("Total number of dequeues in conductor")
             .build();
         let conductor_requeues = meter
