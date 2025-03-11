@@ -43,6 +43,9 @@ const REQUEUE_VT_SEC_SHORT: i32 = 5;
 // that we would want to try again after awhile.
 const REQUEUE_VT_SEC_LONG: i32 = 300;
 
+// Amount of time to wait after attempting to delete a CoreDB instance
+const REQUEUE_DELETE_VT_SEC: i32 = 60;
+
 async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
     let pg_conn_url =
         env::var("POSTGRES_QUEUE_CONNECTION").expect("POSTGRES_QUEUE_CONNECTION must be set");
@@ -531,7 +534,24 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
             Event::Delete => {
                 // Delete CoreDB and Namespace
                 info!("{}: Deleting instance {}", read_msg.msg_id, &namespace);
-                delete_coredb_and_namespace(client.clone(), &namespace, &namespace).await?;
+                let deleted: bool =
+                    delete_coredb_and_namespace(client.clone(), &namespace, &namespace).await?;
+                if !deleted {
+                    info!(
+                        "msg_id:{}, ns: {} delete not complete, requeue for {} seconds",
+                        read_msg.msg_id, &namespace, REQUEUE_DELETE_VT_SEC
+                    );
+                    let _ = queue
+                        .set_vt::<CRUDevent>(
+                            &control_plane_events_queue,
+                            read_msg.msg_id,
+                            REQUEUE_DELETE_VT_SEC,
+                        )
+                        .await?;
+                    // requeue the delete event
+                    // don't process the remainder of the delete event until CoreDB and NS are deleted
+                    continue;
+                }
 
                 if is_cloud_formation {
                     info!("{}: Deleting cloudformation stack", read_msg.msg_id);
