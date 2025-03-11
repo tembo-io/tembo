@@ -1,6 +1,6 @@
 controller:
   image:
-    tag: "fd5caf6"
+    tag: latest
   extraEnv:
     - name: ENABLE_BACKUP
       value: "false"
@@ -9,7 +9,7 @@ controller:
 
 pod-init:
   image:
-    tag: "fd5caf6"
+    tag: latest
   logLevel: info
   extraEnv:
     - name: RUST_LOG
