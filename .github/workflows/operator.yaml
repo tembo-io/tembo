@@ -47,7 +47,6 @@ jobs:
           sudo apt-get install -y pkg-config libssl-dev git wget build-essential
 
       - uses: azure/setup-helm@v4
-
       - uses: extractions/setup-just@v2
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -125,3 +124,6 @@ jobs:
             kubectl -n $ns get coredb -o yaml
             kubectl -n $ns get clusters -o yaml
           done
+          echo "========== tembo-system logs =========="
+          kubectl logs -n tembo-system -l app=tembo-controller
+          kubectl logs -n tembo-system -l app=tembo-pod-init

@@ -3,11 +3,8 @@ controller:
 
 pod-init:
   image:
-    tag: latest
+    tag: "fd5caf6"
   logLevel: info
-  extraEnv:
-    - name: OPENTELEMETRY_ENDPOINT_URL
-      value: http://tempo.monitoring.svc.cluster.local:4317
   resources:
     requests:
       cpu: 50m

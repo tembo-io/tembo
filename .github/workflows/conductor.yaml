@@ -26,7 +26,7 @@ jobs:
     runs-on:
       - self-hosted
       - dind
-      - xlarge-16x16
+      - large-8x8
     strategy:
       # fail-fast means to cancel all jobs if one fails
       fail-fast: false
@@ -40,24 +40,40 @@ jobs:
           set -xe
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev git wget build-essential
-      - uses: azure/setup-helm@v3
-      - uses: extractions/setup-just@v1
+
+      - uses: azure/setup-helm@v4
+      - uses: extractions/setup-just@v2
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
       - name: Install kind
         uses: helm/kind-action@v1
         with:
           install_only: true
-      - uses: dtolnay/rust-toolchain@stable
+          version: "v0.27.0"
+
+      # Cache Helm repositories and charts
+      - name: Cache Helm repositories and charts
+        id: cache-helm
+        uses: actions/cache@v3
         with:
-          toolchain: stable
+          path: |
+            ~/.cache/helm
+            ~/.helm
+          key: helm-cache-${{ runner.os }}-${{ hashFiles('tembo-operator/testdata/*.yaml') }}
+
       - uses: Swatinem/rust-cache@v2
         with:
           prefix-key: "conductor-functional-test"
           workspaces: |
             conductor
-      - uses: aws-actions/configure-aws-credentials@v2
+
+      - uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: "us-east-1"
           role-to-assume: "arn:aws:iam::484221059514:role/cdb-plat-use1-dev-data-1-conductor-gha"
+
       - uses: unfor19/install-aws-cli-action@v1
       - name: Setup local test cluster
         run: |
@@ -71,31 +87,38 @@ jobs:
       - name: Run functional / integration tests
         run: |
           set -xe
-          cargo install cargo-watch
-          cargo build
           # Start conductor in the background
-          just watch > conductor-output.txt 2>&1 &
+          just run > conductor-output.txt 2>&1 &
+          CONDUCTOR_PID=$!
           # Wait long enough that the server build grabs the cargo build lock file
           # before the test does
-          sleep 5
-          # Run the tests
-          cargo test -- --ignored --nocapture
+          sleep 10
+          # Run the tests with timeout to prevent hanging
+          timeout 50m cargo test -- --ignored --nocapture
+          TEST_EXIT=$?
+
+          # Kill the conductor webserver
+          kill $CONDUCTOR_PID || true
+
+          exit $TEST_EXIT
+
       - name: Debugging information
         if: always()
         run: |
           set +e
           set -x
-          echo "=========="
+          echo "========== Operator Output =========="
           cat conductor-output.txt
-          echo "=========="
-          kubectl get pods --all-namespaces
-          echo "=========="
-          kubectl get -o yaml sts --all-namespaces
-          echo "=========="
-          kubectl get -o yaml svc --all-namespaces
-          echo "=========="
-          kubectl get -o yaml pods --all-namespaces
-          echo "=========="
-          kubectl get -o yaml coredb --all-namespaces
-          echo "=========="
+          echo "========== Kubernetes Resources =========="
+          kubectl get pods -A
+          for ns in $(kubectl get ns -o jsonpath='{.items[*].metadata.name}' | tr ' ' '\n' | grep '^org-.*-inst-'); do
+            echo "==== Namespace: $ns ===="
+            kubectl -n $ns get pods -o wide
+            kubectl -n $ns describe pods
+            kubectl -n $ns get events --sort-by='.lastTimestamp'
+            kubectl -n $ns get coredb -o yaml
+            kubectl -n $ns get clusters -o yaml
+          done
+          echo "========== tembo-system logs =========="
           kubectl logs -n tembo-system -l app=tembo-controller
+          kubectl logs -n tembo-system -l app=tembo-pod-init
