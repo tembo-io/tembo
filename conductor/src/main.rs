@@ -13,7 +13,6 @@ use conductor::{
 
 use crate::metrics_reporter::run_metrics_reporter;
 use crate::status_reporter::run_status_reporter;
-use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use conductor::routes::health::background_threads_running;
 use controller::apis::coredb_types::{
     AzureCredentials, Backup, CoreDBSpec, GoogleCredentials, S3Credentials,
@@ -1140,10 +1139,6 @@ async fn init_custom_s3_backup_configuration(
     if !is_custom_s3_backup {
         return Ok(());
     }
-
-    // Create the Kubernetes secret for S3 credentials
-    // let encoded_access_key = BASE64.encode(access_key_id.as_bytes());
-    // let encoded_secret_key = BASE64.encode(secret_access_key.as_bytes());
 
     let mut data = std::collections::BTreeMap::new();
     data.insert(
