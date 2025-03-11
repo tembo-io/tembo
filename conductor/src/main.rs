@@ -4,11 +4,11 @@ use conductor::errors::ConductorError;
 use conductor::monitoring::CustomMetrics;
 use conductor::{
     cloud::CloudProvider, create_azure_storage_workload_identity_binding, create_cloudformation,
-    create_gcp_storage_workload_identity_binding, create_namespace, create_or_update, delete,
+    create_gcp_storage_workload_identity_binding, create_namespace, create_or_update,
     delete_azure_storage_workload_identity_binding, delete_cloudformation,
-    delete_gcp_storage_workload_identity_binding, delete_namespace, generate_cron_expression,
-    generate_spec, get_coredb_error_without_status, get_one, get_pg_conn, lookup_role_arn,
-    restart_coredb, types,
+    delete_coredb_and_namespace, delete_gcp_storage_workload_identity_binding,
+    generate_cron_expression, generate_spec, get_coredb_error_without_status, get_one, get_pg_conn,
+    lookup_role_arn, restart_coredb, types,
 };
 use opentelemetry_sdk::{metrics::SdkMeterProvider, Resource};
 
@@ -569,13 +569,9 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                 }
             }
             Event::Delete => {
-                // delete CoreDB
+                // Delete CoreDB and Namespace
                 info!("{}: Deleting instance {}", read_msg.msg_id, &namespace);
-                delete(client.clone(), &namespace, &namespace).await?;
-
-                // delete namespace
-                info!("{}: Deleting namespace {}", read_msg.msg_id, &namespace);
-                delete_namespace(client.clone(), &namespace).await?;
+                delete_coredb_and_namespace(client.clone(), &namespace, &namespace).await?;
 
                 if is_cloud_formation {
                     info!("{}: Deleting cloudformation stack", read_msg.msg_id);

@@ -1,4 +1,4 @@
-FROM quay.io/tembo/rust:1.85-bookworm as builder
+FROM quay.io/tembo/rust:1.85-bookworm AS builder
 WORKDIR /
 COPY tembo-operator ./tembo-operator
 WORKDIR /build
@@ -15,10 +15,13 @@ COPY metrics.yml .
 
 RUN cargo build --release
 
-FROM quay.io/tembo/rust:1.85.0-chainguard
-COPY --from=builder /build/target/release/conductor /usr/bin/conductor
-USER nonroot
-EXPOSE 8443
-
-CMD ["/usr/bin/conductor"]
-
+FROM quay.io/tembo/debian:12.9-slim
+RUN set -eux; \
+  apt-get update; \
+  apt-get upgrade -y; \
+  apt-get install -y ca-certificates openssl; \
+  apt-get clean; \
+  apt-get autoremove -y; \
+  apt-get clean; \
+  rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
+COPY --from=builder /usr/local/cargo/bin/* /usr/local/bin/

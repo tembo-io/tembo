@@ -1,23 +1,19 @@
 controller:
   image:
-    tag: latest
+    tag: "fd5caf6"
   extraEnv:
     - name: ENABLE_BACKUP
       value: "false"
     - name: RUST_LOG
       value: info,kube=info,controller=info
-    - name: OPENTELEMETRY_ENDPOINT_URL
-      value: http://tempo.monitoring.svc.cluster.local:4317
 
 pod-init:
   image:
-    tag: latest
+    tag: "fd5caf6"
   logLevel: info
   extraEnv:
     - name: RUST_LOG
       value: debug
-    - name: OPENTELEMETRY_ENDPOINT_URL
-      value: http://tempo.monitoring.svc.cluster.local:4317
   resources:
     requests:
       cpu: 50m
