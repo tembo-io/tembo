@@ -33,7 +33,7 @@ prometheus = "0.13"
 sqlx = { version = "0.8", features = ["runtime-tokio-native-tls", "postgres"] }
 anyhow = "1.0.82"
 serde_yaml = "0.9.34"
-reqwest = { version = "0.12.3", features = ["json"] }
+reqwest = { version = "=0.12.12", features = ["json"] }
 google-cloud-storage = "=0.22.1"
 azure_identity = "0.21"
 azure_mgmt_msi = "0.21"
