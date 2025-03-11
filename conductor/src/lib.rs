@@ -197,15 +197,40 @@ pub async fn create_or_update(
 }
 
 pub async fn delete(client: Client, namespace: &str, name: &str) -> Result<(), ConductorError> {
-    let coredb_api: Api<CoreDB> = Api::namespaced(client, namespace);
+    let coredb_api: Api<CoreDB> = Api::namespaced(client.clone(), namespace);
     let params = DeleteParams::default();
     info!("\nDeleting CoreDB: {}", name);
-    let _ = coredb_api
+
+    // Initiate deletion and handle errors
+    coredb_api
         .delete(name, &params)
         .await
-        .map_err(ConductorError::KubeError);
+        .map_err(ConductorError::KubeError)?;
 
-    Ok(())
+    // Wait for the resource to be fully deleted
+    let timeout = std::time::Duration::from_secs(120); // 2 minute timeout
+    let start = std::time::Instant::now();
+
+    while start.elapsed() < timeout {
+        match coredb_api.get(name).await {
+            Ok(_) => {
+                // Resource still exists, wait a bit and retry
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+            }
+            Err(kube::Error::Api(err)) if err.code == 404 => {
+                // Resource is gone (404 Not Found)
+                info!("CoreDB {} successfully deleted", name);
+                return Ok(());
+            }
+            Err(e) => {
+                // Some other error occurred while checking
+                return Err(ConductorError::KubeError(e));
+            }
+        }
+    }
+
+    // If we get here, we timed out waiting for deletion
+    Err(ConductorError::DataplaneError(format!("Timed out waiting for CoreDB {} to be deleted", name)))
 }
 
 pub async fn create_namespace(
@@ -253,7 +278,7 @@ pub async fn delete_namespace(client: Client, name: &str) -> Result<(), Conducto
     let _ = ns_api
         .delete(name, &params)
         .await
-        .map_err(ConductorError::KubeError);
+        .map_err(ConductorError::KubeError)?;
 
     Ok(())
 }

@@ -1,6 +1,6 @@
 controller:
   image:
-    tag: latest
+    tag: "fd5caf6"
   extraEnv:
     - name: ENABLE_BACKUP
       value: "false"
