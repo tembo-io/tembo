@@ -548,6 +548,8 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                             REQUEUE_DELETE_VT_SEC,
                         )
                         .await?;
+                    // requeue the delete event
+                    // don't process the remainder of the delete event until CoreDB and NS are deleted
                     continue;
                 }
 
