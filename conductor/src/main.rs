@@ -136,14 +136,14 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         .unwrap_or_else(|_| "".to_owned())
         .parse()
         .expect("error parsing CUSTOM_S3_ENDPOINT");
-    let access_key_id: String = env::var("CUSTOM_ACCESS_KEY_ID")
+    let access_key_id: String = env::var("CUSTOM_S3_ACCESS_KEY_ID")
         .unwrap_or_else(|_| "".to_owned())
         .parse()
-        .expect("error parsing CUSTOM_ACCESS_KEY_ID");
-    let secret_access_key: String = env::var("CUSTOM_SECRET_ACCESS_KEY")
+        .expect("error parsing CUSTOM_S3_ACCESS_KEY_ID");
+    let secret_access_key: String = env::var("CUSTOM_S3_SECRET_ACCESS_KEY")
         .unwrap_or_else(|_| "".to_owned())
         .parse()
-        .expect("error parsing CUSTOM_SECRET_ACCESS_KEY");
+        .expect("error parsing CUSTOM_S3_SECRET_ACCESS_KEY");
 
     // Error and exit if CF_TEMPLATE_BUCKET is not set when IS_CLOUD_FORMATION is enabled
     if is_cloud_formation && cf_template_bucket.is_empty() {
@@ -1142,17 +1142,17 @@ async fn init_custom_s3_backup_configuration(
     }
 
     // Create the Kubernetes secret for S3 credentials
-    let encoded_access_key = BASE64.encode(access_key_id.as_bytes());
-    let encoded_secret_key = BASE64.encode(secret_access_key.as_bytes());
+    // let encoded_access_key = BASE64.encode(access_key_id.as_bytes());
+    // let encoded_secret_key = BASE64.encode(secret_access_key.as_bytes());
 
     let mut data = std::collections::BTreeMap::new();
     data.insert(
         "ACCESS_KEY_ID".to_string(),
-        ByteString(encoded_access_key.into_bytes()),
+        ByteString(access_key_id.into_bytes()),
     );
     data.insert(
         "SECRET_ACCESS_KEY".to_string(),
-        ByteString(encoded_secret_key.into_bytes()),
+        ByteString(secret_access_key.into_bytes()),
     );
 
     let secret = Secret {
