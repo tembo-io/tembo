@@ -516,8 +516,6 @@ pub enum TrunkError {
     ProjectNotFound(String),
     #[error("Failed to fetch metadata from trunk: {0}")]
     NetworkFailure(#[from] reqwest::Error),
-    #[error("Failed to apply trunk configmap")]
-    ConfigMapApplyError,
     #[error("Extension with version '{0}' not found")]
     ExtensionVersionNotFound(String),
     #[error("Trunk project with version '{0}' not found")]

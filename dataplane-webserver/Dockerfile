@@ -1,17 +1,11 @@
-FROM quay.io/tembo/rust:1.79-slim
-
-RUN apt-get update \
-    && apt-get install -y pkg-config libssl-dev \
-    && rm -rf /var/lib/apt/lists/*
-
+FROM quay.io/tembo/rust:1.85-bookworm as builder
 WORKDIR /build
-
-ENV CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
-
 COPY . .
-
 RUN cargo build --release
 
-RUN cp /build/target/release/dataplane_webserver /usr/local/bin/dataplane_webserver
+FROM quay.io/tembo/rust:1.85.0-chainguard
+COPY --from=builder /build/target/release/dataplane_webserver /usr/bin/dataplane_webserver
+USER nonroot
+EXPOSE 8443
 
-CMD ["/usr/local/bin/dataplane_webserver"]
+CMD ["/usr/bin/dataplane_webserver"]

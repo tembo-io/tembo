@@ -1,3 +1,4 @@
+use crate::metrics;
 use actix_web::{post, web, HttpResponse, Responder};
 use json_patch::{diff, Patch};
 use k8s_openapi::api::core::v1::{Pod, VolumeMount};
@@ -9,45 +10,76 @@ use kube::Client;
 use serde_json::json;
 use std::collections::HashSet;
 use std::sync::Arc;
-use tembo_telemetry::TelemetryConfig;
+use std::time::Instant;
 use tokio::sync::RwLock;
 use tracing::*;
 
 use crate::{config::Config, container::*};
 
-#[instrument(skip(client), fields(trace_id))]
+#[instrument(skip(client, body), fields(trace_id))]
 #[post("/mutate")]
 async fn mutate(
     body: web::Json<AdmissionReview<Pod>>,
     config: web::Data<Config>,
     namespaces: web::Data<Arc<RwLock<HashSet<String>>>>,
     client: web::Data<Arc<Client>>,
-    tc: web::Data<TelemetryConfig>,
+    trace_id: web::Data<String>,
 ) -> impl Responder {
-    // Set trace_id for logging
-    let trace_id = tc.get_trace_id();
-    Span::current().record("trace_id", field::display(&trace_id));
+    let start_time = Instant::now();
 
-    // Extract the AdmissionRequest from the AdmissionReview
-    let admission_request: AdmissionRequest<Pod> = body.clone().request.unwrap();
+    // Set trace_id for logging
+    Span::current().record("trace_id", field::display(&trace_id.as_ref()));
+
+    // Extract namespace and resource info for metrics
+    let namespace = body
+        .request
+        .as_ref()
+        .and_then(|req| req.namespace.as_ref())
+        .unwrap_or(&"unknown".to_string())
+        .clone();
+
+    let resource = "Pod";
+    let operation = body
+        .request
+        .as_ref()
+        .map(|req| req.operation.clone())
+        .unwrap_or_else(|| kube::core::admission::Operation::Create);
+
+    let operation_str = format!("{:?}", operation);
 
     // Check if the namespace is in the list of namespaces to watch
-    let namespace = admission_request.namespace.as_ref().unwrap();
-
-    if !namespaces.read().await.contains(namespace) {
+    if !namespaces.read().await.contains(&namespace) {
         debug!(
             "Namespace {} is not in the list of namespaces to watch",
             namespace
         );
-        return HttpResponse::Ok().json(AdmissionReview {
-            response: Some(mk_allow_response(&admission_request, None)),
-            request: Some(admission_request),
-            types: TypeMeta {
-                api_version: "admission.k8s.io/v1".to_string(),
-                kind: "AdmissionReview".to_string(),
-            },
-        });
+
+        // Record metric for skipped namespace
+        metrics::increment_request_counter(
+            &namespace,
+            &operation_str,
+            resource,
+            "skipped_namespace",
+        );
+
+        return match &body.request {
+            Some(request) => HttpResponse::Ok().json(AdmissionReview {
+                response: Some(mk_allow_response(request, None)),
+                request: Some(request.clone()),
+                types: TypeMeta {
+                    api_version: "admission.k8s.io/v1".to_string(),
+                    kind: "AdmissionReview".to_string(),
+                },
+            }),
+            None => {
+                metrics::increment_error_counter(&namespace, "missing_request");
+                HttpResponse::BadRequest().body("expected AdmissionRequest")
+            }
+        };
     }
+
+    // Extract the AdmissionRequest from the AdmissionReview
+    let admission_request: AdmissionRequest<Pod> = body.clone().request.unwrap();
 
     // Check for the kind of resource in the AdmissionRequest, we only
     // care about Pod resources
@@ -72,18 +104,7 @@ async fn mutate(
     }
 
     // Extract the Pod from the AdmissionRequest
-    let ar: AdmissionReview<Pod> = body.into_inner();
-    let pod: Option<&Pod> = match &ar.request {
-        Some(request) => {
-            debug!("Got AdmissionRequest: {:?}", ar.request);
-            request.object.as_ref()
-        }
-        None => {
-            return HttpResponse::BadRequest().body("expected AdmissionRequest");
-        }
-    };
-
-    let pod = match pod {
+    let pod = match body.request.as_ref().and_then(|req| req.object.as_ref()) {
         Some(pod) => {
             debug!("Got Pod: {:?}", pod);
             pod
@@ -101,16 +122,17 @@ async fn mutate(
         .and_then(|labels| labels.get("cnpg.io/cluster"))
         .map(|s| s.to_string());
 
+    // Check if the pod has the required annotation
     if !pod
         .metadata
         .annotations
         .as_ref()
         .is_some_and(|annotations| annotations.contains_key(&config.pod_annotation))
     {
-        return match ar.request {
+        return match &body.request {
             Some(request) => HttpResponse::Ok().json(AdmissionReview {
-                response: Some(mk_allow_response(&request, None)),
-                request: Some(request),
+                response: Some(mk_allow_response(request, None)),
+                request: Some(request.clone()),
                 types: TypeMeta {
                     api_version: "admission.k8s.io/v1".to_string(),
                     kind: "AdmissionReview".to_string(),
@@ -129,6 +151,7 @@ async fn mutate(
         );
         // set message to say that the pod does not have all required volumes
         let message = "Pod spec does not contain all required volumes, will not mutate";
+        metrics::increment_error_counter(&namespace, "required_volumes_missing");
         return HttpResponse::Ok().json(AdmissionReview {
             response: Some(mk_deny_response(&admission_request, message)),
             request: Some(admission_request),
@@ -159,7 +182,7 @@ async fn mutate(
             );
         } else {
             let init_container =
-                create_init_container(&config, &client, namespace, &cluster_name.unwrap()).await;
+                create_init_container(&config, &client, &namespace, &cluster_name.unwrap()).await;
             let init_containers = spec.init_containers.take().unwrap_or_default();
             let mut new_init_containers = vec![init_container];
             new_init_containers.extend(init_containers);
@@ -170,6 +193,7 @@ async fn mutate(
             "Pod spec is missing, cannot inject initContainer: {:?}",
             pod.clone()
         );
+        metrics::increment_error_counter(&namespace, "pod_spec_missing");
     };
 
     // Mutate a Pod when the container name is Postgres and add a scratch
@@ -186,9 +210,11 @@ async fn mutate(
                 sub_path: None,
                 read_only: None,
                 sub_path_expr: None,
+                ..Default::default()
             };
 
             add_volume_mounts(postgres_container, volume_mount);
+            metrics::increment_volume_mutations(&namespace, "scratch-data");
         } else {
             warn!("Postgres container not found");
         }
@@ -204,6 +230,17 @@ async fn mutate(
     };
     debug!("AdmissionResponse: {:?}", admission_response);
 
+    // Update the request duration metric
+    let duration = start_time.elapsed().as_secs_f64();
+    metrics::observe_request_duration(&namespace, &operation_str, resource, duration);
+
+    metrics::increment_request_counter(
+        &namespace,
+        &operation_str,
+        resource,
+        "allowed_with_mutation",
+    );
+    metrics::increment_mutation_counter(&namespace, resource, "init_container_added");
     HttpResponse::Ok().json(AdmissionReview {
         response: Some(admission_response),
         request: Some(admission_request),
