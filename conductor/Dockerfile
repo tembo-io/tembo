@@ -13,7 +13,7 @@ COPY ./src ./src
 COPY ./migrations ./migrations
 COPY metrics.yml .
 
-RUN cargo build --release
+RUN cargo install --path .
 
 FROM quay.io/tembo/debian:12.9-slim
 RUN set -eux; \
