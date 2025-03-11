@@ -230,7 +230,10 @@ pub async fn delete(client: Client, namespace: &str, name: &str) -> Result<(), C
     }
 
     // If we get here, we timed out waiting for deletion
-    Err(ConductorError::DataplaneError(format!("Timed out waiting for CoreDB {} to be deleted", name)))
+    Err(ConductorError::DataplaneError(format!(
+        "Timed out waiting for CoreDB {} to be deleted",
+        name
+    )))
 }
 
 pub async fn create_namespace(
