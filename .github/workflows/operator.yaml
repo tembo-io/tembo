@@ -29,9 +29,7 @@ jobs:
   functional_test:
     name: Run functional testing
     runs-on:
-      - self-hosted
-      - dind
-      - large-8x8
+      - operator-runner-8x32
     strategy:
       # fail-fast means to cancel all jobs if one fails
       fail-fast: false
