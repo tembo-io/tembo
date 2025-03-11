@@ -3,7 +3,7 @@ controller:
 
 pod-init:
   image:
-    tag: "fd5caf6"
+    tag: latest
   logLevel: info
   resources:
     requests:
