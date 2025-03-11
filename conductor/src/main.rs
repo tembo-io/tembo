@@ -13,14 +13,19 @@ use conductor::{
 
 use crate::metrics_reporter::run_metrics_reporter;
 use crate::status_reporter::run_status_reporter;
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
 use conductor::routes::health::background_threads_running;
 use controller::apis::coredb_types::{
     AzureCredentials, Backup, CoreDBSpec, GoogleCredentials, S3Credentials,
     S3CredentialsAccessKeyId, S3CredentialsSecretAccessKey, ServiceAccountTemplate, VolumeSnapshot,
 };
 use controller::apis::postgres_parameters::{ConfigValue, PgConfig};
+use k8s_openapi::api::core::v1::Secret;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+use k8s_openapi::ByteString;
+use kube::Api;
 use kube::Client;
+use kube::api::PostParams;
 use log::{debug, error, info, warn};
 use opentelemetry::sdk::export::metrics::aggregation;
 use opentelemetry::sdk::metrics::{controllers, processors, selectors};
@@ -130,6 +135,14 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         .unwrap_or_else(|_| "".to_owned())
         .parse()
         .expect("error parsing CUSTOM_S3_ENDPOINT");
+    let access_key_id: String = env::var("CUSTOM_ACCESS_KEY_ID")
+        .unwrap_or_else(|_| "".to_owned())
+        .parse()
+        .expect("error parsing CUSTOM_ACCESS_KEY_ID");
+    let secret_access_key: String = env::var("CUSTOM_SECRET_ACCESS_KEY")
+        .unwrap_or_else(|_| "".to_owned())
+        .parse()
+        .expect("error parsing CUSTOM_SECRET_ACCESS_KEY");
 
     // Error and exit if CF_TEMPLATE_BUCKET is not set when IS_CLOUD_FORMATION is enabled
     if is_cloud_formation && cf_template_bucket.is_empty() {
@@ -420,6 +433,8 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     &mut coredb_spec,
                     s3_bucket.clone(),
                     s3_endpoint.clone(),
+                    access_key_id.clone(),
+                    secret_access_key.clone(),
                 )
                 .await?;
 
@@ -1116,10 +1131,55 @@ async fn init_custom_s3_backup_configuration(
     coredb_spec: &mut CoreDBSpec,
     s3_bucket: String,
     s3_endpoint: String,
+    access_key_id: String,
+    secret_access_key: String,
 ) -> Result<(), ConductorError> {
     if !is_custom_s3_backup {
         return Ok(());
     }
+
+    // Create the Kubernetes secret for S3 credentials
+    let encoded_access_key = BASE64.encode(access_key_id.as_bytes());
+    let encoded_secret_key = BASE64.encode(secret_access_key.as_bytes());
+
+    let mut data = std::collections::BTreeMap::new();
+    data.insert(
+        "ACCESS_KEY_ID".to_string(),
+        ByteString(encoded_access_key.into_bytes()),
+    );
+    data.insert(
+        "SECRET_ACCESS_KEY".to_string(),
+        ByteString(encoded_secret_key.into_bytes()),
+    );
+
+    let secret = Secret {
+        metadata: ObjectMeta {
+            name: Some("custom-s3-creds".to_string()),
+            namespace: Some(read_msg.message.namespace.clone()),
+            ..ObjectMeta::default()
+        },
+        data: Some(data),
+        ..Secret::default()
+    };
+
+    // Create or update the secret in Kubernetes
+    let client = Client::try_default().await?;
+    let secrets_api = Api::<Secret>::namespaced(client, &read_msg.message.namespace);
+    let result = secrets_api.create(&PostParams::default(), &secret).await;
+
+    match result {
+        Ok(_) => Ok(()),
+        Err(e) => {
+            if e.to_string().contains("already exists") {
+                secrets_api
+                    .replace("custom-s3-creds", &PostParams::default(), &secret)
+                    .await
+                    .map(|_| ())
+            } else {
+                Err(e)
+            }
+        }
+    }?;
 
     let write_path = read_msg
         .message
