@@ -241,7 +241,10 @@ async fn delete(client: Client, namespace: &str, name: &str) -> Result<(), Condu
         }
     }
 
-    info!("Timeout waiting for CoreDB {} to be deleted, but continuing", name);
+    info!(
+        "Timeout waiting for CoreDB {} to be deleted, but continuing",
+        name
+    );
     Ok(())
 }
 
@@ -291,7 +294,10 @@ async fn delete_namespace(client: Client, name: &str) -> Result<(), ConductorErr
     // Initiate namespace deletion
     match ns_api.delete(name, &params).await {
         Ok(_) => {
-            info!("Delete request for namespace {} initiated successfully", name);
+            info!(
+                "Delete request for namespace {} initiated successfully",
+                name
+            );
         }
         Err(kube::Error::Api(err)) if err.code == 404 => {
             // Namespace doesn't exist, log and continue
@@ -328,7 +334,10 @@ async fn delete_namespace(client: Client, name: &str) -> Result<(), ConductorErr
         }
     }
 
-    info!("Timeout waiting for namespace {} to be deleted, but continuing", name);
+    info!(
+        "Timeout waiting for namespace {} to be deleted, but continuing",
+        name
+    );
     Ok(())
 }
 
