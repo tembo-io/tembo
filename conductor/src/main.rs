@@ -416,6 +416,10 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                 )
                 .await?;
 
+                info!("{}: Creating namespace", read_msg.msg_id);
+                // create Namespace
+                create_namespace(client.clone(), &namespace, org_id, instance_id).await?;
+
                 init_custom_s3_backup_configuration(
                     is_custom_s3_backup,
                     &read_msg,
@@ -424,12 +428,9 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     s3_endpoint.clone(),
                     access_key_id.clone(),
                     secret_access_key.clone(),
+                    namespace.clone(),
                 )
                 .await?;
-
-                info!("{}: Creating namespace", read_msg.msg_id);
-                // create Namespace
-                create_namespace(client.clone(), &namespace, org_id, instance_id).await?;
 
                 info!("{}: Generating spec", read_msg.msg_id);
                 let stack_type = match coredb_spec.stack.as_ref() {
@@ -1136,6 +1137,7 @@ async fn init_custom_s3_backup_configuration(
     s3_endpoint: String,
     access_key_id: String,
     secret_access_key: String,
+    namespace: String,
 ) -> Result<(), ConductorError> {
     if !is_custom_s3_backup {
         return Ok(());
@@ -1167,7 +1169,7 @@ async fn init_custom_s3_backup_configuration(
 
     // Create or update the secret in Kubernetes
     let client = Client::try_default().await?;
-    let secrets_api = Api::<Secret>::namespaced(client, &read_msg.message.namespace);
+    let secrets_api = Api::<Secret>::namespaced(client, &namespace);
     let result = secrets_api.create(&PostParams::default(), &secret).await;
 
     match result {
@@ -1211,7 +1213,7 @@ async fn init_custom_s3_backup_configuration(
     // Create the backup configuration with default values for encryption and retention
     let backup = Backup {
         destinationPath: Some(full_destination),
-        encryption: Some(String::from("AES256")),
+        encryption: Some("".to_string()),
         retentionPolicy: Some(String::from("30")),
         schedule: Some(generate_cron_expression(&read_msg.message.namespace)),
         s3_credentials,
