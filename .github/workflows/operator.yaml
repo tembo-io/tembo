@@ -29,7 +29,9 @@ jobs:
   functional_test:
     name: Run functional testing
     runs-on:
-      - operator-runner-8x32
+      - self-hosted
+      - dind
+      - large-8x8
     strategy:
       # fail-fast means to cancel all jobs if one fails
       fail-fast: false
@@ -47,7 +49,6 @@ jobs:
           sudo apt-get install -y pkg-config libssl-dev git wget build-essential
 
       - uses: azure/setup-helm@v4
-
       - uses: extractions/setup-just@v2
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -125,3 +126,6 @@ jobs:
             kubectl -n $ns get coredb -o yaml
             kubectl -n $ns get clusters -o yaml
           done
+          echo "========== tembo-system logs =========="
+          kubectl logs -n tembo-system -l app=tembo-controller
+          kubectl logs -n tembo-system -l app=tembo-pod-init

@@ -196,7 +196,7 @@ pub async fn create_or_update(
     Ok(())
 }
 
-pub async fn delete(client: Client, namespace: &str, name: &str) -> Result<(), ConductorError> {
+async fn delete(client: Client, namespace: &str, name: &str) -> Result<(), ConductorError> {
     let coredb_api: Api<CoreDB> = Api::namespaced(client.clone(), namespace);
     let params = DeleteParams::default();
     info!("\nDeleting CoreDB: {}", name);
@@ -274,16 +274,41 @@ pub async fn create_namespace(
     Ok(())
 }
 
-pub async fn delete_namespace(client: Client, name: &str) -> Result<(), ConductorError> {
-    let ns_api: Api<Namespace> = Api::all(client);
+async fn delete_namespace(client: Client, name: &str) -> Result<(), ConductorError> {
+    let ns_api: Api<Namespace> = Api::all(client.clone());
     let params = DeleteParams::default();
     info!("\nDeleting namespace: {}", name);
-    let _ = ns_api
+
+    // Initiate namespace deletion
+    ns_api
         .delete(name, &params)
         .await
         .map_err(ConductorError::KubeError)?;
 
-    Ok(())
+    // Wait for the namespace to be fully deleted
+    let timeout = std::time::Duration::from_secs(120); // 2 minute timeout
+    let start = std::time::Instant::now();
+
+    while start.elapsed() < timeout {
+        match ns_api.get(name).await {
+            Ok(_) => {
+                // Namespace still exists, wait a bit and retry
+                tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+            }
+            Err(kube::Error::Api(err)) if err.code == 404 => {
+                // Namespace is gone (404 Not Found)
+                info!("Namespace {} successfully deleted", name);
+                return Ok(());
+            }
+            Err(e) => {
+                // Some other error occurred while checking
+                return Err(ConductorError::KubeError(e));
+            }
+        }
+    }
+
+    // If we get here, we timed out waiting for deletion
+    Err(ConductorError::DataplaneError(format!("Timed out waiting for namespace {} to be deleted", name)))
 }
 
 async fn get_secret_for_db(client: Client, name: &str) -> Result<(Secret, Secret), ConductorError> {
@@ -689,6 +714,16 @@ pub async fn delete_azure_storage_workload_identity_binding(
     )
     .await?;
     info!("Deleted UAMI");
+
+    Ok(())
+}
+
+pub async fn delete_coredb_and_namespace(client: Client, namespace: &str, name: &str) -> Result<(), ConductorError> {
+    // First, delete the CoreDB and wait for it to be fully deleted
+    delete(client.clone(), namespace, name).await?;
+
+    // Then, delete the namespace and wait for it to be fully deleted
+    delete_namespace(client, namespace).await?;
 
     Ok(())
 }

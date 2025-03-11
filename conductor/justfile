@@ -82,6 +82,21 @@ watch:
 	IS_GCP=false \
 	cargo watch -x run
 
+run:
+	POSTGRES_QUEUE_CONNECTION=postgresql://postgres:postgres@0.0.0.0:5431/postgres \
+	RUST_BACKTRACE=1 \
+	RUST_LOG={{RUST_LOG}} \
+	CONTROL_PLANE_EVENTS_QUEUE=myqueue_control_plane \
+	DATA_PLANE_EVENTS_QUEUE=myqueue_data_plane \
+	METRICS_EVENTS_QUEUE=metrics_events \
+	DATA_PLANE_BASEDOMAIN=coredb-development.com \
+	CF_TEMPLATE_BUCKET=cdb-plat-use1-dev-eks-data-1-conductor-cf-templates \
+	BACKUP_ARCHIVE_BUCKET=cdb-plat-use1-dev-instance-backups \
+	STORAGE_ARCHIVE_BUCKET=cdb-plat-use1-dev-instance-storage \
+	IS_CLOUD_FORMATION=false \
+	IS_GCP=false \
+	cargo run
+
 run-postgres:
 	docker rm --force pgmq-pg || true
 	docker run -d --name pgmq-pg -e POSTGRES_PASSWORD=postgres -p 5431:5432 quay.io/tembo/pg16-pgmq:v1.3.3
