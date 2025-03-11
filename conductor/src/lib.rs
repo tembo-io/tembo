@@ -202,10 +202,21 @@ async fn delete(client: Client, namespace: &str, name: &str) -> Result<(), Condu
     info!("\nDeleting CoreDB: {}", name);
 
     // Initiate deletion and handle errors
-    coredb_api
-        .delete(name, &params)
-        .await
-        .map_err(ConductorError::KubeError)?;
+    match coredb_api.delete(name, &params).await {
+        Ok(_) => {
+            info!("Delete request for CoreDB {} initiated successfully", name);
+        }
+        Err(kube::Error::Api(err)) if err.code == 404 => {
+            // Resource doesn't exist, log and continue
+            info!("CoreDB {} not found (404), already deleted", name);
+            return Ok(());
+        }
+        Err(e) => {
+            // Log other errors but don't fail
+            warn!("Error initiating deletion of CoreDB {}: {:?}", name, e);
+            return Ok(());
+        }
+    }
 
     // Wait for the resource to be fully deleted
     let timeout = std::time::Duration::from_secs(120); // 2 minute timeout
@@ -223,17 +234,15 @@ async fn delete(client: Client, namespace: &str, name: &str) -> Result<(), Condu
                 return Ok(());
             }
             Err(e) => {
-                // Some other error occurred while checking
-                return Err(ConductorError::KubeError(e));
+                // Some other error occurred while checking, log and continue
+                warn!("Error checking if CoreDB {} is deleted: {:?}", name, e);
+                return Ok(());
             }
         }
     }
 
-    // If we get here, we timed out waiting for deletion
-    Err(ConductorError::DataplaneError(format!(
-        "Timed out waiting for CoreDB {} to be deleted",
-        name
-    )))
+    info!("Timeout waiting for CoreDB {} to be deleted, but continuing", name);
+    Ok(())
 }
 
 pub async fn create_namespace(
@@ -280,10 +289,21 @@ async fn delete_namespace(client: Client, name: &str) -> Result<(), ConductorErr
     info!("\nDeleting namespace: {}", name);
 
     // Initiate namespace deletion
-    ns_api
-        .delete(name, &params)
-        .await
-        .map_err(ConductorError::KubeError)?;
+    match ns_api.delete(name, &params).await {
+        Ok(_) => {
+            info!("Delete request for namespace {} initiated successfully", name);
+        }
+        Err(kube::Error::Api(err)) if err.code == 404 => {
+            // Namespace doesn't exist, log and continue
+            info!("Namespace {} not found (404), already deleted", name);
+            return Ok(());
+        }
+        Err(e) => {
+            // Log other errors but don't fail
+            warn!("Error initiating deletion of namespace {}: {:?}", name, e);
+            return Ok(());
+        }
+    }
 
     // Wait for the namespace to be fully deleted
     let timeout = std::time::Duration::from_secs(120); // 2 minute timeout
@@ -301,17 +321,15 @@ async fn delete_namespace(client: Client, name: &str) -> Result<(), ConductorErr
                 return Ok(());
             }
             Err(e) => {
-                // Some other error occurred while checking
-                return Err(ConductorError::KubeError(e));
+                // Some other error occurred while checking, log and continue
+                warn!("Error checking if namespace {} is deleted: {:?}", name, e);
+                return Ok(());
             }
         }
     }
 
-    // If we get here, we timed out waiting for deletion
-    Err(ConductorError::DataplaneError(format!(
-        "Timed out waiting for namespace {} to be deleted",
-        name
-    )))
+    info!("Timeout waiting for namespace {} to be deleted, but continuing", name);
+    Ok(())
 }
 
 async fn get_secret_for_db(client: Client, name: &str) -> Result<(Secret, Secret), ConductorError> {
