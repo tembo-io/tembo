@@ -54,7 +54,6 @@ start-kind:
 	kind create cluster --image=kindest/node:v{{KUBE_VERSION}} --config testdata/kind-config.yaml
 	just update-helm-repos
 	just install-kube-prometheus-stack
-	just install-tempo
 	just install-traefik
 	just install-operator
 	just annotate
