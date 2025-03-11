@@ -308,7 +308,10 @@ async fn delete_namespace(client: Client, name: &str) -> Result<(), ConductorErr
     }
 
     // If we get here, we timed out waiting for deletion
-    Err(ConductorError::DataplaneError(format!("Timed out waiting for namespace {} to be deleted", name)))
+    Err(ConductorError::DataplaneError(format!(
+        "Timed out waiting for namespace {} to be deleted",
+        name
+    )))
 }
 
 async fn get_secret_for_db(client: Client, name: &str) -> Result<(Secret, Secret), ConductorError> {
@@ -718,7 +721,11 @@ pub async fn delete_azure_storage_workload_identity_binding(
     Ok(())
 }
 
-pub async fn delete_coredb_and_namespace(client: Client, namespace: &str, name: &str) -> Result<(), ConductorError> {
+pub async fn delete_coredb_and_namespace(
+    client: Client,
+    namespace: &str,
+    name: &str,
+) -> Result<(), ConductorError> {
     // First, delete the CoreDB and wait for it to be fully deleted
     delete(client.clone(), namespace, name).await?;
 

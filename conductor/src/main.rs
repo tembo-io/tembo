@@ -6,9 +6,9 @@ use conductor::{
     cloud::CloudProvider, create_azure_storage_workload_identity_binding, create_cloudformation,
     create_gcp_storage_workload_identity_binding, create_namespace, create_or_update,
     delete_azure_storage_workload_identity_binding, delete_cloudformation,
-    delete_gcp_storage_workload_identity_binding, delete_coredb_and_namespace, generate_cron_expression,
-    generate_spec, get_coredb_error_without_status, get_one, get_pg_conn, lookup_role_arn,
-    restart_coredb, types,
+    delete_coredb_and_namespace, delete_gcp_storage_workload_identity_binding,
+    generate_cron_expression, generate_spec, get_coredb_error_without_status, get_one, get_pg_conn,
+    lookup_role_arn, restart_coredb, types,
 };
 use opentelemetry_sdk::{metrics::SdkMeterProvider, Resource};
 
