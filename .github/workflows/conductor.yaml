@@ -26,7 +26,7 @@ jobs:
     runs-on:
       - self-hosted
       - dind
-      - xlarge-8x8
+      - large-8x8
     strategy:
       # fail-fast means to cancel all jobs if one fails
       fail-fast: false
