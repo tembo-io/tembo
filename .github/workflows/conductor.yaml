@@ -69,10 +69,11 @@ jobs:
           workspaces: |
             conductor
 
-      - uses: aws-actions/configure-aws-credentials@v2
+      - uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-region: "us-east-1"
           role-to-assume: "arn:aws:iam::484221059514:role/cdb-plat-use1-dev-data-1-conductor-gha"
+
       - uses: unfor19/install-aws-cli-action@v1
       - name: Setup local test cluster
         run: |
