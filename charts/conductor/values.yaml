@@ -1,6 +1,15 @@
 logLevel: info
 
+# Global replicas setting (used as default if specific deployment replicas not set)
 replicas: 1
+
+# Specific replicas settings for each deployment
+conductor:
+  replicas: 1
+metrics:
+  replicas: 1
+watcher:
+  replicas: 1
 
 podMonitor:
   enabled: true

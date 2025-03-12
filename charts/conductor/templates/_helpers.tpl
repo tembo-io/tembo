@@ -91,3 +91,20 @@ Create the name of the service account to use
 {{- define "conductor.serviceAccountName" -}}
 {{- default (include "conductor.fullname" .) .Values.serviceAccount.name }}
 {{- end }}
+
+{{/*
+Determine the number of replicas for a specific deployment type
+*/}}
+{{- define "conductor.replicaCount" -}}
+{{- $deploymentType := . | first -}}
+{{- $root := . | rest | first -}}
+{{- if hasKey $root.Values $deploymentType -}}
+{{- if hasKey (index $root.Values $deploymentType) "replicas" -}}
+{{- (index $root.Values $deploymentType).replicas -}}
+{{- else -}}
+{{- $root.Values.replicas -}}
+{{- end -}}
+{{- else -}}
+{{- $root.Values.replicas -}}
+{{- end -}}
+{{- end -}}

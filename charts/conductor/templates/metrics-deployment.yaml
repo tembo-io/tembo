@@ -5,7 +5,7 @@ metadata:
   labels:
     {{- include "conductor.metricsLabels" . | nindent 4 }}
 spec:
-  replicas: {{ .Values.replicas }}
+  replicas: {{ include "conductor.replicaCount" (list "metrics" .) }}
   selector:
     matchLabels:
       {{- include "conductor.metricsSelectorLabels" . | nindent 6 }}
