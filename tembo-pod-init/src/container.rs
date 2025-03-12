@@ -25,9 +25,11 @@ pub async fn create_init_container(
 
     // Add in mounted volumes
     let volume_mounts = vec![
+        // Mount pgdata to an init location so we can copy files the image
+        // has in /var/lib/postgresql/data.
         VolumeMount {
             name: "pgdata".to_string(),
-            mount_path: "/var/lib/postgresql/data".to_string(),
+            mount_path: "/var/lib/postgresql/init".to_string(),
             ..Default::default()
         },
         VolumeMount {
