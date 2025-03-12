@@ -5,7 +5,7 @@ metadata:
   labels:
     {{- include "conductor.watcherLabels" . | nindent 4 }}
 spec:
-  replicas: {{ .Values.replicas }}
+  replicas: {{ include "conductor.replicaCount" (list "watcher" .) }}
   selector:
     matchLabels:
       {{- include "conductor.watcherSelectorLabels" . | nindent 6 }}
