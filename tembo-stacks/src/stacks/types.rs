@@ -361,7 +361,7 @@ mod tests {
             .app_services
             .unwrap()
             .into_iter()
-            .find(|app| app.name == "embeddings".to_string())
+            .find(|app| app.name == "embeddings")
             .expect("missing embedding app");
 
         let metrics = embedding_app.metrics.expect("missing metrics");

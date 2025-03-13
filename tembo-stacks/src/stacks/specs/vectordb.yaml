@@ -3,10 +3,10 @@ description: A Tembo Postgres Stack configured to support vector data types, sto
 repository: "quay.io/tembo"
 organization: tembo
 images:
-  14: "standard-cnpg:14-ee80907"
-  15: "standard-cnpg:15-ee80907"
-  16: "standard-cnpg:16-ee80907"
-  17: "standard-cnpg:17-ee80907"
+  14: "standard-cnpg:14-bffd097"
+  15: "standard-cnpg:15-bffd097"
+  16: "standard-cnpg:16-bffd097"
+  17: "standard-cnpg:17-bffd097"
 stack_version: 0.1.0
 appServices:
   - image: 387894460527.dkr.ecr.us-east-1.amazonaws.com/tembo-io/vector-serve:ba4e47a

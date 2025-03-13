@@ -3,10 +3,10 @@ description: Postgres for geospatial workloads.
 repository: "quay.io/tembo"
 organization: tembo
 images:
-  14: "geo-cnpg:14-ee80907"
-  15: "geo-cnpg:15-ee80907"
-  16: "geo-cnpg:16-ee80907"
-  17: "geo-cnpg:17-ee80907"
+  14: "geo-cnpg:14-bffd097"
+  15: "geo-cnpg:15-bffd097"
+  16: "geo-cnpg:16-bffd097"
+  17: "geo-cnpg:17-bffd097"
 stack_version: 0.1.0
 postgres_config_engine: standard
 postgres_config:
