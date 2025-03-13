@@ -21,6 +21,8 @@ appServices:
         value: "500"
       - name: XDG_CACHE_HOME
         value: /models/.cache
+      - name: HF_HUB_DISABLE_TELEMETRY
+        value: "1"
     routing:
       - port: 3000
         ingressPath: /vectordb

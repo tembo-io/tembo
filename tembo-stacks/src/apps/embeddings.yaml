@@ -19,14 +19,14 @@ appServices:
             regex: ^\/embeddings\/?
             replacement: /v1/embeddings
     env:
-      - name: HF_HUB_DISABLE_TELEMETRY
-        value: "1"
       - name: TMPDIR
         value: /models
       - name: XDG_CACHE_HOME
         value: /models/.cache
       - name: BATCH_SIZE
         value: "500"
+      - name: HF_HUB_DISABLE_TELEMETRY
+        value: "1"
     resources:
       requests:
         cpu: 100m
