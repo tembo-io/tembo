@@ -9,7 +9,7 @@ images:
   17: "standard-cnpg:17-ee80907"
 stack_version: 0.1.0
 appServices:
-  - image: 387894460527.dkr.ecr.us-east-1.amazonaws.com/tembo-io/vector-serve:c67882e
+  - image: 387894460527.dkr.ecr.us-east-1.amazonaws.com/tembo-io/vector-serve:ba4e47a
     name: embeddings
     metrics:
       path: /metrics

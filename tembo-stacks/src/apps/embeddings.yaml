@@ -2,7 +2,7 @@ name: !embeddings
 appServices:
   # Use the latest commit sha from the last successful build of the main
   # branch of https://github.com/tembo-io/pg_vectorize/actions/workflows/build-vector-serve.yml
-  - image: 387894460527.dkr.ecr.us-east-1.amazonaws.com/tembo-io/vector-serve:c67882e
+  - image: 387894460527.dkr.ecr.us-east-1.amazonaws.com/tembo-io/vector-serve:ba4e47a
     name: embeddings
     metrics:
       path: /metrics
@@ -19,6 +19,8 @@ appServices:
             regex: ^\/embeddings\/?
             replacement: /v1/embeddings
     env:
+      - name: HF_HUB_DISABLE_TELEMETRY
+        value: "1"
       - name: TMPDIR
         value: /models
       - name: XDG_CACHE_HOME
