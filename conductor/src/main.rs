@@ -1,15 +1,16 @@
-use actix_web::{web, App, HttpServer};
-use actix_web_opentelemetry::{PrometheusMetricsHandler, RequestTracing};
+use actix_web::{web, App, HttpResponse, HttpServer};
+use actix_web_opentelemetry::{RequestMetrics, RequestTracing};
 use conductor::errors::ConductorError;
 use conductor::monitoring::CustomMetrics;
 use conductor::{
     cloud::CloudProvider, create_azure_storage_workload_identity_binding, create_cloudformation,
-    create_gcp_storage_workload_identity_binding, create_namespace, create_or_update, delete,
+    create_gcp_storage_workload_identity_binding, create_namespace, create_or_update,
     delete_azure_storage_workload_identity_binding, delete_cloudformation,
-    delete_gcp_storage_workload_identity_binding, delete_namespace, generate_cron_expression,
-    generate_spec, get_coredb_error_without_status, get_one, get_pg_conn, lookup_role_arn,
-    restart_coredb, types,
+    delete_coredb_and_namespace, delete_gcp_storage_workload_identity_binding,
+    generate_cron_expression, generate_spec, get_coredb_error_without_status, get_one, get_pg_conn,
+    lookup_role_arn, restart_coredb, types,
 };
+use opentelemetry_sdk::{metrics::SdkMeterProvider, Resource};
 
 use crate::metrics_reporter::run_metrics_reporter;
 use crate::status_reporter::run_status_reporter;
@@ -26,8 +27,6 @@ use kube::api::PostParams;
 use kube::Api;
 use kube::Client;
 use log::{debug, error, info, warn};
-use opentelemetry::sdk::export::metrics::aggregation;
-use opentelemetry::sdk::metrics::{controllers, processors, selectors};
 use opentelemetry::{global, KeyValue};
 use pgmq::{Message, PGMQueueExt};
 use sqlx::error::Error;
@@ -47,6 +46,9 @@ const REQUEUE_VT_SEC_SHORT: i32 = 5;
 // Amount of time to wait after requeueing a message for an unexpected failure
 // that we would want to try again after awhile.
 const REQUEUE_VT_SEC_LONG: i32 = 300;
+
+// Amount of time to wait after attempting to delete a CoreDB instance
+const REQUEUE_DELETE_VT_SEC: i32 = 60;
 
 async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
     let pg_conn_url =
@@ -277,9 +279,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
             }
         }
 
-        metrics
-            .conductor_total
-            .add(&opentelemetry::Context::current(), 1, &[]);
+        metrics.conductor_total.add(1, &[]);
 
         // note: messages are recycled on purpose
         // but absurdly high read_ct means its probably never going to get processed
@@ -291,9 +291,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
             queue
                 .archive(&control_plane_events_queue, read_msg.msg_id)
                 .await?;
-            metrics
-                .conductor_errors
-                .add(&opentelemetry::Context::current(), 1, &[]);
+            metrics.conductor_errors.add(1, &[]);
 
             // this is what we'll send back to control-plane
             let error_event = types::StateToControlPlane {
@@ -331,9 +329,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     let _archived = queue
                         .archive(&control_plane_events_queue, read_msg.msg_id)
                         .await?;
-                    metrics
-                        .conductor_errors
-                        .add(&opentelemetry::Context::current(), 1, &[]);
+                    metrics.conductor_errors.add(1, &[]);
                     continue;
                 }
                 // spec.expect() should be safe here - since above we continue in loop when it is None
@@ -375,11 +371,9 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                                     REQUEUE_VT_SEC_SHORT,
                                 )
                                 .await?;
-                            metrics.conductor_requeues.add(
-                                &opentelemetry::Context::current(),
-                                1,
-                                &[KeyValue::new("queue_duration", "short")],
-                            );
+                            metrics
+                                .conductor_requeues
+                                .add(1, &[KeyValue::new("queue_duration", "short")]);
                             continue;
                         }
                         _ => {
@@ -394,11 +388,9 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                                     REQUEUE_VT_SEC_LONG,
                                 )
                                 .await?;
-                            metrics.conductor_requeues.add(
-                                &opentelemetry::Context::current(),
-                                1,
-                                &[KeyValue::new("queue_duration", "long")],
-                            );
+                            metrics
+                                .conductor_requeues
+                                .add(1, &[KeyValue::new("queue_duration", "long")]);
                             continue;
                         }
                     },
@@ -507,11 +499,9 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                                         REQUEUE_VT_SEC_SHORT,
                                     )
                                     .await?;
-                                metrics.conductor_requeues.add(
-                                    &opentelemetry::Context::current(),
-                                    1,
-                                    &[KeyValue::new("queue_duration", "short")],
-                                );
+                                metrics
+                                    .conductor_requeues
+                                    .add(1, &[KeyValue::new("queue_duration", "short")]);
                                 continue;
                             }
                             _ => {
@@ -526,11 +516,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                                         REQUEUE_VT_SEC_LONG,
                                     )
                                     .await?;
-                                metrics.conductor_errors.add(
-                                    &opentelemetry::Context::current(),
-                                    1,
-                                    &[],
-                                );
+                                metrics.conductor_errors.add(1, &[]);
                                 continue;
                             }
                         }
@@ -586,13 +572,26 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                 }
             }
             Event::Delete => {
-                // delete CoreDB
+                // Delete CoreDB and Namespace
                 info!("{}: Deleting instance {}", read_msg.msg_id, &namespace);
-                delete(client.clone(), &namespace, &namespace).await?;
-
-                // delete namespace
-                info!("{}: Deleting namespace {}", read_msg.msg_id, &namespace);
-                delete_namespace(client.clone(), &namespace).await?;
+                let deleted: bool =
+                    delete_coredb_and_namespace(client.clone(), &namespace, &namespace).await?;
+                if !deleted {
+                    info!(
+                        "msg_id:{}, ns: {} delete not complete, requeue for {} seconds",
+                        read_msg.msg_id, &namespace, REQUEUE_DELETE_VT_SEC
+                    );
+                    let _ = queue
+                        .set_vt::<CRUDevent>(
+                            &control_plane_events_queue,
+                            read_msg.msg_id,
+                            REQUEUE_DELETE_VT_SEC,
+                        )
+                        .await?;
+                    // requeue the delete event
+                    // don't process the remainder of the delete event until CoreDB and NS are deleted
+                    continue;
+                }
 
                 if is_cloud_formation {
                     info!("{}: Deleting cloudformation stack", read_msg.msg_id);
@@ -708,9 +707,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
             }
             _ => {
                 warn!("Unhandled event_type: {:?}", read_msg.message.event_type);
-                metrics
-                    .conductor_errors
-                    .add(&opentelemetry::Context::current(), 1, &[]);
+                metrics.conductor_errors.add(1, &[]);
                 continue;
             }
         };
@@ -726,9 +723,7 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
             .archive(&control_plane_events_queue, read_msg.msg_id)
             .await?;
 
-        metrics
-            .conductor_completed
-            .add(&opentelemetry::Context::current(), 1, &[]);
+        metrics.conductor_completed.add(1, &[]);
 
         info!("{}: archived: {:?}", read_msg.msg_id, archived);
     }
@@ -771,11 +766,9 @@ async fn requeue_short(
             REQUEUE_VT_SEC_SHORT,
         )
         .await?;
-    metrics.conductor_requeues.add(
-        &opentelemetry::Context::current(),
-        1,
-        &[KeyValue::new("queue_duration", "short")],
-    );
+    metrics
+        .conductor_requeues
+        .add(1, &[KeyValue::new("queue_duration", "short")]);
     Ok(())
 }
 
@@ -786,17 +779,33 @@ async fn requeue_short(
 async fn main() -> std::io::Result<()> {
     env_logger::init();
 
-    let controller = controllers::basic(
-        processors::factory(
-            selectors::simple::histogram([1.0, 2.0, 5.0, 10.0, 20.0, 50.0]),
-            aggregation::cumulative_temporality_selector(),
-        )
-        .with_memory(true),
-    )
-    .build();
+    let registry = prometheus::Registry::new();
+    // Initialize prometheus exporter with error handling
+    let exporter = match opentelemetry_prometheus::exporter()
+        .with_registry(registry.clone())
+        .build()
+    {
+        Ok(exporter) => exporter,
+        Err(err) => {
+            error!("Failed to build prometheus exporter: {}", err);
+            return Ok(());
+        }
+    };
 
-    let exporter = opentelemetry_prometheus::exporter(controller).init();
-    let meter = global::meter("actix_web");
+    // Build the meter provider with the prometheus exporter
+    let provider = SdkMeterProvider::builder()
+        .with_reader(exporter)
+        .with_resource(Resource::new(vec![KeyValue::new(
+            "service.name",
+            "conductor",
+        )]))
+        .build();
+
+    // Set the global meter provider
+    global::set_meter_provider(provider);
+
+    // Get a meter from the global provider
+    let meter = global::meter("conductor");
     let custom_metrics = CustomMetrics::new(&meter);
 
     let background_threads: Arc<Mutex<Vec<tokio::task::JoinHandle<()>>>> =
@@ -822,20 +831,12 @@ async fn main() -> std::io::Result<()> {
                         Err(ConductorError::PgmqError(pgmq::errors::PgmqError::DatabaseError(
                             Error::PoolTimedOut,
                         ))) => {
-                            custom_metrics_copy.clone().conductor_errors.add(
-                                &opentelemetry::Context::current(),
-                                1,
-                                &[],
-                            );
+                            custom_metrics_copy.clone().conductor_errors.add(1, &[]);
                             error!("sqlx PoolTimedOut error in conductor. ending loop");
                             break;
                         }
                         Err(err) => {
-                            custom_metrics_copy.clone().conductor_errors.add(
-                                &opentelemetry::Context::current(),
-                                1,
-                                &[],
-                            );
+                            custom_metrics_copy.clone().conductor_errors.add(1, &[]);
                             error!("error in conductor: {:?}", err);
                         }
                     }
@@ -855,11 +856,7 @@ async fn main() -> std::io::Result<()> {
                     match run_status_reporter(custom_metrics_copy.clone()).await {
                         Ok(_) => {}
                         Err(err) => {
-                            custom_metrics_copy.clone().conductor_errors.add(
-                                &opentelemetry::Context::current(),
-                                1,
-                                &[],
-                            );
+                            custom_metrics_copy.clone().conductor_errors.add(1, &[]);
                             error!("error in conductor: {:?}", err);
                         }
                     }
@@ -876,9 +873,7 @@ async fn main() -> std::io::Result<()> {
         background_threads_locked.push(tokio::spawn(async move {
             let custom_metrics = &custom_metrics_copy;
             if let Err(err) = run_metrics_reporter().await {
-                custom_metrics
-                    .conductor_errors
-                    .add(&opentelemetry::Context::current(), 1, &[]);
+                custom_metrics.conductor_errors.add(1, &[]);
 
                 error!("error in metrics_reporter: {err}")
             }
@@ -895,21 +890,45 @@ async fn main() -> std::io::Result<()> {
         .parse::<u16>()
         .unwrap_or(8080);
 
+    // Create a shared data structure for the registry
+    let registry_data = web::Data::new(registry);
+
     HttpServer::new(move || {
         App::new()
             .app_data(web::Data::new(custom_metrics.clone()))
             .app_data(web::Data::new(background_threads.clone()))
+            .app_data(registry_data.clone())
             .wrap(RequestTracing::new())
-            .route(
-                "/metrics",
-                web::get().to(PrometheusMetricsHandler::new(exporter.clone())),
-            )
+            .wrap(RequestMetrics::default())
+            .route("/metrics", web::get().to(metrics_handler))
             .service(web::scope("/health").service(background_threads_running))
     })
     .workers(1)
     .bind(("0.0.0.0", server_port))?
     .run()
     .await
+}
+
+// Function to handle the metrics endpoint
+async fn metrics_handler(registry: web::Data<prometheus::Registry>) -> HttpResponse {
+    use prometheus::Encoder;
+    let encoder = prometheus::TextEncoder::new();
+
+    let mut buffer = Vec::new();
+    if let Err(e) = encoder.encode(&registry.gather(), &mut buffer) {
+        error!("Failed to encode metrics: {}", e);
+        return HttpResponse::InternalServerError().body("Failed to encode metrics");
+    }
+
+    match String::from_utf8(buffer) {
+        Ok(metrics_text) => HttpResponse::Ok()
+            .content_type("text/plain")
+            .body(metrics_text),
+        Err(e) => {
+            error!("Failed to convert metrics to string: {}", e);
+            HttpResponse::InternalServerError().body("Failed to convert metrics to string")
+        }
+    }
 }
 
 #[allow(clippy::too_many_arguments)]

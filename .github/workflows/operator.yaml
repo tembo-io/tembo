@@ -29,9 +29,7 @@ jobs:
   functional_test:
     name: Run functional testing
     runs-on:
-      - self-hosted
-      - dind
-      - xlarge-16x16
+      - operator-runner-8x32
     strategy:
       # fail-fast means to cancel all jobs if one fails
       fail-fast: false
@@ -39,7 +37,7 @@ jobs:
         # Go here for a list of versions:
         # https://github.com/kubernetes-sigs/kind/releases
         kube_version:
-          - "1.29.8"
+          - "1.31.6"
     steps:
       - uses: actions/checkout@v4
       - name: Install system dependencies
@@ -47,58 +45,85 @@ jobs:
           set -xe
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev git wget build-essential
+
       - uses: azure/setup-helm@v4
       - uses: extractions/setup-just@v2
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
       - name: Install kind
         uses: helm/kind-action@v1
         with:
           install_only: true
-      - uses: dtolnay/rust-toolchain@stable
+          version: "v0.27.0"
+
+      # Cache Helm repositories and charts
+      - name: Cache Helm repositories and charts
+        id: cache-helm
+        uses: actions/cache@v3
         with:
-          toolchain: stable
+          path: |
+            ~/.cache/helm
+            ~/.helm
+          key: helm-cache-${{ runner.os }}-${{ hashFiles('tembo-operator/testdata/*.yaml') }}
+
       - uses: Swatinem/rust-cache@v2
         with:
           prefix-key: "tembo-operator-functional-test"
           workspaces: |
             tembo-operator
+
       - name: Check CRD is updated in the charts directory
         run: |
           set -xe
           cargo run --bin crdgen > ../charts/tembo-operator/templates/crd.yaml
           git diff --exit-code ../charts/tembo-operator/templates/crd.yaml
+
       - name: Setup local test cluster
         run: |
           set -xe
           export KUBE_VERSION=${{ matrix.kube_version }}
           just start-kind
-      - name: Run functional / integration tests
+
+      - name: Run functional tests
         run: |
           set -xe
           export DATA_PLANE_BASEDOMAIN=localhost
           export USE_SHARED_CA=1
-          # Start the operator in the background
+          export RUST_LOG=info,kube=info,controller=info
           cargo run > operator-output.txt 2>&1 &
-          # Run the tests
-          cargo test -- --ignored --nocapture
+          OPERATOR_PID=$!
+
+          # Wait for operator to be ready
+          sleep 15
+
+          # Run the tests with timeout to prevent hanging
+          timeout 50m cargo test -- --ignored --nocapture
+          TEST_EXIT=$?
+
+          # Kill the operator
+          kill $OPERATOR_PID || true
+
+          exit $TEST_EXIT
+
       - name: Debugging information
         if: always()
         run: |
           set +e
           set -x
-          echo "=========="
+          echo "========== Operator Output =========="
           cat operator-output.txt
-          echo "=========="
-          # Get list of namespaces that start with 'test-coredb-'
-          namespaces=$(kubectl get ns -o jsonpath='{.items[*].metadata.name}' | tr ' ' '\n' | grep '^test-coredb-')
-
-          for ns in $namespaces; do
-              echo "==== Namespace: $ns ===="
-              kubectl -n $ns get pods $ns-1 -o yaml
-              echo "=============================="
-              kubectl -n $ns get svc -o yaml
-              echo "=============================="
-              kubectl -n $ns get coredb $ns -o yaml
-              echo "=============================="
-              kubectl -n $ns get clusters $ns -o yaml
-              echo "=============================="
+          echo "========== Kubernetes Resources =========="
+          kubectl get pods -A
+          for ns in $(kubectl get ns -o jsonpath='{.items[*].metadata.name}' | tr ' ' '\n' | grep '^test-coredb-'); do
+            echo "==== Namespace: $ns ===="
+            kubectl -n $ns get pods -o wide
+            kubectl -n $ns describe pods
+            kubectl -n $ns get events --sort-by='.lastTimestamp'
+            kubectl -n $ns get coredb -o yaml
+            kubectl -n $ns get clusters -o yaml
           done
+          echo "========== tembo-system logs =========="
+          kubectl logs -n tembo-system -l app=tembo-controller
+          kubectl logs -n tembo-system -l app=tembo-pod-init

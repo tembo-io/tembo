@@ -2,7 +2,7 @@ NAME := "conductor"
 VERSION := `git rev-parse HEAD`
 SEMVER_VERSION := `grep version Cargo.toml | awk -F"\"" '{print $2}' | head -n 1`
 NAMESPACE := "default"
-KUBE_VERSION := env_var_or_default('KUBE_VERSION', '1.29.8')
+KUBE_VERSION := env_var_or_default('KUBE_VERSION', '1.31.6')
 RUST_LOG := "info"
 
 default:
@@ -54,7 +54,6 @@ start-kind:
 	kind create cluster --image=kindest/node:v{{KUBE_VERSION}} --config testdata/kind-config.yaml
 	just update-helm-repos
 	just install-kube-prometheus-stack
-	just install-tempo
 	just install-traefik
 	just install-operator
 	just annotate
@@ -82,6 +81,21 @@ watch:
 	IS_CLOUD_FORMATION=false \
 	IS_GCP=false \
 	cargo watch -x run
+
+run:
+	POSTGRES_QUEUE_CONNECTION=postgresql://postgres:postgres@0.0.0.0:5431/postgres \
+	RUST_BACKTRACE=1 \
+	RUST_LOG={{RUST_LOG}} \
+	CONTROL_PLANE_EVENTS_QUEUE=myqueue_control_plane \
+	DATA_PLANE_EVENTS_QUEUE=myqueue_data_plane \
+	METRICS_EVENTS_QUEUE=metrics_events \
+	DATA_PLANE_BASEDOMAIN=coredb-development.com \
+	CF_TEMPLATE_BUCKET=cdb-plat-use1-dev-eks-data-1-conductor-cf-templates \
+	BACKUP_ARCHIVE_BUCKET=cdb-plat-use1-dev-instance-backups \
+	STORAGE_ARCHIVE_BUCKET=cdb-plat-use1-dev-instance-storage \
+	IS_CLOUD_FORMATION=false \
+	IS_GCP=false \
+	cargo run
 
 run-postgres:
 	docker rm --force pgmq-pg || true

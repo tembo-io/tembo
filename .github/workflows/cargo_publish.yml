@@ -16,7 +16,7 @@ on:
 jobs:
   find_directories:
     name: Find crates that changed
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     outputs:
       changed_crates: ${{ steps.find_directories.outputs.build_matrix }}
     steps:
@@ -42,7 +42,7 @@ jobs:
     # does not exist, ignoring if the version is already
     # published.
     name: Cargo publish or validate
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     needs:
       - find_directories
     strategy:

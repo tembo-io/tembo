@@ -157,6 +157,13 @@ pod-init:
   #   cpu: 250m
   #   memory: 100Mi
 
+  # -- Set the Mutating Webhook configuration for the pod-init
+  webhookConfig:
+    # -- Use service backed webhook or use a custom URL
+    # -- The custom URL is normally used for development purposes
+    useUrl: false
+    url: ""
+
   # -- Deployment upgradeStrategy configuration
   upgradeStrategy: RollingUpdate
 

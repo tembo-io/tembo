@@ -3497,7 +3497,6 @@ mod tests {
             enable_backup: true,
             enable_volume_snapshot: true,
             reconcile_ttl: 30,
-            reconcile_timestamp_ttl: 90,
             volume_snapshot_retention_period_days: 40,
         };
 
@@ -3544,7 +3543,6 @@ mod tests {
             enable_backup: false,
             enable_volume_snapshot: false,
             reconcile_ttl: 30,
-            reconcile_timestamp_ttl: 90,
             volume_snapshot_retention_period_days: 40,
         };
         let (backup, template) = cnpg_backup_configuration(&cdb, &cfg_disabled);
@@ -3606,7 +3604,7 @@ mod tests {
 
         let backup_credentials = if let Some(_s3_creds) = cdb.spec.backup.s3_credentials.as_ref() {
             panic!("shouldn't get here");
-        } else if let Some(gcs_creds) = cdb.spec.backup.google_credentials.as_ref() {
+        } else if let Some(_gcs_creds) = cdb.spec.backup.google_credentials.as_ref() {
             panic!("shouldn't get here");
         } else if let Some(azure_creds) = cdb.spec.backup.azure_credentials.as_ref() {
             generate_azure_backup_credentials(Some(azure_creds.clone()))
@@ -3693,7 +3691,6 @@ mod tests {
             enable_backup: true,
             enable_volume_snapshot: true,
             reconcile_ttl: 30,
-            reconcile_timestamp_ttl: 90,
             volume_snapshot_retention_period_days: 40,
         };
 
@@ -3748,7 +3745,6 @@ mod tests {
             enable_backup: false,
             enable_volume_snapshot: false,
             reconcile_ttl: 30,
-            reconcile_timestamp_ttl: 90,
             volume_snapshot_retention_period_days: 40,
         };
         let (backup, template) = cnpg_backup_configuration(&cdb, &cfg_disabled);

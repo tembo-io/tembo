@@ -196,16 +196,29 @@ pub async fn create_or_update(
     Ok(())
 }
 
-pub async fn delete(client: Client, namespace: &str, name: &str) -> Result<(), ConductorError> {
-    let coredb_api: Api<CoreDB> = Api::namespaced(client, namespace);
+// returns Ok(true) when deleted, otherwise Ok(false) when delete in progress
+async fn delete(client: Client, namespace: &str, name: &str) -> Result<bool, ConductorError> {
+    let coredb_api: Api<CoreDB> = Api::namespaced(client.clone(), namespace);
     let params = DeleteParams::default();
     info!("\nDeleting CoreDB: {}", name);
-    let _ = coredb_api
-        .delete(name, &params)
-        .await
-        .map_err(ConductorError::KubeError);
 
-    Ok(())
+    // Initiate deletion and handle errors
+    match coredb_api.delete(name, &params).await {
+        Ok(_) => {
+            info!("Delete request for CoreDB {} initiated successfully", name);
+            Ok(false)
+        }
+        Err(kube::Error::Api(err)) if err.code == 404 => {
+            // Resource doesn't exist, log and continue
+            info!("CoreDB {} not found (404), already deleted", name);
+            Ok(true)
+        }
+        Err(e) => {
+            // Log other errors but don't fail
+            warn!("Error initiating deletion of CoreDB {}: {:?}", name, e);
+            Ok(false)
+        }
+    }
 }
 
 pub async fn create_namespace(
@@ -246,16 +259,32 @@ pub async fn create_namespace(
     Ok(())
 }
 
-pub async fn delete_namespace(client: Client, name: &str) -> Result<(), ConductorError> {
-    let ns_api: Api<Namespace> = Api::all(client);
+// returns Ok(true) when deleted, otherwise Ok(false) when delete in progress
+async fn delete_namespace(client: Client, name: &str) -> Result<bool, ConductorError> {
+    let ns_api: Api<Namespace> = Api::all(client.clone());
     let params = DeleteParams::default();
     info!("\nDeleting namespace: {}", name);
-    let _ = ns_api
-        .delete(name, &params)
-        .await
-        .map_err(ConductorError::KubeError);
 
-    Ok(())
+    // Initiate namespace deletion
+    match ns_api.delete(name, &params).await {
+        Ok(_) => {
+            info!(
+                "Delete request for namespace {} initiated successfully",
+                name
+            );
+            Ok(false)
+        }
+        Err(kube::Error::Api(err)) if err.code == 404 => {
+            // Namespace doesn't exist, log and continue
+            info!("Namespace {} not found (404), already deleted", name);
+            Ok(true)
+        }
+        Err(e) => {
+            // Log other errors but don't fail
+            warn!("Error initiating deletion of namespace {}: {:?}", name, e);
+            Ok(false)
+        }
+    }
 }
 
 async fn get_secret_for_db(client: Client, name: &str) -> Result<(Secret, Secret), ConductorError> {
@@ -473,8 +502,7 @@ pub async fn create_cloudformation(
             cf_template_bucket,
             aws_region,
         )
-        .await
-        .map_err(ConductorError::from)?;
+        .await?;
     Ok(())
 
     // We will need to setup a requeuing system at somepoint to query for status
@@ -493,8 +521,7 @@ pub async fn delete_cloudformation(
     let stack_name = format!("{}-cf", namespace);
     aws_config_state
         .delete_cloudformation_stack(&stack_name)
-        .await
-        .map_err(ConductorError::from)?;
+        .await?;
     Ok(())
 }
 
@@ -526,8 +553,7 @@ async fn get_stack_outputs(
     // "cloudformation is not done yet" and return a more specific error
     let (role_name, role_arn) = aws_config_state
         .lookup_cloudformation_stack(&stack_name)
-        .await
-        .map_err(ConductorError::from)?;
+        .await?;
     let stack_outputs = StackOutputs {
         role_name,
         role_arn,
@@ -666,6 +692,23 @@ pub async fn delete_azure_storage_workload_identity_binding(
     info!("Deleted UAMI");
 
     Ok(())
+}
+
+// returns Ok(true) when all deleted, otherwise Ok(false) when delete in progress
+pub async fn delete_coredb_and_namespace(
+    client: Client,
+    namespace: &str,
+    name: &str,
+) -> Result<bool, ConductorError> {
+    // First, delete the CoreDB and wait for it to be fully deleted
+    let cdb_deleted: bool = delete(client.clone(), namespace, name).await?;
+    if !cdb_deleted {
+        return Ok(cdb_deleted);
+    }
+
+    // Then, delete the namespace and wait for it to be fully deleted
+    let ns_deleted: bool = delete_namespace(client, namespace).await?;
+    Ok(ns_deleted)
 }
 
 #[cfg(test)]

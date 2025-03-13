@@ -26,10 +26,7 @@ use crate::{
     secret::{reconcile_postgres_role_secret, reconcile_secret},
     telemetry, Error, Metrics, Result,
 };
-use k8s_openapi::{
-    api::core::v1::{Namespace, Pod},
-    apimachinery::pkg::util::intstr::IntOrString,
-};
+use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::util::intstr::IntOrString};
 use kube::{
     api::{Api, ListParams, Patch, PatchParams, ResourceExt},
     client::Client,
@@ -54,7 +51,6 @@ use crate::{
     trunk::{extensions_that_require_load, reconcile_trunk_configmap},
 };
 use k8s_openapi::api::core::v1::Secret;
-use rand::Rng;
 use serde::Serialize;
 use serde_json::json;
 use std::sync::Arc;
@@ -69,16 +65,18 @@ pub static COREDB_ANNOTATION: &str = "coredbs.coredb.io/watch";
 pub struct Context {
     /// Kubernetes client
     pub client: Client,
+    /// Event recorder
+    pub recorder: Recorder,
     /// Diagnostics read by the web server
     pub diagnostics: Arc<RwLock<Diagnostics>>,
     /// Prometheus metrics
-    pub metrics: Metrics,
+    pub metrics: Arc<Metrics>,
 }
 
 pub fn requeue_normal_with_jitter() -> Action {
     let cfg = Config::default();
     // Check back every 90-150 seconds
-    let jitter = rand::thread_rng().gen_range(0..60);
+    let jitter = rand::Rng::random_range(&mut rand::rng(), 0..60);
     Action::requeue(Duration::from_secs(cfg.reconcile_ttl + jitter))
 }
 
@@ -87,7 +85,7 @@ async fn reconcile(cdb: Arc<CoreDB>, ctx: Arc<Context>) -> Result<Action> {
     let trace_id = telemetry::get_trace_id();
     Span::current().record("trace_id", field::display(&trace_id));
     let cfg = Config::default();
-    let _timer = ctx.metrics.count_and_measure();
+    let _timer = ctx.metrics.reconcile.count_and_measure(&trace_id);
     ctx.diagnostics.write().await.last_event = Utc::now();
     let ns = cdb.namespace().unwrap(); // cdb is namespace scoped
     let coredbs: Api<CoreDB> = Api::namespaced(ctx.client.clone(), &ns);
@@ -125,7 +123,7 @@ async fn reconcile(cdb: Arc<CoreDB>, ctx: Arc<Context>) -> Result<Action> {
 
 pub(crate) fn error_policy(cdb: Arc<CoreDB>, error: &Error, ctx: Arc<Context>) -> Action {
     warn!("reconcile failed: {:?}", error);
-    ctx.metrics.reconcile_failure(&cdb, error);
+    ctx.metrics.reconcile.set_failure(&cdb, error);
 
     // Check for 429 error code from Kubernetes API
     match error {
@@ -134,7 +132,7 @@ pub(crate) fn error_policy(cdb: Arc<CoreDB>, error: &Error, ctx: Arc<Context>) -
                 // Error is a 429 (too many requests), calculate backoff and jitter
                 let backoff: u64 = 60;
                 let max_jitter: u64 = 120;
-                let jitter: u64 = rand::thread_rng().gen_range(0..=max_jitter);
+                let jitter = rand::Rng::random_range(&mut rand::rng(), 0..=max_jitter);
                 let backoff_with_jitter = Duration::from_secs(backoff + jitter);
                 // Log the 429 error and the calculated backoff time
                 warn!(
@@ -182,7 +180,6 @@ impl CoreDB {
     #[instrument(skip(self, ctx, cfg))]
     async fn reconcile(&self, ctx: Arc<Context>, cfg: &Config) -> Result<Action, Action> {
         let client = ctx.client.clone();
-        let _recorder = ctx.diagnostics.read().await.recorder(client.clone(), self);
         let ns = self.namespace().unwrap();
         let name = self.name_any();
         let coredbs: Api<CoreDB> = Api::namespaced(client.clone(), &ns);
@@ -387,7 +384,9 @@ impl CoreDB {
         let (trunk_installs, extensions) =
             reconcile_extensions(self, ctx.clone(), &coredbs, &name).await?;
 
-        let recovery_time = self.get_recovery_time(ctx.clone()).await?;
+        let recovery_time = self
+            .get_recovery_time(ctx.clone(), cfg.enable_volume_snapshot)
+            .await?;
         let last_archiver_status = reconcile_last_archive_status(self, ctx.clone()).await?;
 
         let current_config_values = get_current_config_values(self, ctx.clone()).await?;
@@ -490,32 +489,19 @@ impl CoreDB {
     // Finalizer cleanup (the object was deleted, ensure nothing is orphaned)
     #[instrument(skip(self, ctx))]
     async fn cleanup(&self, ctx: Arc<Context>) -> Result<Action> {
-        // If namespace is terminating, do not publish delete event. Attempting to publish an event
-        // in a terminating namespace will leave us in a bad state in which the namespace will hang
-        // in terminating state.
-        let ns_api: Api<Namespace> = Api::all(ctx.client.clone());
-        let ns_status = ns_api
-            .get_status(self.metadata.namespace.as_ref().unwrap())
-            .await
-            .map_err(Error::KubeError);
-        let phase = ns_status.unwrap().status.unwrap().phase;
-        if phase == Some("Terminating".to_string()) {
-            return Ok(Action::await_change());
-        }
-        let recorder = ctx
-            .diagnostics
-            .read()
-            .await
-            .recorder(ctx.client.clone(), self);
-        // CoreDB doesn't have dependencies in this example case, so we just publish an event
-        recorder
-            .publish(Event {
-                type_: EventType::Normal,
-                reason: "DeleteCoreDB".into(),
-                note: Some(format!("Delete `{}`", self.name_any())),
-                action: "Reconciling".into(),
-                secondary: None,
-            })
+        let oref = self.object_ref(&());
+        // Document doesn't have any real cleanup, so we just publish an event
+        ctx.recorder
+            .publish(
+                &Event {
+                    type_: EventType::Normal,
+                    reason: "DeleteCoreDB".into(),
+                    note: Some(format!("Delete `{}`", self.name_any())),
+                    action: "Deleting".into(),
+                    secondary: None,
+                },
+                &oref,
+            )
             .await
             .map_err(Error::KubeError)?;
         Ok(Action::await_change())
@@ -812,6 +798,7 @@ impl CoreDB {
     pub async fn get_recovery_time(
         &self,
         context: Arc<Context>,
+        enable_volume_snapshot: bool,
     ) -> Result<Option<DateTime<Utc>>, Action> {
         let client = context.client.clone();
         let namespace = self.metadata.namespace.as_ref().ok_or_else(|| {
@@ -823,7 +810,21 @@ impl CoreDB {
         })?;
         let cluster_name = self.name_any();
         let backup: Api<Backup> = Api::namespaced(client, namespace);
-        let lp = ListParams::default().labels(&format!("cnpg.io/cluster={}", cluster_name));
+
+        // Determine the scheduled backup label suffix based on enable_volume_snapshot
+        let scheduled_backup_name = if enable_volume_snapshot {
+            format!("{}-snap", cluster_name)
+        } else {
+            cluster_name.clone()
+        };
+
+        // Create label selector with both cluster name and scheduled backup name
+        let label_selector = format!(
+            "cnpg.io/cluster={},cnpg.io/scheduled-backup={}",
+            cluster_name, scheduled_backup_name
+        );
+
+        let lp = ListParams::default().labels(&label_selector);
         let backup_list = backup.list(&lp).await.map_err(|e| {
             error!("Error getting backups: {:?}", e);
             Action::requeue(Duration::from_secs(300))
@@ -925,18 +926,16 @@ pub struct Diagnostics {
     pub reporter: Reporter,
 }
 impl Default for Diagnostics {
-    #[instrument]
     fn default() -> Self {
         Self {
             last_event: Utc::now(),
-            reporter: "coredb-controller".into(),
+            reporter: "tembo-controller".into(),
         }
     }
 }
 impl Diagnostics {
-    #[instrument(skip(self, client))]
-    fn recorder(&self, client: Client, cdb: &CoreDB) -> Recorder {
-        Recorder::new(client, self.reporter.clone(), cdb.object_ref(&()))
+    fn recorder(&self, client: Client) -> Recorder {
+        Recorder::new(client, self.reporter.clone())
     }
 }
 
@@ -945,15 +944,18 @@ impl Diagnostics {
 pub struct State {
     /// Diagnostics populated by the reconciler
     diagnostics: Arc<RwLock<Diagnostics>>,
-    /// Metrics registry
-    registry: prometheus::Registry,
+    /// Metrics
+    metrics: Arc<Metrics>,
 }
 
 /// State wrapper around the controller outputs for the web server
 impl State {
     /// Metrics getter
-    pub fn metrics(&self) -> Vec<prometheus::proto::MetricFamily> {
-        self.registry.gather()
+    pub fn metrics(&self) -> String {
+        let mut buffer = String::new();
+        let registry = &*self.metrics.registry;
+        prometheus_client::encoding::text::encode(&mut buffer, registry).unwrap();
+        buffer
     }
 
     /// State getter
@@ -962,10 +964,11 @@ impl State {
     }
 
     // Create a Controller Context that can update State
-    pub fn create_context(&self, client: Client) -> Arc<Context> {
+    pub async fn to_context(&self, client: Client) -> Arc<Context> {
         Arc::new(Context {
-            client,
-            metrics: Metrics::default().register(&self.registry).unwrap(),
+            client: client.clone(),
+            recorder: self.diagnostics.read().await.recorder(client),
+            metrics: self.metrics.clone(),
             diagnostics: self.diagnostics.clone(),
         })
     }
@@ -973,26 +976,20 @@ impl State {
 
 /// Initialize the controller and shared state (given the crd is installed)
 pub async fn run(state: State) {
-    // Initialize the Kubernetes client
-    let client_future = kube::Client::try_default();
-    let client = match client_future.await {
-        Ok(wrapped_client) => wrapped_client,
-        Err(_) => panic!("Please configure your Kubernetes Context"),
-    };
-
+    let client = Client::try_default()
+        .await
+        .expect("failed to create kube Client");
     let coredb = Api::<CoreDB>::all(client.clone());
     if let Err(e) = coredb.list(&ListParams::default().limit(1)).await {
         error!("CRD is not queryable; {e:?}. Is the CRD installed?");
         info!("Installation: cargo run --bin crdgen | kubectl apply -f -");
         std::process::exit(1);
     }
-
     let secret_api = Api::<Secret>::all(client.clone());
-
     Controller::new(coredb, watcherConfig::default().any_semantic())
         .owns(secret_api, watcherConfig::default().any_semantic())
         .shutdown_on_signal()
-        .run(reconcile, error_policy, state.create_context(client))
+        .run(reconcile, error_policy, state.to_context(client).await)
         .filter_map(|x| async move { std::result::Result::ok(x) })
         .for_each(|_| futures::future::ready(()))
         .await;
@@ -1009,18 +1006,20 @@ mod test {
     };
     use crate::config::Config;
     use crate::controller::{create_volume_snapshot_patch, is_volume_snapshot_update_needed};
+    use crate::fixtures::{timeout_after_1s, Scenario};
     use chrono::{DateTime, NaiveDate, Utc};
     use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
     use std::sync::Arc;
 
     #[tokio::test]
     async fn new_coredbs_without_finalizers_gets_a_finalizer() {
-        let (testctx, fakeserver, _) = Context::test();
+        let (testctx, fakeserver) = Context::test();
         let coredb = CoreDB::test();
-        // verify that coredb gets a finalizer attached during reconcile
-        fakeserver.handle_finalizer_creation(&coredb);
-        let res = reconcile(Arc::new(coredb), testctx).await;
-        assert!(res.is_ok(), "initial creation succeeds in adding finalizer");
+        let mocksrv = fakeserver.run(Scenario::FinalizerCreation(coredb.clone()));
+        reconcile(Arc::new(coredb), testctx)
+            .await
+            .expect("reconciler");
+        timeout_after_1s(mocksrv).await;
     }
 
     #[tokio::test]
@@ -1237,11 +1236,13 @@ mod test {
 
     // Test the error_policy function, we need to mock the ctx and cdb to mimic a 429 error code
     use crate::{error_policy, Error};
+    use bytes::Bytes;
     use futures::pin_mut;
     use http::{Request, Response, StatusCode};
-    use hyper::Body;
+    use http_body_util::Full;
     use k8s_openapi::api::core::v1::Pod;
-    use kube::{api::Api, Client};
+    use kube::runtime::events::Recorder;
+    use kube::{api::Api, client::Body, Client};
     use serde_json::json;
     use tower_test::mock;
 
@@ -1251,12 +1252,13 @@ mod test {
         let coredb = CoreDB::test();
 
         // mock the Kubernetes client and setup Context
-        let (mock_service, handle) = mock::pair::<Request<Body>, Response<Body>>();
+        let (mock_service, handle) = mock::pair::<Request<Body>, Response<Full<Bytes>>>();
         let client = Client::new(mock_service, "default".to_string());
         let ctx = Arc::new(Context {
             client: client.clone(),
             metrics: Default::default(),
             diagnostics: Default::default(),
+            recorder: Recorder::new(client.clone(), "tembo-controller".into()),
         });
 
         // setup the mock response 429 too many requests
@@ -1267,7 +1269,7 @@ mod test {
                 send.send_response(
                     Response::builder()
                         .status(StatusCode::TOO_MANY_REQUESTS)
-                        .body(Body::from(
+                        .body(Full::new(Bytes::from(
                             json!({
                                 "kind": "Status",
                                 "apiVersion": "v1",
@@ -1278,7 +1280,7 @@ mod test {
                                 "code": 429
                             })
                             .to_string(),
-                        ))
+                        )))
                         .unwrap(),
                 );
             }
@@ -1315,12 +1317,13 @@ mod test {
         let coredb = CoreDB::test();
 
         // mock the Kubernetes client and setup Context
-        let (mock_service, handle) = mock::pair::<Request<Body>, Response<Body>>();
+        let (mock_service, handle) = mock::pair::<Request<Body>, Response<Full<Bytes>>>();
         let client = Client::new(mock_service, "default".to_string());
         let ctx = Arc::new(Context {
             client: client.clone(),
             metrics: Default::default(),
             diagnostics: Default::default(),
+            recorder: Recorder::new(client.clone(), "tembo-controller".into()),
         });
 
         // setup the mock response 404 Not Found
@@ -1329,19 +1332,19 @@ mod test {
             if let Some((_request, send)) = handle.next_request().await {
                 send.send_response(
                     Response::builder()
-                        .status(StatusCode::NOT_FOUND)
-                        .body(Body::from(
+                        .status(StatusCode::TOO_MANY_REQUESTS)
+                        .body(Full::new(Bytes::from(
                             json!({
                                 "kind": "Status",
                                 "apiVersion": "v1",
                                 "metadata": {},
                                 "status": "Failure",
                                 "message": "Not Found",
-                                "reason": "NotFound",
+                                "reason": "Not Found",
                                 "code": 404
                             })
                             .to_string(),
-                        ))
+                        )))
                         .unwrap(),
                 );
             }

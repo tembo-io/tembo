@@ -24,7 +24,7 @@ impl NamespaceWatcher {
         }
     }
 
-    #[instrument(skip(self), fields(trace_id))]
+    #[instrument(skip(self))]
     pub async fn watch(&self) -> Result<(), kube::Error> {
         let namespaces = self.namespaces.clone();
         let client = self.client.clone();
