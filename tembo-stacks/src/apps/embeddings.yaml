@@ -2,7 +2,7 @@ name: !embeddings
 appServices:
   # Use the latest commit sha from the last successful build of the main
   # branch of https://github.com/tembo-io/pg_vectorize/actions/workflows/build-vector-serve.yml
-  - image: 387894460527.dkr.ecr.us-east-1.amazonaws.com/tembo-io/vector-serve:78fb934
+  - image: 387894460527.dkr.ecr.us-east-1.amazonaws.com/tembo-io/vector-serve:c67882e
     name: embeddings
     metrics:
       path: /metrics
