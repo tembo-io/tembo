@@ -394,8 +394,8 @@ mod tests {
             .unwrap()
             .clone();
         let mut to_find = 2;
-        // 3 embedding app defaults + 1 custom
-        assert_eq!(embedding_app.env.as_ref().unwrap().len(), 4);
+        // 4 embedding app defaults + 1 custom
+        assert_eq!(embedding_app.env.as_ref().unwrap().len(), 5);
         for e in embedding_app.env.unwrap() {
             match e.name.as_str() {
                 // custom env var is found

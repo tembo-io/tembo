@@ -9,7 +9,7 @@ images:
   17: "standard-cnpg:17-ee80907"
 stack_version: 0.1.0
 appServices:
-  - image: 387894460527.dkr.ecr.us-east-1.amazonaws.com/tembo-io/vector-serve:df68795
+  - image: 387894460527.dkr.ecr.us-east-1.amazonaws.com/tembo-io/vector-serve:ba4e47a
     name: embeddings
     metrics:
       path: /metrics
@@ -21,6 +21,8 @@ appServices:
         value: "500"
       - name: XDG_CACHE_HOME
         value: /models/.cache
+      - name: HF_HUB_DISABLE_TELEMETRY
+        value: "1"
     routing:
       - port: 3000
         ingressPath: /vectordb
