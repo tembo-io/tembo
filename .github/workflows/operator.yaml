@@ -27,7 +27,7 @@ on:
 
 jobs:
   functional_test:
-    name: Run functional testing
+    name: 🧪 Operator on ☸️ ${{ matrix.kube_version }}
     runs-on:
       - operator-runner-8x32
     strategy:
