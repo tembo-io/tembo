@@ -94,9 +94,10 @@ pub struct Stack {
     /// The Docker images to use for each supported Postgres versions
     ///
     /// Default:
-    ///     14: "standard-cnpg:14-a0a5ab5"
-    ///     15: "standard-cnpg:15-a0a5ab5"
-    ///     16: "standard-cnpg:16-a0a5ab5"
+    ///     14: "standard-cnpg:14-bffd097"
+    ///     15: "standard-cnpg:15-bffd097"
+    ///     16: "standard-cnpg:16-bffd097"
+    ///     17: "standard-cnpg:17-bffd097"
     #[serde(default = "default_images")]
     pub images: ImagePerPgVersion,
     pub stack_version: Option<String>,

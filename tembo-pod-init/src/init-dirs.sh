@@ -1,4 +1,13 @@
-#!/bin/sh
+#!/bin/bash
 
-cp -p --recursive --update /var/lib/postgresql/data/* /var/lib/postgresql/init/
-rm --recursive --force /var/lib/postgresql/init/lost+found
+set -e
+
+src=/var/lib/postgresql/data
+dst=/var/lib/postgresql/init
+
+if [ -x /tmp/sync-volume.sh ]; then
+    /tmp/sync-volume.sh "$dst"
+else
+    cp -p --recursive --update "$src/*" "$dst/"
+    rm --recursive --force "$dst/lost+found"
+fi

@@ -14,7 +14,6 @@ use std::{collections::HashSet, sync::Arc, time::Duration};
 use tracing::{debug, error, info, instrument, warn};
 
 use crate::apis::coredb_types::CoreDBStatus;
-use crate::defaults::postgres_major_version_from_cdb;
 
 // Syncroniously merge and deduplicate pods
 #[instrument(skip(non_fenced_pods, fenced_names) fields(trace_id))]
@@ -336,6 +335,8 @@ async fn execute_extension_install_command(
         ext.name.clone(),
         "--version".to_owned(),
         version,
+        "--pkglibdir".to_owned(),
+        cdb.spec.module_dir(),
     ];
 
     // If the pod is not up yet, do not try and install the extension
@@ -404,7 +405,7 @@ async fn execute_extension_install_command(
     }
 }
 
-// Check if <extension_name>.so file exists for a given extension in /var/lib/postgresql/data/tembo/15/lib
+// Check if <extension_name>.so file exists for a given extension in `cdb.module_dir()`.
 #[instrument(skip(cdb, ctx, pod_name) fields(trace_id))]
 pub async fn check_for_so_files(
     cdb: &CoreDB,
@@ -430,10 +431,9 @@ pub async fn check_for_so_files(
         return Err(Action::requeue(Duration::from_secs(10)));
     }
 
-    let postgres_version = postgres_major_version_from_cdb(cdb).unwrap_or(15);
     let cmd = vec![
         "ls".to_owned(),
-        format!("/var/lib/postgresql/data/tembo/{}/lib", postgres_version).to_owned(),
+        format!("{}/{}.so", cdb.spec.module_dir(), extension_name),
     ];
 
     let result = cdb.exec(pod_name.to_string(), client.clone(), &cmd).await;

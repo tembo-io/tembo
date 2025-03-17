@@ -16,7 +16,7 @@ use tracing::{debug, error};
 
 #[derive(Clone)]
 pub struct RolePassword {
-    pub password: String,
+    pub _password: String,
 }
 
 pub async fn reconcile_secret(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Action> {
@@ -189,7 +189,9 @@ pub async fn reconcile_postgres_role_secret(
                 ))
             }
         };
-        let secret_data = RolePassword { password };
+        let secret_data = RolePassword {
+            _password: password,
+        };
         return Ok(Some(secret_data));
     };
 
@@ -225,7 +227,9 @@ fn generate_role_secret_data(role_name: &str) -> (BTreeMap<String, ByteString>, 
     data.insert("password".to_owned(), b64_password);
     data.insert("username".to_owned(), b64_encode(role_name));
 
-    let secret_data = RolePassword { password };
+    let secret_data = RolePassword {
+        _password: password,
+    };
 
     (data, secret_data)
 }

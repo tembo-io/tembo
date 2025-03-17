@@ -589,7 +589,7 @@ pub struct CoreDBSpec {
     /// [https://tembo.io](https://tembo.io) platform. For more information
     /// please visit our [tembo-images](https://github.com/tembo-io/tembo-images) repository.
     ///
-    /// **Default**: quay.io/tembo/standard-cnpg:15.3.0-1-0c19c7e
+    /// **Default**: quay.io/tembo/standard-cnpg:15-bffd097
     #[serde(default = "defaults::default_image_uri")]
     pub image: String,
 
@@ -894,6 +894,57 @@ impl CoreDBSpec {
         }
         Ok(None)
     }
+
+    // Returns true if the configuration uses the Tembo Postgres image.
+    pub fn uses_postgres_image(&self) -> bool {
+        self.image.contains("postgres:")
+    }
+
+    // Returns the major version of Postgres defined by this spec, parsed from
+    // `self.image`. Defaults to `15` if the version cannot be parsed from the
+    // image name.
+    pub fn pg_major(&self) -> u32 {
+        let parts: Vec<&str> = self.image.split(':').collect();
+        if parts.len() < 2 {
+            return 15;
+        }
+
+        parts[1]
+            .chars()
+            .skip_while(|ch| !ch.is_ascii_digit())
+            .take_while(|ch| ch.is_ascii_digit())
+            .fold(None, |acc, ch| {
+                ch.to_digit(10).map(|b| acc.unwrap_or(0) * 10 + b)
+            })
+            .unwrap_or(15)
+    }
+
+    // Returns the path to the Postgres shared directory for this spec.
+    // Extension `sharedir` files should be installed here.
+    pub fn share_dir(&self) -> String {
+        if self.uses_postgres_image() {
+            return "/var/lib/postgresql/data/share".to_string();
+        }
+        "/var/lib/postgresql/data/tembo".to_string()
+    }
+
+    // Returns the path to the Postgres module directory for this spec.
+    // Extension module files (`*.so`) should be installed here.
+    pub fn module_dir(&self) -> String {
+        if self.uses_postgres_image() {
+            return "/var/lib/postgresql/data/mod".to_string();
+        }
+        format!("/var/lib/postgresql/data/tembo/{}/lib", self.pg_major())
+    }
+
+    // Returns the path to the lib directory for this spec. Shared libraries
+    // required by extensions should be installed here.
+    pub fn lib_dir(&self) -> String {
+        if self.uses_postgres_image() {
+            return "/var/lib/postgresql/data/lib".to_string();
+        }
+        format!("/var/lib/postgresql/data/tembo/{}/lib", self.pg_major())
+    }
 }
 
 /// The status object of `CoreDB`
@@ -1180,6 +1231,109 @@ mod tests {
         }
         "#;
 
-        let _deserialized_spec: CoreDBSpec = serde_json::from_str(json_str).unwrap();
+        let mut spec: CoreDBSpec = serde_json::from_str(json_str).unwrap();
+        for (name, image, major, uses, share, mod_dir, lib) in [
+            (
+                "empty",
+                "",
+                15,
+                false,
+                "/var/lib/postgresql/data/tembo",
+                "/var/lib/postgresql/data/tembo/15/lib",
+                "/var/lib/postgresql/data/tembo/15/lib",
+            ),
+            (
+                "old_default",
+                "quay.io/tembo/tembo-pg-cnpg:15.3.0-5-cede445",
+                15,
+                false,
+                "/var/lib/postgresql/data/tembo",
+                "/var/lib/postgresql/data/tembo/15/lib",
+                "/var/lib/postgresql/data/tembo/15/lib",
+            ),
+            (
+                "standard_sixteen",
+                "quay.io/tembo/standard-cnpg:16-ee80907",
+                16,
+                false,
+                "/var/lib/postgresql/data/tembo",
+                "/var/lib/postgresql/data/tembo/16/lib",
+                "/var/lib/postgresql/data/tembo/16/lib",
+            ),
+            (
+                "gis_fourteen",
+                "quay.io/tembo/geo-cnpg:14-ee80907",
+                14,
+                false,
+                "/var/lib/postgresql/data/tembo",
+                "/var/lib/postgresql/data/tembo/14/lib",
+                "/var/lib/postgresql/data/tembo/14/lib",
+            ),
+            (
+                "aws_sixteen",
+                "387894460527.dkr.ecr.us-east-1.amazonaws.com/tembo-io/standard-cnpg:16.1-d15f2dc",
+                16,
+                false,
+                "/var/lib/postgresql/data/tembo",
+                "/var/lib/postgresql/data/tembo/16/lib",
+                "/var/lib/postgresql/data/tembo/16/lib",
+            ),
+            (
+                "postgres_seventeen_noble",
+                "quay.io/tembo/postgres:17.4-noble",
+                17,
+                true,
+                "/var/lib/postgresql/data/share",
+                "/var/lib/postgresql/data/mod",
+                "/var/lib/postgresql/data/lib",
+            ),
+            (
+                "postgres_sixteen_noble",
+                "quay.io/tembo/postgres:16",
+                16,
+                true,
+                "/var/lib/postgresql/data/share",
+                "/var/lib/postgresql/data/mod",
+                "/var/lib/postgresql/data/lib",
+            ),
+            (
+                "postgres_fifteen_timestamp",
+                "quay.io/tembo/postgres:15.12-noble-202503122254",
+                15,
+                true,
+                "/var/lib/postgresql/data/share",
+                "/var/lib/postgresql/data/mod",
+                "/var/lib/postgresql/data/lib",
+            ),
+            (
+                "old_default_no_registry",
+                "tembo-pg-cnpg:15.3.0-5-cede445",
+                15,
+                false,
+                "/var/lib/postgresql/data/tembo",
+                "/var/lib/postgresql/data/tembo/15/lib",
+                "/var/lib/postgresql/data/tembo/15/lib",
+            ),
+            (
+                "postgres_no_registry",
+                "postgres:15.12-noble-202503122254",
+                15,
+                true,
+                "/var/lib/postgresql/data/share",
+                "/var/lib/postgresql/data/mod",
+                "/var/lib/postgresql/data/lib",
+            ),
+        ] {
+            spec.image = image.to_string();
+            assert_eq!(
+                uses,
+                spec.uses_postgres_image(),
+                "{name} uses_postgres_image"
+            );
+            assert_eq!(major, spec.pg_major(), "{name} pg_major");
+            assert_eq!(share, spec.share_dir(), "{name} share_dir");
+            assert_eq!(mod_dir, spec.module_dir(), "{name} module_dir");
+            assert_eq!(lib, spec.lib_dir(), "{name} lib_dir");
+        }
     }
 }

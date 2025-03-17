@@ -1152,7 +1152,7 @@ mod test {
             },
             "spec": {
                 "replicas": 1,
-                "image": "quay.io/tembo/standard-cnpg:16-30219f2",
+                "image": "quay.io/tembo/standard-cnpg:16-bffd097",
                 "extensions": [{
                         "name": "cube",
                         "description": "fake description",
@@ -5716,7 +5716,7 @@ CREATE EVENT TRIGGER pgrst_watch
                 "name": name
             },
             "spec": {
-                "image": "quay.io/tembo/standard-cnpg:15-30219f2",
+                "image": "quay.io/tembo/standard-cnpg:15-bffd097",
                 "replicas": replicas,
                 "trunk_installs": [
                     {
@@ -5835,7 +5835,7 @@ CREATE EVENT TRIGGER pgrst_watch
         let cluster_api: Api<CoreDB> = Api::namespaced(client.clone(), &namespace);
         let cluster = cluster_api.get(name).await.unwrap();
         let image = cluster.spec.image.clone();
-        assert_eq!(image, "quay.io/tembo/standard-cnpg:15-30219f2");
+        assert_eq!(image, "quay.io/tembo/standard-cnpg:15-bffd097");
 
         // CLEANUP TEST
         // Cleanup CoreDB

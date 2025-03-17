@@ -2989,7 +2989,7 @@ mod tests {
             "namespace": "default"
           },
           "spec": {
-            "imageName": "quay.io/tembo/standard-cnpg:15.3.0-1-0c19c7e",
+            "imageName": "quay.io/tembo/standard-cnpg:15-bffd097",
             "instances": 1,
             "managed": {
               "roles": [
