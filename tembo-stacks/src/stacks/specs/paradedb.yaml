@@ -34,7 +34,7 @@ trunk_installs:
   - name: pg_analytics
     version: 0.3.5
   - name: pg_search
-    version: 0.15.6
+    version: 0.15.8
   - name: pg_cron
     version: 1.6.4
   - name: pgvector
@@ -51,7 +51,7 @@ extensions:
     locations:
       - database: postgres
         enabled: true
-        version: 0.15.6
+        version: 0.15.8
   - name: vector
     locations:
       - database: postgres
