@@ -27,7 +27,7 @@ appServices:
     env:
       - name: PGRST_DB_URI
         valueFromPlatform: ReadWriteConnection
-      - name: PGRST_DB_SCHEMA
+      - name: PGRST_DB_SCHEMAS
         value: public
       - name: PGRST_DB_ANON_ROLE
         value: postgres
