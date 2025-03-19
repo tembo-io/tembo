@@ -335,8 +335,8 @@ async fn execute_extension_install_command(
         ext.name.clone(),
         "--version".to_owned(),
         version,
-        "--pkglibdir".to_owned(),
-        cdb.spec.module_dir(),
+        // "--pkglibdir".to_owned(),
+        // cdb.spec.module_dir(),
     ];
 
     // If the pod is not up yet, do not try and install the extension
@@ -431,9 +431,11 @@ pub async fn check_for_so_files(
         return Err(Action::requeue(Duration::from_secs(10)));
     }
 
+    let so = format!("{}/{}.so", cdb.spec.module_dir(), extension_name);
     let cmd = vec![
-        "ls".to_owned(),
-        format!("{}/{}.so", cdb.spec.module_dir(), extension_name),
+        "/bin/bash".to_string(),
+        "-c".to_string(),
+        format!("if [ -f '{so}' ]; then echo '{so}'; fi"),
     ];
 
     let result = cdb.exec(pod_name.to_string(), client.clone(), &cmd).await;
