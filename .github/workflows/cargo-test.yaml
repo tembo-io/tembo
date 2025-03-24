@@ -71,9 +71,10 @@ jobs:
   test:
     name: Run tests
     runs-on:
-      - self-hosted
-      - dind
-      - large-8x8
+      - "runs-on=${{ github.run_id }}"
+      - "runner=large-amd64"
+      - "cpu=8"
+      - "ram=16"
     needs:
       - find_directories
     strategy:

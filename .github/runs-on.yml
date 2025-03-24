@@ -1,0 +1,3 @@
+# Inherit from the tembo-io/infrastructure repo
+# https://runs-on.com/configuration/repo-config/
+_extends: infrastructure

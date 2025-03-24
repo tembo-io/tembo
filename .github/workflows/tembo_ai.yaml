@@ -30,10 +30,8 @@ jobs:
     name: Run tests
 
     runs-on:
-      - self-hosted
-      - dind
-      - small
-      - amd64
+      - "runs-on=${{ github.run_id }}"
+      - "runner=small-amd64"
     env:
       DATABASE_URL: "postgresql://postgres:postgres@0.0.0.0:5432/postgres"
     steps:

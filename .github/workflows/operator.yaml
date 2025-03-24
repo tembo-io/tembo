@@ -29,7 +29,10 @@ jobs:
   functional_test:
     name: 🧪 Operator on ☸️ ${{ matrix.kube_version }}
     runs-on:
-      - operator-runner-8x32
+      - "runs-on=${{github.run_id}}"
+      - "runner=large-amd64"
+      - "cpu=8"
+      - "ram=[16,32]"
     strategy:
       # fail-fast means to cancel all jobs if one fails
       fail-fast: false
