@@ -1,65 +1,68 @@
-name: Tembo AI Gateway Workflow
-
-permissions:
-  pull-requests: write
-  deployments: write
-  id-token: write
-  contents: read
-
-defaults:
-  run:
-    shell: bash
-    working-directory: ./inference-gateway/
-
-on:
-  pull_request:
-    branches:
-      - main
-    paths:
-    - '.github/workflows/tembo_ai.yaml'
-    - 'inference-gateway/**'
-  push:
-    branches:
-      - main
-    paths:
-    - '.github/workflows/tembo_ai.yaml'
-    - 'inference-gateway/**'
-
-jobs:
-  tests:
-    name: Run tests
-
-    runs-on:
-      - "runs-on=${{ github.run_id }}"
-      - "runner=small-amd64"
-    env:
-      DATABASE_URL: "postgresql://postgres:postgres@0.0.0.0:5432/postgres"
-    steps:
-      - uses: actions/checkout@v4
-      - name: Install system dependencies
-        run: |
-          set -xe
-          sudo apt-get update
-          sudo apt-get install -y pkg-config libssl-dev
-      - uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: "cp-test"
-      - name: Install Rust stable toolchain
-        uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-      - name: install dependencies
-        run: cargo install sqlx-cli --version 0.8.2
-      - name: Start Postgres
-        run: make run-postgres
-      - name: unit-test
-        run: SQLX_OFFLINE=true make unit-test
-      - name: integration-test
-        run: SQLX_OFFLINE=true make integration-test
-      - name: Check Format and Migrations
-        run: make check
-      - name: Debugging information
-        if: always()
-        run: |
-          docker compose logs postgres
-          docker compose logs mock-server
+# Disable building of the Tembo AI Gateway (inference-gateway)
+#
+#
+# name: Tembo AI Gateway Workflow
+#
+# permissions:
+#   pull-requests: write
+#   deployments: write
+#   id-token: write
+#   contents: read
+#
+# defaults:
+#   run:
+#     shell: bash
+#     working-directory: ./inference-gateway/
+#
+# on:
+#   pull_request:
+#     branches:
+#       - main
+#     paths:
+#       - ".github/workflows/tembo_ai.yaml"
+#       - "inference-gateway/**"
+#   push:
+#     branches:
+#       - main
+#     paths:
+#       - ".github/workflows/tembo_ai.yaml"
+#       - "inference-gateway/**"
+#
+# jobs:
+#   tests:
+#     name: Run tests
+#
+#     runs-on:
+#       - "runs-on=${{ github.run_id }}"
+#       - "runner=small-amd64"
+#     env:
+#       DATABASE_URL: "postgresql://postgres:postgres@0.0.0.0:5432/postgres"
+#     steps:
+#       - uses: actions/checkout@v4
+#       - name: Install system dependencies
+#         run: |
+#           set -xe
+#           sudo apt-get update
+#           sudo apt-get install -y pkg-config libssl-dev
+#       - name: Install Rust stable toolchain
+#         uses: actions-rust-lang/setup-rust-toolchain@v1
+#         with:
+#           toolchain: stable
+#           cache: true
+#           cache-key: "tembo-ai-test"
+#           cache-on-failure: true
+#       - name: install dependencies
+#         run: cargo install sqlx-cli --version 0.8.2
+#       - name: Start Postgres
+#         run: make run-postgres
+#       - name: unit-test
+#         run: SQLX_OFFLINE=true make unit-test
+#       - name: integration-test
+#         run: SQLX_OFFLINE=true make integration-test
+#       - name: Check Format and Migrations
+#         run: make check
+#       - name: Debugging information
+#         if: always()
+#         run: |
+#           docker compose logs postgres
+#           docker compose logs mock-server
