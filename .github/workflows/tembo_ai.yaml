@@ -16,14 +16,14 @@ on:
     branches:
       - main
     paths:
-    - '.github/workflows/tembo_ai.yaml'
-    - 'inference-gateway/**'
+      - ".github/workflows/tembo_ai.yaml"
+      - "inference-gateway/**"
   push:
     branches:
       - main
     paths:
-    - '.github/workflows/tembo_ai.yaml'
-    - 'inference-gateway/**'
+      - ".github/workflows/tembo_ai.yaml"
+      - "inference-gateway/**"
 
 jobs:
   tests:
@@ -41,13 +41,13 @@ jobs:
           set -xe
           sudo apt-get update
           sudo apt-get install -y pkg-config libssl-dev
-      - uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: "cp-test"
       - name: Install Rust stable toolchain
-        uses: actions-rs/toolchain@v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
+          cache: true
+          cache-key: "tembo-ai-test"
+          cache-on-failure: true
       - name: install dependencies
         run: cargo install sqlx-cli --version 0.8.2
       - name: Start Postgres

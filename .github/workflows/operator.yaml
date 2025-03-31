@@ -51,9 +51,12 @@ jobs:
 
       - uses: azure/setup-helm@v4
       - uses: extractions/setup-just@v2
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
+          cache: true
+          cache-key: "tembo-operator-functonal-test"
+          cache-on-failure: true
 
       - name: Install kind
         uses: helm/kind-action@v1
@@ -70,12 +73,6 @@ jobs:
             ~/.cache/helm
             ~/.helm
           key: helm-cache-${{ runner.os }}-${{ hashFiles('tembo-operator/testdata/*.yaml') }}
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          prefix-key: "tembo-operator-functional-test"
-          workspaces: |
-            tembo-operator
 
       - name: Check CRD is updated in the charts directory
         run: |
