@@ -68,7 +68,7 @@ trunk_installs:
   - name: pgmq
     version: 1.5.0
   - name: vectorize
-    version: 0.20.0
+    version: 0.22.1
   - name: pgvector
     version: 0.8.0
   - name: pg_stat_statements
@@ -95,7 +95,7 @@ extensions:
     locations:
     - database: postgres
       enabled: true
-      version: 0.20.0
+      version: 0.22.1
   - name: pg_stat_statements
     locations:
       - database: postgres
