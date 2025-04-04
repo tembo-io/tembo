@@ -35,7 +35,7 @@ trunk_installs:
   - name: pgmq
     version: 1.5.0
   - name: vectorize
-    version: 0.20.0
+    version: 0.22.1
   - name: pg_later
     version: 0.3.0
   - name: plpython3u
@@ -69,7 +69,7 @@ extensions:
     locations:
     - database: postgres
       enabled: true
-      version: 0.20.0
+      version: 0.22.1
   - name: pg_later
     locations:
     - database: postgres
