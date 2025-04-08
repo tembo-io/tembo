@@ -10,12 +10,16 @@ use crate::{
 };
 use k8s_openapi::{api::core::v1::Pod, apimachinery::pkg::apis::meta::v1::ObjectMeta};
 use kube::{runtime::controller::Action, Api, ResourceExt};
-use std::{collections::HashSet, sync::Arc, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    sync::Arc,
+    time::Duration,
+};
 use tracing::{debug, error, info, instrument, warn};
 
 use crate::apis::coredb_types::CoreDBStatus;
 
-// Syncroniously merge and deduplicate pods
+// Synchronously merge and deduplicate pods
 #[instrument(skip(non_fenced_pods, fenced_names) fields(trace_id))]
 fn merge_and_deduplicate_pods(
     non_fenced_pods: Vec<Pod>,
@@ -286,6 +290,74 @@ fn initialize_trunk_install_statuses(cdb: &CoreDB, coredb_name: &str) -> Vec<Tru
         })
 }
 
+// Format the output from an execution result.
+macro_rules! format_output {
+    ($result:expr) => {
+        format!(
+            "{}\n{}",
+            $result
+                .stdout
+                .unwrap_or_else(|| "Nothing in stdout".to_string()),
+            $result
+                .stderr
+                .unwrap_or_else(|| "Nothing in stderr".to_string())
+        )
+    };
+}
+
+// Execute `tembox` to install the list of dependencies in in `deps` into
+// `pod_name`. Returns `Ok(true)` on success, `Err(true)` on failure, and
+// `Err(true)` when execution failed but should be re-queued.
+#[instrument(skip(cdb, ctx, db_name, deps, pod_name) fields(trace_id))]
+async fn execute_dependency_install_command(
+    cdb: &CoreDB,
+    ctx: Arc<Context>,
+    db_name: &str,
+    deps: &mut Vec<String>,
+    pod_name: &str,
+) -> Result<bool, bool> {
+    // If the pod is not up yet, do not try and install the dependencies.
+    if let Err(e) = cdb.log_pod_status(ctx.client.clone(), pod_name).await {
+        warn!(
+            "Could not fetch or log pod status for instance {}: {:?}",
+            db_name, e
+        );
+        return Ok(false);
+    }
+
+    // Prepend `tembox` to create teh full command.
+    let cmd: Vec<_> = deps.splice(0..0, vec!["tembox".to_string()]).collect();
+    let result = cdb
+        .exec(pod_name.to_string(), ctx.client.clone(), &cmd)
+        .await;
+
+    // Check if the exec command was successful
+    match result {
+        Ok(result) => {
+            if result.success {
+                info!("Installed {} into {}", deps.join(", "), pod_name,);
+                Ok(true)
+            } else {
+                error!(
+                    "Failed to install {} into {}:\n{}",
+                    deps.join(", "),
+                    pod_name,
+                    format_output!(result),
+                );
+                Err(false)
+            }
+        }
+
+        Err(_) => {
+            error!(
+                "Kube exec error installing dependencies {}: Kube exec error",
+                deps.join(", "),
+            );
+            Ok(false)
+        }
+    }
+}
+
 /// execute_extension_install_command function executes the trunk install command and returns a
 /// TrunkInstallStatus or bool
 #[instrument(skip(cdb, ctx, coredb_name, ext, pod_name) fields(trace_id))]
@@ -355,16 +427,6 @@ async fn execute_extension_install_command(
     // the extension was already installed
     match result {
         Ok(result) => {
-            let output = format!(
-                "{}\n{}",
-                result
-                    .stdout
-                    .unwrap_or_else(|| "Nothing in stdout".to_string()),
-                result
-                    .stderr
-                    .unwrap_or_else(|| "Nothing in stderr".to_string())
-            );
-
             let trunk_install_status = if result.success {
                 info!(
                     "Installed extension {} into {} for {}",
@@ -379,6 +441,7 @@ async fn execute_extension_install_command(
                     installed_to_pods: Some(vec![pod_name.to_string()]),
                 }
             } else {
+                let output = format_output!(result);
                 error!(
                     "Failed to install extension {} into {}:\n{}",
                     &ext.name, pod_name, output
@@ -442,16 +505,7 @@ pub async fn check_for_so_files(
 
     match result {
         Ok(result) => {
-            let output = format!(
-                "{}\n{}",
-                result
-                    .stdout
-                    .unwrap_or_else(|| "Nothing in stdout".to_string()),
-                result
-                    .stderr
-                    .unwrap_or_else(|| "Nothing in stderr".to_string())
-            );
-
+            let output = format_output!(result);
             if result.success {
                 // Check if .so files exist in output
                 if output.contains(format!("{}.so", extension_name).as_str()) {
@@ -483,6 +537,27 @@ pub async fn check_for_so_files(
     }
 }
 
+use lazy_static::lazy_static;
+lazy_static! {
+    pub static ref DEPENDENCY_MAP: HashMap<String, Vec<String>> =
+        serde_yaml::from_str(include_str!("dependencies.yaml"))
+            .expect("dependencies.yaml not found");
+}
+
+/// Assembles the list of dependency packages to install into the pod.
+fn find_dependency_installs_to_pod(trunk_installs: &Vec<&TrunkInstall>) -> Vec<String> {
+    let mut dependencies = HashSet::new();
+    for ext in trunk_installs.iter() {
+        if let Some(deps) = DEPENDENCY_MAP.get(&ext.name) {
+            for d in deps.iter() {
+                dependencies.insert(d.to_string());
+            }
+        }
+    }
+
+    dependencies.into_iter().collect()
+}
+
 /// handles installing extensions
 #[instrument(skip(ctx, cdb) fields(trace_id))]
 pub async fn install_extensions_to_pod(
@@ -510,6 +585,32 @@ pub async fn install_extensions_to_pod(
         "Installing extensions into {}: {:?}",
         coredb_name, trunk_installs
     );
+
+    if cdb.spec.uses_postgres_image() {
+        // Install dependencies.
+        let mut deps_to_install = find_dependency_installs_to_pod(&trunk_installs);
+        if !deps_to_install.is_empty() {
+            match execute_dependency_install_command(
+                cdb,
+                ctx.clone(),
+                &coredb_name,
+                &mut deps_to_install,
+                &pod_name,
+            )
+            .await
+            {
+                Ok(installed) => {
+                    if !installed {
+                        warn!("Requeueing due to errors for instance {}", coredb_name);
+                        return Err(Action::requeue(Duration::from_secs(10)));
+                    }
+                }
+                Err(_) => {
+                    // XXX What should we do here?
+                }
+            }
+        }
+    }
 
     let mut requeue = false;
     for ext in trunk_installs.iter() {
