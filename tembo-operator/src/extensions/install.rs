@@ -406,16 +406,20 @@ async fn execute_extension_install_command(
         Some(version) => version.clone(),
     };
 
-    let cmd = vec![
+    let mut cmd = vec![
         "trunk".to_owned(),
         "install".to_owned(),
         "-r https://registry.pgtrunk.io".to_owned(),
         ext.name.clone(),
         "--version".to_owned(),
         version,
-        // "--pkglibdir".to_owned(),
-        // cdb.spec.module_dir(),
     ];
+
+    if cdb.spec.uses_postgres_image() {
+        cmd.push("--pkglibdir".to_string());
+        cmd.push(cdb.spec.module_dir());
+        cmd.push("--strip-libdir".to_string());
+    }
 
     // If the pod is not up yet, do not try and install the extension
     if let Err(e) = cdb.log_pod_status(client.clone(), pod_name).await {
