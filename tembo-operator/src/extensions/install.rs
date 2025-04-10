@@ -129,18 +129,24 @@ pub fn find_trunk_installs_to_pod<'a>(cdb: &'a CoreDB, pod_name: &str) -> Vec<&'
         cdb.name_any()
     );
 
+    if cdb.spec.uses_postgres_image() {
+        // Install all extensions on the Postgres image.
+        // XXX Do we need to exclude those already on the pod but in an error state?
+        return cdb.spec.trunk_installs.iter().collect();
+    }
+
     let pod_name = pod_name.to_owned();
     let mut trunk_installs_to_install = Vec::new();
 
+    // All TrunkInstallStatus in CDB spec
+    let trunk_install_statuses = cdb
+        .status
+        .as_ref()
+        .and_then(|status| status.trunk_installs.as_deref())
+        .unwrap_or_default();
+
     // Get extensions in spec.trunk_install that are not in status.trunk_install
     for ext in &cdb.spec.trunk_installs {
-        // All TrunkInstallStatus in CDB spec
-        let trunk_install_statuses = cdb
-            .status
-            .as_ref()
-            .and_then(|status| status.trunk_installs.as_deref())
-            .unwrap_or_default();
-
         if !trunk_install_statuses.iter().any(|ext_status| {
             ext.name == ext_status.name
                 && !ext_status.error
@@ -695,7 +701,7 @@ mod tests {
             installed_to_pods: Some(vec!["test-coredb-24631-1".to_string()]),
         };
 
-        let cdb = CoreDB {
+        let mut cdb = CoreDB {
             metadata: ObjectMeta {
                 name: Some("coredb1".to_string()),
                 ..Default::default()
@@ -722,6 +728,14 @@ mod tests {
         assert_eq!(result.len(), 2);
         assert_eq!(result[0].name, "install2");
         assert_eq!(result[1].name, "install3");
+
+        // Test with Postgres image.
+        cdb.spec.image = "quay.io/tembo/postgres:17-noble".to_string();
+        let result = find_trunk_installs_to_pod(&cdb, pod_name);
+        assert_eq!(result.len(), 3);
+        assert_eq!(result[0].name, "install1");
+        assert_eq!(result[1].name, "install2");
+        assert_eq!(result[2].name, "install3");
     }
 
     #[test]
