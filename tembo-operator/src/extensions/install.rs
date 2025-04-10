@@ -345,15 +345,6 @@ async fn execute_extension_install_command(
         // cdb.spec.module_dir(),
     ];
 
-    // If the pod is not up yet, do not try and install the extension
-    if let Err(e) = cdb.log_pod_status(client.clone(), pod_name).await {
-        warn!(
-            "Could not fetch or log pod status for instance {}: {:?}",
-            coredb_name, e
-        );
-        return Err(true);
-    }
-
     let result = cdb.exec(pod_name.to_string(), client.clone(), &cmd).await;
 
     // Check if the exec command was successful
@@ -516,6 +507,16 @@ pub async fn install_extensions_to_pod(
         "Installing extensions into {}: {:?}",
         coredb_name, trunk_installs
     );
+
+    // If the pod is not up yet, do not try and install the extension
+    if let Err(e) = cdb.log_pod_status(ctx.client.clone(), &pod_name).await {
+        warn!(
+            "Could not fetch or log pod status for instance {}: {:?}",
+            coredb_name, e
+        );
+        warn!("Requeueing due to errors for instance {}", coredb_name);
+        return Err(Action::requeue(Duration::from_secs(10)));
+    }
 
     let mut requeue = false;
     for ext in trunk_installs.iter() {
