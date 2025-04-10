@@ -62,7 +62,7 @@ pub async fn create_init_container(
     Container {
         name: config.init_container_name.to_string(),
         image: Some(image),
-        image_pull_policy: Some("IfNotPresent".to_string()),
+        image_pull_policy: config.image_pull_policy(),
         command: Some(vec![
             "/bin/bash".to_string(),
             "-c".to_string(),

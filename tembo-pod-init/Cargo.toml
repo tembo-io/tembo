@@ -1,6 +1,6 @@
 [package]
 name = "tembo-pod-init"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 publish = false
 
@@ -36,6 +36,7 @@ prometheus = "0.13"
 rustc_version_runtime = "0.3"
 tracing-actix-web = "0.7"
 uuid = { version = "1", features = ["v4"] }
+regex = "1.11.1"
 
 [dependencies.kube]
 features = ["admission", "runtime", "client", "derive", "ws"]
