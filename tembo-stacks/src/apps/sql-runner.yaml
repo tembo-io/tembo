@@ -10,7 +10,7 @@ appServices:
         memory: 100Mi
       limits:
         cpu: 200m
-        memory: 100Mi
+        memory: 300Mi
     routing:
       - port: 3000
         ingressPath: "/sql/v1"
