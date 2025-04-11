@@ -2,8 +2,10 @@ use crate::{
     apis::coredb_types::{
         Backup, ConnectionPooler, PgBouncer, ServiceAccountTemplate, VolumeSnapshot,
     },
-    cloudnativepg::clusters::ClusterAffinity,
-    cloudnativepg::poolers::{PoolerPgbouncerPoolMode, PoolerTemplateSpecContainersResources},
+    cloudnativepg::{
+        clusters::ClusterAffinity,
+        poolers::{PoolerPgbouncerPoolMode, PoolerTemplateSpecContainersResources},
+    },
     extensions::types::{Extension, TrunkInstall},
 };
 use k8s_openapi::{

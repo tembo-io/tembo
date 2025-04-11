@@ -11,6 +11,7 @@ use crate::{
             cnpg_cluster_from_cdb, reconcile_cnpg, reconcile_cnpg_scheduled_backup,
             reconcile_pooler,
         },
+        objectstore::reconcile_object_store,
         placement::cnpg_placement::PlacementConfig,
         retention::snapshots::cleanup_old_volume_snapshots,
         VOLUME_SNAPSHOT_CLASS_NAME,
@@ -352,6 +353,8 @@ impl CoreDB {
         // enabled in the CoreDB spec if cfg.enable_volume_snapshot = true.  If it's not
         // then we should enable it, otherwise it should be a no-op.
         self.enable_volume_snapshot(cfg, ctx.clone()).await?;
+
+        reconcile_object_store(self, ctx.clone()).await?;
 
         reconcile_cnpg(self, ctx.clone()).await?;
         if cfg.enable_backup {

@@ -1016,7 +1016,6 @@ pub async fn reconcile_cnpg(cdb: &CoreDB, ctx: Arc<Context>) -> Result<(), Actio
     //         reconcile_volume_snapshot_restore(cdb, ctx.clone()).await?;
     //     }
     // }
-
     debug!("Generating CNPG spec");
     let mut cluster = cnpg_cluster_from_cdb(cdb, Some(pods_to_fence), requires_load);
 
@@ -2055,7 +2054,7 @@ fn generate_restore_destination_path(restore: &Restore, backup: &coredb_types::B
 // generate_google_backup_credentials function will generate the google backup credentials from
 // GoogleCredentials object and return a ClusterBackupBarmanObjectStoreGoogleCredentials object
 #[instrument(fields(trace_id, creds))]
-fn generate_google_backup_credentials(
+pub fn generate_google_backup_credentials(
     creds: Option<GoogleCredentials>,
 ) -> Option<ClusterBackupBarmanObjectStoreGoogleCredentials> {
     match creds {
@@ -2086,7 +2085,7 @@ fn generate_google_backup_credentials(
 // generate_s3_backup_credentials function will generate the s3 backup credentials from
 // S3Credentials object and return a ClusterBackupBarmanObjectStoreS3Credentials object
 #[instrument(fields(trace_id, creds))]
-fn generate_s3_backup_credentials(
+pub fn generate_s3_backup_credentials(
     creds: Option<&S3Credentials>,
 ) -> ClusterBackupBarmanObjectStoreS3Credentials {
     if let Some(creds) = creds {
@@ -2135,7 +2134,7 @@ fn generate_s3_backup_credentials(
 // generate_azure_backup_credentials function will generate the azure backup credentials from
 // AzureCredentials object and return a ClusterBackupBarmanObjectStoreAzureCredentials object
 #[instrument(fields(trace_id, creds))]
-fn generate_azure_backup_credentials(
+pub fn generate_azure_backup_credentials(
     creds: Option<AzureCredentials>,
 ) -> Option<ClusterBackupBarmanObjectStoreAzureCredentials> {
     match creds {
