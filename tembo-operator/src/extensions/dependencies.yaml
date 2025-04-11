@@ -1,0 +1,2 @@
+redis_fdw: [libhiredis]
+pgsql_http: [libbrotli, libldap, libnghttp2, libpsl, librtmp, libssh, libcurl]
