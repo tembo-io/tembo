@@ -985,7 +985,6 @@ async fn init_gcp_storage_workload_identity(
         retentionPolicy: Some(String::from("30")),
         schedule: Some(generate_cron_expression(&read_msg.message.namespace)),
         s3_credentials: None,
-        azure_credentials: None,
         endpoint_url: None,
         google_credentials: Some(GoogleCredentials {
             gke_environment: Some(true),
@@ -1084,7 +1083,6 @@ async fn init_custom_s3_backup_configuration(
         retentionPolicy: Some(String::from("30")),
         schedule: Some(generate_cron_expression(&read_msg.message.namespace)),
         s3_credentials,
-        azure_credentials: None,
         endpoint_url: Some(s3_endpoint),
         google_credentials: None,
         volume_snapshot: Some(VolumeSnapshot {

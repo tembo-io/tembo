@@ -38,7 +38,7 @@ google-cloud-storage = "0.24"
 
 [dependencies.kube]
 features = ["runtime", "client", "derive"]
-version = "0.98.0"
+version = "0.99.0"
 
 
 [dev-dependencies]

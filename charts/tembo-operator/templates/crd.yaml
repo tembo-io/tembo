@@ -2041,7 +2041,6 @@ spec:
                 type: array
               backup:
                 default:
-                  azureCredentials: null
                   destinationPath: s3://
                   encryption: AES256
                   endpointURL: null
@@ -2056,71 +2055,6 @@ spec:
 
                   **Default**: disabled
                 properties:
-                  azureCredentials:
-                    description: The Azure credentials to use for backups
-                    nullable: true
-                    properties:
-                      connectionString:
-                        description: The connection string to be used
-                        nullable: true
-                        properties:
-                          key:
-                            description: The key to select
-                            type: string
-                          name:
-                            description: Name of the referent.
-                            type: string
-                        required:
-                        - key
-                        - name
-                        type: object
-                      inheritFromAzureAD:
-                        description: Use the Azure AD based authentication without providing explicitly the keys.
-                        nullable: true
-                        type: boolean
-                      storageAccount:
-                        description: The storage account where to upload data
-                        nullable: true
-                        properties:
-                          key:
-                            description: The key to select
-                            type: string
-                          name:
-                            description: Name of the referent.
-                            type: string
-                        required:
-                        - key
-                        - name
-                        type: object
-                      storageKey:
-                        description: The storage account key to be used in conjunction with the storage account name
-                        nullable: true
-                        properties:
-                          key:
-                            description: The key to select
-                            type: string
-                          name:
-                            description: Name of the referent.
-                            type: string
-                        required:
-                        - key
-                        - name
-                        type: object
-                      storageSasToken:
-                        description: A shared-access-signature to be used in conjunction with the storage account name
-                        nullable: true
-                        properties:
-                          key:
-                            description: The key to select
-                            type: string
-                          name:
-                            description: Name of the referent.
-                            type: string
-                        required:
-                        - key
-                        - name
-                        type: object
-                    type: object
                   destinationPath:
                     default: s3://
                     description: The S3 bucket path to store backups in
@@ -2588,71 +2522,6 @@ spec:
                   **Default**: disabled
                 nullable: true
                 properties:
-                  azureCredentials:
-                    description: azureCredentials is the Azure credentials to use for restores.
-                    nullable: true
-                    properties:
-                      connectionString:
-                        description: The connection string to be used
-                        nullable: true
-                        properties:
-                          key:
-                            description: The key to select
-                            type: string
-                          name:
-                            description: Name of the referent.
-                            type: string
-                        required:
-                        - key
-                        - name
-                        type: object
-                      inheritFromAzureAD:
-                        description: Use the Azure AD based authentication without providing explicitly the keys.
-                        nullable: true
-                        type: boolean
-                      storageAccount:
-                        description: The storage account where to upload data
-                        nullable: true
-                        properties:
-                          key:
-                            description: The key to select
-                            type: string
-                          name:
-                            description: Name of the referent.
-                            type: string
-                        required:
-                        - key
-                        - name
-                        type: object
-                      storageKey:
-                        description: The storage account key to be used in conjunction with the storage account name
-                        nullable: true
-                        properties:
-                          key:
-                            description: The key to select
-                            type: string
-                          name:
-                            description: Name of the referent.
-                            type: string
-                        required:
-                        - key
-                        - name
-                        type: object
-                      storageSasToken:
-                        description: A shared-access-signature to be used in conjunction with the storage account name
-                        nullable: true
-                        properties:
-                          key:
-                            description: The key to select
-                            type: string
-                          name:
-                            description: Name of the referent.
-                            type: string
-                        required:
-                        - key
-                        - name
-                        type: object
-                    type: object
                   backupsPath:
                     description: |-
                       The object storage path and bucket name of the instance you wish to restore from.  This maps to the `Backup` `destinationPath` field for the original instance.
