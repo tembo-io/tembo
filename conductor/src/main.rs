@@ -3,12 +3,10 @@ use actix_web_opentelemetry::{RequestMetrics, RequestTracing};
 use conductor::errors::ConductorError;
 use conductor::monitoring::CustomMetrics;
 use conductor::{
-    cloud::CloudProvider, create_azure_storage_workload_identity_binding, create_cloudformation,
-    create_gcp_storage_workload_identity_binding, create_namespace, create_or_update,
-    delete_azure_storage_workload_identity_binding, delete_cloudformation,
-    delete_coredb_and_namespace, delete_gcp_storage_workload_identity_binding,
-    generate_cron_expression, generate_spec, get_coredb_error_without_status, get_one, get_pg_conn,
-    lookup_role_arn, restart_coredb, types,
+    cloud::CloudProvider, create_cloudformation, create_gcp_storage_workload_identity_binding,
+    create_namespace, create_or_update, delete_cloudformation, delete_coredb_and_namespace,
+    delete_gcp_storage_workload_identity_binding, generate_cron_expression, generate_spec,
+    get_coredb_error_without_status, get_one, get_pg_conn, lookup_role_arn, restart_coredb, types,
 };
 use opentelemetry_sdk::{metrics::SdkMeterProvider, Resource};
 
@@ -16,8 +14,8 @@ use crate::metrics_reporter::run_metrics_reporter;
 use crate::status_reporter::run_status_reporter;
 use conductor::routes::health::background_threads_running;
 use controller::apis::coredb_types::{
-    AzureCredentials, Backup, CoreDBSpec, GoogleCredentials, S3Credentials,
-    S3CredentialsAccessKeyId, S3CredentialsSecretAccessKey, ServiceAccountTemplate, VolumeSnapshot,
+    Backup, CoreDBSpec, GoogleCredentials, S3Credentials, S3CredentialsAccessKeyId,
+    S3CredentialsSecretAccessKey, ServiceAccountTemplate, VolumeSnapshot,
 };
 use controller::apis::postgres_parameters::{ConfigValue, PgConfig};
 use k8s_openapi::api::core::v1::Secret;
@@ -93,27 +91,6 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         .unwrap_or_else(|_| "".to_owned())
         .parse()
         .expect("error parsing GCP_PROJECT_NUMBER");
-    let is_azure: bool = env::var("IS_AZURE")
-        .unwrap_or_else(|_| "false".to_owned())
-        .parse()
-        .expect("error parsing IS_AZURE");
-    let azure_storage_account: String = env::var("AZURE_STORAGE_ACCOUNT")
-        .unwrap_or_else(|_| "".to_owned())
-        .parse()
-        .expect("error parsing AZURE_STORAGE_ACCOUNT");
-    let azure_subscription_id: String = env::var("AZURE_SUBSCRIPTION_ID")
-        .unwrap_or_else(|_| "".to_owned())
-        .parse()
-        .expect("error parsing AZURE_SUBSCRIPTION_ID");
-    // This is necessary for working with multiple resource groups. Example format: cdb-plat-eus-dev
-    let azure_resource_group_prefix: String = env::var("AZURE_RESOURCE_GROUP_PREFIX")
-        .unwrap_or_else(|_| "".to_owned())
-        .parse()
-        .expect("error parsing AZURE_RESOURCE_GROUP_PREFIX");
-    let azure_region: String = env::var("AZURE_REGION")
-        .unwrap_or_else(|_| "".to_owned())
-        .parse()
-        .expect("error parsing AZURE_REGION");
     let is_loadbalancer_public: bool = env::var("IS_LOADBALANCER_PUBLIC")
         .unwrap_or_else(|_| "true".to_owned())
         .parse()
@@ -151,30 +128,19 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
         panic!("CF_TEMPLATE_BUCKET is required when IS_CLOUD_FORMATION is true");
     }
 
-    // Only allow for setting one of IS_CLOUD_FORMATION, IS_GCP, IS_AZURE, or IS_CUSTOM_S3_BACKUP to true
-    let cloud_providers = [is_cloud_formation, is_gcp, is_azure, is_custom_s3_backup]
+    // Only allow for setting one of IS_CLOUD_FORMATION, IS_GCP, or IS_CUSTOM_S3_BACKUP to true
+    let cloud_providers = [is_cloud_formation, is_gcp, is_custom_s3_backup]
         .iter()
         .filter(|&&x| x)
         .count();
 
     if cloud_providers > 1 {
-        panic!("Only one of IS_CLOUD_FORMATION, IS_GCP, IS_AZURE, or IS_CUSTOM_S3_BACKUP can be set to true");
+        panic!("Only one of IS_CLOUD_FORMATION, IS_GCP or IS_CUSTOM_S3_BACKUP can be set to true");
     }
 
     // Error and exit if IS_GCP is true and GCP_PROJECT_ID or GCP_PROJECT_NUMBER are not set
     if is_gcp && (gcp_project_id.is_empty() || gcp_project_number.is_empty()) {
         panic!("GCP_PROJECT_ID and GCP_PROJECT_NUMBER must be set if IS_GCP is true");
-    }
-
-    // Error and exit if IS_AZURE is true and any of the required Azure environment variables are not set
-    if let Err(err) = validate_azure_environment(
-        is_azure,
-        &azure_storage_account,
-        &azure_subscription_id,
-        &azure_resource_group_prefix,
-        &azure_region,
-    ) {
-        panic!("{}", err);
     }
 
     // Connect to pgmq
@@ -218,7 +184,6 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
     let cloud_provider = CloudProvider::builder()
         .gcp(is_gcp)
         .aws(is_cloud_formation)
-        .azure(is_azure)
         .build();
 
     loop {
@@ -407,18 +372,6 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                 )
                 .await?;
 
-                init_azure_storage_workload_identity(
-                    is_azure,
-                    &read_msg,
-                    &mut coredb_spec,
-                    backup_archive_bucket.clone(),
-                    azure_storage_account.clone(),
-                    azure_subscription_id.clone(),
-                    azure_resource_group_prefix.clone(),
-                    azure_region.clone(),
-                )
-                .await?;
-
                 info!("{}: Creating namespace", read_msg.msg_id);
                 // create Namespace
                 create_namespace(client.clone(), &namespace, org_id, instance_id).await?;
@@ -447,13 +400,6 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     &mut coredb_spec,
                 );
 
-                // If cloud provider is Azure, we need to pass the storage account name to generate_spec
-                // so that the storage account URL can be generated for Azure restore scenarios
-                let azure_storage_account = match cloud_provider {
-                    CloudProvider::Azure => Some(azure_storage_account.as_str()),
-                    _ => None,
-                };
-
                 let spec = generate_spec(
                     org_id,
                     &stack_type,
@@ -461,7 +407,6 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                     &read_msg.message.data_plane_id,
                     &namespace,
                     &backup_archive_bucket,
-                    azure_storage_account,
                     &coredb_spec,
                     &cloud_provider,
                     &storage_class_name,
@@ -608,19 +553,6 @@ async fn run(metrics: CustomMetrics) -> Result<(), ConductorError> {
                         &gcp_project_number,
                         &backup_archive_bucket,
                         &storage_archive_bucket,
-                        &namespace,
-                    )
-                    .await?;
-                }
-
-                if is_azure {
-                    info!(
-                        "{}: Deleting Azure storage workload identity binding",
-                        read_msg.msg_id
-                    );
-                    delete_azure_storage_workload_identity_binding(
-                        &azure_subscription_id,
-                        &azure_resource_group_prefix,
                         &namespace,
                     )
                     .await?;
@@ -1068,83 +1000,6 @@ async fn init_gcp_storage_workload_identity(
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn init_azure_storage_workload_identity(
-    is_azure: bool,
-    read_msg: &Message<CRUDevent>,
-    coredb_spec: &mut CoreDBSpec,
-    backup_archive_bucket: String,
-    azure_storage_account: String,
-    azure_subscription_id: String,
-    azure_resource_group: String,
-    azure_region: String,
-) -> Result<(), ConductorError> {
-    if !is_azure {
-        return Ok(());
-    }
-
-    let uami_client_id = create_azure_storage_workload_identity_binding(
-        &azure_subscription_id,
-        &azure_resource_group,
-        &azure_region,
-        &azure_storage_account,
-        &backup_archive_bucket,
-        &read_msg.message.namespace,
-    )
-    .await?;
-
-    // Format ServiceAccountTemplate spec in CoreDBSpec
-    use std::collections::BTreeMap;
-    let mut annotations: BTreeMap<String, String> = BTreeMap::new();
-    annotations.insert(
-        "azure.workload.identity/client-id".to_string(),
-        uami_client_id,
-    );
-    let service_account_template = ServiceAccountTemplate {
-        metadata: Some(ObjectMeta {
-            annotations: Some(annotations),
-            ..ObjectMeta::default()
-        }),
-    };
-
-    // Generate Backup spec for CoreDB
-    let volume_snapshot = Some(VolumeSnapshot {
-        enabled: false,
-        snapshot_class: None,
-    });
-
-    let write_path = read_msg
-        .message
-        .backups_write_path
-        .clone()
-        .unwrap_or("v2".to_string());
-
-    let backup = Backup {
-        destinationPath: Some(format!(
-            "https://{}.blob.core.windows.net/{}/{}",
-            azure_storage_account, backup_archive_bucket, write_path
-        )),
-        encryption: Some(String::from("AES256")),
-        retentionPolicy: Some(String::from("30")),
-        schedule: Some(generate_cron_expression(&read_msg.message.namespace)),
-        s3_credentials: None,
-        azure_credentials: Some(AzureCredentials {
-            connection_string: None,
-            inherit_from_azure_ad: Some(true),
-            storage_account: None,
-            storage_key: None,
-            storage_sas_token: None,
-        }),
-        endpoint_url: None,
-        google_credentials: None,
-        volume_snapshot,
-    };
-
-    coredb_spec.backup = backup;
-    coredb_spec.serviceAccountTemplate = service_account_template;
-
-    Ok(())
-}
-
 async fn init_custom_s3_backup_configuration(
     is_custom_s3_backup: bool,
     read_msg: &Message<CRUDevent>,
@@ -1245,73 +1100,4 @@ async fn init_custom_s3_backup_configuration(
 
 fn from_env_default(key: &str, default: &str) -> String {
     env::var(key).unwrap_or_else(|_| default.to_owned())
-}
-
-/// Validates that all required Azure environment variables are set when IS_AZURE is true.
-/// Returns Ok(()) if all variables are present and non-empty, or an error message listing missing variables.
-fn validate_azure_environment(
-    is_azure: bool,
-    azure_storage_account: &str,
-    azure_subscription_id: &str,
-    azure_resource_group_prefix: &str,
-    azure_region: &str,
-) -> Result<(), String> {
-    if !is_azure {
-        return Ok(());
-    }
-
-    let required_vars = [
-        ("AZURE_STORAGE_ACCOUNT", azure_storage_account),
-        ("AZURE_SUBSCRIPTION_ID", azure_subscription_id),
-        ("AZURE_RESOURCE_GROUP_PREFIX", azure_resource_group_prefix),
-        ("AZURE_REGION", azure_region),
-    ];
-
-    let missing_vars: Vec<&str> = required_vars
-        .iter()
-        .filter(|(_, value)| value.is_empty())
-        .map(|(name, _)| *name)
-        .collect();
-
-    if missing_vars.is_empty() {
-        Ok(())
-    } else {
-        Err(format!(
-            "The following required Azure environment variables are empty: {}",
-            missing_vars.join(", ")
-        ))
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_azure_validation() {
-        // Test when Azure is disabled
-        assert!(validate_azure_environment(false, "", "", "", "").is_ok());
-
-        // Test when Azure is enabled and all variables are present
-        assert!(validate_azure_environment(
-            true,
-            "storage_account",
-            "subscription_id",
-            "resource_group",
-            "region"
-        )
-        .is_ok());
-
-        // Test when Azure is enabled and variables are missing
-        let err =
-            validate_azure_environment(true, "", "subscription_id", "resource_group", "region")
-                .unwrap_err();
-        assert!(err.contains("AZURE_STORAGE_ACCOUNT"));
-
-        // Test multiple missing variables
-        let err = validate_azure_environment(true, "", "", "resource_group", "").unwrap_err();
-        assert!(err.contains("AZURE_STORAGE_ACCOUNT"));
-        assert!(err.contains("AZURE_SUBSCRIPTION_ID"));
-        assert!(err.contains("AZURE_REGION"));
-    }
 }

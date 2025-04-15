@@ -1,5 +1,4 @@
 pub mod aws;
-pub mod azure;
 pub mod cloud;
 pub mod errors;
 pub mod extensions;
@@ -21,11 +20,6 @@ use k8s_openapi::api::core::v1::{Namespace, Secret};
 
 use kube::api::{DeleteParams, ListParams, Patch, PatchParams};
 
-use crate::azure::uami_builder::{
-    create_federated_identity_credentials, create_role_assignment, create_uami, delete_uami,
-    get_credentials,
-};
-
 use chrono::{DateTime, SecondsFormat, Utc};
 use kube::{Api, Client, ResourceExt};
 use log::{debug, info, warn};
@@ -45,7 +39,6 @@ pub async fn generate_spec(
     data_plane_id: &str,
     namespace: &str,
     backups_bucket: &str,
-    azure_storage_account: Option<&str>,
     spec: &CoreDBSpec,
     cloud_provider: &CloudProvider,
     storage_class_name: &str,
@@ -53,11 +46,8 @@ pub async fn generate_spec(
     let mut spec = spec.clone();
 
     match cloud_provider {
-        CloudProvider::AWS | CloudProvider::GCP | CloudProvider::Azure => {
+        &(CloudProvider::AWS | CloudProvider::GCP) => {
             let prefix = cloud_provider.prefix();
-
-            // Generate the storage_account_url for Azure restore scenarios
-            let storage_account_url = cloud_provider.storage_account_url(azure_storage_account);
 
             // Format the backups_path with the correct prefix
             if let Some(restore) = &mut spec.restore {
@@ -65,15 +55,10 @@ pub async fn generate_spec(
                     let clean_path = remove_known_prefixes(backups_path);
                     if clean_path.starts_with(backups_bucket) {
                         // If the path already includes the bucket, just add the prefix. The
-                        // storage_account_url is specific to Azure and will be empty for AWS and GCP
-                        *backups_path = format!("{}{}{}", prefix, storage_account_url, clean_path);
+                        *backups_path = format!("{}{}", prefix, clean_path);
                     } else {
                         // If the path doesn't include the bucket, add both prefix and bucket. The
-                        // storage_account_url is specific to Azure and will be empty for AWS and GCP
-                        *backups_path = format!(
-                            "{}{}{}/{}",
-                            prefix, storage_account_url, backups_bucket, clean_path
-                        );
+                        *backups_path = format!("{}{}/{}", prefix, backups_bucket, clean_path);
                     }
                 }
             }
@@ -624,76 +609,6 @@ pub async fn delete_gcp_storage_workload_identity_binding(
     Ok(())
 }
 
-pub async fn create_azure_storage_workload_identity_binding(
-    azure_subscription_id: &str,
-    azure_resource_group_prefix: &str,
-    azure_region: &str,
-    azure_storage_account: &str,
-    azure_backup_container: &str,
-    namespace: &str,
-) -> Result<String, ConductorError> {
-    let credentials = get_credentials().await?;
-
-    // Create UAMI
-    let uami = create_uami(
-        azure_resource_group_prefix,
-        azure_subscription_id,
-        namespace,
-        azure_region,
-        credentials.clone(),
-    )
-    .await?;
-
-    // Get UAMI Client ID to return and pass to ServiceAccountTemplate
-    let uami_client_id = uami.properties.clone().unwrap().client_id.unwrap();
-
-    // Create Role Assignment for UAMI
-    let uami_principal_id = uami.properties.unwrap().principal_id.unwrap();
-    create_role_assignment(
-        azure_subscription_id,
-        azure_resource_group_prefix,
-        azure_storage_account,
-        azure_backup_container,
-        namespace,
-        &uami_principal_id,
-        credentials.clone(),
-    )
-    .await?;
-
-    // Create Federated Credential for the UAMI
-    create_federated_identity_credentials(
-        azure_subscription_id,
-        azure_resource_group_prefix,
-        namespace,
-        credentials.clone(),
-    )
-    .await?;
-
-    Ok(uami_client_id)
-}
-
-// TODO(ianstanton) Check to see whether we need to delete the role assignment and federated
-//  credentials
-pub async fn delete_azure_storage_workload_identity_binding(
-    azure_subscription_id: &str,
-    azure_resource_group: &str,
-    namespace: &str,
-) -> Result<(), ConductorError> {
-    let credentials = get_credentials().await?;
-
-    // Delete UAMI
-    delete_uami(
-        azure_subscription_id,
-        azure_resource_group,
-        namespace,
-        credentials.clone(),
-    )
-    .await?;
-    info!("Deleted UAMI");
-
-    Ok(())
-}
-
 // returns Ok(true) when all deleted, otherwise Ok(false) when delete in progress
 pub async fn delete_coredb_and_namespace(
     client: Client,
@@ -805,7 +720,6 @@ mod tests {
             "aws_data_1_use1",
             "namespace",
             "my-bucket",
-            None,
             &spec,
             &cloud_provider,
             "",
@@ -838,7 +752,6 @@ mod tests {
             "aws_data_1_use1",
             "namespace",
             "my-bucket",
-            None,
             &spec,
             &cloud_provider,
             "",
@@ -869,7 +782,6 @@ mod tests {
             "aws_data_1_use1",
             "namespace",
             "my-bucket",
-            None,
             &spec,
             &cloud_provider,
             "",
@@ -893,7 +805,6 @@ mod tests {
             "aws_data_1_use1",
             "namespace",
             "my-bucket",
-            None,
             &spec,
             &cloud_provider,
             "",
@@ -920,7 +831,6 @@ mod tests {
             "gcp_data_1_usc1",
             "namespace",
             "my-bucket",
-            None,
             &spec,
             &cloud_provider,
             "",
@@ -951,7 +861,6 @@ mod tests {
             "gcp_data_1_usc1",
             "namespace",
             "my-bucket",
-            None,
             &spec,
             &cloud_provider,
             "",
@@ -962,122 +871,6 @@ mod tests {
         assert_eq!(
             result["spec"]["restore"]["backupsPath"].as_str().unwrap(),
             expected_backups_path
-        );
-    }
-
-    #[tokio::test]
-    async fn test_generate_spec_with_non_matching_azure_bucket() {
-        let spec = CoreDBSpec {
-            restore: Some(Restore {
-                backups_path: Some("https://v2/test-instance".to_string()),
-                ..Restore::default()
-            }),
-            ..CoreDBSpec::default()
-        };
-        let cloud_provider = CloudProvider::Azure;
-        let result = generate_spec(
-            "org-id",
-            "entity-name",
-            "instance-id",
-            "azure_data_1_eus1",
-            "namespace",
-            "my-blob",
-            Some("eusdevsg"),
-            &spec,
-            &cloud_provider,
-            "tembo-csi",
-        )
-        .await
-        .expect("Failed to generate spec");
-        let expected_backups_path =
-            "https://eusdevsg.blob.core.windows.net/my-blob/v2/test-instance";
-        assert_eq!(
-            result["spec"]["restore"]["backupsPath"].as_str().unwrap(),
-            expected_backups_path
-        );
-    }
-
-    #[tokio::test]
-    async fn test_generate_spec_with_azure_bucket() {
-        let spec = CoreDBSpec {
-            restore: Some(Restore {
-                backups_path: Some("https://my-blob/v2/test-instance".to_string()),
-                ..Restore::default()
-            }),
-            ..CoreDBSpec::default()
-        };
-        let cloud_provider = CloudProvider::Azure;
-        let result = generate_spec(
-            "org-id",
-            "entity-name",
-            "instance-id",
-            "azure_data_1_eus1",
-            "namespace",
-            "my-blob",
-            Some("eusdevsg"),
-            &spec,
-            &cloud_provider,
-            "tembo-csi",
-        )
-        .await
-        .expect("Failed to generate spec");
-        let expected_backups_path =
-            "https://eusdevsg.blob.core.windows.net/my-blob/v2/test-instance";
-        assert_eq!(
-            result["spec"]["restore"]["backupsPath"].as_str().unwrap(),
-            expected_backups_path
-        );
-    }
-
-    #[tokio::test]
-    async fn test_generate_spec_storage_class_for_azure() {
-        // Test Azure cloud provider
-        let spec = CoreDBSpec::default();
-        let cloud_provider = CloudProvider::Azure;
-
-        let result = generate_spec(
-            "org-id",
-            "entity-name",
-            "instance-id",
-            "azure_data_1_eus1",
-            "namespace",
-            "my-blob",
-            Some("eusdevsg"),
-            &spec,
-            &cloud_provider,
-            "tembo-csi",
-        )
-        .await
-        .expect("Failed to generate spec");
-
-        // Verify Azure storage class is set correctly
-        assert_eq!(
-            result["spec"]["storageClass"].as_str().unwrap(),
-            "tembo-csi",
-            "Azure storage class should be set to tembo-csi"
-        );
-
-        // Test non-Azure cloud provider (AWS)
-        let cloud_provider = CloudProvider::AWS;
-        let result = generate_spec(
-            "org-id",
-            "entity-name",
-            "instance-id",
-            "aws_data_1_use1",
-            "namespace",
-            "my-bucket",
-            None,
-            &spec,
-            &cloud_provider,
-            "",
-        )
-        .await
-        .expect("Failed to generate spec");
-
-        // Verify non-Azure storage class remains unchanged
-        assert!(
-            result["spec"]["storageClass"].is_null(),
-            "Non-Azure storage class should remain unchanged"
         );
     }
 }

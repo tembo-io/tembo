@@ -1,6 +1,4 @@
-use crate::azure;
 use aws_sdk_cloudformation::Error as CFError;
-use azure::azure_error::AzureError;
 use google_cloud_storage::http::Error as GcsError;
 use kube;
 use pgmq::errors::PgmqError;
@@ -59,7 +57,4 @@ pub enum ConductorError {
     /// Dataplane error
     #[error("Dataplane not found error: {0}")]
     DataplaneError(String),
-
-    #[error("Error with Azure SDK {0}")]
-    AzureError(#[from] AzureError),
 }
