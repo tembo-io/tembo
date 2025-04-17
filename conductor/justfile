@@ -79,7 +79,6 @@ watch:
 	BACKUP_ARCHIVE_BUCKET=cdb-plat-use1-dev-instance-backups \
 	STORAGE_ARCHIVE_BUCKET=cdb-plat-use1-dev-instance-storage \
 	IS_CLOUD_FORMATION=false \
-	IS_GCP=false \
 	cargo watch -x run
 
 run:
@@ -94,7 +93,6 @@ run:
 	BACKUP_ARCHIVE_BUCKET=cdb-plat-use1-dev-instance-backups \
 	STORAGE_ARCHIVE_BUCKET=cdb-plat-use1-dev-instance-storage \
 	IS_CLOUD_FORMATION=false \
-	IS_GCP=false \
 	cargo run
 
 run-postgres:
