@@ -5,7 +5,7 @@ use crate::ingress_route_crd::{
 };
 use crate::{
     apis::{
-        coredb_types::{CoreDB, S3Credentials, Restore, Backup as CoreDBBackup},
+        coredb_types::{Backup as CoreDBBackup, CoreDB, Restore, S3Credentials},
         postgres_parameters::MergeError,
     },
     cloudnativepg::{
@@ -267,7 +267,11 @@ pub fn cnpg_backup_configuration(
     let backup_path = backup_path.unwrap();
 
     // Copy the endpoint_url and s3_credentials from cdb to configure backups
-    let backup_credentials = cdb.spec.backup.s3_credentials.as_ref()
+    let backup_credentials = cdb
+        .spec
+        .backup
+        .s3_credentials
+        .as_ref()
         .map(|s3_creds| BackupCredentials::S3(generate_s3_backup_credentials(Some(s3_creds))));
 
     let cluster_backup = create_cluster_backup(
@@ -2237,7 +2241,10 @@ pub(crate) async fn get_pooler(cdb: &CoreDB, ctx: Arc<Context>) -> Option<Pooler
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{apis::coredb_types::{CoreDB, Backup as CoreDBBackup}, cloudnativepg::clusters::Cluster};
+    use crate::{
+        apis::coredb_types::{Backup as CoreDBBackup, CoreDB},
+        cloudnativepg::clusters::Cluster,
+    };
     use serde_json::json;
     use std::collections::BTreeMap;
 
@@ -3167,5 +3174,4 @@ mod tests {
             "stormy-capybara-snap"
         );
     }
-
 }
