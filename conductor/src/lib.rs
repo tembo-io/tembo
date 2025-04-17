@@ -2,7 +2,6 @@ pub mod aws;
 pub mod cloud;
 pub mod errors;
 pub mod extensions;
-pub mod gcp;
 pub mod metrics;
 pub mod monitoring;
 pub mod routes;
@@ -46,7 +45,7 @@ pub async fn generate_spec(
     let mut spec = spec.clone();
 
     match cloud_provider {
-        &(CloudProvider::AWS | CloudProvider::GCP) => {
+        &CloudProvider::AWS => {
             let prefix = cloud_provider.prefix();
 
             // Format the backups_path with the correct prefix
@@ -562,53 +561,6 @@ pub fn generate_cron_expression(input: &str) -> String {
     format!("{} {} * * *", minute, hour)
 }
 
-// Create GCP Workload Identity Binding on Buckets for each instance service account
-pub async fn create_gcp_storage_workload_identity_binding(
-    gcp_project_id: &str,
-    gcp_project_number: &str,
-    backup_archive_bucket: &str,
-    storage_archive_bucket: &str,
-    namespace: &str,
-) -> Result<(), ConductorError> {
-    let service_account_name = namespace;
-    let buckets = vec![backup_archive_bucket, storage_archive_bucket];
-
-    // Create a new GCP Storage Client
-    let gcp_storage_client =
-        gcp::client::GcpStorageClient::new(gcp_project_id, gcp_project_number).await?;
-    let gcp_iam_manager = gcp::bucket_manager::BucketIamManager::new(gcp_storage_client);
-
-    // Create a new workload identity binding to the bucket
-    gcp_iam_manager
-        .add_service_account_binding(buckets, namespace, service_account_name)
-        .await?;
-
-    Ok(())
-}
-
-pub async fn delete_gcp_storage_workload_identity_binding(
-    gcp_project_id: &str,
-    gcp_project_number: &str,
-    backup_archive_bucket: &str,
-    storage_archive_bucket: &str,
-    namespace: &str,
-) -> Result<(), ConductorError> {
-    let service_account_name = namespace;
-    let buckets = vec![backup_archive_bucket, storage_archive_bucket];
-
-    // Create a new GCP Storage Client
-    let gcp_storage_client =
-        gcp::client::GcpStorageClient::new(gcp_project_id, gcp_project_number).await?;
-    let gcp_iam_manager = gcp::bucket_manager::BucketIamManager::new(gcp_storage_client);
-
-    // Remove the workload identity binding from the bucket
-    gcp_iam_manager
-        .remove_service_account_binding(buckets, namespace, service_account_name)
-        .await?;
-
-    Ok(())
-}
-
 // returns Ok(true) when all deleted, otherwise Ok(false) when delete in progress
 pub async fn delete_coredb_and_namespace(
     client: Client,
@@ -812,65 +764,5 @@ mod tests {
         .await
         .expect("Failed to generate spec");
         assert!(result["spec"]["restore"].is_null());
-    }
-
-    #[tokio::test]
-    async fn test_generate_spec_with_non_matching_gcp_bucket() {
-        let spec = CoreDBSpec {
-            restore: Some(Restore {
-                backups_path: Some("gs://v2/test-instance".to_string()),
-                ..Restore::default()
-            }),
-            ..CoreDBSpec::default()
-        };
-        let cloud_provider = CloudProvider::GCP;
-        let result = generate_spec(
-            "org-id",
-            "entity-name",
-            "instance-id",
-            "gcp_data_1_usc1",
-            "namespace",
-            "my-bucket",
-            &spec,
-            &cloud_provider,
-            "",
-        )
-        .await
-        .expect("Failed to generate spec");
-        let expected_backups_path = "gs://my-bucket/v2/test-instance";
-        assert_eq!(
-            result["spec"]["restore"]["backupsPath"].as_str().unwrap(),
-            expected_backups_path
-        );
-    }
-
-    #[tokio::test]
-    async fn test_generate_spec_with_gcp_bucket() {
-        let spec = CoreDBSpec {
-            restore: Some(Restore {
-                backups_path: Some("gs://my-bucket/v2/test-instance".to_string()),
-                ..Restore::default()
-            }),
-            ..CoreDBSpec::default()
-        };
-        let cloud_provider = CloudProvider::GCP;
-        let result = generate_spec(
-            "org-id",
-            "entity-name",
-            "instance-id",
-            "gcp_data_1_usc1",
-            "namespace",
-            "my-bucket",
-            &spec,
-            &cloud_provider,
-            "",
-        )
-        .await
-        .expect("Failed to generate spec");
-        let expected_backups_path = "gs://my-bucket/v2/test-instance";
-        assert_eq!(
-            result["spec"]["restore"]["backupsPath"].as_str().unwrap(),
-            expected_backups_path
-        );
     }
 }
