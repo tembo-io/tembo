@@ -8,6 +8,7 @@ on:
     paths-ignore:
       - "tembo-py/**"
       - "tembo-cli/**"
+      - "inference-gateway/**"
 
 jobs:
   find_directories:
@@ -100,9 +101,6 @@ jobs:
           - repository: tembo-io/app-deploy-dev
             subdirectory: dev
             branch: main
-          - repository: tembo-io/app-deploy
-            subdirectory: staging
-            branch: staging-updates
           - repository: tembo-io/app-deploy
             subdirectory: prod
             branch: prod-updates

@@ -295,7 +295,7 @@ fn beautify_logs(json_data: &str, app_name: Option<String>) -> Result<()> {
     for entry in &log_data.data.result {
         if app_name
             .as_ref()
-            .map_or(true, |app| entry.stream.container == *app)
+            .is_none_or(|app| entry.stream.container == *app)
         {
             for value in &entry.values {
                 match value[0].parse::<i64>() {

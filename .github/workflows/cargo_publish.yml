@@ -6,12 +6,14 @@ on:
       - main
     paths-ignore:
       - 'tembo-py/**'
+      - 'inference-gateway/**'
 
   push:
     branches:
       - 'main'
     paths-ignore:
       - 'tembo-py/**'
+      - 'inference-gateway/**'
 
 jobs:
   find_directories:

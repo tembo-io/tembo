@@ -5,10 +5,12 @@ on:
     branches: ["main"]
     paths-ignore:
       - "tembo-py/**"
+      - "inference-gateway/**"
   pull_request:
     branches: ["main"]
     paths-ignore:
       - "tembo-py/**"
+      - "inference-gateway/**"
 
 jobs:
   find_directories:

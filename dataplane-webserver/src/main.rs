@@ -34,8 +34,6 @@ async fn main() -> std::io::Result<()> {
     #[derive(OpenApi)]
     #[openapi(
         paths(
-              secrets::get_secret,
-              secrets::get_secret_names,
               secrets::get_secret_v1,
               secrets::get_secret_names_v1,
               secrets::update_postgres_password,
@@ -106,11 +104,6 @@ async fn main() -> std::io::Result<()> {
                 web::scope("/{namespace}/metrics")
                     .service(metrics::query_range)
                     .service(metrics::query),
-            )
-            .service(
-                web::scope("/{namespace}/secrets")
-                    .service(secrets::get_secret)
-                    .service(secrets::get_secret_names),
             )
             .service(web::scope("/health").service(ready).service(lively))
             .service(SwaggerUi::new("/swagger-ui/{_:.*}").urls(vec![(
