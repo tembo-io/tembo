@@ -507,6 +507,6 @@ pub fn replace_vars_in_file(
     drop(src);
     let new_data = data.replace(word_from, word_to);
     let mut dst = File::create(&file_path)?;
-    dst.write(new_data.as_bytes())?;
+    dst.write_all(new_data.as_bytes())?;
     Ok(())
 }

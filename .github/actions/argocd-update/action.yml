@@ -41,7 +41,7 @@ runs:
         git fetch origin ${{ inputs.branch }} && git checkout ${{ inputs.branch }} || git checkout -b ${{ inputs.branch }}
 
     - name: Update for dev or staging deployments
-      if: inputs.branch == 'staging-updates' || (inputs.branch == 'main' && inputs.subdirectory == 'dev')
+      if: inputs.branch == 'main' && inputs.subdirectory == 'dev'
       uses: mikefarah/yq@v4.44.2
       with:
         cmd: |
@@ -57,9 +57,6 @@ runs:
           yq -i '(.spec.source.helm.parameters.[] | select(.name == "controller.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator-euc1.yaml
           yq -i '(.spec.source.helm.parameters.[] | select(.name == "pod-init.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator.yaml
           yq -i '(.spec.source.helm.parameters.[] | select(.name == "pod-init.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator-euc1.yaml
-          yq -i '(.spec.source.helm.parameters.[] | select(.name == "inferenceGateway.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-ai.yaml
-          yq -i '(.spec.source.helm.parameters.[] | select(.name == "inferenceService.default.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-ai.yaml
-          yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-ai.yaml
 
     - name: Update for prod deployments
       if: inputs.branch == 'prod-updates'
@@ -90,9 +87,6 @@ runs:
           yq -i '(.spec.source.helm.parameters.[] | select(.name == "pod-init.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator-euc1.yaml
           yq -i '(.spec.source.helm.parameters.[] | select(.name == "pod-init.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator-apse1.yaml
           yq -i '(.spec.source.helm.parameters.[] | select(.name == "pod-init.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-operator-usw2.yaml
-          yq -i '(.spec.source.helm.parameters.[] | select(.name == "inferenceGateway.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-ai.yaml
-          yq -i '(.spec.source.helm.parameters.[] | select(.name == "inferenceService.default.image.tag")).value = "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-ai.yaml
-          yq -i '.spec.source.targetRevision= "${{ inputs.version }}"' ${{ inputs.clone_into }}/${{ inputs.subdirectory }}/tembo-ai.yaml
 
     - name: Git commit and push to remote
       shell: bash

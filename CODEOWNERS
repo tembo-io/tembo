@@ -1,7 +1,8 @@
-.github/** @nhudson @ChuckHend @vrmiguel 
-charts/**  @nhudson @vrmiguel @ChuckHend
-dataplane-webserver/** @nhudson @ChuckHend @vrmiguel 
-tembo-operator/** @nhudson @ChuckHend @vrmiguel
-conductor/**  @nhudson @ChuckHend @vrmiguel
-tembo-pod-init/** @nhudson @vrmiguel @ChuckHend
+.github/** @nhudson @vrmiguel 
+charts/**  @nhudson @vrmiguel 
+dataplane-webserver/** @nhudson @vrmiguel 
+tembo-operator/** @nhudson @vrmiguel
+conductor/**  @nhudson @vrmiguel
+tembo-pod-init/** @nhudson @vrmiguel 
 tembo-cli/** @nhudson @vrmiguel @DarrenBaldwin07
+cp-client/** @nhudson @vrmiguel @DarrenBaldwin07

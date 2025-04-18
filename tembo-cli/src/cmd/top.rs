@@ -205,7 +205,7 @@ async fn fetch_metric(
     namespace_encoded: &str,
     client: &reqwest::Client,
     headers: &HeaderMap,
-    url: &String,
+    url: &str,
 ) -> Result<MetricsResponse> {
     let base_url: &str = url;
     let query_encoded = urlencoding::encode(metric_query);
