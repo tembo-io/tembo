@@ -12,6 +12,6 @@ else
     rm --recursive --force "$dst/lost+found"
 fi
 
-# Install /temback
-curl -L https://github.com/tembo-io/temback/releases/download/v0.1.0/temback-v0.1.0-linux-amd64.tar.gz \
-    | tar -C "${dst}" --strip-components=1 -zxf - temback-v0.1.0-linux-amd64/temback
+# Install Temback
+curl -L https://github.com/tembo-io/temback/releases/download/v0.1.1/temback-v0.1.1-linux-amd64.tar.gz \
+    | tar -C "${dst}" --strip-components=1 -zxf - temback-v0.1.1-linux-amd64/temback
