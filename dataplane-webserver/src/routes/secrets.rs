@@ -167,7 +167,7 @@ pub async fn get_secret_v1(
     )
 }
 
-fn is_valid_id(s: &str) -> bool {
+pub fn is_valid_id(s: &str) -> bool {
     let re = Regex::new(r"^[A-Za-z0-9_]+$").unwrap();
     re.is_match(s)
 }

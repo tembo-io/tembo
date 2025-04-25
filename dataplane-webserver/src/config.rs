@@ -5,6 +5,9 @@ use std::env;
 pub struct Config {
     pub prometheus_url: String,
     pub prometheus_timeout_ms: i32,
+    pub backup_bucket_region: String,
+    pub backup_uri_timeout: i32,
+    pub temback_version: String,
 }
 
 impl Default for Config {
@@ -28,6 +31,18 @@ impl Default for Config {
                     500
                 }
             },
+            backup_bucket_region: from_env_default("BACKUP_BUCKET_REGION", "us-east-1"),
+            backup_uri_timeout: match from_env_default("BACKUP_URI_TIMEOUT", "300").parse::<i32>() {
+                Ok(n) => n,
+                Err(e) => {
+                    error!(
+                        "Environment variable BACKUP_URI_TIMEOUT must convert into i32: {}",
+                        e
+                    );
+                    300
+                }
+            },
+            temback_version: from_env_default("TEMBACK_VERSION", "v0.1.1"),
         }
     }
 }
