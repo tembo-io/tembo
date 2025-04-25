@@ -109,7 +109,7 @@ impl Docker {
                 if new_spinner {
                     sp = Some(Spinner::new(
                         spinners::Dots,
-                        "Running docker-compose up",
+                        "Running docker compose up",
                         spinoff::Color::White,
                     ));
                 }
@@ -118,7 +118,7 @@ impl Docker {
             }
         };
 
-        let command = "docker-compose up -d --build";
+        let command = "docker compose up -d --build";
 
         if verbose {
             run_command(command, verbose)?;
@@ -137,7 +137,7 @@ impl Docker {
                     stderr
                 ));
 
-                return Err(Error::msg("Error running docker-compose up!"));
+                return Err(Error::msg("Error running docker compose up!"));
             }
         }
 
@@ -167,7 +167,7 @@ impl Docker {
             spinoff::Color::White,
         );
 
-        let command: String = String::from("docker-compose down");
+        let command: String = String::from("docker compose down");
 
         let output = match ShellCommand::new("sh").arg("-c").arg(&command).output() {
             Ok(output) => output,
@@ -193,7 +193,7 @@ impl Docker {
                 stderr
             ));
 
-            return Err(Error::msg("Error running docker-compose down!"));
+            return Err(Error::msg("Error running docker compose down!"));
         }
 
         Ok(())
