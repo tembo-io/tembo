@@ -1,0 +1,95 @@
+<svg viewBox="0 0 800 620" xmlns="http://www.w3.org/2000/svg">
+  <!-- Define styles and colors -->
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#333"/>
+    </marker>
+  </defs>
+  
+  <!-- Header and Title -->
+  <text x="400" y="30" font-family="Arial" font-size="20" font-weight="bold" text-anchor="middle">Database Backup API Workflow</text>
+  
+  <!-- Entities -->
+  <rect x="50" y="90" width="120" height="50" rx="5" fill="#e6f2ff" stroke="#0066cc" stroke-width="2"/>
+  <text x="110" y="120" font-family="Arial" font-size="14" text-anchor="middle">Client</text>
+  
+  <rect x="350" y="90" width="120" height="50" rx="5" fill="#fff2e6" stroke="#ff9933" stroke-width="2"/>
+  <text x="410" y="120" font-family="Arial" font-size="14" text-anchor="middle">Tembo Dataplane API Server</text>
+  
+  <rect x="650" y="90" width="120" height="50" rx="5" fill="#e6ffe6" stroke="#339933" stroke-width="2"/>
+  <text x="710" y="120" font-family="Arial" font-size="14" text-anchor="middle">S3 Storage</text>
+  
+  <!-- Vertical lifelines -->
+  <line x1="110" y1="140" x2="110" y2="600" stroke="#0066cc" stroke-width="1" stroke-dasharray="5,5"/>
+  <line x1="410" y1="140" x2="410" y2="600" stroke="#ff9933" stroke-width="1" stroke-dasharray="5,5"/>
+  <line x1="710" y1="140" x2="710" y2="600" stroke="#339933" stroke-width="1" stroke-dasharray="5,5"/>
+  
+  <!-- 1. Backup request -->
+  <rect x="100" y="170" width="20" height="30" fill="#e6f2ff" stroke="#0066cc" stroke-width="1"/>
+  <rect x="400" y="190" width="20" height="30" fill="#fff2e6" stroke="#ff9933" stroke-width="1"/>
+  <line x1="120" y1="185" x2="400" y2="205" stroke="#333" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+  <text x="260" y="185" font-family="Arial" font-size="12" text-anchor="middle">1. POST /api/v1/orgs/{org_id}/instances/{instance_id}/backup</text>
+
+  <!-- 2. Generate job ID with metadata -->
+  <rect x="400" y="220" width="20" height="40" fill="#fff2e6" stroke="#ff9933" stroke-width="1"/>
+  <text x="500" y="240" font-family="Arial" font-size="12" text-anchor="middle">2. Generate job_id and metadata file</text>
+  <text x="500" y="255" font-family="Arial" font-size="11" font-style="italic" text-anchor="middle">(contains org_id, instance_id, timestamp)</text>
+  
+  <!-- 3. Create job metadata in S3 -->
+  <rect x="400" y="270" width="20" height="30" fill="#fff2e6" stroke="#ff9933" stroke-width="1"/>
+  <rect x="700" y="280" width="20" height="30" fill="#e6ffe6" stroke="#339933" stroke-width="1"/>
+  <line x1="420" y1="285" x2="700" y2="295" stroke="#333" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+  <text x="560" y="280" font-family="Arial" font-size="12" text-anchor="middle">3. Upload metadata file to S3</text>
+  <text x="560" y="295" font-family="Arial" font-size="11" font-style="italic" text-anchor="middle">(status.json: {status: "processing"})</text>
+  
+  <!-- 4. Return job ID -->
+  <rect x="100" y="310" width="20" height="30" fill="#e6f2ff" stroke="#0066cc" stroke-width="1"/>
+  <line x1="400" y1="315" x2="120" y2="325" stroke="#333" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+  <text x="260" y="310" font-family="Arial" font-size="12" text-anchor="middle">4. Return job_id (status: processing)</text>
+  
+  <!-- 5. Start backup process -->
+  <rect x="400" y="340" width="20" height="40" fill="#fff2e6" stroke="#ff9933" stroke-width="1"/>
+  <text x="505" y="355" font-family="Arial" font-size="12" text-anchor="middle">5. Start backup process</text>
+  <text x="505" y="370" font-family="Arial" font-size="12" text-anchor="middle">(async background task)</text>
+  
+  <!-- 6. Client polls status -->
+  <rect x="100" y="380" width="20" height="30" fill="#e6f2ff" stroke="#0066cc" stroke-width="1"/>
+  <rect x="400" y="400" width="20" height="30" fill="#fff2e6" stroke="#ff9933" stroke-width="1"/>
+  <line x1="120" y1="395" x2="400" y2="415" stroke="#333" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+  <text x="260" y="390" font-family="Arial" font-size="12" text-anchor="middle">6. GET /api/v1/orgs/{org_id}/instances/{instance_id}/backup/{job_id}</text>
+  
+  <!-- 7. Check S3 for status -->
+  <rect x="400" y="430" width="20" height="30" fill="#fff2e6" stroke="#ff9933" stroke-width="1"/>
+  <rect x="700" y="440" width="20" height="30" fill="#e6ffe6" stroke="#339933" stroke-width="1"/>
+  <line x1="420" y1="445" x2="700" y2="455" stroke="#333" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+  <text x="560" y="440" font-family="Arial" font-size="12" text-anchor="middle">7. Get metadata file from S3</text>
+  
+  <!-- 8. Return processing status -->
+  <rect x="100" y="470" width="20" height="30" fill="#e6f2ff" stroke="#0066cc" stroke-width="1"/>
+  <line x1="400" y1="460" x2="120" y2="485" stroke="#333" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+  <text x="260" y="470" font-family="Arial" font-size="12" text-anchor="middle">8. Return status: "processing"</text>
+  
+  <!-- 9. Update status when complete -->
+  <rect x="400" y="500" width="20" height="40" fill="#fff2e6" stroke="#ff9933" stroke-width="1"/>
+  <rect x="700" y="505" width="20" height="35" fill="#e6ffe6" stroke="#339933" stroke-width="1"/>
+  <line x1="420" y1="510" x2="700" y2="515" stroke="#333" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+  <text x="560" y="505" font-family="Arial" font-size="12" text-anchor="middle">9. Upload backup file to S3</text>
+  
+  <line x1="420" y1="530" x2="700" y2="535" stroke="#333" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+  <text x="560" y="550" font-family="Arial" font-size="12" text-anchor="middle">10. Update metadata file</text>
+  <text x="560" y="565" font-family="Arial" font-size="11" font-style="italic" text-anchor="middle">(status.json: {status: "completed", key: "..."})</text>
+  
+  <!-- 11. Client polls again -->
+  <rect x="100" y="570" width="20" height="30" fill="#e6f2ff" stroke="#0066cc" stroke-width="1"/>
+  <rect x="400" y="580" width="20" height="40" fill="#fff2e6" stroke="#ff9933" stroke-width="1"/>
+  <line x1="120" y1="580" x2="400" y2="590" stroke="#333" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+  <text x="260" y="575" font-family="Arial" font-size="12" text-anchor="middle">11. GET /api/v1/orgs/{org_id}/instances/{instance_id}/backup/{job_id}</text>
+  
+  <!-- 12. Return URL to client -->
+  <rect x="700" y="585" width="20" height="35" fill="#e6ffe6" stroke="#339933" stroke-width="1"/>
+  <line x1="420" y1="595" x2="700" y2="600" stroke="#333" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+  <text x="560" y="590" font-family="Arial" font-size="12" text-anchor="middle">12. Get updated metadata</text>
+  
+  <line x1="400" y1="620" x2="120" y2="620" stroke="#333" stroke-width="1.5" marker-end="url(#arrowhead)"/>
+  <text x="260" y="640" font-family="Arial" font-size="12" text-anchor="middle">13. Return status: "completed" with download URL</text>
+</svg>

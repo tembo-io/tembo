@@ -10,7 +10,7 @@ use dataplane_webserver::{
 };
 use log::info;
 
-use dataplane_webserver::routes::{metrics, secrets};
+use dataplane_webserver::routes::{backups, metrics, secrets};
 use utoipa::openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme};
 use utoipa::{Modify, OpenApi};
 use utoipa_redoc::{Redoc, Servable};
@@ -99,6 +99,8 @@ async fn main() -> std::io::Result<()> {
                     .service(secrets::get_secret_names_v1)
                     .service(secrets::get_secret_v1)
                     .service(secrets::update_postgres_password)
+                    .service(backups::trigger_instance_backup)
+                    .service(backups::get_backup_status)
             )
             .service(
                 web::scope("/{namespace}/metrics")
