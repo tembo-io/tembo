@@ -952,35 +952,56 @@ pub async fn reconcile_app_services(
         .collect();
     let apply_errored = apply_resources(resources.clone(), &client, &ns).await;
 
-    let desired_routes: Vec<IngressRouteRoutes> = resources
-        .iter()
-        .filter_map(|r| r.ingress_routes.clone())
-        .flatten()
-        .collect();
+    // Collect routes and middlewares only if `disable_ingress` is false.
+    let desired_routes: Vec<IngressRouteRoutes> = if cdb.spec.disable_ingress {
+        vec![]
+    } else {
+        resources
+            .iter()
+            .filter_map(|r| r.ingress_routes.clone())
+            .flatten()
+            .collect()
+    };
 
-    let desired_tcp_routes: Vec<IngressRouteTCPRoutes> = resources
-        .iter()
-        .filter_map(|r| r.ingress_tcp_routes.clone())
-        .flatten()
-        .collect();
+    let desired_tcp_routes: Vec<IngressRouteTCPRoutes> = if cdb.spec.disable_ingress {
+        vec![]
+    } else {
+        resources
+            .iter()
+            .filter_map(|r| r.ingress_tcp_routes.clone())
+            .flatten()
+            .collect()
+    };
 
-    let desired_middlewares = appsvcs
-        .iter()
-        .filter_map(|appsvc| appsvc.middlewares.clone())
-        .flatten()
-        .collect::<Vec<Middleware>>();
+    let desired_middlewares = if cdb.spec.disable_ingress {
+        vec![]
+    } else {
+        appsvcs
+            .iter()
+            .filter_map(|appsvc| appsvc.middlewares.clone())
+            .flatten()
+            .collect::<Vec<Middleware>>()
+    };
 
-    let desired_entry_points = resources
-        .iter()
-        .filter_map(|r| r.entry_points.clone())
-        .flatten()
-        .collect::<Vec<String>>();
+    let desired_entry_points = if cdb.spec.disable_ingress {
+        vec![]
+    } else {
+        resources
+            .iter()
+            .filter_map(|r| r.entry_points.clone())
+            .flatten()
+            .collect::<Vec<String>>()
+    };
 
-    let desired_entry_points_tcp = resources
-        .iter()
-        .filter_map(|r| r.entry_points_tcp.clone())
-        .flatten()
-        .collect::<Vec<String>>();
+    let desired_entry_points_tcp = if cdb.spec.disable_ingress {
+        vec![]
+    } else {
+        resources
+            .iter()
+            .filter_map(|r| r.entry_points_tcp.clone())
+            .flatten()
+            .collect::<Vec<String>>()
+    };
 
     // Only reconcile IngressRoute and IngressRouteTCP if DATA_PLANE_BASEDOMAIN is set
     if domain.is_some() {

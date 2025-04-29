@@ -2304,6 +2304,13 @@ spec:
                       **Default**: LoadBalancer.
                     type: string
                 type: object
+              disableIngress:
+                default: false
+                description: |-
+                  Disable ingress, so that the instance is inaccessible from outside the cluster.
+
+                  **Default**: false
+                type: boolean
               extensions:
                 default: []
                 description: |-

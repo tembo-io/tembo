@@ -127,6 +127,10 @@ pub fn default_stop() -> bool {
     false
 }
 
+pub fn default_disable_ingress() -> bool {
+    false
+}
+
 pub fn default_extensions_updating() -> bool {
     false
 }

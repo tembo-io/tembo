@@ -590,6 +590,14 @@ pub struct CoreDBSpec {
     #[serde(rename = "ipAllowList")]
     pub ip_allow_list: Option<Vec<String>>,
 
+    /// Disable ingress, so that the instance is inaccessible from outside the
+    /// cluster.
+    ///
+    /// **Default**: false
+    #[serde(rename = "disableIngress")]
+    #[serde(default = "defaults::default_disable_ingress")]
+    pub disable_ingress: bool,
+
     /// The stack configuration for the CoreDB instance.  This is mainly used for the
     /// [https://tembo.io](https://tembo.io) platform to allow for the deployment of
     /// pre-configured Postgres instances.
