@@ -16,6 +16,7 @@ use kube::{
 use tokio::io::AsyncReadExt;
 
 const TEMBACK_INSTALL_DIR: &str = "/var/lib/postgresql/data";
+const TEMBACK_BINARY: &str = "/var/lib/postgresql/data/temback";
 const TEMBACK_INSTALL_CMD_TEMPLATE: &str = "curl -L https://github.com/tembo-io/temback/releases/download/{version}/temback-{version}-linux-amd64.tar.gz | tar -C {install_dir} --strip-components=1 -zxf - temback-{version}-linux-amd64/temback && chmod +x {install_dir}/temback";
 
 /// Executes a backup task for a specific database instance and updates its status in S3.
@@ -256,7 +257,7 @@ async fn install_temback(
         .stdin(false);
 
     // Try to get current version
-    let version_cmd = vec!["/var/lib/postgresql/data/temback", "--version"];
+    let version_cmd = vec![TEMBACK_BINARY, "--version"];
     let mut needs_install = true;
 
     tracing::debug!(
@@ -265,7 +266,10 @@ async fn install_temback(
         "Checking temback version"
     );
 
-    match pods_api.exec(pod_name, version_cmd, &attach_params).await {
+    match pods_api
+        .exec(pod_name, version_cmd.clone(), &attach_params)
+        .await
+    {
         Ok(mut version_output) => {
             let mut version_stdout = String::new();
             if let Some(mut stdout) = version_output.stdout() {
@@ -279,7 +283,14 @@ async fn install_temback(
 
             // Parse version from output format (eg: "temback v0.1.1 (0a6689c)")
             if let Some(version) = version_stdout.split_whitespace().nth(1) {
-                if version == config.temback_version {
+                // Ensure config version has 'v' prefix
+                let expected_version = if config.temback_version.starts_with('v') {
+                    config.temback_version.to_string()
+                } else {
+                    format!("v{}", config.temback_version)
+                };
+
+                if version == expected_version {
                     tracing::debug!(
                         pod = %pod_name,
                         version = %version,
@@ -290,7 +301,7 @@ async fn install_temback(
                     tracing::info!(
                         pod = %pod_name,
                         current_version = %version,
-                        desired_version = %config.temback_version,
+                        desired_version = %expected_version,
                         "temback version mismatch, will reinstall"
                     );
                 }
@@ -339,9 +350,8 @@ async fn install_temback(
         }
 
         // Verify the binary exists and check its version
-        let verify_cmd = vec!["/var/lib/postgresql/data/temback", "--version"];
         let mut verify_result = pods_api
-            .exec(pod_name, verify_cmd, &attach_params)
+            .exec(pod_name, version_cmd, &attach_params)
             .await
             .map_err(|e| {
                 ErrorInternalServerError(format!("Failed to verify temback installation: {}", e))
@@ -357,7 +367,13 @@ async fn install_temback(
                 })?;
         }
 
-        if !verify_stdout.contains(&config.temback_version) {
+        if !verify_stdout.contains(&format!(
+            "v{}",
+            config
+                .temback_version
+                .strip_prefix('v')
+                .unwrap_or(&config.temback_version)
+        )) {
             return Err(ErrorInternalServerError(format!(
                 "Failed to install correct temback version. Got output: {}",
                 verify_stdout
