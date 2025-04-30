@@ -16,6 +16,7 @@ use kube::{
 use tokio::io::AsyncReadExt;
 
 const TEMBACK_INSTALL_DIR: &str = "/var/lib/postgresql/data";
+const TEMBACK_BINARY: &str = "/var/lib/postgresql/data/temback";
 const TEMBACK_INSTALL_CMD_TEMPLATE: &str = "curl -L https://github.com/tembo-io/temback/releases/download/{version}/temback-{version}-linux-amd64.tar.gz | tar -C {install_dir} --strip-components=1 -zxf - temback-{version}-linux-amd64/temback && chmod +x {install_dir}/temback";
 
 /// Executes a backup task for a specific database instance and updates its status in S3.
@@ -234,7 +235,7 @@ pub async fn get_backup_path_from_coredb(
     }
 }
 
-/// Install temback binary in the specified pod if it doesn't exist.
+/// Install temback binary in the specified pod if it doesn't exist or version doesn't match.
 ///
 /// # Arguments
 /// * `pods_api` - Kubernetes Pod API
@@ -242,45 +243,84 @@ pub async fn get_backup_path_from_coredb(
 /// * `config` - Application configuration containing temback version
 ///
 /// # Returns
-/// * `Ok(())` if installation succeeds or binary already exists
+/// * `Ok(())` if installation succeeds or binary already exists with correct version
 /// * `Err(Error)` if installation fails
 async fn install_temback(
     pods_api: &Api<Pod>,
     pod_name: &str,
     config: &Config,
 ) -> Result<(), Error> {
-    let temback_path = format!("{}/temback", TEMBACK_INSTALL_DIR);
-    let check_cmd = vec!["ls", temback_path.as_str()];
     let attach_params = AttachParams::default()
         .container("postgres")
         .stderr(true)
         .stdout(true)
         .stdin(false);
 
+    // Try to get current version
+    let version_cmd = vec![TEMBACK_BINARY, "--version"];
+    let mut needs_install = true;
+
     tracing::debug!(
         pod = %pod_name,
-        command = ?check_cmd,
-        path = %temback_path,
-        "Checking for temback binary"
+        command = ?version_cmd,
+        "Checking temback version"
     );
 
-    let mut check_output = pods_api
-        .exec(pod_name, check_cmd, &attach_params)
+    match pods_api
+        .exec(pod_name, version_cmd.clone(), &attach_params)
         .await
-        .map_err(|e| ErrorInternalServerError(format!("Failed to execute temback check: {}", e)))?;
+    {
+        Ok(mut version_output) => {
+            let mut version_stdout = String::new();
+            if let Some(mut stdout) = version_output.stdout() {
+                stdout
+                    .read_to_string(&mut version_stdout)
+                    .await
+                    .map_err(|e| {
+                        ErrorInternalServerError(format!("Failed to read version output: {}", e))
+                    })?;
+            }
 
-    let mut error_msg = String::new();
-    if let Some(mut stderr) = check_output.stderr() {
-        stderr.read_to_string(&mut error_msg).await.map_err(|e| {
-            ErrorInternalServerError(format!("Failed to read check command error output: {}", e))
-        })?;
+            // Parse version from output format (eg: "temback v0.1.1 (0a6689c)")
+            if let Some(version) = version_stdout.split_whitespace().nth(1) {
+                // Ensure config version has 'v' prefix
+                let expected_version = if config.temback_version.starts_with('v') {
+                    config.temback_version.to_string()
+                } else {
+                    format!("v{}", config.temback_version)
+                };
+
+                if version == expected_version {
+                    tracing::debug!(
+                        pod = %pod_name,
+                        version = %version,
+                        "Found matching temback version"
+                    );
+                    needs_install = false;
+                } else {
+                    tracing::info!(
+                        pod = %pod_name,
+                        current_version = %version,
+                        desired_version = %expected_version,
+                        "temback version mismatch, will reinstall"
+                    );
+                }
+            }
+        }
+        Err(e) => {
+            tracing::info!(
+                error = %e,
+                pod = %pod_name,
+                "Failed to get temback version, will install"
+            );
+        }
     }
 
-    if !error_msg.is_empty() {
+    if needs_install {
         tracing::info!(
             pod = %pod_name,
             version = %config.temback_version,
-            "temback not found, installing..."
+            "Installing temback..."
         );
 
         let install_cmd_str = TEMBACK_INSTALL_CMD_TEMPLATE
@@ -309,36 +349,40 @@ async fn install_temback(
             stderr.read_to_string(&mut _err).await.ok();
         }
 
-        // Verify the binary exists after installation
-        let check_cmd = vec!["ls", temback_path.as_str()];
+        // Verify the binary exists and check its version
         let mut verify_result = pods_api
-            .exec(pod_name, check_cmd, &attach_params)
+            .exec(pod_name, version_cmd, &attach_params)
             .await
             .map_err(|e| {
                 ErrorInternalServerError(format!("Failed to verify temback installation: {}", e))
             })?;
 
-        let mut verify_error = String::new();
-        if let Some(mut stderr) = verify_result.stderr() {
-            stderr
-                .read_to_string(&mut verify_error)
+        let mut verify_stdout = String::new();
+        if let Some(mut stdout) = verify_result.stdout() {
+            stdout
+                .read_to_string(&mut verify_stdout)
                 .await
                 .map_err(|e| {
-                    ErrorInternalServerError(format!(
-                        "Failed to read verification error output: {}",
-                        e
-                    ))
+                    ErrorInternalServerError(format!("Failed to read verification output: {}", e))
                 })?;
         }
 
-        if !verify_error.is_empty() {
-            return Err(ErrorInternalServerError(
-                "Failed to install temback: Binary not found after installation".to_string(),
-            ));
+        if !verify_stdout.contains(&format!(
+            "v{}",
+            config
+                .temback_version
+                .strip_prefix('v')
+                .unwrap_or(&config.temback_version)
+        )) {
+            return Err(ErrorInternalServerError(format!(
+                "Failed to install correct temback version. Got output: {}",
+                verify_stdout
+            )));
         }
 
         tracing::info!(
             pod = %pod_name,
+            version = %config.temback_version,
             "Successfully installed temback"
         );
     }
