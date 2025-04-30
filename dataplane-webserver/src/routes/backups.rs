@@ -38,10 +38,10 @@ use uuid::Uuid;
 #[post("/backup")]
 pub async fn trigger_instance_backup(
     _req: HttpRequest,
-    path: web::Path<(String, String, String)>,
+    path: web::Path<(String, String)>,
     config: web::Data<config::Config>,
 ) -> Result<HttpResponse, Error> {
-    let (org_id, inst_id, _) = path.into_inner();
+    let (org_id, inst_id) = path.into_inner();
     if !crate::routes::secrets::is_valid_id(&org_id)
         || !crate::routes::secrets::is_valid_id(&inst_id)
     {
@@ -72,6 +72,8 @@ pub async fn trigger_instance_backup(
     let (backup_bucket_name, backup_base_path) =
         get_backup_path_from_coredb(&kube_client, &namespace).await?;
 
+    let backup_path = format!("{backup_base_path}/temback/{job_id}");
+
     // Create job metadata
     let metadata = json!({
         "job_id": job_id,
@@ -89,12 +91,14 @@ pub async fn trigger_instance_backup(
         .key(&metadata_key)
         .body(ByteStream::from(metadata.to_string().into_bytes()))
         .content_type("application/json")
+        .server_side_encryption(aws_sdk_s3::types::ServerSideEncryption::Aes256)
         .send()
         .await;
 
     if let Err(e) = put_result {
+        tracing::error!("S3 put_object error: {:?}", e);
         return Err(ErrorInternalServerError(format!(
-            "Failed to save backup metadata to S3: {e}",
+            "Failed to save backup metadata to S3: {e:?}",
         )));
     }
 
@@ -105,10 +109,10 @@ pub async fn trigger_instance_backup(
     let spawn_inst_id = inst_id.clone();
     let spawn_job_id = job_id.clone();
     let spawn_bucket_name = backup_bucket_name;
-    let spawn_base_path = backup_base_path.clone();
+    let spawn_base_path = backup_path.clone();
     let spawn_config = config.clone();
 
-    actix_rt::spawn(async move {
+    actix_web::rt::spawn(async move {
         if let Err(e) = perform_backup_task(
             spawn_org_id.clone(),
             spawn_inst_id.clone(),

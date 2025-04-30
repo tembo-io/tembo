@@ -65,10 +65,17 @@ pub async fn perform_backup_task(
             .await?;
 
     // Define the metadata key
-    let metadata_key = format!("{}/temback/{}/status.json", bucket_path, job_id);
+    let metadata_key = format!("{bucket_path}/status.json");
 
     // Update the status based on the backup result
-    update_backup_status(client, &bucket_name, &metadata_key, &backup_result).await?;
+    update_backup_status(
+        client,
+        &bucket_name,
+        &metadata_key,
+        &backup_result,
+        &namespace,
+    )
+    .await?;
 
     match backup_result {
         BackupResult::Success => {
@@ -227,6 +234,118 @@ pub async fn get_backup_path_from_coredb(
     }
 }
 
+/// Install temback binary in the specified pod if it doesn't exist.
+///
+/// # Arguments
+/// * `pods_api` - Kubernetes Pod API
+/// * `pod_name` - Name of the pod to install temback in
+/// * `config` - Application configuration containing temback version
+///
+/// # Returns
+/// * `Ok(())` if installation succeeds or binary already exists
+/// * `Err(Error)` if installation fails
+async fn install_temback(
+    pods_api: &Api<Pod>,
+    pod_name: &str,
+    config: &Config,
+) -> Result<(), Error> {
+    let temback_path = format!("{}/temback", TEMBACK_INSTALL_DIR);
+    let check_cmd = vec!["ls", temback_path.as_str()];
+    let attach_params = AttachParams::default()
+        .container("postgres")
+        .stderr(true)
+        .stdout(true)
+        .stdin(false);
+
+    tracing::debug!(
+        pod = %pod_name,
+        command = ?check_cmd,
+        path = %temback_path,
+        "Checking for temback binary"
+    );
+
+    let mut check_output = pods_api
+        .exec(pod_name, check_cmd, &attach_params)
+        .await
+        .map_err(|e| ErrorInternalServerError(format!("Failed to execute temback check: {}", e)))?;
+
+    let mut error_msg = String::new();
+    if let Some(mut stderr) = check_output.stderr() {
+        stderr.read_to_string(&mut error_msg).await.map_err(|e| {
+            ErrorInternalServerError(format!("Failed to read check command error output: {}", e))
+        })?;
+    }
+
+    if !error_msg.is_empty() {
+        tracing::info!(
+            pod = %pod_name,
+            version = %config.temback_version,
+            "temback not found, installing..."
+        );
+
+        let install_cmd_str = TEMBACK_INSTALL_CMD_TEMPLATE
+            .replace("{version}", &config.temback_version)
+            .replace("{install_dir}", TEMBACK_INSTALL_DIR);
+        let install_cmd = vec!["sh", "-c", &install_cmd_str];
+
+        tracing::debug!(
+            pod = %pod_name,
+            command = ?install_cmd,
+            "Installing temback"
+        );
+
+        let mut install_output = pods_api
+            .exec(pod_name, install_cmd, &attach_params)
+            .await
+            .map_err(|e| ErrorInternalServerError(format!("Failed to install temback: {}", e)))?;
+
+        // Wait for install to finish by reading all output
+        let mut _out = String::new();
+        if let Some(mut stdout) = install_output.stdout() {
+            stdout.read_to_string(&mut _out).await.ok();
+        }
+        let mut _err = String::new();
+        if let Some(mut stderr) = install_output.stderr() {
+            stderr.read_to_string(&mut _err).await.ok();
+        }
+
+        // Verify the binary exists after installation
+        let check_cmd = vec!["ls", temback_path.as_str()];
+        let mut verify_result = pods_api
+            .exec(pod_name, check_cmd, &attach_params)
+            .await
+            .map_err(|e| {
+                ErrorInternalServerError(format!("Failed to verify temback installation: {}", e))
+            })?;
+
+        let mut verify_error = String::new();
+        if let Some(mut stderr) = verify_result.stderr() {
+            stderr
+                .read_to_string(&mut verify_error)
+                .await
+                .map_err(|e| {
+                    ErrorInternalServerError(format!(
+                        "Failed to read verification error output: {}",
+                        e
+                    ))
+                })?;
+        }
+
+        if !verify_error.is_empty() {
+            return Err(ErrorInternalServerError(
+                "Failed to install temback: Binary not found after installation".to_string(),
+            ));
+        }
+
+        tracing::info!(
+            pod = %pod_name,
+            "Successfully installed temback"
+        );
+    }
+
+    Ok(())
+}
+
 /// Executes a backup using temback in the database pod.
 ///
 /// This function performs the following steps:
@@ -280,108 +399,82 @@ async fn run_backup_on_instance_pod(
         "Found primary database pod for backup"
     );
 
-    // Check if temback exists and install if needed
-    let temback_path = format!("{}/temback", TEMBACK_INSTALL_DIR);
-    let check_cmd = vec!["test", "-f", temback_path.as_str()];
+    // Install temback if needed
+    if let Err(e) = install_temback(&pods_api, pod_name, config).await {
+        return Ok(BackupResult::Failed(e.to_string()));
+    }
+
+    // Execute temback command in the pod
     let attach_params = AttachParams::default()
         .container("postgres")
         .stderr(true)
         .stdout(true)
         .stdin(false);
 
-    let check_result = pods_api.exec(pod_name, check_cmd, &attach_params).await;
-    if check_result.is_err() {
-        tracing::info!(
-            pod = %pod_name,
-            version = %config.temback_version,
-            "temback not found, installing..."
-        );
-
-        // Install temback using version from config
-        let install_cmd_str = TEMBACK_INSTALL_CMD_TEMPLATE
-            .replace("{version}", &config.temback_version)
-            .replace("{install_dir}", TEMBACK_INSTALL_DIR);
-        let install_cmd = vec!["sh", "-c", &install_cmd_str];
-
-        let mut install_output = pods_api
-            .exec(pod_name, install_cmd, &attach_params)
-            .await
-            .map_err(|e| ErrorInternalServerError(format!("Failed to install temback: {}", e)))?;
-
-        // Check for installation errors
-        if let Some(mut stderr) = install_output.stderr() {
-            let mut error_msg = String::new();
-            stderr.read_to_string(&mut error_msg).await.map_err(|e| {
-                ErrorInternalServerError(format!("Failed to read install error output: {}", e))
-            })?;
-
-            if !error_msg.is_empty() {
-                return Ok(BackupResult::Failed(format!(
-                    "Failed to install temback: {}",
-                    error_msg
-                )));
-            }
-        }
-
-        tracing::info!(
-            pod = %pod_name,
-            "Successfully installed temback"
-        );
-    }
-
-    // Execute temback command in the pod
     let backup_cmd = vec![
         "/var/lib/postgresql/data/temback",
         "--name",
         namespace,
         "--compress",
         "--clean",
+        "--cd",
+        "/tmp",
         "--bucket",
         &bucket_name,
         "--dir",
         &bucket_path,
     ];
 
-    let mut output = pods_api
+    tracing::debug!(
+        pod = %pod_name,
+        command = ?backup_cmd,
+        "Executing temback backup command"
+    );
+
+    let mut backup_result = pods_api
         .exec(pod_name, backup_cmd, &attach_params)
         .await
         .map_err(|e| {
             ErrorInternalServerError(format!("Failed to execute backup command: {}", e))
         })?;
 
-    // Check for any errors
-    if let Some(mut stderr) = output.stderr() {
-        let mut error_msg = String::new();
-        stderr
-            .read_to_string(&mut error_msg)
-            .await
-            .map_err(|e| ErrorInternalServerError(format!("Failed to read error output: {}", e)))?;
+    // Collect both stdout and stderr
+    let mut stdout_msg = String::new();
+    let mut stderr_msg = String::new();
 
-        if !error_msg.is_empty() {
-            tracing::error!(
-                error = %error_msg,
-                pod = %pod_name,
-                "Backup command produced error output"
-            );
-            return Ok(BackupResult::Failed(format!(
-                "Backup command failed: {}",
-                error_msg
-            )));
-        }
-    }
-
-    // Read stdout for any additional information
-    if let Some(mut stdout) = output.stdout() {
-        let mut output_msg = String::new();
-        stdout.read_to_string(&mut output_msg).await.map_err(|e| {
+    if let Some(mut stdout) = backup_result.stdout() {
+        stdout.read_to_string(&mut stdout_msg).await.map_err(|e| {
             ErrorInternalServerError(format!("Failed to read command output: {}", e))
         })?;
+    }
 
+    if let Some(mut stderr) = backup_result.stderr() {
+        stderr
+            .read_to_string(&mut stderr_msg)
+            .await
+            .map_err(|e| ErrorInternalServerError(format!("Failed to read error output: {}", e)))?;
+    }
+
+    // Log the output regardless of success/failure
+    if !stdout_msg.is_empty() {
         tracing::info!(
-            output = %output_msg,
+            output = %stdout_msg,
             pod = %pod_name,
-            "Backup command output"
+            "Backup command stdout"
         );
+    }
+
+    // If we got any stderr output, consider it a failure
+    if !stderr_msg.is_empty() {
+        tracing::error!(
+            error = %stderr_msg,
+            pod = %pod_name,
+            "Backup command failed with error output"
+        );
+        return Ok(BackupResult::Failed(format!(
+            "Backup command failed: {}",
+            stderr_msg
+        )));
     }
 
     tracing::info!(
@@ -399,6 +492,16 @@ async fn run_backup_on_instance_pod(
 mod tests {
     use super::*;
     use actix_web::error::ErrorInternalServerError;
+
+    fn redact_password_arg(cmd: &[&str]) -> Vec<String> {
+        let mut redacted = cmd.iter().map(|s| s.to_string()).collect::<Vec<_>>();
+        if let Some(pass_index) = redacted.iter().position(|s| s == "--pass") {
+            if pass_index + 1 < redacted.len() {
+                redacted[pass_index + 1] = "[REDACTED]".to_string();
+            }
+        }
+        redacted
+    }
 
     /// Helper function to test S3 URI parsing logic directly
     fn parse_s3_uri(uri: &str) -> Result<(String, String), Error> {
@@ -441,5 +544,25 @@ mod tests {
         // Test invalid URI (no s3:// prefix)
         assert!(parse_s3_uri("invalid-uri").is_err());
         assert!(parse_s3_uri("http://wrong-protocol").is_err());
+    }
+
+    #[test]
+    fn test_redact_password_arg() {
+        let cmd = [
+            "/var/lib/postgresql/data/temback",
+            "--name",
+            "testns",
+            "--pass",
+            "supersecret",
+            "--host",
+            "localhost",
+        ];
+        let redacted = redact_password_arg(&cmd);
+        assert_eq!(redacted[3], "--pass");
+        assert_eq!(redacted[4], "[REDACTED]");
+        // Ensure other args are unchanged
+        assert_eq!(redacted[2], "testns");
+        assert_eq!(redacted[5], "--host");
+        assert_eq!(redacted[6], "localhost");
     }
 }

@@ -1,4 +1,4 @@
-FROM quay.io/tembo/rust:1.85-bookworm AS builder
+FROM quay.io/tembo/rust:1.86-bookworm AS builder
 RUN set -eux; \
   apt-get update; \
   apt-get upgrade -y; \
@@ -9,11 +9,11 @@ WORKDIR /build
 COPY . .
 RUN cargo build --release
 
-FROM quay.io/tembo/debian:12.9-slim
+FROM quay.io/tembo/debian:12.10-slim
 RUN set -eux; \
   apt-get update; \
   apt-get upgrade -y; \
-  apt-get install -y --no-install-recommends openssl; \
+  apt-get install -y --no-install-recommends openssl ca-certificates; \
   apt-get autoremove -y; \
   apt-get clean; \
   rm -rf /var/lib/apt/lists/* /var/cache/apt/archives/*
