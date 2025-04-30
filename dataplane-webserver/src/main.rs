@@ -20,6 +20,8 @@ use utoipa_swagger_ui::{SwaggerUi, Url};
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
     env_logger::init_from_env(env_logger::Env::new().default_filter_or("debug"));
+    rustls::crypto::CryptoProvider::install_default(rustls::crypto::aws_lc_rs::default_provider())
+        .expect("Failed to install rustls CryptoProvider");
 
     let cfg = config::Config::default();
     info!("{:?}", cfg);

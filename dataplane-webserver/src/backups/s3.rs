@@ -237,6 +237,7 @@ async fn get_presigned_request(
 /// * `bucket_name` - Name of the S3 bucket containing the backup metadata
 /// * `metadata_key` - Full path to the status.json file in S3
 /// * `result` - The backup operation result (Success or Failed with error message)
+/// * `namespace` - Namespace for the backup
 ///
 /// # Returns
 /// * `Ok(())` if the metadata was successfully updated
@@ -246,6 +247,8 @@ async fn get_presigned_request(
 /// ```json
 /// {
 ///     "status": "completed",
+///     "backup_bucket": "my-bucket",
+///     "backup_key": "path/to/backup.tar.gz",
 ///     "completed_at": "2024-03-21T15:30:00Z"
 /// }
 /// ```
@@ -253,6 +256,8 @@ async fn get_presigned_request(
 /// ```json
 /// {
 ///     "status": "failed",
+///     "backup_bucket": "my-bucket",
+///     "backup_key": "path/to/backup.tar.gz",
 ///     "error": "detailed error message",
 ///     "failed_at": "2024-03-21T15:30:00Z"
 /// }
@@ -262,6 +267,7 @@ pub async fn update_backup_status(
     bucket_name: &str,
     metadata_key: &str,
     result: &BackupResult,
+    namespace: &str,
 ) -> Result<(), Error> {
     // Get the existing metadata first
     let existing_metadata = client
@@ -287,11 +293,33 @@ pub async fn update_backup_status(
     if let Some(obj) = metadata.as_object_mut() {
         match result {
             BackupResult::Success => {
+                // Derive backup tarball key from metadata_key
+                let backup_key = if let Some(stripped) = metadata_key.strip_suffix("/status.json") {
+                    format!("{stripped}/{namespace}.tar.gz")
+                } else {
+                    return Err(ErrorNotFound(format!(
+                        "metadata_key does not end with /status.json: {}",
+                        metadata_key
+                    )));
+                };
+
+                // Check if the backup tarball exists in S3
+                if !s3_object_exists(client, bucket_name, &backup_key).await? {
+                    tracing::error!("Backup tarball not found in S3 at {bucket_name}/{backup_key}");
+                    return Err(ErrorNotFound(format!(
+                        "Backup tarball not found in S3 at {}/{}",
+                        bucket_name, backup_key
+                    )));
+                }
+                tracing::info!("Backup tarball found in S3 at {bucket_name}/{backup_key}");
+
                 obj.insert("status".to_string(), json!("completed"));
                 obj.insert(
                     "completed_at".to_string(),
                     json!(chrono::Utc::now().to_rfc3339()),
                 );
+                obj.insert("backup_bucket".to_string(), json!(bucket_name));
+                obj.insert("backup_key".to_string(), json!(backup_key));
             }
             BackupResult::Failed(error) => {
                 obj.insert("status".to_string(), json!("failed"));
@@ -311,6 +339,7 @@ pub async fn update_backup_status(
         .key(metadata_key)
         .body(ByteStream::from(metadata.to_string().into_bytes()))
         .content_type("application/json")
+        .server_side_encryption(aws_sdk_s3::types::ServerSideEncryption::Aes256)
         .send()
         .await
         .map_err(|e| {
@@ -318,4 +347,20 @@ pub async fn update_backup_status(
         })?;
 
     Ok(())
+}
+
+pub async fn s3_object_exists(client: &S3Client, bucket: &str, key: &str) -> Result<bool, Error> {
+    match client.head_object().bucket(bucket).key(key).send().await {
+        Ok(_) => Ok(true),
+        Err(e) => {
+            // If it's a not found error, return false, otherwise propagate error
+            if e.to_string().contains("NotFound") {
+                return Ok(false);
+            }
+            Err(ErrorInternalServerError(format!(
+                "Failed to check object existence: {}",
+                e
+            )))
+        }
+    }
 }

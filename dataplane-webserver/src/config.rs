@@ -42,7 +42,7 @@ impl Default for Config {
                     300
                 }
             },
-            temback_version: from_env_default("TEMBACK_VERSION", "v0.1.1"),
+            temback_version: from_env_default("TEMBACK_VERSION", "v0.2.1"),
         }
     }
 }

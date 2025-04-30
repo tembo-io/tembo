@@ -1,6 +1,6 @@
 use crate::routes::secrets::SECRETS_ALLOW_LIST;
 use crate::secrets::types::AvailableSecret;
-use actix_web::HttpResponse;
+use actix_web::{error::ErrorInternalServerError, Error, HttpResponse};
 use k8s_openapi::ByteString;
 use kube::{Api, Client};
 use log::error;
@@ -13,43 +13,10 @@ pub async fn get_secret_data_from_kubernetes(
     namespace: String,
     requested_secret: &AvailableSecret,
 ) -> HttpResponse {
-    let kubernetes_secret_name = requested_secret.kube_secret_name(&namespace);
-
-    let secrets_api: Api<k8s_openapi::api::core::v1::Secret> =
-        Api::namespaced(kubernetes_client, &namespace);
-    let kube_secret = secrets_api.get(&kubernetes_secret_name).await;
-
-    match kube_secret {
-        Ok(secret) => {
-            let mut filtered_data: BTreeMap<String, String> = BTreeMap::new();
-            let secret_data = match secret.data {
-                None => {
-                    error!(
-                        "Secret '{}' found in namespace '{}' does not have a 'data' block.",
-                        kubernetes_secret_name, namespace
-                    );
-                    return HttpResponse::NotFound().json("Secret not found to have data block");
-                }
-                Some(data) => data,
-            };
-            for key in &requested_secret.possible_keys {
-                if let Some(value) = secret_data.get(key) {
-                    let value = match byte_string_to_string(value) {
-                        Ok(val) => val,
-                        Err(http_response) => return http_response,
-                    };
-                    filtered_data.insert(key.clone(), value);
-                }
-            }
-            HttpResponse::Ok().json(filtered_data)
-        }
-        Err(_) => {
-            error!(
-                "Secret '{}' not found in namespace '{}'",
-                kubernetes_secret_name, namespace
-            );
-            HttpResponse::NotFound().json("Secret not found")
-        }
+    match lookup_secret_data_from_kubernetes(&kubernetes_client, &namespace, requested_secret).await
+    {
+        Ok(filtered_data) => HttpResponse::Ok().json(filtered_data),
+        Err(e) => HttpResponse::NotFound().json(e.to_string()),
     }
 }
 
@@ -76,6 +43,55 @@ pub fn byte_string_to_string(byte_string: &ByteString) -> Result<String, HttpRes
             error!("Failed to convert secret value to UTF-8 string");
             Err(HttpResponse::InternalServerError()
                 .json("Failed to convert secret value to UTF-8 string"))
+        }
+    }
+}
+
+async fn lookup_secret_data_from_kubernetes(
+    kubernetes_client: &Client,
+    namespace: &str,
+    requested_secret: &AvailableSecret,
+) -> Result<BTreeMap<String, String>, Error> {
+    let kubernetes_secret_name = requested_secret.kube_secret_name(namespace);
+
+    let secrets_api: Api<k8s_openapi::api::core::v1::Secret> =
+        Api::namespaced(kubernetes_client.clone(), namespace);
+    let kube_secret = secrets_api.get(&kubernetes_secret_name).await;
+
+    match kube_secret {
+        Ok(secret) => {
+            let mut filtered_data: BTreeMap<String, String> = BTreeMap::new();
+            let secret_data = match secret.data {
+                None => {
+                    error!(
+                        "Secret '{}' found in namespace '{}' does not have a 'data' block.",
+                        kubernetes_secret_name, namespace
+                    );
+                    return Err(ErrorInternalServerError(
+                        "Secret not found to have data block",
+                    ));
+                }
+                Some(data) => data,
+            };
+            for key in &requested_secret.possible_keys {
+                if let Some(value) = secret_data.get(key) {
+                    let value = match crate::secrets::byte_string_to_string(value) {
+                        Ok(val) => val,
+                        Err(_) => {
+                            return Err(ErrorInternalServerError("Failed to decode secret value"))
+                        }
+                    };
+                    filtered_data.insert(key.clone(), value);
+                }
+            }
+            Ok(filtered_data)
+        }
+        Err(_) => {
+            error!(
+                "Secret '{}' not found in namespace '{}'",
+                kubernetes_secret_name, namespace
+            );
+            Err(ErrorInternalServerError("Secret not found"))
         }
     }
 }
