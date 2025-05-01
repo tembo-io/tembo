@@ -197,6 +197,9 @@ impl CoreDB {
 
         reconcile_certificates(ctx.client.clone(), self, &ns).await?;
 
+        // Check if we need to delete the IngressRouteTCP and MiddlewareTCP resources
+        let delete = self.spec.replicas < 1 || self.spec.stop || self.spec.disable_ingress;
+
         // Ingress
         match std::env::var("DATA_PLANE_BASEDOMAIN") {
             Ok(basedomain) => {
@@ -225,7 +228,7 @@ impl CoreDB {
                     service_name_read_only.as_str(),
                     IntOrString::Int(5432),
                     vec![middleware_name.clone()],
-                    self.spec.replicas < 2 || self.spec.stop,
+                    delete,
                 )
                 .await
                 .map_err(|e| {
@@ -248,7 +251,7 @@ impl CoreDB {
                     service_name_read_write.as_str(),
                     IntOrString::Int(5432),
                     vec![middleware_name.clone()],
-                    self.spec.replicas < 1 || self.spec.stop,
+                    delete,
                 )
                 .await
                 .map_err(|e| {
@@ -285,6 +288,7 @@ impl CoreDB {
 
                 let name_pooler = format!("{}-pooler", self.name_any().as_str());
                 let prefix_pooler = format!("{}-pooler-", self.name_any().as_str());
+                let delete_pooler = delete || !self.spec.connectionPooler.enabled;
                 reconcile_postgres_ing_route_tcp(
                     self,
                     ctx.clone(),
@@ -295,7 +299,7 @@ impl CoreDB {
                     name_pooler.as_str(),
                     IntOrString::Int(5432),
                     vec![middleware_name.clone()],
-                    self.spec.replicas < 1 || self.spec.stop || !self.spec.connectionPooler.enabled,
+                    delete_pooler,
                 )
                 .await
                 .map_err(|e| {
