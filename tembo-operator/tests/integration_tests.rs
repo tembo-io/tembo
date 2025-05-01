@@ -4401,10 +4401,10 @@ CREATE EVENT TRIGGER pgrst_watch
 
         // There should be 1 IngressRouteTCP left (postgres)
         let ingresses_tcp: Vec<IngressRouteTCP> =
-            list_resources(client.clone(), cdb_name, &namespace, &default_params, 1)
+            list_resources(client.clone(), cdb_name, &namespace, &default_params, 2)
                 .await
                 .unwrap();
-        assert_eq!(ingresses_tcp.len(), 1);
+        assert_eq!(ingresses_tcp.len(), 2);
 
         // CLEANUP TEST
         // Cleanup CoreDB
@@ -5950,12 +5950,12 @@ CREATE EVENT TRIGGER pgrst_watch
 
         // Assert there are 2 IngressRouteTCPs created after starting. 1 for postgres and 1 for the pooler
         let ingress_tcps: Vec<IngressRouteTCP> =
-            list_resources(client.clone(), &name, &namespace, &default_params, 2)
+            list_resources(client.clone(), &name, &namespace, &default_params, 3)
                 .await
                 .unwrap();
         assert_eq!(
             ingress_tcps.len(),
-            2,
+            3,
             "IngressRouteTCPs should be created after starting"
         );
 
@@ -6141,12 +6141,12 @@ CREATE EVENT TRIGGER pgrst_watch
         // ferretdb
         let client = test.client.clone();
         let ingresses_tcp: Vec<IngressRouteTCP> =
-            list_resources(client.clone(), &name, &namespace, &default_params, 3)
+            list_resources(client.clone(), &name, &namespace, &default_params, 4)
                 .await
                 .unwrap();
         assert_eq!(
             ingresses_tcp.len(),
-            3,
+            4,
             "IngressRouteTCPs should be created after starting"
         );
 
@@ -6225,12 +6225,12 @@ CREATE EVENT TRIGGER pgrst_watch
         // Assert there are 3 IngressRouteTCPs created after starting. One for postgres, pooler,
         // ferretdb
         let ingress_tcps: Vec<IngressRouteTCP> =
-            list_resources(client.clone(), &name, &namespace, &default_params, 3)
+            list_resources(client.clone(), &name, &namespace, &default_params, 4)
                 .await
                 .unwrap();
         assert_eq!(
             ingress_tcps.len(),
-            3,
+            4,
             "IngressRouteTCPs should be created after starting"
         );
 
