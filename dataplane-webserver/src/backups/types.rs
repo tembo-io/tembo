@@ -63,11 +63,36 @@ pub enum BackupStatus {
 ///
 /// # Variants
 /// * `Success` - Backup operation completed successfully
+/// * `Processing` - Backup operation is currently in progress
 /// * `Failed` - Backup operation failed with an error message
 #[derive(Debug)]
 pub enum BackupResult {
     /// Backup operation completed successfully
     Success,
+    /// Backup operation is currently in progress
+    Processing,
     /// Backup operation failed with an error message
     Failed(String),
+}
+
+/// Represents the connection information needed to connect to a database instance for backup.
+#[derive(Debug, Clone)]
+pub struct ConnectionInfo {
+    pub host: String,
+    pub user: String,
+    pub password: String,
+    pub port: String,
+}
+
+/// Represents the status of a Kubernetes Job for backup processing.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum JobStatus {
+    /// Job is still running
+    Processing,
+    /// Job completed successfully
+    Completed,
+    /// Job failed
+    Failed,
+    /// Job status is unknown or job does not exist
+    Unknown,
 }
