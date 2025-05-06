@@ -1,7 +1,9 @@
 use crate::{
-    backups::find_instance_namespace, backups::get_backup_path_from_coredb,
-    backups::perform_backup_task, backups::s3::determine_backup_status,
-    backups::s3::get_backup_metadata, config,
+    backups::coredb::{fetch_coredb, get_backup_path_from_coredb},
+    backups::find_instance_namespace,
+    backups::perform_backup_task,
+    backups::s3::determine_backup_status,
+    config,
 };
 use actix_web::{
     error::ErrorInternalServerError, get, post, web, Error, HttpRequest, HttpResponse,
@@ -69,8 +71,8 @@ pub async fn trigger_instance_backup(
     // Find the namespace for this instance
     let namespace = find_instance_namespace(&kube_client, &org_id, &inst_id).await?;
     // Get the backup path from CoreDB spec
-    let (backup_bucket_name, backup_base_path) =
-        get_backup_path_from_coredb(&kube_client, &namespace).await?;
+    let coredb = fetch_coredb(&kube_client, &namespace).await?;
+    let (backup_bucket_name, backup_base_path) = get_backup_path_from_coredb(&coredb)?;
 
     let backup_path = format!("{backup_base_path}/temback/{job_id}");
 
@@ -123,6 +125,7 @@ pub async fn trigger_instance_backup(
             spawn_base_path,
             namespace.clone(),
             &spawn_config,
+            &coredb,
         )
         .await
         {
@@ -226,12 +229,21 @@ pub async fn get_backup_status(
         ErrorInternalServerError(format!("Failed to create Kubernetes client: {}", e))
     })?;
     let namespace = find_instance_namespace(&kube_client, &org_id, &inst_id).await?;
-    let (backup_bucket_name, backup_base_path) =
-        get_backup_path_from_coredb(&kube_client, &namespace).await?;
+    let coredb = fetch_coredb(&kube_client, &namespace).await?;
+    let (backup_bucket_name, backup_base_path) = get_backup_path_from_coredb(&coredb)?;
 
     // Get and parse the backup metadata
     let metadata_key = format!("{backup_base_path}/temback/{job_id}/status.json");
-    let metadata = match get_backup_metadata(&client, &backup_bucket_name, &metadata_key).await {
+    let metadata = match crate::backups::s3::refresh_and_get_backup_metadata(
+        &kube_client,
+        &client,
+        &namespace,
+        &job_id,
+        &backup_bucket_name,
+        &metadata_key,
+    )
+    .await
+    {
         Ok(metadata) => metadata,
         Err(e) => {
             if e.to_string().contains("not found") {

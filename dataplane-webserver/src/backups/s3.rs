@@ -1,3 +1,5 @@
+use crate::backups::job::get_job_status;
+use crate::backups::types::JobStatus;
 use crate::{
     backups::types::{BackupResult, BackupStatus},
     config,
@@ -231,12 +233,13 @@ async fn get_presigned_request(
 /// This function manages the status.json file for a backup job, updating it based on the backup result.
 /// For successful backups, it sets the status to "completed" and adds a completion timestamp.
 /// For failed backups, it sets the status to "failed", includes the error message, and adds a failure timestamp.
+/// For processing backups, it sets the status to "processing" and adds a processing timestamp.
 ///
 /// # Arguments
 /// * `client` - AWS S3 client for accessing the bucket
 /// * `bucket_name` - Name of the S3 bucket containing the backup metadata
 /// * `metadata_key` - Full path to the status.json file in S3
-/// * `result` - The backup operation result (Success or Failed with error message)
+/// * `result` - The backup operation result (Success, Failed with error message, or Processing)
 /// * `namespace` - Namespace for the backup
 ///
 /// # Returns
@@ -262,6 +265,15 @@ async fn get_presigned_request(
 ///     "failed_at": "2024-03-21T15:30:00Z"
 /// }
 /// ```
+/// or
+/// ```json
+/// {
+///     "status": "processing",
+///     "backup_bucket": "my-bucket",
+///     "backup_key": "path/to/backup.tar.gz",
+///     "processing_at": "2024-03-21T15:30:00Z"
+/// }
+/// ```
 pub async fn update_backup_status(
     client: &S3Client,
     bucket_name: &str,
@@ -269,6 +281,13 @@ pub async fn update_backup_status(
     result: &BackupResult,
     namespace: &str,
 ) -> Result<(), Error> {
+    tracing::debug!(
+        bucket_name = %bucket_name,
+        metadata_key = %metadata_key,
+        result = ?result,
+        namespace = %namespace,
+        "Starting update_backup_status"
+    );
     // Get the existing metadata first
     let existing_metadata = client
         .get_object()
@@ -277,17 +296,23 @@ pub async fn update_backup_status(
         .send()
         .await
         .map_err(|e| {
+            tracing::error!(error = %e, "Failed to get existing metadata from S3");
             ErrorInternalServerError(format!("Failed to get existing metadata from S3: {}", e))
         })?;
+    tracing::debug!("Fetched existing metadata from S3");
 
     // Read the existing metadata
     let existing_bytes = existing_metadata.body.collect().await.map_err(|e| {
+        tracing::error!(error = %e, "Failed to read existing metadata from S3");
         ErrorInternalServerError(format!("Failed to read existing metadata from S3: {}", e))
     })?;
+    tracing::debug!("Read existing metadata bytes from S3");
     let mut metadata: serde_json::Value = serde_json::from_slice(&existing_bytes.to_vec())
         .map_err(|e| {
+            tracing::error!(error = %e, "Failed to parse existing metadata");
             ErrorInternalServerError(format!("Failed to parse existing metadata: {}", e))
         })?;
+    tracing::debug!(metadata = ?metadata, "Parsed existing metadata JSON");
 
     // Update the status based on the backup result
     if let Some(obj) = metadata.as_object_mut() {
@@ -297,6 +322,7 @@ pub async fn update_backup_status(
                 let backup_key = if let Some(stripped) = metadata_key.strip_suffix("/status.json") {
                     format!("{stripped}/{namespace}.tar.gz")
                 } else {
+                    tracing::error!(metadata_key = %metadata_key, "metadata_key does not end with /status.json");
                     return Err(ErrorNotFound(format!(
                         "metadata_key does not end with /status.json: {}",
                         metadata_key
@@ -305,13 +331,13 @@ pub async fn update_backup_status(
 
                 // Check if the backup tarball exists in S3
                 if !s3_object_exists(client, bucket_name, &backup_key).await? {
-                    tracing::error!("Backup tarball not found in S3 at {bucket_name}/{backup_key}");
+                    tracing::error!(bucket = %bucket_name, backup_key = %backup_key, "Backup tarball not found in S3");
                     return Err(ErrorNotFound(format!(
                         "Backup tarball not found in S3 at {}/{}",
                         bucket_name, backup_key
                     )));
                 }
-                tracing::info!("Backup tarball found in S3 at {bucket_name}/{backup_key}");
+                tracing::info!(bucket = %bucket_name, backup_key = %backup_key, "Backup tarball found in S3");
 
                 obj.insert("status".to_string(), json!("completed"));
                 obj.insert(
@@ -329,7 +355,15 @@ pub async fn update_backup_status(
                     json!(chrono::Utc::now().to_rfc3339()),
                 );
             }
+            BackupResult::Processing => {
+                obj.insert("status".to_string(), json!("processing"));
+                obj.insert(
+                    "processing_at".to_string(),
+                    json!(chrono::Utc::now().to_rfc3339()),
+                );
+            }
         }
+        tracing::debug!(updated_metadata = ?obj, "Updated metadata object");
     }
 
     // Save updated metadata back to S3
@@ -343,24 +377,104 @@ pub async fn update_backup_status(
         .send()
         .await
         .map_err(|e| {
+            tracing::error!(error = %e, "Failed to update backup metadata in S3");
             ErrorInternalServerError(format!("Failed to update backup metadata in S3: {}", e))
         })?;
-
+    tracing::debug!("Successfully updated backup metadata in S3");
     Ok(())
 }
 
+/// Checks if an object exists in the specified S3 bucket and key.
+///
+/// This function sends a HEAD request to S3 to determine if the object exists.
+/// Returns Ok(true) if the object exists, Ok(false) if it does not (404),
+/// and Err(Error) for other errors.
+///
+/// # Arguments
+/// * `client` - AWS S3 client
+/// * `bucket` - Name of the S3 bucket
+/// * `key` - Object key within the bucket
+///
+/// # Returns
+/// * `Ok(true)` if the object exists
+/// * `Ok(false)` if the object does not exist (404)
+/// * `Err(Error)` for other errors
 pub async fn s3_object_exists(client: &S3Client, bucket: &str, key: &str) -> Result<bool, Error> {
+    tracing::debug!(bucket = %bucket, key = %key, "Checking if S3 object exists");
     match client.head_object().bucket(bucket).key(key).send().await {
-        Ok(_) => Ok(true),
+        Ok(_) => {
+            tracing::debug!(bucket = %bucket, key = %key, "S3 object exists");
+            Ok(true)
+        }
         Err(e) => {
             // If it's a not found error, return false, otherwise propagate error
             if e.to_string().contains("NotFound") {
+                tracing::debug!(bucket = %bucket, key = %key, "S3 object does not exist (NotFound)");
                 return Ok(false);
             }
+            tracing::error!(error = %e, bucket = %bucket, key = %key, "Failed to check S3 object existence");
             Err(ErrorInternalServerError(format!(
                 "Failed to check object existence: {}",
                 e
             )))
         }
     }
+}
+
+/// Checks the Kubernetes Job status, updates the backup status in S3, and fetches the latest metadata.
+///
+/// This function ensures that the S3 status.json file accurately reflects the current state of the backup job in Kubernetes before returning the metadata.
+/// It should be used in endpoints or logic where you want to present the most up-to-date backup status to users or clients.
+///
+/// # Arguments
+/// * `kube_client` - Kubernetes client for querying the Job status
+/// * `s3_client` - AWS S3 client for updating and fetching metadata
+/// * `namespace` - Kubernetes namespace where the Job is running
+/// * `job_id` - The backup job identifier (UUID)
+/// * `bucket_name` - Name of the S3 bucket containing the backup metadata
+/// * `metadata_key` - Full path to the status.json file in S3
+///
+/// # Returns
+/// * `Ok(serde_json::Value)` - The latest backup metadata as JSON
+/// * `Err(Error)` - If updating or fetching the metadata fails
+///
+pub async fn refresh_and_get_backup_metadata(
+    kube_client: &kube::Client,
+    s3_client: &S3Client,
+    namespace: &str,
+    job_id: &str,
+    bucket_name: &str,
+    metadata_key: &str,
+) -> Result<serde_json::Value, Error> {
+    tracing::debug!(
+        namespace = %namespace,
+        job_id = %job_id,
+        bucket_name = %bucket_name,
+        metadata_key = %metadata_key,
+        "Starting refresh_and_get_backup_metadata"
+    );
+    // Get the current job status
+    let job_status = get_job_status(kube_client, namespace, job_id).await;
+    tracing::debug!(job_status = ?job_status, "Fetched job status");
+    let backup_result = match job_status {
+        JobStatus::Completed => BackupResult::Success,
+        JobStatus::Failed => BackupResult::Failed("Backup job failed".to_string()),
+        JobStatus::Processing => BackupResult::Processing,
+        JobStatus::Unknown => BackupResult::Failed("Backup job status unknown".to_string()),
+    };
+    tracing::debug!(backup_result = ?backup_result, "Determined backup result");
+    // Update the status.json in S3
+    update_backup_status(
+        s3_client,
+        bucket_name,
+        metadata_key,
+        &backup_result,
+        namespace,
+    )
+    .await?;
+    tracing::debug!("Updated backup status in S3");
+    // Fetch the latest metadata from S3
+    let metadata = get_backup_metadata(s3_client, bucket_name, metadata_key).await?;
+    tracing::debug!(metadata = ?metadata, "Fetched latest backup metadata from S3");
+    Ok(metadata)
 }
